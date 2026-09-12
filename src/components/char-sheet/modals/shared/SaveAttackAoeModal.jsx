@@ -74,6 +74,10 @@ function getTargetDefenses(combatSummary, targetName) {
     return { resistances, immunities, evasionEffects: targetChar?.computedStats?.evasionEffects };
 }
 
+function npcSaveBonus(target, saveType) {
+    return target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+}
+
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
     const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName } = ctx;
@@ -82,7 +86,7 @@ function resolveNpcTarget(ctx) {
 
     if (isSoulstitchProtected) {
         // CLA-321: Soulstitch Spells — chosen creature auto-succeeds, takes no damage.
-        const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+        const saveBonus = npcSaveBonus(target, saveType);
         addEntry(campaignName, {
             type: 'roll',
             characterName: playerStats.name,

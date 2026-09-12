@@ -121,7 +121,7 @@ describe('logConcentrationSave', () => {
     });
 
     it('posts a roll entry with concentration-save details', () => {
-        logConcentrationSave(campaignName, 'Gortha', 14, 2, '+2 DEX', 'Fireball', 15, true);
+        logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2 DEX', spellName: 'Fireball', dc: 15, success: true });
 
         const entry = capturedEntry();
         expect(entry).toEqual({
@@ -143,14 +143,14 @@ describe('logConcentrationSave', () => {
     });
 
     it('uses custom mode when provided', () => {
-        logConcentrationSave(campaignName, 'Gortha', 14, 2, '+2 DEX', 'Fireball', 15, true, 'disadvantage');
+        logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2 DEX', spellName: 'Fireball', dc: 15, success: true, mode: 'disadvantage' });
 
         const entry = capturedEntry();
         expect(entry.mode).toBe('disadvantage');
     });
 
     it('posts a failed concentration save entry', () => {
-        logConcentrationSave(campaignName, 'Gortha', 5, 3, '+3 CON', 'Bless', 12, false);
+        logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 5, bonus: 3, bonusDetail: '+3 CON', spellName: 'Bless', dc: 12, success: false });
 
         const entry = capturedEntry();
         expect(entry.success).toBe(false);
@@ -159,7 +159,7 @@ describe('logConcentrationSave', () => {
 
     it('logConcentrationSave does not throw when addEntry rejects', async () => {
         vi.mocked(addEntry).mockRejectedValue(new Error('fail'));
-        await expect(logConcentrationSave(campaignName, 'Gortha', 14, 2, '+2', 'Fireball', 15, true)).resolves.toBeUndefined();
+        await expect(logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2', spellName: 'Fireball', dc: 15, success: true })).resolves.toBeUndefined();
     });
 
 });
@@ -170,7 +170,7 @@ describe('logConditionSave', () => {
     });
 
     it('posts a roll entry with condition-save details', () => {
-        logConditionSave(campaignName, 'Gortha', 13, 3, '+3 WIS', 'poisoned', 'Wisdom', 14, true);
+        logConditionSave({ campaignName, creatureName: 'Gortha', roll: 13, bonus: 3, bonusDetail: '+3 WIS', conditionLabel: 'poisoned', abilityLabel: 'Wisdom', dc: 14, success: true });
 
         const entry = capturedEntry();
         expect(entry).toEqual({
@@ -192,7 +192,7 @@ describe('logConditionSave', () => {
     });
 
     it('posts a failed condition save entry', () => {
-        logConditionSave(campaignName, 'Gortha', 8, 3, '+3 WIS', 'poisoned', 'Wisdom', 14, false);
+        logConditionSave({ campaignName, creatureName: 'Gortha', roll: 8, bonus: 3, bonusDetail: '+3 WIS', conditionLabel: 'poisoned', abilityLabel: 'Wisdom', dc: 14, success: false });
 
         const entry = capturedEntry();
         expect(entry.success).toBe(false);
@@ -202,7 +202,7 @@ describe('logConditionSave', () => {
 
     // CLA-209: multi-dice roll array (advantage) must log both dice + mode 'advantage'
     it('logs both dice with mode advantage when roll is passed as a multi-dice array (CLA-209)', () => {
-        logConditionSave(campaignName, 'Gortha', [8, 14], 3, '+3 STR', 'grappled', 'Strength', 13, true);
+        logConditionSave({ campaignName, creatureName: 'Gortha', roll: [8, 14], bonus: 3, bonusDetail: '+3 STR', conditionLabel: 'grappled', abilityLabel: 'Strength', dc: 13, success: true });
 
         const entry = capturedEntry();
         expect(entry.rolls).toEqual([8, 14]);
@@ -295,12 +295,12 @@ describe('error handling', () => {
 
     it('logConcentrationSave does not throw when addEntry rejects', async () => {
         mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logConcentrationSave(campaignName, 'Gortha', 14, 2, '+2', 'Fireball', 15, true)).resolves.toBeUndefined();
+        await expect(logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2', spellName: 'Fireball', dc: 15, success: true })).resolves.toBeUndefined();
     });
 
     it('logConditionSave does not throw when addEntry rejects', async () => {
         mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logConditionSave(campaignName, 'Gortha', 13, 3, '+3', 'poisoned', 'Wisdom', 14, true)).resolves.toBeUndefined();
+        await expect(logConditionSave({ campaignName, creatureName: 'Gortha', roll: 13, bonus: 3, bonusDetail: '+3', conditionLabel: 'poisoned', abilityLabel: 'Wisdom', dc: 14, success: true })).resolves.toBeUndefined();
     });
 
     it('logHpChange does not throw when addEntry rejects', async () => {

@@ -64,9 +64,9 @@ export function createConcentrationHandlers({
         const hasConcentrationBreaker = resolveConcentrationBreaker(getSaveModifiers(attacker))
         const advantageSources = collectAdvantageSources(getSaveModifiers(findCharacterByName(characters, creatureName)))
 
-        const { roll: r1, success, bonus, bonusDetail, starryDragonFloor, displayRolls } = await rollConcentrationSave(
-            creature, concentration, characters, campaignNpcs, campaignName, mapName, (name) => name, hasConcentrationBreaker
-        )
+        const { roll: r1, success, bonus, bonusDetail, starryDragonFloor, displayRolls } = await rollConcentrationSave({
+            creature, concentration, characters, campaignNpcs, campaignName, mapName, getName: (name) => name, disadvantage: hasConcentrationBreaker
+        })
 
         if (!success) {
             creature.concentration = null
@@ -78,10 +78,10 @@ export function createConcentrationHandlers({
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
 
-        setConditionPopup(buildConcentrationPopup(r1, bonus, bonusDetail, concentration.spell, concentration.dc, success, starryDragonFloor, displayRolls))
+        setConditionPopup(buildConcentrationPopup({ roll: r1, bonus, bonusDetail, spellName: concentration.spell, dc: concentration.dc, success, starryDragonFloor, displayRolls }))
 
         const mode = resolveSaveMode(hasConcentrationBreaker, advantageSources)
-        logConcentrationSave(campaignName, creatureName, r1, bonus, bonusDetail, concentration.spell, concentration.dc, success, mode, advantageSources.length > 0 ? advantageSources : undefined)
+        logConcentrationSave({ campaignName, creatureName, roll: r1, bonus, bonusDetail, spellName: concentration.spell, dc: concentration.dc, success, mode })
 
         if (!success) {
             cleanupConcentrationEffects(creatureName, concentration.spell, campaignName)

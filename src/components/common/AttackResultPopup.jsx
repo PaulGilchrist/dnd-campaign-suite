@@ -5,6 +5,32 @@ import * as logService from '../../services/ui/logService.js';
 import Popup from './popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 
+function resolveInspirationUses(raw) {
+  if (typeof raw === 'object' && raw !== null) return raw.current;
+  return raw != null ? Number(raw) : 0;
+}
+
+function buildBiDefenseDescription({ attackerName, targetName, dieValue, newAc, attackTotal, willMiss }) {
+  return willMiss
+    ? `${attackerName || 'The attacker'}'s attack missed! ${targetName} used Combat Inspiration - Defense, rolling ${dieValue} to boost AC to ${newAc}. Attack total (${attackTotal}) < new AC (${newAc}).`
+    : `${targetName} used Combat Inspiration - Defense, rolling ${dieValue} to boost AC to ${newAc}, but the attack still hits (${attackTotal} >= ${newAc}).`;
+}
+
+function DiceRollPopupContent({ popupHtml, playerStats, missToHitApplied, boonUsed, onDone, onStrokeOfLuck, onBardicInspirationDefense, ...callbacks }) {
+  return (
+    <DiceRollResult
+      {...popupHtml}
+      hit={missToHitApplied || popupHtml?.hit}
+      autoDamage={popupHtml?.autoDamage}
+      playerStats={playerStats}
+      onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? onBardicInspirationDefense : undefined}
+      onDone={popupHtml?.autoDamage ? onDone : undefined}
+      onStrokeOfLuck={popupHtml?.strokeOfLuck || (popupHtml?.autoRerollForAttack && !missToHitApplied && !boonUsed) ? onStrokeOfLuck : undefined}
+      {...callbacks}
+    />
+  );
+}
+
 function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, playerStats, setPopupHtml, onBeforeBiDefense, onAfterBiDefense, onStrokeOfLuck, ...callbacks }) {
   const [missToHitApplied, setMissToHitApplied] = useState(false);
   const hasBoonBeenUsedRef = useRef(false);
@@ -43,8 +69,7 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
     if (onBeforeBiDefense) {
       await onBeforeBiDefense({ dieValue, dieSize, newAc, willMiss, targetName });
     }
-    const biUsesRaw = getRuntimeValue(targetName, 'bardicInspirationUses', campaignName);
-    const currentUses = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : 0);
+    const currentUses = resolveInspirationUses(getRuntimeValue(targetName, 'bardicInspirationUses', campaignName));
     if (currentUses > 0) {
       await setRuntimeValue(targetName, 'bardicInspirationUses', currentUses - 1, campaignName);
     }
@@ -57,9 +82,7 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
         type: 'ability_use',
         characterName: targetName,
         abilityName: 'Combat Inspiration - Defense',
-        description: willMiss
-          ? `${attackerName || 'The attacker'}'s attack missed! ${targetName} used Combat Inspiration - Defense, rolling ${dieValue} to boost AC to ${newAc}. Attack total (${attackTotal}) < new AC (${newAc}).`
-          : `${targetName} used Combat Inspiration - Defense, rolling ${dieValue} to boost AC to ${newAc}, but the attack still hits (${attackTotal} >= ${newAc}).`,
+        description: buildBiDefenseDescription({ attackerName, targetName, dieValue, newAc, attackTotal, willMiss }),
         biDieRoll: dieValue,
         timestamp: Date.now(),
       });
@@ -79,14 +102,14 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
       {typeof popupHtml === 'string' ? (
         <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }} />
       ) : (
-        <DiceRollResult
-          {...popupHtml}
-          hit={missToHitApplied || popupHtml?.hit}
-          autoDamage={popupHtml?.autoDamage}
+        <DiceRollPopupContent
+          popupHtml={popupHtml}
           playerStats={playerStats}
-          onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? handleBardicInspirationDefense : undefined}
-          onDone={popupHtml?.autoDamage ? handleDone : undefined}
-          onStrokeOfLuck={popupHtml?.strokeOfLuck || (popupHtml?.autoRerollForAttack && !missToHitApplied && !hasBoonBeenUsedRef.current) ? handleMissToHit : undefined}
+          missToHitApplied={missToHitApplied}
+          boonUsed={hasBoonBeenUsedRef.current}
+          onDone={handleDone}
+          onStrokeOfLuck={handleMissToHit}
+          onBardicInspirationDefense={handleBardicInspirationDefense}
           {...callbacks}
         />
       )}

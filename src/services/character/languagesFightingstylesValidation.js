@@ -226,6 +226,30 @@ async function addSubraceLanguageGrants(subraceName, ruleset, preSelected) {
     return subraceData.language_options?.choose || 0;
 }
 
+// Race + class + background language grants for 2024
+function collect2024LanguageGrants(raceData, classData, backgroundData, preSelected) {
+    let allowed = addLanguageSource(preSelected, raceData?.languages || []);
+    allowed += addLanguageSource(preSelected, classData?.languages || []);
+    if (backgroundData) {
+        // Background languages (2024: from background JSON)
+        allowed += addLanguageSource(preSelected, backgroundData.languages || []);
+    } else {
+        // Default background languages for 2024
+        allowed += 2;
+    }
+    return allowed;
+}
+
+// Class_levels language features (e.g., Ranger "Deft Explorer") for 2024
+function countClassLevelLanguageGrants2024(classData, level) {
+    if (!classData?.class_levels) {
+        return 0;
+    }
+    return countLanguagesFromClassLevels(classData.class_levels, level, feature =>
+        feature.description?.match(/\blanguages?\b/i) ? countLanguagesFrom2024Feature(feature) : 0
+    );
+}
+
 async function getLanguageLimits2024(formData) {
     const className = formData.class?.name || '';
     const raceName = formData.race?.name || '';
@@ -236,33 +260,9 @@ async function getLanguageLimits2024(formData) {
     const classData = className ? await fetchClassData(className, '2024') : null;
     const backgroundData = backgroundName ? await fetchBackgroundData(backgroundName, '2024') : null;
 
-    let allowed = 0;
     const preSelected = [];
-
-    // Race languages
-    if (raceData) {
-        allowed += addLanguageSource(preSelected, raceData.languages || []);
-    }
-
-    // Class languages
-    if (classData) {
-        allowed += addLanguageSource(preSelected, classData.languages || []);
-    }
-
-    // Background languages (2024: from background JSON)
-    if (backgroundData) {
-        allowed += addLanguageSource(preSelected, backgroundData.languages || []);
-    } else {
-        // Default background languages for 2024
-        allowed += 2;
-    }
-
-    // Also check class_levels for language features (e.g., Ranger "Deft Explorer")
-    if (classData?.class_levels) {
-        allowed += countLanguagesFromClassLevels(classData.class_levels, level, feature =>
-            feature.description?.match(/\blanguages?\b/i) ? countLanguagesFrom2024Feature(feature) : 0
-        );
-    }
+    let allowed = collect2024LanguageGrants(raceData, classData, backgroundData, preSelected);
+    allowed += countClassLevelLanguageGrants2024(classData, level);
 
     return { allowed, preSelected, details: `In 2024 rules, languages come from your race, class, and background.` };
 }

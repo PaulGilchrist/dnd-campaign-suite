@@ -25,6 +25,27 @@ function findThiefsReflexesAutomation(characters, characterName) {
     return null
 }
 
+function resyncExistingSecondTurn(combatSummary, existing, init) {
+    const wanted = String(init - 10)
+    if (existing.initiative !== wanted) {
+        existing.initiative = wanted
+        combatSummary.creatures.sort((a, b) => b.initiative - a.initiative)
+    }
+    return false
+}
+
+function findHolderEntry(combatSummary, characterName) {
+    const entry = combatSummary.creatures.find(c => c.type === 'player' && c.name === characterName)
+    if (!entry || entry.initiative === '' || entry.initiative == null) return null
+    const init = Number(entry.initiative)
+    return Number.isFinite(init) ? init : null
+}
+
+function remainingTurns(characterName, resourceKey, usesMax, campaignName) {
+    const uses = Number(getRuntimeValue(characterName, resourceKey, campaignName) ?? usesMax)
+    return uses
+}
+
 /**
  * At initiative roll/set for round 1, grants the holder a second combatSummary
  * entry at initiative − 10, spends the feature use and logs an ability_use.
@@ -36,26 +57,17 @@ export function maybeGrantThiefsReflexesSecondTurn(combatSummary, characterName,
     if (!combatSummary?.creatures) return false
     if ((combatSummary.round ?? 1) !== 1) return false
     if (typeof characterName !== 'string' || characterName.endsWith(SECOND_TURN_SUFFIX)) return false
-    const entry = combatSummary.creatures.find(c => c.type === 'player' && c.name === characterName)
-    if (!entry || entry.initiative === '' || entry.initiative == null) return false
-    const init = Number(entry.initiative)
-    if (!Number.isFinite(init)) return false
+    const init = findHolderEntry(combatSummary, characterName)
+    if (init === null) return false
 
     const secondName = `${characterName}${SECOND_TURN_SUFFIX}`
     const existing = combatSummary.creatures.find(c => c.name === secondName)
-    if (existing) {
-        const wanted = String(init - 10)
-        if (existing.initiative === wanted) return false
-        existing.initiative = wanted
-        combatSummary.creatures.sort((a, b) => b.initiative - a.initiative)
-        return false
-    }
+    if (existing) return resyncExistingSecondTurn(combatSummary, existing, init)
 
     const auto = findThiefsReflexesAutomation(characters, characterName)
     if (!auto) return false
     const resourceKey = auto.resourceKey || DEFAULT_RESOURCE_KEY
-    const usesMax = auto.uses || 1
-    const uses = Number(getRuntimeValue(characterName, resourceKey, campaignName) ?? usesMax)
+    const uses = remainingTurns(characterName, resourceKey, auto.uses || 1, campaignName)
     if (uses <= 0) return false
 
     combatSummary.creatures.push({

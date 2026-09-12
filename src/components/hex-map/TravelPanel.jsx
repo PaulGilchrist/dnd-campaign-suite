@@ -2,6 +2,54 @@ import { useRef } from 'react';
 import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/campaign/travelService.js';
 import { EVENT_FREQUENCIES } from '../../services/campaign/randomEventService.js';
 
+function TravelExhaustedBanner({ exhausted, partyHasMaxExhaustion, onForceCamp, onForcedMarch }) {
+  if (!exhausted) return null;
+  return (
+    <div className="travel-panel-exhausted">
+      <i className="fa-solid fa-tent"></i>
+      <span>Travel budget exhausted — camp or forced march?</span>
+      <button onClick={onForceCamp} className="travel-btn-camp">
+        <i className="fa-solid fa-campground"></i> Camp
+      </button>
+      <button onClick={onForcedMarch} className="travel-btn-march" disabled={partyHasMaxExhaustion}>
+        <i className="fa-solid fa-person-running"></i> Forced March
+      </button>
+    </div>
+  );
+}
+
+function TravelForcedMarchStatus({ forcedMarchHours, exhaustionMultiplier }) {
+  if (!(forcedMarchHours > 0)) return null;
+  return (
+    <div className="travel-panel-exhaustion">
+      <span className="travel-exhaustion-label">
+        <i className="fa-solid fa-heart-pulse"></i> Forced March
+      </span>
+      <span className="travel-exhaustion-value">{forcedMarchHours} / 6 stacks</span>
+      <span className="travel-exhaustion-speed">
+        <i className="fa-solid fa-gauge"></i> Speed: {exhaustionMultiplier}%
+      </span>
+    </div>
+  );
+}
+
+function TravelWeatherSection({ weather, onReRollWeather }) {
+  if (!weather) return null;
+  return (
+    <div className="travel-panel-weather">
+      <span className="travel-panel-label">Weather:</span>
+      <span className="travel-weather-icon">
+        <i className={`fa-solid fa-${weather.icon}`}></i>
+      </span>
+      <span className="travel-weather-label">{weather.label}</span>
+      <span className="travel-weather-desc">{weather.description}</span>
+      <button className="travel-weather-reroll" onClick={onReRollWeather} title="Re-roll weather">
+        <i className="fa-solid fa-dice"></i>
+      </button>
+    </div>
+  );
+}
+
 function TravelPanel({
   travelPace,
   path,
@@ -92,45 +140,20 @@ function TravelPanel({
         </button>
       </div>
 
-      {dayExhausted && (
-        <div className="travel-panel-exhausted">
-          <i className="fa-solid fa-tent"></i>
-          <span>Travel budget exhausted — camp or forced march?</span>
-          <button onClick={onForceCamp} className="travel-btn-camp">
-            <i className="fa-solid fa-campground"></i> Camp
-          </button>
-          <button onClick={onForcedMarch} className="travel-btn-march" disabled={partyHasMaxExhaustion}>
-            <i className="fa-solid fa-person-running"></i> Forced March
-          </button>
-        </div>
-      )}
+      <TravelExhaustedBanner
+        exhausted={dayExhausted}
+        partyHasMaxExhaustion={partyHasMaxExhaustion}
+        onForceCamp={onForceCamp}
+        onForcedMarch={onForcedMarch}
+      />
 
-      {forcedMarchHours > 0 && (
-        <div className="travel-panel-exhaustion">
-          <span className="travel-exhaustion-label">
-            <i className="fa-solid fa-heart-pulse"></i> Forced March
-          </span>
-          <span className="travel-exhaustion-value">{forcedMarchHours} / 6 stacks</span>
-          <span className="travel-exhaustion-speed">
-            <i className="fa-solid fa-gauge"></i> Speed: {exhaustionMultiplier}%
-          </span>
-        </div>
-      )}
+      <TravelForcedMarchStatus
+        forcedMarchHours={forcedMarchHours}
+        exhaustionMultiplier={exhaustionMultiplier}
+      />
 
       {/* Weather section */}
-      {weather && (
-        <div className="travel-panel-weather">
-          <span className="travel-panel-label">Weather:</span>
-          <span className="travel-weather-icon">
-            <i className={`fa-solid fa-${weather.icon}`}></i>
-          </span>
-          <span className="travel-weather-label">{weather.label}</span>
-          <span className="travel-weather-desc">{weather.description}</span>
-          <button className="travel-weather-reroll" onClick={onReRollWeather} title="Re-roll weather">
-            <i className="fa-solid fa-dice"></i>
-          </button>
-        </div>
-      )}
+      <TravelWeatherSection weather={weather} onReRollWeather={onReRollWeather} />
 
       <div className="travel-panel-frequency">
         <span className="travel-panel-label">Events:</span>

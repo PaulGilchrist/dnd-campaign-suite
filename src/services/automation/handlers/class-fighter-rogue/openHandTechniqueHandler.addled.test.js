@@ -181,15 +181,17 @@ describe('openHandTechniqueHandler.noOpportunityAttacks effect', () => {
     );
 
     expect(addCondition).toHaveBeenCalledWith(
-      expect.any(Object),
-      'Goblin',
-      { key: 'addled', label: 'Addled' },
-      13,
-      'STR',
-      getRuntimeValue,
-      setRuntimeValue,
-      campaignName,
-      expect.any(Object),
+      expect.objectContaining({
+        combatSummary: expect.any(Object),
+        creatureName: 'Goblin',
+        conditionDef: { key: 'addled', label: 'Addled' },
+        dc: 13,
+        ability: 'STR',
+        getRuntimeValue,
+        setRuntimeValue,
+        campaignName,
+        playerStats: expect.any(Object),
+      }),
     );
   });
 
@@ -214,15 +216,12 @@ describe('openHandTechniqueHandler.noOpportunityAttacks effect', () => {
     );
 
     expect(addCondition).not.toHaveBeenCalledWith(
-      expect.any(Object),
-      'Goblin',
-      { key: 'addled', label: 'Addled' },
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      campaignName,
-      expect.anything(),
+      expect.objectContaining({
+        combatSummary: expect.any(Object),
+        creatureName: 'Goblin',
+        conditionDef: { key: 'addled', label: 'Addled' },
+        campaignName,
+      }),
     );
   });
 

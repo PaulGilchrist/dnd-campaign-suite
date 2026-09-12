@@ -52,33 +52,28 @@ export function toAbbr(name) {
   return ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
 }
 
+function getCreatureSaveModifier(creature, abilityKey) {
+  if (!creature) return 0;
+  if (creature.saving_throws?.[abilityKey] != null) {
+    return creature.saving_throws[abilityKey].modifier;
+  }
+  if (creature.ability_score_modifiers?.[abilityKey] != null) {
+    return creature.ability_score_modifiers[abilityKey];
+  }
+  return 0;
+}
+
 export function getSaveModifierForSaveType(saveType, target, characters, creatures) {
   const abilityKey = toAbbr(saveType);
-  if (!abilityKey) return 0;
-
-  if (!target) return 0;
+  if (!abilityKey || !target) return 0;
 
   if (target.type === 'player') {
     const playerChar = characters?.find(c => c.name === target.name);
     if (playerChar?.abilities) {
       return getAbilitySaveModifier(playerChar.abilities, abilityKey);
     }
-    const creature = creatures?.find(c => c.name === target.name);
-    if (creature?.saving_throws?.[abilityKey]) {
-      return creature.saving_throws[abilityKey].modifier;
-    }
-    if (creature?.ability_score_modifiers?.[abilityKey] != null) {
-      return creature.ability_score_modifiers[abilityKey];
-    }
-    return 0;
+    return getCreatureSaveModifier(creatures?.find(c => c.name === target.name), abilityKey);
   }
 
-  if (target.saving_throws?.[abilityKey] != null) {
-    return target.saving_throws[abilityKey].modifier;
-  }
-  if (target.ability_score_modifiers?.[abilityKey] != null) {
-    return target.ability_score_modifiers[abilityKey];
-  }
-
-  return 0;
+  return getCreatureSaveModifier(target, abilityKey);
 }

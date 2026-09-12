@@ -27,39 +27,24 @@ function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setR
         if (event.key !== expectedKey) return;
 
         const data = event.data;
-        if (data.gridSize !== undefined) {
-            setGridSizeG(data.gridSize);
-           }
-        if (data.terrain !== undefined) {
-            setTerrainG(data.terrain);
-           }
-        if (data.rivers !== undefined) {
-            setRiversG(data.rivers);
-           }
-        if (data.pois !== undefined) {
-            setPoisG(data.pois);
-           }
-        if (data.roads !== undefined) {
-            setRoadsG(data.roads);
-           }
-        if (data.zoom !== undefined) {
-            setZoomG(data.zoom);
-           }
-        if (data.panX !== undefined) {
-            setPanXG(data.panX);
-           }
-        if (data.panY !== undefined) {
-            setPanYG(data.panY);
-           }
-        if (data.marchingOrder !== undefined) {
-            setMarchingOrderG(data.marchingOrder);
-           }
-        if (data.partyPosition !== undefined) {
-            setPartyPositionG(data.partyPosition);
-           }
-        if (data.weather !== undefined) {
-            setWeatherG(data.weather);
-           }
+        const fieldSetters = [
+            ['gridSize', setGridSizeG],
+            ['terrain', setTerrainG],
+            ['rivers', setRiversG],
+            ['pois', setPoisG],
+            ['roads', setRoadsG],
+            ['zoom', setZoomG],
+            ['panX', setPanXG],
+            ['panY', setPanYG],
+            ['marchingOrder', setMarchingOrderG],
+            ['partyPosition', setPartyPositionG],
+            ['weather', setWeatherG],
+        ];
+
+        for (const [field, setter] of fieldSetters) {
+            if (data[field] !== undefined) setter(data[field]);
+        }
+
         if (data.travelState !== undefined && onTravelStateChange) {
             onTravelStateChange(data.travelState);
            }

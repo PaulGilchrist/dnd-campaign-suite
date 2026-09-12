@@ -126,10 +126,15 @@ async function resolveCharmTarget(playerStats, campaignName) {
     return null;
 }
 
+function resolveCharmSaveDc(metaCtx, playerStats) {
+    const fallback = 8 + (playerStats.proficiency || 2);
+    return metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || fallback;
+}
+
 export async function triggerCharmPerson(spell, metaCtx, playerStats, campaignName, mapName) {
     if ((spell.name || '').toLowerCase() !== 'charm person') return null;
 
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    const spellSaveDc = resolveCharmSaveDc(metaCtx, playerStats);
     const slotLevel = metaCtx?.slotLevel || spell.level || 1;
 
     const targetNames = metaCtx?.charmPersonTargets;

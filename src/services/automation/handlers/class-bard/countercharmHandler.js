@@ -125,6 +125,23 @@ function buildCheckDescription(rollEvent, rerolledD20, newTotal) {
     return description;
 }
 
+const DESCRIPTION_BUILDERS = {
+    attack: buildAttackDescription,
+    save: buildSaveDescription,
+    check: buildCheckDescription,
+};
+
+async function maybeLiftEnchantment(cs, rollEvent, rollType, targetName, newTotal) {
+    if (rollType !== 'save') return;
+    const { saveResult } = rollEvent;
+    const oldSuccess = saveResult === 'success';
+    const newSuccess = newTotal >= rollEvent.saveDc;
+    if (!oldSuccess && newSuccess) {
+        await removeCondition(cs, targetName, 'charmed', getRuntimeValue, setRuntimeValue);
+        await removeCondition(cs, targetName, 'frightened', getRuntimeValue, setRuntimeValue);
+    }
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -141,14 +158,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const { rerolledD20, newTotal } = computeReroll(rollEvent);
 
     let description = `<b>${featureName}</b><br/>Target: ${targetName}<br/>`;
-
-    if (rollType === 'attack') {
-        description += buildAttackDescription(rollEvent, rerolledD20, newTotal);
-    } else if (rollType === 'save') {
-        description += buildSaveDescription(rollEvent, rerolledD20, newTotal);
-    } else {
-        description += buildCheckDescription(rollEvent, rerolledD20, newTotal);
-    }
+    const buildDescription = DESCRIPTION_BUILDERS[rollType] || buildCheckDescription;
+    description += buildDescription(rollEvent, rerolledD20, newTotal);
 
     const { outcome, effect } = computeOutcome(rollEvent, rerolledD20, newTotal);
 
@@ -157,15 +168,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const targetCreature = cs?.creatures?.find(c => c.name === targetName);
 
     // Remove charmed/frightened condition if save succeeded
-    if (rollType === 'save') {
-        const { saveResult } = rollEvent;
-        const oldSuccess = saveResult === 'success';
-        const newSuccess = newTotal >= rollEvent.saveDc;
-        if (!oldSuccess && newSuccess) {
-            await removeCondition(cs, targetName, 'charmed', getRuntimeValue, setRuntimeValue);
-            await removeCondition(cs, targetName, 'frightened', getRuntimeValue, setRuntimeValue);
-        }
-    }
+    await maybeLiftEnchantment(cs, rollEvent, rollType, targetName, newTotal);
 
     addEntry(campaignName, {
         type: 'ability_use',

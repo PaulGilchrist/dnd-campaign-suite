@@ -120,15 +120,17 @@ describe('createEffectAdderHandlers', () => {
             handlers.handleApplyEffect('conditions', conditionData);
 
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
-                combatSummary,
-                'Alice',
-                expect.objectContaining({ key: 'blinded' }),
-                15,
-                'wis',
-                useRuntimeState.getRuntimeValue,
-                useRuntimeState.setRuntimeValue,
-                'test-campaign',
-                expect.any(Object),
+                expect.objectContaining({
+                    combatSummary,
+                    creatureName: 'Alice',
+                    conditionDef: expect.objectContaining({ key: 'blinded' }),
+                    dc: 15,
+                    ability: 'wis',
+                    getRuntimeValue: useRuntimeState.getRuntimeValue,
+                    setRuntimeValue: useRuntimeState.setRuntimeValue,
+                    campaignName: 'test-campaign',
+                    playerStats: expect.any(Object),
+                }),
             );
             expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, 'test-campaign');
             expect(setCombatSummary).toHaveBeenCalled();
@@ -159,15 +161,17 @@ describe('createEffectAdderHandlers', () => {
             handlersAlt.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Alice the Wizard', dc: 10, ability: 'con' });
 
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
-                cs,
-                'Alice the Wizard',
-                expect.any(Object),
-                10,
-                'con',
-                useRuntimeState.getRuntimeValue,
-                useRuntimeState.setRuntimeValue,
-                'test-campaign',
-                expect.objectContaining({ hitPoints: 25 }),
+                expect.objectContaining({
+                    combatSummary: cs,
+                    creatureName: 'Alice the Wizard',
+                    conditionDef: expect.any(Object),
+                    dc: 10,
+                    ability: 'con',
+                    getRuntimeValue: useRuntimeState.getRuntimeValue,
+                    setRuntimeValue: useRuntimeState.setRuntimeValue,
+                    campaignName: 'test-campaign',
+                    playerStats: expect.objectContaining({ hitPoints: 25 }),
+                }),
             );
         });
 
@@ -175,15 +179,17 @@ describe('createEffectAdderHandlers', () => {
             handlers.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Goblin', dc: 10, ability: 'con' });
 
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
-                combatSummary,
-                'Goblin',
-                expect.any(Object),
-                10,
-                'con',
-                useRuntimeState.getRuntimeValue,
-                useRuntimeState.setRuntimeValue,
-                'test-campaign',
-                undefined,
+                expect.objectContaining({
+                    combatSummary,
+                    creatureName: 'Goblin',
+                    conditionDef: expect.any(Object),
+                    dc: 10,
+                    ability: 'con',
+                    getRuntimeValue: useRuntimeState.getRuntimeValue,
+                    setRuntimeValue: useRuntimeState.setRuntimeValue,
+                    campaignName: 'test-campaign',
+                    playerStats: undefined,
+                }),
             );
         });
 
@@ -201,15 +207,17 @@ describe('createEffectAdderHandlers', () => {
             handlers.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Alice' });
 
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
-                combatSummary,
-                'Alice',
-                expect.any(Object),
-                undefined,
-                undefined,
-                useRuntimeState.getRuntimeValue,
-                useRuntimeState.setRuntimeValue,
-                'test-campaign',
-                expect.any(Object),
+                expect.objectContaining({
+                    combatSummary,
+                    creatureName: 'Alice',
+                    conditionDef: expect.any(Object),
+                    dc: undefined,
+                    ability: undefined,
+                    getRuntimeValue: useRuntimeState.getRuntimeValue,
+                    setRuntimeValue: useRuntimeState.setRuntimeValue,
+                    campaignName: 'test-campaign',
+                    playerStats: expect.any(Object),
+                }),
             );
         });
     });

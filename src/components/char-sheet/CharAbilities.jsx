@@ -146,20 +146,13 @@ function wardingBondBonusParts(conditionEffects) {
 }
 
 function resolveSaveForcedMode(conditionEffects, abbr, autoFail) {
-    let forcedMode = undefined;
-    const restoreBalance = conditionEffects?.restoreBalance;
-    if (restoreBalance) {
-        forcedMode = 'normal';
-    } else if (!autoFail && conditionEffects?.saveDisadvantage?.includes(abbr)) {
-        forcedMode = 'disadvantage';
-    }
-    if (!autoFail && !restoreBalance && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
-        forcedMode = 'advantage';
-    }
-    if (!autoFail && !restoreBalance && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abbr.toUpperCase())) {
-        forcedMode = 'advantage';
-    }
-    return forcedMode;
+    const ce = conditionEffects || {};
+    if (ce.restoreBalance) return 'normal';
+    if (autoFail) return undefined;
+    if (ce.saveDisadvantage?.includes(abbr)) return 'disadvantage';
+    if ((ce.saveAdvantageCount || 0) > 0) return 'advantage';
+    if (ce.saveAdvantageAbilities?.includes(abbr.toUpperCase())) return 'advantage';
+    return undefined;
 }
 
 function buildStrSaveReplaceExtras(_ce, playerStats) {
@@ -187,6 +180,12 @@ function buildSaveFeatureExtras(conditionEffects, playerStats, luckyDisadvantage
         if (matches(ce)) return build(ce, playerStats);
     }
     return {};
+}
+
+function checkPenalizedClass(conditionEffects, abilityName, exhaustionPenalty) {
+    if (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage) return ' stat--penalized';
+    if (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(abilityName)) return ' stat--penalized';
+    return '';
 }
 
 function computeCharismaReplacedBonus(playerStats, skill, exhaustionPenalty) {
@@ -407,7 +406,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 return <div key={ability.name} className='abilities'>
                     <div className='clickable left' onClick={() => setPopupHtml(abilityDesc(ability.name))}>{ability.name}</div>
                     <div>{ability.totalScore}</div>
-                    <div className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage || (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(ability.name)) ? ' stat--penalized' : '')} onClick={() => {
+                    <div className={'clickable' + checkPenalizedClass(conditionEffects, ability.name, exhaustionPenalty)} onClick={() => {
                           const checkCtx = { ...makeCheckContext(ability.name) };
                           const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
                           if (biDie) {
@@ -441,7 +440,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                                     const skillBonus = getSkillBonus(skill);
                                     const isExpert = playerStats.expertise?.includes(skill.name);
                                     return <span key={skill.name} className='skills'>
-                                        <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage || (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(ability.name)) ? ' stat--penalized' : '')} onClick={() => {
+                                        <span className={'clickable' + checkPenalizedClass(conditionEffects, ability.name, exhaustionPenalty)} onClick={() => {
                                             const checkCtx = { ...makeCheckContext(skill.name) };
                                             const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
                                             if (biDie) {
@@ -456,7 +455,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                                     const tool = item;
                                     const toolBonus = tool.bonus - exhaustionPenalty;
                                     return <span key={tool.name}>
-                                        <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage || (conditionEffects?.abilityCheckDisadvantageAbilities?.includes(ability.name)) ? ' stat--penalized' : '')} onClick={() => {
+                                        <span className={'clickable' + checkPenalizedClass(conditionEffects, ability.name, exhaustionPenalty)} onClick={() => {
                                             const checkCtx = { ...makeCheckContext(tool.name) };
                                             const biDie = getRuntimeValue(playerStats.name, 'bardicInspirationDie', campaignName);
                                             if (biDie) {

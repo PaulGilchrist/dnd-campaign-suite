@@ -187,6 +187,31 @@ function buildBonusDetail({ auraBonusStr, cosmicOmenDetail, baneSaveRoll, baneAt
   return bonusDetailParts.filter(Boolean).join(' ') || undefined;
 }
 
+function buildSaveDamageFields(current) {
+  const rawDamage = current.rawDamage || 0;
+  const damageType = current.damageType || null;
+  return {
+    damageFormula: current.damageFormula || null,
+    attackName: current.sourceName || current.name || null,
+    damageType,
+    rawDamage,
+    primaryDamage: rawDamage,
+    primaryDamageType: damageType,
+    actualDamage: rawDamage,
+    damageApplied: rawDamage > 0,
+  };
+}
+
+function buildSecondaryDamageFields(current) {
+  if (!current.secondaryFormula) return {};
+  return {
+    secondaryFormula: current.secondaryFormula,
+    secondaryDamageType: current.secondaryDamageType || null,
+    secondaryRawDamage: current.secondaryRawDamage || 0,
+    secondaryTotal: current.secondaryRawDamage || 0,
+  };
+}
+
 function buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, auraBonus, cosmicOmenAppliedBonus, total, success }) {
   return {
     attackerName: current.attackerName || current.targetName,
@@ -200,20 +225,8 @@ function buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, aura
     saveDc: current.saveDc,
     saveResult: success ? 'success' : 'failure',
     saveConditions: current.condition ? [current.condition] : [],
-    damageFormula: current.damageFormula || null,
-    attackName: current.sourceName || current.name || null,
-    damageType: current.damageType || null,
-    rawDamage: current.rawDamage || 0,
-    primaryDamage: current.rawDamage || 0,
-    primaryDamageType: current.damageType || null,
-    actualDamage: current.rawDamage || 0,
-    damageApplied: (current.rawDamage || 0) > 0,
-    ...(current.secondaryFormula ? {
-      secondaryFormula: current.secondaryFormula,
-      secondaryDamageType: current.secondaryDamageType || null,
-      secondaryRawDamage: current.secondaryRawDamage || 0,
-      secondaryTotal: current.secondaryRawDamage || 0,
-    } : {}),
+    ...buildSaveDamageFields(current),
+    ...buildSecondaryDamageFields(current),
     timestamp: Date.now(),
   };
 }

@@ -86,11 +86,15 @@ function getAllyHitDieSize(playerStats) {
     return 4
 }
 
+function pickClassLevelEntry(classLevels, playerStats) {
+    return classLevels[(playerStats.level || 1) - 1] || {}
+}
+
 function buildDiceTokenValues(playerStats, slotLevel) {
     const prof = playerStats?.proficiency || 0
     const level = playerStats?.level || 1
     const classLevels = playerStats?.class?.class_levels || []
-    const levelEntry = classLevels[(playerStats.level || 1) - 1] || {}
+    const levelEntry = pickClassLevelEntry(classLevels, playerStats)
     const currentEntry = classLevels.find(cl => cl.level === playerStats.level) || {}
     const abilities = playerStats?.abilities || []
     return {

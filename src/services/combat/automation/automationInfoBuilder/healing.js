@@ -1,6 +1,24 @@
 import { evaluateAutoExpression, resolveHealingPoolExpression } from '../automationExpressions.js'
 import { getHitDieSize } from '../../../rules/effects/restRules.js'
 
+function resolvePoolDice(auto, resolvedExpression, playerStats, prof, level) {
+    const explicitDicePool = auto.isDicePool === true
+    const diceMatch = resolvedExpression.match(/^(\d+)d(\d+)$/i)
+    const isDicePool = explicitDicePool || !!diceMatch
+    let pool = 0
+    let dieType = null
+    if (explicitDicePool) {
+        pool = evaluateAutoExpression(resolvedExpression, playerStats, prof, level)
+        dieType = auto.dieType || 6
+    } else if (diceMatch) {
+        pool = parseInt(diceMatch[1], 10)
+        dieType = parseInt(diceMatch[2], 10)
+    } else if (resolvedExpression) {
+        pool = evaluateAutoExpression(resolvedExpression, playerStats, prof, level)
+    }
+    return { isDicePool, pool, dieType }
+}
+
 export const healingHandlers = {
     'healing': (feature, playerStats) => {
         const auto = feature.automation
@@ -48,21 +66,14 @@ export const healingHandlers = {
         const level = playerStats.level || 1
         const baseExpression = auto.poolExpression || ''
         const resolvedExpression = resolveHealingPoolExpression(baseExpression, auto.scaling, playerStats)
-        const explicitDicePool = auto.isDicePool === true
-        const diceMatch = resolvedExpression.match(/^(\d+)d(\d+)$/i)
-        const isDicePool = explicitDicePool || !!diceMatch
-        const pool = isDicePool
-            ? (explicitDicePool
-                ? evaluateAutoExpression(resolvedExpression, playerStats, prof, level)
-                : parseInt(diceMatch[1], 10))
-            : (resolvedExpression ? evaluateAutoExpression(resolvedExpression, playerStats, prof, level) : 0)
+        const { isDicePool, pool, dieType } = resolvePoolDice(auto, resolvedExpression, playerStats, prof, level)
         return {
             type: 'healing_pool',
             name: feature.name,
             pool,
             poolExpression: resolvedExpression,
             isDicePool,
-            dieType: explicitDicePool ? (auto.dieType || 6) : (isDicePool ? parseInt(diceMatch[2], 10) : null),
+            dieType,
             action: auto.action || 'action',
             recharge: auto.recharge || 'long_rest',
             alsoCures: auto.alsoCures || [],

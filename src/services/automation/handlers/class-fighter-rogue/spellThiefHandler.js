@@ -55,6 +55,10 @@ async function addStolenSpell(playerName, casterName, spellName, campaignName) {
     }
 }
 
+function resolveStolenSpellName(action, attackEvent) {
+    return normalizeStolenSpellName(action.spellName || attackEvent.attackName || attackEvent.damageName || 'unknown spell');
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -127,13 +131,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return refuse(`${featureName} — the most recent spell did not target you.`);
     }
 
-    const casterCreature = cs.creatures ? cs.creatures.find(c => c.name === casterName) : null;
+    const casterCreature = cs.creatures?.find(c => c.name === casterName);
     if (!casterCreature) {
         return refuse(`${featureName} — ${casterName} is not in combat.`);
     }
     const isMonsterCaster = casterCreature.type !== 'player';
 
-    const spellName = normalizeStolenSpellName(action.spellName || attackEvent.attackName || attackEvent.damageName || 'unknown spell');
+    const spellName = resolveStolenSpellName(action, attackEvent);
 
     const saveDc = buildSaveDc(auto, playerStats);
 
@@ -155,7 +159,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
 
-    logThiefSave(campaignName, featureName, playerName, casterName, saveDc, auto, saveResult, success);
+    logThiefSave({ campaignName, featureName, playerName, casterName, saveDc, auto, saveResult, success });
 
     const resultDescription = await resolveThiefSaveOutcome({
         success, attackEvent, cs, campaignName, featureName, playerName, casterName, spellName, saveDc, isMonsterCaster,
@@ -200,7 +204,7 @@ function didTargetThief(attackEvent, playerName) {
         || (attackEvent.affectedTargets || []).includes(playerName);
 }
 
-function logThiefSave(campaignName, featureName, playerName, casterName, saveDc, auto, saveResult, success) {
+function logThiefSave({ campaignName, featureName, playerName, casterName, saveDc, auto, saveResult, success }) {
     addEntry(campaignName, {
         type: 'roll',
         name: featureName,

@@ -200,7 +200,8 @@ vi.mock('../../services/ui/formatUtils.js', () => ({
   }),
 }));
 
-vi.mock('../../services/ui/spellSectionUtils.js', () => ({
+vi.mock('../../services/ui/spellSectionUtils.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   getActionSpellNames: vi.fn((playerStats) => {
     const names = new Set();
     for (const spell of playerStats.spellAbilities?.spells || []) {

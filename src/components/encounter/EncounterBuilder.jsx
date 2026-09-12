@@ -61,6 +61,26 @@ function matchesSearchQuery(m, q) {
      || (m.subtype && m.subtype.toLowerCase().includes(q));
 }
 
+const monsterSortExtractors = {
+  name: (m) => m.name.toLowerCase(),
+  cr: (m) => m.challenge_rating || 0,
+  xp: (m) => m.xp || 0,
+  env: (m) => (m.environments || []).join(', ').toLowerCase(),
+};
+
+function getMonsterSortValue(m, sortField, selectedMonsters) {
+  if (sortField === 'sel') return selectedMonsters.some((sm) => sm.index === m.index) ? 0 : 1;
+  return (monsterSortExtractors[sortField] || monsterSortExtractors.name)(m);
+}
+
+function compareMonsters(a, b, sortField, sortDirection, selectedMonsters) {
+  const valA = getMonsterSortValue(a, sortField, selectedMonsters);
+  const valB = getMonsterSortValue(b, sortField, selectedMonsters);
+  if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+  if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+  return 0;
+}
+
 function filterMonsters(monsters, filter = {}) {
   if (!monsters) return [];
   const { searchQuery = '', environmentFilter = '', typeFilter = '', sizeFilter = '', crMin = '', crMax = '' } = filter;
@@ -252,37 +272,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
             }
            }
 
-        result.sort((a, b) => {
-         let valA, valB;
-         switch (sortField) {
-          case 'name':
-            valA = a.name.toLowerCase();
-            valB = b.name.toLowerCase();
-            break;
-          case 'cr':
-            valA = a.challenge_rating || 0;
-            valB = b.challenge_rating || 0;
-            break;
-          case 'xp':
-            valA = a.xp || 0;
-            valB = b.xp || 0;
-            break;
-          case 'env':
-            valA = (a.environments || []).join(', ').toLowerCase();
-            valB = (b.environments || []).join(', ').toLowerCase();
-            break;
-          case 'sel':
-            valA = selectedMonsters.some((m) => m.index === a.index) ? 0 : 1;
-            valB = selectedMonsters.some((m) => m.index === b.index) ? 0 : 1;
-            break;
-           default:
-            valA = a.name.toLowerCase();
-            valB = b.name.toLowerCase();
-           }
-          if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-         return 0;
-           });
+        result.sort((a, b) => compareMonsters(a, b, sortField, sortDirection, selectedMonsters));
         return result;
         },
         [monsters, searchQuery, filter.environment, filter.type, filter.size, filter.crMin, filter.crMax, selectedMonsters, sortField, sortDirection]

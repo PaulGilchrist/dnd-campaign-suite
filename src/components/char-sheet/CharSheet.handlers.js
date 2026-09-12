@@ -299,13 +299,19 @@ export async function handleSavageAttackerChoice(playerStats, campaignName, char
     return { kept: 'original', damageDifference: 0 };
 }
 
+function extractTacticalMindRoll(popupHtml) {
+    return {
+        checkName: popupHtml?.name || 'Ability Check',
+        d20: popupHtml?.rolls?.[0] || 0,
+        bonus: popupHtml?.bonus || 0,
+        dieValue: popupHtml?.tacticalMindDie || 0,
+    };
+}
+
 export async function handleTacticalMind(playerStats, campaignName, popupHtml, setPopupHtml) {
     if (!playerStats) return;
     const playerName = playerStats.name;
-    const checkName = popupHtml?.name || 'Ability Check';
-    const d20 = popupHtml?.rolls?.[0] || 0;
-    const bonus = popupHtml?.bonus || 0;
-    const dieValue = popupHtml?.tacticalMindDie || 0;
+    const { checkName, d20, bonus, dieValue } = extractTacticalMindRoll(popupHtml);
     const originalTotal = d20 + bonus;
     const modifiedTotal = originalTotal + dieValue;
 
@@ -365,12 +371,13 @@ export async function handleDarkOnesLuck(playerStats, campaignName, popupHtml) {
     const d20 = popupHtml?.rolls?.[0] || 0;
     const bonus = popupHtml?.bonus || 0;
     const originalTotal = d20 + bonus;
-    const modifiedTotal = originalTotal + popupHtml?.darkOnesLuckValue || 0;
+    const luckValue = popupHtml?.darkOnesLuckValue || 0;
+    const modifiedTotal = originalTotal + luckValue;
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: "Dark One's Own Luck",
-        description: `${playerName} used Dark One's Own Luck: +1d10(${popupHtml?.darkOnesLuckValue || 0}) to ${rollName} (d20 ${d20} + ${bonus} = ${originalTotal} → ${modifiedTotal}). Uses remaining: ${currentUses - 1}/${maxUses}.`,
+        description: `${playerName} used Dark One's Own Luck: +1d10(${luckValue}) to ${rollName} (d20 ${d20} + ${bonus} = ${originalTotal} → ${modifiedTotal}). Uses remaining: ${currentUses - 1}/${maxUses}.`,
         timestamp: Date.now(),
     });
 }

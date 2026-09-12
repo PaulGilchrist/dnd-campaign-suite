@@ -90,6 +90,41 @@ function computeListCopy({ allowAnyCreature, mode, effectiveMaxCR, wildShapeLimi
     return { listLabel, searchPlaceholder, noResultsMsg };
 }
 
+function resolveWildShapeLimitations(playerStats) {
+    if (!playerStats) return null;
+    return getClassFeatures(playerStats)?.wildShapeLimitations || 'walk only (no swim or fly)';
+}
+
+function resolveEffectiveMaxCR(playerStats, maxCR) {
+    if (typeof maxCR === 'number') return maxCR;
+    return getClassFeatures(playerStats)?.maxWildShapeChallengeRating || 0;
+}
+
+function LoadingView({ icon, title }) {
+    return (
+        <div className="sp-overlay sp-overlay--evasion">
+            <div className="sp-modal">
+                <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
+                <div className="sp-body"><p>Loading available creatures...</p></div>
+            </div>
+        </div>
+    );
+}
+
+function ErrorView({ icon, title, error, onCancel }) {
+    return (
+        <div className="sp-overlay sp-overlay--evasion">
+            <div className="sp-modal">
+                <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
+                <div className="sp-body"><p className="sp-note">{error}</p></div>
+                <div className="sp-actions">
+                    <button className="sp-dismiss-btn" onClick={onCancel}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function BeastRow({ beast, isSelected, wildShapeLimitations, onSelect }) {
     const cr = parseChallengeRating(beast.challenge_rating);
     const beastSpeeds = filterBeastSpeeds(beast.speed, wildShapeLimitations);
@@ -131,12 +166,8 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
     const [error, setError] = React.useState(null);
     const [searchTerm, setSearchTerm] = React.useState('');
 
-    const wildShapeLimitations = playerStats
-        ? (getClassFeatures(playerStats)?.wildShapeLimitations || 'walk only (no swim or fly)')
-        : null;
-    const effectiveMaxCR = typeof maxCR === 'number'
-        ? maxCR
-        : (getClassFeatures(playerStats)?.maxWildShapeChallengeRating || 0);
+    const wildShapeLimitations = resolveWildShapeLimitations(playerStats);
+    const effectiveMaxCR = resolveEffectiveMaxCR(playerStats, maxCR);
 
     React.useEffect(() => {
         async function loadBeasts() {
@@ -176,28 +207,11 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
     }, [onCancel]);
 
     if (loading) {
-        return (
-            <div className="sp-overlay sp-overlay--evasion">
-                <div className="sp-modal">
-                    <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
-                    <div className="sp-body"><p>Loading available creatures...</p></div>
-                </div>
-            </div>
-        );
+        return <LoadingView icon={icon} title={title} />;
     }
 
     if (error) {
-        return (
-            <div className="sp-overlay sp-overlay--evasion">
-                <div className="sp-modal">
-                    <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
-                    <div className="sp-body"><p className="sp-note">{error}</p></div>
-                    <div className="sp-actions">
-                        <button className="sp-dismiss-btn" onClick={onCancel}>Close</button>
-                    </div>
-                </div>
-            </div>
-        );
+        return <ErrorView icon={icon} title={title} error={error} onCancel={onCancel} />;
     }
 
     const { listLabel, searchPlaceholder, noResultsMsg } = computeListCopy({ allowAnyCreature, mode, effectiveMaxCR, wildShapeLimitations });

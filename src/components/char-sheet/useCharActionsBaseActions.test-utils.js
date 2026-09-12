@@ -37,6 +37,10 @@ const mockAddExpiration = vi.fn();
 const mockLoadCombatSummary = vi.fn();
 const mockGetMonsterData = vi.fn();
 
+function pick(value, fallback) {
+    return value || fallback;
+}
+
 export function createHooks(overrides = {}) {
     const {
         cannotAct = false,
@@ -54,16 +58,16 @@ export function createHooks(overrides = {}) {
         cannotAct,
         getRuntimeValue,
         setRuntimeValue,
-        rollSkillCheck: overrides.rollSkillCheck || mockRollSkillCheck,
-        rollAbilityCheck: overrides.rollAbilityCheck || mockRollAbilityCheck,
-        addEntry: overrides.addEntry || mockAddEntry,
-        setPopupHtml: overrides.setPopupHtml || mockSetPopupHtml,
-        playerStats: overrides.playerStats || playerStats,
+        rollSkillCheck: pick(overrides.rollSkillCheck, mockRollSkillCheck),
+        rollAbilityCheck: pick(overrides.rollAbilityCheck, mockRollAbilityCheck),
+        addEntry: pick(overrides.addEntry, mockAddEntry),
+        setPopupHtml: pick(overrides.setPopupHtml, mockSetPopupHtml),
+        playerStats: pick(overrides.playerStats, playerStats),
         campaignName: cn,
         exhaustionPenalty,
         conditionEffects,
-        toggleBuff: overrides.toggleBuff || mockToggleBuff,
-        addExpiration: overrides.addExpiration || mockAddExpiration,
+        toggleBuff: pick(overrides.toggleBuff, mockToggleBuff),
+        addExpiration: pick(overrides.addExpiration, mockAddExpiration),
         loadCombatSummary: lcs,
         getMonsterData: gmd,
     };

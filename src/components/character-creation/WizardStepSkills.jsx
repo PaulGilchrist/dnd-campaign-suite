@@ -62,6 +62,124 @@ const areEqual = (prevProps, nextProps) => {
   );
 };
 
+const SkillLimitsInfo = ({ skillLimits, formData }) => (
+	<div className="rule-info">
+		<p className="skill-count-summary">
+			<span className="skill-count-text">
+				You have selected <strong>{formData.skillProficiencies?.length || 0}</strong> of <strong>{skillLimits.allowed}</strong> allowed skill proficiency/ies.
+			</span>
+		</p>
+		{skillLimits.skillChoiceSources && skillLimits.skillChoiceSources.length > 0 && (() => {
+			const selectedSkills = formData.skillProficiencies || [];
+			const assignedSkills = new Set();
+			const sourceAssignments = {};
+			const skillSourceMap = new Map();
+
+			skillLimits.skillChoiceSources.forEach(s => {
+				sourceAssignments[s.source + '_' + (s.featName || '0')] = 0;
+			});
+
+			// Build map of which source each skill belongs to
+			skillLimits.skillChoiceSources.forEach(source => {
+				source.skills.forEach(skill => {
+					if (!skillSourceMap.has(skill)) {
+						skillSourceMap.set(skill, []);
+					}
+					skillSourceMap.get(skill).push(source);
+				});
+			});
+
+			// Greedy assignment algorithm
+			const remainingSkills = [...selectedSkills];
+			const assignments = [];
+
+			while (remainingSkills.length > 0) {
+				let bestSource = null;
+				let bestSize = Infinity;
+
+				skillLimits.skillChoiceSources.forEach(source => {
+					const key = source.source + '_' + (source.featName || '0');
+					const remainingCapacity = source.count - sourceAssignments[key];
+					if (remainingCapacity <= 0) return;
+					const unassignedInPool = remainingSkills.filter(s =>
+						source.skills.includes(s) && !assignedSkills.has(s)
+					);
+					if (unassignedInPool.length > 0 && source.skills.length < bestSize) {
+						bestSource = source;
+						bestSize = source.skills.length;
+					}
+				});
+
+				if (!bestSource) break;
+
+				const assigned = remainingSkills.find(s =>
+					bestSource.skills.includes(s) && !assignedSkills.has(s)
+				);
+				if (!assigned) break;
+
+				const key = bestSource.source + '_' + (bestSource.featName || '0');
+				sourceAssignments[key]++;
+				assignedSkills.add(assigned);
+				const idx = remainingSkills.indexOf(assigned);
+				remainingSkills.splice(idx, 1);
+				assignments.push({ source: bestSource, skill: assigned });
+			}
+
+			// Count assignments per source
+			const assignmentMap = {};
+			assignments.forEach(a => {
+				const key = a.source.source + '_' + (a.source.featName || '0');
+				if (!assignmentMap[key]) assignmentMap[key] = 0;
+				assignmentMap[key]++;
+			});
+
+			// Determine which skills come from Skilled
+			const skilledSkills = [];
+			selectedSkills.forEach(skill => {
+				if (!assignedSkills.has(skill)) {
+					skilledSkills.push(skill);
+				}
+			});
+
+			const skilledUsesAvailable = skillLimits.skilledUsesAvailable || 0;
+			const skilledUsesUsed = skillLimits.skilledUsesUsed || 0;
+
+			return (
+				<>
+					{skilledUsesAvailable > 0 && (
+						<div className="breakdown-source skilled-source">
+							<span className="breakdown-source-label">
+								Skilled: {skilledUsesUsed} of {skilledUsesAvailable}
+							</span>
+							<span className="breakdown-source-skills">
+								{skilledSkills.length > 0 ? skilledSkills.join(', ') : 'None selected'}
+							</span>
+						</div>
+					)}
+					{skillLimits.skillChoiceSources.map((source, idx) => {
+						const key = source.source + '_' + (source.featName || '0');
+						const selectedFromSource = assignmentMap[key] || 0;
+						const sourceLabel = source.featName || source.source.charAt(0).toUpperCase() + source.source.slice(1);
+						return (
+							<div key={idx} className="breakdown-source">
+								<span className="breakdown-source-label">
+									{sourceLabel}: {selectedFromSource} of {source.count}
+								</span>
+								<span className="breakdown-source-skills">
+									{source.skills.join(', ')}
+								</span>
+							</div>
+						);
+					})}
+				</>
+			);
+		})()}
+		{skillLimits.details && (!skillLimits.skillChoiceSources || skillLimits.skillChoiceSources.length === 0) && (
+			<p><strong>Rules:</strong> {skillLimits.details}</p>
+		)}
+	</div>
+);
+
 const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseToggle, skillLimits, expertiseLimits, warnings, preSelectedSkills }) {
   const [showExpertiseFeedback, setShowExpertiseFeedback] = useState(null);
   const [skills, setSkills] = useState([]);
@@ -170,123 +288,7 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors
 			<h2>Step 6: Skill Proficiencies</h2>
 
 			{/* Display skill limits info with breakdown */}
-			{skillLimits && (
-				<div className="rule-info">
-					<p className="skill-count-summary">
-						<span className="skill-count-text">
-							You have selected <strong>{formData.skillProficiencies?.length || 0}</strong> of <strong>{skillLimits.allowed}</strong> allowed skill proficiency/ies.
-						</span>
-					</p>
-					{skillLimits.skillChoiceSources && skillLimits.skillChoiceSources.length > 0 && (() => {
-						const selectedSkills = formData.skillProficiencies || [];
-						const assignedSkills = new Set();
-						const sourceAssignments = {};
-						const skillSourceMap = new Map();
-
-						skillLimits.skillChoiceSources.forEach(s => {
-							sourceAssignments[s.source + '_' + (s.featName || '0')] = 0;
-						});
-
-						// Build map of which source each skill belongs to
-						skillLimits.skillChoiceSources.forEach(source => {
-							source.skills.forEach(skill => {
-								if (!skillSourceMap.has(skill)) {
-									skillSourceMap.set(skill, []);
-								}
-								skillSourceMap.get(skill).push(source);
-							});
-						});
-
-						// Greedy assignment algorithm
-						const remainingSkills = [...selectedSkills];
-						const assignments = [];
-
-						while (remainingSkills.length > 0) {
-							let bestSource = null;
-							let bestSize = Infinity;
-
-							skillLimits.skillChoiceSources.forEach(source => {
-								const key = source.source + '_' + (source.featName || '0');
-								const remainingCapacity = source.count - sourceAssignments[key];
-								if (remainingCapacity <= 0) return;
-								const unassignedInPool = remainingSkills.filter(s =>
-									source.skills.includes(s) && !assignedSkills.has(s)
-								);
-								if (unassignedInPool.length > 0 && source.skills.length < bestSize) {
-									bestSource = source;
-									bestSize = source.skills.length;
-								}
-							});
-
-							if (!bestSource) break;
-
-							const assigned = remainingSkills.find(s =>
-								bestSource.skills.includes(s) && !assignedSkills.has(s)
-							);
-							if (!assigned) break;
-
-							const key = bestSource.source + '_' + (bestSource.featName || '0');
-							sourceAssignments[key]++;
-							assignedSkills.add(assigned);
-							const idx = remainingSkills.indexOf(assigned);
-							remainingSkills.splice(idx, 1);
-							assignments.push({ source: bestSource, skill: assigned });
-						}
-
-						// Count assignments per source
-						const assignmentMap = {};
-						assignments.forEach(a => {
-							const key = a.source.source + '_' + (a.source.featName || '0');
-							if (!assignmentMap[key]) assignmentMap[key] = 0;
-							assignmentMap[key]++;
-						});
-
-						// Determine which skills come from Skilled
-						const skilledSkills = [];
-						selectedSkills.forEach(skill => {
-							if (!assignedSkills.has(skill)) {
-								skilledSkills.push(skill);
-							}
-						});
-
-						const skilledUsesAvailable = skillLimits.skilledUsesAvailable || 0;
-						const skilledUsesUsed = skillLimits.skilledUsesUsed || 0;
-
-						return (
-							<>
-								{skilledUsesAvailable > 0 && (
-									<div className="breakdown-source skilled-source">
-										<span className="breakdown-source-label">
-											Skilled: {skilledUsesUsed} of {skilledUsesAvailable}
-										</span>
-										<span className="breakdown-source-skills">
-											{skilledSkills.length > 0 ? skilledSkills.join(', ') : 'None selected'}
-										</span>
-									</div>
-								)}
-								{skillLimits.skillChoiceSources.map((source, idx) => {
-									const key = source.source + '_' + (source.featName || '0');
-									const selectedFromSource = assignmentMap[key] || 0;
-									const sourceLabel = source.featName || source.source.charAt(0).toUpperCase() + source.source.slice(1);
-									return (
-										<div key={idx} className="breakdown-source">
-											<span className="breakdown-source-label">
-												{sourceLabel}: {selectedFromSource} of {source.count}
-											</span>
-											<span className="breakdown-source-skills">
-												{source.skills.join(', ')}
-											</span>
-										</div>
-									);
-								})}
-							</>
-						);
-					})()}
-					{skillLimits.details && (!skillLimits.skillChoiceSources || skillLimits.skillChoiceSources.length === 0) && (
-						<p><strong>Rules:</strong> {skillLimits.details}</p>
-					)}
-				</div>
-			)}
+			{skillLimits && <SkillLimitsInfo skillLimits={skillLimits} formData={formData} />}
 
 			{/* Display expertise info */}
 			{expertiseLimits && expertiseLimits.allowed && (

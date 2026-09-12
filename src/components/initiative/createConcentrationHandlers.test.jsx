@@ -131,16 +131,16 @@ describe('createConcentrationHandlers', () => {
             const { handleRollConcentrationSave } = createHandlers();
             await handleRollConcentrationSave('Alice');
 
-            expect(rollConcentrationSave).toHaveBeenCalledWith(
-                { name: 'Alice', type: 'player', concentration: { spell: 'Fireball', dc: 13 } },
-                { spell: 'Fireball', dc: 13 },
-                mockCharacters,
-                mockCampaignNpcs,
-                'test-campaign',
-                'test-map',
-                expect.any(Function),
-                false
-            );
+            expect(rollConcentrationSave).toHaveBeenCalledWith({
+                creature: { name: 'Alice', type: 'player', concentration: { spell: 'Fireball', dc: 13 } },
+                concentration: { spell: 'Fireball', dc: 13 },
+                characters: mockCharacters,
+                campaignNpcs: mockCampaignNpcs,
+                campaignName: 'test-campaign',
+                mapName: 'test-map',
+                getName: expect.any(Function),
+                disadvantage: false,
+            });
             expect(storage.set).toHaveBeenCalledWith('combatSummary', mockCombatSummary, 'test-campaign');
             expect(mockSetCombatSummary).toHaveBeenCalled();
             expect(buildConcentrationPopup).toHaveBeenCalled();
@@ -190,27 +190,28 @@ describe('createConcentrationHandlers', () => {
             const { handleRollConcentrationSave } = createHandlers();
             await handleRollConcentrationSave('Alice');
 
-            expect(rollConcentrationSave).toHaveBeenCalledWith(
-                expect.any(Object),
-                expect.any(Object),
-                expect.any(Array),
-                expect.any(Array),
-                'test-campaign',
-                'test-map',
-                expect.any(Function),
-                true
-            );
+            expect(rollConcentrationSave).toHaveBeenCalledWith({
+                creature: expect.any(Object),
+                concentration: expect.any(Object),
+                characters: expect.any(Array),
+                campaignNpcs: expect.any(Array),
+                campaignName: 'test-campaign',
+                mapName: 'test-map',
+                getName: expect.any(Function),
+                disadvantage: true,
+            });
             expect(logConcentrationSave).toHaveBeenCalledWith(
-                'test-campaign',
-                'Alice',
-                15,
-                2,
-                undefined,
-                'Fireball',
-                13,
-                true,
-                'disadvantage',
-                undefined
+                expect.objectContaining({
+                    campaignName: 'test-campaign',
+                    creatureName: 'Alice',
+                    roll: 15,
+                    bonus: 2,
+                    bonusDetail: undefined,
+                    spellName: 'Fireball',
+                    dc: 13,
+                    success: true,
+                    mode: 'disadvantage',
+                })
             );
         });
 
@@ -222,16 +223,16 @@ describe('createConcentrationHandlers', () => {
             const { handleRollConcentrationSave } = createHandlers();
             await handleRollConcentrationSave('Alice');
 
-            expect(rollConcentrationSave).toHaveBeenCalledWith(
-                expect.any(Object),
-                expect.any(Object),
-                expect.any(Array),
-                expect.any(Array),
-                'test-campaign',
-                'test-map',
-                expect.any(Function),
-                false
-            );
+            expect(rollConcentrationSave).toHaveBeenCalledWith({
+                creature: expect.any(Object),
+                concentration: expect.any(Object),
+                characters: expect.any(Array),
+                campaignNpcs: expect.any(Array),
+                campaignName: 'test-campaign',
+                mapName: 'test-map',
+                getName: expect.any(Function),
+                disadvantage: false,
+            });
         });
 
         it('should default hasConcentrationBreaker to false when lastAttack has no attackerName', async () => {
@@ -242,16 +243,16 @@ describe('createConcentrationHandlers', () => {
             const { handleRollConcentrationSave } = createHandlers();
             await handleRollConcentrationSave('Alice');
 
-            expect(rollConcentrationSave).toHaveBeenCalledWith(
-                expect.any(Object),
-                expect.any(Object),
-                expect.any(Array),
-                expect.any(Array),
-                'test-campaign',
-                'test-map',
-                expect.any(Function),
-                false
-            );
+            expect(rollConcentrationSave).toHaveBeenCalledWith({
+                creature: expect.any(Object),
+                concentration: expect.any(Object),
+                characters: expect.any(Array),
+                campaignNpcs: expect.any(Array),
+                campaignName: 'test-campaign',
+                mapName: 'test-map',
+                getName: expect.any(Function),
+                disadvantage: false,
+            });
         });
     });
 
@@ -276,8 +277,10 @@ describe('createConcentrationHandlers', () => {
             ]);
             await handleRollConcentrationSave('Alice');
             expect(logConcentrationSave).toHaveBeenCalledWith(
-                'test-campaign', 'Alice', 15, 2, undefined, 'Fireball', 13,
-                true, 'advantage', ['Bard']
+                expect.objectContaining({
+                    campaignName: 'test-campaign', creatureName: 'Alice', roll: 15, bonus: 2,
+                    spellName: 'Fireball', dc: 13, success: true, mode: 'advantage',
+                })
             );
 
             vi.clearAllMocks();
@@ -286,8 +289,10 @@ describe('createConcentrationHandlers', () => {
             ]);
             await handleRollConcentrationSave('Alice');
             expect(logConcentrationSave).toHaveBeenCalledWith(
-                'test-campaign', 'Alice', 15, 2, undefined, 'Fireball', 13,
-                true, 'advantage', ['Paladin']
+                expect.objectContaining({
+                    campaignName: 'test-campaign', creatureName: 'Alice', roll: 15, bonus: 2,
+                    spellName: 'Fireball', dc: 13, success: true, mode: 'advantage',
+                })
             );
 
             vi.clearAllMocks();
@@ -296,8 +301,10 @@ describe('createConcentrationHandlers', () => {
             ]);
             await handleRollConcentrationSave('Alice');
             expect(logConcentrationSave).toHaveBeenCalledWith(
-                'test-campaign', 'Alice', 15, 2, undefined, 'Fireball', 13,
-                true, 'normal', undefined
+                expect.objectContaining({
+                    campaignName: 'test-campaign', creatureName: 'Alice', roll: 15, bonus: 2,
+                    spellName: 'Fireball', dc: 13, success: true, mode: 'normal',
+                })
             );
 
             vi.clearAllMocks();
@@ -307,24 +314,30 @@ describe('createConcentrationHandlers', () => {
             ]);
             await handleRollConcentrationSave('Alice');
             expect(logConcentrationSave).toHaveBeenCalledWith(
-                'test-campaign', 'Alice', 15, 2, undefined, 'Fireball', 13,
-                true, 'advantage', ['Bard']
+                expect.objectContaining({
+                    campaignName: 'test-campaign', creatureName: 'Alice', roll: 15, bonus: 2,
+                    spellName: 'Fireball', dc: 13, success: true, mode: 'advantage',
+                })
             );
 
             vi.clearAllMocks();
             setupAdvantageTest(undefined);
             await handleRollConcentrationSave('Alice');
             expect(logConcentrationSave).toHaveBeenCalledWith(
-                'test-campaign', 'Alice', 15, 2, undefined, 'Fireball', 13,
-                true, 'normal', undefined
+                expect.objectContaining({
+                    campaignName: 'test-campaign', creatureName: 'Alice', roll: 15, bonus: 2,
+                    spellName: 'Fireball', dc: 13, success: true, mode: 'normal',
+                })
             );
 
             vi.clearAllMocks();
             setupAdvantageTest([]);
             await handleRollConcentrationSave('Alice');
             expect(logConcentrationSave).toHaveBeenCalledWith(
-                'test-campaign', 'Alice', 15, 2, undefined, 'Fireball', 13,
-                true, 'normal', undefined
+                expect.objectContaining({
+                    campaignName: 'test-campaign', creatureName: 'Alice', roll: 15, bonus: 2,
+                    spellName: 'Fireball', dc: 13, success: true, mode: 'normal',
+                })
             );
         });
     });

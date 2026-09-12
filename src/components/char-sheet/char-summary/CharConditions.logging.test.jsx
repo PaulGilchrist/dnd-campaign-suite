@@ -115,15 +115,17 @@ describe('CharConditions logging', () => {
       );
 
       expect(logConditionSave).toHaveBeenCalledWith(
-        'test-campaign',
-        'Test Character',
-        15,
-        2,
-        undefined,
-        'Charmed',
-        'wis',
-        14,
-        true
+        expect.objectContaining({
+          campaignName: 'test-campaign',
+          creatureName: 'Test Character',
+          roll: 15,
+          bonus: 2,
+          bonusDetail: undefined,
+          conditionLabel: 'Charmed',
+          abilityLabel: 'wis',
+          dc: 14,
+          success: true,
+        })
       );
 
       await waitFor(() => {
@@ -161,15 +163,17 @@ describe('CharConditions logging', () => {
       );
 
       expect(logConditionSave).toHaveBeenCalledWith(
-        'test-campaign',
-        'Test Character',
-        15,
-        5,
-        '(+3 aura from Paladin)',
-        'Charmed',
-        'wis',
-        14,
-        true
+        expect.objectContaining({
+          campaignName: 'test-campaign',
+          creatureName: 'Test Character',
+          roll: 15,
+          bonus: 5,
+          bonusDetail: '(+3 aura from Paladin)',
+          conditionLabel: 'Charmed',
+          abilityLabel: 'wis',
+          dc: 14,
+          success: true,
+        })
       );
     });
 
@@ -204,15 +208,17 @@ describe('CharConditions logging', () => {
       );
 
       expect(logConditionSave).toHaveBeenCalledWith(
-        'test-campaign',
-        'Test Character',
-        [8, 14],
-        expect.any(Number),
-        expect.anything(),
-        'Grappled',
-        'str',
-        13,
-        true
+        expect.objectContaining({
+          campaignName: 'test-campaign',
+          creatureName: 'Test Character',
+          roll: [8, 14],
+          bonus: expect.any(Number),
+          bonusDetail: expect.anything(),
+          conditionLabel: 'Grappled',
+          abilityLabel: 'str',
+          dc: 13,
+          success: true,
+        })
       );
     });
   });

@@ -202,11 +202,29 @@ function applyRamProneCondition(target, campaignName, logEntry) {
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
+function resolveBardicInspirationFlags(context, characterName, campaignName) {
+    const playerStats = context?.playerStats;
+    return {
+        offense: context?.bardicInspirationOffense || (playerStats ? hasBardicInspirationOffense(playerStats, campaignName) : false),
+        dieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (playerStats ? getBardicInspirationDieSizeFromClass(playerStats) : null),
+    };
+}
+
+function resolveEmpoweredSpellFlags(context) {
+    const playerStats = context?.playerStats;
+    return {
+        empoweredSpell: context?.empoweredSpell || (playerStats ? hasEmpoweredSpell(playerStats) : false),
+        empoweredSpellChaMod: context?.empoweredSpellChaMod || getChaModifier(playerStats),
+    };
+}
+
 function attachInspirationEmpoweredFlags(popupData, context, characterName, campaignName) {
-    popupData.bardicInspirationOffense = context?.bardicInspirationOffense || (context?.playerStats ? hasBardicInspirationOffense(context.playerStats, campaignName) : false);
-    popupData.bardicInspirationOffenseDieSize = context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (context?.playerStats ? getBardicInspirationDieSizeFromClass(context.playerStats) : null);
-    popupData.empoweredSpell = context?.empoweredSpell || (context?.playerStats ? hasEmpoweredSpell(context.playerStats) : false);
-    popupData.empoweredSpellChaMod = context?.empoweredSpellChaMod || getChaModifier(context?.playerStats);
+    const bardic = resolveBardicInspirationFlags(context, characterName, campaignName);
+    const empowered = resolveEmpoweredSpellFlags(context);
+    popupData.bardicInspirationOffense = bardic.offense;
+    popupData.bardicInspirationOffenseDieSize = bardic.dieSize;
+    popupData.empoweredSpell = empowered.empoweredSpell;
+    popupData.empoweredSpellChaMod = empowered.empoweredSpellChaMod;
     popupData.spellName = context?.spellName || '';
 }
 

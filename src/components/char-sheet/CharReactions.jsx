@@ -9,7 +9,7 @@ import BendFateModal from './modals/BendFateModal.jsx'
 import BoonFateModal from './modals/BoonFateModal.jsx'
 import StepsOfTheFeyTauntModal from './modals/StepsOfTheFeyTauntModal.jsx'
 import SearingVengeanceModal from './modals/SearingVengeanceModal.jsx'
-import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js'
+import { getReactionSpellNames, applyPotentSpellcasting } from '../../services/ui/spellSectionUtils.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
@@ -343,6 +343,18 @@ function ReactionSpellRow({ spell, playerStats, cannotAct, rollAttack, gateMetam
     </React.Fragment>;
 }
 
+function applyAutomationModalResult(result, reaction, { campaignName, characters, setModalState, setPopupHtml }) {
+    const modalKey = REACTION_MODAL_KEYS[result.modalName];
+    if (result.modalName === 'searingVengeance') {
+        setModalState({ searingVengeanceModal: { ...result.payload, reaction, campaignName, characters } });
+    } else if (modalKey) {
+        setModalState({ [modalKey]: result.payload });
+    } else {
+        const html = buildFeatureDetailHtml(reaction);
+        if (html) setPopupHtml(html);
+    }
+}
+
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters, autoDamageSource: 'char-reactions', autoDamageRoll: async (autoDamage, isCrit) => {
@@ -366,18 +378,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         }
         const resolved = resolveSpellDamageAtLevel(spell, playerStats.level);
         if (!resolved || spell.level !== 0) return resolved;
-        const potentFeature = playerStats.automation?.actions?.find(
-            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
-        );
-        if (!potentFeature) return resolved;
-        const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
-        const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
-        if (potentFeature.options.length > 1 && !chosen) return resolved;
-        if (chosen && !chosen.toLowerCase().includes('spellcasting')) return resolved;
-        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
-        const wisMod = Math.max(0, wis?.bonus || 0);
-        if (wisMod <= 0) return resolved;
-        return `${resolved}+${wisMod}`;
+        return applyPotentSpellcasting(resolved, playerStats, campaignName);
     }, [playerStats, campaignName]);
 
     // Build reactions list immutably
@@ -523,15 +524,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         }
 
         if (result.type === 'modal') {
-            const modalKey = REACTION_MODAL_KEYS[result.modalName];
-            if (result.modalName === 'searingVengeance') {
-                setModalState({ searingVengeanceModal: { ...result.payload, reaction, campaignName, characters } });
-            } else if (modalKey) {
-                setModalState({ [modalKey]: result.payload });
-            } else {
-                const html = buildFeatureDetailHtml(reaction);
-                if (html) setPopupHtml(html);
-            }
+            applyAutomationModalResult(result, reaction, { campaignName, characters, setModalState, setPopupHtml });
             return;
         }
 

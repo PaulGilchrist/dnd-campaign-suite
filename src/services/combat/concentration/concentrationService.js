@@ -14,7 +14,7 @@ import { removeHeroismBuff } from '../../rules/features/heroismService.js'
 import { removeSummonedCreatures } from '../summons/summonedCreatureService.js'
 import { revertTruePolymorph } from '../../automation/handlers/spells/truePolymorphService.js'
 
-async function rollConcentrationSave(creature, concentration, characters, campaignNpcs, campaignName, mapName, getName, disadvantage = false) {
+async function rollConcentrationSave({ creature, concentration, characters, campaignNpcs, campaignName, mapName, getName, disadvantage = false }) {
     const saveBonus = await getCreatureSaveBonus(creature, 'con', characters, campaignNpcs, getName)
     const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName, allCreatures: getCombatSummary(campaignName)?.creatures })
     const auraBonus = aura.bonus
@@ -96,7 +96,7 @@ function addConcentration(combatSummary, creatureName, spellName, dc, target = n
     }
 }
 
-function buildConcentrationPopup(roll, bonus, bonusDetail, spellName, dc, success, starryDragonFloor, displayRolls) {
+function buildConcentrationPopup({ roll, bonus, bonusDetail, spellName, dc, success, starryDragonFloor, displayRolls }) {
     return {
         type: 'd20',
         rollType: 'condition-save',

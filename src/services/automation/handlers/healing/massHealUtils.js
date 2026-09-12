@@ -50,10 +50,18 @@ export function createMassHealHandler(config) {
         useCurrentRound = false,
     } = config;
 
+    function resolveMaxTargets(auto) {
+        return auto?.maxTargets || defaultMaxTargets;
+    }
+
+    function resolveSlotLevel(auto, action) {
+        return auto?.slotLevel || action.spell?.level || defaultSlotLevel;
+    }
+
     async function handle(action, playerStats, campaignName, _mapName) {
         const auto = action.automation;
-        const slotLevel = auto?.slotLevel || action.spell?.level || defaultSlotLevel;
-        const maxTargets = auto?.maxTargets || defaultMaxTargets;
+        const slotLevel = resolveSlotLevel(auto, action);
+        const maxTargets = resolveMaxTargets(auto);
 
         const spellCastingMod = getSpellCastingMod(playerStats, action.spell);
         const healExpression = resolveHealExpression(action.spell, slotLevel, spellCastingMod);
@@ -109,7 +117,7 @@ export function createMassHealHandler(config) {
 
     async function confirmFn({ action, playerStats, campaignName, selectedTargetNames, healExpression, maximize, bonusHeal, bonusDetails, slotLevel: _slotLevel, currentRound }) {
         const playerName = playerStats.name;
-        const maxTargets = action.automation?.maxTargets || defaultMaxTargets;
+        const maxTargets = resolveMaxTargets(action.automation);
         const finalTargets = selectedTargetNames.slice(0, maxTargets);
         const combatSummary = await getCombatContext(campaignName);
         const results = [];

@@ -355,7 +355,7 @@ function gateLongstrider(spell, campaignName, cfSetPending, _playerStats, _metaC
 // Canonical HP truth: PCs via the runtime store, monsters via cs.currentHp
 // (pitfall 29). Returns true even when no valid target exists (refusal popup)
 // so the cast never falls through to the generic path — mirrors gateRevivify.
-function gateSpareTheDying(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer, setPopupHtml) {
+function gateSpareTheDying({ spell, campaignName, cfSetPending, playerStats, setPopupHtml }) {
   const { cs, creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   const dyingTargets = creatureTargets.filter(name => isSpareTheDyingTarget(cs, name));
   if (dyingTargets.length > 0) {
@@ -577,7 +577,7 @@ function gateCureWounds(spell, campaignName, cfSetPending, _playerStats, _metaCt
 // INCLUDED: Revivify RAW works on any creature reduced to 0 Hit Points.
 // Returns true even when no dead creature exists (refusal popup) so the cast
 // never falls through to the generic path that would spend the slot + diamond.
-function gateRevivify(spell, campaignName, cfSetPending, playerStats, _metaCtx, _characters, _isSorcerer, setPopupHtml) {
+function gateRevivify({ spell, campaignName, cfSetPending, playerStats, setPopupHtml }) {
   const { cs, creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   const deadTargets = creatureTargets.filter(name => isCreatureDead(cs, name));
   if (deadTargets.length > 0) {
@@ -711,7 +711,9 @@ const spellGateMap = {
   'feign death': gateFeignDeath,
   'heal': gateHeal,
   'longstrider': gateLongstrider,
-  'spare the dying': gateSpareTheDying,
+  'spare the dying': (...args) => gateSpareTheDying({
+    spell: args[0], campaignName: args[1], cfSetPending: args[2], playerStats: args[3], setPopupHtml: args[7],
+  }),
   'pass without trace': gatePassWithoutTrace,
   'beacon of hope': gateBeaconOfHope,
   "heroes' feast": gateHeroesFeast,
@@ -730,7 +732,9 @@ const spellGateMap = {
   'regenerate': gateRegenerate,
   'healing word': gateHealingWord,
   'cure wounds': gateCureWounds,
-  'revivify': gateRevivify,
+  'revivify': (...args) => gateRevivify({
+    spell: args[0], campaignName: args[1], cfSetPending: args[2], playerStats: args[3], setPopupHtml: args[7],
+  }),
   'aura of life': gateAuraOfLife,
   'aura of purity': gateAuraOfPurity,
   'circle of power': gateCircleOfPower,

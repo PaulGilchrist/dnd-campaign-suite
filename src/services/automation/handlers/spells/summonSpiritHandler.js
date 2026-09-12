@@ -71,7 +71,7 @@ function resolveMonsterActions(monster, { slotLevel, spellAttackMod, spellSaveDc
     });
 }
 
-function buildSpiritCreature(monster, displayName, casterName, initiativeValue, slotLevel, auto, playerStats, options = {}) {
+function buildSpiritCreature({ monster, displayName, casterName, initiativeValue, slotLevel, auto, playerStats, options = {} }) {
     const baseAc = typeof monster.armor_class === 'number' ? monster.armor_class : 10;
     const baseHp = monster.hit_points || 10;
     const scale = auto.scale !== false;
@@ -230,7 +230,7 @@ async function performSummon(action, playerStats, campaignName, variant) {
 
     const { isPhantasmalFreeCast, halveHp } = resolveSummonFlags(playerStats, action);
 
-    const creature = buildSpiritCreature(monster, variant.name, casterName, initiativeValue, slotLevel, auto, playerStats, { noConcentration, createThrall, warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp });
+    const creature = buildSpiritCreature({ monster, displayName: variant.name, casterName, initiativeValue, slotLevel, auto, playerStats, options: { noConcentration, createThrall, warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp } });
     if (isPhantasmalFreeCast) {
         creature.phantasmal = true;
         creature.spectral = true;

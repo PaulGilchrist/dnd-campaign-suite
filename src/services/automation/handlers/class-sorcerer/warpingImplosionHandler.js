@@ -28,6 +28,31 @@ function getEmanationRange(auto, playerStats, playerName, campaignName) {
     return fallback;
 }
 
+function resolveUsesKey(auto, featureName) {
+    return auto.resourceKey || (featureName.toLowerCase().replace(/\s+/g, '') + 'Uses');
+}
+
+function buildImplosionPayload({ action, playerStats, campaignName, mapData, attackerPos, saveDcValue, rangeFeet, canRestore, currentUses }) {
+    const auto = action.automation;
+    return {
+        action,
+        playerStats,
+        campaignName,
+        mapData,
+        attackerPos,
+        saveDc: saveDcValue,
+        saveType: auto.saveType || 'STR',
+        shape: auto.shape || 'emanation_30ft',
+        rangeFeet,
+        damageExpression: auto.damage || '',
+        damageType: auto.damageType || '',
+        teleportRange: TELEPORT_RANGE_FEET,
+        canRestore,
+        restoreCost: auto.restoreCost || 5,
+        hasRemaining: currentUses > 0,
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -39,7 +64,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const canRestore = currentSP >= (auto.restoreCost || 5);
 
     // Check if already used this long rest
-    const usesKey = auto.resourceKey || (featureName.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    const usesKey = resolveUsesKey(auto, featureName);
     const usesMax = auto.uses ?? 1;
     const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
 
@@ -78,23 +103,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     return {
         type: 'modal',
         modalName: 'warpingImplosion',
-        payload: {
-            action,
-            playerStats,
-            campaignName,
-            mapData,
-            attackerPos,
-            saveDc: saveDcValue,
-            saveType: auto.saveType || 'STR',
-            shape: auto.shape || 'emanation_30ft',
-            rangeFeet,
-            damageExpression: auto.damage || '',
-            damageType: auto.damageType || '',
-            teleportRange: TELEPORT_RANGE_FEET,
-            canRestore,
-            restoreCost: auto.restoreCost || 5,
-            hasRemaining: currentUses > 0,
-        },
+        payload: buildImplosionPayload({ action, playerStats, campaignName, mapData, attackerPos, saveDcValue, rangeFeet, canRestore, currentUses }),
     };
 }
 
@@ -129,7 +138,7 @@ export async function applyWarpingImplosion(action, playerStats, campaignName, r
             };
         }
     } else {
-        const usesKey = auto.resourceKey || (featureName.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        const usesKey = resolveUsesKey(auto, featureName);
         const usesMax = auto.uses ?? 1;
         const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
         if (currentUses <= 0) {

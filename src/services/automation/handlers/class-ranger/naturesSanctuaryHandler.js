@@ -16,12 +16,23 @@ function getMovesUsed(playerName, campaignName) {
     return Number(getRuntimeValue(playerName, SANCTUARY_MOVES_KEY, campaignName) ?? 0);
 }
 
+function resolveWildShapeMax(playerStats) {
+    return playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+}
+
+function buildCreatureTargets(combatSummary) {
+    return combatSummary?.creatures
+        ? combatSummary.creatures
+            .map(c => ({ name: c.name, type: c.type, currentHp: c.currentHp, maxHp: c.maxHp, size: c.size }))
+        : [];
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
     // Check Wild Shape uses remain
-    const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+    const maxWS = resolveWildShapeMax(playerStats);
     const currentWS = Number(getRuntimeValue(playerName, 'wildShapeUses', campaignName) ?? maxWS);
     if (currentWS <= 0) {
         return {
@@ -60,10 +71,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Get all creatures from combat context
     const combatSummary = await getCombatContext(campaignName);
-    const creatureTargets = combatSummary?.creatures
-        ? combatSummary.creatures
-            .map(c => ({ name: c.name, type: c.type, currentHp: c.currentHp, maxHp: c.maxHp, size: c.size }))
-        : [];
+    const creatureTargets = buildCreatureTargets(combatSummary);
 
     // Set up expiration for 1 minute (10 rounds) — rounds MUST be passed or
     // the queue treats it as Infinity and the sanctuary never expires (CLA-235).
@@ -123,10 +131,7 @@ export async function handleMove(action, playerStats, campaignName, _mapName) {
 
     // Get all creatures from combat context
     const combatSummary = await getCombatContext(campaignName);
-    const creatureTargets = combatSummary?.creatures
-        ? combatSummary.creatures
-            .map(c => ({ name: c.name, type: c.type, currentHp: c.currentHp, maxHp: c.maxHp, size: c.size }))
-        : [];
+    const creatureTargets = buildCreatureTargets(combatSummary);
 
     return {
         type: 'modal',
@@ -147,7 +152,7 @@ export async function activateNaturesSanctuary(action, playerStats, campaignName
     const playerName = playerStats.name;
 
     // Expend 1 Wild Shape use
-    const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+    const maxWS = resolveWildShapeMax(playerStats);
     const currentWS = Number(getRuntimeValue(playerName, 'wildShapeUses', campaignName) ?? maxWS);
     await setRuntimeValue(playerName, 'wildShapeUses', currentWS - 1, campaignName);
 

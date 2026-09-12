@@ -16,6 +16,30 @@ function hasGridPos(c) {
     return !!c && c.gridX != null && c.gridY != null;
 }
 
+async function resolveSilenceCombatants(campaignName) {
+    const combatSummary = await getCombatContext(campaignName);
+    return [
+        ...(combatSummary?.players || []),
+        ...(combatSummary?.creatures || []),
+    ];
+}
+
+function resolveSilenceCenterGrid(posOf, targetedNames, casterName) {
+    // "Point you choose" (manual-picker model): the first placed picked token
+    // is the sphere center; fall back to the caster's grid position.
+    for (const targetName of targetedNames) {
+        const pickedPos = posOf(targetName);
+        if (pickedPos) {
+            return { gridX: pickedPos.gridX, gridY: pickedPos.gridY };
+        }
+    }
+    const casterPos = posOf(casterName);
+    if (casterPos) {
+        return { gridX: casterPos.gridX, gridY: casterPos.gridY };
+    }
+    return null;
+}
+
 export default function SilenceModal({
     playerStats,
     campaignName,
@@ -37,29 +61,9 @@ export default function SilenceModal({
             return;
         }
 
-        const combatSummary = await getCombatContext(campaignName);
-        const csAll = [
-            ...(combatSummary?.players || []),
-            ...(combatSummary?.creatures || []),
-        ];
+        const csAll = await resolveSilenceCombatants(campaignName);
         const posOf = name => csAll.find(c => c.name === name && hasGridPos(c));
-
-        // "Point you choose" (manual-picker model): the first placed picked token
-        // is the sphere center; fall back to the caster's grid position.
-        let centerGrid = null;
-        for (const targetName of targetedNames) {
-            const pickedPos = posOf(targetName);
-            if (pickedPos) {
-                centerGrid = { gridX: pickedPos.gridX, gridY: pickedPos.gridY };
-                break;
-            }
-        }
-        if (!centerGrid) {
-            const casterPos = posOf(casterName);
-            if (casterPos) {
-                centerGrid = { gridX: casterPos.gridX, gridY: casterPos.gridY };
-            }
-        }
+        const centerGrid = resolveSilenceCenterGrid(posOf, targetedNames, casterName);
 
         setRuntimeValue(casterName, SILENCE_KEY, true, campaignName);
         setRuntimeValue(casterName, SILENCE_CENTER_KEY, centerGrid ? JSON.stringify(centerGrid) : null, campaignName);

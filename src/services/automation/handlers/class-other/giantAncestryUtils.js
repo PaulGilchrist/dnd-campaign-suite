@@ -68,7 +68,7 @@ export function applyAncestryDamage(cs, targetName, damageResult, damageType, ca
     return { actualDamage: applyResult?.finalDamage ?? damageResult?.total ?? 0, newHp: applyResult?.newHp };
 }
 
-export async function logAncestryDamageRoll(campaignName, playerStats, optName, targetName, damageType, actualDamage, formula, damageResult) {
+export async function logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula, damageResult }) {
     await addEntry(campaignName, {
         type: 'roll',
         characterName: playerStats.name,

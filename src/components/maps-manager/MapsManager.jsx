@@ -7,6 +7,93 @@ import GenerateDungeonModal from './GenerateDungeonModal.jsx';
 import GenerateTerrainModal from './GenerateTerrainModal.jsx';
 import './MapsManager.css';
 
+const GENERATE_BUTTONS = {
+    indoor: {
+        icon: 'fa-solid fa-wand-magic-sparkles',
+        label: 'Generate Dungeon',
+        title: 'Generate a dungeon map with rooms, hallways, and doorways',
+    },
+    outdoor: {
+        icon: 'fa-solid fa-mountain',
+        label: 'Generate Terrain',
+        title: 'Generate a terrain map with biomes',
+    },
+};
+
+function DeleteMapModal({ maps, fileName, onCancel, onConfirm }) {
+    const mapName = maps.find(m => m.fileName === fileName)?.name || fileName;
+    return (
+        <div className="maps-manager-modal-overlay" onClick={onCancel}>
+            <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
+                <h3>Delete Map</h3>
+                <p>
+                    This will permanently delete the map &apos;<strong>{mapName}</strong>&apos; and all its
+                    contents (walls, items, creature positions). This <strong>cannot be undone</strong>.
+                </p>
+                <div className="maps-manager-modal-actions">
+                    <button onClick={onCancel}>Cancel</button>
+                    <button className="delete-confirm-btn" onClick={() => onConfirm(fileName)}>
+                        Yes, Delete Permanently
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DescriptionEditModal({ map, description, onDescriptionChange, loading, saving, onCancel, onSave }) {
+    if (!map) return null;
+    return (
+        <div className="maps-manager-modal-overlay" onClick={(e) => {
+            if (e.target === e.currentTarget) onCancel();
+        }}>
+            <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
+                <div className="ct-modal-header">
+                    <h3>Edit Description — {map.name}</h3>
+                    <button className="ct-modal-close" onClick={onCancel} aria-label="Close">
+                        &times;
+                    </button>
+                </div>
+
+                <div className="ct-modal-body">
+                    {loading ? (
+                        <div className="maps-manager-loading">Loading map data…</div>
+                    ) : (
+                        <PreviewToggle
+                            id="map-description"
+                            value={description}
+                            onChange={onDescriptionChange}
+                            placeholder="Describe this map… (supports Markdown)"
+                            label="Map Description"
+                            minHeight="200px"
+                        />
+                    )}
+                </div>
+
+                <div className="ct-modal-footer">
+                    <div className="ct-modal-buttons">
+                        <button
+                            className="ct-btn ct-btn-secondary"
+                            onClick={onCancel}
+                            disabled={saving}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            className="ct-btn ct-btn-primary"
+                            onClick={onSave}
+                            disabled={saving}
+                        >
+                            <i className="fa-solid fa-floppy-disk" />{' '}
+                            {saving ? 'Saving…' : 'Save'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function MapsManager({ campaignName, onOpenMap, onBack }) {
     const [maps, setMaps] = useState([]);
     const setMapsGuarded = useSSEEqualityGuard(setMaps);
@@ -24,6 +111,8 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
     const [editDescription, setEditDescription] = useState('');
     const [loadingMapData, setLoadingMapData] = useState(false);
     const [savingDescription, setSavingDescription] = useState(false);
+
+    const generateModalOpeners = { indoor: setShowGenerateModal, outdoor: setShowTerrainModal };
 
     const loadMapsList = useCallback(async () => {
         try {
@@ -190,10 +279,6 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
         setEditDescription('');
     };
 
-    const deletingMapName = deletingMap
-        ? (maps.find(m => m.fileName === deletingMap)?.name || deletingMap)
-        : '';
-
     return (
         <div className="maps-manager">
             <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
@@ -233,23 +318,13 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                 <button onClick={handleCreate} disabled={!createName.trim()}>
                     Create Map
                 </button>
-                {mapType === 'indoor' ? (
-                    <button
-                        className="generate-dungeon-btn"
-                        onClick={() => setShowGenerateModal(true)}
-                        title="Generate a dungeon map with rooms, hallways, and doorways"
-                    >
-                        <i className="fa-solid fa-wand-magic-sparkles"></i> Generate Dungeon
-                    </button>
-                ) : (
-                    <button
-                        className="generate-dungeon-btn"
-                        onClick={() => setShowTerrainModal(true)}
-                        title="Generate a terrain map with biomes"
-                    >
-                        <i className="fa-solid fa-mountain"></i> Generate Terrain
-                    </button>
-                )}
+                <button
+                    className="generate-dungeon-btn"
+                    onClick={() => generateModalOpeners[mapType](true)}
+                    title={GENERATE_BUTTONS[mapType].title}
+                >
+                    <i className={GENERATE_BUTTONS[mapType].icon}></i> {GENERATE_BUTTONS[mapType].label}
+                </button>
             </div>
 
             {error && <div className="maps-manager-error">{error}</div>}
@@ -299,21 +374,12 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
             )}
 
             {deletingMap && (
-                <div className="maps-manager-modal-overlay" onClick={() => setDeletingMap(null)}>
-                    <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
-                        <h3>Delete Map</h3>
-                        <p>
-                            This will permanently delete the map &apos;<strong>{deletingMapName}</strong>&apos; and all its
-                            contents (walls, items, creature positions). This <strong>cannot be undone</strong>.
-                        </p>
-                        <div className="maps-manager-modal-actions">
-                            <button onClick={() => setDeletingMap(null)}>Cancel</button>
-                            <button className="delete-confirm-btn" onClick={() => handleDelete(deletingMap)}>
-                                Yes, Delete Permanently
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <DeleteMapModal
+                    maps={maps}
+                    fileName={deletingMap}
+                    onCancel={() => setDeletingMap(null)}
+                    onConfirm={handleDelete}
+                />
             )}
 
             {showGenerateModal && (
@@ -334,54 +400,16 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                 />
             )}
 
-            {editModalOpen && editingMap && (
-                <div className="maps-manager-modal-overlay" onClick={(e) => {
-                    if (e.target === e.currentTarget) handleCancelDescription();
-                }}>
-                    <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
-                        <div className="ct-modal-header">
-                            <h3>Edit Description — {editingMap.name}</h3>
-                            <button className="ct-modal-close" onClick={handleCancelDescription} aria-label="Close">
-                                &times;
-                            </button>
-                        </div>
-
-                        <div className="ct-modal-body">
-                            {loadingMapData ? (
-                                <div className="maps-manager-loading">Loading map data…</div>
-                            ) : (
-                                <PreviewToggle
-                                    id="map-description"
-                                    value={editDescription}
-                                    onChange={setEditDescription}
-                                    placeholder="Describe this map… (supports Markdown)"
-                                    label="Map Description"
-                                    minHeight="200px"
-                                />
-                            )}
-                        </div>
-
-                        <div className="ct-modal-footer">
-                            <div className="ct-modal-buttons">
-                                <button
-                                    className="ct-btn ct-btn-secondary"
-                                    onClick={handleCancelDescription}
-                                    disabled={savingDescription}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    className="ct-btn ct-btn-primary"
-                                    onClick={handleSaveDescription}
-                                    disabled={savingDescription}
-                                >
-                                    <i className="fa-solid fa-floppy-disk" />{' '}
-                                    {savingDescription ? 'Saving…' : 'Save'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            {editModalOpen && (
+                <DescriptionEditModal
+                    map={editingMap}
+                    description={editDescription}
+                    onDescriptionChange={setEditDescription}
+                    loading={loadingMapData}
+                    saving={savingDescription}
+                    onCancel={handleCancelDescription}
+                    onSave={handleSaveDescription}
+                />
             )}
         </div>
     );

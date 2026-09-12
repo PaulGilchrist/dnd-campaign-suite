@@ -7,6 +7,18 @@ import { computeTrackedResources } from './trackedResources.js';
 import { getChosenRuntimeValue } from '../automation/common/choiceStorage.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
+// Merge granted values into the playerStats resistances/immunities list,
+// validating the current list is an array (identical contract to the
+// original inline resolution — same console.error and throw messages).
+function mergeDefenseList(playerStats, key, extras) {
+    const current = playerStats[key];
+    if (!Array.isArray(current)) {
+        console.error(`rulesFactory.getPlayerStats: expected ${key} array`);
+        throw new Error(`Expected ${key} to be an array`);
+    }
+    playerStats[key] = [...new Set([...current, ...extras])];
+}
+
 const rulesFactory = {
       /**
        * Get the appropriate rule modules for the given ruleset.
@@ -122,15 +134,7 @@ const rulesFactory = {
                 return damageTypes;
             });
         if (autoResistances.length) {
-            const resistances = playerStats.resistances;
-            if (!Array.isArray(resistances)) {
-                console.error('rulesFactory.getPlayerStats: expected resistances array');
-                throw new Error('Expected resistances to be an array');
-            }
-            playerStats.resistances = [...new Set([
-                ...resistances,
-                ...autoResistances
-            ])];
+            mergeDefenseList(playerStats, 'resistances', autoResistances);
         }
 
         // Resolve passive_immunity damageResistance (e.g., Psychic Defenses)
@@ -138,15 +142,7 @@ const rulesFactory = {
             .filter(p => p.type === 'passive_immunity' && Array.isArray(p.damageResistance))
             .flatMap(p => p.damageResistance);
         if (passiveImmunityResistances.length) {
-            const resistances = playerStats.resistances;
-            if (!Array.isArray(resistances)) {
-                console.error('rulesFactory.getPlayerStats: expected resistances array');
-                throw new Error('Expected resistances to be an array');
-            }
-            playerStats.resistances = [...new Set([
-                ...resistances,
-                ...passiveImmunityResistances
-            ])];
+            mergeDefenseList(playerStats, 'resistances', passiveImmunityResistances);
         }
 
         // Resolve land_resistance automation (Circle of the Land Nature's Ward)
@@ -168,15 +164,7 @@ const rulesFactory = {
                 return mappings[landType] ? [mappings[landType]] : [];
             });
         if (landResistances.length) {
-            const resistances = playerStats.resistances;
-            if (!Array.isArray(resistances)) {
-                console.error('rulesFactory.getPlayerStats: expected resistances array');
-                throw new Error('Expected resistances to be an array');
-            }
-            playerStats.resistances = [...new Set([
-                ...resistances,
-                ...landResistances
-            ])];
+            mergeDefenseList(playerStats, 'resistances', landResistances);
         }
 
         // Resolve land_resistance conditionImmunity (Nature's Ward: poisoned condition immunity)
@@ -184,57 +172,25 @@ const rulesFactory = {
             .filter(p => p.type === 'land_resistance' && p.conditionImmunity)
             .map(p => p.conditionImmunity);
         if (landConditionImmunities.length) {
-            const immunities = playerStats.immunities;
-            if (!Array.isArray(immunities)) {
-                console.error('rulesFactory.getPlayerStats: expected immunities array');
-                throw new Error('Expected immunities to be an array');
-            }
-            playerStats.immunities = [...new Set([
-                ...immunities,
-                ...landConditionImmunities
-            ])];
+            mergeDefenseList(playerStats, 'immunities', landConditionImmunities);
         }
 
         // Resolve Elemental Affinity damage type resistance (2024 Draconic Sorcery)
         const elementalAffinityType = getChosenRuntimeValue(playerStats, 'Elemental Affinity', 'chosenType');
         if (elementalAffinityType) {
-            const resistances = playerStats.resistances;
-            if (!Array.isArray(resistances)) {
-                console.error('rulesFactory.getPlayerStats: expected resistances array');
-                throw new Error('Expected resistances to be an array');
-            }
-            playerStats.resistances = [...new Set([
-                ...resistances,
-                elementalAffinityType
-            ])];
+            mergeDefenseList(playerStats, 'resistances', [elementalAffinityType]);
         }
 
         // Resolve Fiendish Resilience damage type resistance (2024 Warlock Fiend Patron)
         const fiendishResilienceType = getChosenRuntimeValue(playerStats, 'Fiendish Resilience', 'chosenType');
         if (fiendishResilienceType) {
-            const resistances = playerStats.resistances;
-            if (!Array.isArray(resistances)) {
-                console.error('rulesFactory.getPlayerStats: expected resistances array');
-                throw new Error('Expected resistances to be an array');
-            }
-            playerStats.resistances = [...new Set([
-                ...resistances,
-                fiendishResilienceType
-            ])];
+            mergeDefenseList(playerStats, 'resistances', [fiendishResilienceType]);
         }
 
         // Resolve Boon Of Energy Resistance damage type resistances (2024 Epic Boon)
         const boonEnergyResistances = getChosenRuntimeValue(playerStats, 'Boon Of Energy Resistance', 'chosenTypes');
         if (Array.isArray(boonEnergyResistances) && boonEnergyResistances.length > 0) {
-            const resistances = playerStats.resistances;
-            if (!Array.isArray(resistances)) {
-                console.error('rulesFactory.getPlayerStats: expected resistances array');
-                throw new Error('Expected resistances to be an array');
-            }
-            playerStats.resistances = [...new Set([
-                ...resistances,
-                ...boonEnergyResistances
-            ])];
+            mergeDefenseList(playerStats, 'resistances', boonEnergyResistances);
         }
 
         playerStats._trackedResources = computeTrackedResources(playerStats);

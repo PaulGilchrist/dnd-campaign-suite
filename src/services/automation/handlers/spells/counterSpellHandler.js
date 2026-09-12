@@ -86,6 +86,26 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         promptId,
     }).catch((e) => { console.error("[counterSpell] Error:", e); });
 
+    async function refundSpellBreakerSlot() {
+        const spellBreaker = playerStats.automation?.passives?.find(p => p.type === 'spell_breaker');
+        if (!(spellBreaker && spellBreaker.slotRetentionSpells?.includes('Counterspell'))) return;
+
+        // CLA-322: refund keyed by the ACTUAL cast slot level (upcast-safe),
+        // not hardcoded level 3, and logged (house rule: every automation logs).
+        const castLevel = (action.spell?.isUpcast && action.spell?.upcastLevel) || action.spell?.level || 3;
+        const slotKey = `spell_slots_level_${castLevel}`;
+        const currentSlots = getRuntimeValue(playerName, slotKey);
+        if (currentSlots != null && currentSlots >= 0) {
+            setRuntimeValue(playerName, slotKey, currentSlots + 1, campaignName);
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Spell Breaker',
+                description: `Spell Breaker: Counterspell failed to counter '${spellName}' — spell slot level ${castLevel} refunded.`,
+            }).catch((e) => { console.error('[counterSpell] Error:', e); });
+        }
+    }
+
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
 
@@ -138,24 +158,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description: `${attackerName} succeeded on CON save. ${featureName} fails to counter '${spellName}'.`,
             }).catch((e) => { console.error("[counterSpell] Error:", e); });
 
-            const passives = playerStats.automation?.passives;
-            const spellBreaker = passives?.find(p => p.type === 'spell_breaker');
-            if (spellBreaker && spellBreaker.slotRetentionSpells?.includes('Counterspell')) {
-                // CLA-322: refund keyed by the ACTUAL cast slot level (upcast-safe),
-                // not hardcoded level 3, and logged (house rule: every automation logs).
-                const castLevel = (action.spell?.isUpcast && action.spell?.upcastLevel) || action.spell?.level || 3;
-                const slotKey = `spell_slots_level_${castLevel}`;
-                const currentSlots = getRuntimeValue(playerName, slotKey);
-                if (currentSlots != null && currentSlots >= 0) {
-                    setRuntimeValue(playerName, slotKey, currentSlots + 1, campaignName);
-                    addEntry(campaignName, {
-                        type: 'ability_use',
-                        characterName: playerName,
-                        abilityName: 'Spell Breaker',
-                        description: `Spell Breaker: Counterspell failed to counter '${spellName}' — spell slot level ${castLevel} refunded.`,
-                    }).catch((e) => { console.error('[counterSpell] Error:', e); });
-                }
-            }
+            await refundSpellBreakerSlot();
         }
 
         window.removeEventListener('save-result', handleSaveResult);

@@ -9,18 +9,22 @@ function isInCoronaEnemiesList(sourceName, targetName) {
     return storedEnemies.includes(targetName);
 }
 
+function getCoronaBuffForTarget(playerName, targetName) {
+    const buffs = getRuntimeValue(playerName, 'activeBuffs') || [];
+    const coronaBuff = Array.isArray(buffs) ? buffs.find(b => b.effect === 'sunlight_aura') : null;
+    if (!coronaBuff) return null;
+    if (!isInCoronaEnemiesList(playerName, targetName)) return null;
+    return coronaBuff;
+}
+
 export async function getCoronaSaveDisadvantage({ targetName, mapData, damageType }) {
     const players = mapData?.players?.length ? mapData.players : [];
     if (!players.length) return { disadvantage: false };
 
     for (const player of players) {
         if (player.name === targetName) continue;
-        const buffs = getRuntimeValue(player.name, 'activeBuffs') || [];
-        const coronaBuff = Array.isArray(buffs) ? buffs.find(b => b.effect === 'sunlight_aura') : null;
+        const coronaBuff = getCoronaBuffForTarget(player.name, targetName);
         if (!coronaBuff) continue;
-
-        const inList = isInCoronaEnemiesList(player.name, targetName);
-        if (!inList) continue;
 
         const range = coronaBuff.distance || '60 ft';
         const rangeNum = parseInt(range) || 60;

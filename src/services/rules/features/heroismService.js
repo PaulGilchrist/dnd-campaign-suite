@@ -99,8 +99,25 @@ async function applyHeroismToTarget(targetName, playerStats, campaignName, caste
     }).catch((e) => { console.error("[heroism] Error logging:", e); });
 }
 
+function hasValidHeroismTargets(targetNames) {
+    return Array.isArray(targetNames) && targetNames.length > 0;
+}
+
+function resolveHeroismTempHpAmount(spell, playerStats) {
+    const spellcastingAbilityMod = playerStats.spellAbilities?.modifier || 0;
+    const tempHpExpression = spell.automation?.tempHpExpression || 'spellcasting_ability_modifier';
+    return tempHpExpression === 'spellcasting_ability_modifier' ? spellcastingAbilityMod : 0;
+}
+
+function heroismPopupDescription(targetNames, casterName, tempHpAmount) {
+    if (targetNames.length === 1) {
+        return `${targetNames[0]} gained Heroism from ${casterName}'s cast: immune to Frightened, ${tempHpAmount} temp HP at start of each turn.`;
+    }
+    return `${targetNames.length} targets gained Heroism: ${targetNames.join(', ')}.`;
+}
+
 export async function applyHeroism(heroismAction, playerStats, campaignName, _mapName, targetNames) {
-    if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
+    if (!hasValidHeroismTargets(targetNames)) {
         return null;
     }
 
@@ -108,12 +125,7 @@ export async function applyHeroism(heroismAction, playerStats, campaignName, _ma
     const casterName = playerStats.name;
     const duration = spell.automation?.duration || 'Concentration, up to 1 minute';
 
-    const spellcastingAbilityMod = playerStats.spellAbilities?.modifier || 0;
-
-    const tempHpExpression = spell.automation?.tempHpExpression || 'spellcasting_ability_modifier';
-    const tempHpAmount = tempHpExpression === 'spellcasting_ability_modifier'
-        ? spellcastingAbilityMod
-        : 0;
+    const tempHpAmount = resolveHeroismTempHpAmount(spell, playerStats);
 
     const combatSummary = getCombatSummary(campaignName);
     const dc = playerStats.spellAbilities?.saveDc || (8 + (playerStats.proficiency || 0));
@@ -122,17 +134,12 @@ export async function applyHeroism(heroismAction, playerStats, campaignName, _ma
         await applyHeroismToTarget(targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc);
     }
 
-    const targetsList = targetNames.join(', ');
-    const popupDescription = targetNames.length === 1
-        ? `${targetNames[0]} gained Heroism from ${casterName}'s cast: immune to Frightened, ${tempHpAmount} temp HP at start of each turn.`
-        : `${targetNames.length} targets gained Heroism: ${targetsList}.`;
-
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: heroismAction.name || 'Heroism',
-            description: popupDescription,
+            description: heroismPopupDescription(targetNames, casterName, tempHpAmount),
             automation: heroismAction.automation || {},
         },
     };

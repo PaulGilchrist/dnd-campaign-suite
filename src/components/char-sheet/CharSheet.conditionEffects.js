@@ -146,7 +146,7 @@ function applyAttackAdvantageBuffs(conditionEffects, activeBuffs) {
 }
 
 // Post-compute buff/feature modifiers applied to the base conditionEffects, in original order.
-function applyPostComputeModifiers(conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions) {
+function applyPostComputeModifiers({ conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions }) {
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;
@@ -261,7 +261,7 @@ export function computeCharConditionEffects(playerSummary, playerStats, campaign
     });
 
     const { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive, shieldActive, shieldOfFaithActive, hasteActive, wardingBondAcBonus, wardingBondSaveBonus } =
-        applyPostComputeModifiers(conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions);
+        applyPostComputeModifiers({ conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions });
 
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
     // SP-111: the Poisoned-by-Stinking-Cloud rider blocks Actions + Bonus

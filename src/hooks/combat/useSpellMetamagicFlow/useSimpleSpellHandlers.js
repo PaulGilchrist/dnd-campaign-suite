@@ -317,7 +317,7 @@ const SIMPLE_SPELL_SPECS = [
   { name: 'web', key: 'Web', run: areaExecute('web_area_save', 'DEX') },
 ]
 
-export function useSimpleSpellHandlers(createConfirmHandler, createSkipHandler, playerStats, campaignName, characters, setPopupHtml, getPending, cfClearPending, onExecute) {
+export function useSimpleSpellHandlers({ createConfirmHandler, createSkipHandler, playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute }) {
   const deps = { playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute }
   const handlers = {}
   for (const spec of SIMPLE_SPELL_SPECS) {

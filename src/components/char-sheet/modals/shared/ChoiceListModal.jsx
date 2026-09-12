@@ -43,6 +43,14 @@ function DefaultChoiceOptionRow({ option, isSelected, isExisting, disabled, mult
   );
 }
 
+function ChoiceConfirmButton({ multiSelect, selected, confirmIcon, icon, confirmLabel, onApply }) {
+  return (
+    <button className="sp-roll-btn" onClick={onApply} disabled={multiSelect ? selected.length === 0 : !selected}>
+      <i className={`fa-solid ${confirmIcon || icon}`}></i> {confirmLabel}
+    </button>
+  );
+}
+
 export function ChoiceListModal({
   icon,
   title,
@@ -153,9 +161,7 @@ export function ChoiceListModal({
           </div>
         </div>
         <div className="sp-actions">
-          <button className="sp-roll-btn" onClick={handleApply} disabled={multiSelect ? selected.length === 0 : !selected}>
-            <i className={`fa-solid ${confirmIcon || icon}`}></i> {confirmLabel}
-          </button>
+          <ChoiceConfirmButton multiSelect={multiSelect} selected={selected} confirmIcon={confirmIcon} icon={icon} confirmLabel={confirmLabel} onApply={handleApply} />
           <button className="sp-dismiss-btn" onClick={onClose}>{cancelLabel}</button>
         </div>
       </div>

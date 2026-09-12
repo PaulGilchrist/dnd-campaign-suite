@@ -80,6 +80,24 @@ function logIndomitableMight(characterName, campaignName, name, rollType, bonus,
     }).catch((e) => { console.error('[Indomitable Might] Log error:', e); });
 }
 
+function resolveRollTargetName(rollType, target, context) {
+    if (rollType !== 'attack' && rollType !== 'save') return undefined;
+    return target?.name || context?.targetName;
+}
+
+function buildContextRollFields(context) {
+    return {
+        damageType: context?.damageType,
+        rangeReason: context?.rangeReason,
+        resistanceNotice: context?.resistanceNotice,
+        hunterLoreNotice: context?.hunterLoreNotice,
+        coverLevel: context?.coverLevel,
+        coverAcBonus: context?.coverAcBonus,
+        coverReason: context?.coverReason,
+        advantageReason: context?.advantageReason,
+    };
+}
+
 function buildRollLogEntry({ characterName, rollType, name, ctx, context, target, targetAc }) {
     return {
         type: 'roll',
@@ -96,24 +114,17 @@ function buildRollLogEntry({ characterName, rollType, name, ctx, context, target
         blessRoll: ctx.blessAttackRoll,
         isNatural20: ctx.effectiveD20Roll === 20,
         isNatural1: ctx.effectiveD20Roll === 1,
-        targetName: (rollType === 'attack' || rollType === 'save') ? (target?.name || context?.targetName) : undefined,
+        targetName: resolveRollTargetName(rollType, target, context),
         targetAc,
         effectiveAc: ctx.effectiveAc,
         shieldAcBonus: ctx._shieldAcBonus || 0,
         shieldOfFaithAcBonus: ctx._shieldOfFaithAcBonus || 0,
         wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
         slowAcPenalty: ctx._slowAcPenalty || 0,
-        damageType: context?.damageType,
         hit: ctx.hit,
         isAutoMiss: ctx.isAutoMiss,
         isCrit: ctx.isCrit,
-        rangeReason: context?.rangeReason,
-        resistanceNotice: context?.resistanceNotice,
-        hunterLoreNotice: context?.hunterLoreNotice,
-        coverLevel: context?.coverLevel,
-        coverAcBonus: context?.coverAcBonus,
-        coverReason: context?.coverReason,
-        advantageReason: context?.advantageReason,
+        ...buildContextRollFields(context),
     };
 }
 
@@ -146,22 +157,22 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
     };
 }
 
+const REROLL_COPY_FLAG_KEYS = [
+    'autoReroll', 'autoRerollBonus', 'autoRerollCondition',
+    'strSaveReplace', 'strScore', 'strCheckReplace',
+    'reliableTalent', 'wisCheckReplace', 'wisCheckMinBonus',
+    'd20Floor10',
+];
+
 function buildRerollAndReplacementFlags(context) {
-    return {
-        autoReroll: context?.autoReroll,
-        autoRerollBonus: context?.autoRerollBonus,
-        autoRerollCondition: context?.autoRerollCondition,
-        autoRerollForAttack: context?.autoRerollForAttack || context?.boonOfCombatProwess,
-        strSaveReplace: context?.strSaveReplace,
-        strScore: context?.strScore,
-        strCheckReplace: context?.strCheckReplace,
-        reliableTalent: context?.reliableTalent,
-        wisCheckReplace: context?.wisCheckReplace,
-        wisCheckMinBonus: context?.wisCheckMinBonus,
-        defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
-        baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
-        d20Floor10: context?.d20Floor10,
-    };
+    const flags = {};
+    for (const key of REROLL_COPY_FLAG_KEYS) {
+        flags[key] = context?.[key];
+    }
+    flags.autoRerollForAttack = context?.autoRerollForAttack || context?.boonOfCombatProwess;
+    flags.defensiveDuelistBonus = context?.defensiveDuelistBonus || 0;
+    flags.baitAndSwitchBonus = context?.baitAndSwitchBonus || 0;
+    return flags;
 }
 
 const LUCK_INSPIRATION_PASSTHROUGH_KEYS = [
@@ -376,10 +387,11 @@ export function createLogAndShow(deps) {
         // AC computation (attack-only)
         const targetAc = computeTargetAc(ctx, target, characters);
 
-        ctx._shieldAcBonus = getShieldAcBonus(target?.name, campaignName);
-        ctx._shieldOfFaithAcBonus = getShieldOfFaithAcBonus(target?.name, campaignName);
-        ctx._wardingBondAcBonus = getWardingBondAcBonus(target?.name, campaignName);
-        ctx._slowAcPenalty = getSlowAcPenalty(target?.name, campaignName);
+        const acTargetName = target?.name;
+        ctx._shieldAcBonus = getShieldAcBonus(acTargetName, campaignName);
+        ctx._shieldOfFaithAcBonus = getShieldOfFaithAcBonus(acTargetName, campaignName);
+        ctx._wardingBondAcBonus = getWardingBondAcBonus(acTargetName, campaignName);
+        ctx._slowAcPenalty = getSlowAcPenalty(acTargetName, campaignName);
 
         // Bi die size for bardic inspiration defense (attack-only)
         ctx._biDieSize = resolveBiDieSize(rollType, target, campaignName, characters);

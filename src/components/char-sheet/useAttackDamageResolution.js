@@ -175,9 +175,10 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
 }
 
 async function handlePrecisionAttackMiss({ popupHtml, maneuver, currentFormula, currentTotal, currentRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline }) {
-    const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
-    const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
-    const origD20 = (popupHtml.rolls?.[0] != null && popupHtml.rolls[0] !== 20) ? popupHtml.rolls[0] : (popupHtml.rolls?.[0] || 0);
+    const dieExpr = maneuver.dieExpression || 'superiority_die';
+    const dieRoll = rollExpression(dieExpr);
+    const dieValue = dieRoll?.total || evaluateAutoExpression(dieExpr, playerStats);
+    const origD20 = popupHtml.rolls?.[0] ?? 0;
     const origBonus = popupHtml.bonus || 0;
     const origTotal = origD20 + origBonus;
     const newTotal = origTotal + dieValue;
@@ -367,17 +368,20 @@ export default function useAttackDamageResolution({
      * Run the attack damage pipeline. For manual damage clicks, context comes from popupHtml.
      * For auto-damage (after an attack roll), pass ctxOverrides from normalizeAutoDamage().
      */
-    const resolveDamageContextFlags = (ctxOverrides, popupHtmlData, attackData) => ({
-        hit: ctxOverrides.hit ?? (popupHtmlData?.hit === true || popupHtmlData?.isCrit === true),
-        isCrit: ctxOverrides.isCrit ?? (popupHtmlData?.isCrit === true),
-        isNatural20: ctxOverrides.isNatural20 ?? (popupHtmlData?.isNatural20 === true),
-        targetName: ctxOverrides.targetName ?? (popupHtmlData?.targetName || null),
-        isBonusActionAttack: ctxOverrides.isBonusActionAttack ?? (attackData?.type === 'Bonus Action'),
-        overchannelActive: ctxOverrides.overchannelActive ?? false,
-        overchannelUseCount: ctxOverrides.overchannelUseCount ?? 0,
-        overchannelSpellLevel: ctxOverrides.overchannelSpellLevel ?? 1,
-        empoweredEvocationModifier: ctxOverrides.empoweredEvocationModifier ?? 0,
-    });
+    const resolveDamageContextFlags = (ctxOverrides, popupHtmlData, attackData) => {
+        const ph = popupHtmlData || {};
+        return {
+            hit: ctxOverrides.hit ?? (ph.hit === true || ph.isCrit === true),
+            isCrit: ctxOverrides.isCrit ?? (ph.isCrit === true),
+            isNatural20: ctxOverrides.isNatural20 ?? (ph.isNatural20 === true),
+            targetName: ctxOverrides.targetName ?? (ph.targetName || null),
+            isBonusActionAttack: ctxOverrides.isBonusActionAttack ?? (attackData?.type === 'Bonus Action'),
+            overchannelActive: ctxOverrides.overchannelActive ?? false,
+            overchannelUseCount: ctxOverrides.overchannelUseCount ?? 0,
+            overchannelSpellLevel: ctxOverrides.overchannelSpellLevel ?? 1,
+            empoweredEvocationModifier: ctxOverrides.empoweredEvocationModifier ?? 0,
+        };
+    };
 
     const resolveAttackDamage = async (attack, ctxOverrides = {}) => {
         pendingCtxOverrides = ctxOverrides;

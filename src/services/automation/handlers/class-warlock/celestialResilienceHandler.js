@@ -36,6 +36,15 @@ export async function grantCelestialResilience(playerStats, campaignName, source
     return result;
 }
 
+async function collectRangeCandidates(mapName, campaignName, playerStats) {
+    const mapPlayers = mapName ? (await loadMapData(campaignName, mapName))?.players || [] : [];
+    const combatSummary = getCombatSummary(campaignName);
+    const allCreatures = combatSummary?.creatures || [];
+    return mapPlayers.length > 0
+        ? mapPlayers.filter(p => p.name !== playerStats.name)
+        : allCreatures.filter(c => c.name !== playerStats.name);
+}
+
 async function attachAllyGrant(result, playerStats, campaignName, auto, mapName) {
     const allyTempHp = evaluateAutoExpression(auto.allyTempHpExpression || 'floor(warlock level / 2) + CHA modifier', playerStats);
     if (typeof allyTempHp !== 'number' || allyTempHp <= 0) return;
@@ -44,12 +53,7 @@ async function attachAllyGrant(result, playerStats, campaignName, auto, mapName)
     const allies = [];
 
     if (rangeFt != null) {
-        const mapPlayers = mapName ? (await loadMapData(campaignName, mapName))?.players || [] : [];
-        const combatSummary = getCombatSummary(campaignName);
-        const allCreatures = combatSummary?.creatures || [];
-        const candidates = mapPlayers.length > 0
-            ? mapPlayers.filter(p => p.name !== playerStats.name)
-            : allCreatures.filter(c => c.name !== playerStats.name);
+        const candidates = await collectRangeCandidates(mapName, campaignName, playerStats);
         for (const creature of candidates) {
             if (await isWithinRange(playerStats.name, creature.name, rangeFt)) {
                 allies.push({ name: creature.name, type: creature.type || 'player', currentHp: creature.currentHp || 0, maxHp: creature.maxHp || 0 });

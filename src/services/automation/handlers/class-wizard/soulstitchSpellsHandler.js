@@ -5,13 +5,21 @@ import { soulstitchStampKey } from '../../../../hooks/combat/loggedDiceRollUtils
 
 const EVOCATION_SCHOOL = 'evocation';
 
+function resolveSpell(action) {
+    return action.spell || action.payload?.spell;
+}
+
+function spellHasSave(spell, auto) {
+    return !!(spell?.dc || auto?.saveType);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Soulstitch Spells';
 
     // Check if this is an Evocation spell
-    const spell = action.spell || action.payload?.spell;
+    const spell = resolveSpell(action);
     const spellSchool = (spell?.school || '').toLowerCase();
 
     if (spellSchool !== EVOCATION_SCHOOL) {
@@ -19,9 +27,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Check if the spell has a save (dc field)
-    const hasSave = !!(spell?.dc || auto?.saveType);
-
-    if (!hasSave) {
+    if (!spellHasSave(spell, auto)) {
         return null;
     }
 

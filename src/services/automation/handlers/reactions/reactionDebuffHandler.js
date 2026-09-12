@@ -56,7 +56,7 @@ function appendAttackOutcomeLines(description, hit, finalHit, defenderName, heal
     return description;
 }
 
-async function handleAttackRollDebuff(action, _playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
+async function handleAttackRollDebuff({ action, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary }) {
     const auto = action.automation;
 
     const attackResult = await findLastAttack(campaignName);
@@ -81,7 +81,7 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, _mapNa
     return infoPopup(action.name, description, auto, { defenderHp });
 }
 
-async function handleDamageDebuff(action, _playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
+async function handleDamageDebuff({ action, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary }) {
     const auto = action.automation;
 
     const attackResult = await findLastAttack(campaignName);
@@ -137,6 +137,35 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, _map
     return infoPopup(action.name, description, auto, { defenderHp, defenderName, healedAmount });
 }
 
+async function gateBranchesInRange(featureName, auto, playerName, activeCreatureName, campaignName, _mapName) {
+    const rangeFt = rangeToFeet(auto.range || '30_ft');
+    const activeMapName = getRuntimeValue('__map__', 'activeMapName');
+
+    if (!activeMapName || !_mapName) return null;
+    const combatSummary = getCombatSummary(campaignName);
+    if (!combatSummary) return null;
+
+    const playerCreature = combatSummary.players?.find(p => p.name === playerName);
+    const targetCreature = combatSummary.creatures?.find(c => c.name === activeCreatureName);
+
+    const positioned = playerCreature?.gridX != null && playerCreature?.gridY != null &&
+        targetCreature?.gridX != null && targetCreature?.gridY != null;
+    if (!positioned) return null;
+
+    const inRange = await isWithinRange(playerName, activeCreatureName, rangeFt);
+    if (inRange) return null;
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description: `${activeCreatureName} is out of range.`,
+            automation: auto,
+        },
+    };
+}
+
 async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const featureName = action.name || 'Branches of the Tree';
@@ -156,32 +185,8 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName
         };
     }
 
-    const rangeFt = rangeToFeet(auto.range || '30_ft');
-    const activeMapName = getRuntimeValue('__map__', 'activeMapName');
-
-    if (activeMapName && _mapName) {
-        const combatSummary = getCombatSummary(campaignName);
-        if (combatSummary) {
-            const playerCreature = combatSummary.players?.find(p => p.name === playerName);
-            const targetCreature = combatSummary.creatures?.find(c => c.name === activeCreatureName);
-
-            if (playerCreature?.gridX != null && playerCreature?.gridY != null &&
-                targetCreature?.gridX != null && targetCreature?.gridY != null) {
-                const inRange = await isWithinRange(playerName, activeCreatureName, rangeFt);
-                if (!inRange) {
-                    return {
-                        type: 'popup',
-                        payload: {
-                            type: 'automation_info',
-                            name: featureName,
-                            description: `${activeCreatureName} is out of range.`,
-                            automation: auto,
-                        },
-                    };
-                }
-            }
-        }
-    }
+    const outOfRange = await gateBranchesInRange(featureName, auto, playerName, activeCreatureName, campaignName, _mapName);
+    if (outOfRange) return outOfRange;
 
     const strMod = getAbilityModifier(playerStats.abilities, 'STR');
     const prof = playerStats.proficiency || 0;
@@ -474,7 +479,7 @@ async function bardicRangeRefusal(auto, campaignName, playerName, attackerName, 
     return refused(infoPopup(featureName, `${attackerName} is out of range.`, auto));
 }
 
-async function handleBardicRoll(action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary) {
+async function handleBardicRoll({ action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary }) {
     const targetInfo = await resolveTarget(campaignName, playerName);
     if (!targetInfo?.target) {
         return refused(infoPopup(featureName, `${featureName} requires a target. Select a creature in combat and try again.`, auto));
@@ -498,11 +503,11 @@ async function handleBardicRoll(action, auto, playerStats, playerName, featureNa
     }
 
     if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
-        const result = await handleDamageDebuff(action, playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+        const result = await handleDamageDebuff({ action, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary });
         return applied(result, attackerName);
     }
 
-    const result = await handleAttackRollDebuff(action, playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+    const result = await handleAttackRollDebuff({ action, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary });
     return applied(result, attackerName);
 }
 
@@ -580,7 +585,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     } else if (effect === 'teleport_and_slow') {
         outcome = applied(await handleTeleportAndSlow(action, playerStats, campaignName, _mapName));
     } else {
-        outcome = await handleBardicRoll(action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary);
+        outcome = await handleBardicRoll({ action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary });
     }
 
     if (outcome.refused) return outcome.response;

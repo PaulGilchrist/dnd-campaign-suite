@@ -11,7 +11,7 @@ export function hasOpenNeighbor(walls, gx, gy, gridSize) {
     return false;
 }
 
-export function hasOutsideOpenNeighbor(walls, gx, gy, minX, maxX, minY, maxY, gridSize) {
+export function hasOutsideOpenNeighbor({ walls, gx, gy, minX, maxX, minY, maxY, gridSize }) {
     const neighbors = [
         [gx - 1, gy], [gx + 1, gy],
         [gx, gy - 1], [gx, gy + 1],
@@ -28,6 +28,7 @@ export function hasOutsideOpenNeighbor(walls, gx, gy, minX, maxX, minY, maxY, gr
 
 export function buildRoomWalls(walls, minX, maxX, minY, maxY, gridSize) {
     const newWalls = new Set(walls);
+    const bounds = { minX, maxX, minY, maxY, gridSize };
 
     for (let y = minY; y <= maxY; y++) {
         for (let x = minX; x <= maxX; x++) {
@@ -36,22 +37,22 @@ export function buildRoomWalls(walls, minX, maxX, minY, maxY, gridSize) {
     }
 
     for (let x = minX; x <= maxX; x++) {
-        if (!hasOutsideOpenNeighbor(newWalls, x, minY, minX, maxX, minY, maxY, gridSize)) {
+        if (!hasOutsideOpenNeighbor({ ...bounds, walls: newWalls, gx: x, gy: minY })) {
             newWalls.add(`${x},${minY}`);
         }
     }
     for (let x = minX; x <= maxX; x++) {
-        if (!hasOutsideOpenNeighbor(newWalls, x, maxY, minX, maxX, minY, maxY, gridSize)) {
+        if (!hasOutsideOpenNeighbor({ ...bounds, walls: newWalls, gx: x, gy: maxY })) {
             newWalls.add(`${x},${maxY}`);
         }
     }
     for (let y = minY + 1; y < maxY; y++) {
-        if (!hasOutsideOpenNeighbor(newWalls, minX, y, minX, maxX, minY, maxY, gridSize)) {
+        if (!hasOutsideOpenNeighbor({ ...bounds, walls: newWalls, gx: minX, gy: y })) {
             newWalls.add(`${minX},${y}`);
         }
     }
     for (let y = minY + 1; y < maxY; y++) {
-        if (!hasOutsideOpenNeighbor(newWalls, maxX, y, minX, maxX, minY, maxY, gridSize)) {
+        if (!hasOutsideOpenNeighbor({ ...bounds, walls: newWalls, gx: maxX, gy: y })) {
             newWalls.add(`${maxX},${y}`);
         }
     }

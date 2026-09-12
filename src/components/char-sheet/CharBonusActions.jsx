@@ -8,7 +8,7 @@ import TargetSpellPopups from './char-spells/TargetSpellPopups.jsx'
 
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
-import { getBonusActionSpellNames } from '../../services/ui/spellSectionUtils.js'
+import { getBonusActionSpellNames, applyPotentSpellcasting } from '../../services/ui/spellSectionUtils.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { addEntry } from '../../services/ui/logService.js'
@@ -437,6 +437,16 @@ function filterKnownBonusSpells(playerStats, bonusSpellNameSet) {
     return (playerStats.spellAbilities?.spells || []).filter(spell => bonusSpellNameSet.has(spell.name));
 }
 
+function findPsychicTeleportationAuto(playerStats) {
+    return (playerStats.automation?.bonusActions ?? []).find(
+        a => a.effect === 'psychic_teleportation'
+    );
+}
+
+function findHordeBreakerMarker(playerStats) {
+    return (playerStats.attacks || []).find(a => a.isHordeBreaker);
+}
+
 function BonusFeatureList({ playerStats, onAutomationAction, setPopupHtml }) {
     return <div>
         {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
@@ -512,9 +522,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     // the auto_effect half into automation.bonusActions; render it as a
     // clickable Bonus Actions row (same pattern as Apply Poison) that
     // dispatches psychicTeleportationHandler (expends 1 Psionic Energy die).
-    const psychicTeleportationAuto = (playerStats.automation?.bonusActions ?? []).find(
-        a => a.effect === 'psychic_teleportation'
-    );
+    const psychicTeleportationAuto = findPsychicTeleportationAuto(playerStats);
     const showPsychicTeleportation = !!psychicTeleportationAuto && !cannotAct;
 
     const handleApplyPoison = React.useCallback(async () => {
@@ -566,18 +574,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         }
         const resolved = resolveSpellDamageAtLevel(spell, playerStats.level);
         if (!resolved || spell.level !== 0) return resolved;
-        const potentFeature = playerStats.automation?.actions?.find(
-            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
-        );
-        if (!potentFeature) return resolved;
-        const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
-        const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
-        if (potentFeature.options.length > 1 && !chosen) return resolved;
-        if (chosen && !chosen.toLowerCase().includes('spellcasting')) return resolved;
-        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
-        const wisMod = Math.max(0, wis?.bonus || 0);
-        if (wisMod <= 0) return resolved;
-        return `${resolved}+${wisMod}`;
+        return applyPotentSpellcasting(resolved, playerStats, campaignName);
     }, [playerStats, campaignName]);
 
     const handleBonusSpellClick = (spellName) => {
@@ -637,7 +634,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const bonusActionSpells = filterKnownBonusSpells(playerStats, bonusSpellNameSet);
     const hasBonusActions = playerStats.bonusActions.length > 0;
 
-    const hordeBreakerMarker = (playerStats.attacks || []).find(a => a.isHordeBreaker);
+    const hordeBreakerMarker = findHordeBreakerMarker(playerStats);
     const hordeBreakerWeapon = React.useMemo(() => {
         if (!hordeBreakerReady || !hordeBreakerReady.attackName) return null;
         return (playerStats.attacks || []).find(a => !a.isHordeBreaker && a.name === hordeBreakerReady.attackName) || null;

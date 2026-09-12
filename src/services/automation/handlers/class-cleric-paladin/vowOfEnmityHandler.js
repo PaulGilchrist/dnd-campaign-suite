@@ -65,32 +65,29 @@ export async function applyTargetChoice(action, playerStats, campaignName, chose
     return activateVowOfEnmity(action, playerStats, campaignName, chosenTargetName, currentCharges);
 }
 
+// Determine if this is a free reactivation (previous target at 0 HP or missing)
+async function resolveVowReactivation(previousTarget, campaignName) {
+    if (!previousTarget) return { isFree: false, costMessage: '' };
+    const cs = await getCombatContext(campaignName);
+    const prevCreature = cs?.creatures?.find(c => c.name === previousTarget);
+    if (!prevCreature) {
+        // Previous target not in combatSummary — missing
+        return { isFree: true, costMessage: ' Previous target removed from combat — no Channel Divinity cost.' };
+    }
+    const prevHp = prevCreature.currentHp ?? prevCreature.hit_points?.current ?? 0;
+    if (prevHp <= 0) {
+        return { isFree: true, costMessage: ' Previous target defeated — no Channel Divinity cost.' };
+    }
+    return { isFree: false, costMessage: '' };
+}
+
 async function activateVowOfEnmity(action, playerStats, campaignName, targetName, currentCharges) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const previousTarget = getRuntimeValue(playerName, 'vowOfEnmityTarget', campaignName);
 
-    // Determine if this is a free reactivation (previous target at 0 HP or missing)
-    let isFree = false;
-    let costMessage = '';
-
-    if (previousTarget) {
-        // Check if previous target is defeated or removed
-        const cs = await getCombatContext(campaignName);
-        const prevCreature = cs?.creatures?.find(c => c.name === previousTarget);
-
-        if (prevCreature) {
-            const prevHp = prevCreature.currentHp ?? prevCreature.hit_points?.current ?? 0;
-            if (prevHp <= 0) {
-                isFree = true;
-                costMessage = ' Previous target defeated — no Channel Divinity cost.';
-            }
-        } else {
-            // Previous target not in combatSummary — missing
-            isFree = true;
-            costMessage = ' Previous target removed from combat — no Channel Divinity cost.';
-        }
-    }
+    const { isFree, costMessage: freeCostMessage } = await resolveVowReactivation(previousTarget, campaignName);
+    let costMessage = freeCostMessage;
 
     let description;
 

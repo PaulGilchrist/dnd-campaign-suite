@@ -39,8 +39,12 @@ function abilityBonus(playerStats, abilityName) {
 }
 
 /* ─── Barbarian ─── */
+function getClassLevel(playerStats) {
+    return playerStats.class?.class_levels?.[playerStats.level - 1];
+}
+
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+    const classLevel = getClassLevel(playerStats);
     const is2024 = playerStats.rules === '2024';
 
     const { extraAttacks, rageCount, rageDamage, weaponMastery } = barbarianRageScaling(classLevel, is2024, playerStats.level);
@@ -95,11 +99,31 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
     );
 };
 
+function expertiseTextFor(playerStats) {
+    if (playerStats.level <= 2) return null;
+    const expertise = playerStats.expertise;
+    return expertise && expertise.length > 0 ? expertise.join(', ') : null;
+}
+
+function UnbreakableMajestySection({ majestyActive, majestyDc, onToggle }) {
+    if (!majestyActive) return null;
+    return (
+        <button
+            className="automation-btn majesty-badge majesty-badge--active"
+            onClick={onToggle}
+            title={`Unbreakable Majesty (DC ${majestyDc})\n\nFirst attack per turn that hits forces attacker to make a CHA save or the attack misses.\nClick to deactivate.`}
+        >
+            <i className="fa-solid fa-shield-halved"></i> Unbreakable Majesty DC {majestyDc}
+        </button>
+    );
+}
+
 const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
     const bardFeatures = getClassFeatures(playerStats);
     const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
     const majestyActive = isUnbreakableMajestyActive(playerStats.name, campaignName);
     const majestyDc = getUnbreakableMajestySaveDc(playerStats.name, campaignName);
+    const expertiseText = expertiseTextFor(playerStats);
 
     function toggleMajesty() {
         if (majestyActive) {
@@ -120,18 +144,10 @@ const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
                 )}
                 <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
                 <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                {playerStats.level > 2 && playerStats.expertise && playerStats.expertise.length > 0 && <div><b>Expertise: </b>{playerStats.expertise.join(', ')}</div>}
+                {expertiseText && <div><b>Expertise: </b>{expertiseText}</div>}
                 {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
                 {bardFeatures?.magicalSecrets !== null && <TrackedResourceInput label="Magical Secrets" resourceKey="magicalSecrets" playerName={playerStats.name} getMax={() => bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
-                {majestyActive && (
-                    <button
-                        className="automation-btn majesty-badge majesty-badge--active"
-                        onClick={() => toggleMajesty()}
-                        title={`Unbreakable Majesty (DC ${majestyDc})\n\nFirst attack per turn that hits forces attacker to make a CHA save or the attack misses.\nClick to deactivate.`}
-                    >
-                        <i className="fa-solid fa-shield-halved"></i> Unbreakable Majesty DC {majestyDc}
-                    </button>
-                )}
+                <UnbreakableMajestySection majestyActive={majestyActive} majestyDc={majestyDc} onToggle={toggleMajesty} />
                 {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
             </div>
          );
@@ -557,19 +573,29 @@ function SupremeSneakBadge({ level, stealthAttackActive }) {
     );
 }
 
+function RogueSneakAttackLine({ rogueFeatures }) {
+    const diceCount = rogueFeatures?.sneakAttack?.dice_count || 0;
+    const diceValue = rogueFeatures?.sneakAttack?.dice_value || 0;
+    return <div><b>Sneak Attack Damage: </b>+{diceCount}d{diceValue}</div>;
+}
+
+function resolveRogueMajorName(playerStats) {
+    return playerStats.class.major?.name || playerStats.class.subclass?.name;
+}
+
 const RogueFeatures = function RogueFeatures({ playerStats, campaignName }) {
     const rogueFeatures = getClassFeatures(playerStats);
     const stealthAttackCost = useRuntimeValue(playerStats.name, 'stealthAttackCost', campaignName);
     const stealthAttackActive = (stealthAttackCost ?? 0) > 0;
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
+    const majorName = resolveRogueMajorName(playerStats);
     const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
     return (
           <div data-testid="char-class-rogue">
               {rogueFeatures?.expertise?.length > 0 && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
               {hasEnergy && <EnergyDiceSection playerStats={playerStats} campaignName={campaignName} classLevel={classLevel} />}
               <SupremeSneakBadge level={playerStats.level} stealthAttackActive={stealthAttackActive} />
-              <div><b>Sneak Attack Damage: </b>+{rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0}</div>
+              <RogueSneakAttackLine rogueFeatures={rogueFeatures} />
           </div>
     );
 };
@@ -776,10 +802,18 @@ const CLASS_COMPONENTS = {
 };
 
 /* ─── Entry point ─── */
+function hasAdrenalineRushTrait(playerStats) {
+    return (playerStats?.automation?.specialActions ?? []).some(a => a.effect === 'bonus_action_dash');
+}
+
+function hasStonecunningTrait(playerStats) {
+    return (playerStats?.race?.traits || []).some(t => t.name === 'Stonecunning' && t.automation);
+}
+
 function CharClassFeatures({ playerStats, campaignName }) {
     const Cmp = CLASS_COMPONENTS[playerStats?.class?.name];
-    const hasAdrenalineRush = (playerStats?.automation?.specialActions ?? []).some(a => a.effect === 'bonus_action_dash');
-    const hasStonecunning = (playerStats?.race?.traits || []).some(t => t.name === 'Stonecunning' && t.automation);
+    const hasAdrenalineRush = hasAdrenalineRushTrait(playerStats);
+    const hasStonecunning = hasStonecunningTrait(playerStats);
     const [modalState, setModalState] = React.useState({});
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const dodgeActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'dodge');

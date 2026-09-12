@@ -324,6 +324,23 @@ function finalizeSpellList(spellAbilities, allSpells) {
     });
 }
 
+// Context-dependent spell list additions: full Druid/Paladin class lists,
+// subclass always-prepared spells, passive always-prepared spells, arcanums.
+function addContextualSpellLists(spellAbilities, playerStats, allSpells) {
+    if (playerStats.class.name === 'Druid' || playerStats.class.name === 'Paladin') {
+        addAllClassListSpells(spellAbilities, playerStats, allSpells);
+    }
+    if (playerStats.level > 2 && playerStats.class.subclass && playerStats.class.subclass.spells) {
+        addSubclassAlwaysPreparedSpells(spellAbilities, playerStats);
+    }
+    if (playerStats.automation?.passives) {
+        addPassiveAlwaysPreparedSpells(spellAbilities, playerStats);
+    }
+    if (playerStats.class?.arcanums && Array.isArray(playerStats.class.arcanums) && allSpells) {
+        addArcanumSpells(spellAbilities, playerStats, allSpells);
+    }
+}
+
 export function getSpellAbilities(allSpells, playerStats) {
     // Dependencies: Abilities, Class
     let spellAbilities = null;
@@ -345,18 +362,7 @@ export function getSpellAbilities(allSpells, playerStats) {
     if (spellAbilities) {
         const spellAbility = computeCastingAbilityStats(spellAbilities, playerStats);
         applySubclassAdjustments(spellAbilities, playerStats);
-        if (playerStats.class.name === 'Druid' || playerStats.class.name === 'Paladin') {
-            addAllClassListSpells(spellAbilities, playerStats, allSpells);
-        }
-        if (playerStats.level > 2 && playerStats.class.subclass && playerStats.class.subclass.spells) {
-            addSubclassAlwaysPreparedSpells(spellAbilities, playerStats);
-        }
-        if (playerStats.automation?.passives) {
-            addPassiveAlwaysPreparedSpells(spellAbilities, playerStats);
-        }
-        if (playerStats.class?.arcanums && Array.isArray(playerStats.class.arcanums) && allSpells) {
-            addArcanumSpells(spellAbilities, playerStats, allSpells);
-        }
+        addContextualSpellLists(spellAbilities, playerStats, allSpells);
         applyClassPreparedRule(spellAbilities, playerStats, spellAbility);
         applySpellThiefLists(spellAbilities, playerStats);
         finalizeSpellList(spellAbilities, allSpells);

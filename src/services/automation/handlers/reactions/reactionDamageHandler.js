@@ -183,52 +183,8 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
 
-        if (!event.detail.success && auto.damageExpression) {
-            const damageResult = rollExpression(auto.damageExpression);
-            if (damageResult) {
-                addEntry(campaignName, {
-                    type: 'roll',
-                    characterName: playerStats.name,
-                    rollType: 'damage',
-                    name: action.name + ' Damage',
-                    targetName,
-                    damageType: auto.damageType || 'Necrotic',
-                    total: damageResult.total,
-                    formula: auto.damageExpression,
-                    rolls: damageResult.rolls,
-                    description: `${action.name} dealt ${damageResult.total} ${auto.damageType || 'Necrotic'} damage to ${targetName}.`,
-                }).catch((e) => { console.error("[reactionDamage] Error:", e); });
-
-                const cs = await getCombatContext(campaignName);
-                if (cs) {
-                    await applyDamageToTarget(cs, targetName, damageResult.total, [auto.damageType || 'Necrotic'], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
-                } else {
-                    console.error('[reactionDamage] No combat context — damage not applied:', { actionName: action.name, targetName });
-                }
-            }
-        }
-
-        if (!event.detail.success && auto.alsoInflicts) {
-            const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const newEffects = [...storedEffects, {
-                target: targetName,
-                source: action.name,
-                option: auto.alsoInflicts,
-                effect: auto.alsoInflicts,
-                duration: 'until_used',
-            }];
-            setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName);
-        }
-
         if (!event.detail.success) {
-            const hasPhysiciansTouch = playerStats.specialActions?.some(f => f.name === "Physician's Touch");
-            if (hasPhysiciansTouch) {
-                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                const condArray = Array.isArray(conditions) ? conditions : [];
-                if (!condArray.includes('poisoned')) {
-                    setRuntimeValue(targetName, 'activeConditions', [...condArray, 'poisoned'], campaignName);
-                }
-            }
+            await applySaveFailureEffects({ auto, action, playerStats, campaignName, targetName, characters });
         }
 
         window.removeEventListener('save-result', handleSaveResult);
@@ -246,6 +202,62 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
             automation: auto,
         },
     };
+}
+
+async function applyFailDamage({ auto, action, playerStats, campaignName, targetName, characters }) {
+    if (!auto.damageExpression) return;
+    const damageResult = rollExpression(auto.damageExpression);
+    if (!damageResult) return;
+
+    const damageType = auto.damageType || 'Necrotic';
+    addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerStats.name,
+        rollType: 'damage',
+        name: action.name + ' Damage',
+        targetName,
+        damageType,
+        total: damageResult.total,
+        formula: auto.damageExpression,
+        rolls: damageResult.rolls,
+        description: `${action.name} dealt ${damageResult.total} ${damageType} damage to ${targetName}.`,
+    }).catch((e) => { console.error("[reactionDamage] Error:", e); });
+
+    const cs = await getCombatContext(campaignName);
+    if (cs) {
+        await applyDamageToTarget(cs, targetName, damageResult.total, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
+    } else {
+        console.error('[reactionDamage] No combat context — damage not applied:', { actionName: action.name, targetName });
+    }
+}
+
+function applyFailInfliction({ auto, action, campaignName, targetName }) {
+    if (!auto.alsoInflicts) return;
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const newEffects = [...storedEffects, {
+        target: targetName,
+        source: action.name,
+        option: auto.alsoInflicts,
+        effect: auto.alsoInflicts,
+        duration: 'until_used',
+    }];
+    setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName);
+}
+
+function applyFailPhysiciansTouch({ playerStats, campaignName, targetName }) {
+    const hasPhysiciansTouch = playerStats.specialActions?.some(f => f.name === "Physician's Touch");
+    if (!hasPhysiciansTouch) return;
+    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+    const condArray = Array.isArray(conditions) ? conditions : [];
+    if (!condArray.includes('poisoned')) {
+        setRuntimeValue(targetName, 'activeConditions', [...condArray, 'poisoned'], campaignName);
+    }
+}
+
+async function applySaveFailureEffects({ auto, action, playerStats, campaignName, targetName, characters }) {
+    await applyFailDamage({ auto, action, playerStats, campaignName, targetName, characters });
+    applyFailInfliction({ auto, action, campaignName, targetName });
+    applyFailPhysiciansTouch({ playerStats, campaignName, targetName });
 }
 
 async function gatePolearmReachTrigger(action, auto, campaignName) {
@@ -341,7 +353,7 @@ function thoughtShieldRefuse(action, warlockName, campaignName, description) {
 // because the persisted reflect re-stamps lastAttack with the warlock as attacker
 // (CLA-337 caveat), so the latch is the authoritative guard that a spent Reaction
 // cannot refire — refuses spend nothing.
-async function gateThoughtShieldTrigger(action, cs, warlockName, campaignName) {
+async function gateThoughtShieldRoundLatch(action, cs, warlockName, campaignName) {
     const refuse = (description) => thoughtShieldRefuse(action, warlockName, campaignName, description);
 
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
@@ -355,6 +367,12 @@ async function gateThoughtShieldTrigger(action, cs, warlockName, campaignName) {
         return { refusal: refuse(`You have already used ${action.name} this round — your Reaction is spent until your next turn.`) };
     }
 
+    return { lastAttack, currentRound };
+}
+
+function gateThoughtShieldPsychicIdentity(action, warlockName, campaignName, lastAttack) {
+    const refuse = (description) => thoughtShieldRefuse(action, warlockName, campaignName, description);
+
     if (lastAttack.targetName !== warlockName) {
         return { refusal: refuse(`You were not the target of the last attack (${lastAttack.targetName} was). Thought Shield only works when you take psychic damage.`) };
     }
@@ -367,6 +385,19 @@ async function gateThoughtShieldTrigger(action, cs, warlockName, campaignName) {
     if (actualWarlockDamage <= 0) {
         return { refusal: refuse('The attacker dealt no damage to you (immune/resistant). Thought Shield reflects the damage you took, which was 0.') };
     }
+
+    return { actualWarlockDamage };
+}
+
+async function gateThoughtShieldTrigger(action, cs, warlockName, campaignName) {
+    const roundGate = await gateThoughtShieldRoundLatch(action, cs, warlockName, campaignName);
+    if (roundGate.refusal) return roundGate;
+    const { lastAttack, currentRound } = roundGate;
+
+    const identity = gateThoughtShieldPsychicIdentity(action, warlockName, campaignName, lastAttack);
+    if (identity.refusal) return identity;
+
+    const refuse = (description) => thoughtShieldRefuse(action, warlockName, campaignName, description);
 
     const attackerCreatureName = lastAttack.attackerName;
     if (!attackerCreatureName) {
@@ -391,7 +422,7 @@ async function gateThoughtShieldTrigger(action, cs, warlockName, campaignName) {
         return { refusal: refuse(`${attackerCreatureName} is not within ${rangeFt} feet of you. Thought Shield requires the attacker to be within ${rangeFt} feet.`) };
     }
 
-    return { currentRound, actualWarlockDamage, attackerCreatureName };
+    return { currentRound, actualWarlockDamage: identity.actualWarlockDamage, attackerCreatureName };
 }
 
 async function handleThoughtShield(action, playerStats, campaignName) {

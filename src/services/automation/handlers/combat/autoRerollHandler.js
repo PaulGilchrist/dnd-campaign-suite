@@ -308,7 +308,7 @@ async function handleBardicInspiration(action, auto, playerName, playerStats, la
     return result;
 }
 
-async function handleHomingStrikes(action, auto, playerName, playerStats, lastAttack, campaignName, usesKey, currentUses, defaultMax) {
+async function handleHomingStrikes(action, auto, playerName, playerStats, lastAttack, campaignName, { usesKey, currentUses, defaultMax }) {
     const attackFresh = lastAttack?.rollType === 'attack' && lastAttack.hit === false && lastAttack.attackerName === playerName;
     if (!attackFresh) {
         return infoPopup(action.name, `${action.name}: No recent missed attack found — Homing Strikes can only be used when one of your own attack rolls misses.`, auto);
@@ -331,10 +331,13 @@ async function handleHomingStrikes(action, auto, playerName, playerStats, lastAt
     const modifiedTotal = modifiedD20 + atkBonus;
     const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
     const originalTotal = d20 + atkBonus;
+    const acText = ac != null ? ac : '—';
+    const modifiedHitText = modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS';
+    const struck = modifiedHit === true;
 
-    let logDescription = `${playerName} used ${action.name} (Homing Strikes) on Psychic Blade attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${ac != null ? ac : '—'} → MISS. Psionic die: 1d${psionicDieSize} (${dieRoll}) → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → ${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}.`;
+    let logDescription = `${playerName} used ${action.name} (Homing Strikes) on Psychic Blade attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${acText} → MISS. Psionic die: 1d${psionicDieSize} (${dieRoll}) → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${acText} → ${modifiedHitText}.`;
     let result;
-    if (modifiedHit === true) {
+    if (struck) {
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
         logDescription += ` Miss turned into a hit — 1 Psionic Energy expended. Psionic Energy: ${currentUses - 1}/${defaultMax}.`;
         result = await handleAttackRoll(action, dieRoll, lastAttack, playerStats, campaignName);
@@ -345,10 +348,10 @@ async function handleHomingStrikes(action, auto, playerName, playerStats, lastAt
 
     await setRuntimeValue('campaign', 'lastAttack', {
         ...lastAttack,
-        hit: modifiedHit === true,
+        hit: struck,
         homingStrikesAttempted: true,
-        homingStrikesUsed: modifiedHit === true,
-        homingStrikesBonus: modifiedHit === true ? dieRoll : null,
+        homingStrikesUsed: struck,
+        homingStrikesBonus: struck ? dieRoll : null,
     }, campaignName);
 
     addEntry(campaignName, {
@@ -360,6 +363,18 @@ async function handleHomingStrikes(action, auto, playerName, playerStats, lastAt
     }).catch((e) => { console.error("[autoReroll] Error:", e); });
 
     return result;
+}
+
+function buildPsionicAttackRerollText(playerName, actionName, lastAttack, dieRoll, psionicDieSize, currentUses, defaultMax) {
+    const { d20, bonus: atkBonus, targetAc, hit } = lastAttack;
+    const ac = targetAc;
+    const modifiedD20 = d20 + dieRoll;
+    const modifiedTotal = modifiedD20 + atkBonus;
+    const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
+    const originalTotal = d20 + atkBonus;
+    const acText = ac != null ? ac : '—';
+    const modifiedHitText = modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS';
+    return `${playerName} used ${actionName} on attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${acText} → ${hit ? 'HIT' : 'MISS'}. Bonus: +${dieRoll} → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${acText} → ${modifiedHitText}. Psionic Energy Die: 1d${psionicDieSize} (${dieRoll}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`;
 }
 
 async function handlePsionicEnergyDie(action, auto, playerName, playerStats, lastAttack, campaignName) {
@@ -378,7 +393,7 @@ async function handlePsionicEnergyDie(action, auto, playerName, playerStats, las
     // die is expended ONLY if the boosted total turns the miss into a hit.
     const isHomingStrikes = auto.trigger === 'psychic_blade_miss' || auto.condition === 'psychic_blade_miss';
     if (isHomingStrikes) {
-        return handleHomingStrikes(action, auto, playerName, playerStats, lastAttack, campaignName, usesKey, currentUses, defaultMax);
+        return handleHomingStrikes(action, auto, playerName, playerStats, lastAttack, campaignName, { usesKey, currentUses, defaultMax });
     }
 
     const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
@@ -393,14 +408,7 @@ async function handlePsionicEnergyDie(action, auto, playerName, playerStats, las
     let logDescription;
     let result;
     if (attackFresh) {
-        const { d20, bonus: atkBonus, targetAc, hit } = lastAttack;
-        const ac = targetAc;
-        const modifiedD20 = d20 + dieRoll;
-        const modifiedTotal = modifiedD20 + atkBonus;
-        const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
-        const originalTotal = d20 + atkBonus;
-
-        logDescription = `${playerName} used ${action.name} on attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}. Bonus: +${dieRoll} → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → ${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}. Psionic Energy Die: 1d${psionicDieSize} (${dieRoll}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`;
+        logDescription = buildPsionicAttackRerollText(playerName, action.name, lastAttack, dieRoll, psionicDieSize, currentUses, defaultMax);
         result = await handleAttackRoll(action, dieRoll, lastAttack, playerStats, campaignName);
     } else {
         const { d20, bonus: checkBonus, checkName } = lastAttack;

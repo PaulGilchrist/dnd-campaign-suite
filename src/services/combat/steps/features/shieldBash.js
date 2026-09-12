@@ -221,7 +221,7 @@ export async function applyShieldBashEffect(action, playerStats, campaignName, t
 
     const cs = await getCombatContext(campaignName);
     const conditionDef = { key: 'prone', label: 'Prone' };
-    addCondition(cs, targetName, conditionDef, saveDc, 'STR', getRuntimeValue, setRuntimeValue, campaignName, playerStats);
+    addCondition({ combatSummary: cs, creatureName: targetName, conditionDef, dc: saveDc, ability: 'STR', getRuntimeValue, setRuntimeValue, campaignName, playerStats });
 
     addEntry(campaignName, {
       type: 'ability_use',

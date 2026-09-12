@@ -385,7 +385,7 @@ async function applyMaxHeal(spell, target, playerStats, characters, campaignName
 }
 
 // Dice-expression branch — rolls, applies maximize/reroll-ones, heals, and logs.
-async function applyRolledHeal(spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails) {
+async function applyRolledHeal({ spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails }) {
     const resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
     const maximize = hasHealingMaximizationForTarget(playerStats, target.name, campaignName);
     const rerollOnes = hasRerollHealingOnes(playerStats);
@@ -433,7 +433,7 @@ async function resolveGenericHeal(spell, target, metaCtx, playerStats, campaignN
     if (expression === 'max') {
         return await applyMaxHeal(spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails);
     }
-    return await applyRolledHeal(spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails);
+    return await applyRolledHeal({ spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails });
 }
 
 // Generic healing path (spell.heal_at_slot_level) — returns genericHealResult.
@@ -574,21 +574,30 @@ async function runMarkedTargetSpell(spell, metaCtx, playerStats, campaignName, g
     return false;
 }
 
-export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
-    // --- Block checks ---
+// Pre-cast blocking checks, in original evaluation order. Returns the first
+// blocking result, or null when the cast proceeds.
+async function runCastBlockChecks(spell, playerStats, campaignName, getTargetInfo) {
     const buffBlock = await checkBlockedBySpellcastingBuff(spell, playerStats, campaignName);
     if (buffBlock) return buffBlock;
 
     const globeTargetName = getTargetInfo ? (await getTargetInfo())?.name || null : null;
-    const globeBlock = await checkGlobeOfInvulnerability(spell, globeTargetName, playerStats, campaignName);
-    if (globeBlock) return globeBlock;
 
-    const forcecageBlock = await checkForcecageBlocked(spell, globeTargetName, playerStats, campaignName);
-    if (forcecageBlock) return forcecageBlock;
+    const blockers = [
+        () => checkGlobeOfInvulnerability(spell, globeTargetName, playerStats, campaignName),
+        () => checkForcecageBlocked(spell, globeTargetName, playerStats, campaignName),
+        () => checkAntimagicField(spell, playerStats, globeTargetName, campaignName),
+    ];
+    for (const check of blockers) {
+        const block = await check();
+        if (block) return block;
+    }
+    return null;
+}
 
-    // Antimagic Field checks
-    const antimagicBlock = await checkAntimagicField(spell, playerStats, globeTargetName, campaignName);
-    if (antimagicBlock) return antimagicBlock;
+export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
+    // --- Block checks ---
+    const block = await runCastBlockChecks(spell, playerStats, campaignName, getTargetInfo);
+    if (block) return block;
 
     // --- Spell resolution (inline) ---
     const hasInvisible = resolveMagicalAmbushInvisible(playerStats, campaignName);

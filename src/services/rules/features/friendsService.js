@@ -114,6 +114,13 @@ async function runFriendsHandler(action, playerStats, campaignName, mapName) {
     }
 }
 
+// Resolve save DC / slot level from meta context with character fallbacks.
+function resolveFriendsSaveContext(metaCtx, spell, playerStats) {
+    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    const slotLevel = metaCtx?.slotLevel || spell.level || 0;
+    return { spellSaveDc, slotLevel };
+}
+
 export async function triggerFriends(spell, metaCtx, playerStats, campaignName, mapName) {
     const isFriends = (spell.name || '').toLowerCase() === 'friends';
     if (!isFriends) return null;
@@ -160,8 +167,7 @@ export async function triggerFriends(spell, metaCtx, playerStats, campaignName, 
     }
 
     // Build the spell save DC
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-    const slotLevel = metaCtx?.slotLevel || spell.level || 0;
+    const { spellSaveDc, slotLevel } = resolveFriendsSaveContext(metaCtx, spell, playerStats);
 
     const action = {
         name: 'Friends',

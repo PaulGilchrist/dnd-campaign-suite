@@ -199,6 +199,24 @@ function buildModePopup(mode, action, targetName, casterName, campaignName, maxC
     };
 }
 
+async function resolveCreatureTargetMode({ action, campaignName, casterName, dc, mode, targetName, targetCreature }) {
+    const refusal = await gateTruePolymorphTarget(action, casterName, targetName, targetCreature, campaignName);
+    if (refusal) return refusal;
+
+    const allies = getAllyList(casterName);
+    const isAlly = allies.some(n => utils.getName(n) === utils.getName(targetName));
+
+    if (!isAlly) {
+        const resisted = await runTransformationSave(action, campaignName, casterName, targetName, dc);
+        if (resisted) return resisted;
+    }
+
+    const characters = action.metaCtx?.characters || [];
+    const maxCR = await resolveTruePolymorphMaxCR(targetName, campaignName, characters);
+
+    return buildModePopup(mode, action, targetName, casterName, campaignName, maxCR);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -232,21 +250,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const targetCreature = cs.creatures.find(c => c.name === targetName);
 
     if (targetName && targetCreature) {
-        const refusal = await gateTruePolymorphTarget(action, casterName, targetName, targetCreature, campaignName);
-        if (refusal) return refusal;
-
-        const allies = getAllyList(casterName);
-        const isAlly = allies.some(n => utils.getName(n) === utils.getName(targetName));
-
-        if (!isAlly) {
-            const resisted = await runTransformationSave(action, campaignName, casterName, targetName, dc);
-            if (resisted) return resisted;
-        }
-
-        const characters = action.metaCtx?.characters || [];
-        const maxCR = await resolveTruePolymorphMaxCR(targetName, campaignName, characters);
-
-        return buildModePopup(mode, action, targetName, casterName, campaignName, maxCR);
+        return await resolveCreatureTargetMode({ action, campaignName, casterName, dc, mode, targetName, targetCreature });
     }
 
     if (mode === 'object_into_creature') {

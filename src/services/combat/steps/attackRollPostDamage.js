@@ -289,7 +289,7 @@ async function applyFailedPoisonSaveOutcome(ctx, saveDc) {
   }
 
   const conditionDef = { key: 'poisoned', label: 'Poisoned' };
-  addCondition(cs, targetName, conditionDef, saveDc, 'CON', getRuntimeValue, setRuntimeValue, ctx.campaignName, ctx.playerStats);
+  addCondition({ combatSummary: cs, creatureName: targetName, conditionDef, dc: saveDc, ability: 'CON', getRuntimeValue, setRuntimeValue, campaignName: ctx.campaignName, playerStats: ctx.playerStats });
 
   const primaryDmg = lastAttack?.primaryDamage || 0;
   const primaryType = lastAttack?.primaryDamageType || 'weapon';
@@ -543,6 +543,40 @@ export function buildTacticalMasterStep() {
   };
 }
 
+function computeToppleSaveDc(ctx, lastAttack) {
+  const weaponAttack = ctx.playerStats.attacks?.find(a => a.name === lastAttack.attackName);
+  const abilityName = weaponAttack?.abilityName || 'Strength';
+  const ability = ctx.playerStats.abilities?.find(a => a.name === abilityName);
+  const abilityMod = ability?.bonus || 0;
+  const prof = ctx.playerStats.proficiency || 0;
+  return { abilityName, saveDc: 8 + abilityMod + prof };
+}
+
+async function handleToppleFailure(ctx, toppleTargetName, saveDc, abilityName) {
+  const cs = await loadCombatSummary(ctx.campaignName);
+  const conditionDef = { key: 'prone', label: 'Prone' };
+  addCondition({ combatSummary: cs, creatureName: toppleTargetName, conditionDef, dc: saveDc, ability: 'CON', getRuntimeValue, setRuntimeValue, campaignName: ctx.campaignName, playerStats: ctx.playerStats });
+
+  addEntry(ctx.campaignName, {
+    type: 'save_result',
+    characterName: ctx.playerStats.name,
+    rollType: 'save-topple',
+    targetName: toppleTargetName,
+    saveDc,
+    saveType: 'CON',
+    success: false,
+    description: `${toppleTargetName} failed CON save vs Topple. Gains Prone condition.`,
+  }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
+
+  addEntry(ctx.campaignName, {
+    type: 'ability_use',
+    characterName: ctx.playerStats.name,
+    abilityName: 'Topple',
+    description: `${ctx.playerStats.name} used Topple on ${toppleTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
+    targetName: toppleTargetName,
+  }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
+}
+
 export function buildToppleMasteryStep() {
   return {
     name: 'toppleMastery',
@@ -562,12 +596,7 @@ export function buildToppleMasteryStep() {
       if (available.baseMastery !== 'Topple') return { data: {} };
 
       const toppleTargetName = lastAttack.targetName;
-      const weaponAttack = ctx.playerStats.attacks?.find(a => a.name === lastAttack.attackName);
-      const abilityName = weaponAttack?.abilityName || 'Strength';
-      const ability = ctx.playerStats.abilities?.find(a => a.name === abilityName);
-      const abilityMod = ability?.bonus || 0;
-      const prof = ctx.playerStats.proficiency || 0;
-      const saveDc = 8 + abilityMod + prof;
+      const { abilityName, saveDc } = computeToppleSaveDc(ctx, lastAttack);
 
       const { promise } = createSaveListener(ctx.campaignName, {
         targetName: toppleTargetName,
@@ -588,28 +617,7 @@ export function buildToppleMasteryStep() {
       const result = await promise;
 
       if (result && !result.success) {
-        const cs = await loadCombatSummary(ctx.campaignName);
-        const conditionDef = { key: 'prone', label: 'Prone' };
-        addCondition(cs, toppleTargetName, conditionDef, saveDc, 'CON', getRuntimeValue, setRuntimeValue, ctx.campaignName, ctx.playerStats);
-
-        addEntry(ctx.campaignName, {
-          type: 'save_result',
-          characterName: ctx.playerStats.name,
-          rollType: 'save-topple',
-          targetName: toppleTargetName,
-          saveDc,
-          saveType: 'CON',
-          success: false,
-          description: `${toppleTargetName} failed CON save vs Topple. Gains Prone condition.`,
-        }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
-
-        addEntry(ctx.campaignName, {
-          type: 'ability_use',
-          characterName: ctx.playerStats.name,
-          abilityName: 'Topple',
-          description: `${ctx.playerStats.name} used Topple on ${toppleTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
-          targetName: toppleTargetName,
-        }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
+        await handleToppleFailure(ctx, toppleTargetName, saveDc, abilityName);
       }
 
       return { data: {} };

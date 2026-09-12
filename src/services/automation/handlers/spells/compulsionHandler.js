@@ -46,6 +46,43 @@ function rollNpcCompulsionSave(targetInfo, targetName, dc, saveAdvantage) {
     return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
 }
 
+async function applyCompulsionCharm(targetName, campaignName) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
+}
+
+async function applyCompulsionSaveSuccess(campaignName, casterName, actionName, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-compulsion',
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: true,
+        description: `${targetName} succeeded on WIS save against Compulsion.`,
+    }).catch((e) => { console.error("[compulsion] Error:", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: actionName,
+            description: `${targetName} succeeded on WIS save against Compulsion.`,
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -102,39 +139,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const saveResult = await promise;
 
     if (saveResult.success) {
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'success',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: [],
-            appliedDamage: 0,
-        });
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-compulsion',
-            targetName,
-            saveDc: dc,
-            saveType: 'WIS',
-            success: true,
-            description: `${targetName} succeeded on WIS save against Compulsion.`,
-        }).catch((e) => { console.error("[compulsion] Error:", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${targetName} succeeded on WIS save against Compulsion.`,
-            },
-        };
+        return await applyCompulsionSaveSuccess(campaignName, casterName, action.name, targetName, dc, saveResult);
     }
 
-    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
-    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
+    await applyCompulsionCharm(targetName, campaignName);
 
     await addTargetResult(campaignName, {
         targetName,

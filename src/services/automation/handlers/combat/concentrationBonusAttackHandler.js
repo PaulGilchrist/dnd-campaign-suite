@@ -38,7 +38,7 @@ function resolveMeleeWeapon(playerStats) {
     };
 }
 
-async function resolveConcentrationDamage(cs, campaignName, playerName, targetName, damageFormula, damageType, isCrit, actionName) {
+async function resolveConcentrationDamage({ cs, campaignName, playerName, targetName, damageFormula, damageType, isCrit, actionName }) {
     let finalDamage = 0;
     let damageRolls = [];
     const rollResult = (isCrit ? rollExpressionDoubled : rollExpression)(damageFormula);
@@ -66,6 +66,15 @@ async function resolveConcentrationDamage(cs, campaignName, playerName, targetNa
     }).catch((e) => { console.error("[concentrationBonusAttackHandler:log-error]", e); });
 
     return { finalDamage, rawDamage, damageRolls };
+}
+
+function isConcentratingOn(cs, playerName, concentrationSpell) {
+    const creature = cs.creatures?.find(c => c.name === playerName);
+    return !!(creature?.concentration && creature.concentration.spell === concentrationSpell);
+}
+
+function isLatchedThisTurn(latch, round) {
+    return !!latch && (latch.round ?? 0) >= round;
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -111,9 +120,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Gate on LIVE concentration: concentration is established by casting the spell
     // (spellPreparationService), not by this row.
-    const creature = cs.creatures?.find(c => c.name === playerName);
-    const concentrating = creature?.concentration && creature.concentration.spell === concentrationSpell;
-    if (!concentrating) {
+    if (!isConcentratingOn(cs, playerName, concentrationSpell)) {
         const reason = `You are not concentrating on ${concentrationSpell}. Cast ${concentrationSpell} first.`;
         await logRefusal(reason);
         return refusal(reason);
@@ -121,7 +128,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const round = cs.round ?? 1;
     const latch = getRuntimeValue(playerName, LATCH_KEY, campaignName);
-    if (latch && (latch.round ?? 0) >= round) {
+    if (isLatchedThisTurn(latch, round)) {
         const reason = 'You have already made your bonus-action weapon attack this turn.';
         await logRefusal(reason);
         return refusal(reason);
@@ -170,7 +177,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     let finalDamage = 0;
     if (hit) {
-        const outcome = await resolveConcentrationDamage(cs, campaignName, playerName, targetName, damageFormula, damageType, isCrit, action.name);
+        const outcome = await resolveConcentrationDamage({ cs, campaignName, playerName, targetName, damageFormula, damageType, isCrit, actionName: action.name });
         finalDamage = outcome.finalDamage;
     }
 

@@ -357,15 +357,17 @@ describe('compulsionService applyCompulsionEffect', () => {
             );
 
             expect(addCondition).toHaveBeenCalledWith(
-                expect.objectContaining({ creatures: expect.any(Array) }),
-                'Goblin',
-                { key: 'charmed', label: 'Charmed' },
-                15,
-                'WIS',
-                getRuntimeValue,
-                setRuntimeValue,
-                campaignName,
-                playerStats,
+                expect.objectContaining({
+                    combatSummary: expect.objectContaining({ creatures: expect.any(Array) }),
+                    creatureName: 'Goblin',
+                    conditionDef: { key: 'charmed', label: 'Charmed' },
+                    dc: 15,
+                    ability: 'WIS',
+                    getRuntimeValue,
+                    setRuntimeValue,
+                    campaignName,
+                    playerStats,
+                }),
             );
         });
 

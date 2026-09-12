@@ -18,7 +18,7 @@ export function applyConditionToTarget(targetName, conditionKey, campaignName, c
         return;
     }
     const conditionDef = { key: conditionKey, label: conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1) };
-    addCondition(combatSummary, targetName, conditionDef, saveDc, saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats);
+    addCondition({ combatSummary, creatureName: targetName, conditionDef, dc: saveDc, ability: saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats });
 }
 
 export function hasRelentless(playerStats) {

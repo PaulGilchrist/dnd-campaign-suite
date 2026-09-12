@@ -1,5 +1,5 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { registerPendingSavePrompt } from '../../../combat/auras/pendingSaveRegistry.js';
 import { addEntry } from '../../../ui/logService.js';
 import { loadCombatSummary } from '../../../encounters/combatData.js';
@@ -8,6 +8,7 @@ import { hasIgnoreResistance } from '../../../combat/automation/automationServic
 import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { buildSaveDc } from '../../common/savePrompt.js';
+import { resolveChannelDivinityCharges } from '../healing/healingPoolHandler.js';
 import storage from '../../../../services/ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -15,10 +16,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
 
     // Check Channel Divinity charges
-    const storedCharges = getRuntimeValue(playerName, 'channelDivinityCharges');
-    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+    const { currentCharges } = resolveChannelDivinityCharges(playerStats);
 
     if (currentCharges <= 0) {
         return {

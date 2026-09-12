@@ -164,7 +164,7 @@ async function applyThrustEffect(action, playerStats, campaignName, targetName, 
     if (proneAlready) return;
 
     const conditionDef = { key: 'prone', label: 'Prone' };
-    addCondition(combatContext, targetName, conditionDef, saveDc, saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats);
+    addCondition({ combatSummary: combatContext, creatureName: targetName, conditionDef, dc: saveDc, ability: saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats });
     storage.set('combatSummary', combatContext, campaignName);
 
     const pushValue = option.value || 10;

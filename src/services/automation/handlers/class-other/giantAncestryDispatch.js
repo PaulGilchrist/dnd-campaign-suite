@@ -70,7 +70,7 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
     const cs = await getCombatContext(campaignName);
     const { actualDamage, newHp } = applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats);
 
-    await logAncestryDamageRoll(campaignName, playerStats, optName, targetName, damageType, actualDamage, opt.damage, damageResult);
+    await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula: opt.damage, damageResult });
 
     return ancestryDamagePopup(optName, opt.damage, damageResult, actualDamage, targetName, newHp, damageType);
 }
@@ -100,7 +100,7 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
 
     await applySpeedReductionEffect(targetName, optName, speedReduction, campaignName);
 
-    await logAncestryDamageRoll(campaignName, playerStats, optName, targetName, damageType, actualDamage, opt.damage, damageResult);
+    await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula: opt.damage, damageResult });
     await logSpeedReductionCondition(campaignName, playerStats, optName, targetName, speedReduction);
 
     return ancestryDamagePopup(optName, opt.damage, damageResult, actualDamage, targetName, newHp, damageType);
@@ -227,33 +227,8 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
     };
 }
 
-export async function handleStonesEndurance(action, playerStats, campaignName, option) {
-    const optName = (option?.name || action.name || "Stone's Endurance");
-    const opt = option || action.automation;
-    const { usesKey, currentUses } = resolveAncestryUses(playerStats, optName, campaignName);
-
-    if (currentUses <= 0) return ancestryNoUsesPopup(optName, action.automation, currentUses);
-
-    const lastAttack = await findLastAttack(campaignName);
-    const gateRefusal = stonesEnduranceDamageGate(optName, action.automation, playerStats, lastAttack);
-    if (gateRefusal) return gateRefusal;
-
-    const totalDamage = lastAttack.totalDamage || 0;
-
-    // CLA-335: Reaction-economy round latch — one triggering hit can only be
-    // reduced once. Mirrors the CLA-315 Slow Fall / CLA-297 Retaliation /
-    // CLA-310 Shadowy Dodge recipe: stamp holder playerStats.name with a round
-    // read from a FRESH getCombatContext (never the stale cs mirror, FT-082);
-    // re-arms when the round advances (also cleared at initiative roll in
-    // initiative.jsx / navigationHandlers.js).
-    const combatContext = await getCombatContext(campaignName);
-    const currentRound = combatContext?.round || 1;
-    const usedRoundKey = '_Stones_Endurance_usedRound';
-    const usedRound = Number(getRuntimeValue(playerStats.name, usedRoundKey, campaignName) ?? 0);
-    if (usedRound === currentRound) {
-        return stonesEnduranceRoundRefusal(campaignName, playerStats, optName, action.automation);
-    }
-
+async function applyStonesEnduranceHeal(action, playerStats, campaignName, optName, opt, uses, totalDamage) {
+    const { usesKey, currentUses, usedRoundKey, currentRound } = uses;
     const enduranceRoll = rollExpression('1d12');
     const conMod = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
     const totalHeal = enduranceRoll.total + conMod;
@@ -297,6 +272,36 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
     };
 }
 
+export async function handleStonesEndurance(action, playerStats, campaignName, option) {
+    const optName = (option?.name || action.name || "Stone's Endurance");
+    const opt = option || action.automation;
+    const { usesKey, currentUses } = resolveAncestryUses(playerStats, optName, campaignName);
+
+    if (currentUses <= 0) return ancestryNoUsesPopup(optName, action.automation, currentUses);
+
+    const lastAttack = await findLastAttack(campaignName);
+    const gateRefusal = stonesEnduranceDamageGate(optName, action.automation, playerStats, lastAttack);
+    if (gateRefusal) return gateRefusal;
+
+    const totalDamage = lastAttack.totalDamage || 0;
+
+    // CLA-335: Reaction-economy round latch — one triggering hit can only be
+    // reduced once. Mirrors the CLA-315 Slow Fall / CLA-297 Retaliation /
+    // CLA-310 Shadowy Dodge recipe: stamp holder playerStats.name with a round
+    // read from a FRESH getCombatContext (never the stale cs mirror, FT-082);
+    // re-arms when the round advances (also cleared at initiative roll in
+    // initiative.jsx / navigationHandlers.js).
+    const combatContext = await getCombatContext(campaignName);
+    const currentRound = combatContext?.round || 1;
+    const usedRoundKey = '_Stones_Endurance_usedRound';
+    const usedRound = Number(getRuntimeValue(playerStats.name, usedRoundKey, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return stonesEnduranceRoundRefusal(campaignName, playerStats, optName, action.automation);
+    }
+
+    return applyStonesEnduranceHeal(action, playerStats, campaignName, optName, opt, { usesKey, currentUses, usedRoundKey, currentRound }, totalDamage);
+}
+
 export async function handleStormsThunder(action, playerStats, campaignName, _mapName, option) {
     const optName = ((option && option.name) || action.name || "Storm's Thunder");
     const opt = option || action.automation;
@@ -337,7 +342,7 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
         description: `${playerStats.name} used ${optName} against ${attackerName} (${currentUses - 1} uses remaining), dealing ${actualDamage} ${damageType} damage.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
-    await logAncestryDamageRoll(campaignName, playerStats, optName, attackerName, damageType, actualDamage, formula, damageResult);
+    await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName: attackerName, damageType, actualDamage, formula, damageResult });
 
     return ancestryDamagePopup(optName, formula, damageResult, actualDamage, attackerName, newHp, damageType);
 }

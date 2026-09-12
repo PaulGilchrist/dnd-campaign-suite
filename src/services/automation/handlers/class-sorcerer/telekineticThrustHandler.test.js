@@ -280,15 +280,17 @@ describe('telekineticThrustHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Failure');
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
-                combatContext,
-                'Goblin',
-                { key: 'prone', label: 'Prone' },
-                13,
-                'STR',
-                expect.any(Function),
-                expect.any(Function),
-                'test-campaign',
-                expect.any(Object)
+                expect.objectContaining({
+                    combatSummary: combatContext,
+                    creatureName: 'Goblin',
+                    conditionDef: { key: 'prone', label: 'Prone' },
+                    dc: 13,
+                    ability: 'STR',
+                    getRuntimeValue: expect.any(Function),
+                    setRuntimeValue: expect.any(Function),
+                    campaignName: 'test-campaign',
+                    playerStats: expect.any(Object),
+                })
             );
             expect(storage.set).toHaveBeenCalledWith('combatSummary', combatContext, 'test-campaign');
             expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({

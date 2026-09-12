@@ -29,7 +29,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
         }
 
         const conditionDef = { key: condKey, label: condName.charAt(0).toUpperCase() + condName.slice(1) };
-        addCondition(ctx.combatSummary, targetName, conditionDef, saveDcValue, saveType, getRuntimeValue, setRuntimeValue, campaignName, targetStats);
+        addCondition({ combatSummary: ctx.combatSummary, creatureName: targetName, conditionDef, dc: saveDcValue, ability: saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats: targetStats });
     }, [campaignName, characters, saveType]);
 
     const addConditionToCreature = useCallback((targetName, saveDcValue, ctx) => {

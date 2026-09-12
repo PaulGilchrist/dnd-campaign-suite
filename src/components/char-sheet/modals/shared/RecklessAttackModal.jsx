@@ -43,12 +43,31 @@ function BrutalStrikeOptionsPicker({ multiSelect, maxEffects, selectedEffects, b
     );
 }
 
+function BrutalStrikeToggle({ useBrutalStrike, onToggle, multiSelect, maxEffects, selectedEffects, brutalStrikeOptions, handleEffectToggle, labelExtra }) {
+    return (
+        <div style={{ marginTop: '12px', textAlign: 'left' }}>
+            <label style={{ display: 'block', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', background: useBrutalStrike ? 'rgba(255,255,255,0.15)' : 'transparent', border: useBrutalStrike ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                <input
+                    type="checkbox"
+                    checked={useBrutalStrike}
+                    onChange={onToggle}
+                    style={{ marginRight: '8px' }}
+                />
+                <strong>Use Brutal Strike</strong>{labelExtra}
+            </label>
+            {useBrutalStrike && <BrutalStrikeOptionsPicker multiSelect={multiSelect} maxEffects={maxEffects} selectedEffects={selectedEffects} brutalStrikeOptions={brutalStrikeOptions} handleEffectToggle={handleEffectToggle} />}
+        </div>
+    );
+}
+
 function RecklessAttackModal({ playerStats: _playerStats, campaignName: _campaignName, attack, onConfirm, onCancel, mode = 'full', hasBrutalStrike = false, brutalStrikeOptions = [], maxEffects = 1 }) {
     const [useBrutalStrike, setUseBrutalStrike] = useState(false);
     const [selectedEffects, setSelectedEffects] = useState([]);
 
     const isBrutalOnly = mode === 'brutalOnly';
     const multiSelect = maxEffects > 1;
+    const extraDice = multiSelect ? '2d10' : '1d10';
+    const toggleBrutalStrike = () => { setUseBrutalStrike(!useBrutalStrike); setSelectedEffects([]); };
 
     const handleEffectToggle = (effectName) => {
         if (multiSelect) {
@@ -95,21 +114,10 @@ function RecklessAttackModal({ playerStats: _playerStats, campaignName: _campaig
                     <div className="sp-body">
                         <p>Reckless Attack is already active. Use Brutal Strike on this attack?</p>
                         <p style={{ opacity: 0.8, fontSize: '0.9em' }}>
-                            Forgo Advantage on this attack to deal extra {maxEffects > 1 ? '2d10' : '1d10'} damage and apply effects.
+                            Forgo Advantage on this attack to deal extra {extraDice} damage and apply effects.
                         </p>
                         {hasBrutalStrike && (
-                            <div style={{ marginTop: '12px', textAlign: 'left' }}>
-                                <label style={{ display: 'block', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', background: useBrutalStrike ? 'rgba(255,255,255,0.15)' : 'transparent', border: useBrutalStrike ? '1px solid var(--color-link)' : '1px solid transparent' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={useBrutalStrike}
-                                        onChange={() => { setUseBrutalStrike(!useBrutalStrike); setSelectedEffects([]); }}
-                                        style={{ marginRight: '8px' }}
-                                    />
-                                    <strong>Use Brutal Strike</strong>
-                                </label>
-                                {useBrutalStrike && <BrutalStrikeOptionsPicker multiSelect={multiSelect} maxEffects={maxEffects} selectedEffects={selectedEffects} brutalStrikeOptions={brutalStrikeOptions} handleEffectToggle={handleEffectToggle} />}
-                            </div>
+                            <BrutalStrikeToggle useBrutalStrike={useBrutalStrike} onToggle={toggleBrutalStrike} multiSelect={multiSelect} maxEffects={maxEffects} selectedEffects={selectedEffects} brutalStrikeOptions={brutalStrikeOptions} handleEffectToggle={handleEffectToggle} />
                         )}
                     </div>
                     <div className="sp-actions">
@@ -135,18 +143,7 @@ function RecklessAttackModal({ playerStats: _playerStats, campaignName: _campaig
                 <div className="sp-body">
                     <p>Use Reckless Attack? You'll have Advantage on Strength attack rolls until the start of your next turn, but attack rolls against you also have Advantage.</p>
                     {hasBrutalStrike && (
-                        <div style={{ marginTop: '12px', textAlign: 'left' }}>
-                            <label style={{ display: 'block', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', background: useBrutalStrike ? 'rgba(255,255,255,0.15)' : 'transparent', border: useBrutalStrike ? '1px solid var(--color-link)' : '1px solid transparent' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={useBrutalStrike}
-                                    onChange={() => { setUseBrutalStrike(!useBrutalStrike); setSelectedEffects([]); }}
-                                    style={{ marginRight: '8px' }}
-                                />
-                                <strong>Use Brutal Strike</strong> — Forgo Advantage for extra {maxEffects > 1 ? '2d10' : '1d10'} damage
-                            </label>
-                            {useBrutalStrike && <BrutalStrikeOptionsPicker multiSelect={multiSelect} maxEffects={maxEffects} selectedEffects={selectedEffects} brutalStrikeOptions={brutalStrikeOptions} handleEffectToggle={handleEffectToggle} />}
-                        </div>
+                        <BrutalStrikeToggle useBrutalStrike={useBrutalStrike} onToggle={toggleBrutalStrike} multiSelect={multiSelect} maxEffects={maxEffects} selectedEffects={selectedEffects} brutalStrikeOptions={brutalStrikeOptions} handleEffectToggle={handleEffectToggle} labelExtra={` — Forgo Advantage for extra ${extraDice} damage`} />
                     )}
                 </div>
                 <div className="sp-actions">

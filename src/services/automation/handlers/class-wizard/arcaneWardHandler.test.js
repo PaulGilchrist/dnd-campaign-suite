@@ -235,11 +235,11 @@ describe('arcaneWardHandler', () => {
 
         describe('projected ward - absorption scenarios', () => {
             it.each([
-                ['full', 10, 15, { rawDamage: 7 }, 5, 10, 10, 3, true],
-                ['partial', 5, 13, { rawDamage: 12 }, 8, 15, 13, 0, false],
-                ['zero absorption (ward empty)', 0, 13, { rawDamage: 7 }, 5, 10, 5, null, false],
-            ])('absorbs %s: wardHp=%d, max=%d, damage=%j, targetHp=%d, maxHp=%d → targetHp=%d, wardHp=%d, allAbsorbed=%s',
-                async (_label, wardHp, wardMax, projectedDamage, targetCurrentHp, targetMaxHp, expectedTargetHp, expectedWardHp, allAbsorbed) => {
+                { label: 'full', wardHp: 10, wardMax: 15, projectedDamage: { rawDamage: 7 }, targetCurrentHp: 5, targetMaxHp: 10, expectedTargetHp: 10, expectedWardHp: 3, allAbsorbed: true },
+                { label: 'partial', wardHp: 5, wardMax: 13, projectedDamage: { rawDamage: 12 }, targetCurrentHp: 8, targetMaxHp: 15, expectedTargetHp: 13, expectedWardHp: 0, allAbsorbed: false },
+                { label: 'zero absorption (ward empty)', wardHp: 0, wardMax: 13, projectedDamage: { rawDamage: 7 }, targetCurrentHp: 5, targetMaxHp: 10, expectedTargetHp: 5, expectedWardHp: null, allAbsorbed: false },
+            ])('absorbs $label: wardHp=$wardHp, max=$wardMax, damage=$projectedDamage, targetHp=$targetCurrentHp, maxHp=$targetMaxHp → targetHp=$expectedTargetHp, wardHp=$expectedWardHp, allAbsorbed=$allAbsorbed',
+                async ({ wardHp, wardMax, projectedDamage, targetCurrentHp, targetMaxHp, expectedTargetHp, expectedWardHp, allAbsorbed }) => {
                     setMocks(
                         wardRuntime('Goblin', wardHp, wardMax, projectedDamage, targetCurrentHp, targetMaxHp),
                         combatContext('TestWizard', 'Goblin'),

@@ -131,7 +131,7 @@ function logWildHeartFormChoice(isWildHeart, chosenOption, playerName, campaignN
     }).catch((e) => { console.error("[combatStanceHandler:log-error]", e); });
 }
 
-function buildStanceDescription(action, auto, maxUses, currentUses, chosenOption, playerStats, playerName, campaignName) {
+function buildStanceDescription({ action, auto, maxUses, currentUses, chosenOption, playerStats, playerName, campaignName }) {
     if (chosenOption) {
         return describeChosenOption(chosenOption, playerStats, playerName, campaignName);
     }
@@ -195,7 +195,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         };
     }
 
-    const description = buildStanceDescription(action, auto, maxUses, currentUses, chosenOption, playerStats, playerName, campaignName);
+    const description = buildStanceDescription({ action, auto, maxUses, currentUses, chosenOption, playerStats, playerName, campaignName });
 
     return {
         type: 'popup',
@@ -424,28 +424,24 @@ function resolveIllusionFollowUp(action, auto, playerStats, isImprovedDuplicity,
     return null;
 }
 
+const STANCE_OPTION_DESCRIPTIONS = {
+    Bear: () => 'Resistance to Acid, Bludgeoning, Cold, Fire, Lightning, Piercing, Poison, Slashing, Thunder',
+    Eagle: () => 'You can take the Disengage and Dash action as part of this Bonus Action. While raging, you can take a Bonus Action to do both again.',
+    Wolf: () => 'While raging, allies have Advantage on attack rolls against enemies within 5 feet of you.',
+    Falcon: () => 'While raging, you have a Fly Speed equal to your Speed if you are not wearing armor.',
+    Lion: () => 'While raging, enemies within 5 feet of you have Disadvantage on attack rolls against targets other than you or another Barbarian with this option active.',
+    Ram: () => 'While raging, you can cause a Large or smaller creature to have the Prone condition when you hit it with a melee attack.',
+    Cold: () => 'Ice Walk: You can walk across and climb icy or wet surfaces without needing to make an Ability Check. You ignore difficult terrain that is composed of ice or snow.',
+    Fire: (option) => `Speed Boost: Your Speed increases by ${option.speedBonus || 10} feet.`,
+    Lightning: () => 'Fly Speed: You gain a Fly Speed equal to your Speed for 1 round.',
+    Thunder: (option) => `Teleport: You can teleport up to ${option.teleportDistance || '30 ft'} to an unoccupied space you can see.`,
+};
+
 function describeChosenOption(chosenOption, playerStats, playerName, campaignName) {
     const optionEffects = [];
-    if (chosenOption.name === 'Bear') {
-        optionEffects.push('Resistance to Acid, Bludgeoning, Cold, Fire, Lightning, Piercing, Poison, Slashing, Thunder');
-    } else if (chosenOption.name === 'Eagle') {
-        optionEffects.push('You can take the Disengage and Dash action as part of this Bonus Action. While raging, you can take a Bonus Action to do both again.');
-    } else if (chosenOption.name === 'Wolf') {
-        optionEffects.push('While raging, allies have Advantage on attack rolls against enemies within 5 feet of you.');
-    } else if (chosenOption.name === 'Falcon') {
-        optionEffects.push('While raging, you have a Fly Speed equal to your Speed if you are not wearing armor.');
-    } else if (chosenOption.name === 'Lion') {
-        optionEffects.push('While raging, enemies within 5 feet of you have Disadvantage on attack rolls against targets other than you or another Barbarian with this option active.');
-    } else if (chosenOption.name === 'Ram') {
-        optionEffects.push('While raging, you can cause a Large or smaller creature to have the Prone condition when you hit it with a melee attack.');
-    } else if (chosenOption.name === 'Cold') {
-        optionEffects.push('Ice Walk: You can walk across and climb icy or wet surfaces without needing to make an Ability Check. You ignore difficult terrain that is composed of ice or snow.');
-    } else if (chosenOption.name === 'Fire') {
-        optionEffects.push(`Speed Boost: Your Speed increases by ${chosenOption.speedBonus || 10} feet.`);
-    } else if (chosenOption.name === 'Lightning') {
-        optionEffects.push('Fly Speed: You gain a Fly Speed equal to your Speed for 1 round.');
-    } else if (chosenOption.name === 'Thunder') {
-        optionEffects.push(`Teleport: You can teleport up to ${chosenOption.teleportDistance || '30 ft'} to an unoccupied space you can see.`);
+    const describe = STANCE_OPTION_DESCRIPTIONS[chosenOption.name];
+    if (describe) {
+        optionEffects.push(describe(chosenOption));
     }
     if (chosenOption.name === 'Falcon' && chosenOption.flySpeed && chosenOption.noArmor && isWearingArmor(playerStats)) {
         optionEffects.push('Blocked because you are wearing armor.');

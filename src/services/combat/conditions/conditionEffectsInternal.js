@@ -267,6 +267,24 @@ function applyAbilityCheckAdvantage(effects, mod, abilityName) {
   }
 }
 
+function applyAdvantageDisadvantageCount(effects, mod, advKey, disKey) {
+  if (mod.effect === 'advantage') {
+    effects[advKey] = (effects[advKey] || 0) + 1;
+  } else if (mod.effect === 'disadvantage') {
+    effects[disKey] = (effects[disKey] || 0) + 1;
+  }
+}
+
+function applyD20Effect(effects, mod) {
+  if (mod.effect === 'portent') {
+    effects.portent = true;
+  } else if (mod.effect === 'stroke_of_luck') {
+    effects.strokeOfLuck = true;
+  } else if (mod.effect === 'bardic_inspiration') {
+    effects.bardicInspiration = true;
+  }
+}
+
 // Returns false when the modifier's target should be skipped entirely
 // (original `continue` in the target if/else-if chain).
 function applyTargetModifiers(effects, mod, abilityName) {
@@ -280,33 +298,15 @@ function applyTargetModifiers(effects, mod, abilityName) {
     return true;
   }
   if (mod.target === 'all_attackers_vs_target') {
-    if (mod.effect === 'advantage') {
-      effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
-    }
-    if (mod.effect === 'disadvantage') {
-      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
-    }
+    applyAdvantageDisadvantageCount(effects, mod, 'targetAdvantageCount', 'targetDisadvantageCount');
     return true;
   }
   if (mod.target === 'd20') {
-    if (mod.effect === 'portent') {
-      effects.portent = true;
-    }
-    if (mod.effect === 'stroke_of_luck') {
-      effects.strokeOfLuck = true;
-    }
-    if (mod.effect === 'bardic_inspiration') {
-      effects.bardicInspiration = true;
-    }
+    applyD20Effect(effects, mod);
     return true;
   }
   if (ATTACK_TARGETS.has(mod.target)) {
-    if (mod.effect === 'advantage') {
-      effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
-    }
-    if (mod.effect === 'disadvantage') {
-      effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
-    }
+    applyAdvantageDisadvantageCount(effects, mod, 'attackAdvantageCount', 'attackDisadvantageCount');
     return true;
   }
   return SAVE_TARGET_SET.has(mod.target);

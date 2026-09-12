@@ -106,32 +106,50 @@ function SaveResultBadge({ success, roll, bonus }) {
   );
 }
 
+function SaveInfoBadge({ entry }) {
+  if (!entry.saveType || !entry.saveDc) return null;
+  return (
+    <span className="log-save-info">
+      {entry.saveType.toUpperCase()} save DC {entry.saveDc}&nbsp;
+      {entry.mode === 'disadvantage' && (
+        <span className="log-mode-badge disadvantage">DISADVANTAGE</span>
+      )}
+    </span>
+  );
+}
+
+function SaveOutcomeBadge({ entry }) {
+  if (entry.saveResult) {
+    return <SaveResultBadge success={entry.saveResult === 'success'} roll={entry.saveRoll} bonus={entry.saveBonus} />;
+  }
+  if (entry.saveSuccess != null) {
+    return <SaveResultBadge success={!!entry.saveSuccess} />;
+  }
+  return null;
+}
+
+function SaveTargetBadge({ entry }) {
+  if (!entry.targetName) return null;
+  if (entry.rollType === 'save' && entry.attackerName) {
+    return <span className="log-target">{entry.targetName} vs {entry.attackerName}</span>;
+  }
+  if (entry.rollType === 'save-damage') {
+    return <span className="log-target">vs {entry.targetName}</span>;
+  }
+  return null;
+}
+
 function RollSaveBadges({ entry }) {
   const isSave = entry.rollType === 'save';
   const isSaveDamage = entry.rollType === 'save-damage';
   const isAoeDamage = entry.rollType === 'aoe-damage';
+  const showsOutcome = (isSave || isSaveDamage) && !!entry.saveResult;
+  const showsLegacyOutcome = isSaveDamage && !entry.saveResult && entry.saveSuccess != null;
   return (
     <>
-      {(isSave || isSaveDamage || isAoeDamage) && entry.saveType && entry.saveDc && (
-        <span className="log-save-info">
-          {entry.saveType.toUpperCase()} save DC {entry.saveDc}&nbsp;
-          {entry.mode === 'disadvantage' && (
-            <span className="log-mode-badge disadvantage">DISADVANTAGE</span>
-          )}
-        </span>
-      )}
-      {(isSave || isSaveDamage) && entry.saveResult && (
-        <SaveResultBadge success={entry.saveResult === 'success'} roll={entry.saveRoll} bonus={entry.saveBonus} />
-      )}
-      {isSaveDamage && !entry.saveResult && entry.saveSuccess != null && (
-        <SaveResultBadge success={!!entry.saveSuccess} />
-      )}
-      {isSave && entry.targetName && entry.attackerName && (
-        <span className="log-target">{entry.targetName} vs {entry.attackerName}</span>
-      )}
-      {isSaveDamage && entry.targetName && (
-        <span className="log-target">vs {entry.targetName}</span>
-      )}
+      {(isSave || isSaveDamage || isAoeDamage) && <SaveInfoBadge entry={entry} />}
+      {(showsOutcome || showsLegacyOutcome) && <SaveOutcomeBadge entry={entry} />}
+      <SaveTargetBadge entry={entry} />
     </>
   );
 }

@@ -191,21 +191,23 @@ function addFiendBlessing(resources, { playerStats, isWarlock, charisma }) {
   resources.darkOnesLuckUses = { current: maxDOL, max: maxDOL }
 }
 
+function arcanumPool(levelUses) {
+  const value = levelUses || 0
+  return { current: value, max: value }
+}
+
 function addPactAndArcanum(resources, { features, classLevel, is2024, isWarlock }) {
-  let maxPM = 0
-  if (isWarlock) {
-    maxPM = is2024
-      ? (classLevel?.pact_slot_levels || 0)
-      : (classLevel?.class_specific?.pact_slots || 0)
-  }
-  resources.warlockPactMagic = { current: maxPM, max: maxPM }
+  const pactSlots = isWarlock
+    ? (is2024 ? (classLevel?.pact_slot_levels || 0) : (classLevel?.class_specific?.pact_slots || 0))
+    : 0
+  resources.warlockPactMagic = { current: pactSlots, max: pactSlots }
 
   // Mystic Arcanum: one free cast per long rest for levels 6-9
   if (isWarlock && features?.arcanumLevels) {
-    resources.mysticArcanumLevel6 = { current: features.arcanumLevels.level6 || 0, max: features.arcanumLevels.level6 || 0 }
-    resources.mysticArcanumLevel7 = { current: features.arcanumLevels.level7 || 0, max: features.arcanumLevels.level7 || 0 }
-    resources.mysticArcanumLevel8 = { current: features.arcanumLevels.level8 || 0, max: features.arcanumLevels.level8 || 0 }
-    resources.mysticArcanumLevel9 = { current: features.arcanumLevels.level9 || 0, max: features.arcanumLevels.level9 || 0 }
+    resources.mysticArcanumLevel6 = arcanumPool(features.arcanumLevels.level6)
+    resources.mysticArcanumLevel7 = arcanumPool(features.arcanumLevels.level7)
+    resources.mysticArcanumLevel8 = arcanumPool(features.arcanumLevels.level8)
+    resources.mysticArcanumLevel9 = arcanumPool(features.arcanumLevels.level9)
   }
 }
 
@@ -280,6 +282,12 @@ function addRangerPrimalResources(resources, { playerStats, wis }) {
   resources.tirelessUses = { current: maxTU, max: maxTU }
 }
 
+// WIS-gated use pool: max(WIS bonus, 1) when allowed, else 0.
+function wisGatedPool(allowed, wis) {
+  const value = allowed ? Math.max(wis?.bonus || 0, 1) : 0
+  return { current: value, max: value }
+}
+
 function addDruidPrimalResources(resources, { playerStats, features, wis }) {
   const maxWS = features?.maxWildShapeUses || 0
   resources.wildShapeUses = { current: maxWS, max: maxWS }
@@ -288,17 +296,13 @@ function addDruidPrimalResources(resources, { playerStats, features, wis }) {
   const maxNR = isDruid ? Math.floor(playerStats.level / 2) : 0
   resources.naturalRecoverySlots = { current: maxNR, max: maxNR }
 
-  const moonlightSubclass = matchesPatron(playerStats, ['Circle of the Moon'])
-  const maxMoonlightStep = isDruid && moonlightSubclass ? Math.max(wis?.bonus || 0, 1) : 0
-  resources.moonlightStepUses = { current: maxMoonlightStep, max: maxMoonlightStep }
+  const isMoonCircle = isDruid && matchesPatron(playerStats, ['Circle of the Moon'])
+  resources.moonlightStepUses = wisGatedPool(isMoonCircle, wis)
 
-  const isCircleOfTheStars = matchesPatron(playerStats, ['Circle of the Stars'])
-  const maxCosmicOmen = isDruid && isCircleOfTheStars && playerStats.level >= 6 ? Math.max(wis?.bonus || 0, 1) : 0
-  resources.cosmicomenUses = { current: maxCosmicOmen, max: maxCosmicOmen }
+  const isStarsCircle = isDruid && matchesPatron(playerStats, ['Circle of the Stars'])
+  resources.cosmicomenUses = wisGatedPool(isStarsCircle && playerStats.level >= 6, wis)
 
-  const isDruidStars = isDruid && isCircleOfTheStars
-  const maxStarMap = isDruidStars && playerStats.level >= 3 ? Math.max(wis?.bonus || 0, 1) : 0
-  resources._Star_Map_freeCastCount = { current: maxStarMap, max: maxStarMap }
+  resources._Star_Map_freeCastCount = wisGatedPool(isStarsCircle && playerStats.level >= 3, wis)
 }
 
 function hasAncestralTrait(playerStats, traitName, fromSubrace) {

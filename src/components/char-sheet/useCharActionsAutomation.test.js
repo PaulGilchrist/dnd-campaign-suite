@@ -44,6 +44,19 @@ const basePlayerStats = {
     automation: { passives: [] },
 };
 
+function makeBaseGRV(activeBuffs, focusPoints) {
+    return vi.fn((charKey, key, _cn) => {
+        if (key === 'activeBuffs') return activeBuffs;
+        if (key === 'focusPoints') return focusPoints;
+        if (key === 'lastActionSpellCast') return null;
+        return undefined;
+    });
+}
+
+function pick(value, fallback) {
+    return value || fallback;
+}
+
 function createDeps(overrides = {}) {
     const {
         cannotAct = false,
@@ -65,32 +78,22 @@ function createDeps(overrides = {}) {
         characters: customCharacters,
     } = overrides;
 
-    const baseGRV = vi.fn((charKey, key, _cn) => {
-        if (key === 'activeBuffs') return activeBuffs;
-        if (key === 'focusPoints') return focusPoints;
-        if (key === 'lastActionSpellCast') return null;
-        return undefined;
-    });
-
-    const grv = customGRV || baseGRV;
-    const srv = customSRV || vi.fn();
-
     return {
         cannotAct,
-        getRuntimeValue: grv,
-        setRuntimeValue: srv,
-        rollDamage: customRollDamage || vi.fn(),
-        rollAttack: customRollAttack || vi.fn(),
-        executeHandler: customExecuteHandler || vi.fn().mockResolvedValue(undefined),
-        addEntry: customAddEntry || vi.fn().mockResolvedValue(undefined),
-        setPopupHtml: customSetPopupHtml || vi.fn(),
-        setModalState: customSetModalState || vi.fn(),
-        modalState: customModalState || {},
+        getRuntimeValue: pick(customGRV, makeBaseGRV(activeBuffs, focusPoints)),
+        setRuntimeValue: pick(customSRV, vi.fn()),
+        rollDamage: pick(customRollDamage, vi.fn()),
+        rollAttack: pick(customRollAttack, vi.fn()),
+        executeHandler: pick(customExecuteHandler, vi.fn().mockResolvedValue(undefined)),
+        addEntry: pick(customAddEntry, vi.fn().mockResolvedValue(undefined)),
+        setPopupHtml: pick(customSetPopupHtml, vi.fn()),
+        setModalState: pick(customSetModalState, vi.fn()),
+        modalState: pick(customModalState, {}),
         playerStats,
         campaignName: cn,
-        mapName: customMapName || 'test-map',
-        characters: customCharacters || [],
-        onBuffsChange: customOnBuffsChange || vi.fn(),
+        mapName: pick(customMapName, 'test-map'),
+        characters: pick(customCharacters, []),
+        onBuffsChange: pick(customOnBuffsChange, vi.fn()),
     };
 }
 

@@ -9,6 +9,51 @@ import { addConcentration } from '../../../combat/concentration/concentrationSer
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
 
+function registerHypnoticConcentration(combatSummary, casterName, playerStats, campaignName) {
+    const dc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    addConcentration(combatSummary, casterName, 'Hypnotic Pattern', dc);
+    storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
+async function applyHypnoticPatternCharm(campaignName, casterName, targetName, dc, saveResult, results) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c =>
+        String(c).toLowerCase() !== 'charmed' &&
+        String(c).toLowerCase() !== 'incapacitated' &&
+        String(c).toLowerCase() !== 'speed_zero'
+    );
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed', 'incapacitated', 'speed_zero'], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['charmed', 'incapacitated', 'speed_zero'],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Charmed, Incapacitated, Speed 0',
+        reason: 'Hypnotic Pattern spell',
+        note: `${targetName} is Charmed, Incapacitated, and has Speed 0. The spell ends if the creature takes damage or someone uses an action to shake it free.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[hypnoticPattern] Error:", e); });
+
+    addExpiration(casterName, targetName, [
+        { type: 'charmed', condition: 'charmed' },
+        { type: 'incapacitated', condition: 'incapacitated' },
+        { type: 'speed_zero', condition: 'speed_zero' },
+    ], campaignName);
+
+    results.push(`${targetName} is Charmed, Incapacitated, and has Speed 0.`);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -30,10 +75,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Register concentration for this spell
     const combatSummary = getCombatSummary(campaignName);
     if (combatSummary) {
-        const dc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-        addConcentration(combatSummary, casterName, 'Hypnotic Pattern', dc);
-        storage.set('combatSummary', combatSummary, campaignName);
-        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+        registerHypnoticConcentration(combatSummary, casterName, playerStats, campaignName);
     }
 
     storeSpellLastAttack(campaignName, {
@@ -94,42 +136,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }).catch((e) => { console.error("[hypnoticPattern] Error:", e); });
         } else {
             affectedCount++;
-
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c =>
-                String(c).toLowerCase() !== 'charmed' &&
-                String(c).toLowerCase() !== 'incapacitated' &&
-                String(c).toLowerCase() !== 'speed_zero'
-            );
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed', 'incapacitated', 'speed_zero'], campaignName);
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['charmed', 'incapacitated', 'speed_zero'],
-                appliedDamage: 0,
-            });
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Charmed, Incapacitated, Speed 0',
-                reason: 'Hypnotic Pattern spell',
-                note: `${targetName} is Charmed, Incapacitated, and has Speed 0. The spell ends if the creature takes damage or someone uses an action to shake it free.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[hypnoticPattern] Error:", e); });
-
-            addExpiration(casterName, targetName, [
-                { type: 'charmed', condition: 'charmed' },
-                { type: 'incapacitated', condition: 'incapacitated' },
-                { type: 'speed_zero', condition: 'speed_zero' },
-            ], campaignName);
-
-            results.push(`${targetName} is Charmed, Incapacitated, and has Speed 0.`);
+            await applyHypnoticPatternCharm(campaignName, casterName, targetName, dc, saveResult, results);
         }
     }
 

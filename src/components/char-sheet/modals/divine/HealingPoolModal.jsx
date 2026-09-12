@@ -256,9 +256,21 @@ function computeCharismaMod(playerStats) {
     return Math.floor((chaScore - 1) / 2);
 }
 
+function resolveEffectivePoolMax(isDicePool, poolMaxProp, level) {
+    if (isDicePool) return poolMaxProp;
+    return 5 * (level || 1);
+}
+
+function resolveMaxDicePerUse(maxDicePerUseProp, playerStats) {
+    return maxDicePerUseProp ? computeCharismaMod(playerStats) : Infinity;
+}
+
+function hasRestoringTouchRow(restoringTouchConditions) {
+    return !!restoringTouchConditions && restoringTouchConditions.length > 0;
+}
+
 function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, maxDicePerUse: maxDicePerUseProp = '', creatureTargets, resourceCost = '', onClose }) {
-    const layOnHandsPoolMax = 5 * (playerStats.level || 1);
-    const effectivePoolMax = isDicePool ? poolMaxProp : layOnHandsPoolMax;
+    const effectivePoolMax = resolveEffectivePoolMax(isDicePool, poolMaxProp, playerStats.level);
     const effectiveResourceKey = resolveHealingPoolResourceKey(resourceKeyProp, isDicePool, featureName);
 
     const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource(
@@ -279,7 +291,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const [selectedTargetName, setSelectedTargetName] = React.useState(null);
     const [showTargetSelection, setShowTargetSelection] = React.useState(!!(creatureTargets && creatureTargets.length > 1));
 
-    const effectiveMaxDicePerUse = maxDicePerUseProp ? computeCharismaMod(playerStats) : Infinity;
+    const effectiveMaxDicePerUse = resolveMaxDicePerUse(maxDicePerUseProp, playerStats);
 
     const safePool = Number(poolRemaining) || 0;
     const safeMax = Number(poolMaxFromHook) || 0;
@@ -378,7 +390,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const targetConditions = getTargetConditions();
     const curableEntries = buildCurableEntries(alsoCures, restoringTouchConditions, targetConditions);
 
-    const hasRestoringTouch = restoringTouchConditions && restoringTouchConditions.length > 0;
+    const hasRestoringTouch = hasRestoringTouchRow(restoringTouchConditions);
 
     React.useEffect(() => {
         const validKeys = new Set(curableEntries.map(e => e.key));

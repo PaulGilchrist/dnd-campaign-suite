@@ -73,45 +73,75 @@ describe('multiTargetHandler.applyMultiTarget', () => {
 
   describe('early returns', () => {
     it('should return null when secondTargetName is empty string', async () => {
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', '', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: '',
+          spell: null,
+          metaCtx: null,
+      });
       expect(result).toBeNull();
     });
 
     it('should return null when secondTargetName is null', async () => {
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', null, null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: null,
+          spell: null,
+          metaCtx: null,
+      });
       expect(result).toBeNull();
     });
 
     it('should return null when no combat context exists', async () => {
       getCombatContext.mockResolvedValue(null);
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell: null,
+          metaCtx: null,
+      });
       expect(result).toBeNull();
     });
 
     it('should return null when first target not found in combat summary', async () => {
       getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Orc' }]));
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell: null,
+          metaCtx: null,
+      });
       expect(result).toBeNull();
     });
 
     it('should return null when second target not found in combat summary', async () => {
       getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell: null,
+          metaCtx: null,
+      });
       expect(result).toBeNull();
     });
   });
@@ -134,10 +164,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getDistanceFeet.mockReturnValue(50);
       isWithinRange.mockResolvedValue(false);
 
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell: null,
+          metaCtx: null,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -151,10 +187,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getDistanceFeet.mockReturnValueOnce(10).mockReturnValueOnce(50);
       isWithinRange.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
 
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell: null,
+          metaCtx: null,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('out of range');
@@ -165,10 +207,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
 
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, null,
-        'Goblin', 'Orc', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: null,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell: null,
+          metaCtx: null,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -179,10 +227,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({ attackerPos: null });
 
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell: null,
+          metaCtx: null,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -193,10 +247,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       rangeToFeet.mockReturnValue(null);
       resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 1 } });
 
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', null, null
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell: null,
+          metaCtx: null,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -214,10 +274,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getCombatContext.mockResolvedValue(cs);
       applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 10 });
 
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(applyDamageToTarget).toHaveBeenCalledWith(cs, 'Orc', 20, ['cold'], campaignName, null, { ignoreResistance: false, attackerName: 'TestHero' });
       expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestHero', campaignName);
@@ -241,10 +307,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
       ));
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(applyDamageToTarget).not.toHaveBeenCalled();
       expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
@@ -257,10 +329,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
       ));
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
@@ -278,10 +356,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 10 });
 
-      const result = await applyMultiTarget(
-        action, makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      const result = await applyMultiTarget({
+          action,
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(result.payload.description).toContain('Misty Step');
     });
@@ -294,10 +378,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 10 });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 15, ['fire'], campaignName, null, { ignoreResistance: false, attackerName: 'TestHero' });
     });
@@ -310,10 +400,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue(null);
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(addEntry).toHaveBeenCalledTimes(1);
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
@@ -332,10 +428,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 15, finalDamage: 0 });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
     });
@@ -348,10 +450,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 15, finalDamage: 5 });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 10, [''], campaignName, null, { ignoreResistance: false, attackerName: 'TestHero' });
     });
@@ -368,10 +476,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getCombatContext.mockResolvedValue(cs);
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 7 });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Orc', 7, campaignName);
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
@@ -397,10 +511,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getRuntimeValue.mockReturnValue(10);
       applyHealingToTarget.mockReturnValue({ newHp: 18, actualHeal: 8 });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(getRuntimeValue).toHaveBeenCalledWith('Orc', 'currentHitPoints', campaignName);
     });
@@ -416,10 +536,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getRuntimeValue.mockReturnValue(null);
       applyHealingToTarget.mockReturnValue({ newHp: 25, actualHeal: 15 });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats({ hitPoints: 25 }), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats({ hitPoints: 25 }),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Orc', 15, campaignName);
     });
@@ -435,10 +561,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getRuntimeValue.mockReturnValue(22);
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 0 });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(applyHealingToTarget).not.toHaveBeenCalled();
     });
@@ -454,10 +586,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getRuntimeValue.mockReturnValue(10);
       applyHealingToTarget.mockReturnValue(null);
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(addEntry).toHaveBeenCalledTimes(1);
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
@@ -482,10 +620,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         return null;
       });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Orc', 'activeConditions', ['frightened'], campaignName
@@ -506,10 +650,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         return null;
       });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'condition',
@@ -535,10 +685,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         return null;
       });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       const setCalls = setRuntimeValue.mock.calls.filter(
         call => call[1] === 'powerWordHealStandPermission'
@@ -560,10 +716,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         return null;
       });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Orc', 'activeConditions', ['frightened'], campaignName
@@ -580,10 +742,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 10 });
 
-      await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
@@ -608,10 +776,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 15, finalDamage: 5 });
 
-      await applyMultiTarget(
-        action, makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      await applyMultiTarget({
+          action,
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         description: expect.stringContaining('Misty Step'),
@@ -628,10 +802,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 5 });
 
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -648,10 +828,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 5 });
 
-      const result = await applyMultiTarget(
-        makeAction(), makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      const result = await applyMultiTarget({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(result.payload.description).toContain('30 ft');
     });
@@ -669,10 +855,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       ));
       applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 5 });
 
-      const result = await applyMultiTarget(
-        action, makePlayerStats(), campaignName, mapName,
-        'Goblin', 'Orc', spell, metaCtx
-      );
+      const result = await applyMultiTarget({
+          action,
+          playerStats: makePlayerStats(),
+          campaignName,
+          _mapName: mapName,
+          firstTargetName: 'Goblin',
+          secondTargetName: 'Orc',
+          spell,
+          metaCtx,
+      });
 
       expect(result.payload.description).toContain('10 ft');
     });

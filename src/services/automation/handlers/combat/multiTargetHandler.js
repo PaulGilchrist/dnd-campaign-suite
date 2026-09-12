@@ -94,7 +94,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-async function checkSecondTargetRange(playerName, firstTarget, secondTarget, rangeFt, secondTargetName, auto, actionName, _mapName) {
+async function checkSecondTargetRange({ playerName, firstTarget, secondTarget, rangeFt, secondTargetName, auto, actionName, _mapName }) {
     if (rangeFt == null || !_mapName) return null;
     const firstInRange = await isWithinRange(playerName, firstTarget.name, rangeFt);
     const secondInRange = await isWithinRange(playerName, secondTarget.name, rangeFt);
@@ -110,7 +110,7 @@ async function checkSecondTargetRange(playerName, firstTarget, secondTarget, ran
     };
 }
 
-function applySpreadDamage(combatSummary, secondTarget, secondTargetName, spell, spellName, damageType, metaCtx, playerStats, campaignName) {
+function applySpreadDamage({ combatSummary, secondTarget, secondTargetName, spell, spellName, damageType, metaCtx, playerStats, campaignName }) {
     if (!spell?.damage) return;
     const rawDamage = metaCtx?.totalDamage || metaCtx?.rawDamage || 0;
     if (rawDamage <= 0) return;
@@ -187,14 +187,7 @@ function applyPowerWordHealSpread(combatSummary, secondTarget, secondTargetName,
 }
 
 export async function applyMultiTarget(
-    action,
-    playerStats,
-    campaignName,
-    _mapName,
-    firstTargetName,
-    secondTargetName,
-    spell,
-    metaCtx
+    { action, playerStats, campaignName, _mapName, firstTargetName, secondTargetName, spell, metaCtx }
 ) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -212,13 +205,13 @@ export async function applyMultiTarget(
 
     if (!firstTarget || !secondTarget) return null;
 
-    const rangeReject = await checkSecondTargetRange(playerName, firstTarget, secondTarget, rangeFt, secondTargetName, auto, action.name, _mapName);
-    if (rangeReject) return rangeReject;
-
     const spellName = spell?.name || action.payload?.spellName || 'Unknown Spell';
     const damageType = spell?.damage?.damage_type || '';
 
-    applySpreadDamage(combatSummary, secondTarget, secondTargetName, spell, spellName, damageType, metaCtx, playerStats, campaignName);
+    const rangeReject = await checkSecondTargetRange({ playerName, firstTarget, secondTarget, rangeFt, secondTargetName, auto, actionName: action.name, _mapName });
+    if (rangeReject) return rangeReject;
+
+    applySpreadDamage({ combatSummary, secondTarget, secondTargetName, spell, spellName, damageType, metaCtx, playerStats, campaignName });
 
     applyPowerWordHealSpread(combatSummary, secondTarget, secondTargetName, spell, spellName, playerStats, campaignName);
 

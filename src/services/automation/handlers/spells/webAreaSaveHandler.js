@@ -30,7 +30,7 @@ import { spellNoticePopup, resolveSelectedSpellTargets, registerSpellConcentrati
  */
 
 // Cast-time DEX save succeeded: record the outcome + log row.
-async function saveSuccess(campaignName, casterName, targetName, dc, saveResult, saveType, rollType, successDescription) {
+async function saveSuccess({ campaignName, casterName, targetName, dc, saveResult, saveType, rollType, successDescription }) {
     await addTargetResult(campaignName, {
         targetName,
         saveResult: 'success',
@@ -230,7 +230,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         if (saveResult.success) {
             savedCount++;
-            await saveSuccess(campaignName, casterName, targetName, dc, saveResult, 'DEX', 'save-web', `${targetName} succeeded on DEX save against Web.`);
+            await saveSuccess({ campaignName, casterName, targetName, dc, saveResult, saveType: 'DEX', rollType: 'save-web', successDescription: `${targetName} succeeded on DEX save against Web.` });
         } else {
             affectedCount++;
             await restrainWebTarget(campaignName, casterName, targetName, dc, saveResult, durationRounds);

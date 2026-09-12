@@ -116,12 +116,26 @@ function imprisonTarget(targetName, casterName, dc, campaignName) {
     }).catch((e) => { console.error("[forcecage] Error:", e); });
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation || {};
+function resolveForcecageDc(auto, playerStats) {
     let dc = buildSaveDc(auto, playerStats);
     if (auto.saveDc === 'ability' && playerStats.spellAbilities?.saveDc != null) {
         dc = playerStats.spellAbilities.saveDc;
     }
+    return dc;
+}
+
+function registerForcecageConcentration(casterName, playerStats, campaignName) {
+    const combatSummary = getCombatSummary(campaignName);
+    if (!combatSummary) return;
+    const concentrationDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    addConcentration(combatSummary, casterName, 'Forcecage', concentrationDc);
+    storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation || {};
+    const dc = resolveForcecageDc(auto, playerStats);
     const casterName = playerStats.name;
 
     const cs = await getCombatContext(campaignName);
@@ -164,13 +178,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Register concentration (2024 rules — concentration, up to 1 hour)
-    const combatSummary = getCombatSummary(campaignName);
-    if (combatSummary) {
-        const concentrationDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-        addConcentration(combatSummary, casterName, 'Forcecage', concentrationDc);
-        storage.set('combatSummary', combatSummary, campaignName);
-        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-    }
+    registerForcecageConcentration(casterName, playerStats, campaignName);
 
     const trapped = [];
 
@@ -201,8 +209,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
  * - On success: creature escapes and the Forcecage effect is removed
  * - On failure: creature doesn't exit and wastes the spell/effect
  */
+function resolveEscapeTargetName(action) {
+    return action.metaCtx?.target || action.metaCtx?.forcecageTargetName;
+}
+
+function resolveForcecageCreatureBonuses(targetCreature) {
+    return {
+        chaBonus: targetCreature?.abilities?.CHA?.bonus ?? 0,
+        chaProficiency: targetCreature?.proficiency ?? 0,
+    };
+}
+
 export async function handleEscape(action, playerStats, campaignName, _mapName) {
-    const targetName = action.metaCtx?.target || action.metaCtx?.forcecageTargetName;
+    const targetName = resolveEscapeTargetName(action);
 
     if (!targetName) {
         return {
@@ -233,8 +252,7 @@ export async function handleEscape(action, playerStats, campaignName, _mapName) 
     }
 
     const targetCreature = (action.metaCtx?.creatures || []).find(c => c.name === targetName);
-    const chaBonus = targetCreature?.abilities?.CHA?.bonus ?? 0;
-    const chaProficiency = targetCreature?.proficiency ?? 0;
+    const { chaBonus, chaProficiency } = resolveForcecageCreatureBonuses(targetCreature);
     const saveDc = forcecageEffect.dc || 15;
 
     // Roll the CHA saving throw

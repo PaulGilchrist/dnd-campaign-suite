@@ -2,30 +2,29 @@ import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeT
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../postCastRiderService.js';
 import { setRuntimeValue } from '../../../../../hooks/runtime/useRuntimeState.js';
 
+// Adds a feat range bonus to a spell's effective range when the feat is
+// active, the spell is eligible, and the base range is at least 10 feet.
+function applyRangeBonus(effectiveRange, spell, featEffects, bonusKey, eligible) {
+    const bonus = featEffects?.[bonusKey] || 0;
+    if (bonus <= 0 || !eligible) return effectiveRange;
+    const baseRange = rangeToFeet(spell.range);
+    if (baseRange != null && baseRange >= 10) return effectiveRange + bonus;
+    return effectiveRange;
+}
+
 function computeRange(spell, metaCtx, attackerPos, targetPos, featEffects) {
     if (!attackerPos || !targetPos) return {};
 
-    let effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
-    if (effectiveRange != null) {
-        const cantripRangeBonus = (featEffects?.cantripRangeBonus) || 0;
-        if (cantripRangeBonus > 0 && spell.level === 0) {
-            const baseRange = rangeToFeet(spell.range);
-            if (baseRange != null && baseRange >= 10) {
-                effectiveRange += cantripRangeBonus;
-            }
-        }
-        const spellRangeBonus = (featEffects?.spellRangeBonus) || 0;
-        if (spellRangeBonus > 0 && spell.attack_type && !spell.dc) {
-            const baseRange = rangeToFeet(spell.range);
-            if (baseRange != null && baseRange >= 10) {
-                effectiveRange += spellRangeBonus;
-            }
-        }
-        const distanceFt = getDistanceFeet(attackerPos, targetPos);
-        const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects ?? {});
-        if (rangeResult.mode === 'miss') {
-            return { isAutoMiss: true, rangeReason: rangeResult.reason };
-        }
+    const initialRange = computeEffectiveSpellRange(spell.range, metaCtx);
+    if (initialRange == null) return {};
+
+    let effectiveRange = applyRangeBonus(initialRange, spell, featEffects, 'cantripRangeBonus', spell.level === 0);
+    effectiveRange = applyRangeBonus(effectiveRange, spell, featEffects, 'spellRangeBonus', !!spell.attack_type && !spell.dc);
+
+    const distanceFt = getDistanceFeet(attackerPos, targetPos);
+    const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects ?? {});
+    if (rangeResult.mode === 'miss') {
+        return { isAutoMiss: true, rangeReason: rangeResult.reason };
     }
     return {};
 }

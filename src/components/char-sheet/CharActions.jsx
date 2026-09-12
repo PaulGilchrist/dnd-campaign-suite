@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { getCategories } from '../../services/character/featureCategories.js'
-import { getActionSpellNames } from '../../services/ui/spellSectionUtils.js'
+import { getActionSpellNames, applyPotentSpellcasting } from '../../services/ui/spellSectionUtils.js'
 import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
 import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from '../../services/rules/core/spellDamageUtils.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -148,6 +148,20 @@ function PendingActionModalsHost({
     );
 }
 
+function getActionSpells(playerStats, campaignName) {
+    const nameSet = getActionSpellNames(playerStats, campaignName);
+    return (playerStats.spellAbilities?.spells || []).filter(spell => nameSet.has(spell.name));
+}
+
+function hasWeaponKindMastery(playerStats) {
+    return (playerStats.automation?.passives || []).some(p => p.type === 'weapon_kind_mastery');
+}
+
+function renderCannotActLabel(cannotAct, cannotActReason) {
+    if (!cannotAct) return null;
+    return <span className='disabled-attack-label'>({cannotActReason || 'Incapacitated'})</span>;
+}
+
 function handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic }) {
     if (cannotAct) return;
     // SINGLE ENTRY POINT for action spell casting:
@@ -175,18 +189,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
         }
         const resolved = resolveSpellDamageAtLevel(spell, playerStats.level);
         if (!resolved || spell.level !== 0) return resolved;
-        const potentFeature = playerStats.automation?.actions?.find(
-            a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
-        );
-        if (!potentFeature) return resolved;
-        const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
-        const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
-        if (potentFeature.options.length > 1 && !chosen) return resolved;
-        if (chosen && !chosen.toLowerCase().includes('spellcasting')) return resolved;
-        const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
-        const wisMod = Math.max(0, wis?.bonus || 0);
-        if (wisMod <= 0) return resolved;
-        return `${resolved}+${wisMod}`;
+        return applyPotentSpellcasting(resolved, playerStats, campaignName);
     }, [playerStats, campaignName]);
 
     useEffect(() => {
@@ -464,11 +467,10 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
 
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
-    const actionSpellNameSet = getActionSpellNames(playerStats, campaignName);
-    const actionSpells = (playerStats.spellAbilities?.spells || []).filter(spell => actionSpellNameSet.has(spell.name));
+    const actionSpells = getActionSpells(playerStats, campaignName);
     const actionSpellNames = actionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
 
-    const actionAttacks = playerStats.attacks?.filter(a => a.type === 'Action') || [];
+    const actionAttacks = (playerStats.attacks || []).filter(a => a.type === 'Action');
 
     const handleActionSpellClick = (spellName) => {
         let spell = actionSpellNames[spellName];
@@ -491,8 +493,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
         actionGateMetamagic(spell, metaCtx);
     }, [actionGateMetamagic, resolveActionSpellPositions]);
 
-    const is2024Rules = playerStats.rules === '2024';
-    const hasWeaponMastery = (playerStats.automation?.passives || []).some(p => p.type === 'weapon_kind_mastery');
+    const showMastery = playerStats.rules === '2024' && hasWeaponKindMastery(playerStats);
 
     const categories = getCategories(playerStats.rules || '5e');
 
@@ -512,15 +513,15 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
              */}
             <div>
                 <div className='sectionHeader'>Actions</div>
-                {cannotAct && <span className='disabled-attack-label'>({cannotActReason || 'Incapacitated'})</span>}
-                <div className={`attacks ${is2024Rules && hasWeaponMastery ? 'mastery-enabled' : ''}`}>
+                {renderCannotActLabel(cannotAct, cannotActReason)}
+                <div className={`attacks ${showMastery ? 'mastery-enabled' : ''}`}>
                     <div className='left'><b>Name</b></div>
                     <div><b>Level</b></div>
                     <div><b>Range</b></div>
                     <div><b>Hit</b></div>
                     <div><b>Damage</b></div>
                     <div className='left'><b>Type</b></div>
-                    {is2024Rules && hasWeaponMastery && <div><b>Mastery</b></div>}
+                    {showMastery && <div><b>Mastery</b></div>}
                     {actionAttacks.map((attack) => {
                         const attackLevel = getAttackSpellLevel(playerStats.spellAbilities, attack.name);
                         const attackItem = { ...attack };
@@ -548,7 +549,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                                 handleSimpleDamageRoll(attackItem);
                             }}>{attack.damage}</div>
                             <div className='left'>{attack.damageType}</div>
-                            {is2024Rules && hasWeaponMastery && (() => { const mastery = getWeaponMastery(attack.name, attack, playerStats); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
+                            {showMastery && (() => { const mastery = getWeaponMastery(attack.name, attack, playerStats); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
                         </React.Fragment>;
                     })}
                     {actionSpells.map((spell) => {
@@ -560,7 +561,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                             {renderActionSpellHitCell({ autoHit, isSpellAtk, hasAttackType, cannotAct, conditionAttackMode, toHit: playerStats.spellAbilities?.toHit, exhaustionPenalty, saveDc: playerStats.spellAbilities?.saveDc, displaySaveDcBonus, dcType: spell.dc?.dc_type, attackItem, handleSpellAttackClick })}
                             <div className={resolvedDamage ? "clickable" : ""} onClick={() => handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic })}>{getSpellDamageDisplay(spell)}</div>
                             {renderActionSpellTypeCell(spell, damageType)}
-                            {is2024Rules && hasWeaponMastery && <div></div>}
+                            {showMastery && <div></div>}
                         </React.Fragment>;
                     })}
                 </div>

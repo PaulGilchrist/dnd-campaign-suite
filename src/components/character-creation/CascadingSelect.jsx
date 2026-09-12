@@ -25,6 +25,21 @@ function ChildOptionList({ options, childOptionsKey, childOptionsIndexKey }) {
   });
 }
 
+function SubOptionsBlock({ childLabel, parentData, childFieldName, error, options, childOptionsKey, childOptionsIndexKey, onChange }) {
+  return (
+    <ChildSelect
+      childLabel={childLabel}
+      value={parentData?.[childFieldName]?.name || ''}
+      onChange={onChange}
+      className={error ? 'error' : ''}
+      error={error}
+      options={options}
+      childOptionsKey={childOptionsKey}
+      childOptionsIndexKey={childOptionsIndexKey}
+    />
+  );
+}
+
 function CascadingSelect({
   label,
   options,
@@ -46,6 +61,7 @@ function CascadingSelect({
   const selectedParentValue = formData[fieldName]?.name || '';
 
   const availableSubOptions = subOptionsSelector(selectedParentValue) || [];
+  const childError = errors[errorKey];
 
   const childLabel = resolveChildLabel(label, childLabelProp, ruleset);
 
@@ -66,7 +82,7 @@ function CascadingSelect({
       <div className="form-group">
         <label>{label} *</label>
         <select
-          value={formData[fieldName]?.name || ''}
+          value={selectedParentValue}
           onChange={handleParentChange}
           className={errors[fieldName] ? 'error' : ''}
         >
@@ -77,15 +93,15 @@ function CascadingSelect({
       </div>
 
       {availableSubOptions.length > 0 && (
-        <ChildSelect
+        <SubOptionsBlock
           childLabel={childLabel}
-          value={formData[fieldName]?.[childFieldName]?.name || ''}
-          onChange={handleChildChange}
-          className={errors[errorKey] ? 'error' : ''}
-          error={errors[errorKey]}
+          parentData={formData[fieldName]}
+          childFieldName={childFieldName}
+          error={childError}
           options={availableSubOptions}
           childOptionsKey={childOptionsKey}
           childOptionsIndexKey={childOptionsIndexKey}
+          onChange={handleChildChange}
         />
       )}
     </div>

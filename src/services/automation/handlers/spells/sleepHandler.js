@@ -83,9 +83,24 @@ async function resolveSleepPlayerSave(campaignName, casterName, action, targetNa
  * - Creatures that don't sleep (elves, undead, constructs) or that are immune to
  *   Exhaustion automatically succeed.
  */
+function resolveSleepDc(action, auto, playerStats) {
+    return action.metaCtx?.spellSaveDc ?? buildSaveDc(auto, playerStats);
+}
+
+function resolveSleepSelectedTargets(action) {
+    const selected = action.metaCtx?.selectedTargets;
+    return Array.isArray(selected) && selected.length > 0 ? selected : null;
+}
+
+function sleepSaveDescription(targetName, success, dc, spellName) {
+    return success
+        ? `${targetName} succeeded on its WIS save (DC ${dc}) against ${spellName}.`
+        : `${targetName} failed its WIS save (DC ${dc}) against ${spellName}.`;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName, characters) {
     const auto = action.automation || {};
-    const dc = action.metaCtx?.spellSaveDc ?? buildSaveDc(auto, playerStats);
+    const dc = resolveSleepDc(action, auto, playerStats);
     const casterName = playerStats.name;
 
     const cs = await getCombatContext(campaignName);
@@ -93,9 +108,7 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
         return sleepPopup(action.name, 'No creatures in combat. Sleep has no effect.');
     }
 
-    const selectedNames = Array.isArray(action.metaCtx?.selectedTargets) && action.metaCtx.selectedTargets.length > 0
-        ? action.metaCtx.selectedTargets
-        : null;
+    const selectedNames = resolveSleepSelectedTargets(action);
 
     const targets = cs.creatures.filter(c => {
         if (c.name === casterName) return false;
@@ -149,9 +162,7 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
             roll,
             total,
             saveBonus,
-            description: success
-                ? `${targetName} succeeded on its WIS save (DC ${dc}) against ${action.name}.`
-                : `${targetName} failed its WIS save (DC ${dc}) against ${action.name}.`,
+            description: sleepSaveDescription(targetName, success, dc, action.name),
         }).catch((e) => { console.error('[sleep] Error logging save result:', e); });
 
         if (success) {

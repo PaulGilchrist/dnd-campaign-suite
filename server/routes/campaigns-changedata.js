@@ -75,6 +75,32 @@ router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     res.json({ [key]: data[key] });
 }));
 
+// value may be the full store object { targetEffects: [...], hitPoints: 123, ... }
+// or just the property value directly. Extract the property if value[key] exists.
+function extractPropertyValue(key, value) {
+    if (value && typeof value === 'object') {
+        if (key in value) {
+            return value[key];
+        }
+        if ('value' in value && Object.keys(value).length === 1 && typeof value.value === 'object') {
+            // Client sent { value: fullStoreObject } — unwrap it directly
+            return value.value;
+        }
+    }
+    return value;
+}
+
+function warnDeprecatedLastAttack(campaign, key, value) {
+    if (key !== 'combatSummary' || !value || typeof value !== 'object' || !('lastAttack' in value)) {
+        return;
+    }
+    console.error(
+        '[campaigns-changedata] Client wrote lastAttack to deprecated combatSummary.lastAttack. ' +
+        `Campaign: "${campaign}". Use POST to /api/campaigns/:campaign/lastAttack directly. ` +
+        'Check storage.setProperty(\'combatSummary\', \'lastAttack\', ...) or storage.set(\'combatSummary\', { ...lastAttack }).'
+    );
+}
+
 // POST /api/campaigns/:campaign/:key - Generic POST to in-memory change data store
 router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
@@ -99,29 +125,13 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
 
     const value = 'value' in req.body ? req.body.value : req.body;
 
-    if (key === 'combatSummary' && value && typeof value === 'object' && 'lastAttack' in value) {
-        console.error(
-            '[campaigns-changedata] Client wrote lastAttack to deprecated combatSummary.lastAttack. ' +
-            `Campaign: "${campaign}". Use POST to /api/campaigns/:campaign/lastAttack directly. ` +
-            'Check storage.setProperty(\'combatSummary\', \'lastAttack\', ...) or storage.set(\'combatSummary\', { ...lastAttack }).'
-        );
-    }
+    warnDeprecatedLastAttack(campaign, key, value);
 
     if (!characterChangeData.has(campaign)) {
         characterChangeData.set(campaign, {});
     }
 
-    // value may be the full store object { targetEffects: [...], hitPoints: 123, ... }
-    // or just the property value directly. Extract the property if value[key] exists.
-    let propertyValue;
-    if (value && typeof value === 'object' && key in value) {
-        propertyValue = value[key];
-    } else if (value && typeof value === 'object' && 'value' in value && Object.keys(value).length === 1 && typeof value.value === 'object') {
-        // Client sent { value: fullStoreObject } — unwrap it directly
-        propertyValue = value.value;
-    } else {
-        propertyValue = value;
-    }
+    const propertyValue = extractPropertyValue(key, value);
     characterChangeData.get(campaign)[key] = propertyValue;
     markDirty(campaign);
 

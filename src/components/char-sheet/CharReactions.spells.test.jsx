@@ -47,7 +47,8 @@ vi.mock('./modals/SearingVengeanceModal.jsx', () => ({
             React.createElement('button', { 'data-testid': 'sv-skip', onClick: onSkip }, 'Skip'),
         ),
 }));
-vi.mock('../../services/ui/spellSectionUtils.js', () => ({
+vi.mock('../../services/ui/spellSectionUtils.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     getReactionSpellNames: vi.fn(() => new Set(['Shield', 'Hellish Rebuke'])),
 }));
 vi.mock('../../services/character/featureCategories.js', () => ({

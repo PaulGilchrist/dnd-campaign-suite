@@ -49,7 +49,7 @@ export function rollNpcSave(targetCreature, dc, advantage) {
     return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
 }
 
-async function logSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult, rollType, logPrefix) {
+async function logSaveSuccess({ campaignName, casterName, action, targetName, dc, saveResult, rollType, logPrefix }) {
     await addTargetResult(campaignName, {
         targetName,
         saveResult: 'success',
@@ -169,7 +169,7 @@ async function charmOneTarget({ campaignName, casterName, action, auto, config, 
     const saveResult = await promise;
 
     if (saveResult.success) {
-        await logSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult, config.rollType, config.logPrefix);
+        await logSaveSuccess({ campaignName, casterName, action, targetName, dc, saveResult, rollType: config.rollType, logPrefix: config.logPrefix });
         return 'saved';
     }
     await applyCharmFailure({ campaignName, casterName, action, targetName, dc, saveResult, rollType: config.rollType, logPrefix: config.logPrefix });

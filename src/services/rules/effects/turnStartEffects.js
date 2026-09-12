@@ -467,6 +467,18 @@ async function applyRegenerateBuffHeal(activeName, playerStats, campaignName) {
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
 }
 
+function isCreatureGrappled(creature) {
+    const conditions = creature.conditions;
+    if (!Array.isArray(conditions)) {
+        console.error('expirations: expected conditions to be an array for creature', creature.name);
+        throw new Error('Missing array: conditions for creature ' + creature.name);
+    }
+    return conditions.some(c => {
+        const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
+        return cStr.toLowerCase() === 'grappled';
+    });
+}
+
 async function applyGrappleDamageTurnStart(activeName, playerStats, effect, campaignName) {
     const combatSummary = getCombatSummary(campaignName);
     if (!combatSummary) return;
@@ -481,22 +493,13 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
 
     const damage = evaluateAutoExpression(damageExpression, playerStats);
 
-    if (typeof damage !== 'number' || isNaN(damage) || damage <= 0) return;
+    if (typeof damage !== 'number' || !(damage > 0)) return;
 
     for (const creature of creatures) {
         const creatureName = utils.getName(creature.name);
         if (creatureName === utils.getName(activeName)) continue;
 
-        const conditions = creature.conditions;
-        if (!Array.isArray(conditions)) {
-            console.error('expirations: expected conditions to be an array for creature', creature.name);
-            throw new Error('Missing array: conditions for creature ' + creature.name);
-        }
-        const isGrappled = conditions.some(c => {
-            const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
-            return cStr.toLowerCase() === 'grappled';
-        });
-        if (!isGrappled) continue;
+        if (!isCreatureGrappled(creature)) continue;
 
         try {
             const creatureCurrentHp = creature.hit_points?.current ?? creature.currentHp;

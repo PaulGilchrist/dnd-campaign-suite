@@ -158,7 +158,7 @@ const RUNNER_STEPS = [
     },
     {
         test: m => m.effect === 'melee_attack_reaction',
-        run: (m, d, ctx) => runRiposte(m, ctx.auto, d, ctx.targetName, ctx.dieValue, ctx.superiorityDieSize, ctx.playerStats, ctx.campaignName),
+        run: (m, d, ctx) => runRiposte({ maneuver: m, auto: ctx.auto, description: d, targetName: ctx.targetName, dieValue: ctx.dieValue, superiorityDieSize: ctx.superiorityDieSize, playerStats: ctx.playerStats, campaignName: ctx.campaignName }),
     },
     {
         test: m => m.effect === 'secondary_damage',
@@ -394,7 +394,7 @@ async function runDamageReduction(maneuver, playerStats, dieValue, campaignName)
     return description;
 }
 
-async function runRiposte(maneuver, auto, description, targetName, dieValue, superiorityDieSize, playerStats, campaignName) {
+async function runRiposte({ maneuver, auto, description, targetName, dieValue, superiorityDieSize, playerStats, campaignName }) {
     await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', dieValue, campaignName);
 
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
@@ -515,19 +515,29 @@ async function runSweepingAttack(maneuver, auto, dieDescription, dieValue, targe
     };
 }
 
+const SIZE_ORDER = ['Fine', 'Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
+const SIZE_LIMIT_LABELS = {
+    large_or_smaller: 'Large or smaller',
+    medium_or_smaller: 'Medium or smaller',
+    one_size_larger: 'up to one size larger than you',
+};
+
+function resolveMaxSizeIndex(sizeLimit, playerStats) {
+    if (sizeLimit === 'large_or_smaller') {
+        return SIZE_ORDER.indexOf('Large');
+    }
+    if (sizeLimit === 'medium_or_smaller') {
+        return SIZE_ORDER.indexOf('Medium');
+    }
+    if (sizeLimit === 'one_size_larger') {
+        return SIZE_ORDER.indexOf(playerStats?.size || 'Medium') + 1;
+    }
+    return null;
+}
+
 export async function validateSizeLimit(maneuver, targetName, campaignName, playerStats) {
     if (!maneuver.sizeLimit || !targetName) return { valid: true };
-    const sizeOrder = ['Fine', 'Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
-    let maxAllowed;
-    if (maneuver.sizeLimit === 'large_or_smaller') {
-        maxAllowed = sizeOrder.indexOf('Large');
-    }
-    else if (maneuver.sizeLimit === 'medium_or_smaller') {
-        maxAllowed = sizeOrder.indexOf('Medium');
-    }
-    else if (maneuver.sizeLimit === 'one_size_larger') {
-        maxAllowed = sizeOrder.indexOf(playerStats?.size || 'Medium') + 1;
-    }
+    const maxAllowed = resolveMaxSizeIndex(maneuver.sizeLimit, playerStats);
     if (maxAllowed == null) return { valid: true };
     const cs = await getCombatContext(campaignName);
     if (!cs) return { valid: true };
@@ -538,13 +548,9 @@ export async function validateSizeLimit(maneuver, targetName, campaignName, play
     // target.size (combatSummary, populated by encounterToInitiative for EB joins).
     const monsterData = await getMonsterData(targetName, null);
     const targetSize = monsterData?.size || target.size || 'Medium';
-    const targetSizeIndex = sizeOrder.indexOf(targetSize);
+    const targetSizeIndex = SIZE_ORDER.indexOf(targetSize);
     if (targetSizeIndex > maxAllowed) {
-        const sizeLabel = maneuver.sizeLimit === 'large_or_smaller'
-            ? 'Large or smaller'
-            : maneuver.sizeLimit === 'medium_or_smaller'
-                ? 'Medium or smaller'
-                : `up to one size larger than you`;
+        const sizeLabel = SIZE_LIMIT_LABELS[maneuver.sizeLimit];
         return {
             valid: false,
             description: `${maneuver.name}: Target is ${targetSize} (too large — only ${sizeLabel} affected).`,

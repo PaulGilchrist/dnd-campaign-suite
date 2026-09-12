@@ -255,7 +255,13 @@ describe('ottosDanceHandler.handle', () => {
 
   describe('initial cast - failed save', () => {
     it('should apply charmed and speed_zero conditions on failed save', async () => {
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+      });
       setup();
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -271,7 +277,13 @@ describe('ottosDanceHandler.handle', () => {
     });
 
     it('should add expiration for charmed and speed_zero conditions', async () => {
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -285,7 +297,13 @@ describe('ottosDanceHandler.handle', () => {
     });
 
     it('should call addEntry on failed save', async () => {
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -302,7 +320,13 @@ describe('ottosDanceHandler.handle', () => {
     });
 
     it('should call addEntry with save_result on failed save', async () => {
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -321,7 +345,14 @@ describe('ottosDanceHandler.handle', () => {
     });
 
     it('should append to existing conditions on failed save', async () => {
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener, ['frightened']);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+          existingConditions: ['frightened'],
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -335,7 +366,13 @@ describe('ottosDanceHandler.handle', () => {
     });
 
     it('should register the ottos_irresistible_dance targetEffect on failed save', async () => {
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -365,7 +402,15 @@ describe('ottosDanceHandler.handle', () => {
         duration: 'concentration',
         conditions: ['charmed'],
       };
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener, [], [existingEffect]);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+          existingConditions: [],
+          existingEffects: [existingEffect],
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -379,7 +424,13 @@ describe('ottosDanceHandler.handle', () => {
     });
 
     it('should call addEntry with ability_use on initial cast', async () => {
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -395,7 +446,13 @@ describe('ottosDanceHandler.handle', () => {
     });
 
     it('should set activeConditionMeta on failed save', async () => {
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -414,7 +471,16 @@ describe('ottosDanceHandler.handle', () => {
       const existingMeta = {
         frightened: { dc: 13, ability: 'wis' },
       };
-      const setup = createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener, [], [], existingMeta);
+      const setup = createFailedSaveSetup({
+          getCombatContext,
+          buildSaveDc,
+          resolveTarget,
+          getRuntimeValue,
+          createSaveListener,
+          existingConditions: [],
+          existingEffects: [],
+          existingMeta,
+      });
       setup();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);

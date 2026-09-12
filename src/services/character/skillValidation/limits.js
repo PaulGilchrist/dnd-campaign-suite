@@ -69,6 +69,29 @@ export async function getSkillLimits(formData, allFeats) {
   const finalTotal = totalAllowed + featProfs;
 
   // Build skillChoiceSources array with restricted pools
+  const { skillChoiceSources, featChoiceData } = await build5eChoiceSources(formData, allFeats, fromClass, fromRace);
+
+  // Count Skilled uses
+  const skilledUsesAvailable = await countSkilledUses(formData, allFeats);
+
+  // Compute total Skilled usage (skills + tools not covered by restrictive sources)
+  const skilledUsesUsed = await computeTotalSkilledUsage(formData, skillChoiceSources);
+
+  const details = build5eDetails({ fromClass, fromRace, fromBackground, totalAllowed, featProfs, featChoiceData });
+
+  return {
+    allowed: finalTotal + skilledUsesAvailable,
+    fromClass,
+    fromRace,
+    fromBackground,
+    skillChoiceSources,
+    skilledUsesAvailable,
+    skilledUsesUsed,
+    details
+  };
+}
+
+async function build5eChoiceSources(formData, allFeats, fromClass, fromRace) {
   const skillChoiceSources = [];
   if (fromClass.isChoice && fromClass.skills.length > 0) {
     skillChoiceSources.push({
@@ -106,12 +129,10 @@ export async function getSkillLimits(formData, allFeats) {
     });
   }
 
-  // Count Skilled uses
-  const skilledUsesAvailable = await countSkilledUses(formData, allFeats);
+  return { skillChoiceSources, featChoiceData };
+}
 
-  // Compute total Skilled usage (skills + tools not covered by restrictive sources)
-  const skilledUsesUsed = await computeTotalSkilledUsage(formData, skillChoiceSources);
-
+function build5eDetails({ fromClass, fromRace, fromBackground, totalAllowed, featProfs, featChoiceData }) {
   let details = `In 5e rules, you get ${fromClass.count} skill choice(s)${fromClass.skills.length > 0 ? ' from ' + fromClass.skills.join(', ') : ''}, ${fromRace.count} from your race, and ${fromBackground.count} from your background (${totalAllowed} total)`;
   if (featChoiceData.skillLists.length > 0) {
     const featDetails = featChoiceData.skillLists.map(sl => `${sl.featName}: choose 1 from ${sl.skills.join(', ')}`).join('. ');
@@ -119,17 +140,7 @@ export async function getSkillLimits(formData, allFeats) {
       details += `. + ${featProfs} from feats: ${featDetails}`;
     }
   }
-
-  return {
-    allowed: finalTotal + skilledUsesAvailable,
-    fromClass,
-    fromRace,
-    fromBackground,
-    skillChoiceSources,
-    skilledUsesAvailable,
-    skilledUsesUsed,
-    details
-  };
+  return details;
 }
 
 async function getSkillLimits2024(formData, allFeats, ctx) {

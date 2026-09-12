@@ -426,19 +426,29 @@ function resetChefFeatures(name, playerStats, campaignName) {
   return { hasBolsteringTreats, hasReplenishingMeal }
 }
 
+// Flag-driven resource lines restored on Long Rest, in log order.
+const LONG_REST_FLAG_RESOURCES = [
+  ['hasPortent', 'Portent dice'],
+  ['hasBolsteringTreats', 'Bolstering Treats'],
+  ['hasReplenishingMeal', 'Replenishing Meals'],
+]
+
+function hasCelestialResilience(playerStats) {
+  const isCelestialPatron = playerStats.class?.major?.name === 'Celestial Patron'
+    || playerStats.class?.subclass?.name === 'Celestial Patron'
+  return isCelestialPatron && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience') === true
+}
+
 // Resources-restored list for the long rest log, in original push order.
 function buildLongRestResourcesList(playerStats, flags) {
-  const { hasPortent, hasNaturalRecovery, hasBolsteringTreats, hasReplenishingMeal } = flags
+  const { hasNaturalRecovery } = flags
   const isWarlock = playerStats.class?.name === 'Warlock'
-  const resources = []
-  resources.push('All hit dice restored')
-  resources.push('All spell slots restored')
+  const resources = ['All hit dice restored', 'All spell slots restored']
   if (isWarlock) resources.push('Pact Magic (Warlock spell slots)')
-  if (hasPortent) resources.push('Portent dice')
-  if (hasBolsteringTreats) resources.push('Bolstering Treats')
-  if (hasReplenishingMeal) resources.push('Replenishing Meals')
-  const hasCelestialResilience = playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron'
-  if (hasCelestialResilience && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) resources.push('Celestial Resilience (temp HP)')
+  for (const [flag, label] of LONG_REST_FLAG_RESOURCES) {
+    if (flags[flag]) resources.push(label)
+  }
+  if (hasCelestialResilience(playerStats)) resources.push('Celestial Resilience (temp HP)')
   if (hasNaturalRecovery) resources.push('Natural Recovery (spell slots)')
   if (isWarlock) resources.push('Magical Cunning (feature reset)')
   if ((playerStats.automation?.reactions ?? []).some(r => r.type === 'telekinetic_thrust')) resources.push('Telekinetic Thrust (use restored)')

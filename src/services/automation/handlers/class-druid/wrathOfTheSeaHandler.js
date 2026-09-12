@@ -115,7 +115,8 @@ async function resolveNpcSaveAndDamage({ action, combatSummary, target, playerNa
     // instant te marker + log per WM-006/CLA-357 precedent).
     const size = String(target?.size || '').toLowerCase();
     const canBePushed = !NO_PUSH_SIZES.includes(size);
-    if (!saveSuccess && canBePushed) {
+    const pushed = !saveSuccess && canBePushed;
+    if (pushed) {
         registerTargetEffect(campaignName, target.name, 'push', action.name, {
             value: pushDistanceFt,
             movedDistanceFt: pushDistanceFt,
@@ -131,7 +132,7 @@ async function resolveNpcSaveAndDamage({ action, combatSummary, target, playerNa
         saveBonus,
         damage: actualDamage,
         newHp,
-        pushed: !saveSuccess && canBePushed,
+        pushed,
     };
 
     await addEntry(campaignName, {

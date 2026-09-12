@@ -1,6 +1,122 @@
 import React, { useState } from 'react';
 import './CampaignAdmin.css';
 
+const BUSY_STATUS_TEXT = {
+    'snapshotting': 'Creating snapshot...',
+    'rolling-back': 'Rolling back...',
+    'downloading': 'Preparing download...',
+    'uploading': 'Uploading and extracting...',
+    'clearing-change-data': 'Clearing change data...',
+    'clearing-log': 'Clearing log...',
+    'resetting': 'Performing full reset...'
+};
+
+function AdminHeader({ campaignName, onBack }) {
+    return (
+        <div className="ct-header">
+            <button className="ct-back-btn" onClick={onBack}>
+                <i className="fas fa-arrow-left"></i> Back
+            </button>
+            <h2>Admin — {campaignName}</h2>
+        </div>
+    );
+}
+
+function AppearanceSection({ theme, toggleTheme }) {
+    return (
+        <div className="admin-section">
+            <h3>Appearance</h3>
+            <div className="admin-actions-grid">
+                <div className="admin-action admin-action--full">
+                    <button className="ct-btn" onClick={toggleTheme}>
+                        <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
+                        Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function StatusDisplay({ status }) {
+    if (!status) return null;
+    const statusText = typeof status === 'string' ? BUSY_STATUS_TEXT[status] : null;
+    const kind = typeof status === 'string' ? 'loading' : (status.error ? 'error' : 'success');
+    return (
+        <div className={`admin-status admin-status--${kind}`}>
+            {statusText ? (
+                <span>
+                    <i className="fas fa-spinner fa-spin"></i> {statusText}
+                </span>
+            ) : (
+                <>
+                    <i className={`fas ${status.error ? 'fa-exclamation-circle' : 'fa-check-circle'}`}></i>
+                    {status.error ? status.error : status.success}
+                </>
+            )}
+        </div>
+    );
+}
+
+function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit }) {
+    return (
+        <div className="ct-modal-overlay" onClick={onClose}>
+            <div className="ct-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="ct-modal-header">
+                    <h3>Rename Campaign</h3>
+                    <button className="ct-modal-close" onClick={onClose}>
+                        <i className="fas fa-times"></i>
+                    </button>
+                </div>
+                <div className="ct-modal-body">
+                    <label className="ct-label" htmlFor="rename-campaign-input">New Campaign Name</label>
+                    <input
+                        id="rename-campaign-input"
+                        className="ct-input"
+                        type="text"
+                        value={newName}
+                        onChange={(e) => onNewNameChange(e.target.value)}
+                        placeholder={campaignName}
+                        autoFocus
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') onSubmit();
+                            if (e.key === 'Escape') onClose();
+                        }}
+                    />
+                </div>
+                <div className="ct-modal-footer">
+                    <button className="ct-btn ct-btn-secondary" onClick={onClose}>Cancel</button>
+                    <button className="ct-btn ct-btn-primary" onClick={onSubmit} disabled={!newName.trim()}>Rename</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ConfirmModal({ modal, onClose }) {
+    return (
+        <div className="ct-modal-overlay" onClick={onClose}>
+            <div className="ct-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="ct-modal-header">
+                    <h3>{modal.title}</h3>
+                    <button className="ct-modal-close" onClick={onClose}>
+                        <i className="fas fa-times"></i>
+                    </button>
+                </div>
+                <div className="ct-modal-body">
+                    <p>{modal.message}</p>
+                </div>
+                <div className="ct-modal-footer">
+                    <button className="ct-btn ct-btn-secondary" onClick={onClose}>Cancel</button>
+                    <button className="ct-btn ct-btn-danger" onClick={() => { onClose(); modal.onConfirm(); }}>
+                        <i className="fas fa-exclamation-triangle"></i> Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampaign }) {
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
@@ -194,36 +310,11 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
         });
     };
 
-    const statusText = isBusy ? (
-        status === 'snapshotting' ? 'Creating snapshot...' :
-        status === 'rolling-back' ? 'Rolling back...' :
-        status === 'downloading' ? 'Preparing download...' :
-        status === 'uploading' ? 'Uploading and extracting...' :
-        status === 'clearing-change-data' ? 'Clearing change data...' :
-        status === 'clearing-log' ? 'Clearing log...' :
-        'Performing full reset...'
-    ) : null;
-
     return (
         <div className="ct-container campaign-admin">
-            <div className="ct-header">
-                <button className="ct-back-btn" onClick={onBack}>
-                    <i className="fas fa-arrow-left"></i> Back
-                </button>
-                <h2>Admin — {campaignName}</h2>
-            </div>
+            <AdminHeader campaignName={campaignName} onBack={onBack} />
 
-            <div className="admin-section">
-                <h3>Appearance</h3>
-                <div className="admin-actions-grid">
-                    <div className="admin-action admin-action--full">
-                        <button className="ct-btn" onClick={toggleTheme}>
-                            <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
-                            Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <AppearanceSection theme={theme} toggleTheme={toggleTheme} />
 
             <div className="admin-section">
                 <h3>Campaign Management</h3>
@@ -307,74 +398,20 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                 </div>
             </div>
 
-            {status && (
-                <div className={`admin-status admin-status--${typeof status === 'string' ? 'loading' : status.error ? 'error' : 'success'}`}>
-                    {statusText ? (
-                        <span>
-                            <i className="fas fa-spinner fa-spin"></i> {statusText}
-                        </span>
-                    ) : (
-                        <>
-                            <i className={`fas ${status.error ? 'fa-exclamation-circle' : 'fa-check-circle'}`}></i>
-                            {status.error ? status.error : status.success}
-                        </>
-                    )}
-                </div>
-            )}
+            <StatusDisplay status={status} />
 
             {renameModal && (
-                <div className="ct-modal-overlay" onClick={() => setRenameModal(false)}>
-                    <div className="ct-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="ct-modal-header">
-                            <h3>Rename Campaign</h3>
-                            <button className="ct-modal-close" onClick={() => setRenameModal(false)}>
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div className="ct-modal-body">
-                            <label className="ct-label" htmlFor="rename-campaign-input">New Campaign Name</label>
-                            <input
-                                id="rename-campaign-input"
-                                className="ct-input"
-                                type="text"
-                                value={newName}
-                                onChange={(e) => setNewName(e.target.value)}
-                                placeholder={campaignName}
-                                autoFocus
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleRenameSubmit();
-                                    if (e.key === 'Escape') setRenameModal(false);
-                                }}
-                            />
-                        </div>
-                        <div className="ct-modal-footer">
-                            <button className="ct-btn ct-btn-secondary" onClick={() => setRenameModal(false)}>Cancel</button>
-                            <button className="ct-btn ct-btn-primary" onClick={handleRenameSubmit} disabled={!newName.trim()}>Rename</button>
-                        </div>
-                    </div>
-                </div>
+                <RenameModal
+                    campaignName={campaignName}
+                    newName={newName}
+                    onNewNameChange={setNewName}
+                    onClose={() => setRenameModal(false)}
+                    onSubmit={handleRenameSubmit}
+                />
             )}
 
             {confirmModal && (
-                <div className="ct-modal-overlay" onClick={() => setConfirmModal(null)}>
-                    <div className="ct-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="ct-modal-header">
-                            <h3>{confirmModal.title}</h3>
-                            <button className="ct-modal-close" onClick={() => setConfirmModal(null)}>
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div className="ct-modal-body">
-                            <p>{confirmModal.message}</p>
-                        </div>
-                        <div className="ct-modal-footer">
-                            <button className="ct-btn ct-btn-secondary" onClick={() => setConfirmModal(null)}>Cancel</button>
-                            <button className="ct-btn ct-btn-danger" onClick={() => { setConfirmModal(null); confirmModal.onConfirm(); }}>
-                                <i className="fas fa-exclamation-triangle"></i> Confirm
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmModal modal={confirmModal} onClose={() => setConfirmModal(null)} />
             )}
         </div>
     );

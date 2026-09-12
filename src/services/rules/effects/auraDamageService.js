@@ -19,6 +19,16 @@ async function loadDetachedCombatSummary(campaignName) {
     return cachedSummary ? cloneDeep(cachedSummary) : null;
 }
 
+// True when this creature should take the aura's damage: not the source,
+// passes the target filter, isn't a tracked ally, and is within range.
+async function shouldTakeAuraDamage(creature, activeName, range, targetFilter, allyList) {
+    const creatureName = utils.getName(creature.name);
+    if (creatureName === utils.getName(activeName)) return false;
+    if (targetFilter && !targetFilter(creature)) return false;
+    if (allyList && allyList.includes(creatureName)) return false;
+    return await isWithinRange(activeName, creatureName, range);
+}
+
 export async function applyAuraDamage(activeName, playerStats, campaignName, characters = [], options = {}) {
     const { activeKey, damageValue, range, damageType = 'Radiant', targetFilter, allyFilter } = options;
 
@@ -34,21 +44,14 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
         return;
     }
 
-    if (typeof damageValue !== 'number' || isNaN(damageValue) || damageValue <= 0) return;
+    if (typeof damageValue !== 'number' || !(damageValue > 0)) return;
 
     const allyList = allyFilter ? getStoredAllyList(activeName) : null;
 
     for (const creature of creatures) {
+        if (!await shouldTakeAuraDamage(creature, activeName, range, targetFilter, allyList)) continue;
+
         const creatureName = utils.getName(creature.name);
-        if (creatureName === utils.getName(activeName)) continue;
-
-        if (targetFilter && !targetFilter(creature)) continue;
-
-        if (allyList && allyList.includes(creatureName)) continue;
-
-        const inRange = await isWithinRange(activeName, creatureName, range);
-        if (!inRange) continue;
-
         try {
             applyDamageToTarget(combatSummary, creatureName, damageValue, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: activeName });
         } catch (error) { console.error(`[auraDamage] Failed to apply damage to ${creatureName}:`, error); }

@@ -71,10 +71,8 @@ function applyBeastSaves(merged, beastSaves) {
 }
 
 function isCircleOfTheMoon(druidCharacter) {
-    return druidCharacter?.computedStats?.class?.major?.name === MOON_CIRCLE ||
-        druidCharacter?.computedStats?.class?.subclass?.name === MOON_CIRCLE ||
-        druidCharacter?.class?.major?.name === MOON_CIRCLE ||
-        druidCharacter?.class?.subclass?.name === MOON_CIRCLE
+    return [druidCharacter?.computedStats?.class, druidCharacter?.class]
+        .some(cls => cls?.major?.name === MOON_CIRCLE || cls?.subclass?.name === MOON_CIRCLE)
 }
 
 function hasLunarRadiance(druidCharacter) {

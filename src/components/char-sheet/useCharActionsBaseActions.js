@@ -4,6 +4,10 @@ import { isWithinRange } from '../../services/rules/combat/rangeCheck.js'
 
 const SIZE_ORDER = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
 
+function computePlayerSizeIndex(playerStats) {
+    return sizeIndexFor(playerStats?.size || playerStats?.race?.size || 'Medium', 2);
+}
+
 function sizeIndexFor(size, fallbackIndex) {
     const normalized = String(size || '').trim().toLowerCase();
     const index = SIZE_ORDER.findIndex(s => normalized === s.toLowerCase() || normalized.startsWith(`${s.toLowerCase()} `));
@@ -24,22 +28,33 @@ function resolveWisReplaceStealthBonus(playerStats, exhaustionPenalty) {
     return newBonus - exhaustionPenalty;
 }
 
-// Pure: resolve the Stealth check bonus from passive/skill modifiers.
-function computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty) {
-    const stealthSkill = playerStats?.abilities?.flatMap(a => a.skills || []).find(s => s.name === 'Stealth');
-    let stealthBonus = stealthSkill?.bonus ?? 0 - exhaustionPenalty;
-    const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes('Stealth');
-    if (conditionEffects?.wisCheckReplace && isCharismaSkill) {
-        stealthBonus = resolveWisReplaceStealthBonus(playerStats, exhaustionPenalty);
-    }
+function findStealthSkill(playerStats) {
+    return (playerStats?.abilities || []).flatMap(a => a.skills || []).find(s => s.name === 'Stealth');
+}
+
+// Pure: half proficiency added to Stealth when Jack of All Trades covers a non-proficient skill.
+function jackOfAllTradesStealthAdjust(playerStats) {
     const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
     const isNotProficient = !playerStats?.skillProficiencies?.includes('Stealth');
     if (isJackOfAllTrades && isNotProficient) {
         const prof = Math.floor((playerStats.level - 1) / 4 + 2);
-        stealthBonus += Math.floor(prof / 2);
+        return Math.floor(prof / 2);
     }
-    if (conditionEffects?.passWithoutTraceBonus && 'Stealth' === 'Stealth') {
-        stealthBonus += parseInt(conditionEffects.passWithoutTraceBonus, 10);
+    return 0;
+}
+
+// Pure: resolve the Stealth check bonus from passive/skill modifiers.
+function computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty) {
+    const ce = conditionEffects || {};
+    const stealthSkill = findStealthSkill(playerStats);
+    let stealthBonus = stealthSkill?.bonus ?? 0 - exhaustionPenalty;
+    const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes('Stealth');
+    if (ce.wisCheckReplace && isCharismaSkill) {
+        stealthBonus = resolveWisReplaceStealthBonus(playerStats, exhaustionPenalty);
+    }
+    stealthBonus += jackOfAllTradesStealthAdjust(playerStats);
+    if (ce.passWithoutTraceBonus && 'Stealth' === 'Stealth') {
+        stealthBonus += parseInt(ce.passWithoutTraceBonus, 10);
     }
     return stealthBonus;
 }
@@ -153,7 +168,7 @@ export default function useCharActionsBaseActions({
     async function findLargerObscuringCreature() {
         const cs = await loadCombatSummary(campaignName);
         const creatures = Array.isArray(cs?.creatures) ? cs.creatures : [];
-        const playerSizeIndex = sizeIndexFor(playerStats?.size || playerStats?.race?.size || 'Medium', 2);
+        const playerSizeIndex = computePlayerSizeIndex(playerStats);
         for (const creature of creatures) {
             if (!creature || creature.name === playerStats.name) continue;
             if (creature.currentHp === 0) continue;

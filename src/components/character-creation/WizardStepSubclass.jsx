@@ -2,6 +2,64 @@ import { useState } from 'react';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import './WizardStepSubclass.css';
 
+function SubclassDetailCard({ selectedSubclass, features, expanded, onToggleExpanded }) {
+  return (
+    <div className="subclass-detail-card">
+      <div className="detail-card-header" onClick={onToggleExpanded}>
+        <h3>
+          <i className="fa-solid fa-star" />
+          {selectedSubclass.name} Details
+        </h3>
+        <button className="toggle-details-btn" onClick={(e) => { e.stopPropagation(); onToggleExpanded(); }}>
+          {expanded ? 'Hide Details' : 'Show Details'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="detail-card-body">
+          {selectedSubclass.description && (
+            <div className="detail-section">
+              <h4>Description</h4>
+              <div
+                className="detail-content"
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedSubclass.description) }}
+              />
+            </div>
+          )}
+
+          {selectedSubclass.subclass_flavor && (
+            <div className="detail-section">
+              <h4>Flavor</h4>
+              <div className="detail-content">{selectedSubclass.subclass_flavor}</div>
+            </div>
+          )}
+
+          {features.length > 0 && (
+            <div className="detail-section">
+              <h4>Features</h4>
+              {features.map((feature, index) => (
+                <div key={index} className="feature-item">
+                  <div className="feature-header">
+                    <span className="feature-name">{feature.name}</span>
+                    <span className="feature-level-badge">Level {feature.level}</span>
+                  </div>
+                  <div className="feature-description">
+                    {feature.description.includes('<') ? (
+                      <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(feature.description) }} />
+                    ) : (
+                      feature.description
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WizardStepSubclass({ formData, errors, classSubtypes, ruleset, onInputChange, allClassesData }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -102,59 +160,12 @@ function WizardStepSubclass({ formData, errors, classSubtypes, ruleset, onInputC
           </div>
 
           {selectedSubclass && (
-            <div className="subclass-detail-card">
-              <div className="detail-card-header" onClick={() => setExpanded(!expanded)}>
-                <h3>
-                  <i className="fa-solid fa-star" />
-                  {selectedSubclass.name} Details
-                </h3>
-                <button className="toggle-details-btn" onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}>
-                  {expanded ? 'Hide Details' : 'Show Details'}
-                </button>
-              </div>
-
-              {expanded && (
-                <div className="detail-card-body">
-                  {selectedSubclass.description && (
-                    <div className="detail-section">
-                      <h4>Description</h4>
-                      <div
-                        className="detail-content"
-                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedSubclass.description) }}
-                      />
-                    </div>
-                  )}
-
-                  {selectedSubclass.subclass_flavor && (
-                    <div className="detail-section">
-                      <h4>Flavor</h4>
-                      <div className="detail-content">{selectedSubclass.subclass_flavor}</div>
-                    </div>
-                  )}
-
-                  {features.length > 0 && (
-                    <div className="detail-section">
-                      <h4>Features</h4>
-                      {features.map((feature, index) => (
-                        <div key={index} className="feature-item">
-                          <div className="feature-header">
-                            <span className="feature-name">{feature.name}</span>
-                            <span className="feature-level-badge">Level {feature.level}</span>
-                          </div>
-                          <div className="feature-description">
-                            {feature.description.includes('<') ? (
-                              <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(feature.description) }} />
-                            ) : (
-                              feature.description
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <SubclassDetailCard
+              selectedSubclass={selectedSubclass}
+              features={features}
+              expanded={expanded}
+              onToggleExpanded={() => setExpanded(!expanded)}
+            />
           )}
         </>
       )}

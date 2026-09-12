@@ -260,56 +260,65 @@ function clearSapDisadvantage({ targetName, characterName, campaignName }) {
     setRuntimeValue('campaign', 'targetEffects', clearedEffects, campaignName);
 }
 
+function resolveGrazeTargetMaxHp(context, targetName) {
+    return context._target?.type === 'player'
+        ? (getRuntimeValue(targetName, 'hitPoints') ?? 0)
+        : context._target?.maxHp ?? 0;
+}
+
+function buildGrazePopupData({ context, targetName, grazeFormula, grazeDamageAmount, grazeDamageType, applyResult, grazeTargetMaxHp }) {
+    return {
+        type: 'graze-damage',
+        name: `${context.name} (Graze)`,
+        formula: grazeFormula,
+        rolls: [grazeDamageAmount],
+        bonus: 0,
+        modifier: 0,
+        damageType: grazeDamageType,
+        targetName: targetName,
+        total: grazeDamageAmount,
+        targetCurrentHp: applyResult?.newHp,
+        targetMaxHp: grazeTargetMaxHp,
+        damageApplied: true,
+        finalDamage: applyResult?.finalDamage,
+        damageReduced: applyResult?.damageReduced,
+    };
+}
+
 async function processGrazeDamage(context, targetName, characterName, campaignName, characters, logEntry, setPopupHtml) {
     const grazeAbilityMod = context?.grazeAbilityMod || 0;
     const grazeDamageAmount = Math.max(0, grazeAbilityMod);
-    if (grazeDamageAmount > 0) {
-        const grazeDamageType = context?.damageType || 'Slashing';
-        const grazeFormula = `${grazeDamageAmount} [Graze]`;
-        const combatSummary2 = await loadCombatSummary(campaignName);
-        const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, grazeDamageType)) || false;
-        const applyResult = await applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName });
-        const grazeTargetMaxHp = context._target?.type === 'player'
-            ? (getRuntimeValue(targetName, 'hitPoints') ?? 0)
-            : context._target?.maxHp ?? 0;
-        logEntry({
-            type: 'roll',
-            characterName,
-            rollType: 'graze-damage',
-            name: context.name,
-            formula: grazeFormula,
-            rolls: [grazeDamageAmount],
-            total: grazeDamageAmount,
-            modifier: 0,
-            damageType: grazeDamageType,
-            targetName: targetName,
-            finalDamage: applyResult?.finalDamage,
-            note: 'Graze: ability modifier damage on miss',
-        });
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: characterName,
-            abilityName: 'Graze',
-            description: `${characterName} used Graze on ${context.name} against ${targetName}`,
-            targetName: targetName,
-        }).catch((e) => { console.error("[attackPostProcessing:log-error]", e); });
-        setPopupHtml({
-            type: 'graze-damage',
-            name: `${context.name} (Graze)`,
-            formula: grazeFormula,
-            rolls: [grazeDamageAmount],
-            bonus: 0,
-            modifier: 0,
-            damageType: grazeDamageType,
-            targetName: targetName,
-            total: grazeDamageAmount,
-            targetCurrentHp: applyResult?.newHp,
-            targetMaxHp: grazeTargetMaxHp,
-            damageApplied: true,
-            finalDamage: applyResult?.finalDamage,
-            damageReduced: applyResult?.damageReduced,
-        });
-    }
+    if (grazeDamageAmount <= 0) return;
+
+    const grazeDamageType = context?.damageType || 'Slashing';
+    const grazeFormula = `${grazeDamageAmount} [Graze]`;
+    const combatSummary2 = await loadCombatSummary(campaignName);
+    const playerStats = context?.playerStats;
+    const ignoreResistance = playerStats ? hasIgnoreResistance(playerStats, grazeDamageType) : false;
+    const applyResult = await applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName });
+    const grazeTargetMaxHp = resolveGrazeTargetMaxHp(context, targetName);
+    logEntry({
+        type: 'roll',
+        characterName,
+        rollType: 'graze-damage',
+        name: context.name,
+        formula: grazeFormula,
+        rolls: [grazeDamageAmount],
+        total: grazeDamageAmount,
+        modifier: 0,
+        damageType: grazeDamageType,
+        targetName: targetName,
+        finalDamage: applyResult?.finalDamage,
+        note: 'Graze: ability modifier damage on miss',
+    });
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: characterName,
+        abilityName: 'Graze',
+        description: `${characterName} used Graze on ${context.name} against ${targetName}`,
+        targetName: targetName,
+    }).catch((e) => { console.error("[attackPostProcessing:log-error]", e); });
+    setPopupHtml(buildGrazePopupData({ context, targetName, grazeFormula, grazeDamageAmount, grazeDamageType, applyResult, grazeTargetMaxHp }));
 }
 
 export async function processPotentCantrip({ hit, isAutoMiss, targetName, characterName, campaignName, context, characters, logEntry, setPopupHtml }) {

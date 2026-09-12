@@ -44,6 +44,21 @@ function isCampaignDataKey(key) {
 }
 
 /**
+ * Migrates: flattens campaign-named nested keys to the top level of data,
+ * then removes the nested wrapper.
+ */
+function flattenNestedCampaignKeys(data, nestedKey) {
+    const nested = data[nestedKey];
+    if (!nested || typeof nested !== 'object') return;
+    for (const [key, value] of Object.entries(nested)) {
+        if (isCampaignDataKey(key) && !(key in data)) {
+            data[key] = value;
+        }
+    }
+    delete data[nestedKey];
+}
+
+/**
  * Loads all campaign change data from disk into characterChangeData Map at startup
  */
 export const readFile = () => {
@@ -66,29 +81,9 @@ export const readFile = () => {
                 if (fs.existsSync(filePath)) {
                     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
                     // Migrate: flatten campaign-named keys to top level
-                    if (data[campaign] && typeof data[campaign] === 'object') {
-                        const nested = data[campaign];
-                        for (const [key, value] of Object.entries(nested)) {
-                            if (isCampaignDataKey(key)) {
-                                if (!(key in data)) {
-                                    data[key] = value;
-                                }
-                            }
-                        }
-                        delete data[campaign];
-                    }
+                    flattenNestedCampaignKeys(data, campaign);
                     // Migrate: flatten deprecated "campaign" wrapper to top level
-                    if (data['campaign'] && typeof data['campaign'] === 'object') {
-                        const nested = data['campaign'];
-                        for (const [key, value] of Object.entries(nested)) {
-                            if (isCampaignDataKey(key)) {
-                                if (!(key in data)) {
-                                    data[key] = value;
-                                }
-                            }
-                        }
-                        delete data['campaign'];
-                    }
+                    flattenNestedCampaignKeys(data, 'campaign');
                     characterChangeData.set(campaign, data);
                 } else {
                     characterChangeData.set(campaign, {});

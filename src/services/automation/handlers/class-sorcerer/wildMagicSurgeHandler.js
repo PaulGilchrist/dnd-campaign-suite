@@ -19,11 +19,21 @@ async function addSurgeEffect(playerName, campaignName, surgeEntry) {
     await setSurgeEffects(playerName, campaignName, newEffects);
 }
 
+function hasDoubleRoll(playerName, playerStats, campaignName) {
+    return getRuntimeValue(playerName, 'wildMagicDoubleRoll', campaignName) === true ||
+        (playerStats.automation?.passives ?? []).some(p => p.type === 'auto_effect' && p.effect === 'wild_magic_double_roll');
+}
+
+function getSurgeTable(playerStats) {
+    return playerStats.wildMagicSurgeTable || [];
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
+    const isAutoSurge = !!auto?.autoSurge;
 
-    if (!auto?.autoSurge) {
+    if (!isAutoSurge) {
         const skip = await checkOncePerTurn(action.name, 'surgeUsedRound', playerName, campaignName);
         if (skip) {
             await addEntry(campaignName, {
@@ -41,12 +51,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const hasRollOnTableEffect = activeEffects.some(e => e && e.effect && e.effect.includes('Roll on the surge table at the start of each turn'));
 
     const d20Roll = Math.floor(Math.random() * 20) + 1;
-    const doubleRoll = getRuntimeValue(playerName, 'wildMagicDoubleRoll', campaignName) === true ||
-        (playerStats.automation?.passives ?? []).some(p => p.type === 'auto_effect' && p.effect === 'wild_magic_double_roll');
+    const doubleRoll = hasDoubleRoll(playerName, playerStats, campaignName);
 
     if (doubleRoll) {
         await setRuntimeValue(playerName, 'wildMagicDoubleRoll', false, campaignName, true);
-        if (!auto?.autoSurge) {
+        if (!isAutoSurge) {
             await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
         }
         return {
@@ -54,7 +63,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             modalName: 'wildMagicSurge',
             payload: {
                 featureName: action.name,
-            surgeTable: playerStats.wildMagicSurgeTable || [],
+            surgeTable: getSurgeTable(playerStats),
                 campaignName,
                 playerStats,
                 mode: 'controlledChaos',
@@ -64,7 +73,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    if (!auto?.autoSurge && !hasRollOnTableEffect && d20Roll !== 20) {
+    if (!isAutoSurge && !hasRollOnTableEffect && d20Roll !== 20) {
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
@@ -83,7 +92,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    if (!auto?.autoSurge) {
+    if (!isAutoSurge) {
         await markOncePerTurn(action.name, 'surgeUsedRound', playerStats, campaignName);
     }
 
@@ -92,7 +101,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         modalName: 'wildMagicSurge',
         payload: {
             featureName: action.name,
-            surgeTable: playerStats.wildMagicSurgeTable || [],
+            surgeTable: getSurgeTable(playerStats),
             campaignName,
             playerStats,
             mode: 'roll',

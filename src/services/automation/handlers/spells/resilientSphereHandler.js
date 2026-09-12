@@ -8,31 +8,7 @@ import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollba
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation || {};
-    const dc = buildSaveDc(auto, playerStats);
-    const casterName = playerStats.name;
-
-    const cs = await getCombatContext(campaignName);
-    if (!cs?.creatures || cs.creatures.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No creatures in combat. ${action.name} has no effect.`,
-            },
-        };
-    }
-
-    storeSpellLastAttack(campaignName, {
-        casterName,
-        spellName: action.name,
-        saveType: 'DEX',
-        saveDc: dc,
-        attackScope: 'single',
-    });
-
+async function resolveSphereTarget(action, campaignName, casterName) {
     // 2024 rules: target selected via SecondaryTargetModal (passed through metaCtx)
     let targetName = action.metaCtx?.resilientSphereTargetName;
 
@@ -41,57 +17,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const targetInfo = await resolveTarget(campaignName, casterName);
         targetName = targetInfo?.target?.name;
     }
+    return targetName;
+}
 
-    if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No target selected. ${action.name} has no effect.`,
-            },
-        };
-    }
-
-    // Check if target is an ally — auto-fail save
-    const allyList = getAllyList(casterName);
-    const isAlly = allyList.includes(targetName);
-
-    // Ally auto-fails the save — no prompt needed
-    const saveResult = isAlly
-        ? { success: false, roll: 0, total: 0 }
-        : await promptResilientSphereSave(action, auto, campaignName, casterName, targetName, dc);
-
-    if (saveResult.success) {
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'success',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: [],
-            appliedDamage: 0,
-        });
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-resilient-sphere',
-            targetName,
-            saveDc: dc,
-            saveType: 'DEX',
-            success: true,
-            description: `${targetName} succeeded on DEX save against ${action.name}.`,
-        }).catch((e) => { console.error("[resilientSphere] Error:", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${targetName} succeeded on DEX save against ${action.name}.`,
-            },
-        };
-    }
-
+async function encloseInResilientSphere(action, auto, casterName, targetName, dc, saveResult, campaignName) {
     // Failed save: apply the sphere enclosure
     const { wasActive } = toggleResilientSphere(
         targetName,
@@ -156,6 +85,87 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: `${targetName} failed DEX save and is enclosed in a Resilient Sphere. Nothing passes through the barrier. The sphere is immune to all damage. Inside can't be damaged from outside; inside can't damage outside. Creature can use action to roll sphere at half speed. Others can move it. Disintegrate destroys it.`,
         },
     };
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation || {};
+    const dc = buildSaveDc(auto, playerStats);
+    const casterName = playerStats.name;
+
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.creatures || cs.creatures.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No creatures in combat. ${action.name} has no effect.`,
+            },
+        };
+    }
+
+    storeSpellLastAttack(campaignName, {
+        casterName,
+        spellName: action.name,
+        saveType: 'DEX',
+        saveDc: dc,
+        attackScope: 'single',
+    });
+
+    const targetName = await resolveSphereTarget(action, campaignName, casterName);
+
+    if (!targetName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No target selected. ${action.name} has no effect.`,
+            },
+        };
+    }
+
+    // Check if target is an ally — auto-fail save
+    const allyList = getAllyList(casterName);
+    const isAlly = allyList.includes(targetName);
+
+    // Ally auto-fails the save — no prompt needed
+    const saveResult = isAlly
+        ? { success: false, roll: 0, total: 0 }
+        : await promptResilientSphereSave(action, auto, campaignName, casterName, targetName, dc);
+
+    if (saveResult.success) {
+        await addTargetResult(campaignName, {
+            targetName,
+            saveResult: 'success',
+            roll: saveResult.roll ?? 0,
+            total: saveResult.total ?? 0,
+            conditions: [],
+            appliedDamage: 0,
+        });
+        addEntry(campaignName, {
+            type: 'save_result',
+            characterName: casterName,
+            rollType: 'save-resilient-sphere',
+            targetName,
+            saveDc: dc,
+            saveType: 'DEX',
+            success: true,
+            description: `${targetName} succeeded on DEX save against ${action.name}.`,
+        }).catch((e) => { console.error("[resilientSphere] Error:", e); });
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${targetName} succeeded on DEX save against ${action.name}.`,
+            },
+        };
+    }
+
+    // Failed save: apply the sphere enclosure
+    return encloseInResilientSphere(action, auto, casterName, targetName, dc, saveResult, campaignName);
 }
 
 async function promptResilientSphereSave(action, auto, campaignName, casterName, targetName, dc) {

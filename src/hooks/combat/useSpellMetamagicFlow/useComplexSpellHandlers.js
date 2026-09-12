@@ -13,7 +13,7 @@ import { applyPolymorph } from '../../../services/automation/handlers/spells/pol
 import { applyAnimalShapes } from '../../../services/automation/handlers/spells/animalShapesService.js'
 import { applyTruePolymorph } from '../../../services/automation/handlers/spells/truePolymorphService.js'
 
-export function useComplexSpellHandlers(createConfirmHandler, playerStats, campaignName, cfClearPending, getPending, cfSetPending, setPopupHtml, onExecute, _characters) {
+export function useComplexSpellHandlers({ createConfirmHandler, playerStats, campaignName, cfClearPending, getPending, cfSetPending, setPopupHtml, onExecute }) {
   const handleHealingWordConfirm = React.useCallback(async (pending, result) => {
     const targetName = result.targetName
     if (!targetName) return

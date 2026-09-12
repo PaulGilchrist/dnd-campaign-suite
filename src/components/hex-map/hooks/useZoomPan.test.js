@@ -34,7 +34,7 @@ const setup = (overrides = {}) => {
         hostRef.zoom = zoom;
         hostRef.panX = panX;
         hostRef.panY = panY;
-        return useZoomPan(svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY);
+        return useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY });
     });
 
     return { ...utils, svgRef, hostRef };
@@ -75,7 +75,7 @@ describe('useZoomPan', () => {
                 const [zoom, setZoom] = useState(2);
                 const [panX, setPanX] = useState(0);
                 const [panY, setPanY] = useState(0);
-                return useZoomPan(svgRef, cols, rows, zoom, setZoom, panX, setPanX, panY, setPanY);
+                return useZoomPan({ svgRef, hexCols: cols, hexRows: rows, zoom, setZoom, panX, setPanX, panY, setPanY });
             }, { initialProps: { cols: 10, rows: 10 } });
             expect(result.current.gridPixelBounds.width).toBeCloseTo(753.4421, 3);
             rerender({ cols: 20, rows: 10 });
@@ -88,7 +88,7 @@ describe('useZoomPan', () => {
                 const [zoom, setZoom] = useState(2);
                 const [panX, setPanX] = useState(0);
                 const [panY, setPanY] = useState(0);
-                return useZoomPan(svgRef, cols, rows, zoom, setZoom, panX, setPanX, panY, setPanY);
+                return useZoomPan({ svgRef, hexCols: cols, hexRows: rows, zoom, setZoom, panX, setPanX, panY, setPanY });
             }, { initialProps: { cols: 10, rows: 10 } });
             expect(result.current.gridPixelBounds.height).toBeCloseTo(465, 3);
             rerender({ cols: 10, rows: 20 });

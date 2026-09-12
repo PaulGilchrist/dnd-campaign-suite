@@ -376,8 +376,8 @@ function resolveRegenerateExpression(healAtSlotLevel, slotLevel) {
     return highestBelow ? healAtSlotLevel[highestBelow] : expression;
 }
 
-// Rolls the initial Regenerate healing, applies it, and logs the hp_change entry.
-async function applyRegenerateInitialHeal(spell, targetName, caster, campaignName, expression, bonusHeal, bonusDetails) {
+// Roll the Regenerate expression, honouring maximization and ones-reroll.
+function rollRegenerateHeal(expression, caster, targetName, campaignName) {
     const maximize = hasHealingMaximizationForTarget(caster, targetName, campaignName);
     const rerollOnes = hasRerollHealingOnes(caster);
     let result = maximize ? rollExpressionMaximized(expression) : rollExpression(expression);
@@ -385,6 +385,33 @@ async function applyRegenerateInitialHeal(spell, targetName, caster, campaignNam
         const { displayRolls } = applyHealingRerollOnes(result.rolls, expression);
         result = { ...result, rolls: displayRolls };
     }
+    return result;
+}
+
+function logRegenerateHealEntry({ spell, targetName, caster, campaignName, expression, initialHeal, maxHp, currentHp, bonusDetails }) {
+    const formulaParts = [expression];
+    if (bonusDetails.length > 0) {
+        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
+        formulaParts.push(`(${bonusParts})`);
+    }
+    addEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: initialHeal,
+        currentHp: Math.min(maxHp, currentHp + initialHeal),
+        maxHp,
+        isHealing: true,
+        sourceName: caster.name,
+        note: spell.name,
+        formula: formulaParts.join(' + '),
+        bonusDetails: bonusDetails.length > 0 ? bonusDetails : undefined,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[spellCast] Error:", e); });
+}
+
+// Rolls the initial Regenerate healing, applies it, and logs the hp_change entry.
+async function applyRegenerateInitialHeal(spell, targetName, caster, campaignName, expression, bonusHeal, bonusDetails) {
+    const result = rollRegenerateHeal(expression, caster, targetName, campaignName);
     if (!result) return { initialHeal: 0, result };
 
     const combatSummary = await getCombatContext(campaignName);
@@ -402,24 +429,7 @@ async function applyRegenerateInitialHeal(spell, targetName, caster, campaignNam
     if (initialHeal > 0) {
         applyHealingToTarget(combatSummary, targetName, initialHeal, campaignName);
     }
-    const formulaParts = [expression];
-    if (bonusDetails.length > 0) {
-        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
-        formulaParts.push(`(${bonusParts})`);
-    }
-    addEntry(campaignName, {
-        type: 'hp_change',
-        targetName,
-        delta: initialHeal,
-        currentHp: Math.min(maxHp, currentHp + initialHeal),
-        maxHp,
-        isHealing: true,
-        sourceName: caster.name,
-        note: spell.name,
-        formula: formulaParts.join(' + '),
-        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[spellCast] Error:", e); });
+    logRegenerateHealEntry({ spell, targetName, caster, campaignName, expression, initialHeal, maxHp, currentHp, bonusDetails });
 
     return { initialHeal, result };
 }

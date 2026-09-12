@@ -375,6 +375,10 @@ function findCreatureCurrentHp(combatSummary, targetName) {
     return combatSummary?.creatures?.find(c => c.name === targetName)?.currentHp ?? 0;
 }
 
+function resolvePendingAttacker(pending) {
+    return pending.attackerName || pending.sourceAttackerName || null;
+}
+
 async function handleSaveResult(detail, { characterName, campaignName, logEntry, charactersRef }) {
     const pending = getPendingSavePrompt(detail.promptId);
     syncListenerPromptFilters(detail, pending, campaignName);
@@ -406,8 +410,8 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
     const pendingTargetName = pending.targetName;
     const combatSummary = getCombatSummary(campaignName);
     const targetMaxHp = resolvePendingTargetMaxHp(combatSummary, pendingTargetName);
-    const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
-    const attacker = pending.attackerName || pending.sourceAttackerName || null;
+    const ignoreResistance = pending.playerStats ? hasIgnoreResistance(pending.playerStats, pending.damageType) : false;
+    const attacker = resolvePendingAttacker(pending);
 
     // Compute secondary damage info first (dice rolls only, no damage application)
     // so we can use the combined total for the concentration DC

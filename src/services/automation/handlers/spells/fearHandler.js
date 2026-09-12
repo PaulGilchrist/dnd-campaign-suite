@@ -8,6 +8,74 @@ import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollba
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import storage from '../../../ui/storage.js';
 
+async function applyFearSaveSuccess(campaignName, casterName, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-fear',
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: true,
+        description: `${targetName} succeeded on WIS save against Fear.`,
+    }).catch((e) => { console.error("[fear] Error:", e); });
+}
+
+async function applyFearSaveFail(campaignName, casterName, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['frightened'],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Frightened',
+        reason: 'Fear spell',
+        note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[fear] Error:", e); });
+
+    addExpiration(casterName, targetName, [
+        { type: 'condition', condition: 'frightened' },
+    ], campaignName);
+
+    // Track Fear-specific effect: affected creature can re-save if it ends its turn
+    // without line of sight to the caster
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
+    const existingIdx = effects.findIndex(
+        te => te.target === targetName && te.effect === 'fear_end_on_los'
+    );
+    const fearEffect = {
+        target: targetName,
+        effect: 'fear_end_on_los',
+        source: casterName,
+        condition: 'frightened',
+        dc: dc,
+        duration: 'concentration',
+    };
+    if (existingIdx >= 0) {
+        effects[existingIdx] = fearEffect;
+    } else {
+        effects.push(fearEffect);
+    }
+    setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -69,24 +137,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         if (saveResult.success) {
             savedCount++;
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-fear',
-                targetName,
-                saveDc: dc,
-                saveType: 'WIS',
-                success: true,
-                description: `${targetName} succeeded on WIS save against Fear.`,
-            }).catch((e) => { console.error("[fear] Error:", e); });
+            await applyFearSaveSuccess(campaignName, casterName, targetName, dc, saveResult);
         } else {
             affectedCount++;
 
@@ -95,50 +146,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
             setRuntimeValue(targetName, 'activeConditions', [...filtered, 'frightened'], campaignName);
 
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['frightened'],
-                appliedDamage: 0,
-            });
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Frightened',
-                reason: 'Fear spell',
-                note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[fear] Error:", e); });
-
-            addExpiration(casterName, targetName, [
-                { type: 'condition', condition: 'frightened' },
-            ], campaignName);
-
-            // Track Fear-specific effect: affected creature can re-save if it ends its turn
-            // without line of sight to the caster
-            const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-            const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
-            const existingIdx = effects.findIndex(
-                te => te.target === targetName && te.effect === 'fear_end_on_los'
-            );
-            const fearEffect = {
-                target: targetName,
-                effect: 'fear_end_on_los',
-                source: casterName,
-                condition: 'frightened',
-                dc: dc,
-                duration: 'concentration',
-            };
-            if (existingIdx >= 0) {
-                effects[existingIdx] = fearEffect;
-            } else {
-                effects.push(fearEffect);
-            }
-            setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+            await applyFearSaveFail(campaignName, casterName, targetName, dc, saveResult);
 
             results.push(`${targetName} drops what it's holding and is Frightened.`);
         }

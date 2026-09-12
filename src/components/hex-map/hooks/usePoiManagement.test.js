@@ -28,7 +28,7 @@ const baseTerrain = {};
 const hexCols = 10;
 const hexRows = 10;
 
-const setup = (overrides = {}) => {
+const setup = ({ getHex, ...overrides } = {}) => {
     const setPois = vi.fn();
     const setRoads = vi.fn();
     const props = {
@@ -39,16 +39,15 @@ const setup = (overrides = {}) => {
         terrain: baseTerrain,
         hexCols,
         hexRows,
-        getHex: vi.fn(() => DEFAULT_HEX),
+        getHexFromEvent: getHex ?? vi.fn(() => DEFAULT_HEX),
         tool: TOOL_NONE,
         ...overrides,
     };
     const hook = renderHook(
-        ({ pois, setPois, roads, setRoads, terrain, hexCols, hexRows, getHex, tool }) =>
-            usePoiManagement(pois, setPois, roads, setRoads, terrain, hexCols, hexRows, getHex, tool),
+        (options) => usePoiManagement(options),
         { initialProps: props }
     );
-    return { ...hook, setPois, setRoads, getHex: props.getHex };
+    return { ...hook, setPois, setRoads, getHex: props.getHexFromEvent };
 };
 
 const applyUpdater = (mock, callIndex, initialState) => mock.mock.calls[callIndex][0](initialState);
@@ -430,7 +429,7 @@ describe('usePoiManagement', () => {
                 terrain: baseTerrain,
                 hexCols,
                 hexRows,
-                getHex,
+                getHexFromEvent: getHex,
                 tool: TOOL_POI,
             });
             act(() => {

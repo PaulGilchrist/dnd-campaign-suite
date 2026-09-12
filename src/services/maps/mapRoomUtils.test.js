@@ -43,34 +43,34 @@ describe('hasOpenNeighbor', () => {
 describe('hasOutsideOpenNeighbor', () => {
   it('returns true when an in-bounds neighbor outside the room is not walled', () => {
     const walls = new Set();
-    expect(hasOutsideOpenNeighbor(walls, 1, 1, 1, 3, 1, 3, 10)).toBe(true);
+    expect(hasOutsideOpenNeighbor({ walls, gx: 1, gy: 1, minX: 1, maxX: 3, minY: 1, maxY: 3, gridSize: 10 })).toBe(true);
   });
 
   it('returns false when all in-bounds outside neighbors are walled', () => {
     const walls = new Set(['0,1', '1,0']);
-    expect(hasOutsideOpenNeighbor(walls, 1, 1, 1, 3, 1, 3, 10)).toBe(false);
+    expect(hasOutsideOpenNeighbor({ walls, gx: 1, gy: 1, minX: 1, maxX: 3, minY: 1, maxY: 3, gridSize: 10 })).toBe(false);
   });
 
   it('returns false when outside neighbors are beyond grid size', () => {
     // Cell (9,9) on a 10x10 grid has no in-bounds outside neighbors
     const walls = new Set();
-    expect(hasOutsideOpenNeighbor(walls, 9, 9, 8, 9, 8, 9, 10)).toBe(false);
+    expect(hasOutsideOpenNeighbor({ walls, gx: 9, gy: 9, minX: 8, maxX: 9, minY: 8, maxY: 9, gridSize: 10 })).toBe(false);
   });
 
   it('ignores neighbors that are inside the room', () => {
     const walls = new Set(['0,1']);
     // Cell (2,1) on room edge: (1,1) and (3,1) are inside the room, only (2,0) is outside
-    expect(hasOutsideOpenNeighbor(walls, 2, 1, 1, 3, 1, 3, 10)).toBe(true);
+    expect(hasOutsideOpenNeighbor({ walls, gx: 2, gy: 1, minX: 1, maxX: 3, minY: 1, maxY: 3, gridSize: 10 })).toBe(true);
   });
 
   it('returns false for a corner cell with all outside neighbors walled', () => {
     const walls = new Set(['4,3', '3,4']);
-    expect(hasOutsideOpenNeighbor(walls, 3, 3, 1, 3, 1, 3, 10)).toBe(false);
+    expect(hasOutsideOpenNeighbor({ walls, gx: 3, gy: 3, minX: 1, maxX: 3, minY: 1, maxY: 3, gridSize: 10 })).toBe(false);
   });
 
   it('returns false when a single-cell room is fully walled', () => {
     const walls = new Set(['1,0', '0,1']);
-    expect(hasOutsideOpenNeighbor(walls, 0, 0, 0, 0, 0, 0, 5)).toBe(false);
+    expect(hasOutsideOpenNeighbor({ walls, gx: 0, gy: 0, minX: 0, maxX: 0, minY: 0, maxY: 0, gridSize: 5 })).toBe(false);
   });
 });
 

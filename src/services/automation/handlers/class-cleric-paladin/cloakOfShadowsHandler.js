@@ -3,6 +3,54 @@ import { getClassFeatures } from '../../../character/classFeatures.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
 
+async function removeInvisibleCondition(playerName, campaignName) {
+    const condStored = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
+    const condArray = Array.isArray(condStored) ? condStored : [];
+    const filteredConds = condArray.filter(c => String(c).toLowerCase() !== 'invisible');
+    if (filteredConds.length !== condArray.length) {
+        await setRuntimeValue(playerName, 'activeConditions', filteredConds, campaignName);
+    }
+}
+
+async function addInvisibleCondition(playerName, campaignName) {
+    const storedConditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
+        await setRuntimeValue(playerName, 'activeConditions', [...conditions, 'invisible'], campaignName);
+    }
+}
+
+async function endCloakOfShadows(action, playerName, campaignName, auto) {
+    const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(stored) ? stored : [];
+    const newBuffs = activeBuffs.filter(b => b.name !== action.name);
+    setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+
+    // Remove invisible condition
+    await removeInvisibleCondition(playerName, campaignName);
+
+    // Clear invisibility tracking key
+    await setRuntimeValue('campaign', `_activeInvisibility_${playerName}`, null, campaignName);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} ended ${action.name}.`,
+    }).catch((e) => { console.error("[cloakOfShadowsHandler:log-error]", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: `${action.name} ended`,
+            automation: auto,
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -12,37 +60,7 @@ export async function handle(action, playerStats, campaignName) {
     const wasActive = activeBuffs.some(b => b.name === action.name);
 
     if (wasActive) {
-        const newBuffs = activeBuffs.filter(b => b.name !== action.name);
-        setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
-
-        // Remove invisible condition
-        const condStored = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
-        const condArray = Array.isArray(condStored) ? condStored : [];
-        const filteredConds = condArray.filter(c => String(c).toLowerCase() !== 'invisible');
-        if (filteredConds.length !== condArray.length) {
-            await setRuntimeValue(playerName, 'activeConditions', filteredConds, campaignName);
-        }
-
-        // Clear invisibility tracking key
-        await setRuntimeValue('campaign', `_activeInvisibility_${playerName}`, null, campaignName);
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${playerName} ended ${action.name}.`,
-        }).catch((e) => { console.error("[cloakOfShadowsHandler:log-error]", e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `${action.name} ended`,
-                automation: auto,
-            },
-        };
+        return await endCloakOfShadows(action, playerName, campaignName, auto);
     }
 
     const maxFocus = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points
@@ -65,11 +83,7 @@ export async function handle(action, playerStats, campaignName) {
     await setRuntimeValue(playerName, 'focusPoints', currentFocus - 3, campaignName);
 
     // Set invisible condition
-    const storedConditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
-    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-    if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
-        await setRuntimeValue(playerName, 'activeConditions', [...conditions, 'invisible'], campaignName);
-    }
+    await addInvisibleCondition(playerName, campaignName);
 
     // Set invisibility tracking key (for endInvisibilityOnHostileAction)
     await setRuntimeValue('campaign', `_activeInvisibility_${playerName}`, playerStats.name, campaignName);

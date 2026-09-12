@@ -40,6 +40,14 @@ function perSpellTrackingDecision(entry, playerName, spellName, campaignName) {
   return count > 0;
 }
 
+// Generic uses/recharge free casts: the spell must be listed on the entry and
+// the feature counter must still have uses left.
+function rechargeEntryGrantsCast(entry, playerName, spellName) {
+  if (!entrySpells(entry).includes(spellName)) return false;
+  if (entry.uses == null || !entry.recharge || entry.uses_expression) return false;
+  return featureFreeCastCount(playerName, featureFreeCastKey(entry), entry.uses) > 0;
+}
+
 // One free_spell/fey_reinforcements/misty_wanderer/dragon_companion automation entry.
 // Returns true (authorized), false (explicitly not authorized — the caller must stop
 // scanning and deny), or undefined (entry not applicable — continue scanning).
@@ -62,9 +70,7 @@ function checkFreeCastEntry(entry, playerName, spellName, spellLevel, campaignNa
     return perSpellTrackingDecision(entry, playerName, spellName, campaignName);
   }
 
-  if (entrySpells(entry).includes(spellName) && entry.uses != null && entry.recharge && !entry.uses_expression) {
-    if (featureFreeCastCount(playerName, featureFreeCastKey(entry), entry.uses) > 0) return true;
-  }
+  if (rechargeEntryGrantsCast(entry, playerName, spellName)) return true;
 
   const sharedKey = `_${entry.name.replace(/\s+/g, '_')}_freeCast`;
   const stored = getRuntimeValue(playerName, sharedKey);
@@ -747,9 +753,8 @@ function applyNewConcentration(spell, playerName, playerStats, campaignName) {
   storageService.default.set('combatSummary', cs, campaignName);
 }
 
-// Psychic damage-type override, Spell Breaker bonus-action Dispel Magic, and
-// CLA-252 phantasmal (spectral) free-cast stamping on the modified spell.
-function stampModifiedSpell(modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName) {
+// Psychic damage-type override and Spell Breaker bonus-action Dispel Magic stamp.
+function applyWarlockSpellBreakerStamps(modifiedSpell, spell, playerStats, usePsychicDamage) {
   const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
   const hasSpellBreaker = playerStats.automation?.passives?.some(p => p.type === 'spell_breaker');
   const hasDamage = !!spell.damage;
@@ -762,11 +767,21 @@ function stampModifiedSpell(modifiedSpell, spell, playerStats, usePsychicDamage,
   if (isDispelMagicAsBonusAction && modifiedSpell.casting_time === '1 action') {
     modifiedSpell.casting_time = '1 bonus action';
   }
+}
 
+// CLA-252 phantasmal (spectral) free-cast stamping.
+function applyPhantasmalStamp(modifiedSpell, spell, playerStats, freeCastAuthorized, playerName, campaignName) {
   const phantasmalPassive = playerStats.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
   if (phantasmalPassive && freeCastAuthorized && (phantasmalPassive.freeCastSpells || []).includes(spell.name)) {
     stampPhantasmalCast(modifiedSpell, spell.name, phantasmalPassive, playerName, campaignName);
   }
+}
+
+// Psychic damage-type override, Spell Breaker bonus-action Dispel Magic, and
+// CLA-252 phantasmal (spectral) free-cast stamping on the modified spell.
+function stampModifiedSpell(modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName) {
+  applyWarlockSpellBreakerStamps(modifiedSpell, spell, playerStats, usePsychicDamage);
+  applyPhantasmalStamp(modifiedSpell, spell, playerStats, freeCastAuthorized, playerName, campaignName);
 }
 
 export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats, campaignName, isUpcast, upcastLevel, usePsionicPayment, usePsychicDamage, freeCastAuthorized }) {

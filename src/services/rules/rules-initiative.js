@@ -7,8 +7,10 @@ export function computeInitiative(playerStats) {
     const dexAbility = playerStats.abilities.find((ability) => ability.name === 'Dexterity');
     playerStats.initiative = dexAbility.bonus;
 
+    const passives = playerStats.automation?.passives ?? [];
+
     // Add Dread Ambush initiative bonus (WIS modifier) for Gloom Stalkers
-    const dreadAmbushPassive = (playerStats.automation?.passives ?? []).find(
+    const dreadAmbushPassive = passives.find(
         p => p.type === 'passive_rule' && p.effect === 'dread_ambush_initiative'
     );
     if (dreadAmbushPassive) {
@@ -17,7 +19,7 @@ export function computeInitiative(playerStats) {
     }
 
     // Add initiative_bonus from passive_buff (e.g., Alert feat)
-    const initiativeBonusPassives = (playerStats.automation?.passives ?? []).filter(
+    const initiativeBonusPassives = passives.filter(
         p => p.type === 'passive_buff' && p.effect === 'initiative_bonus'
     );
     for (const passive of initiativeBonusPassives) {
@@ -26,17 +28,17 @@ export function computeInitiative(playerStats) {
             playerStats.initiative += bonus;
         }
     }
-    playerStats.initiativeAdvantage = (playerStats.automation?.passives ?? []).some(
+    playerStats.initiativeAdvantage = passives.some(
         p => p.type === 'passive_rule' && p.effect === 'initiative_advantage'
     );
 
     // Alert: can't be surprised while conscious
-    playerStats.noSurprise = (playerStats.automation?.passives ?? []).some(
+    playerStats.noSurprise = passives.some(
         p => p.type === 'passive_buff' && p.effect === 'no_surprise'
     );
 
     // Alert: unseen attackers don't gain advantage on attacks against you
-    playerStats.unseenAttackerAdvantageNegate = (playerStats.automation?.passives ?? []).some(
+    playerStats.unseenAttackerAdvantageNegate = passives.some(
         p => p.type === 'passive_buff' && p.effect === 'unseen_attacker_advantage_negate'
     );
 }

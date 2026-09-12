@@ -39,13 +39,17 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     return handleInspiringMovement(action, playerStats, campaignName, _mapName);
 }
 
+function resolveMaxSorceryPoints(playerStats) {
+    const featureMaxSP = playerStats.automation?.specialActions?.find(a => a.name === 'Sorcery Points')?.uses || 0;
+    return featureMaxSP || (getClassFeatures(playerStats)?.maxSorceryPoints || 0);
+}
+
 async function handleBendFate(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Bend Luck';
 
-    const featureMaxSP = playerStats.automation?.specialActions?.find(a => a.name === 'Sorcery Points')?.uses || 0;
-    const maxSP = featureMaxSP || (getClassFeatures(playerStats)?.maxSorceryPoints || 0);
+    const maxSP = resolveMaxSorceryPoints(playerStats);
     const currentSP = getCurrentSorceryPoints(playerName, maxSP);
 
     if (currentSP < 1) {

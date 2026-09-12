@@ -5,6 +5,33 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
 import { createSaveListener } from '../../../../services/automation/common/savePrompt.js';
 
+function DivineSparkResultView({ result, targetName }) {
+    if (!result) return null;
+    if (result.type === 'heal') {
+        return (
+            <>
+                <p><strong>{targetName}</strong> healed for <strong>{result.total}</strong> HP.</p>
+                <p className="sp-note">Roll: {result.formula} = {result.total}{result.maximized ? ' (Maximized)' : ''}</p>
+                <p className="sp-note">Current HP: {result.newHp} / {result.maxHp} (healed {result.actualHeal})</p>
+            </>
+        );
+    }
+    if (result.type === 'harm') {
+        return (
+            <>
+                <p><strong>{targetName}</strong> — {result.saveType} save (DC {result.saveDc}): {result.saveSuccess ? 'Success' : 'Failed'}</p>
+                {result.saveSuccess ? (
+                    <p className="sp-note">Target saved and takes no damage.</p>
+                ) : (
+                    <p><strong>{targetName}</strong> takes <strong>{result.total}</strong> {result.damageType} damage.</p>
+                )}
+                <p className="sp-note">Damage roll: {result.formula} = {result.total}</p>
+            </>
+        );
+    }
+    return null;
+}
+
 function DivineSparkModal({ featureName, attackerName, targetName, campaignName, healExpression, damageExpression, damageTypes, saveType, wisModifier, playerStats, onClose }) {
     const [mode, setMode] = useState(null);
     const [damageType, setDamageType] = useState(damageTypes[0] || 'Radiant');
@@ -166,25 +193,7 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
                         <p><i className="fa-solid fa-spinner fa-spin"></i> Rolling...</p>
                     )}
 
-                    {result && result.type === 'heal' && (
-                        <>
-                            <p><strong>{targetName}</strong> healed for <strong>{result.total}</strong> HP.</p>
-                            <p className="sp-note">Roll: {result.formula} = {result.total}{result.maximized ? ' (Maximized)' : ''}</p>
-                            <p className="sp-note">Current HP: {result.newHp} / {result.maxHp} (healed {result.actualHeal})</p>
-                        </>
-                    )}
-
-                    {result && result.type === 'harm' && (
-                        <>
-                            <p><strong>{targetName}</strong> — {result.saveType} save (DC {result.saveDc}): {result.saveSuccess ? 'Success' : 'Failed'}</p>
-                            {result.saveSuccess ? (
-                                <p className="sp-note">Target saved and takes no damage.</p>
-                            ) : (
-                                <p><strong>{targetName}</strong> takes <strong>{result.total}</strong> {result.damageType} damage.</p>
-                            )}
-                            <p className="sp-note">Damage roll: {result.formula} = {result.total}</p>
-                        </>
-                    )}
+                    <DivineSparkResultView result={result} targetName={targetName} />
                 </div>
                 <div className="sp-actions">
                     {result ? (

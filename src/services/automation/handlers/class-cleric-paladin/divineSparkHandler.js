@@ -2,13 +2,17 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { resolveTarget } from '../../common/targetResolver.js';
 import { addEntry } from '../../../ui/logService.js';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-
+function resolveSparkCharges(playerStats) {
     const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+    return storedCharges != null ? Number(storedCharges) : maxCharges;
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+
+    const currentCharges = resolveSparkCharges(playerStats);
 
     if (currentCharges <= 0) {
         return {

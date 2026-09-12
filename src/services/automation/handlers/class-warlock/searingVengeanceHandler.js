@@ -26,6 +26,34 @@ function getRealCurrentHp(creature, campaignName) {
     return creature.currentHp ?? 0;
 }
 
+async function findCreaturesAtZero(cs, playerName, campaignName, allyRangeFt) {
+    const zeroCreatures = [];
+    for (const creature of cs.creatures) {
+        if (Number(getRuntimeValue(creature.name, 'isDead', campaignName) || 0) > 0) continue;
+        if (getRealCurrentHp(creature, campaignName) > 0) continue;
+        if (await isWithinRange(playerName, creature.name, allyRangeFt)) {
+            zeroCreatures.push(creature);
+        }
+    }
+    return zeroCreatures;
+}
+
+async function findBurstTargets(cs, targetName, playerName, rangeFt) {
+    const creatureTargets = [];
+    for (const creature of cs.creatures) {
+        if (creature.name === targetName || creature.name === playerName) continue;
+        if (await isWithinRange(targetName, creature.name, rangeFt)) {
+            creatureTargets.push({
+                name: creature.name,
+                type: creature.type,
+                currentHp: creature.currentHp,
+                maxHp: creature.maxHp,
+            });
+        }
+    }
+    return creatureTargets;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -61,16 +89,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // 3. Find creatures at 0 HP within ally range — RAW: "you or ally within 60 feet", self included
     const allyRangeFt = auto.allyRange ? rangeToFeet(auto.allyRange) : 60;
-    const creaturesAtZero = [];
-    for (const creature of cs.creatures) {
-        if (Number(getRuntimeValue(creature.name, 'isDead', campaignName) || 0) > 0) continue;
-        if (getRealCurrentHp(creature, campaignName) <= 0) {
-            const inRange = await isWithinRange(playerName, creature.name, allyRangeFt);
-            if (inRange) {
-                creaturesAtZero.push(creature);
-            }
-        }
-    }
+    const creaturesAtZero = await findCreaturesAtZero(cs, playerName, campaignName, allyRangeFt);
 
     if (creaturesAtZero.length === 0) {
         return {
@@ -103,20 +122,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // 5. Burst targets within 30 feet, centered on the healed creature ("Creature regains HP... Each creature within 30 feet")
     const rangeFt = auto.range ? rangeToFeet(auto.range) : 30;
-    const creatureTargets = [];
-    for (const creature of cs.creatures) {
-        if (creature.name === target.name) continue;
-        if (creature.name === playerName) continue;
-        const inRange = await isWithinRange(target.name, creature.name, rangeFt);
-        if (inRange) {
-            creatureTargets.push({
-                name: creature.name,
-                type: creature.type,
-                currentHp: creature.currentHp,
-                maxHp: creature.maxHp,
-            });
-        }
-    }
+    const creatureTargets = await findBurstTargets(cs, target.name, playerName, rangeFt);
 
     return {
         type: 'modal',

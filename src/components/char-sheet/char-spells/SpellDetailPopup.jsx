@@ -54,12 +54,11 @@ function FreeCastNotices({ freeCastAuthorized, isShadowArtsFreeCast, isPhantasma
       {isPhantasmalFreeCast && (
         <p className="spell-detail-free-cast"><i className="fa-solid fa-ghost"></i> Phantasmal Creatures free cast — spectral Illusion version, half HP</p>
       )}
-      {!canCast && !isCantrip && !freeCastAuthorized && isShadowArtsFreeCast && (
+      {!canCast && !isCantrip && !freeCastAuthorized && (isShadowArtsFreeCast ? (
         <p className="spell-detail-no-slots"><i className="fa-solid fa-moon"></i> Shadow Arts: {spell.name} already cast — finish a Long Rest to regain it.</p>
-      )}
-      {!canCast && !isCantrip && !freeCastAuthorized && !isShadowArtsFreeCast && (
+      ) : (
         <p className="spell-detail-no-slots">No spell slots available for this level.</p>
-      )}
+      ))}
     </>
   );
 }
@@ -176,6 +175,29 @@ function computeHasAnySlots({ isCantrip, freeCastAuthorized, upcastLevels, isWar
   return isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0) || (isWarlock && warlockSlotLevel !== null) || psionicSorceryAvailable > 0;
 }
 
+function PsionicPaymentSection({ playerStats, spell, upcastLevel, isCantrip, freeCastAuthorized, psionicSorceryAvailable, usePsionicPayment, onTogglePsionicPayment }) {
+  const slotKey = `spell_slots_level_${upcastLevel}`;
+  const currentSlots = getRuntimeValue(playerStats.name, slotKey);
+  const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
+  const availableSlots = currentSlots != null ? currentSlots : maxSlots;
+  const showBoth = psionicSorceryAvailable > 0 && availableSlots > 0;
+  const isPsionic = isPsionicSpell(playerStats, spell.name);
+  const hasPsionic = hasPsionicSorcery(playerStats);
+  if (!isPsionic || !hasPsionic || isCantrip || freeCastAuthorized || !showBoth) return null;
+  return (
+    <div className="spell-detail-upcast">
+      <label>
+        <input
+          type="checkbox"
+          checked={usePsionicPayment}
+          onChange={onTogglePsionicPayment}
+        />
+        <span>Use Sorcery Points ({upcastLevel} SP) instead of spell slot</span>
+      </label>
+    </div>
+  );
+}
+
 // CLA-252: Phantasmal Creatures free cast — spectral Illusion version, halved HP.
 function computeIsPhantasmalFreeCast(playerStats, spell, freeCastAuthorized) {
   if (!freeCastAuthorized) return false;
@@ -183,10 +205,15 @@ function computeIsPhantasmalFreeCast(playerStats, spell, freeCastAuthorized) {
   return !!phantasmalPassive && (phantasmalPassive.freeCastSpells || []).includes(spell.name);
 }
 
+function spellDescriptionHtml(spell) {
+  return sanitizeHtml(Array.isArray(spell.description) ? spell.description.join('') : spell.description || '');
+}
+
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
-  const slotDmg = spell.damage?.damage_at_slot_level;
-  const charDmg = spell.damage?.damage_at_character_level;
+  const spellDamage = spell.damage || {};
+  const slotDmg = spellDamage.damage_at_slot_level;
+  const charDmg = spellDamage.damage_at_character_level;
   const isUpcastable = computeIsUpcastable(spell, isCantrip);
 
   // CLA-312: free-cast authorization is gated on the EFFECTIVE cast level —
@@ -308,7 +335,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     <div className="spell-detail-popup">
       <div className="spell-detail-content">
         <h3 dangerouslySetInnerHTML={{ __html: sanitizeHtml(spell.name) }} />
-        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(Array.isArray(spell.description) ? spell.description.join('') : spell.description || '') }} />
+        <div dangerouslySetInnerHTML={{ __html: spellDescriptionHtml(spell) }} />
         <SpellMeta isCantrip={isCantrip} spell={spell} isPhantasmalFreeCast={isPhantasmalFreeCast} isDispelMagicAsBonusAction={isDispelMagicAsBonusAction} isWarlock={isWarlock} warlockSlotLevel={warlockSlotLevel} playerStats={playerStats} showUpcastSelector={showUpcastSelector} psionicSorceryAvailable={_psionicSorceryAvailable} />
         {showUpcastSelector && (
           <div className="spell-detail-upcast">
@@ -338,29 +365,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
             })}
           </div>
         )}
-        {(() => {
-          const upcastLevel = isUpcastable ? (Number(selectedUpcastLvl) || spell.level) : spell.level;
-          const slotKey = `spell_slots_level_${upcastLevel}`;
-          const currentSlots = getRuntimeValue(playerStats.name, slotKey);
-          const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
-          const availableSlots = currentSlots != null ? currentSlots : maxSlots;
-          const showBoth = _psionicSorceryAvailable > 0 && availableSlots > 0;
-          const isPsionic = isPsionicSpell(playerStats, spell.name);
-          const hasPsionic = hasPsionicSorcery(playerStats);
-          if (!isPsionic || !hasPsionic || isCantrip || freeCastAuthorized || !showBoth) return null;
-          return (
-            <div className="spell-detail-upcast">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={usePsionicPayment}
-                  onChange={() => setUsePsionicPayment(!usePsionicPayment)}
-                />
-                <span>Use Sorcery Points ({upcastLevel} SP) instead of spell slot</span>
-              </label>
-            </div>
-          );
-        })()}
+        <PsionicPaymentSection playerStats={playerStats} spell={spell} upcastLevel={gateSpellLevel} isCantrip={isCantrip} freeCastAuthorized={freeCastAuthorized} psionicSorceryAvailable={_psionicSorceryAvailable} usePsionicPayment={usePsionicPayment} onTogglePsionicPayment={() => setUsePsionicPayment(!usePsionicPayment)} />
         {canChangeDamageType && (
           <PsychicDamageCheckbox usePsychicDamage={usePsychicDamage} onTogglePsychicDamage={() => setUsePsychicDamage(!usePsychicDamage)} />
         )}

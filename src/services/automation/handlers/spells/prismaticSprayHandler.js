@@ -123,7 +123,7 @@ function queueRaySave(ctx) {
     return false;
 }
 
-async function applyRayDamage(cs, campaignName, characters, casterName, targetName, ray, damageFormula, succeeded) {
+async function applyRayDamage({ cs, campaignName, characters, casterName, targetName, ray, damageFormula, succeeded }) {
     const dmgResult = rollExpression(damageFormula);
     if (!dmgResult) return;
     const finalDamage = computeDamageAfterSave(dmgResult.total, succeeded, 'half');
@@ -158,7 +158,7 @@ async function resolveSpraySaveOutcome(ctx) {
 
         // Apply half damage for damage rays
         if (type === 'damage' && cs) {
-            await applyRayDamage(cs, campaignName, characters, casterName, targetName, ray, damageFormula, true);
+            await applyRayDamage({ cs, campaignName, characters, casterName, targetName, ray, damageFormula, succeeded: true });
         }
 
         results.push(`${targetName}: ${ray.name} ray (saved DEX save).`);
@@ -186,7 +186,7 @@ async function resolveSpraySaveOutcome(ctx) {
 
     // Apply full damage for damage rays
     if (type === 'damage' && cs) {
-        await applyRayDamage(cs, campaignName, characters, casterName, targetName, ray, damageFormula, false);
+        await applyRayDamage({ cs, campaignName, characters, casterName, targetName, ray, damageFormula, succeeded: false });
     }
 
     // Apply ray-specific effects on save failure
@@ -354,6 +354,11 @@ async function processSpraySaves({ campaignName, casterName, cs, characters, dc,
     }
 }
 
+function resolveTargetImmunityList(targetCreature) {
+    const targetImmunities = targetCreature?.weaknessesAndResistivities?.immunities || [];
+    return Array.isArray(targetImmunities) ? targetImmunities.map(i => String(i).toLowerCase()) : [];
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -402,8 +407,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     for (const targetName of targetNames) {
         const targetCreature = cs.creatures.find(c => c.name === targetName);
-        const targetImmunities = targetCreature?.weaknessesAndResistivities?.immunities || [];
-        const immunityList = Array.isArray(targetImmunities) ? targetImmunities.map(i => String(i).toLowerCase()) : [];
+        const immunityList = resolveTargetImmunityList(targetCreature);
         const disadvantage = action.metaCtx?.heightenTarget === targetName;
 
         const { rays, rollDescription } = pickRays();
@@ -422,9 +426,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const affectedCreatures = creaturesThatFailed.size;
     const savedCreatures = creaturesThatSaved.size;
+    const immuneNote = immuneCount > 0 ? `${immuneCount} ray(s) immune.` : '';
     const summary = affectedCreatures > 0
-        ? `Prismatic Spray affects ${affectedCreatures} creature(s). ${results.join(' ')} ${savedCreatures} creature(s) saved. ${immuneCount > 0 ? `${immuneCount} ray(s) immune.` : ''}`
-        : `No creatures affected by Prismatic Spray. ${savedCreatures} creature(s) saved. ${immuneCount > 0 ? `${immuneCount} ray(s) immune.` : ''}`;
+        ? `Prismatic Spray affects ${affectedCreatures} creature(s). ${results.join(' ')} ${savedCreatures} creature(s) saved. ${immuneNote}`
+        : `No creatures affected by Prismatic Spray. ${savedCreatures} creature(s) saved. ${immuneNote}`;
     return {
         type: 'popup',
         payload: {

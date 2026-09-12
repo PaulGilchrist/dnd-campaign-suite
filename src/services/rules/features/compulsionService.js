@@ -99,7 +99,7 @@ export async function applyCompulsionEffect(spell, playerStats, campaignName, ma
         if (!saveResult.success) {
             const cs = await getCombatContext(campaignName);
             const conditionDef = { key: 'charmed', label: 'Charmed' };
-            addCondition(cs, targetName, conditionDef, spellSaveDc, 'WIS', getRuntimeValue, setRuntimeValue, campaignName, playerStats);
+            addCondition({ combatSummary: cs, creatureName: targetName, conditionDef, dc: spellSaveDc, ability: 'WIS', getRuntimeValue, setRuntimeValue, campaignName, playerStats });
 
             addExpiration(casterName, targetName, [
                 { type: 'charmed', condition: 'charmed' },

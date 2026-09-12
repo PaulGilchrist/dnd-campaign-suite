@@ -82,6 +82,54 @@ export function endAnimalFriendshipEarly(casterName, targetName, campaignName) {
     }).catch((e) => { console.error("[animalFriendshipHandler:log-error]", e); });
 }
 
+async function applyAnimalFriendshipCharm(campaignName, casterName, action, targetName, dc, saveResult, affectedTargets) {
+    // Apply charmed condition
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['charmed'],
+        appliedDamage: 0,
+    });
+
+    // Add long rest expiration (24-hour duration)
+    addExpiration(casterName, targetName, [
+        { type: 'charmed', condition: 'charmed' },
+    ], campaignName);
+
+    // Track for early end on damage
+    trackAnimalFriendshipTarget(casterName, targetName, campaignName);
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Charmed',
+        reason: 'Animal Friendship spell',
+        note: `${targetName} is Charmed by ${casterName} and regards them as a friendly acquaintance. The spell ends if ${casterName} or allies deal damage to ${targetName}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[animalFriendship] Error:", e); });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-animal-friendship',
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: false,
+        description: `${targetName} failed WIS save against Animal Friendship and is Charmed.`,
+    }).catch((e) => { console.error("[animalFriendship] Error:", e); });
+
+    affectedTargets.push(`${targetName} is Charmed by Animal Friendship.`);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -160,52 +208,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }).catch((e) => { console.error("[animalFriendship] Error:", e); });
         } else {
             affectedCount++;
-
-            // Apply charmed condition
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['charmed'],
-                appliedDamage: 0,
-            });
-
-            // Add long rest expiration (24-hour duration)
-            addExpiration(casterName, targetName, [
-                { type: 'charmed', condition: 'charmed' },
-            ], campaignName);
-
-            // Track for early end on damage
-            trackAnimalFriendshipTarget(casterName, targetName, campaignName);
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Charmed',
-                reason: 'Animal Friendship spell',
-                note: `${targetName} is Charmed by ${casterName} and regards them as a friendly acquaintance. The spell ends if ${casterName} or allies deal damage to ${targetName}.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[animalFriendship] Error:", e); });
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-animal-friendship',
-                targetName,
-                saveDc: dc,
-                saveType: 'WIS',
-                success: false,
-                description: `${targetName} failed WIS save against Animal Friendship and is Charmed.`,
-            }).catch((e) => { console.error("[animalFriendship] Error:", e); });
-
-            affectedTargets.push(`${targetName} is Charmed by Animal Friendship.`);
+            await applyAnimalFriendshipCharm(campaignName, casterName, action, targetName, dc, saveResult, affectedTargets);
         }
     }
 

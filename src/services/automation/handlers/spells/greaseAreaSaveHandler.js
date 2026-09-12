@@ -118,7 +118,7 @@ function targetHasCondition(targetName, condition, campaignName) {
 async function recordGreaseFailure(campaignName, casterName, targetName, tracking, saveResult) {
     const cs = await getCombatContext(campaignName);
     const conditionDef = { key: tracking.condition.toLowerCase(), label: tracking.condition.charAt(0).toUpperCase() + tracking.condition.slice(1) };
-    addCondition(cs, targetName, conditionDef, tracking.saveDc, tracking.saveType, getRuntimeValue, setRuntimeValue, campaignName, null);
+    addCondition({ combatSummary: cs, creatureName: targetName, conditionDef, dc: tracking.saveDc, ability: tracking.saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats: null });
 
     await addTargetResult(campaignName, {
         targetName,

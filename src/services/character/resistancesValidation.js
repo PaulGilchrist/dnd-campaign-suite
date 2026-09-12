@@ -89,6 +89,30 @@ function extract5eRaceResistances(raceData, subraceName) {
  * @param {string} subraceName - The selected subrace name (optional)
  * @returns {string[]} - Array of resistance types
  */
+function addResistanceMatch(resistances, desc) {
+  const match = desc.match(/Resistance to (\w+)/i);
+  if (match) {
+    resistances.add(match[1]);
+  }
+}
+
+// Subrace resistances from JSON traits; Dragonborn ancestry from subrace description
+function extract2024SubraceResistances(raceData, subraceName) {
+  const resistances = new Set();
+  if (!subraceName || !raceData.subraces) {
+    return resistances;
+  }
+  const subrace = raceData.subraces.find(sr => sr.name === subraceName);
+  if (!subrace) {
+    return resistances;
+  }
+  (subrace.traits || []).forEach(trait => addResistanceMatch(resistances, trait.description || ''));
+  if (raceData.name === 'Dragonborn') {
+    addResistanceMatch(resistances, subrace.description || '');
+  }
+  return resistances;
+}
+
 function extract2024RaceResistances(raceData, subraceName) {
   const resistances = new Set();
 
@@ -111,66 +135,10 @@ function extract2024RaceResistances(raceData, subraceName) {
     if (name.includes('Dwarven Resilience') && desc.includes('Resistance to Poison')) {
       resistances.add('Poison');
     }
-
-    // Dragonborn: Damage Resistance - depends on ancestry
-      // Read from subrace data instead of hardcoded mapping
-    if (name.includes('Damage Resistance') && desc.includes('Resistance to')) {
-        // Handle in subrace check below
-      }
-
-    // Tiefling: Fiendish Legacy - check for resistance in the table description
-    if (name.includes('Fiendish Legacy') || name.includes('Fiendish Legacies')) {
-        // Parse the table for resistance types based on legacy
-        // This will be handled by subrace-specific data
-      }
   });
 
-  // Check subrace-specific resistances
-  if (subraceName && raceData.subraces) {
-    const subrace = raceData.subraces.find(sr => sr.name === subraceName);
-    if (subrace) {
-      const subraceTraits = subrace.traits || [];
-
-      subraceTraits.forEach(trait => {
-        const desc = trait.description || '';
-        if (desc.match(/Resistance to (\w+)/i)) {
-          const match = desc.match(/Resistance to (\w+)/i);
-          if (match) {
-            resistances.add(match[1]);
-            }
-          }
-      });
-      }
-    }
-
-    // For Dragonborn, determine resistance based on subrace/ancestry from JSON
-  if (raceData.name === 'Dragonborn' && subraceName) {
-    const subrace = raceData.subraces?.find(sr => sr.name === subraceName);
-    if (subrace) {
-        // Check subrace description for resistance type
-      const desc = subrace.description || '';
-      if (desc.match(/Resistance to (\w+)/i)) {
-        const match = desc.match(/Resistance to (\w+)/i);
-        resistances.add(match[1]);
-        }
-      }
-    }
-
-    // For Tiefling, determine resistance based on subrace/legacy from JSON
-  if (raceData.name === 'Tiefling' && subraceName) {
-    const subrace = raceData.subraces?.find(sr => sr.name === subraceName);
-    if (subrace) {
-        // Check subrace traits for resistance
-      const subraceTraits = subrace.traits || [];
-      subraceTraits.forEach(trait => {
-        const desc = trait.description || '';
-        if (desc.match(/Resistance to (\w+)/i)) {
-          const match = desc.match(/Resistance to (\w+)/i);
-          resistances.add(match[1]);
-          }
-        });
-      }
-    }
+  // Subrace-specific resistances (including Dragonborn/Tiefling ancestry legacies)
+  extract2024SubraceResistances(raceData, subraceName).forEach(r => resistances.add(r));
 
   return Array.from(resistances);
 }
@@ -369,6 +337,35 @@ export async function getPreSelectedResistances(formData) {
  * @param {object} formData - The character form data
  * @returns {Promise<object>} - Array of warning objects { message: string, type: 'warning'|'info' }
  */
+function pushUngrantedWarning(warnings, selected, granted, plural) {
+  const ungranted = selected.filter(item => !granted.includes(item));
+  if (ungranted.length > 0) {
+    warnings.push({
+      message: `These ${plural} are not granted by your race, class, or background: ${ungranted.join(', ')}. Verify with your DM.`,
+      type: 'warning'
+      });
+    }
+}
+
+function pushDuplicateWarning(warnings, selected, plural, singular) {
+  if (new Set(selected).size < selected.length) {
+    warnings.push({
+      message: `Some ${plural} are selected multiple times. Each ${singular} should only be selected once.`,
+      type: 'warning'
+      });
+    }
+}
+
+function pushUnselectedGrantWarning(warnings, selected, granted, plural) {
+  const unselected = granted.filter(item => !selected.includes(item));
+  if (unselected.length > 0) {
+    warnings.push({
+      message: `Your race/class grants these ${plural} that are not selected: ${unselected.join(', ')}. You may want to select them.`,
+      type: 'info'
+      });
+    }
+}
+
 export async function validateResistances(formData) {
   const warnings = [];
   const selectedResistances = formData.resistances || [];
@@ -378,40 +375,10 @@ export async function validateResistances(formData) {
   // Get the allowed resistances and immunities
   const limits = await getResistanceLimits(formData);
 
-  // Check for resistances that aren't granted by race/class/background
-  const ungrantedResistances = selectedResistances.filter(r => !limits.resistances.includes(r));
-  if (ungrantedResistances.length > 0) {
-    warnings.push({
-      message: `These resistances are not granted by your race, class, or background: ${ungrantedResistances.join(', ')}. Verify with your DM.`,
-      type: 'warning'
-      });
-    }
-
-  // Check for immunities that aren't granted by race/class/background
-  const ungrantedImmunities = selectedImmunities.filter(i => !limits.immunities.includes(i));
-  if (ungrantedImmunities.length > 0) {
-    warnings.push({
-      message: `These immunities are not granted by your race, class, or background: ${ungrantedImmunities.join(', ')}. Verify with your DM.`,
-      type: 'warning'
-      });
-    }
-
-  // Check for duplicate selections
-  const uniqueResistances = new Set(selectedResistances);
-  if (uniqueResistances.size < selectedResistances.length) {
-    warnings.push({
-      message: 'Some resistances are selected multiple times. Each resistance should only be selected once.',
-      type: 'warning'
-      });
-    }
-
-  const uniqueImmunities = new Set(selectedImmunities);
-  if (uniqueImmunities.size < selectedImmunities.length) {
-    warnings.push({
-      message: 'Some immunities are selected multiple times. Each immunity should only be selected once.',
-      type: 'warning'
-      });
-    }
+  pushUngrantedWarning(warnings, selectedResistances, limits.resistances, 'resistances');
+  pushUngrantedWarning(warnings, selectedImmunities, limits.immunities, 'immunities');
+  pushDuplicateWarning(warnings, selectedResistances, 'resistances', 'resistance');
+  pushDuplicateWarning(warnings, selectedImmunities, 'immunities', 'immunity');
 
   // Info message if character has no resistances or immunities
   if (selectedResistances.length === 0 && selectedImmunities.length === 0) {
@@ -421,22 +388,8 @@ export async function validateResistances(formData) {
       });
     }
 
-  // Info message about granted but unselected resistances/immunities
-  const unselectedResistances = limits.resistances.filter(r => !selectedResistances.includes(r));
-  if (unselectedResistances.length > 0) {
-    warnings.push({
-      message: `Your race/class grants these resistances that are not selected: ${unselectedResistances.join(', ')}. You may want to select them.`,
-      type: 'info'
-      });
-    }
-
-  const unselectedImmunities = limits.immunities.filter(i => !selectedImmunities.includes(i));
-  if (unselectedImmunities.length > 0) {
-    warnings.push({
-      message: `Your race/class grants these immunities that are not selected: ${unselectedImmunities.join(', ')}. You may want to select them.`,
-      type: 'info'
-      });
-    }
+  pushUnselectedGrantWarning(warnings, selectedResistances, limits.resistances, 'resistances');
+  pushUnselectedGrantWarning(warnings, selectedImmunities, limits.immunities, 'immunities');
 
   return warnings;
 }
@@ -464,23 +417,25 @@ export async function getResistanceInfo(type, category, formData) {
   };
 }
 
+const RACE_RESISTANCE_EXTRACTORS = {
+  '2024': extract2024RaceResistances,
+  '5e': extract5eRaceResistances
+};
+
 async function resolveGrantedSources(type, category, formData, ruleset) {
   const sources = [];
-  const raceName = formData.race?.name || '';
-  const className = formData.class?.name || '';
+  const subraceName = formData.race?.subrace?.name || '';
 
-  if (raceName) {
-    const raceData = await fetchRaceData(raceName, ruleset);
-    const raceResistances = ruleset === '2024'
-       ? extract2024RaceResistances(raceData, formData.race?.subrace?.name || '')
-       : extract5eRaceResistances(raceData, formData.race?.subrace?.name || '');
-    if (raceResistances.includes(type)) {
+  if (formData.race?.name) {
+    const raceData = await fetchRaceData(formData.race.name, ruleset);
+    const extractRaceResistances = RACE_RESISTANCE_EXTRACTORS[ruleset] || extract5eRaceResistances;
+    if (extractRaceResistances(raceData, subraceName).includes(type)) {
       sources.push('Race');
       }
     }
 
-  if (className && category === 'immunity') {
-    const classData = await fetchClassData(className, ruleset);
+  if (formData.class?.name && category === 'immunity') {
+    const classData = await fetchClassData(formData.class.name, ruleset);
     const classImmunities = extractClassImmunities(classData, ruleset, formData.level || 1);
     if (classImmunities.includes(type)) {
       sources.push('Class');

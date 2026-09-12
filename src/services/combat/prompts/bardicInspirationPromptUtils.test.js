@@ -63,16 +63,16 @@ describe('bardicInspirationPromptUtils', () => {
   describe('sendBardicInspirationDefensePrompt', () => {
     it('sets the correct runtime value with mode defense', () => {
       mockFetchResolved();
-      sendBardicInspirationDefensePrompt(
-        'TestCampaign',
-        'Ally',
-        'Goblin',
-        17,
-        2,
-        15,
-        6,
-        1
-      );
+      sendBardicInspirationDefensePrompt({
+        campaignName: 'TestCampaign',
+        targetName: 'Ally',
+        attackerName: 'Goblin',
+        attackRoll: 17,
+        bonus: 2,
+        effectiveAc: 15,
+        dieSize: 6,
+        promptId: 1,
+      });
 
       const { setRuntimeValue } = realMod;
       expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -98,31 +98,31 @@ describe('bardicInspirationPromptUtils', () => {
       // setRuntimeValue mock is a no-op for fetch, so this just verifies
       // the function completes without throwing
       expect(
-        sendBardicInspirationDefensePrompt(
-          'C',
-          'T',
-          'A',
-          1,
-          0,
-          10,
-          4,
-          1
-        )
+        sendBardicInspirationDefensePrompt({
+          campaignName: 'C',
+          targetName: 'T',
+          attackerName: 'A',
+          attackRoll: 1,
+          bonus: 0,
+          effectiveAc: 10,
+          dieSize: 4,
+          promptId: 1,
+        })
       ).toBeUndefined();
     });
 
     it('includes all numeric fields correctly', () => {
       mockFetchResolved();
-      sendBardicInspirationDefensePrompt(
-        'C',
-        'Target',
-        'Attacker',
-        20,
-        5,
-        18,
-        8,
-        42
-      );
+      sendBardicInspirationDefensePrompt({
+        campaignName: 'C',
+        targetName: 'Target',
+        attackerName: 'Attacker',
+        attackRoll: 20,
+        bonus: 5,
+        effectiveAc: 18,
+        dieSize: 8,
+        promptId: 42,
+      });
 
       const { setRuntimeValue } = realMod;
       const callArgs = setRuntimeValue.mock.calls[0];
@@ -301,9 +301,7 @@ describe('bardicInspirationPromptUtils', () => {
   describe('data integrity', () => {
     it('defense prompt fullDescription matches the source exactly', () => {
       mockFetchResolved();
-      sendBardicInspirationDefensePrompt(
-        'C', 'T', 'A', 1, 0, 10, 4, 1
-      );
+      sendBardicInspirationDefensePrompt({ campaignName: 'C', targetName: 'T', attackerName: 'A', attackRoll: 1, bonus: 0, effectiveAc: 10, dieSize: 4, promptId: 1 });
 
       const { setRuntimeValue } = realMod;
       const data = setRuntimeValue.mock.calls[0][2];
@@ -325,7 +323,7 @@ describe('bardicInspirationPromptUtils', () => {
 
     it('defense prompt has all expected fields', () => {
       mockFetchResolved();
-      sendBardicInspirationDefensePrompt('C', 'Target', 'Attacker', 15, 3, 14, 6, 10);
+      sendBardicInspirationDefensePrompt({ campaignName: 'C', targetName: 'Target', attackerName: 'Attacker', attackRoll: 15, bonus: 3, effectiveAc: 14, dieSize: 6, promptId: 10 });
 
       const { setRuntimeValue } = realMod;
       const data = setRuntimeValue.mock.calls[0][2];

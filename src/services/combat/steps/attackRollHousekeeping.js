@@ -43,6 +43,21 @@ function clearStalkersFlurryKeys(ctx) {
   setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrikeTarget', null, ctx.campaignName);
 }
 
+function markHordeBreakerReady(ctx) {
+  const attack = ctx.attack;
+  if (attack?.weaponType !== 'melee' || attack?.saveDc || attack?.name === 'Horde Breaker') return;
+
+  const hbChoice = getRuntimeValue(ctx.playerStats.name, "_Hunter's_Prey_choice", ctx.campaignName);
+  const lastAttack = getRuntimeValue('campaign', 'lastAttack', ctx.campaignName);
+  if (hbChoice === 'Horde Breaker' && lastAttack?.hit && lastAttack.attackerName === ctx.playerStats.name && lastAttack.weaponType === 'melee') {
+    setRuntimeValue(ctx.playerStats.name, '_Hunters_Prey_HordeBreaker_Ready', {
+      round: getCurrentCombatRound(),
+      targetName: lastAttack.targetName,
+      attackName: lastAttack.attackName,
+    }, ctx.campaignName);
+  }
+}
+
 function applyHuntersPreyHousekeeping(ctx, isBonus) {
   if (ctx.attack?.name === 'Horde Breaker' && isBonus) {
     const choice = getRuntimeValue(ctx.playerStats.name, "_Hunter's_Prey_choice", ctx.campaignName);
@@ -52,17 +67,8 @@ function applyHuntersPreyHousekeeping(ctx, isBonus) {
     return;
   }
 
-  if (!isBonus && ctx.attack?.weaponType === 'melee' && !ctx.attack?.saveDc && ctx.attack?.name !== 'Horde Breaker' && ctx.targetName) {
-    const hbChoice = getRuntimeValue(ctx.playerStats.name, "_Hunter's_Prey_choice", ctx.campaignName);
-    const lastAttack = getRuntimeValue('campaign', 'lastAttack', ctx.campaignName);
-    if (hbChoice === 'Horde Breaker' && lastAttack?.hit && lastAttack.attackerName === ctx.playerStats.name && lastAttack.weaponType === 'melee') {
-      setRuntimeValue(ctx.playerStats.name, '_Hunters_Prey_HordeBreaker_Ready', {
-        round: getCurrentCombatRound(),
-        targetName: lastAttack.targetName,
-        attackName: lastAttack.attackName,
-      }, ctx.campaignName);
-    }
-  }
+  if (isBonus || !ctx.targetName) return;
+  markHordeBreakerReady(ctx);
 }
 
 export function buildHousekeepingStep() {

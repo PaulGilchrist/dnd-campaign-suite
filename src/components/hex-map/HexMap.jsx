@@ -44,6 +44,28 @@ import useTravelToolSync from './hooks/useTravelToolSync.js';
 import useEncounterGeneration from './hooks/useEncounterGeneration.js';
 import './HexMap.css';
 
+function HexHoverPreview({ hoveredHex, tool, rivers }) {
+    if (!hoveredHex) return null;
+
+    const center = hexToPixel(hoveredHex.q, hoveredHex.r, HEX_SIZE);
+    const pathD = hexToSVGPath(center.x, center.y, HEX_SIZE);
+
+    if (tool === TOOL_PAINT || tool === TOOL_ERASE) {
+        return (
+            <path d={pathD} fill="rgba(255,255,255,0.15)" stroke="#FFD700" strokeWidth={1.5} pointerEvents="none" />
+        );
+    }
+
+    if (tool === TOOL_RIVER) {
+        const hasRiver = rivers.includes(hexKey(hoveredHex.q, hoveredHex.r));
+        return (
+            <path d={pathD} fill={hasRiver ? 'rgba(200,50,50,0.15)' : 'rgba(60,130,210,0.2)'} stroke={hasRiver ? '#c44' : '#4A90D9'} strokeWidth={1.5} pointerEvents="none" />
+        );
+    }
+
+    return null;
+}
+
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
     const svgRef = useRef(null);
 
@@ -71,7 +93,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const hexRows = gridSize;
 
     // ── Zoom/pan interaction ──
-    const zoomPan = useZoomPan(svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY);
+    const zoomPan = useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY });
     const { svgWidth, svgHeight, zoomIn, zoomOut, resetView, clampPan, centerView,
         panning, handlePanStart, handlePanMove, handlePanEnd, handleWheel } = zoomPan;
 
@@ -112,7 +134,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool);
 
     // ── POI management ──
-    const poiMgmt = usePoiManagement(pois, setPois, roads, setRoads, terrain, hexCols, hexRows, getHexFromEvent, tool);
+    const poiMgmt = usePoiManagement({ pois, setPois, roads, setRoads, terrain, hexCols, hexRows, getHexFromEvent, tool });
     const {
         selectedPoiMenu, setSelectedPoiMenu,
         showRename, setShowRename,
@@ -451,23 +473,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             partyPosition={partyPosition}
                         />
 
-                        {hoveredHex && (tool === TOOL_PAINT || tool === TOOL_ERASE) && (() => {
-                            const center = hexToPixel(hoveredHex.q, hoveredHex.r, HEX_SIZE);
-                            const pathD = hexToSVGPath(center.x, center.y, HEX_SIZE);
-                            return (
-                                <path d={pathD} fill="rgba(255,255,255,0.15)" stroke="#FFD700" strokeWidth={1.5} pointerEvents="none" />
-                            );
-                        })()}
-
-                        {hoveredHex && tool === TOOL_RIVER && (() => {
-                            const center = hexToPixel(hoveredHex.q, hoveredHex.r, HEX_SIZE);
-                            const pathD = hexToSVGPath(center.x, center.y, HEX_SIZE);
-                            const key = hexKey(hoveredHex.q, hoveredHex.r);
-                            const hasRiver = rivers.includes(key);
-                            return (
-                                <path d={pathD} fill={hasRiver ? 'rgba(200,50,50,0.15)' : 'rgba(60,130,210,0.2)'} stroke={hasRiver ? '#c44' : '#4A90D9'} strokeWidth={1.5} pointerEvents="none" />
-                            );
-                        })()}
+                        <HexHoverPreview hoveredHex={hoveredHex} tool={tool} rivers={rivers} />
 
                         <POIContextMenu
                             selectedPoi={selectedPoiMenu}

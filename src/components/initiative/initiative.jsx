@@ -40,6 +40,76 @@ import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.j
 import { buildDisplayCreature } from './displayCreatureUtils.js'
 import InitiativeLoot from './InitiativeLoot.jsx'
 
+function clearPlayerRoundFlags(creatureName, campaignName) {
+    setRuntimeValue(creatureName, 'activeBuffs', [], campaignName)
+    setRuntimeValue(creatureName, 'invokeDuplicityAdvantageTargets', [], campaignName)
+    setRuntimeValue(creatureName, 'unbreakableMajestyActive', null, campaignName)
+    setRuntimeValue(creatureName, 'unbreakableMajestySaveDc', null, campaignName)
+    setRuntimeValue(creatureName, 'wrathOfTheSeaActive', null, campaignName)
+    setRuntimeValue(creatureName, 'wrathOfTheSeaDc', null, campaignName)
+    setRuntimeValue(creatureName, 'wrathOfTheSeaWisMod', null, campaignName)
+    setRuntimeValue(creatureName, 'wrathOfTheSeaSource', null, campaignName)
+    setRuntimeValue(creatureName, 'peerlessAthleteActive', null, campaignName)
+    setRuntimeValue(creatureName, 'elementalAttunementActive', null, campaignName)
+    setRuntimeValue(creatureName, 'elementalAttunementElement', null, campaignName)
+    setRuntimeValue(creatureName, '_CunningStrike_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_Charge_Attack_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_FastHands_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_CunningAction_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_Cleave_UsedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_Nick_UsedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_PsychicBlade_attack_round', null, campaignName)
+    setRuntimeValue(creatureName, '_PsychicBlade_secondBlade_round', null, campaignName)
+    setRuntimeValue(creatureName, '_Retaliation_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_ShadowyDodge_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_ShadowyDodge_appliedAttack', null, campaignName)
+    setRuntimeValue(creatureName, '_Slow_Fall_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_Stones_Endurance_usedRound', null, campaignName)
+    // CLA-393: Wrath of the Sea once-per-turn attack latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_Wrath_of_the_Sea_usedRound', null, campaignName)
+    // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_Warding_Flare_usedRound', null, campaignName)
+    // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_War_Magic_usedRound', null, campaignName)
+    // FT-099: War Caster Reactive Spell once-per-round reaction latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_Reactive_Spell_usedRound', null, campaignName)
+    // FT-094: Telekinetic Shove once-per-turn latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_Telekinetic_Shove_usedRound', null, campaignName)
+    // CLA-361: Thought Shield reflect round latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_Thought_Shield_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_Superior_Hunters_Defense_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_Riposte_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_Riposte_appliedAttack', null, campaignName)
+    setRuntimeValue(creatureName, 'pendingRiposteDieValue', null, campaignName)
+    setRuntimeValue(creatureName, 'surgeUsedRound', null, campaignName)
+    setRuntimeValue(creatureName, 'illusoryRealityUsedRound', null, campaignName)
+    setRuntimeValue(creatureName, 'portentUsedThisTurn', null, campaignName)
+    setRuntimeValue(creatureName, 'psionicStrikeUsedThisTurn', null, campaignName)
+    setRuntimeValue(creatureName, '_BrutalStrike_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_fortifiedHealth_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, '_Shield_Bash_usedRound', null, campaignName)
+    setRuntimeValue(creatureName, 'piercerPunctureUsedThisTurn', null, campaignName)
+}
+
+function clearDominatedExpirations(creature, campaignName) {
+    const dominateList = getRuntimeValue(creature.name, 'pendingExpirations')
+    if (!Array.isArray(dominateList) || dominateList.length === 0) return
+    for (const entry of dominateList) {
+        if (entry.effects && Array.isArray(entry.effects)) {
+            for (const effect of entry.effects) {
+                if (effect.type === 'dominated') {
+                    clearExpirationEffects([effect], entry.target, creature.name, campaignName)
+                }
+            }
+        }
+    }
+    const filteredExpirations = dominateList.filter(entry => {
+        if (!entry.effects || !Array.isArray(entry.effects)) return true
+        return entry.effects.every(e => e.type !== 'dominated')
+    })
+    setRuntimeValue(creature.name, 'pendingExpirations', filteredExpirations, campaignName)
+}
+
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
@@ -344,78 +414,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             for (const creature of (summary?.creatures || [])) {
                 if (isSecondTurnEntry(creature)) continue
                 if (creature.type === 'player') {
-                    setRuntimeValue(creature.name, 'activeBuffs', [], campaignName)
-                    setRuntimeValue(creature.name, 'invokeDuplicityAdvantageTargets', [], campaignName)
-                    setRuntimeValue(creature.name, 'unbreakableMajestyActive', null, campaignName)
-                    setRuntimeValue(creature.name, 'unbreakableMajestySaveDc', null, campaignName)
-                    setRuntimeValue(creature.name, 'wrathOfTheSeaActive', null, campaignName)
-                    setRuntimeValue(creature.name, 'wrathOfTheSeaDc', null, campaignName)
-                    setRuntimeValue(creature.name, 'wrathOfTheSeaWisMod', null, campaignName)
-                    setRuntimeValue(creature.name, 'wrathOfTheSeaSource', null, campaignName)
-                    setRuntimeValue(creature.name, 'peerlessAthleteActive', null, campaignName)
-                    setRuntimeValue(creature.name, 'elementalAttunementActive', null, campaignName)
-                    setRuntimeValue(creature.name, 'elementalAttunementElement', null, campaignName)
-                    setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Charge_Attack_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_FastHands_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_CunningAction_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Cleave_UsedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Nick_UsedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_PsychicBlade_attack_round', null, campaignName)
-                    setRuntimeValue(creature.name, '_PsychicBlade_secondBlade_round', null, campaignName)
-                    setRuntimeValue(creature.name, '_Retaliation_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_ShadowyDodge_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_ShadowyDodge_appliedAttack', null, campaignName)
-                    setRuntimeValue(creature.name, '_Slow_Fall_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Stones_Endurance_usedRound', null, campaignName)
-                    // CLA-393: Wrath of the Sea once-per-turn attack latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Wrath_of_the_Sea_usedRound', null, campaignName)
-                    // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Warding_Flare_usedRound', null, campaignName)
-                    // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_War_Magic_usedRound', null, campaignName)
-                    // FT-099: War Caster Reactive Spell once-per-round reaction latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Reactive_Spell_usedRound', null, campaignName)
-                    // FT-094: Telekinetic Shove once-per-turn latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Telekinetic_Shove_usedRound', null, campaignName)
-                    // CLA-361: Thought Shield reflect round latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Thought_Shield_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Superior_Hunters_Defense_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Riposte_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Riposte_appliedAttack', null, campaignName)
-                    setRuntimeValue(creature.name, 'pendingRiposteDieValue', null, campaignName)
-                    setRuntimeValue(creature.name, 'surgeUsedRound', null, campaignName)
-                    setRuntimeValue(creature.name, 'illusoryRealityUsedRound', null, campaignName)
-                    setRuntimeValue(creature.name, 'portentUsedThisTurn', null, campaignName)
-                    setRuntimeValue(creature.name, 'psionicStrikeUsedThisTurn', null, campaignName)
-                    setRuntimeValue(creature.name, '_BrutalStrike_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_fortifiedHealth_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Shield_Bash_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, 'piercerPunctureUsedThisTurn', null, campaignName)
+                    clearPlayerRoundFlags(creature.name, campaignName)
                 }
                 if (creature.concentration?.spell === "Hunter's Mark") {
                     creature.concentration = null
                     storage.set('combatSummary', summary, campaignName)
                     clearedHuntersMark = true
                 }
-
-                const dominateList = getRuntimeValue(creature.name, 'pendingExpirations')
-                if (Array.isArray(dominateList) && dominateList.length > 0) {
-                    for (const entry of dominateList) {
-                        if (entry.effects && Array.isArray(entry.effects)) {
-                            for (const effect of entry.effects) {
-                                if (effect.type === 'dominated') {
-                                    clearExpirationEffects([effect], entry.target, creature.name, campaignName)
-                                }
-                            }
-                        }
-                    }
-                    const filteredExpirations = dominateList.filter(entry => {
-                        if (!entry.effects || !Array.isArray(entry.effects)) return true
-                        return entry.effects.every(e => e.type !== 'dominated')
-                    })
-                    setRuntimeValue(creature.name, 'pendingExpirations', filteredExpirations, campaignName)
-                }
+                clearDominatedExpirations(creature, campaignName)
             }
             if (clearedHuntersMark) {
                 setCombatSummaryG(cloneDeep(summary))

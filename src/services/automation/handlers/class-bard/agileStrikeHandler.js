@@ -4,6 +4,12 @@ import { rollD20, rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
+function resolveAttackText(hit, damageTotal) {
+    const hitText = hit ? 'HIT' : 'MISS';
+    const damageText = hit ? ` dealt ${damageTotal} Bludgeoning damage` : ' missed — no damage';
+    return { hitText, damageText };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName, _characters) {
     const auto = action.automation || action;
     const bardicDie = auto.bardicDie || 6;
@@ -54,8 +60,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
         applyDamageToTarget(cs, targetName, damageTotal, ['Bludgeoning'], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
     }
 
-    const hitText = hit ? 'HIT' : 'MISS';
-    const damageText = hit ? ` dealt ${damageTotal} Bludgeoning damage` : ' missed — no damage';
+    const { hitText, damageText } = resolveAttackText(hit, damageTotal);
 
     addEntry(campaignName, {
         type: 'ability_use',

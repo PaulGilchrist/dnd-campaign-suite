@@ -4,140 +4,45 @@
 // Complexity ratchet: per-directory thresholds equal each directory's current
 // worst metric (non-test code). New code must not exceed its directory baseline,
 // since npm run lint runs with --max-warnings 0.
+// NOTE: step mode — src/services/rules complexity temporarily dropped to 17.
+// Fix the reported violations, then run npm run lint:complexity-baseline to lock.
 export default [
   {
-    files: ['src/components/campaign-admin/**'],
+    files: ['server/routes/npcs.js'],
     rules: {
-      'complexity': ['warn', 19],
+      'complexity': ['warn', 17],
     },
   },
   {
     files: ['src/components/char-sheet/**'],
     rules: {
-      'complexity': ['warn', 19],
+      'complexity': ['warn', 17],
       'max-depth': ['warn', 6],
-      'max-params': ['warn', 8],
+      'max-params': ['warn', 7],
     },
   },
   {
     files: ['src/components/character-creation/**'],
     rules: {
-      'complexity': ['warn', 19],
+      'complexity': ['warn', 17],
     },
   },
   {
     files: ['src/components/common/**'],
     rules: {
-      'complexity': ['warn', 19],
+      'complexity': ['warn', 17],
       'max-params': ['warn', 7],
-    },
-  },
-  {
-    files: ['src/components/hex-map/**'],
-    rules: {
-      'complexity': ['warn', 19],
-      'max-params': ['warn', 9],
-    },
-  },
-  {
-    files: ['src/components/initiative/**'],
-    rules: {
-      'complexity': ['warn', 19],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 64],
-    },
-  },
-  {
-    files: ['src/components/maps-manager/**'],
-    rules: {
-      'complexity': ['warn', 19],
-    },
-  },
-  {
-    files: ['src/hooks/combat/**'],
-    rules: {
-      'complexity': ['warn', 19],
-      'max-params': ['warn', 9],
-    },
-  },
-  {
-    files: ['src/services/automation/**'],
-    rules: {
-      'complexity': ['warn', 19],
-      'max-depth': ['warn', 6],
-      'max-params': ['warn', 9],
-    },
-  },
-  {
-    files: ['src/services/character/**'],
-    rules: {
-      'complexity': ['warn', 19],
-    },
-  },
-  {
-    files: ['src/services/combat/**'],
-    rules: {
-      'complexity': ['warn', 19],
-      'max-params': ['warn', 9],
-    },
-  },
-  {
-    files: ['src/services/items/**'],
-    rules: {
-      'complexity': ['warn', 19],
-    },
-  },
-  {
-    files: ['src/services/maps/**'],
-    rules: {
-      'complexity': ['warn', 19],
-      'max-depth': ['warn', 5],
-      'max-params': ['warn', 8],
-    },
-  },
-  {
-    files: ['src/services/rules/**'],
-    rules: {
-      'complexity': ['warn', 19],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 61],
-      'max-params': ['warn', 9],
-    },
-  },
-  {
-    files: ['server/routes/campaigns-changedata.js'],
-    rules: {
-      'complexity': ['warn', 18],
-    },
-  },
-  {
-    files: ['server/routes/maps.js'],
-    rules: {
-      'complexity': ['warn', 18],
     },
   },
   {
     files: ['src/components/encounter/**'],
     rules: {
-      'complexity': ['warn', 18],
+      'complexity': ['warn', 17],
       'max-params': ['warn', 7],
     },
   },
   {
-    files: ['src/components/log/**'],
-    rules: {
-      'complexity': ['warn', 18],
-    },
-  },
-  {
-    files: ['src/components/map/**'],
-    rules: {
-      'complexity': ['warn', 18],
-      'max-params': ['warn', 6],
-    },
-  },
-  {
-    files: ['server/routes/npcs.js'],
+    files: ['src/components/initiative/**'],
     rules: {
       'complexity': ['warn', 17],
     },
@@ -150,9 +55,37 @@ export default [
     },
   },
   {
+    files: ['src/hooks/combat/**'],
+    rules: {
+      'complexity': ['warn', 17],
+      'max-params': ['warn', 7],
+    },
+  },
+  {
     files: ['src/hooks/management/**'],
     rules: {
       'complexity': ['warn', 17],
+    },
+  },
+  {
+    files: ['src/services/automation/**'],
+    rules: {
+      'complexity': ['warn', 17],
+      'max-depth': ['warn', 6],
+      'max-params': ['warn', 7],
+    },
+  },
+  {
+    files: ['src/services/character/**'],
+    rules: {
+      'complexity': ['warn', 17],
+    },
+  },
+  {
+    files: ['src/services/combat/**'],
+    rules: {
+      'complexity': ['warn', 17],
+      'max-params': ['warn', 7],
     },
   },
   {
@@ -160,14 +93,38 @@ export default [
     rules: {
       'complexity': ['warn', 17],
       'max-depth': ['warn', 5],
-      'max-params': ['warn', 9],
+      'max-params': ['warn', 7],
     },
   },
   {
-    files: ['server/utils/changeData.js'],
+    files: ['src/services/maps/**'],
+    rules: {
+      'complexity': ['warn', 17],
+      'max-depth': ['warn', 5],
+      'max-params': ['warn', 7],
+    },
+  },
+  {
+    files: ['src/services/rules/**'],
+    rules: {
+      'complexity': ['warn', 17],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 61],
+      'max-params': ['warn', 8],
+    },
+  },
+  {
+    files: ['src/components/hex-map/**'],
     rules: {
       'complexity': ['warn', 16],
-      'max-depth': ['warn', 8],
+      'max-params': ['warn', 6],
+    },
+  },
+  {
+    files: ['src/components/map/**'],
+    rules: {
+      'complexity': ['warn', 16],
+      'max-params': ['warn', 6],
     },
   },
   {

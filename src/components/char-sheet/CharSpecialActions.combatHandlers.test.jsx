@@ -264,16 +264,16 @@ describe('CharSpecialActions - Portent Die Choice', () => {
         expect(applyPortentChoice).toHaveBeenCalledOnce();
       });
 
-      expect(applyPortentChoice).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Portent' }),
-        expect.any(Object),
-        'test',
-        'Orc',
-        'save',
-        expect.objectContaining({ d20: 10, bonus: 2, saveType: 'Dexterity' }),
-        expect.any(Object),
-        5
-      );
+      expect(applyPortentChoice).toHaveBeenCalledWith({
+        action: expect.objectContaining({ name: 'Portent' }),
+        playerStats: expect.any(Object),
+        campaignName: 'test',
+        targetName: 'Orc',
+        eventType: 'save',
+        eventData: expect.objectContaining({ d20: 10, bonus: 2, saveType: 'Dexterity' }),
+        context: expect.any(Object),
+        chosenDie: 5,
+      });
 
       expect(mockSetPopupHtml).toHaveBeenCalled();
       const popupCall = mockSetPopupHtml.mock.calls[0][0];

@@ -97,10 +97,10 @@ export default function useCharActionsAttackHandlers({
         const isOfferedThisTurn = offeredValue && offeredValue.activeCreature === currentCreature;
 
         const brutalStrikePassives = selectBrutalStrikeRiders(passives);
-        const brutalStrikePassive = brutalStrikePassives[0];
-        const hasBrutalStrike = !!brutalStrikePassive;
-        const brutalStrikeOptions = brutalStrikePassive?.options || [];
-        const maxEffects = brutalStrikePassive?.maxEffects || 1;
+        const brutalStrikePassive = brutalStrikePassives[0] || {};
+        const hasBrutalStrike = brutalStrikePassives.length > 0;
+        const brutalStrikeOptions = brutalStrikePassive.options || [];
+        const maxEffects = brutalStrikePassive.maxEffects || 1;
 
         const brutalStrikeUsedKey = '_BrutalStrike_usedRound';
         const brutalStrikeUsedValue = getRuntimeValue(playerName, brutalStrikeUsedKey, campaignName);

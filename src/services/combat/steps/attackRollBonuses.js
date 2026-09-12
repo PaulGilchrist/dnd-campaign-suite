@@ -224,6 +224,51 @@ function weaponHitModalResult(bonus, r) {
   };
 }
 
+// SP-112: 'weapon_attack_hit' / 'weapon_or_beast_form_attack_hit' riders
+// (Blessed Strikes/Divine Strike, Dreadful Strikes, Lunar Form) are WEAPON-ONLY.
+// Mirror the combatSuperiorityQueries.js gate (`trigger weapon_attack_hit &&
+// !isWeaponAttack → skip`) and the FT-071 `!attack.school && weaponType !== 'spell'`
+// discriminator: a SPELL attack (Spiritual Weapon force, Luminous Arrow — any
+// autoDamage carrying a spell school or spell attackType) must never collect a
+// weapon damage_bonus, stamp _Divine_Strike_usedRound, or open the damage-type modal.
+function isSpellAttackContext(ctx) {
+  return !!ctx.autoDamageSchool
+    || ctx.attack?.weaponType === 'spell'
+    || ctx.attack?.attackType === 'spell'
+    || !!ctx.attack?.school
+    || ctx.attack?.isWeaponAttack === false;
+}
+
+function collectWeaponHitBonuses(ctx) {
+  const all = [...(ctx.playerStats.automation.actions || []), ...(ctx.playerStats.automation.passives || [])];
+  const upgraded = new Set(all.filter(b => b.upgrades).map(b => b.upgrades));
+
+  return ctx.playerStats.automation.actions.filter(
+    a => a.type === 'damage_bonus' && (a.trigger === 'weapon_attack_hit' || a.trigger === 'weapon_or_beast_form_attack_hit')
+  ).filter(b => !upgraded.has(b.name));
+}
+
+function applyWeaponHitBonus(ctx, bonus, round, acc) {
+  if (weaponHitChoiceSkips(ctx, bonus)) return null;
+
+  const usedKey = `_${underscored(bonus.name)}_usedRound`;
+  if (weaponHitBonusSpent(ctx, bonus, usedKey, round)) return null;
+
+  const r = rollExpression(bonus.damageExpression);
+  if (!r) return null;
+
+  const dt = bonus.damageType || '';
+  if (dt.includes(' or ')) {
+    return weaponHitModalResult(bonus, r);
+  }
+  acc.formula += ` + ${bonus.damageExpression} [${dt.toLowerCase()}]`;
+  acc.total += r.total;
+  acc.rolls = [...acc.rolls, ...r.rolls];
+
+  consumeWeaponHitUses(ctx, bonus, usedKey, round);
+  return null;
+}
+
 export function buildWeaponHitBonusesStep() {
   return {
     name: 'weaponHitBonuses',
@@ -231,53 +276,18 @@ export function buildWeaponHitBonusesStep() {
     emit: 'weapon_hit:applied',
     condition: (ctx) => !!ctx.playerStats.automation?.actions,
     handler: async (ctx) => {
-      let formula = ctx.formula;
-      let total = ctx.total;
-      let rolls = [...(ctx.rolls || [])];
+      const acc = { formula: ctx.formula, total: ctx.total, rolls: [...(ctx.rolls || [])] };
+      if (isSpellAttackContext(ctx)) return { data: acc };
 
-      // SP-112: 'weapon_attack_hit' / 'weapon_or_beast_form_attack_hit' riders
-      // (Blessed Strikes/Divine Strike, Dreadful Strikes, Lunar Form) are WEAPON-ONLY.
-      // Mirror the combatSuperiorityQueries.js gate (`trigger weapon_attack_hit &&
-      // !isWeaponAttack → skip`) and the FT-071 `!attack.school && weaponType !== 'spell'`
-      // discriminator: a SPELL attack (Spiritual Weapon force, Luminous Arrow — any
-      // autoDamage carrying a spell school or spell attackType) must never collect a
-      // weapon damage_bonus, stamp _Divine_Strike_usedRound, or open the damage-type modal.
-      const isSpellAttack = !!ctx.autoDamageSchool
-        || ctx.attack?.weaponType === 'spell'
-        || ctx.attack?.attackType === 'spell'
-        || !!ctx.attack?.school
-        || ctx.attack?.isWeaponAttack === false;
-      if (isSpellAttack) return { data: { formula, total, rolls } };
-
-      const all = [...(ctx.playerStats.automation.actions || []), ...(ctx.playerStats.automation.passives || [])];
-      const upgraded = new Set(all.filter(b => b.upgrades).map(b => b.upgrades));
-
-      const bonuses = ctx.playerStats.automation.actions.filter(
-        a => a.type === 'damage_bonus' && (a.trigger === 'weapon_attack_hit' || a.trigger === 'weapon_or_beast_form_attack_hit')
-      ).filter(b => !upgraded.has(b.name));
+      const bonuses = collectWeaponHitBonuses(ctx);
+      const round = getCurrentCombatRound(ctx.campaignName);
 
       for (const bonus of bonuses) {
-        if (weaponHitChoiceSkips(ctx, bonus)) continue;
-
-        const usedKey = `_${underscored(bonus.name)}_usedRound`;
-        const round = getCurrentCombatRound(ctx.campaignName);
-        if (weaponHitBonusSpent(ctx, bonus, usedKey, round)) continue;
-
-        const r = rollExpression(bonus.damageExpression);
-        if (!r) continue;
-
-        const dt = bonus.damageType || '';
-        if (dt.includes(' or ')) {
-          return weaponHitModalResult(bonus, r);
-        }
-        formula += ` + ${bonus.damageExpression} [${dt.toLowerCase()}]`;
-        total += r.total;
-        rolls = [...rolls, ...r.rolls];
-
-        consumeWeaponHitUses(ctx, bonus, usedKey, round);
+        const modalResult = applyWeaponHitBonus(ctx, bonus, round, acc);
+        if (modalResult) return modalResult;
       }
 
-      return { data: { formula, total, rolls } };
+      return { data: acc };
     },
   };
 }

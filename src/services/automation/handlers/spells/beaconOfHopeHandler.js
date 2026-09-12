@@ -43,6 +43,36 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function logBeaconOfHopeCast(campaignName, casterName, action, targetNames, now) {
+    const targetList = targetNames.join(', ');
+    const spellLevel = action.spell?.level || 3;
+    const castingTime = action.spell?.casting_time || '1 action';
+
+    addEntry(campaignName, {
+        type: 'spell',
+        characterName: casterName,
+        targetName: targetNames[0],
+        targets: targetNames,
+        spellName: 'Beacon of Hope',
+        spellLevel,
+        castingTime,
+        description: `${casterName} casts Beacon of Hope on ${targetList}. Targets gain advantage on WIS saves and death saves, and regain maximum HP from healing.`,
+        timestamp: now,
+    }).catch((e) => { console.error('[beaconOfHope] Error logging cast:', e); });
+
+    addEntry(campaignName, {
+        type: 'spell',
+        characterName: casterName,
+        targetName: targetNames[0],
+        targets: targetNames,
+        spellName: 'Beacon of Hope',
+        spellLevel,
+        castingTime,
+        description: `Beacon of Hope cast: ${targetNames.length} creature(s) affected.`,
+        timestamp: now,
+    }).catch((e) => { console.error('[beaconOfHope] Error logging summary:', e); });
+}
+
 export async function applyBeaconOfHopeEffect(action, playerStats, campaignName, _mapName, targetNames) {
     if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
         return null;
@@ -82,31 +112,7 @@ export async function applyBeaconOfHopeEffect(action, playerStats, campaignName,
 
     if (reasons.length > 0) {
         setRuntimeValue('campaign', 'targetEffects', effects, campaignName, true);
-
-        const targetList = targetNames.join(', ');
-        addEntry(campaignName, {
-            type: 'spell',
-            characterName: casterName,
-            targetName: targetNames[0],
-            targets: targetNames,
-            spellName: 'Beacon of Hope',
-            spellLevel: action.spell?.level || 3,
-            castingTime: action.spell?.casting_time || '1 action',
-            description: `${casterName} casts Beacon of Hope on ${targetList}. Targets gain advantage on WIS saves and death saves, and regain maximum HP from healing.`,
-            timestamp: now,
-        }).catch((e) => { console.error('[beaconOfHope] Error logging cast:', e); });
-
-        addEntry(campaignName, {
-            type: 'spell',
-            characterName: casterName,
-            targetName: targetNames[0],
-            targets: targetNames,
-            spellName: 'Beacon of Hope',
-            spellLevel: action.spell?.level || 3,
-            castingTime: action.spell?.casting_time || '1 action',
-            description: `Beacon of Hope cast: ${targetNames.length} creature(s) affected.`,
-            timestamp: now,
-        }).catch((e) => { console.error('[beaconOfHope] Error logging summary:', e); });
+        logBeaconOfHopeCast(campaignName, casterName, action, targetNames, now);
     }
 
     return {

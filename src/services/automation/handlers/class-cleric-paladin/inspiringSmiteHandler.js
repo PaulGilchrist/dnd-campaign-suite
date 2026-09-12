@@ -5,6 +5,7 @@ import { loadMapData } from '../../../maps/mapsService.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
+import { resolveChannelDivinityCharges } from '../healing/healingPoolHandler.js';
 
 async function buildCreatureTargets(playerName, campaignName, mapName, rangeFt) {
     const creatureTargets = [];
@@ -51,10 +52,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
 
     // Check Channel Divinity charges
-    const storedCharges = getRuntimeValue(playerName, 'channelDivinityCharges');
-    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
-    const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+    const { currentCharges } = resolveChannelDivinityCharges(playerStats);
 
     if (currentCharges <= 0) {
         return {

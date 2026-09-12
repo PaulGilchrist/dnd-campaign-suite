@@ -38,6 +38,45 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function getActiveBuffList(targetName, campaignName) {
+    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    return Array.isArray(activeBuffs) ? activeBuffs : [];
+}
+
+function processBarkskinTarget(targetName, targetCharacter, casterName, duration, campaignName, skippedTargets) {
+    const targetAc = targetCharacter?.computedStats?.armorClass ?? targetCharacter?.armorClass ?? 10;
+
+    if (targetAc >= 17) {
+        skippedTargets.push({ name: targetName, ac: targetAc });
+        return false;
+    }
+
+    const buffs = getActiveBuffList(targetName, campaignName);
+    const existingBarkskin = buffs.some(b => b.name === BARKSKIN_BUFF_NAME);
+    if (!existingBarkskin) {
+        buffs.push({
+            name: BARKSKIN_BUFF_NAME,
+            effect: 'barkskin',
+            duration,
+            sourceCharacter: casterName,
+        });
+        setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
+    }
+
+    addExpiration(casterName, targetName, [
+        { type: 'remove_active_buff', buffName: BARKSKIN_BUFF_NAME }
+    ], campaignName);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: BARKSKIN_BUFF_NAME,
+        description: `${casterName} cast ${BARKSKIN_BUFF_NAME} on ${targetName}. Target's AC becomes 17.`,
+    }).catch((e) => { console.error('[barkskin] Error logging:', e); });
+
+    return true;
+}
+
 export async function applyBarkskin(action, playerStats, campaignName, _mapName, targetNames, characters) {
     if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
         return null;
@@ -56,39 +95,9 @@ export async function applyBarkskin(action, playerStats, campaignName, _mapName,
     let skippedTargets = [];
 
     for (const targetName of targetNames) {
-        const targetCharacter = targetCharacterMap[targetName];
-        const targetAc = targetCharacter?.computedStats?.armorClass ?? targetCharacter?.armorClass ?? 10;
-
-        if (targetAc >= 17) {
-            skippedTargets.push({ name: targetName, ac: targetAc });
-            continue;
+        if (processBarkskinTarget(targetName, targetCharacterMap[targetName], casterName, duration, campaignName, skippedTargets)) {
+            appliedTargets.push(targetName);
         }
-
-        const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
-        const buffs = Array.isArray(activeBuffs) ? activeBuffs : [];
-        const existingBarkskin = buffs.some(b => b.name === BARKSKIN_BUFF_NAME);
-        if (!existingBarkskin) {
-            buffs.push({
-                name: BARKSKIN_BUFF_NAME,
-                effect: 'barkskin',
-                duration,
-                sourceCharacter: casterName,
-            });
-            setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
-        }
-
-        addExpiration(casterName, targetName, [
-            { type: 'remove_active_buff', buffName: BARKSKIN_BUFF_NAME }
-        ], campaignName);
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: BARKSKIN_BUFF_NAME,
-            description: `${casterName} cast ${BARKSKIN_BUFF_NAME} on ${targetName}. Target's AC becomes 17.`,
-        }).catch((e) => { console.error('[barkskin] Error logging:', e); });
-
-        appliedTargets.push(targetName);
     }
 
     const popupDescription = buildDescription(appliedTargets, skippedTargets, targetNames.length);

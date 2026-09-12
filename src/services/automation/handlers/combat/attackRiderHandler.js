@@ -227,6 +227,20 @@ async function markAndApplySingleRiderOption(action, auto, options, playerStats,
     return applyRiderEffect(action, playerStats, campaignName, targetName, chosen, _mapName);
 }
 
+function logRiderUse(campaignName, playerStats, action, targetName) {
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${action.name} used${targetName ? ` against ${targetName}` : ''}`,
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+}
+
+async function gateHandleOncePerTurn(action, auto, playerStats, campaignName) {
+    if (!auto.oncePerTurn) return null;
+    return checkOncePerTurn(action.name, oncePerTurnUsedKey(action), playerStats.name, campaignName);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || action;
     let options = auto.options || [];
@@ -246,18 +260,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
     const targetName = target?.name || null;
 
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: action.name,
-        description: `${action.name} used${targetName ? ` against ${targetName}` : ''}`,
-    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+    logRiderUse(campaignName, playerStats, action, targetName);
 
-    if (auto.oncePerTurn) {
-        const usedKey = oncePerTurnUsedKey(action);
-        const skip = await checkOncePerTurn(action.name, usedKey, playerStats.name, campaignName);
-        if (skip) return skip;
-    }
+    const skip = await gateHandleOncePerTurn(action, auto, playerStats, campaignName);
+    if (skip) return skip;
 
     if (options.length > 0 && (auto.chooseOne || (auto.maxEffects || 1) > 1)) {
         return {
@@ -391,8 +397,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     let versatileTricksterSecondaryTarget = null;
 
     // Check if Versatile Trickster is available (Arcane Trickster level 13+)
-    const passives = playerStats.automation?.passives || [];
-    const hasVersatileTricksterPassive = passives.some(
+    const hasVersatileTricksterPassive = (playerStats.automation?.passives || []).some(
         p => p.type === 'passive_rule' && p.effect === 'versatile_trickster'
     );
 
@@ -404,16 +409,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         if (secondaryTargets) versatileTricksterSecondaryTarget = secondaryTargets;
     }
 
-    if (versatileTricksterSecondaryTarget) {
-        stampVersatileTricksterTargets(playerStats, campaignName, versatileTricksterSecondaryTarget, targetName);
-    }
-
-    // If Sudden Strike or Mass Fear was applied, find secondary targets for the effect
-    const stalkersFlurrySecondaryTarget = await resolveStalkersFlurrySecondaryTargets(chosenOptions, targetName, campaignName);
-
-    if (stalkersFlurrySecondaryTarget && stalkersFlurrySecondaryTarget.length > 0) {
-        stampStalkersFlurryTargets(playerStats, campaignName, chosenOptions, stalkersFlurrySecondaryTarget, targetName);
-    }
+    await stampRiderSecondaryTargets(playerStats, campaignName, targetName, versatileTricksterSecondaryTarget, chosenOptions);
 
     if (results.length === 1) {
         return results[0];
@@ -424,6 +420,19 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     const costNote = totalCostD6 > 0 ? `<br/><em>(Forgoing ${totalCostD6}d6 Sneak Attack damage dice)</em>` : '';
 
     return riderNotice(action.name, auto, `Applied to ${targetName || 'target'}:<br/>• ${effectDescriptions.join('<br/>• ')}${costNote}`);
+}
+
+async function stampRiderSecondaryTargets(playerStats, campaignName, targetName, versatileTricksterSecondaryTarget, chosenOptions) {
+    if (versatileTricksterSecondaryTarget) {
+        stampVersatileTricksterTargets(playerStats, campaignName, versatileTricksterSecondaryTarget, targetName);
+    }
+
+    // If Sudden Strike or Mass Fear was applied, find secondary targets for the effect
+    const stalkersFlurrySecondaryTarget = await resolveStalkersFlurrySecondaryTargets(chosenOptions, targetName, campaignName);
+
+    if (stalkersFlurrySecondaryTarget && stalkersFlurrySecondaryTarget.length > 0) {
+        stampStalkersFlurryTargets(playerStats, campaignName, chosenOptions, stalkersFlurrySecondaryTarget, targetName);
+    }
 }
 
 async function gateRiderOncePerTurn(action, auto, playerStats, campaignName) {
@@ -508,29 +517,33 @@ function applyPushEffect(action, auto, playerStats, campaignName, targetName, op
     return riderNotice(action.name, auto, `${targetName} was pushed ${pushDistance} feet away.`);
 }
 
+function pickOrNull(value) {
+    return value || null;
+}
+
 function buildRiderEffect(action, targetName, playerStats, option, auto) {
     return {
         target: targetName,
         source: playerStats.name,
         option: option.name,
         effect: option.effect,
-        value: option.value || null,
+        value: pickOrNull(option.value),
         noOpportunityAttacks: option.noOpportunityAttacks || false,
         duration: option.duration || 'until_start_of_next_turn',
-        saveType: option.saveType || null,
-        saveDc: option.saveDc || null,
-        saveAbility: option.saveAbility || null,
-        condition: option.condition || null,
+        saveType: pickOrNull(option.saveType),
+        saveDc: pickOrNull(option.saveDc),
+        saveAbility: pickOrNull(option.saveAbility),
+        condition: pickOrNull(option.condition),
         repeatingSave: !!option.repeatingSave,
-        requires: option.requires || null,
-        sizeLimit: option.sizeLimit || null,
-        movement: option.movement || null,
-        cost: option.cost || null,
+        requires: pickOrNull(option.requires),
+        sizeLimit: pickOrNull(option.sizeLimit),
+        movement: pickOrNull(option.movement),
+        cost: pickOrNull(option.cost),
         ignoreResistance: !!option.ignoreResistance,
-        restoreCost: option.restoreCost || null,
+        restoreCost: pickOrNull(option.restoreCost),
         damageDoubled: option.damageDoubled || auto.damageDoubled || false,
-        damageExpression: option.damageExpression || null,
-        damageType: option.damageType || null,
+        damageExpression: pickOrNull(option.damageExpression),
+        damageType: pickOrNull(option.damageType),
         label: auto.name || action.name,
     };
 }

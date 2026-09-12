@@ -144,6 +144,19 @@ async function handleHealersKit(action, auto, playerStats, campaignName, charact
     return infoPopup(action, description);
 }
 
+async function resolveMonkHealTarget(playerStats, campaignName, isSelf) {
+    if (isSelf) return playerStats.name;
+    const targetInfo = await resolveTarget(campaignName, playerStats.name);
+    return targetInfo?.target?.name || playerStats.name;
+}
+
+async function markFortifiedHealthIfApplied(actualHeal, bonusDetails, playerStats, campaignName) {
+    if (actualHeal <= 0) return;
+    if (bonusDetails.some(d => d.name === 'Fortified Health')) {
+        await markFortifiedHealthUsed(playerStats, campaignName);
+    }
+}
+
 async function handleMonkHealing(action, playerStats, campaignName, isSelf, slotLevel) {
     const monkFeatures = getClassFeatures(playerStats);
     const martialArtsDie = monkFeatures?.martialArtsDie || 4;
@@ -151,14 +164,9 @@ async function handleMonkHealing(action, playerStats, campaignName, isSelf, slot
     const wisModifier = wisdom?.bonus || 0;
 
     const rerollOnes = hasRerollHealingOnes(playerStats);
-    let targetName = playerStats.name;
-    if (!isSelf) {
-        const targetInfo = await resolveTarget(campaignName, playerStats.name);
-        targetName = targetInfo?.target?.name || playerStats.name;
-    }
-    const healTargetName = isSelf ? playerStats.name : targetName;
+    const healTargetName = await resolveMonkHealTarget(playerStats, campaignName, isSelf);
 
-    const maximize = hasHealingMaximizationForTarget(playerStats, targetName, campaignName);
+    const maximize = hasHealingMaximizationForTarget(playerStats, healTargetName, campaignName);
     const rollResult = rollHeal(`1d${martialArtsDie}`, maximize, rerollOnes);
     if (!rollResult) {
         console.error(`[healingHandler] ${action.name}: monk rollExpression returned null for 1d${martialArtsDie}`);
@@ -171,12 +179,7 @@ async function handleMonkHealing(action, playerStats, campaignName, isSelf, slot
 
     const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, healTargetName, healAmount, campaignName);
 
-    if (actualHeal > 0) {
-        const hasFortifiedHealth = bonusDetails.some(d => d.name === 'Fortified Health');
-        if (hasFortifiedHealth) {
-            await markFortifiedHealthUsed(playerStats, campaignName);
-        }
-    }
+    await markFortifiedHealthIfApplied(actualHeal, bonusDetails, playerStats, campaignName);
 
     const rollInfo = `1d${martialArtsDie}=${rollResult.total} (${rollDisplay(rollResult, maximize, rerollOnes)})`;
 
@@ -405,7 +408,7 @@ async function handleSelfHealing(action, auto, playerStats, campaignName, slotLe
     return infoPopup(action, description);
 }
 
-async function handleUsesExpressionHealing(action, auto, playerStats, campaignName, slotLevel, targetName, usesKey, currentUses, maxUses) {
+async function handleUsesExpressionHealing(action, auto, playerStats, campaignName, slotLevel, targetName, { usesKey, currentUses, maxUses }) {
     const resolvedExpression = resolveDiceExpression(auto.healExpression, playerStats, slotLevel);
     const maximize = hasHealingMaximizationForTarget(playerStats, targetName, campaignName);
     const rerollOnes = hasRerollHealingOnes(playerStats);
@@ -503,7 +506,7 @@ async function handleUsesHealing(action, auto, playerStats, campaignName, slotLe
     const targetName = targetInfo?.target?.name || playerStats.name;
 
     if (auto.healExpression) {
-        return handleUsesExpressionHealing(action, auto, playerStats, campaignName, slotLevel, targetName, usesKey, currentUses, maxUses);
+        return handleUsesExpressionHealing(action, auto, playerStats, campaignName, slotLevel, targetName, { usesKey, currentUses, maxUses });
     }
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);

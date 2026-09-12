@@ -11,6 +11,219 @@ function parseBackgroundAbilityScores(abilityScoresStr) {
     .filter(s => s.length > 0);
 }
 
+function withDefault(value, fallback) {
+  return value === undefined ? fallback : value;
+}
+
+function defaultBackgroundAssignments(names) {
+  const defaults = {};
+  names.forEach(name => { defaults[name] = 1; });
+  return defaults;
+}
+
+function BackgroundAbilityPanel({ background, choices, getIncrease, onIncreaseChange, warnings }) {
+  if (choices.length === 0) return null;
+  return (
+    <div className="step-description bg-ability-choice">
+      <strong>Background Ability Scores ({background}):</strong>
+      <div className="bg-ability-rule-text">
+        Your background grants ability score increases. Increase one ability by 2 and another by 1, or increase all three by 1. None of these increases can raise a score above 20.
+      </div>
+      <div className="bg-ability-assignments">
+        {choices.map((ability) => (
+          <div key={ability} className="bg-ability-assignment">
+            <span className="bg-ability-name">{ability}:</span>
+            <select
+              value={getIncrease(ability)}
+              onChange={(e) => onIncreaseChange(ability, e.target.value)}
+              className="bg-ability-select"
+            >
+              <option value={0}>+0</option>
+              <option value={1}>+1</option>
+              <option value={2}>+2</option>
+            </select>
+          </div>
+        ))}
+      </div>
+      {warnings.length > 0 && (
+        <div className="bg-ability-warnings">
+          {warnings.map((warning, index) => (
+            <div key={index} className="bg-ability-warning">
+              <i className="fa-solid fa-triangle-exclamation"></i> {warning}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeatChoiceCard({ group, assignment, onAbilityChange, onModeChange }) {
+  const mode = (assignment && assignment.mode) || 'single';
+
+  if (group.type === 'fixed') {
+    const selected = (assignment && assignment.assignment) || group.abilityNames[0];
+    return (
+      <div className="feat-asi-card">
+        <div className="feat-asi-card-header">
+          <span className="feat-asi-card-name">{group.featName}</span>
+          <select
+            value={selected}
+            onChange={(e) => onAbilityChange(group.id, 0, e.target.value)}
+            className="bg-ability-select"
+          >
+            {group.abilityNames.map((abilityName) => (
+              <option key={abilityName} value={abilityName}>{abilityName}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
+  }
+
+  const singleSelected = (assignment && assignment.assignments && assignment.assignments.single) || group.options.single.abilityNames[0];
+  const dualAssignments = (assignment && assignment.assignments && assignment.assignments.dual) || [];
+
+  const dualAssignmentsRender = () => group.options.dual.assignments.map((_, i) => (
+    <div key={i} className="feat-asi-assignment">
+      <span className="feat-asi-assignment-label">Ability {i + 1}:</span>
+      <select
+        value={dualAssignments[i] || group.options.dual.abilityNames[0]}
+        onChange={(e) => onAbilityChange(group.id, i, e.target.value)}
+        className="bg-ability-select"
+      >
+        {group.options.dual.abilityNames.map((abilityName) => (
+          <option key={abilityName} value={abilityName}>{abilityName}</option>
+        ))}
+      </select>
+    </div>
+  ));
+
+  return (
+    <div className="feat-asi-card">
+      <div className="feat-asi-card-header">
+        <span className="feat-asi-card-name">{group.featName}</span>
+        <div className="feat-asi-mode-toggle">
+          <label className="feat-asi-mode-option">
+            <input
+              type="radio"
+              name={`mode-${group.id}`}
+              checked={mode === 'single'}
+              onChange={() => onModeChange(group.id, 'single')}
+            />
+            +{group.options.single.amount} to one ability
+          </label>
+          <label className="feat-asi-mode-option">
+            <input
+              type="radio"
+              name={`mode-${group.id}`}
+              checked={mode === 'dual'}
+              onChange={() => onModeChange(group.id, 'dual')}
+            />
+            +{group.options.dual.amount} to {group.options.dual.count} abilities
+          </label>
+        </div>
+      </div>
+      <div className="feat-asi-assignments">
+        {mode === 'single' && (
+          <div className="feat-asi-assignment">
+            <span className="feat-asi-assignment-label">Increase:</span>
+            <select
+              value={singleSelected}
+              onChange={(e) => onAbilityChange(group.id, 0, e.target.value)}
+              className="bg-ability-select"
+            >
+              {group.options.single.abilityNames.map((abilityName) => (
+                <option key={abilityName} value={abilityName}>{abilityName}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {mode === 'dual' && dualAssignmentsRender()}
+      </div>
+    </div>
+  );
+}
+
+function MiscIncreaseWarning({ totalMiscPoints }) {
+  if (totalMiscPoints <= 0) return null;
+  return (
+    <div className="step-description misc-warning">
+      <i className="fa-solid fa-triangle-exclamation"></i>
+      <span>Misc increases total {totalMiscPoints} point{totalMiscPoints > 1 ? 's' : ''}. These points are not counted against the point buy system and must be approved by your GM.</span>
+    </div>
+  );
+}
+
+function AbilityScoreCard({
+  ability,
+  index,
+  abilityData,
+  backgroundIncrease,
+  cost,
+  featIncrease,
+  racialIncrease,
+  isBackgroundAbilityScore,
+  totalScore,
+  scoreCap,
+  errors,
+  onBaseScoreChange,
+  onMiscIncreaseChange,
+}) {
+  const baseScoreError = errors[`ability_${index}_baseScore`];
+  const miscIncreaseError = errors[`ability_${index}_miscIncrease`];
+  return (
+    <div className={`ability-score-card ${isBackgroundAbilityScore ? 'bg-ability-score' : ''}`}>
+      {isBackgroundAbilityScore && (
+        <div className="bg-ability-badge">
+          <i className="fa-solid fa-star"></i> Background: +{backgroundIncrease}
+        </div>
+      )}
+      {racialIncrease > 0 && (
+        <div className="racial-increase-badge">
+          <i className="fa-solid fa-dragon"></i> Racial: +{racialIncrease}
+        </div>
+      )}
+      {featIncrease > 0 && (
+        <div className="feat-increase-badge">
+          <i className="fa-solid fa-dumbbell"></i> Feat: +{featIncrease}
+        </div>
+      )}
+      <h4>{ability}</h4>
+      <div className="form-group ability-score-form-group">
+        <label htmlFor={`base-score-${index}`}>Base Score (8-15)</label>
+        <input
+          id={`base-score-${index}`}
+          type="number"
+          min="8"
+          max="15"
+          value={abilityData.baseScore}
+          onChange={(e) => onBaseScoreChange(index, e.target.value)}
+          className={baseScoreError ? 'error' : ''}
+        />
+        <span className="point-cost">Cost: {cost}</span>
+        {baseScoreError && <span className="error-message">{baseScoreError}</span>}
+      </div>
+
+      <div className="form-group ability-score-form-group">
+        <label htmlFor={`misc-increase-${index}`}>Misc Increase</label>
+        <input
+          id={`misc-increase-${index}`}
+          type="number"
+          value={abilityData.miscIncrease}
+          onChange={(e) => onMiscIncreaseChange(index, parseInt(e.target.value))}
+          className={miscIncreaseError ? 'error' : ''}
+        />
+        {miscIncreaseError && <span className="error-message">{miscIncreaseError}</span>}
+      </div>
+      <div className={`total-score ${totalScore > scoreCap ? 'error' : ''}`}>
+        Total: <strong>{totalScore}</strong>
+        {totalScore > scoreCap && <span className="error-message"> (max {scoreCap})</span>}
+      </div>
+    </div>
+  );
+}
+
 function WizardStepAbilities({
   formData,
   errors,
@@ -18,20 +231,26 @@ function WizardStepAbilities({
   onAbilityMiscIncreaseChange,
   onBackgroundIncreaseChange,
   backgroundAbilityChoices,
-  backgroundAbilityAssignments = {},
-  backgroundValidationWarnings = [],
+  backgroundAbilityAssignments,
+  backgroundValidationWarnings,
   allFeats,
-  featAbilityChoices = [],
-  featAbilityAssignments = {},
+  featAbilityChoices,
+  featAbilityAssignments,
   onFeatAbilityChoiceChange,
   onFeatAbilityModeChange,
-  racesData = [],
+  racesData,
 }) {
   const { race } = formData;
+  const raceList = withDefault(racesData, []);
+  const choiceGroups = withDefault(featAbilityChoices, []);
+  const featAssignments = withDefault(featAbilityAssignments, {});
+  const bgAssignments = withDefault(backgroundAbilityAssignments, {});
+  const bgValidationWarnings = withDefault(backgroundValidationWarnings, []);
+
   const fullRace = useMemo(() => {
     if (!race?.name) return null;
-    return racesData.find(r => r.name === race.name) || null;
-  }, [race?.name, racesData]);
+    return raceList.find(r => r.name === race.name) || null;
+  }, [race?.name, raceList]);
   const [pointBuyCosts, setPointBuyCosts] = useState({});
   const [pointsAllowed, setPointsAllowed] = useState(27);
   const [abilityNames, setAbilityNames] = useState(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
@@ -43,8 +262,8 @@ function WizardStepAbilities({
   const useProps = backgroundAbilityChoices !== undefined;
 
   const effectiveBackgroundAbilityChoices = useProps ? backgroundAbilityChoices : localBackgroundAbilityChoices;
-  const effectiveBackgroundAbilityAssignments = useProps ? backgroundAbilityAssignments : localBackgroundAbilityAssignments;
-  const effectiveBackgroundValidationWarnings = useProps ? backgroundValidationWarnings : localBackgroundValidationWarnings;
+  const effectiveBackgroundAbilityAssignments = useProps ? bgAssignments : localBackgroundAbilityAssignments;
+  const effectiveBackgroundValidationWarnings = useProps ? bgValidationWarnings : localBackgroundValidationWarnings;
 
   const racialAbilityIncreases = useMemo(() => {
     if (formData.rules !== '5e' || !fullRace?.name) {
@@ -108,14 +327,10 @@ function WizardStepAbilities({
               const parsed = JSON.parse(stored);
               setLocalBackgroundAbilityAssignments(parsed);
             } catch (_e) {
-              const defaults = {};
-              names.forEach(name => { defaults[name] = 1; });
-              setLocalBackgroundAbilityAssignments(defaults);
+              setLocalBackgroundAbilityAssignments(defaultBackgroundAssignments(names));
             }
           } else {
-            const defaults = {};
-            names.forEach(name => { defaults[name] = 1; });
-            setLocalBackgroundAbilityAssignments(defaults);
+            setLocalBackgroundAbilityAssignments(defaultBackgroundAssignments(names));
           }
         } else {
           setLocalBackgroundAbilityChoices([]);
@@ -192,8 +407,8 @@ function WizardStepAbilities({
     const nonChoice = nonChoiceFeatIncreases[abilityName] || 0;
 
     let choiceIncrease = 0;
-    featAbilityChoices.forEach(group => {
-      const saved = featAbilityAssignments[group.id];
+    choiceGroups.forEach(group => {
+      const saved = featAssignments[group.id];
       if (!saved) return;
 
       if (group.type === 'choice') {
@@ -241,7 +456,7 @@ function WizardStepAbilities({
     onFeatAbilityModeChange?.(featName, mode);
   };
 
-  const hasFeatsWithChoices = featAbilityChoices.length > 0;
+  const hasFeatsWithChoices = choiceGroups.length > 0;
 
   const effectiveAbilityScoreCap = useMemo(() => {
     if (!allFeats || allFeats.length === 0 || !formData.feats || formData.feats.length === 0) {
@@ -284,39 +499,13 @@ function WizardStepAbilities({
         Total score (base + feat + background + racial + misc) cannot exceed {effectiveAbilityScoreCap} for any ability.
       </div>
 
-      {effectiveBackgroundAbilityChoices.length > 0 && (
-        <div className="step-description bg-ability-choice">
-          <strong>Background Ability Scores ({formData.background}):</strong>
-          <div className="bg-ability-rule-text">
-            Your background grants ability score increases. Increase one ability by 2 and another by 1, or increase all three by 1. None of these increases can raise a score above 20.
-          </div>
-          <div className="bg-ability-assignments">
-            {effectiveBackgroundAbilityChoices.map((ability) => (
-              <div key={ability} className="bg-ability-assignment">
-                <span className="bg-ability-name">{ability}:</span>
-                <select
-                  value={getBackgroundIncrease(ability)}
-                  onChange={(e) => handleBackgroundIncreaseChange(ability, e.target.value)}
-                  className="bg-ability-select"
-                >
-                  <option value={0}>+0</option>
-                  <option value={1}>+1</option>
-                  <option value={2}>+2</option>
-                </select>
-              </div>
-            ))}
-          </div>
-          {effectiveBackgroundValidationWarnings.length > 0 && (
-            <div className="bg-ability-warnings">
-              {effectiveBackgroundValidationWarnings.map((warning, index) => (
-                <div key={index} className="bg-ability-warning">
-                  <i className="fa-solid fa-triangle-exclamation"></i> {warning}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <BackgroundAbilityPanel
+        background={formData.background}
+        choices={effectiveBackgroundAbilityChoices}
+        getIncrease={getBackgroundIncrease}
+        onIncreaseChange={handleBackgroundIncreaseChange}
+        warnings={effectiveBackgroundValidationWarnings}
+      />
 
       {hasFeatsWithChoices && (
         <div className="step-description bg-ability-choice">
@@ -325,95 +514,20 @@ function WizardStepAbilities({
             Your selected feats grant ability score increases. Choose which ability score to increase.
           </div>
           <div className="feat-asi-cards">
-            {featAbilityChoices.map((group) => (
-              <div key={group.id} className="feat-asi-card">
-                {group.type === 'fixed' ? (
-                  <div className="feat-asi-card-header">
-                    <span className="feat-asi-card-name">{group.featName}</span>
-                    <select
-                      value={featAbilityAssignments[group.id]?.assignment || group.abilityNames[0]}
-                      onChange={(e) => handleFeatAbilityChange(group.id, 0, e.target.value)}
-                      className="bg-ability-select"
-                    >
-                      {group.abilityNames.map((abilityName) => (
-                        <option key={abilityName} value={abilityName}>{abilityName}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <>
-                    <div className="feat-asi-card-header">
-                      <span className="feat-asi-card-name">{group.featName}</span>
-                      <div className="feat-asi-mode-toggle">
-                        <label className="feat-asi-mode-option">
-                          <input
-                            type="radio"
-                            name={`mode-${group.id}`}
-                            checked={(featAbilityAssignments[group.id]?.mode || 'single') === 'single'}
-                            onChange={() => handleFeatAbilityModeChange(group.id, 'single')}
-                          />
-                          +{group.options.single.amount} to one ability
-                        </label>
-                        <label className="feat-asi-mode-option">
-                          <input
-                            type="radio"
-                            name={`mode-${group.id}`}
-                            checked={(featAbilityAssignments[group.id]?.mode || 'single') === 'dual'}
-                            onChange={() => handleFeatAbilityModeChange(group.id, 'dual')}
-                          />
-                          +{group.options.dual.amount} to {group.options.dual.count} abilities
-                        </label>
-                      </div>
-                    </div>
-                    <div className="feat-asi-assignments">
-                      {(featAbilityAssignments[group.id]?.mode || 'single') === 'single' && (
-                        <div className="feat-asi-assignment">
-                          <span className="feat-asi-assignment-label">Increase:</span>
-                          <select
-                            value={featAbilityAssignments[group.id]?.assignments?.single || group.options.single.abilityNames[0]}
-                            onChange={(e) => handleFeatAbilityChange(group.id, 0, e.target.value)}
-                            className="bg-ability-select"
-                          >
-                            {group.options.single.abilityNames.map((abilityName) => (
-                              <option key={abilityName} value={abilityName}>{abilityName}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      {(featAbilityAssignments[group.id]?.mode || 'single') === 'dual' && (
-                        (() => {
-                          const savedAssignments = featAbilityAssignments[group.id]?.assignments?.dual || [];
-                          return group.options.dual.assignments.map((_, i) => (
-                            <div key={i} className="feat-asi-assignment">
-                              <span className="feat-asi-assignment-label">Ability {i + 1}:</span>
-                              <select
-                                value={savedAssignments[i] || group.options.dual.abilityNames[0]}
-                                onChange={(e) => handleFeatAbilityChange(group.id, i, e.target.value)}
-                                className="bg-ability-select"
-                              >
-                                {group.options.dual.abilityNames.map((abilityName) => (
-                                  <option key={abilityName} value={abilityName}>{abilityName}</option>
-                                ))}
-                              </select>
-                            </div>
-                          ));
-                        })()
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
+            {choiceGroups.map((group) => (
+              <FeatChoiceCard
+                key={group.id}
+                group={group}
+                assignment={featAssignments[group.id]}
+                onAbilityChange={handleFeatAbilityChange}
+                onModeChange={handleFeatAbilityModeChange}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {totalMiscPoints > 0 && (
-        <div className="step-description misc-warning">
-          <i className="fa-solid fa-triangle-exclamation"></i>
-          <span>Misc increases total {totalMiscPoints} point{totalMiscPoints > 1 ? 's' : ''}. These points are not counted against the point buy system and must be approved by your GM.</span>
-        </div>
-      )}
+      <MiscIncreaseWarning totalMiscPoints={totalMiscPoints} />
 
       <div className="ability-scores-grid">
         {abilityNames.map((ability, index) => {
@@ -428,54 +542,22 @@ function WizardStepAbilities({
           const cost = pointBuyCosts[baseScore] || 0;
 
           return (
-            <div key={ability} className={`ability-score-card ${isBackgroundAbilityScore ? 'bg-ability-score' : ''}`}>
-              {isBackgroundAbilityScore && (
-                <div className="bg-ability-badge">
-                  <i className="fa-solid fa-star"></i> Background: +{backgroundIncrease}
-                </div>
-              )}
-              {racialIncrease > 0 && (
-                <div className="racial-increase-badge">
-                  <i className="fa-solid fa-dragon"></i> Racial: +{racialIncrease}
-                </div>
-              )}
-              {featIncrease > 0 && (
-                <div className="feat-increase-badge">
-                  <i className="fa-solid fa-dumbbell"></i> Feat: +{featIncrease}
-                </div>
-              )}
-              <h4>{ability}</h4>
-              <div className="form-group ability-score-form-group">
-                <label htmlFor={`base-score-${index}`}>Base Score (8-15)</label>
-                <input
-                  id={`base-score-${index}`}
-                  type="number"
-                  min="8"
-                  max="15"
-                  value={abilityData.baseScore}
-                  onChange={(e) => onAbilityBaseScoreChange(index, e.target.value)}
-                  className={errors[`ability_${index}_baseScore`] ? 'error' : ''}
-                />
-                <span className="point-cost">Cost: {cost}</span>
-                {errors[`ability_${index}_baseScore`] && <span className="error-message">{errors[`ability_${index}_baseScore`]}</span>}
-              </div>
-
-              <div className="form-group ability-score-form-group">
-                <label htmlFor={`misc-increase-${index}`}>Misc Increase</label>
-                <input
-                  id={`misc-increase-${index}`}
-                  type="number"
-                  value={abilityData.miscIncrease}
-                  onChange={(e) => onAbilityMiscIncreaseChange(index, parseInt(e.target.value))}
-                  className={errors[`ability_${index}_miscIncrease`] ? 'error' : ''}
-                />
-                {errors[`ability_${index}_miscIncrease`] && <span className="error-message">{errors[`ability_${index}_miscIncrease`]}</span>}
-              </div>
-              <div className={`total-score ${totalScore > effectiveAbilityScoreCap ? 'error' : ''}`}>
-                Total: <strong>{totalScore}</strong>
-                {totalScore > effectiveAbilityScoreCap && <span className="error-message"> (max {effectiveAbilityScoreCap})</span>}
-              </div>
-            </div>
+            <AbilityScoreCard
+              key={ability}
+              ability={ability}
+              index={index}
+              abilityData={abilityData}
+              backgroundIncrease={backgroundIncrease}
+              cost={cost}
+              featIncrease={featIncrease}
+              racialIncrease={racialIncrease}
+              isBackgroundAbilityScore={isBackgroundAbilityScore}
+              totalScore={totalScore}
+              scoreCap={effectiveAbilityScoreCap}
+              errors={errors}
+              onBaseScoreChange={onAbilityBaseScoreChange}
+              onMiscIncreaseChange={onAbilityMiscIncreaseChange}
+            />
           );
         })}
       </div>

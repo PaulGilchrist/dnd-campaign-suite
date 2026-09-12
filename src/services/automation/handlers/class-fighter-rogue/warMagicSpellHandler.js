@@ -128,7 +128,7 @@ async function applyWeaponHitDamage(playerName, targetName, damageFormula, damag
     return { rollResult, finalDamage };
 }
 
-function logWeaponDamageRoll(action, playerName, targetName, damageFormula, damageType, rollResult, finalDamage, isCrit, campaignName) {
+function logWeaponDamageRoll(action, playerName, targetName, campaignName, { damageFormula, damageType, rollResult, finalDamage, isCrit }) {
     addEntry(campaignName, {
         type: 'roll',
         characterName: playerName,
@@ -180,7 +180,7 @@ async function rollWeaponAttack(action, playerStats, campaignName, targetName, t
     }).catch((e) => { console.error('[warMagicSpellHandler:attack-roll-log-error]', e); });
 
     if (hit) {
-        logWeaponDamageRoll(action, playerName, targetName, damageFormula, damageType, rollResult, finalDamage, isCrit, campaignName);
+        logWeaponDamageRoll(action, playerName, targetName, campaignName, { damageFormula, damageType, rollResult, finalDamage, isCrit });
     }
 
     return { d20Roll, totalAttack, hit, isCrit, finalDamage, damageType, ac: targetAc };
@@ -218,11 +218,11 @@ async function resolveSpellSaveDamage(action, spell, selectedSpellName, playerNa
 
 // Resolve spell damage against the card target: shield-block, auto-hit,
 // save-for-half, or spell-attack paths (in original guard order).
-async function resolveWarMagicSpellDamage(action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName) {
+async function resolveWarMagicSpellDamage({ action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName }) {
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
 
     const { spellRolls, spellDamage, spellFormula } = await resolveWarMagicDamageRoll(
-        action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName
+        { action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName }
     );
 
     if (spellDamage <= 0) {
@@ -252,7 +252,7 @@ async function resolveWarMagicSpellDamage(action, spell, selectedSpellName, play
     return { spellDamage: finalDamage, spellFormula, spellRolls };
 }
 
-async function resolveWarMagicDamageRoll(action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName) {
+async function resolveWarMagicDamageRoll({ action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName }) {
     const isShieldActive = (getRuntimeValue(targetName, 'activeBuffs', campaignName) || [])
         .some(b => b.effect === 'shield');
 
@@ -305,6 +305,20 @@ function buildWeaponLine(weapon) {
     return `${outcome} — d20(${weapon.d20Roll}) + ${weapon.totalAttack - weapon.d20Roll} = ${weapon.totalAttack} vs AC ${weapon.ac}${damagePart}`;
 }
 
+function resolveWarMagicTargetName(cs, playerName) {
+    if (!cs) return null;
+    return getTargetFromAttacker(cs, playerName)?.name || null;
+}
+
+function buildWarMagicPopupDescription(action, selectedSpellName, spell, targetName, spellDamage, spellDamageType, weaponLine) {
+    const spellPart = spellDamage > 0
+        ? ` Spell dealt <b>${spellDamage}</b> ${spellDamageType} damage.`
+        : (spell.damage ? ' Spell dealt no damage.' : '');
+    return `<b>${action.name}</b>: Cast <b>${selectedSpellName}</b> (level ${spell.level} spell slot expended) at <b>${targetName}</b>.` +
+        spellPart +
+        `<br/>Weapon attack: ${weaponLine}`;
+}
+
 export async function confirmWarMagicSpell(action, playerStats, campaignName, selectedSpellName) {
     if (!selectedSpellName) {
         return {
@@ -334,7 +348,7 @@ export async function confirmWarMagicSpell(action, playerStats, campaignName, se
 
     // Target: the creature set on the caster's initiative card.
     const cs = getCombatSummary(campaignName);
-    const targetName = cs ? getTargetFromAttacker(cs, playerName)?.name || null : null;
+    const targetName = resolveWarMagicTargetName(cs, playerName);
     if (!targetName) {
         return {
             type: 'popup',
@@ -381,7 +395,7 @@ export async function confirmWarMagicSpell(action, playerStats, campaignName, se
     let spellDamage = 0;
 
     if (spell.damage) {
-        const resolved = await resolveWarMagicSpellDamage(action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName);
+        const resolved = await resolveWarMagicSpellDamage({ action, spell, selectedSpellName, playerName, playerStats, campaignName, cs, targetName });
         spellDamage = resolved.spellDamage;
     }
 
@@ -391,10 +405,7 @@ export async function confirmWarMagicSpell(action, playerStats, campaignName, se
 
     const weaponLine = buildWeaponLine(weapon);
 
-    const popupDescription =
-        `<b>${action.name}</b>: Cast <b>${selectedSpellName}</b> (level ${spell.level} spell slot expended) at <b>${targetName}</b>.` +
-        (spellDamage > 0 ? ` Spell dealt <b>${spellDamage}</b> ${spellDamageType} damage.` : (spell.damage ? ' Spell dealt no damage.' : '')) +
-        `<br/>Weapon attack: ${weaponLine}`;
+    const popupDescription = buildWarMagicPopupDescription(action, selectedSpellName, spell, targetName, spellDamage, spellDamageType, weaponLine);
 
     return {
         type: 'popup',

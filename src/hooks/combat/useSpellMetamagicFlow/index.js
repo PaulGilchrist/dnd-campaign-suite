@@ -18,11 +18,11 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute, setS
   // Create handler factories
   const { handleConfirm, handleSkip } = useMetamagicHandler(playerStats, campaignName, cfClearPending, getPending, onExecute)
   const { handleConfirm: handleMultiTargetConfirm, handleSkip: handleMultiTargetSkip } = useMultiTargetHandler(playerStats, campaignName, cfClearPending, getPending, onExecute)
-  const simpleHandlers = useSimpleSpellHandlers(createConfirmHandler, createSkipHandler, playerStats, campaignName, characters, setPopupHtml, getPending, cfClearPending, onExecute)
+  const simpleHandlers = useSimpleSpellHandlers({ createConfirmHandler, createSkipHandler, playerStats, campaignName, setPopupHtml, getPending, cfClearPending, onExecute })
   const twoStageHandlers = useTwoStageHandlers(playerStats, campaignName, cfClearPending, getPending, setPopupHtml, characters)
   const customHandlers = useCustomHandlers(playerStats, campaignName, cfClearPending, getPending, setPopupHtml, characters)
   const areaHandlers = useAreaEffectHandlers(createSkipHandler, playerStats, campaignName, cfClearPending, getPending, setPopupHtml)
-  const complexHandlers = useComplexSpellHandlers(createConfirmHandler, playerStats, campaignName, cfClearPending, getPending, cfSetPending, setPopupHtml, onExecute, characters)
+  const complexHandlers = useComplexSpellHandlers({ createConfirmHandler, playerStats, campaignName, cfClearPending, getPending, cfSetPending, setPopupHtml, onExecute })
 
   // Destructure all handlers from factories
   const {

@@ -4,6 +4,78 @@ function getNestedValue(obj, path) {
   return path.split('.').reduce((current, key) => current?.[key], obj);
 }
 
+function FilterControls({
+  fieldName,
+  title,
+  searchQuery,
+  onSearchQueryChange,
+  searchPlaceholder,
+  filters,
+  filterOptions,
+  filterStates,
+  onFilterChange,
+  showOnlySelected,
+  onShowOnlySelectedChange,
+  selectedCount,
+}) {
+  return (
+    <div className="list-filter-container">
+      <div className="filter-group">
+        <label htmlFor={`${fieldName}-search`}>Search {title}</label>
+        <input
+         type="text"
+         id={`${fieldName}-search`}
+         className={`${fieldName}-search-input`}
+         placeholder={searchPlaceholder}
+         value={searchQuery}
+         onChange={(e) => onSearchQueryChange(e.target.value)}
+        />
+      </div>
+
+      {/* Render filter dropdowns */}
+      {filters.map(filter => (
+        <div key={filter.field} className="filter-group">
+          <label htmlFor={`${fieldName}-${filter.field}-filter`}>{filter.label}</label>
+          <select
+           id={`${fieldName}-${filter.field}-filter`}
+           className={`${filter.className || `${filter.field}-filter`}`}
+           value={filterStates[filter.field]}
+           onChange={(e) => onFilterChange(filter.field, e.target.value)}
+          >
+            {(filterOptions[filter.field] || []).map(option => (
+              <option key={option} value={option}>
+                {filter.renderOption ? filter.renderOption(option) : option}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+
+      {/* Show Only Selected checkbox */}
+      <div className="filter-group">
+        <label className="filter-checkbox-label">
+          <input
+           type="checkbox"
+           checked={showOnlySelected}
+           onChange={(e) => onShowOnlySelectedChange(e.target.checked)}
+         />
+          Show Only Selected&nbsp;(
+        </label>
+        <span className="filter-checkbox-count">
+           {selectedCount} selected)
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function resultsMessage(searchQuery, filters, filterStates, resultLabel) {
+  if (searchQuery || filters.some(f => filterStates[f.field] !== (f.defaultLabel || 'All'))) {
+    return `No ${resultLabel || 'items'} found matching your criteria.`;
+  }
+  return `No ${resultLabel || 'items'} available.`;
+}
+
 function SelectableList({
   items,
   fieldName,
@@ -206,53 +278,20 @@ function SelectableList({
        {renderWarnings && renderWarnings()}
 
        {/* Filter controls */}
-       <div className="list-filter-container">
-         <div className="filter-group">
-           <label htmlFor={`${fieldName}-search`}>Search {title}</label>
-           <input
-            type="text"
-            id={`${fieldName}-search`}
-            className={`${fieldName}-search-input`}
-            placeholder={searchPlaceholder}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-           />
-         </div>
-
-         {/* Render filter dropdowns */}
-         {filters.map(filter => (
-           <div key={filter.field} className="filter-group">
-             <label htmlFor={`${fieldName}-${filter.field}-filter`}>{filter.label}</label>
-             <select
-              id={`${fieldName}-${filter.field}-filter`}
-              className={`${filter.className || `${filter.field}-filter`}`}
-              value={filterStates[filter.field]}
-              onChange={(e) => handleFilterChange(filter.field, e.target.value)}
-             >
-               {(filterOptions[filter.field] || []).map(option => (
-                 <option key={option} value={option}>
-                   {filter.renderOption ? filter.renderOption(option) : option}
-                 </option>
-               ))}
-             </select>
-           </div>
-         ))}
-
-         {/* Show Only Selected checkbox */}
-         <div className="filter-group">
-           <label className="filter-checkbox-label">
-             <input
-              type="checkbox"
-              checked={showOnlySelected}
-              onChange={(e) => setShowOnlySelected(e.target.checked)}
-            />
-            Show Only Selected&nbsp;(
-           </label>
-           <span className="filter-checkbox-count">
-              {(getNestedValue(formData, fieldName) || []).length} selected)
-           </span>
-         </div>
-       </div>
+       <FilterControls
+         fieldName={fieldName}
+         title={title}
+         searchQuery={searchQuery}
+         onSearchQueryChange={setSearchQuery}
+         searchPlaceholder={searchPlaceholder}
+         filters={filters}
+         filterOptions={filterOptions}
+         filterStates={filterStates}
+         onFilterChange={handleFilterChange}
+         showOnlySelected={showOnlySelected}
+         onShowOnlySelectedChange={setShowOnlySelected}
+         selectedCount={(getNestedValue(formData, fieldName) || []).length}
+       />
 
        {/* Results container */}
        <div className={`list-results-container ${className}-results-container`}>
@@ -263,13 +302,11 @@ function SelectableList({
          </div>
 
          <div className={`list-results-list ${className}-results-list`}>
-           {filteredItems.length === 0 ? (
-             <div className="no-results-found">
-               {searchQuery || filters.some(f => filterStates[f.field] !== (f.defaultLabel || 'All'))
-                 ? `No ${resultLabel || 'items'} found matching your criteria.`
-                 : `No ${resultLabel || 'items'} available.`}
-             </div>
-           ) : (
+            {filteredItems.length === 0 ? (
+              <div className="no-results-found">
+                {resultsMessage(searchQuery, filters, filterStates, resultLabel)}
+              </div>
+            ) : (
               filteredItems.map((item, index) =>
                 renderItem(item, index, {
                   isSelected: itemIsSelected(item.name),

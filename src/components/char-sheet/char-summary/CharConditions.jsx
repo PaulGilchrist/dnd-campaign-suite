@@ -147,7 +147,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       condition: conditionLabel,
     })
 
-    logConditionSave(campaignName, playerStats.name, hasAdvantage ? [roll1, roll2] : finalRoll, saveBonus + auraBonus, bonusDetail, conditionLabel, saveLabel, meta.dc, success)
+    logConditionSave({ campaignName, creatureName: playerStats.name, roll: hasAdvantage ? [roll1, roll2] : finalRoll, bonus: saveBonus + auraBonus, bonusDetail, conditionLabel, abilityLabel: saveLabel, dc: meta.dc, success })
 
     setPopupHtml({
       type: 'd20',

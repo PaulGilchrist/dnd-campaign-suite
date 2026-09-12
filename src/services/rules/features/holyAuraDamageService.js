@@ -46,7 +46,7 @@ export async function checkHolyAuraDamage(creature, attackerName, combatSummary,
         if (saveTotal < conSaveDc) {
             const cs = await loadCombatSummary(campaignName);
             const conditionDef = { key: 'blinded', label: 'Blinded' };
-            addCondition(cs, attackerName, conditionDef, conSaveDc, 'CON', getRuntimeValue, setRuntimeValue, campaignName, attackerCreature);
+            addCondition({ combatSummary: cs, creatureName: attackerName, conditionDef, dc: conSaveDc, ability: 'CON', getRuntimeValue, setRuntimeValue, campaignName, playerStats: attackerCreature });
             addEntry(campaignName, {
                 type: 'condition',
                 action: 'added',

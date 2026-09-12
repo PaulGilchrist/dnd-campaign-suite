@@ -21,7 +21,7 @@ function setPortentDice(playerName, dice, campaignName) {
     setRuntimeValue(playerName, 'portentDice', JSON.stringify(dice), campaignName);
 }
 
-function buildPortentDescription(action, eventType, newDie, bonus, label, replacedValue, targetName, outcomeNote) {
+function buildPortentDescription({ newDie, bonus, label, replacedValue, targetName, outcomeNote }) {
     const originalTotal = replacedValue + bonus;
     const newTotal = newDie + bonus;
 
@@ -150,7 +150,7 @@ function computeSaveOutcomeNote(context, chosenDie, bonus) {
     return null;
 }
 
-async function applyPortentChoice(action, playerStats, campaignName, targetName, eventType, eventData, context, chosenDie) {
+async function applyPortentChoice({ action, playerStats, campaignName, targetName, eventType, eventData, context, chosenDie }) {
     const playerName = playerStats.name;
 
     const remainingDice = consumePortentDie(playerName, chosenDie, campaignName);
@@ -209,7 +209,7 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[portent] Error:", e); });
 
-    const description = buildPortentDescription(action, eventType, chosenDie, bonus, label, originalD20, targetName, outcomeNote);
+    const description = buildPortentDescription({ eventType, newDie: chosenDie, bonus, label, replacedValue: originalD20, targetName, outcomeNote });
     return infoPopup(action.name, description, action.automation);
 }
 

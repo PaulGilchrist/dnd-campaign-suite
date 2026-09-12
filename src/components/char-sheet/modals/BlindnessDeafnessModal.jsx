@@ -24,17 +24,17 @@ function BlindnessDeafnessModal({ combatSummary, attackerName, attackerPos, save
         const targetCharacter = characters?.find(c => utils.getName(c.name) === targetName);
         const targetStats = targetCharacter?.computedStats || targetCharacter;
 
-        addCondition(
-            ctx.combatSummary,
-            targetName,
-            effectDef,
-            saveDcValue,
-            'CON',
+        addCondition({
+            combatSummary: ctx.combatSummary,
+            creatureName: targetName,
+            conditionDef: effectDef,
+            dc: saveDcValue,
+            ability: 'CON',
             getRuntimeValue,
             setRuntimeValue,
             campaignName,
-            targetStats,
-        );
+            playerStats: targetStats,
+        });
     }, [campaignName, characters, effectOptions]);
 
     const addConditionToCreature = useCallback((targetName, saveDcValue, effect, ctx) => {

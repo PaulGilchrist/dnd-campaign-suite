@@ -597,7 +597,7 @@ function usePortentHandlers({ portentModal, setPortentModal, setPopupHtml }) {
         if (!portentModal) return;
         const { action, playerStats: ps, campaignName: cn, targetName, eventType, eventData, context } = portentModal;
         try {
-            const result = await applyPortentChoice(action, ps, cn, targetName, eventType, eventData, context, chosenDie);
+            const result = await applyPortentChoice({ action, playerStats: ps, campaignName: cn, targetName, eventType, eventData, context, chosenDie });
             setPortentModal(null);
             if (result?.type === 'popup') {
                 const payload = result.payload;

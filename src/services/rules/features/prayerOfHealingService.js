@@ -157,14 +157,19 @@ async function healPrayerTarget(target, ctx) {
     return { targetName, healAmount: actualHeal, rolls: rollResult.rolls, rawTotal: rollResult.total + bonusHeal };
 }
 
+function resolvePrayerCastingContext(spell, metaCtx, playerStats) {
+    const slotLevel = metaCtx?.slotLevel || spell.level || 2;
+    const spellCastingMod = getSpellCastingMod(playerStats, spell);
+    const healExpression = resolveHealExpression(spell, slotLevel, spellCastingMod);
+    return { slotLevel, healExpression };
+}
+
 export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isPrayerOfHealing(spell)) {
         return null;
     }
 
-    const slotLevel = metaCtx?.slotLevel || spell.level || 2;
-    const spellCastingMod = getSpellCastingMod(playerStats, spell);
-    const healExpression = resolveHealExpression(spell, slotLevel, spellCastingMod);
+    const { slotLevel, healExpression } = resolvePrayerCastingContext(spell, metaCtx, playerStats);
 
     if (!healExpression) {
         return null;

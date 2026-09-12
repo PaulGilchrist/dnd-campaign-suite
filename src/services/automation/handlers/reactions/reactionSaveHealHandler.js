@@ -38,6 +38,14 @@ function evaluateHealExpression(expression, playerStats) {
     return playerStats.level || 1;
 }
 
+function getPlayersLastKnownHp(cs, playerName, campaignName) {
+    const playerCreature = cs.creatures?.find(c => c.name === playerName || c.name.startsWith(playerName + ' '));
+    if (playerCreature?.type === 'player') {
+        return getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? 0;
+    }
+    return playerCreature?.currentHp ?? 0;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -72,10 +80,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const playerCreature = cs.creatures?.find(c => c.name === playerName || c.name.startsWith(playerName + ' '));
-    const playerHp = playerCreature?.type === 'player'
-        ? (getRuntimeValue(playerName, 'currentHitPoints', campaignName) ?? 0)
-        : (playerCreature?.currentHp ?? 0);
+    const playerHp = getPlayersLastKnownHp(cs, playerName, campaignName);
 
     if (playerHp > 0) {
         return {
@@ -92,8 +97,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const usesKey = getRuntimeUsesKey(featureName);
     const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? 0);
 
-    const recharge = auto.recharge || 'short_or_long_rest';
-    const maxUses = recharge === 'short_or_long_rest' ? 1 : 1;
+    const maxUses = 1;
 
     if (currentUses >= maxUses) {
         return {

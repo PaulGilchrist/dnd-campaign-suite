@@ -6,6 +6,23 @@ import { addEntry } from '../../../ui/logService.js';
 
 import { executeHandler } from '../../index.js';
 
+function resolveBardicDieSize(playerStats) {
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+    return classLevel?.bardic_die || classLevel?.class_specific?.bardic_inspiration_die || 6;
+}
+
+function buildCreatureTargets(creatures, playerStats, hasCombatOptions) {
+    return creatures
+        .filter(c => c.name !== playerStats.name || hasCombatOptions)
+        .map(c => ({
+            name: c.name,
+            currentHp: c.currentHp,
+            maxHp: c.maxHp,
+            size: c.size,
+            type: c.type,
+        }));
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
@@ -28,8 +45,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-    const dieSize = classLevel?.bardic_die || classLevel?.class_specific?.bardic_inspiration_die || 6;
+    const dieSize = resolveBardicDieSize(playerStats);
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary || !combatSummary.creatures || combatSummary.creatures.length === 0) {
@@ -48,15 +64,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         p => p.effect === 'bardic_inspiration_combat_options'
     );
 
-    const creatureTargets = combatSummary.creatures
-        .filter(c => c.name !== playerStats.name || hasCombatOptions)
-        .map(c => ({
-            name: c.name,
-            currentHp: c.currentHp,
-            maxHp: c.maxHp,
-            size: c.size,
-            type: c.type,
-        }));
+    const creatureTargets = buildCreatureTargets(combatSummary.creatures, playerStats, hasCombatOptions);
 
     if (creatureTargets.length === 0) {
         return {

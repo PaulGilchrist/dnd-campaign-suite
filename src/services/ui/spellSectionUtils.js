@@ -119,3 +119,22 @@ export function getExcludedSpellNames(playerStats, campaignName) {
 function elderChampionActive(playerStats, campaignName) {
     return isElderChampionActive(playerStats.name, campaignName);
 }
+
+/**
+ * Display-only: adds the Potent Spellcasting Wisdom bonus to a resolved
+ * cantrip damage formula when applicable.
+ */
+export function applyPotentSpellcasting(resolved, playerStats, campaignName) {
+    const potentFeature = playerStats.automation?.actions?.find(
+        a => a.type === 'damage_bonus' && !a.upgrades && a.options?.some(o => o.toLowerCase().includes('spellcasting'))
+    );
+    if (!potentFeature) return resolved;
+    const optKey = `_${(potentFeature.name || 'PotentSpellcasting').replace(/\s+/g, '_')}_option`;
+    const chosen = getRuntimeValue(playerStats.name, optKey, campaignName);
+    if (potentFeature.options.length > 1 && !chosen) return resolved;
+    if (chosen && !chosen.toLowerCase().includes('spellcasting')) return resolved;
+    const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+    const wisMod = Math.max(0, wis?.bonus || 0);
+    if (wisMod <= 0) return resolved;
+    return `${resolved}+${wisMod}`;
+}

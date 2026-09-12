@@ -165,17 +165,17 @@ describe('addCondition', () => {
     playerIsImmuneToCondition.mockReturnValue(true);
     const setRV = makeSetRuntimeValue();
 
-    addCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'charmed', label: 'Charmed' },
-      15,
-      'wis',
-      vi.fn(),
-      setRV,
-      'Campaign',
-      { name: 'Hero', allFeatures: [] },
-    );
+    addCondition({
+      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
+      creatureName: 'Hero',
+      conditionDef: { key: 'charmed', label: 'Charmed' },
+      dc: 15,
+      ability: 'wis',
+      getRuntimeValue: vi.fn(),
+      setRuntimeValue: setRV,
+      campaignName: 'Campaign',
+      playerStats: { name: 'Hero', allFeatures: [] },
+    });
 
     expect(playerIsImmuneToCondition).toHaveBeenCalled();
     expect(setRV).not.toHaveBeenCalled();
@@ -185,31 +185,31 @@ describe('addCondition', () => {
     const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': [] });
     const setRV = makeSetRuntimeValue();
 
-    addCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'charmed', label: 'Charmed' },
-      15,
-      'wis',
-      getRV,
-      setRV,
-      '',
-      null,
-    );
+    addCondition({
+      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
+      creatureName: 'Hero',
+      conditionDef: { key: 'charmed', label: 'Charmed' },
+      dc: 15,
+      ability: 'wis',
+      getRuntimeValue: getRV,
+      setRuntimeValue: setRV,
+      campaignName: '',
+      playerStats: null,
+    });
     expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
 
     vi.clearAllMocks();
-    addCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'charmed', label: 'Charmed' },
-      15,
-      'wis',
-      getRV,
-      setRV,
-      '',
-      { name: 'Hero' },
-    );
+    addCondition({
+      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
+      creatureName: 'Hero',
+      conditionDef: { key: 'charmed', label: 'Charmed' },
+      dc: 15,
+      ability: 'wis',
+      getRuntimeValue: getRV,
+      setRuntimeValue: setRV,
+      campaignName: '',
+      playerStats: { name: 'Hero' },
+    });
     expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
   });
 
@@ -219,17 +219,17 @@ describe('addCondition', () => {
     const setRV = makeSetRuntimeValue();
     const playerStats = { name: 'Hero' };
 
-    addCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'charmed', label: 'Charmed' },
-      15,
-      'wis',
-      getRV,
-      setRV,
-      'Campaign',
+    addCondition({
+      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
+      creatureName: 'Hero',
+      conditionDef: { key: 'charmed', label: 'Charmed' },
+      dc: 15,
+      ability: 'wis',
+      getRuntimeValue: getRV,
+      setRuntimeValue: setRV,
+      campaignName: 'Campaign',
       playerStats,
-    );
+    });
 
     expect(playerIsImmuneToCondition).toHaveBeenCalledWith({
       conditionKey: 'charmed',
@@ -244,49 +244,49 @@ describe('addCondition', () => {
 
     const getRV1 = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded'] });
     const setRV1 = makeSetRuntimeValue();
-    addCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'charmed', label: 'Charmed' },
-      15,
-      'wis',
-      getRV1,
-      setRV1,
-      'Campaign',
-      {},
-    );
+    addCondition({
+      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
+      creatureName: 'Hero',
+      conditionDef: { key: 'charmed', label: 'Charmed' },
+      dc: 15,
+      ability: 'wis',
+      getRuntimeValue: getRV1,
+      setRuntimeValue: setRV1,
+      campaignName: 'Campaign',
+      playerStats: {},
+    });
     expect(setRV1).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded', 'charmed'], 'Campaign');
 
     vi.clearAllMocks();
     const getRV2 = makeGetRuntimeValue({ 'Hero:activeConditions': ['Charmed'] });
     const setRV2 = makeSetRuntimeValue();
-    addCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'charmed', label: 'Charmed' },
-      15,
-      'wis',
-      getRV2,
-      setRV2,
-      'Campaign',
-      {},
-    );
+    addCondition({
+      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
+      creatureName: 'Hero',
+      conditionDef: { key: 'charmed', label: 'Charmed' },
+      dc: 15,
+      ability: 'wis',
+      getRuntimeValue: getRV2,
+      setRuntimeValue: setRV2,
+      campaignName: 'Campaign',
+      playerStats: {},
+    });
     expect(setRV2).toHaveBeenCalledWith('Hero', 'activeConditions', ['charmed'], 'Campaign');
 
     vi.clearAllMocks();
     const getRV3 = vi.fn(() => null);
     const setRV3 = makeSetRuntimeValue();
-    addCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'poisoned', label: 'Poisoned' },
-      12,
-      'con',
-      getRV3,
-      setRV3,
-      '',
-      {},
-    );
+    addCondition({
+      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
+      creatureName: 'Hero',
+      conditionDef: { key: 'poisoned', label: 'Poisoned' },
+      dc: 12,
+      ability: 'con',
+      getRuntimeValue: getRV3,
+      setRuntimeValue: setRV3,
+      campaignName: '',
+      playerStats: {},
+    });
     expect(setRV3).toHaveBeenCalledWith('Hero', 'activeConditions', ['poisoned'], '');
   });
 
@@ -295,32 +295,32 @@ describe('addCondition', () => {
 
     const getRV = makeGetRuntimeValue({ 'Goblin:activeConditions': ['blinded'] });
     const setRV = makeSetRuntimeValue();
-    addCondition(
-      { creatures: [{ type: 'npc', name: 'Goblin' }] },
-      'Goblin',
-      { key: 'frightened', label: 'Frightened' },
-      13,
-      'wis',
-      getRV,
-      setRV,
-      '',
-      null,
-    );
+    addCondition({
+      combatSummary: { creatures: [{ type: 'npc', name: 'Goblin' }] },
+      creatureName: 'Goblin',
+      conditionDef: { key: 'frightened', label: 'Frightened' },
+      dc: 13,
+      ability: 'wis',
+      getRuntimeValue: getRV,
+      setRuntimeValue: setRV,
+      campaignName: '',
+      playerStats: null,
+    });
     expect(setRV).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded', 'frightened'], '');
 
     vi.clearAllMocks();
     const setRV2 = makeSetRuntimeValue();
-    addCondition(
-      { creatures: [{ type: 'player', name: 'Other' }] },
-      'NonExistent',
-      { key: 'blinded', label: 'Blinded' },
-      10,
-      'null',
-      vi.fn(),
-      setRV2,
-      '',
-      null,
-    );
+    addCondition({
+      combatSummary: { creatures: [{ type: 'player', name: 'Other' }] },
+      creatureName: 'NonExistent',
+      conditionDef: { key: 'blinded', label: 'Blinded' },
+      dc: 10,
+      ability: 'null',
+      getRuntimeValue: vi.fn(),
+      setRuntimeValue: setRV2,
+      campaignName: '',
+      playerStats: null,
+    });
     expect(setRV2).not.toHaveBeenCalled();
   });
 });

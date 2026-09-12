@@ -38,6 +38,27 @@ export function getAvailableAttackRiderManeuvers(playerStats, campaignName, atta
     return getManeuversByType(playerStats, campaignName, knownNames, 'attack_rider', attackInfo);
 }
 
+const TRIGGER_MATCHERS = {
+    // MN-018: HIT-triggered riders must ALSO require the attack to have hit.
+    // Previously these branches only checked weapon/melee type, so a melee
+    // MISS still offered Sweeping Attack / the weapon_attack_hit riders.
+    weapon_attack_hit: (ctx) => ctx.isWeaponAttack && ctx.attackInfo?.hit === true,
+    melee_weapon_attack_hit: (ctx) => ctx.isMeleeAttack && ctx.attackInfo?.hit === true,
+    attack_roll_miss: (ctx) => ctx.attackInfo?.hit === false,
+    melee_attack_miss: (ctx) => ctx.isMeleeAttack && ctx.attackInfo?.hit === false,
+    melee_damage_taken: (ctx) => ctx.isMeleeAttack,
+    melee_attack_straight_line: (ctx) => ctx.isMeleeAttack,
+    replace_attack: (ctx) => ctx.attackInfo?.replacingAttack === true,
+};
+
+function matchesManeuverTrigger(m, ctx) {
+    if (!m.trigger || m.trigger === 'any') return true;
+    // MN-018: default must be FALSE. A trigger we don't recognise must not
+    // be offered generically (this default-true is what failed open on misses).
+    const matcher = TRIGGER_MATCHERS[m.trigger];
+    return matcher ? matcher(ctx) : false;
+}
+
 export function getAvailableAttackRiderManeuversByTrigger(playerStats, campaignName, attackInfo) {
     const knownNames = getKnownManeuvers(playerStats, campaignName);
     if (knownNames.length === 0) return [];
@@ -47,39 +68,13 @@ export function getAvailableAttackRiderManeuversByTrigger(playerStats, campaignN
 
     const allManeuvers = getManeuversByType(playerStats, campaignName, knownNames, 'attack_rider', attackInfo);
 
-    const isWeaponAttack = attackInfo?.weaponType === 'melee' || attackInfo?.weaponType === 'ranged' || attackInfo?.isUnarmedStrike;
-    const isMeleeAttack = attackInfo?.weaponType === 'melee' || attackInfo?.isUnarmedStrike;
+    const ctx = {
+        attackInfo,
+        isWeaponAttack: attackInfo?.weaponType === 'melee' || attackInfo?.weaponType === 'ranged' || attackInfo?.isUnarmedStrike,
+        isMeleeAttack: attackInfo?.weaponType === 'melee' || attackInfo?.isUnarmedStrike,
+    };
 
-    return allManeuvers.filter(m => {
-        if (!m.trigger || m.trigger === 'any') return true;
-        // MN-018: HIT-triggered riders must ALSO require the attack to have hit.
-        // Previously these branches only checked weapon/melee type, so a melee
-        // MISS still offered Sweeping Attack / the weapon_attack_hit riders.
-        if (m.trigger === 'weapon_attack_hit') {
-            return isWeaponAttack && attackInfo?.hit === true;
-        }
-        if (m.trigger === 'melee_weapon_attack_hit') {
-            return isMeleeAttack && attackInfo?.hit === true;
-        }
-        if (m.trigger === 'attack_roll_miss') {
-            return attackInfo?.hit === false;
-        }
-        if (m.trigger === 'melee_attack_miss') {
-            return isMeleeAttack && attackInfo?.hit === false;
-        }
-        if (m.trigger === 'melee_damage_taken') {
-            return isMeleeAttack;
-        }
-        if (m.trigger === 'melee_attack_straight_line') {
-            return isMeleeAttack;
-        }
-        if (m.trigger === 'replace_attack') {
-            return attackInfo?.replacingAttack === true;
-        }
-        // MN-018: default must be FALSE. A trigger we don't recognise must not
-        // be offered generically (this default-true is what failed open on misses).
-        return false;
-    });
+    return allManeuvers.filter(m => matchesManeuverTrigger(m, ctx));
 }
 
 export function getAvailableSkillCheckManeuvers(playerStats, campaignName, skillName, isInitiative) {

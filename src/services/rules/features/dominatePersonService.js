@@ -61,6 +61,14 @@ function logNonHumanoidRejection(targetName, playerStats, campaignName) {
     }).catch((e) => { console.error("[dominatePersonService:log-error]", e); });
 }
 
+function resolveSlotLevel(metaCtx, spell) {
+    return metaCtx?.slotLevel || spell.level || 5;
+}
+
+function resolveSpellSaveDc(metaCtx, playerStats) {
+    return metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+}
+
 export async function triggerDominatePerson(spell, metaCtx, playerStats, campaignName, mapName) {
     if ((spell.name || '').toLowerCase() !== 'dominate person') return null;
 
@@ -73,26 +81,24 @@ export async function triggerDominatePerson(spell, metaCtx, playerStats, campaig
     const isHumanoid = await isTargetHumanoid(targetName, campaignName);
     if (!isHumanoid) {
         logNonHumanoidRejection(targetName, playerStats, campaignName);
-        refundDominatePersonSlot(playerStats, metaCtx?.slotLevel || spell.level || 5, campaignName);
+        refundDominatePersonSlot(playerStats, resolveSlotLevel(metaCtx, spell), campaignName);
         return dominatePersonInfoPopup(`No effect. ${targetName} is not a Humanoid. Spell slot refunded.`);
     }
 
     // RAW advantage is "if you or your allies are fighting it" — the gridless app
     // exposes no adjacency/hostility signal on combatSummary, so no advantage is
     // granted here (the former currentHp<maxHp proxy was not the RAW condition).
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-    const slotLevel = metaCtx?.slotLevel || spell.level || 5;
 
     const action = {
         name: 'Dominate Person',
         automation: {
             type: 'dominate_person',
-            saveDc: spellSaveDc,
+            saveDc: resolveSpellSaveDc(metaCtx, playerStats),
             targetName: targetName,
             advantage: false,
         },
         spell,
-        spellSlotLevel: slotLevel,
+        spellSlotLevel: resolveSlotLevel(metaCtx, spell),
     };
 
     try {

@@ -114,41 +114,64 @@ function weightedPick(values, weights) {
   return values[values.length - 1];
 }
 
-function generateCurrencyEntry(tier, totalValueGP) {
-  const cpW = tier.cpWeight || 0;
-  const spW = tier.spWeight || 0;
-  const gpW = tier.gpWeight || 0;
-  const ppW = tier.ppWeight || 0;
+const currencyUnitRules = [
+  {
+    unit: 'pp',
+    minGP: 100,
+    toGP: 100,
+    weightKey: 'ppWeight',
+    rollQty: (totalValueGP) => {
+      const maxPP = Math.max(1, Math.floor(totalValueGP / 100));
+      return randInt(Math.max(1, Math.floor(maxPP * 0.3)), maxPP);
+    },
+  },
+  {
+    unit: 'gp',
+    minGP: 1,
+    toGP: 1,
+    weightKey: 'gpWeight',
+    rollQty: (totalValueGP) => randInt(Math.max(1, Math.floor(totalValueGP * 0.2)), Math.max(1, Math.floor(totalValueGP))),
+  },
+  {
+    unit: 'sp',
+    minGP: 0.1,
+    toGP: 0.1,
+    weightKey: 'spWeight',
+    rollQty: (totalValueGP) => randInt(Math.max(1, Math.floor(totalValueGP * 2)), Math.max(1, Math.floor(totalValueGP * 10))),
+  },
+  {
+    unit: 'cp',
+    minGP: 0.01,
+    toGP: 0.01,
+    weightKey: 'cpWeight',
+    rollQty: (totalValueGP) => {
+      const maxCP = Math.max(1, Math.floor(totalValueGP * 100));
+      return randInt(Math.max(1, Math.floor(maxCP * 0.3)), maxCP);
+    },
+  },
+];
 
-  if (totalValueGP <= 0) return null;
-
+function selectCurrencyUnits(tier, totalValueGP) {
   const units = [];
   const weights = [];
+  for (const rule of currencyUnitRules) {
+    const weight = tier[rule.weightKey] || 0;
+    if (weight > 0 && totalValueGP >= rule.minGP) {
+      units.push(rule);
+      weights.push(weight);
+    }
+  }
+  return { units, weights };
+}
 
-  if (ppW > 0 && totalValueGP >= 100) { units.push('pp'); weights.push(ppW); }
-  if (gpW > 0 && totalValueGP >= 1) { units.push('gp'); weights.push(gpW); }
-  if (spW > 0 && totalValueGP >= 0.1) { units.push('sp'); weights.push(spW); }
-  if (cpW > 0 && totalValueGP >= 0.01) { units.push('cp'); weights.push(cpW); }
+function generateCurrencyEntry(tier, totalValueGP) {
+  if (totalValueGP <= 0) return null;
 
+  const { units, weights } = selectCurrencyUnits(tier, totalValueGP);
   if (units.length === 0) return null;
 
-  const unit = weightedPick(units, weights);
-  const toGP = { cp: 0.01, sp: 0.1, gp: 1, pp: 100 };
-
-  let qty;
-  if (unit === 'pp') {
-    const maxPP = Math.max(1, Math.floor(totalValueGP / 100));
-    qty = randInt(Math.max(1, Math.floor(maxPP * 0.3)), maxPP);
-   } else if (unit === 'gp') {
-    qty = randInt(Math.max(1, Math.floor(totalValueGP * 0.2)), Math.max(1, Math.floor(totalValueGP)));
-   } else if (unit === 'sp') {
-    qty = randInt(Math.max(1, Math.floor(totalValueGP * 2)), Math.max(1, Math.floor(totalValueGP * 10)));
-   } else {
-    const maxCP = Math.max(1, Math.floor(totalValueGP * 100));
-    qty = randInt(Math.max(1, Math.floor(maxCP * 0.3)), maxCP);
-   }
-
-  return qty * (toGP[unit] || 0);
+  const rule = weightedPick(units, weights);
+  return rule.rollQty(totalValueGP) * rule.toGP;
 }
 
 function generateGemEntry(tier) {

@@ -144,6 +144,7 @@ function collectRageConditionalImmunities(playerStats, activeBuffs) {
 }
 
 function computeResistances(playerStats, activeBuffs, campaignName, auraComboEffects) {
+    const auraFx = auraComboEffects || {}
     const stormbornResistances = (playerStats.automation?.passives || [])
         .filter(p => p.type === 'resistance' && p.name === 'Stormborn')
         .flatMap(p => p.damageTypes || [])
@@ -167,7 +168,7 @@ function computeResistances(playerStats, activeBuffs, campaignName, auraComboEff
 
     const allImmunities = [...new Set([
         ...(playerStats.immunities || []),
-        ...(auraComboEffects?.immunities || []),
+        ...(auraFx.immunities || []),
         ...(playerStats.automationConditionImmunities || []),
         ...rageConditionalImmunities,
         ...CONDITION_IMMUNITY_BUFF_NAMES.map(name => conditionImmunitiesFromBuff(activeBuffs, name)).flat()
@@ -178,7 +179,7 @@ function computeResistances(playerStats, activeBuffs, campaignName, auraComboEff
 
     const allResistances = [...new Set([
         ...(playerStats.resistances || []),
-        ...(auraComboEffects?.resistances || []),
+        ...(auraFx.resistances || []),
         ...stormbornResistancesActive,
         ...rageResistances,
         ...singleToArray(epitomeResistanceType),
@@ -195,8 +196,8 @@ function computeResistances(playerStats, activeBuffs, campaignName, auraComboEff
 
     return {
         allImmunities, allResistances,
-        auraResistances: auraComboEffects?.resistances || [],
-        auraResistanceSource: auraComboEffects?.resistanceSource || null,
+        auraResistances: auraFx.resistances || [],
+        auraResistanceSource: auraFx.resistanceSource || null,
         heroesFeastResistances: resistancesFromBuffs(activeBuffs, b => b.name === "Heroes' Feast"),
         heroesFeastConditionImmunities: conditionImmunitiesFromBuff(activeBuffs, "Heroes' Feast"),
         wrathOfTheSeaActive
@@ -256,7 +257,7 @@ function deriveAspectSpeeds(aspectOption, totalSpeed, acc, playerStats) {
     return climbSpeed
 }
 
-function computeMovementSection(playerStats, activeBuffs, hasArmorOrShield, speed, totalSpeed, buffSpeedBonus, auraSpeedBonus, wrathOfTheSeaActive) {
+function computeMovementSection({ playerStats, activeBuffs, hasArmorOrShield, speed, totalSpeed, buffSpeedBonus, auraSpeedBonus, wrathOfTheSeaActive }) {
     const largeFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'large_form')
     const huntersMarkActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === "Hunter's Mark")
     const aspectOption = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'Aspect of the Wilds')?.optionName || null) : null
@@ -372,7 +373,7 @@ export function computeCharSummaryContext(playerStats, campaignName, characters,
     const totalSpeed = speed + auraSpeedBonus
 
     const resistances = computeResistances(playerStats, activeBuffs, campaignName, auraComboEffects)
-    const movement = computeMovementSection(playerStats, activeBuffs, hasArmorOrShield, speed, totalSpeed, buffSpeedBonus, auraSpeedBonus, resistances.wrathOfTheSeaActive)
+    const movement = computeMovementSection({ playerStats, activeBuffs, hasArmorOrShield, speed, totalSpeed, buffSpeedBonus, auraSpeedBonus, wrathOfTheSeaActive: resistances.wrathOfTheSeaActive })
     buffSpeedBonus = movement.buffSpeedBonus
 
     const baitAndSwitch = computeBaitAndSwitch(playerStats, campaignName)

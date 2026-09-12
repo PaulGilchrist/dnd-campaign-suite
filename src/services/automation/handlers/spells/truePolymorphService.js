@@ -351,6 +351,69 @@ function getMonsterSaveBonuses(monster) {
     return saveBonuses;
 }
 
+function revertSummonedTruePolymorph(cs, targetName, campaignName) {
+    const updated = { ...cs, creatures: cs.creatures.filter(c => c.name !== targetName) };
+    storage.set('combatSummary', updated, campaignName);
+    setCombatSummaryCache(updated, campaignName);
+
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const filtered = targetEffects.filter(te => {
+        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
+        return !(teTarget === targetName && te.effect === 'summoned');
+    });
+    if (filtered.length !== targetEffects.length) {
+        setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true);
+    }
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: targetName,
+        abilityName: 'True Polymorph',
+        description: `${targetName} fades away as the True Polymorph spell ends.`,
+    }).catch((e) => { console.error("[truePolymorphService:log-error]", e); });
+
+    return true;
+}
+
+function revertObjectTruePolymorph(cs, creature, targetName, campaignName) {
+    const original = creature.polymorphOriginal || {};
+    if (original.maxHp !== undefined) creature.maxHp = original.maxHp;
+    if (original.ac !== undefined) creature.ac = original.ac;
+    if (original.speed !== undefined) creature.speed = original.speed;
+    delete creature.polymorphObject;
+    delete creature.objectType;
+    delete creature.polymorphSource;
+    delete creature.polymorphOriginal;
+
+    const activeConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const filteredConds = activeConditions.filter(c => String(c).toLowerCase() !== 'incapacitated');
+    if (filteredConds.length !== activeConditions.length) {
+        setRuntimeValue(targetName, 'activeConditions', filteredConds, campaignName);
+    }
+
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const filtered = targetEffects.filter(te => {
+        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
+        return !(teTarget === targetName && te.effect === OBJECT_TRANSFORM_EFFECT);
+    });
+    if (filtered.length !== targetEffects.length) {
+        setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true);
+    }
+
+    const updated = { ...cs, creatures: cs.creatures };
+    storage.set('combatSummary', updated, campaignName);
+    setCombatSummaryCache(updated, campaignName);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: targetName,
+        abilityName: 'True Polymorph',
+        description: `${targetName} reverts to their normal form.`,
+    }).catch((e) => { console.error("[truePolymorphService:log-error]", e); });
+
+    return true;
+}
+
 export function revertTruePolymorph(targetName, campaignName) {
     const cs = getCombatSummary(campaignName);
     if (!cs?.creatures) {
@@ -363,66 +426,11 @@ export function revertTruePolymorph(targetName, campaignName) {
     }
 
     if (creature.summonSource === 'true_polymorph') {
-        const updated = { ...cs, creatures: cs.creatures.filter(c => c.name !== targetName) };
-        storage.set('combatSummary', updated, campaignName);
-        setCombatSummaryCache(updated, campaignName);
-
-        const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-        const filtered = targetEffects.filter(te => {
-            const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-            return !(teTarget === targetName && te.effect === 'summoned');
-        });
-        if (filtered.length !== targetEffects.length) {
-            setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true);
-        }
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: targetName,
-            abilityName: 'True Polymorph',
-            description: `${targetName} fades away as the True Polymorph spell ends.`,
-        }).catch((e) => { console.error("[truePolymorphService:log-error]", e); });
-
-        return true;
+        return revertSummonedTruePolymorph(cs, targetName, campaignName);
     }
 
     if (creature.polymorphSource && creature.polymorphObject) {
-        const original = creature.polymorphOriginal || {};
-        if (original.maxHp !== undefined) creature.maxHp = original.maxHp;
-        if (original.ac !== undefined) creature.ac = original.ac;
-        if (original.speed !== undefined) creature.speed = original.speed;
-        delete creature.polymorphObject;
-        delete creature.objectType;
-        delete creature.polymorphSource;
-        delete creature.polymorphOriginal;
-
-        const activeConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const filteredConds = activeConditions.filter(c => String(c).toLowerCase() !== 'incapacitated');
-        if (filteredConds.length !== activeConditions.length) {
-            setRuntimeValue(targetName, 'activeConditions', filteredConds, campaignName);
-        }
-
-        const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-        const filtered = targetEffects.filter(te => {
-            const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-            return !(teTarget === targetName && te.effect === OBJECT_TRANSFORM_EFFECT);
-        });
-        if (filtered.length !== targetEffects.length) {
-            setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true);
-        }
-
-        const updated = { ...cs, creatures: cs.creatures };
-        storage.set('combatSummary', updated, campaignName);
-        setCombatSummaryCache(updated, campaignName);
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: targetName,
-            abilityName: 'True Polymorph',
-            description: `${targetName} reverts to their normal form.`,
-        }).catch((e) => { console.error("[truePolymorphService:log-error]", e); });
-
-        return true;
+        return revertObjectTruePolymorph(cs, creature, targetName, campaignName);
     }
 
     if (creature.polymorphSource) {

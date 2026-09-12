@@ -9,6 +9,34 @@ import { consumeMaterial } from '../../../services/rules/spells/materialComponen
 import { isFreeCastAuthorized, prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js'
 import { triggerPrimalCompanionSpellShare } from '../../../services/rules/features/primalCompanionSpellShareService.js'
 
+async function consumeProtectionFromPoisonSlot(pending, playerStats, campaignName) {
+  const isCantrip = (pending.spell?.level === 0)
+  if (isCantrip || !pending.spell) return
+  const upcastLevel = pending.spell.upcastLevel
+  const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
+  // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
+  const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
+  const slotResult = await prepareSpellCast(pending.spell, {}, {
+    playerName: playerStats.name,
+    playerStats,
+    campaignName,
+    isUpcast,
+    upcastLevel,
+    freeCastAuthorized,
+  })
+  if (slotResult && slotResult.slotConsumed) {
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: playerStats.name,
+      abilityName: pending.spellName,
+      spellName: pending.spellName,
+      description: `${pending.spellName}: Expended a level ${(slotResult.modifiedSpell && slotResult.modifiedSpell.level) || pending.spellLevel || 0} spell slot.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error("[useCustomHandlers:log-error]", e); })
+  }
+}
+
 export function useCustomHandlers(playerStats, campaignName, cfClearPending, getPending, setPopupHtml, characters) {
   const handleBarkskinConfirm = React.useCallback(async (result) => {
     const pending = getPending('barkskin')
@@ -138,32 +166,7 @@ export function useCustomHandlers(playerStats, campaignName, cfClearPending, get
     // createConfirmHandler (useConfirmableFlow.js) — the custom confirm previously
     // bypassed it, so no lv2 slot was ever spent. No concentration is registered
     // because the spell data says concentration:false (RAW 2024: not concentration).
-    const isCantrip = (pending.spell?.level === 0)
-    if (!isCantrip && pending.spell) {
-      const upcastLevel = pending.spell.upcastLevel
-      const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
-      // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
-      const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
-      const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
-      const slotResult = await prepareSpellCast(pending.spell, {}, {
-        playerName: playerStats.name,
-        playerStats,
-        campaignName,
-        isUpcast,
-        upcastLevel,
-        freeCastAuthorized,
-      })
-      if (slotResult && slotResult.slotConsumed) {
-        addEntry(campaignName, {
-          type: 'ability_use',
-          characterName: playerStats.name,
-          abilityName: pending.spellName,
-          spellName: pending.spellName,
-          description: `${pending.spellName}: Expended a level ${(slotResult.modifiedSpell && slotResult.modifiedSpell.level) || pending.spellLevel || 0} spell slot.`,
-          timestamp: Date.now(),
-        }).catch((e) => { console.error("[useCustomHandlers:log-error]", e); })
-      }
-    }
+    await consumeProtectionFromPoisonSlot(pending, playerStats, campaignName)
 
     const popup = await applyProtectionFromPoisonHandler(
       { name: pending.spellName, spell: pending.spell, automation: { type: 'protection_from_poison', range: pending.range } },

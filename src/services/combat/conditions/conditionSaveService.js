@@ -56,10 +56,14 @@ function hasProtectionFromPoisonAdvantage(creatureName, campaignName, conditionK
     return activeBuffs.some(b => b.name === 'Protection from Poison' && b.saveAdvantageTypes?.includes('poisoned'))
 }
 
-function buildSaveResult(roll, rolls, saveBonus, auraBonus, aura, dc, starryDragonFloor, advantage) {
+function buildSaveResult({ roll, rolls, saveBonus, auraBonus, aura, dc, starryDragonFloor, advantage }) {
     const total = roll + saveBonus + auraBonus
     const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined
     return { roll, total, success: total >= dc, bonus: saveBonus + auraBonus, bonusDetail, ...(advantage ? { advantage: true } : {}), rolls, starryDragonFloor }
+}
+
+function applyStarryDragonFloor(roll, dragonConstellationActive) {
+    return dragonConstellationActive && roll <= 9 ? 10 : roll
 }
 
 async function rollConditionSave(creature, condition, characters, campaignNpcs, campaignName, mapName, getName) {
@@ -85,12 +89,12 @@ async function rollConditionSave(creature, condition, characters, campaignNpcs, 
     if (hasAdvantage) {
         const rolls = [rollD20(), rollD20()]
         const max = Math.max(...rolls)
-        const roll = dragonConstellationActive && max <= 9 ? 10 : max
-        return buildSaveResult(roll, rolls, saveBonus, auraBonus, aura, condition.dc, dragonConstellationActive, true)
+        const roll = applyStarryDragonFloor(max, dragonConstellationActive)
+        return buildSaveResult({ roll, rolls, saveBonus, auraBonus, aura, dc: condition.dc, starryDragonFloor: dragonConstellationActive, advantage: true })
     }
     const rawRoll = rollD20()
-    const roll = dragonConstellationActive && rawRoll <= 9 ? 10 : rawRoll
-    return buildSaveResult(roll, [rawRoll], saveBonus, auraBonus, aura, condition.dc, dragonConstellationActive, false)
+    const roll = applyStarryDragonFloor(rawRoll, dragonConstellationActive)
+    return buildSaveResult({ roll, rolls: [rawRoll], saveBonus, auraBonus, aura, dc: condition.dc, starryDragonFloor: dragonConstellationActive, advantage: false })
 }
 
 function removeCondition(combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName) {
@@ -109,7 +113,7 @@ function removeCondition(combatSummary, creatureName, condition, getRuntimeValue
     }
 }
 
-function addCondition(combatSummary, creatureName, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats) {
+function addCondition({ combatSummary, creatureName, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats }) {
     if (!combatSummary || !combatSummary.creatures) {
         console.error(`[addCondition] combatSummary is null/undefined or missing creatures when adding ${conditionDef.key} to ${creatureName}`)
         return

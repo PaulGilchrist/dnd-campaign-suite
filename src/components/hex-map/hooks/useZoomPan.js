@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { HEX_SIZE, MIN_ZOOM, MAX_ZOOM } from '../../../config/outdoorConfig.js';
 
-function useZoomPan(svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY) {
+function useZoomPan({ svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY }) {
     const [panning, setPanning] = useState(null);
 
     const zoomValueRef = useRef(MIN_ZOOM);

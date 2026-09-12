@@ -3,7 +3,7 @@ import { getRuntimeValue, setRuntimeValue, getStore } from '../../../hooks/runti
 const PROMPT_KEY = 'biPrompt';
 const PROMPT_CLEARED_KEY = 'biPromptCleared';
 
-export function sendBardicInspirationDefensePrompt(campaignName, targetName, attackerName, attackRoll, bonus, effectiveAc, dieSize, promptId) {
+export function sendBardicInspirationDefensePrompt({ campaignName, targetName, attackerName, attackRoll, bonus, effectiveAc, dieSize, promptId }) {
     const data = {
         mode: 'defense',
         promptId,

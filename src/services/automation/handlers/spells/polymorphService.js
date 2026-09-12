@@ -50,6 +50,19 @@ export async function applyPolymorph(spell, metaCtx, playerStats, campaignName, 
     }
 }
 
+function numOr(value, fallback) {
+    return typeof value === 'number' ? value : fallback;
+}
+
+async function addPolymorphConcentration(cs, casterName, playerStats, spellName, campaignName) {
+    const casterCreature = cs.creatures.find(c => c.name === casterName);
+    if (!casterCreature) return;
+    const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
+    addConcentration(cs, casterName, spellName, concentrationDc);
+    await storage.set('combatSummary', cs, campaignName);
+    setCombatSummaryCache(cs, campaignName);
+}
+
 export async function confirmPolymorphTransform({ targetName, beast, casterName, spell, playerStats, campaignName }) {
     const cs = await getCombatContext(campaignName) || { creatures: [] };
     const creature = cs.creatures.find(c => c.name === targetName);
@@ -58,8 +71,9 @@ export async function confirmPolymorphTransform({ targetName, beast, casterName,
         return { ok: false, reason: 'no_target' };
     }
 
-    const beastHp = typeof beast.hit_points === 'number' ? beast.hit_points : 0;
-    const beastAc = typeof beast.armor_class === 'number' ? beast.armor_class : 10;
+    const spellName = spell?.name || 'Polymorph';
+    const beastHp = numOr(beast.hit_points, 0);
+    const beastAc = numOr(beast.armor_class, 10);
 
     creature.polymorphOriginal = {
         maxHp: creature.maxHp ?? beastHp,
@@ -101,13 +115,7 @@ export async function confirmPolymorphTransform({ targetName, beast, casterName,
     });
     setRuntimeValue('campaign', 'targetEffects', cleaned, campaignName, true);
 
-    const casterCreature = cs.creatures.find(c => c.name === casterName);
-    if (casterCreature) {
-        const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
-        addConcentration(cs, casterName, spell?.name || 'Polymorph', concentrationDc);
-        await storage.set('combatSummary', cs, campaignName);
-        setCombatSummaryCache(cs, campaignName);
-    }
+    await addPolymorphConcentration(cs, casterName, playerStats, spellName, campaignName);
 
     const expirations = getRuntimeValue(casterName, 'pendingExpirations', campaignName);
     const expList = Array.isArray(expirations) ? expirations : [];
@@ -129,7 +137,7 @@ export async function confirmPolymorphTransform({ targetName, beast, casterName,
         saveDc: 0,
         saveType: 'WIS',
         success: false,
-        description: `${targetName} is transformed into ${beast.name} (CR ${beast.challenge_rating}) by ${casterName}'s ${spell?.name || 'Polymorph'}.`,
+        description: `${targetName} is transformed into ${beast.name} (CR ${beast.challenge_rating}) by ${casterName}'s ${spellName}.`,
     }).catch((e) => { console.error("[polymorphService:log-error]", e); });
 
     return { ok: true };

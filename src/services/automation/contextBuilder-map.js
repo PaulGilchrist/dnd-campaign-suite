@@ -52,7 +52,7 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
             }
 
             if (!base.isAutoMiss && targetPos) {
-                await applyCoverModifiers(base, attack, attackerPlayer, targetPos, mapData, playerStats, campaignName, isRanged);
+                await applyCoverModifiers({ base, attack, attackerPlayer, targetPos, mapData, playerStats, campaignName, isRanged });
             }
 
             if (isRanged && !base.isAutoMiss) {
@@ -214,7 +214,34 @@ async function applyHalfCoverGrants(base, coverResult, mapData, playerStats, cam
     return current;
 }
 
-async function applyCoverModifiers(base, attack, attackerPlayer, targetPos, mapData, playerStats, campaignName, isRanged) {
+// Sharpshooter "Bypass Cover": ranged WEAPON attacks ignore Half/Three-Quarters
+// cover only. Full cover still blocks the attack; melee and spell attacks keep cover.
+// (Live sheet rows leave weaponType empty; spell rows carry school — the same
+// spell discriminator used by the improved-illusions check.)
+function applySharpshooterCover(base, attack, coverResult, playerStats, isRanged) {
+    const ignoreCoverPassive = (playerStats.automation?.passives || []).find(
+        p => p.type === 'passive_rule' && p.effect === 'ignore_cover_ranged'
+    );
+    const isRangedWeaponAttack = isRanged && !attack.school && attack.weaponType !== 'spell';
+    if (ignoreCoverPassive && isRangedWeaponAttack
+        && getIgnorableCoverLevels(ignoreCoverPassive).includes(coverResult.level)) {
+        base.coverReason = 'Sharpshooter';
+        return { level: 'none', acBonus: 0 };
+    }
+    return coverResult;
+}
+
+function finalizeCover(base, coverResult) {
+    if (coverResult.level === 'full') {
+        base.isAutoMiss = true;
+        base.coverReason = 'Target has full cover';
+    } else if (coverResult.acBonus > 0) {
+        base.coverAcBonus = coverResult.acBonus;
+        base.coverLevel = coverResult.level;
+    }
+}
+
+async function applyCoverModifiers({ base, attack, attackerPlayer, targetPos, mapData, playerStats, campaignName, isRanged }) {
     const walls = mapData?.walls || new Set();
     let coverResult = computeCover(
         { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
@@ -223,19 +250,7 @@ async function applyCoverModifiers(base, attack, attackerPlayer, targetPos, mapD
         mapData?.placedItems || [],
     );
 
-    // Sharpshooter "Bypass Cover": ranged WEAPON attacks ignore Half/Three-Quarters
-    // cover only. Full cover still blocks the attack; melee and spell attacks keep cover.
-    // (Live sheet rows leave weaponType empty; spell rows carry school — the same
-    // spell discriminator used by the improved-illusions check.)
-    const ignoreCoverPassive = (playerStats.automation?.passives || []).find(
-        p => p.type === 'passive_rule' && p.effect === 'ignore_cover_ranged'
-    );
-    const isRangedWeaponAttack = isRanged && !attack.school && attack.weaponType !== 'spell';
-    if (ignoreCoverPassive && isRangedWeaponAttack
-        && getIgnorableCoverLevels(ignoreCoverPassive).includes(coverResult.level)) {
-        coverResult = { level: 'none', acBonus: 0 };
-        base.coverReason = 'Sharpshooter';
-    }
+    coverResult = applySharpshooterCover(base, attack, coverResult, playerStats, isRanged);
 
     // Half-cover grants: Nature's Sanctuary, Bulwark of Force, Smite of Protection
     coverResult = await applyHalfCoverGrants(base, coverResult, mapData, playerStats, campaignName);
@@ -254,13 +269,7 @@ async function applyCoverModifiers(base, attack, attackerPlayer, targetPos, mapD
         coverResult.acBonus = baitAndSwitchBonus;
     }
 
-    if (coverResult.level === 'full') {
-        base.isAutoMiss = true;
-        base.coverReason = 'Target has full cover';
-    } else if (coverResult.acBonus > 0) {
-        base.coverAcBonus = coverResult.acBonus;
-        base.coverLevel = coverResult.level;
-    }
+    finalizeCover(base, coverResult);
 }
 
 function applyMeleeProximity(base, attackerPlayer, mapData, npcs, feats) {

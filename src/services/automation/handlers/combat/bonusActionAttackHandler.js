@@ -156,10 +156,18 @@ async function resolveWarPriestLeg(action, playerStats, campaignName, usesKey, u
     };
 }
 
+function resolveUsesMax(auto, playerStats) {
+    const rawUsesMax = auto.usesMax ?? (auto.uses_expression
+        ? evaluateAutoExpression(auto.uses_expression, playerStats)
+        : 0);
+    return Number(rawUsesMax) || 0;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName, _allEquipment) {
     const auto = action.automation;
+    const isPolearm = auto?.trigger === 'after_attack_action_with_polearm';
 
-    if (auto?.trigger === 'after_attack_action_with_polearm' || auto?.weaponRequirement === 'quarterstaff_spear_heavy_reach') {
+    if (isPolearm || auto?.weaponRequirement === 'quarterstaff_spear_heavy_reach') {
         const invalid = await checkPolearmRequirement(action, campaignName);
         if (invalid) return invalid;
     }
@@ -169,10 +177,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _allEq
     // usesMax — the old gate saw usesMax=0 and skipped, so War Priest was an
     // unlimited popup-only row. Resolve the expression here (mirrors the verified
     // bardicInspiration/stepsOfTheFey pattern).
-    const rawUsesMax = auto.usesMax ?? (auto.uses_expression
-        ? evaluateAutoExpression(auto.uses_expression, playerStats)
-        : 0);
-    const usesMax = Number(rawUsesMax) || 0;
+    const usesMax = resolveUsesMax(auto, playerStats);
     const usesKey = auto.resourceKey || 'warPriestUses';
 
     const logRefusal = async (reason) => {
@@ -210,7 +215,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _allEq
         return resolveDisengageLeg(action, playerStats, campaignName);
     }
 
-    if (auto?.trigger === 'after_attack_action_with_polearm') {
+    if (isPolearm) {
         return resolvePoleStrikeLeg(action, playerStats, campaignName, usesKey, usesMax);
     }
 

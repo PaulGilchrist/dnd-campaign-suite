@@ -254,12 +254,36 @@ export function isRoadConnectable(typeA, typeB) {
  * @param {Record<string, string>} terrain - hex key → terrain id
  * @returns {Array<{ q: number, r: number }> | null}
  */
-export function findHexPath(start, end, hexCols, hexRows, terrain = {}) {
-  const terrainCost = {
-    plains: 1, beach: 1.2, hills: 1.5, forest: 1.5,
-    desert: 1.8, tundra: 1.8, swamp: 2.5, mountains: 4, water: 10,
-  };
+const HEX_TERRAIN_COST = {
+  plains: 1, beach: 1.2, hills: 1.5, forest: 1.5,
+  desert: 1.8, tundra: 1.8, swamp: 2.5, mountains: 4, water: 10,
+};
 
+function cheapestOpenKey(openSet, fScore) {
+  let current = null;
+  let currentF = Infinity;
+  for (const k of openSet) {
+    const f = fScore[k] ?? Infinity;
+    if (f < currentF) {
+      currentF = f;
+      current = k;
+    }
+  }
+  return current;
+}
+
+function reconstructHexPath(cameFrom, endKey, end) {
+  const path = [{ q: end.q, r: end.r }];
+  let c = endKey;
+  while (cameFrom[c]) {
+    const [pq, pr] = cameFrom[c].split(',').map(Number);
+    path.unshift({ q: pq, r: pr });
+    c = cameFrom[c];
+  }
+  return path;
+}
+
+export function findHexPath(start, end, hexCols, hexRows, terrain = {}) {
   const key = (q, r) => `${q},${r}`;
   const startKey = key(start.q, start.r);
   const endKey = key(end.q, end.r);
@@ -271,27 +295,10 @@ export function findHexPath(start, end, hexCols, hexRows, terrain = {}) {
   const fScore = { [startKey]: hexDistance(start, end) };
 
   while (openSet.size > 0) {
-    // Find node in openSet with lowest fScore
-    let current = null;
-    let currentF = Infinity;
-    for (const k of openSet) {
-      const f = fScore[k] ?? Infinity;
-      if (f < currentF) {
-        currentF = f;
-        current = k;
-      }
-    }
+    const current = cheapestOpenKey(openSet, fScore);
 
     if (current === endKey) {
-      // Reconstruct path
-      const path = [{ q: end.q, r: end.r }];
-      let c = endKey;
-      while (cameFrom[c]) {
-        const [pq, pr] = cameFrom[c].split(',').map(Number);
-        path.unshift({ q: pq, r: pr });
-        c = cameFrom[c];
-      }
-      return path;
+      return reconstructHexPath(cameFrom, endKey, end);
     }
 
     openSet.delete(current);
@@ -301,14 +308,13 @@ export function findHexPath(start, end, hexCols, hexRows, terrain = {}) {
       if (n.q < 0 || n.q >= hexCols || n.r < 0 || n.r >= hexRows) continue;
       const nk = key(n.q, n.r);
       const terrainId = terrain[nk] || 'plains';
-      const cost = terrainCost[terrainId] ?? 2;
+      const cost = HEX_TERRAIN_COST[terrainId] ?? 2;
       const tentative = (gScore[current] ?? Infinity) + cost;
-      if (tentative < (gScore[nk] ?? Infinity)) {
-        cameFrom[nk] = current;
-        gScore[nk] = tentative;
-        fScore[nk] = tentative + hexDistance(n, end);
-        openSet.add(nk);
-      }
+      if (tentative >= (gScore[nk] ?? Infinity)) continue;
+      cameFrom[nk] = current;
+      gScore[nk] = tentative;
+      fScore[nk] = tentative + hexDistance(n, end);
+      openSet.add(nk);
     }
   }
 

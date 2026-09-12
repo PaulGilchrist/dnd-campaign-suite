@@ -78,6 +78,67 @@ function rollNpcImprisonmentSave(targetCreature, dc) {
     return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
 }
 
+async function applyImprisonmentEffect(action, auto, casterName, targetName, dc, saveResult, campaignName) {
+    // Failed save: apply imprisonment target effect (badge)
+    const prisonType = auto.options?.[0] || 'Slumber';
+
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const otherEffects = targetEffects.filter(
+        te => !(te.target === targetName && te.effect === 'imprisonment' && te.source === casterName)
+    );
+    setRuntimeValue('campaign', 'targetEffects', [...otherEffects, {
+        effect: 'imprisonment',
+        target: targetName,
+        source: casterName,
+        prisonType,
+        duration: 'Until dispelled',
+    }], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+
+    // Track for expiration cleanup (badge removal)
+    addExpiration(casterName, targetName, [
+        { type: 'remove_target_effect', effectKey: 'imprisonment', target: targetName, source: casterName },
+    ], campaignName);
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-imprisonment',
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: false,
+        description: `${targetName} failed WIS save against ${action.name} and is imprisoned (${prisonType}).`,
+    }).catch((e) => { console.error("[imprisonment] Error:", e); });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Imprisoned',
+        reason: action.name,
+        note: `${targetName} is imprisoned (${prisonType}) by ${action.name}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[imprisonment] Error:", e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${targetName} failed WIS save and is imprisoned (${prisonType}).`,
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -186,61 +247,5 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Failed save: apply imprisonment target effect (badge)
-    const prisonType = auto.options?.[0] || 'Slumber';
-
-    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    const otherEffects = targetEffects.filter(
-        te => !(te.target === targetName && te.effect === 'imprisonment' && te.source === casterName)
-    );
-    setRuntimeValue('campaign', 'targetEffects', [...otherEffects, {
-        effect: 'imprisonment',
-        target: targetName,
-        source: casterName,
-        prisonType,
-        duration: 'Until dispelled',
-    }], campaignName);
-
-    await addTargetResult(campaignName, {
-        targetName,
-        saveResult: 'failure',
-        roll: saveResult.roll ?? 0,
-        total: saveResult.total ?? 0,
-        conditions: [],
-        appliedDamage: 0,
-    });
-
-    // Track for expiration cleanup (badge removal)
-    addExpiration(casterName, targetName, [
-        { type: 'remove_target_effect', effectKey: 'imprisonment', target: targetName, source: casterName },
-    ], campaignName);
-
-    addEntry(campaignName, {
-        type: 'save_result',
-        characterName: casterName,
-        rollType: 'save-imprisonment',
-        targetName,
-        saveDc: dc,
-        saveType: 'WIS',
-        success: false,
-        description: `${targetName} failed WIS save against ${action.name} and is imprisoned (${prisonType}).`,
-    }).catch((e) => { console.error("[imprisonment] Error:", e); });
-
-    addEntry(campaignName, {
-        type: 'condition',
-        action: 'applied',
-        characterName: targetName,
-        condition: 'Imprisoned',
-        reason: action.name,
-        note: `${targetName} is imprisoned (${prisonType}) by ${action.name}.`,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[imprisonment] Error:", e); });
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: `${targetName} failed WIS save and is imprisoned (${prisonType}).`,
-        },
-    };
+    return applyImprisonmentEffect(action, auto, casterName, targetName, dc, saveResult, campaignName);
 }

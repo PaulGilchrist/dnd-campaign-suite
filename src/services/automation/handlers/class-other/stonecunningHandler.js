@@ -11,6 +11,16 @@ const STONECANNING_USES_KEY = 'stonecunningUses';
 // SACRED_WEAPON_ROUNDS in sacredWeaponHandler.js.
 const STONECANNING_ROUNDS = 100;
 
+function resolveStonecunningUsesMax(auto, playerStats) {
+    if (auto.uses === 'proficiency_bonus') {
+        return playerStats.proficiency || 0;
+    }
+    if (typeof auto.uses === 'number') {
+        return auto.uses;
+    }
+    return auto.usesMax != null ? auto.usesMax : 1;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -18,14 +28,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const usesKey = STONECANNING_USES_KEY;
 
-    let usesMax;
-    if (auto.uses === 'proficiency_bonus') {
-        usesMax = playerStats.proficiency || 0;
-    } else if (typeof auto.uses === 'number') {
-        usesMax = auto.uses;
-    } else {
-        usesMax = auto.usesMax != null ? auto.usesMax : 1;
-    }
+    const usesMax = resolveStonecunningUsesMax(auto, playerStats);
 
     const stored = getRuntimeValue(playerName, usesKey, campaignName);
     const usesRemaining = stored != null ? Number(stored) : usesMax;

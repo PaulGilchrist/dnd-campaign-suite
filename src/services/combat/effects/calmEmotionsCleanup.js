@@ -8,6 +8,22 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
  * Called from concentrationService cleanupConcentrationEffects and from
  * useInitiativeEffects on initiative roll.
  */
+function restoreSuppressedConditions(effect, campaignName) {
+    if (effect.mode !== 'immunity') return;
+    if (!Array.isArray(effect.suppressedConditions) || effect.suppressedConditions.length === 0) return;
+    if (!effect.target) return;
+
+    const storedConditions = getRuntimeValue(effect.target, 'activeConditions') || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const lowerConditions = conditions.map(c => String(c).toLowerCase());
+    for (const suppressedCond of effect.suppressedConditions) {
+        const lowerSuppressed = String(suppressedCond).toLowerCase();
+        if (!lowerConditions.includes(lowerSuppressed)) {
+            setRuntimeValue(effect.target, 'activeConditions', [...conditions, suppressedCond], campaignName);
+        }
+    }
+}
+
 export function endCalmEmotions(casterName, campaignName) {
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const calmEffects = storedEffects.filter(
@@ -18,17 +34,7 @@ export function endCalmEmotions(casterName, campaignName) {
 
     // Restore suppressed conditions for immunity-mode effects
     for (const effect of calmEffects) {
-        if (effect.mode === 'immunity' && Array.isArray(effect.suppressedConditions) && effect.suppressedConditions.length > 0 && effect.target) {
-            const storedConditions = getRuntimeValue(effect.target, 'activeConditions') || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const lowerConditions = conditions.map(c => String(c).toLowerCase());
-            for (const suppressedCond of effect.suppressedConditions) {
-                const lowerSuppressed = String(suppressedCond).toLowerCase();
-                if (!lowerConditions.includes(lowerSuppressed)) {
-                    setRuntimeValue(effect.target, 'activeConditions', [...conditions, suppressedCond], campaignName);
-                }
-            }
-        }
+        restoreSuppressedConditions(effect, campaignName);
     }
 
     // Remove all calm_emotions targetEffects from this caster

@@ -45,10 +45,8 @@ export function computeDamageAfterResistances(rawDamage, damageTypes, resistance
   return rawDamage;
 }
 
-export function computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance = false, spellOrigin = false) {
-  if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistancesWithDetails: damageTypes is required');
+function classifyDamageTypeDetails(damageTypes, resistances, immunities, ignoreResistance) {
   const typeDetails = [];
-  let finalDamage = rawDamage;
   let isImmune = false;
   let isResistant = false;
   for (const dt of damageTypes) {
@@ -64,18 +62,26 @@ export function computeDamageAfterResistancesWithDetails(rawDamage, damageTypes,
       typeDetails.push({ damageType: dt, status: 'resistant' });
     }
   }
+  return { typeDetails, isImmune, isResistant };
+}
+
+export function computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance = false, spellOrigin = false) {
+  if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistancesWithDetails: damageTypes is required');
+  const { typeDetails, isImmune, isResistant } = classifyDamageTypeDetails(damageTypes, resistances, immunities, ignoreResistance);
   if (isImmune) {
-    finalDamage = 0;
-  } else if (isResistant) {
-    finalDamage = Math.floor(rawDamage / 2);
-  } else if (spellOrigin && !ignoreResistance && resistances?.some(r => String(r).toLowerCase() === 'spell')) {
+    return { finalDamage: 0, typeDetails };
+  }
+  if (isResistant) {
+    return { finalDamage: Math.floor(rawDamage / 2), typeDetails };
+  }
+  if (spellOrigin && !ignoreResistance && resistances?.some(r => String(r).toLowerCase() === 'spell')) {
     // CLA-324: categorical 'Spell' resistance (e.g. Abjurer Spell Resistance passive_immunity
     // damage_resistance:['Spell']) halves spell-origin damage. 'Spell' is never a concrete
     // damage type, so it is matched via the spellOrigin flag, not the damageTypes loop.
-    finalDamage = Math.floor(rawDamage / 2);
     typeDetails.push({ damageType: 'Spell', status: 'resistant' });
+    return { finalDamage: Math.floor(rawDamage / 2), typeDetails };
   }
-  return { finalDamage, typeDetails };
+  return { finalDamage: rawDamage, typeDetails };
 }
 
 export function computeDamageAfterSave(rawDamage, saveSuccess, dcSuccess) {
@@ -541,10 +547,18 @@ function handleNpcConcentrationBreak(creature, characters, attackerName, combatS
 // Resolve the defender's full resistance/immunity profile: computed stats (players),
 // passive passives (CLA-336, read LIVE), buff-granted resistances, Silence thunder
 // immunity, and aura-granted resistances.
-async function resolveCreatureDefenses(creature, targetName, isPlayer, characters, campaignName) {
+function resolveBaseDefenses(creature, targetName, isPlayer, characters) {
   const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
   const playerComputed = playerStats?.computedStats || playerStats;
-  let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
+  const resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
+  const immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
+  return { playerStats, playerComputed, resistances, immunities };
+}
+
+async function resolveCreatureDefenses(creature, targetName, isPlayer, characters, campaignName) {
+  const { playerStats, playerComputed, resistances: baseResistances, immunities: baseImmunities } = resolveBaseDefenses(creature, targetName, isPlayer, characters);
+  let resistances = baseResistances;
+  let immunities = baseImmunities;
   let passiveResistances = [];
   if (isPlayer && playerStats) {
     passiveResistances = getPlayerPassiveResistances(creature, playerComputed, playerStats);
@@ -552,7 +566,6 @@ async function resolveCreatureDefenses(creature, targetName, isPlayer, character
       resistances = [...new Set([...resistances, ...passiveResistances])];
     }
   }
-  let immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
 
   const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
   const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
@@ -574,7 +587,7 @@ async function resolveCreatureDefenses(creature, targetName, isPlayer, character
 }
 
 // Post-computation resistance/immunity logs, in their original evaluation order.
-function logResistanceOutcomes(creature, rawDamage, finalDamage, damageTypes, resistanceDetails, passiveResistances, silenceThunderImmunity, spellOrigin, campaignName) {
+function logResistanceOutcomes({ creature, rawDamage, finalDamage, damageTypes, resistanceDetails, passiveResistances, silenceThunderImmunity, spellOrigin, campaignName }) {
   if (spellOrigin && rawDamage > 0 && resistanceDetails.some(rd => rd.damageType === 'Spell' && rd.status === 'resistant')) {
     logSpellResistance(creature, rawDamage, finalDamage, campaignName);
   }
@@ -709,7 +722,7 @@ function resolveTargetDamageOutcome({ creature, combatSummary, characters, isPla
 }
 
 // Persist the (possibly mutated) combat summary, broadcast, and log the HP change.
-function persistAndLogDamageOutcome(combatSummary, combatSummaryChanged, existingAttack, creature, finalDamage, oldHp, newHp, suppressHpLog, campaignName) {
+function persistAndLogDamageOutcome({ combatSummary, combatSummaryChanged, existingAttack, creature, finalDamage, oldHp, newHp, suppressHpLog, campaignName }) {
   if (combatSummaryChanged || existingAttack) {
     storage.set('combatSummary', combatSummary, campaignName);
   }
@@ -725,15 +738,29 @@ function isSpellOriginDamage(options, existingAttack) {
   return options?.isSpellDamage === true || existingAttack?.rollType === 'spell-save' || existingAttack?.isSpellDamage === true;
 }
 
+// Stamp campaign lastAttack with this hit and return the pre-hit attack (if any).
+function stampLastAttack(attackerName, targetName, rawDamage, damageTypes, campaignName) {
+  const existingAttack = getRuntimeValue('campaign', 'lastAttack') || null;
+  setRuntimeValue('campaign', 'lastAttack', buildLastAttackUpdate(existingAttack, attackerName, targetName, rawDamage, damageTypes), campaignName);
+  return existingAttack;
+}
+
+// HP application split: players track damage-taking options distinctly from creatures.
+function applyTargetHpDamage(creature, isPlayer, damageAfterTempHp, options, campaignName, rawDamage, finalDamage) {
+  if (isPlayer) {
+    return applyPlayerHpDamage(creature, damageAfterTempHp, options, campaignName, rawDamage, finalDamage);
+  }
+  return applyCreatureHpDamage(creature, damageAfterTempHp, options, campaignName);
+}
+
 export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, { ignoreResistance = false, attackerName = null, suppressHpLog = false, ...options } = {}) {
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
   if (isNaN(rawDamage) || rawDamage == null) return null;
 
-  const existingAttack = getRuntimeValue('campaign', 'lastAttack') || null;
+  const existingAttack = stampLastAttack(attackerName, targetName, rawDamage, damageTypes, campaignName);
   const isSecondary = existingAttack?.primaryDamage != null;
-  setRuntimeValue('campaign', 'lastAttack', buildLastAttackUpdate(existingAttack, attackerName, targetName, rawDamage, damageTypes), campaignName);
 
   const isPlayer = creature.type === 'player';
   const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
@@ -744,19 +771,14 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
   const spellOrigin = isSpellOriginDamage(options, existingAttack);
   const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, defenses.resistances, defenses.immunities, ignoreResistance, spellOrigin);
 
-  logResistanceOutcomes(creature, rawDamage, resResult.finalDamage, damageTypes, resResult.typeDetails, defenses.passiveResistances, defenses.silenceThunderImmunity, spellOrigin, campaignName);
+  logResistanceOutcomes({ creature, rawDamage, finalDamage: resResult.finalDamage, damageTypes, resistanceDetails: resResult.typeDetails, passiveResistances: defenses.passiveResistances, silenceThunderImmunity: defenses.silenceThunderImmunity, spellOrigin, campaignName });
 
   const absorbed = absorbThroughFeaturesAndWards(creature, isPlayer, playerComputed, playerStats, damageTypes, resResult.finalDamage, campaignName);
   const { finalDamage, damageReducedByFeature, wardDamage, damageAfterTempHp } = absorbed;
 
   await revertPolymorphIfBufferDepleted(creature, campaignName);
 
-  let oldHp, newHp, actualDamageTaken;
-  if (isPlayer) {
-    ({ oldHp, newHp, actualDamageTaken } = applyPlayerHpDamage(creature, damageAfterTempHp, options, campaignName, rawDamage, finalDamage));
-  } else {
-    ({ oldHp, newHp, actualDamageTaken } = applyCreatureHpDamage(creature, damageAfterTempHp, options, campaignName));
-  }
+  const { oldHp, newHp, actualDamageTaken } = applyTargetHpDamage(creature, isPlayer, damageAfterTempHp, options, campaignName, rawDamage, finalDamage);
 
   // SP-107: Sleep ends on a target that takes damage (staged Incapacitated or Unconscious).
   if (actualDamageTaken > 0) {
@@ -783,7 +805,7 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
     combatSummaryChanged = true;
   }
 
-  persistAndLogDamageOutcome(combatSummary, combatSummaryChanged, existingAttack, creature, finalDamage, oldHp, newHp, suppressHpLog, campaignName);
+  persistAndLogDamageOutcome({ combatSummary, combatSummaryChanged, existingAttack, creature, finalDamage, oldHp, newHp, suppressHpLog, campaignName });
 
   return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage, damageReducedByFeature: damageReducedByFeature, resistanceDetails: resResult.typeDetails, holyAuraSaveResult: wardEvents.holyAuraSaveResult };
 }

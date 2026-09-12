@@ -80,7 +80,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const inRange = await isWithinRange(playerName, targetName, auto.range ?? 30);
+    const wardRange = auto.range ?? 30;
+    const inRange = await isWithinRange(playerName, targetName, wardRange);
     if (!inRange) {
         return {
             type: 'popup',
@@ -88,7 +89,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 type: 'automation_info',
                 name: action.name,
                 automationType: auto.type,
-                description: `${action.name}: ${targetName} is out of range (${auto.range ?? 30} ft). Arcane Ward cannot project that far.`,
+                description: `${action.name}: ${targetName} is out of range (${wardRange} ft). Arcane Ward cannot project that far.`,
                 automation: auto,
             },
         };
@@ -96,7 +97,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Get the most recent single damage hit on the target
     const latestDamage = getRuntimeValue(targetName, PROJECTED_WARD_DAMAGE_KEY, campaignName);
-    if (!latestDamage?.rawDamage || latestDamage.rawDamage <= 0) {
+    const rawDamage = latestDamage?.rawDamage;
+    if (!rawDamage || rawDamage <= 0) {
         return {
             type: 'popup',
             payload: {
@@ -125,11 +127,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Log the reaction use
+    const remainingText = remainingDamage > 0 ? ` ${targetName} takes ${remainingDamage} remaining damage.` : ' All damage absorbed.';
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} used ${action.name} on ${targetName}. Arcane Ward absorbed ${absorbed} of ${damageAmount} damage (${wardHp} → ${newWardHp} HP). ${remainingDamage > 0 ? `${targetName} takes ${remainingDamage} remaining damage.` : 'All damage absorbed.'}`,
+        description: `${playerName} used ${action.name} on ${targetName}. Arcane Ward absorbed ${absorbed} of ${damageAmount} damage (${wardHp} → ${newWardHp} HP).${remainingText}`,
     }).catch((e) => { console.error("[arcaneWardHandler:log-error]", e); });
 
     // Log ward absorption
@@ -143,11 +146,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[arcaneWardHandler:log-error]", e); });
 
     let description = `${action.name}: ${targetName} took ${damageAmount} damage. Arcane Ward absorbed ${absorbed} (${wardHp} → ${newWardHp} HP).`;
-    if (remainingDamage > 0) {
-        description += ` ${targetName} takes ${remainingDamage} remaining damage.`;
-    } else {
-        description += ' All damage absorbed.';
-    }
+    description += remainingText;
 
     return {
         type: 'popup',

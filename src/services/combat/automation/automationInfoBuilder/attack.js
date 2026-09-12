@@ -71,14 +71,17 @@ function mapAutomationEffectOption(effect) {
     };
 }
 
+function resolveAttackRiderOptions(auto) {
+    const options = auto.options || [];
+    if (options.length > 0) return options;
+    return defaultRiderOptions(auto) || (Array.isArray(auto.effects) ? auto.effects.map(mapAutomationEffectOption) : []);
+}
+
 export const attackHandlers = {
     'attack_rider': (feature, playerStats) => {
         const auto = feature.automation
         const resolvedExpr = resolveRiderDamageExpression(auto, playerStats);
-        let options = auto.options || [];
-        if (options.length === 0) {
-            options = defaultRiderOptions(auto) || (Array.isArray(auto.effects) ? auto.effects.map(mapAutomationEffectOption) : []);
-        }
+        const options = resolveAttackRiderOptions(auto);
         return {
             type: 'attack_rider',
             name: feature.name,

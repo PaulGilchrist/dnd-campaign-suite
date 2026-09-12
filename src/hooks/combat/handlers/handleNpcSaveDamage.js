@@ -481,12 +481,9 @@ function buildSavePopupData({ name, formula, rolls, modifier, target, saveResult
     };
 }
 
-function storeSaveLastAttack({ context, campaignName, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage, characterName }) {
-    const { attackerName, statusEffects, affectedTargets } = context || {};
-    if (!attackerName || !target?.name) {
-        console.error('[useLoggedDiceRollDamage] lastAttack missing required fields:', { attackerName, targetName: target?.name, characterName });
-    }
-    setRuntimeValue('campaign', 'lastAttack', {
+function buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage }) {
+    const saveOutcome = isSoulstitchProtected ? 'success' : (saveResult.success ? 'success' : 'failure');
+    return {
         attackerName: attackerName || null,
         targetName: target.name,
         d20: saveResult.roll,
@@ -496,7 +493,7 @@ function storeSaveLastAttack({ context, campaignName, target, saveResult, saveTy
         rollType: 'attack',
         saveType: saveType || null,
         saveDc: saveDc,
-        saveResult: isSoulstitchProtected ? 'success' : (saveResult.success ? 'success' : 'failure'),
+        saveResult: saveOutcome,
         damageFormula: formula || null,
         damageName: name || null,
         damageType: damageType || null,
@@ -508,7 +505,16 @@ function storeSaveLastAttack({ context, campaignName, target, saveResult, saveTy
         statusEffects: statusEffects || null,
         affectedTargets: affectedTargets || [target.name],
         timestamp: Date.now(),
-    }, campaignName);
+    };
+}
+
+function storeSaveLastAttack({ context, campaignName, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage, characterName }) {
+    const { attackerName, statusEffects, affectedTargets } = context || {};
+    if (!attackerName || !target?.name) {
+        console.error('[useLoggedDiceRollDamage] lastAttack missing required fields:', { attackerName, targetName: target?.name, characterName });
+    }
+    const entry = buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage });
+    setRuntimeValue('campaign', 'lastAttack', entry, campaignName);
 }
 
 // CLA-394: Zealous Presence buff (advantage_attacks_and_saves) grants blanket save advantage.
@@ -596,6 +602,7 @@ export function createNpcSaveDamageHandler(deps) {
 
     return async function handleNpcSaveDamage({ name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls }) {
         const { saveDc, saveType, dcSuccess, damageType } = context || {};
+        const playerStats = context?.playerStats;
         const target = findTargetByContext(combatSummary, context);
         if (!target) return;
         const targetMaxHp = resolveTargetMaxHp(target);
@@ -605,14 +612,14 @@ export function createNpcSaveDamageHandler(deps) {
             campaignName,
             damageType,
             attackerName: characterName,
-            attackerStats: context?.playerStats,
-            forceDisadvantage: context?.metamagicHeighten || false,
+            attackerStats: playerStats,
+            forceDisadvantage: Boolean(context?.metamagicHeighten),
             consumeTargetEffect: true,
         });
         const { targetCharacter, saveResult, advantage, finalDamage, isCantripFlag, hasPotentFlag, isSoulstitchProtected } = rollTargetSaveDamage({
             context, target, characters, combatSummary, campaignName, characterName, disadvantage, saveType, saveDc, dcSuccess, adjustedTotal, logEntry,
         });
-        const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+        const ignoreResistance = playerStats ? hasIgnoreResistance(playerStats, damageType) : false;
 
         const { secondaryResult, secondaryFinalDamage } = await rollAndApplySecondarySaveDamage({
             context, combatSummary, target, saveResult, advantage, isSoulstitchProtected, hasPotentFlag, isCantripFlag, characters, campaignName, characterName, name,
@@ -624,7 +631,7 @@ export function createNpcSaveDamageHandler(deps) {
 
         applyPostSaveDamageEffects(primaryApplyResult, characterName, campaignName, formula);
 
-        const isCrit = context?.isAutoCrit || false;
+        const isCrit = Boolean(context?.isAutoCrit);
         const primaryFinalDamage = primaryApplyResult?.finalDamage ?? finalDamage;
         const logEntryData = buildSaveLogData({ characterName, name, modifier, formula, target, saveResult, saveDc, saveType, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, isCrit, disadvantage, isSoulstitchProtected, primaryFinalDamage });
         assignSecondaryFields(logEntryData, secondaryResult, SECONDARY_LOG_SUFFIXES);

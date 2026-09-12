@@ -79,9 +79,9 @@ describe('rollConcentrationSave', () => {
         const creature = { name: 'Alice', type: 'player' }
         const chars = [createCharacter('Alice')]
 
-        const result = await rollConcentrationSaveSvc(
-            creature, { spell: 'Bless', dc: 10 }, chars, [], 'TestCampaign', null, (n) => n
-        )
+        const result = await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Bless', dc: 10 }, characters: chars, campaignNpcs: [], campaignName: 'TestCampaign', mapName: null, getName: (n) => n
+        })
 
         expect(result.roll).toBe(12)
         expect(result.success).toBe(true)
@@ -97,9 +97,9 @@ describe('rollConcentrationSave', () => {
         const creature = { name: 'Alice', type: 'player' }
         const chars = [createCharacter('Alice')]
 
-        const result = await rollConcentrationSaveSvc(
-            creature, { spell: 'Bless', dc: 10 }, chars, [], 'TestCampaign', null, (n) => n
-        )
+        const result = await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Bless', dc: 10 }, characters: chars, campaignNpcs: [], campaignName: 'TestCampaign', mapName: null, getName: (n) => n
+        })
 
         expect(result.bonusDetail).toBeUndefined()
     })
@@ -113,9 +113,9 @@ describe('rollConcentrationSave', () => {
         const chars = [{ name: 'Group' }]
         const getName = (n) => n
 
-        await rollConcentrationSaveSvc(
-            creature, { spell: 'Shield', dc: 15 }, chars, [], 'MyCampaign', 'DungeonMap', getName
-        )
+        await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Shield', dc: 15 }, characters: chars, campaignNpcs: [], campaignName: 'MyCampaign', mapName: 'DungeonMap', getName
+        })
 
         expect(getCreatureSaveBonus).toHaveBeenCalledWith(creature, 'con', chars, [], getName)
         expect(computeAuraBonus).toHaveBeenCalledWith({
@@ -134,9 +134,9 @@ describe('rollConcentrationSave', () => {
         const creature = { name: 'Sorcerer', type: 'player' }
         const chars = [createCharacter('Sorcerer', { activeBuffs: [{ name: 'Starry Form', constellation: 'Dragon' }] })]
 
-        await rollConcentrationSaveSvc(
-            creature, { spell: 'Shield', dc: 13 }, chars, [], '', null, (n) => n
-        )
+        await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Shield', dc: 13 }, characters: chars, campaignNpcs: [], campaignName: '', mapName: null, getName: (n) => n
+        })
 
         expect(rollConcentrationRules).toHaveBeenCalledWith(3, 13, true, false)
     })
@@ -153,9 +153,9 @@ describe('rollConcentrationSave', () => {
         const creature = { name: 'Sorcerer', type: 'player' }
         const chars = [createCharacter('Sorcerer', { activeBuffs: [] })]
 
-        await rollConcentrationSaveSvc(
-            creature, { spell: 'Shield', dc: 13 }, chars, [], '', null, (n) => n
-        )
+        await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Shield', dc: 13 }, characters: chars, campaignNpcs: [], campaignName: '', mapName: null, getName: (n) => n
+        })
 
         expect(rollConcentrationRules).toHaveBeenCalledWith(3, 13, true, false)
     })
@@ -168,9 +168,9 @@ describe('rollConcentrationSave', () => {
         const creature = { name: 'Sorcerer', type: 'player' }
         const chars = [createCharacter('Sorcerer', { activeBuffs: [{ name: 'Starry Form', constellation: 'Dragon' }] })]
 
-        const result = await rollConcentrationSaveSvc(
-            creature, { spell: 'Shield', dc: 13 }, chars, [], '', null, (n) => n
-        )
+        const result = await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Shield', dc: 13 }, characters: chars, campaignNpcs: [], campaignName: '', mapName: null, getName: (n) => n
+        })
 
         expect(result.starryDragonFloor).toBe(true)
         expect(result.displayRolls).toEqual([4])
@@ -184,9 +184,9 @@ describe('rollConcentrationSave', () => {
         const creature = { name: 'Alice', type: 'player' }
         const chars = [createCharacter('Alice')]
 
-        const result = await rollConcentrationSaveSvc(
-            creature, { spell: 'Bless', dc: 10 }, chars, [], '', null, (n) => n
-        )
+        const result = await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Bless', dc: 10 }, characters: chars, campaignNpcs: [], campaignName: '', mapName: null, getName: (n) => n
+        })
 
         expect(result.displayRolls).toEqual([10])
     })
@@ -199,9 +199,9 @@ describe('rollConcentrationSave', () => {
         const creature = { name: 'Wizard', type: 'player' }
         const chars = [createCharacter('Wizard', { activeBuffs: [] })]
 
-        await rollConcentrationSaveSvc(
-            creature, { spell: 'Bless', dc: 10 }, chars, [], '', null, (n) => n, true
-        )
+        await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Bless', dc: 10 }, characters: chars, campaignNpcs: [], campaignName: '', mapName: null, getName: (n) => n, disadvantage: true
+        })
 
         expect(rollConcentrationRules).toHaveBeenCalledWith(3, 10, false, true)
     })
@@ -214,9 +214,9 @@ describe('rollConcentrationSave', () => {
         const creature = { name: 'Alice', type: 'player' }
         const chars = [createCharacter('Alice')]
 
-        const result = await rollConcentrationSaveSvc(
-            creature, { spell: 'Shield', dc: 11 }, chars, [], '', null, (n) => n
-        )
+        const result = await rollConcentrationSaveSvc({
+            creature, concentration: { spell: 'Shield', dc: 11 }, characters: chars, campaignNpcs: [], campaignName: '', mapName: null, getName: (n) => n
+        })
 
         expect(result.bonus).toBe(1)
         expect(result.bonusDetail).toBe('(+3 aura from Paladin)')
@@ -302,7 +302,7 @@ describe('addConcentration', () => {
 
 describe('buildConcentrationPopup', () => {
     it('builds popup data structure with all expected fields', () => {
-        const popup = buildConcentrationPopup(12, 5, undefined, 'Bless', 10, true)
+        const popup = buildConcentrationPopup({ roll: 12, bonus: 5, bonusDetail: undefined, spellName: 'Bless', dc: 10, success: true })
 
         expect(popup).toEqual({
             type: 'd20',
@@ -320,35 +320,35 @@ describe('buildConcentrationPopup', () => {
     })
 
     it('includes bonusDetail when provided', () => {
-        const popup = buildConcentrationPopup(12, 5, '+3 aura from Paladin', 'Bless', 10, true)
+        const popup = buildConcentrationPopup({ roll: 12, bonus: 5, bonusDetail: '+3 aura from Paladin', spellName: 'Bless', dc: 10, success: true })
         expect(popup.bonusDetail).toBe('+3 aura from Paladin')
     })
 
     it('reflects failure when success is false', () => {
-        const popup = buildConcentrationPopup(5, 3, undefined, 'Armor', 14, false)
+        const popup = buildConcentrationPopup({ roll: 5, bonus: 3, bonusDetail: undefined, spellName: 'Armor', dc: 14, success: false })
         expect(popup.success).toBe(false)
         expect(popup.rollType).toBe('condition-save')
     })
 
     it('handles zero and negative bonus', () => {
-        expect(buildConcentrationPopup(10, 0, undefined, 'Shield', 10, true).bonus).toBe(0)
-        expect(buildConcentrationPopup(10, -2, undefined, 'Shield', 8, true).bonus).toBe(-2)
+        expect(buildConcentrationPopup({ roll: 10, bonus: 0, bonusDetail: undefined, spellName: 'Shield', dc: 10, success: true }).bonus).toBe(0)
+        expect(buildConcentrationPopup({ roll: 10, bonus: -2, bonusDetail: undefined, spellName: 'Shield', dc: 8, success: true }).bonus).toBe(-2)
     })
 
     it('wraps the roll value in a rolls array', () => {
-        const popup = buildConcentrationPopup(7, 0, undefined, 'Haste', 10, true)
+        const popup = buildConcentrationPopup({ roll: 7, bonus: 0, bonusDetail: undefined, spellName: 'Haste', dc: 10, success: true })
         expect(popup.rolls).toEqual([7])
     })
 
     it('uses raw display rolls and sets starryDragonFloor when Dragon floor applied', () => {
-        const popup = buildConcentrationPopup(10, 3, undefined, 'Bless', 13, true, true, [4])
+        const popup = buildConcentrationPopup({ roll: 10, bonus: 3, bonusDetail: undefined, spellName: 'Bless', dc: 13, success: true, starryDragonFloor: true, displayRolls: [4] })
 
         expect(popup.rolls).toEqual([4])
         expect(popup.starryDragonFloor).toBe(true)
     })
 
     it('omits starryDragonFloor when not provided', () => {
-        const popup = buildConcentrationPopup(10, 3, undefined, 'Bless', 13, true)
+        const popup = buildConcentrationPopup({ roll: 10, bonus: 3, bonusDetail: undefined, spellName: 'Bless', dc: 13, success: true })
 
         expect(popup.starryDragonFloor).toBeUndefined()
     })

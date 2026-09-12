@@ -8,6 +8,27 @@ import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 const QUIVERING_PALM_EFFECT = 'quivering_palm';
 
+function lastAttackRefusal(action, auto, playerName, campaignName, lastAttack, targetName) {
+    if (lastAttack?.attackerName !== playerName) {
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — Last attack was not made by ${playerName}.`,
+            `${action.name} — Last attack was not made by you.`);
+    }
+    if (lastAttack?.attackName !== 'Unarmed Strike') {
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — Last attack was not an Unarmed Strike.`);
+    }
+    if (!didLastAttackHit(lastAttack)) {
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — Last Unarmed Strike did not hit.`);
+    }
+    if (!targetName) {
+        return refusal(action, auto, playerName, campaignName,
+            `${action.name} — No target selected.`);
+    }
+    return null;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -40,30 +61,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-    const isMonkAttacker = lastAttack?.attackerName === playerName;
-    const isUnarmedStrike = lastAttack?.attackName === 'Unarmed Strike';
-    const attackHit = didLastAttackHit(lastAttack);
-
-    if (!isMonkAttacker) {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — Last attack was not made by ${playerName}.`,
-            `${action.name} — Last attack was not made by you.`);
-    }
-
-    if (!isUnarmedStrike) {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — Last attack was not an Unarmed Strike.`);
-    }
-
-    if (!attackHit) {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — Last Unarmed Strike did not hit.`);
-    }
-
-    if (!targetName) {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — No target selected.`);
-    }
+    const refusalResult = lastAttackRefusal(action, auto, playerName, campaignName, lastAttack, targetName);
+    if (refusalResult) return refusalResult;
 
     const cost = auto.cost?.amount || 3;
     const resource = auto.cost?.resource || 'kiPoints';

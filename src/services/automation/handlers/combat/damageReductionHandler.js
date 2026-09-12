@@ -194,7 +194,7 @@ function attackTriggerRefusal(auto, lastAttack, playerName, featureName, campaig
 }
 
 // Heal the holder by the reduced amount and log the hp_change entry.
-async function applyDeflectHeal(cs, actualHeal, playerName, campaignName, playerStats, featureName, reductionRoll, totalDamage) {
+async function applyDeflectHeal({ cs, actualHeal, playerName, campaignName, playerStats, featureName, reductionRoll, totalDamage }) {
     let healedAmount = 0;
     if (cs && actualHeal > 0) {
         const healResult = await applyHealingToTarget(cs, playerName, actualHeal, campaignName);
@@ -243,9 +243,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const damageAfterReduction = Math.max(0, totalDamage - reductionAmount);
 
     const cs = combatContext;
-    const healedAmount = await applyDeflectHeal(cs, actualHeal, playerName, campaignName, playerStats, featureName, reductionRoll, totalDamage);
+    const healedAmount = await applyDeflectHeal({ cs, actualHeal, playerName, campaignName, playerStats, featureName, reductionRoll, totalDamage });
 
-    const attackDetailsHTML = buildAttackDetailsHTML(lastAttack, playerName, totalDamage, primaryDamage, secondaryDamage, reductionRoll, healedAmount, damageAfterReduction);
+    const attackDetailsHTML = buildAttackDetailsHTML({ lastAttack, playerName, totalDamage, primaryDamage, secondaryDamage, reductionRoll, healedAmount, damageAfterReduction });
 
     if (damageAfterReduction === 0 && auto.redirect) {
         const popupResult = {
@@ -300,7 +300,7 @@ async function logDeflectHeal(playerName, campaignName, playerStats, featureName
     }).catch((e) => { console.error("[damageReduction] Error logging heal:", e); });
 }
 
-function buildAttackDetailsHTML(lastAttack, playerName, totalDamage, primaryDamage, secondaryDamage, reductionRoll, healedAmount, damageAfterReduction) {
+function buildAttackDetailsHTML({ lastAttack, playerName, totalDamage, primaryDamage, secondaryDamage, reductionRoll, healedAmount, damageAfterReduction }) {
     const attackEvent = lastAttack.attackEvent;
     if (!attackEvent) return '';
     return `
@@ -376,7 +376,7 @@ async function handleRedirect(action, auto, playerStats, campaignName, featureNa
             featureDescription: `Target makes a DEX saving throw (DC ${finalSaveDc}) or takes 2 × ${martialArtsDie}-sided die + Dexterity modifier Force damage.`,
             description: `You reduced the damage to 0. You expend 1 ${resource.replace('_', ' ')} to redirect the force to a creature.`,
             onTargetSelected: async (targetName) => {
-                await executeRedirect(playerName, targetName, campaignName, auto, redirectDamageExpression, featureName, playerStats, finalSaveDc);
+                await executeRedirect({ playerName, targetName, campaignName, redirectDamageExpression, featureName, playerStats, finalSaveDc });
             },
             onSkip: async () => {
                 await addEntry(campaignName, {
@@ -390,7 +390,7 @@ async function handleRedirect(action, auto, playerStats, campaignName, featureNa
     };
 }
 
-async function executeRedirect(playerName, targetName, campaignName, auto, redirectDamageExpression, featureName, playerStats, finalSaveDc) {
+async function executeRedirect({ playerName, targetName, campaignName, redirectDamageExpression, featureName, playerStats, finalSaveDc }) {
     if (!targetName) return;
 
     const cs = await getCombatContext(campaignName);

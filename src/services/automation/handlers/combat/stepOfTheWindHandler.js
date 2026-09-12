@@ -3,13 +3,43 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { handle as handleDestructiveStride } from './destructiveStrideHandler.js';
 
+function resolveMaxFocus(playerStats) {
+    return playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points || 0;
+}
+
+function buildStepOfWindTexts(playerName, actionName, expend, isHeightened, focusRemaining) {
+    if (expend) {
+        let description = `${playerName} expended 1 Focus Point on ${actionName}: Disengage + Dash as a bonus action, doubled jump distance.`;
+        let logDesc = `${playerName} spent 1 Focus Point on ${actionName}: Disengage + Dash as a bonus action (no Opportunity Attacks against you until the start of your next turn); jump distance doubled`;
+        if (isHeightened) {
+            description += ' Moving a willing creature within 5 feet (Large or smaller) with you.';
+            logDesc += ', moving a willing creature within 5 feet (Large or smaller) with you';
+        }
+        description += ` (${focusRemaining} Focus Points remaining).`;
+        return { description, logDesc };
+    }
+    // Free base Dash — no Focus Point available, so no Disengage and no doubled jump.
+    return {
+        description: `${playerName} used ${actionName}: Dash as a Bonus Action (free — no Focus Point available to expend for Disengage + doubled jump).`,
+        logDesc: `${playerName} used ${actionName} to Dash as a bonus action (free; no Focus Point available, so no Disengage or doubled jump)`,
+    };
+}
+
+async function maybeDestructiveStride(playerStats, campaignName) {
+    const epitomeActive = getRuntimeValue(playerStats.name, 'elementalEpitomeActive', campaignName);
+    if (!epitomeActive) return null;
+    const destructiveStrideFeature = playerStats.specialActions?.find(f => f.name === 'Destructive Stride');
+    if (!destructiveStrideFeature) return null;
+    return await handleDestructiveStride(destructiveStrideFeature, playerStats, campaignName);
+}
+
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const isHeightened = action.name === 'Heightened Step of the Wind';
 
     const cost = auto.cost?.amount || 1;
-    const maxFocus = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points || 0;
+    const maxFocus = resolveMaxFocus(playerStats);
     const currentFocus = Number(getRuntimeValue(playerName, 'focusPoints', campaignName) ?? maxFocus);
 
     // CLA-333 Option A: RAW is "Take Dash as Bonus Action, OR expend 1 Focus Point for
@@ -40,23 +70,7 @@ export async function handle(action, playerStats, campaignName) {
         ], campaignName, undefined, playerName);
     }
 
-    let description;
-    let logDesc;
-    if (expend) {
-        description = `${playerName} expended 1 Focus Point on ${action.name}: Disengage + Dash as a bonus action, doubled jump distance.`;
-        if (isHeightened) {
-            description += ' Moving a willing creature within 5 feet (Large or smaller) with you.';
-        }
-        description += ` (${focusRemaining} Focus Points remaining).`;
-        logDesc = `${playerName} spent 1 Focus Point on ${action.name}: Disengage + Dash as a bonus action (no Opportunity Attacks against you until the start of your next turn); jump distance doubled`;
-        if (isHeightened) {
-            logDesc += ', moving a willing creature within 5 feet (Large or smaller) with you';
-        }
-    } else {
-        // Free base Dash — no Focus Point available, so no Disengage and no doubled jump.
-        description = `${playerName} used ${action.name}: Dash as a Bonus Action (free — no Focus Point available to expend for Disengage + doubled jump).`;
-        logDesc = `${playerName} used ${action.name} to Dash as a bonus action (free; no Focus Point available, so no Disengage or doubled jump)`;
-    }
+    const { description, logDesc } = buildStepOfWindTexts(playerName, action.name, expend, isHeightened, focusRemaining);
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -65,15 +79,9 @@ export async function handle(action, playerStats, campaignName) {
         description: logDesc,
     }).catch((e) => { console.error("[stepOfTheWindHandler:log-error]", e); });
 
-    const epitomeActive = getRuntimeValue(playerName, 'elementalEpitomeActive', campaignName);
-    if (epitomeActive) {
-        const destructiveStrideFeature = playerStats.specialActions?.find(f => f.name === 'Destructive Stride');
-        if (destructiveStrideFeature) {
-            const result = await handleDestructiveStride(destructiveStrideFeature, playerStats, campaignName);
-            if (result) {
-                return result;
-            }
-        }
+    const epitomeResult = await maybeDestructiveStride(playerStats, campaignName);
+    if (epitomeResult) {
+        return epitomeResult;
     }
 
     return {

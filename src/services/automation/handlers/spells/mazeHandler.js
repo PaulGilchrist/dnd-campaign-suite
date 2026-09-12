@@ -85,7 +85,7 @@ function isTargetInvisibleButUnseen(targetCreature, casterCreature) {
     return targetInvisible && !hasTruesight && !hasBlindsight;
 }
 
-function applyMazeBanishment(campaignName, casterName, action, targetName, dc, casterCreature, playerStats, cs) {
+function applyMazeBanishment({ campaignName, casterName, action, targetName, dc, casterCreature, playerStats, cs }) {
     // Maze doesn't require a save — the target is simply banished
     // Store spell last attack for rollback tracking
     storeSpellLastAttack(campaignName, {
@@ -208,7 +208,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return mazePopup(action.name, `${targetName} is invisible. You can't see the target. ${action.name} has no effect.`);
     }
 
-    applyMazeBanishment(campaignName, casterName, action, targetName, dc, casterCreature, playerStats, cs);
+    applyMazeBanishment({ campaignName, casterName, action, targetName, dc, casterCreature, playerStats, cs });
 
     return mazePopup(action.name, `${targetName} is banished to a labyrinthine demiplane. ${targetName} is Incapacitated and can take a Study action (DC 20 INT Investigation) to escape.`);
 }

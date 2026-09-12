@@ -99,7 +99,7 @@ function resolveOriginalAttackRoll(attackInfo, lastAttack, maneuver) {
     return { damageType, attackBonus, originalTotal, originalD20Roll };
 }
 
-async function resolveSweepingAttack(maneuver, auto, targetName, playerStats, campaignName, attackInfo, dieValue, dieDescription) {
+async function resolveSweepingAttack({ maneuver, auto, targetName, playerStats, campaignName, attackInfo, dieValue, dieDescription }) {
     const cs = await getCombatContext(campaignName);
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
     const { damageType, attackBonus, originalTotal, originalD20Roll } = resolveOriginalAttackRoll(attackInfo, lastAttack, maneuver);
@@ -232,7 +232,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     }
 
     if (maneuver.effect === 'secondary_damage') {
-        return resolveSweepingAttack(maneuver, auto, targetName, playerStats, campaignName, attackInfo, dieValue, dieDescription);
+        return resolveSweepingAttack({ maneuver, auto, targetName, playerStats, campaignName, attackInfo, dieValue, dieDescription });
     }
 
     if (maneuver.damageBonus) {

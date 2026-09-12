@@ -125,6 +125,16 @@ function computeStanceDamageBonus(activeBuffs, playerStats) {
     return stanceDamageBonus;
 }
 
+function frenzyGatesSatisfied(activeBuffs, attack, playerStats) {
+    const isReckless = activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
+    const isRaging = activeBuffs.some(b => b.damageBonusExpression);
+    const attackAbilityName = attack?.abilityName;
+    const strMod = playerStats.abilities?.find(a => a.name === 'Strength')?.bonus ?? 0;
+    const dexMod = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
+    const isStrFinal = attackAbilityName ? attackAbilityName.toLowerCase() === 'strength' : strMod >= dexMod;
+    return isReckless && isRaging && isStrFinal;
+}
+
 // Frenzy: extra rage_damage_d6 when reckless, raging, strength-based (once per turn)
 function computeFrenzyDamageFormula(playerStats, attack, activeBuffs, campaignName) {
     const frenzyActions = (playerStats.automation?.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'reckless_attack_hit_while_raging');
@@ -134,13 +144,7 @@ function computeFrenzyDamageFormula(playerStats, attack, activeBuffs, campaignNa
         const currentRound = getCurrentCombatRound(campaignName);
         if (usedRound === currentRound) return null;
     }
-    const isReckless = activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
-    const isRaging = activeBuffs.some(b => b.damageBonusExpression);
-    const attackAbilityName = attack?.abilityName;
-    const strMod = playerStats.abilities?.find(a => a.name === 'Strength')?.bonus ?? 0;
-    const dexMod = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
-    const isStrFinal = attackAbilityName ? attackAbilityName.toLowerCase() === 'strength' : strMod >= dexMod;
-    if (!isReckless || !isRaging || !isStrFinal) return null;
+    if (!frenzyGatesSatisfied(activeBuffs, attack, playerStats)) return null;
     return resolveDiceExpression(frenzyActions[0].damageExpression, playerStats) || null;
 }
 
@@ -496,7 +500,7 @@ async function hasFlankingAlly(combatSummary, playerStats, targetName) {
 }
 
 // Ordered forced-mode resolvers — first match wins, mirroring original guard order.
-async function resolveAttackModeResolvers(playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName) {
+async function resolveAttackModeResolvers({ playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName }) {
     const modeResolvers = [
         // Vow of Enmity: Advantage on attack rolls against the vowed creature
         () => (targetName && hasVowOfEnmity(targetName, campaignName) ? { mode: 'advantage' } : undefined),
@@ -554,6 +558,11 @@ async function accumulateTargetAdvDis(adv, dis, playerName, playerStats, targetN
         if (isDeathWardActive(targetName, campaignName)) dis++;
     }
     return { adv, dis };
+}
+
+function buildAutoDamageFormula(attack, stanceDamageBonus, frenzyDamageFormula, brutalStrikeFormulaPart) {
+    const primaryDamage = attack.damage || attack.damage_dice_primary || '';
+    return [primaryDamage, stanceDamageBonus > 0 ? stanceDamageBonus : null, frenzyDamageFormula, brutalStrikeFormulaPart].filter(v => v !== null).join(' plus ');
 }
 
 export async function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects, opts = {}) {
@@ -617,7 +626,7 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
 
         let advantageReason = undefined;
         if (forcedMode === undefined) {
-            const outcome = await resolveAttackModeResolvers(playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName);
+            const outcome = await resolveAttackModeResolvers({ playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName });
             if (outcome) {
                 forcedMode = outcome.mode;
                 advantageReason = outcome.reason;
@@ -628,8 +637,7 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
             dis++;
         }
 
-        const primaryDamage = attack.damage || attack.damage_dice_primary || '';
-        const autoDamageFormula = [primaryDamage, stanceDamageBonus > 0 ? stanceDamageBonus : null, frenzyDamageFormula, brutalStrikeFormulaPart].filter(v => v !== null).join(' plus ');
+        const autoDamageFormula = buildAutoDamageFormula(attack, stanceDamageBonus, frenzyDamageFormula, brutalStrikeFormulaPart);
 
         let sunderingBonus = 0;
         const effectiveHitBonus = (attack.hitBonus ?? 0) + sacredWeaponBonus + blessedWarriorBonus + sunderingBonus;

@@ -2,11 +2,23 @@ import { useState } from 'react';
 import { applyBendFateChoice } from '../../../services/automation/handlers/reactions/reactionBonusHandler.js';
 import '../../common/SavePromptModal.css';
 
+function handleOverlayDismiss(e, onClose) {
+    if (e.target.closest('.sp-modal')) return;
+    onClose?.();
+}
+
+function resolveBendFateBonus(lastAttack) {
+    if (typeof lastAttack.bonus === 'object') {
+        return lastAttack.bonus?.modifier || lastAttack.bonus?.total || 0;
+    }
+    return lastAttack.bonus || 0;
+}
+
 function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, attackerName: _attackerName, eventLabel, hitStatus, saveStatus, isAttack, isSave, isCheck: _isCheck, onClose }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
 
-    const bonusValue = typeof lastAttack.bonus === 'object' ? (lastAttack.bonus?.modifier || lastAttack.bonus?.total || 0) : (lastAttack.bonus || 0);
+    const bonusValue = resolveBendFateBonus(lastAttack);
     const originalTotal = (lastAttack.d20 || 0) + bonusValue;
 
     const handleChoice = async (mode) => {
@@ -21,10 +33,7 @@ function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, 
 
     if (result) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+            <div className="sp-overlay" onClick={(e) => handleOverlayDismiss(e, onClose)}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand"></i> {action.name || 'Bend Luck'}
@@ -40,10 +49,7 @@ function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, 
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay" onClick={(e) => handleOverlayDismiss(e, onClose)}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand"></i> {action.name || 'Bend Luck'}

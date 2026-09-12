@@ -554,8 +554,10 @@ describe('applyShieldBashEffect', () => {
       'test-campaign',
     );
     expect(addCondition).toHaveBeenCalledWith(
-      expect.any(Object), 'Orc1', { key: 'prone', label: 'Prone' }, 16, 'STR',
-      getRuntimeValue, setRuntimeValue, 'test-campaign', basePlayerStats,
+      expect.objectContaining({
+        combatSummary: expect.any(Object), creatureName: 'Orc1', conditionDef: { key: 'prone', label: 'Prone' }, dc: 16, ability: 'STR',
+        getRuntimeValue, setRuntimeValue, campaignName: 'test-campaign', playerStats: basePlayerStats,
+      }),
     );
     expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'ability_use', abilityName: 'Shield Bash', description: expect.stringContaining('Prone condition'),

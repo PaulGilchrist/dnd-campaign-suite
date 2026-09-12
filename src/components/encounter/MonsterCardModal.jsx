@@ -92,33 +92,38 @@ function applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, 
   }
 }
 
+function resolveTargetGridPos(mapData, target, attackerPlaced) {
+  const targetPlayer = mapData.players?.find(p => p.name === target.name);
+  if (targetPlayer) return { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
+  if (!mapData.placedItems?.length) return null;
+  const targetNpc = getNearestPlacedItem(mapData.placedItems, target.name, attackerPlaced ? { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY } : null);
+  return targetNpc ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY } : null;
+}
+
+const RANGE_MODE_HANDLERS = {
+  disadvantage: (state, reason) => {
+    state.rangeForcedMode = 'disadvantage';
+    state.rangeReason = reason;
+  },
+  miss: (state, reason) => {
+    state.isAutoMiss = true;
+    state.rangeReason = reason;
+  },
+};
+
 function computeMapRangeState(mapData, target, monsterName, attackRange) {
   const state = { isAutoMiss: false, rangeReason: null, rangeForcedMode: null };
   if (!mapData || !target) return state;
-  const attackerPlaced = (mapData?.placedItems || []).find(i => i.name === monsterName) || null;
-  let targetPos = null;
-  const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-  const targetNpc = mapData?.placedItems?.length
-    ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlaced ? { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY } : null)
-    : null;
-  if (targetPlayer) {
-    targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
-  } else if (targetNpc) {
-    targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
-  }
+  const attackerPlaced = (mapData.placedItems || []).find(i => i.name === monsterName) || null;
+  const targetPos = resolveTargetGridPos(mapData, target, attackerPlaced);
   if (!attackerPlaced || !targetPos) return state;
   const distanceFt = getDistanceFeet(
     { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY },
     targetPos
   );
   const rangeResult = computeRangeEffect(attackRange, distanceFt);
-  if (rangeResult.mode === 'disadvantage') {
-    state.rangeForcedMode = 'disadvantage';
-    state.rangeReason = rangeResult.reason;
-  } else if (rangeResult.mode === 'miss') {
-    state.isAutoMiss = true;
-    state.rangeReason = rangeResult.reason;
-  }
+  const handler = RANGE_MODE_HANDLERS[rangeResult.mode];
+  if (handler) handler(state, rangeResult.reason);
   return state;
 }
 
@@ -285,6 +290,21 @@ function blockStinkingCloudAction(campaignName, monsterName, name) {
     description: `${monsterName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — ${name} refused.`,
     timestamp: Date.now(),
   }).catch((e) => { console.error('[MonsterCardModal] Error:', e); });
+}
+
+function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll }) {
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <AttackResultPopup
+        popupHtml={popupHtml}
+        onClose={() => setPopupHtml(null)}
+        campaignName={campaignName}
+        attackerName={monsterName}
+        setPopupHtml={setPopupHtml}
+        onQuickRoll={popupHtml.waitingForPlayerSave ? () => onQuickRoll(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined}
+      />
+    </div>
+  );
 }
 
 function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters }) {
@@ -644,16 +664,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         creatures={creatures}
       />
       {popupHtml && (
-        <div onClick={(e) => e.stopPropagation()}>
-          <AttackResultPopup
-            popupHtml={popupHtml}
-            onClose={() => setPopupHtml(null)}
-            campaignName={campaignName}
-            attackerName={monsterName}
-            setPopupHtml={setPopupHtml}
-            onQuickRoll={popupHtml.waitingForPlayerSave ? () => handleQuickRollWithEvasion(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined}
-          />
-        </div>
+        <MonsterAttackPopup
+          popupHtml={popupHtml}
+          campaignName={campaignName}
+          monsterName={monsterName}
+          setPopupHtml={setPopupHtml}
+          onQuickRoll={handleQuickRollWithEvasion}
+        />
       )}
     </div>
     {evasionSelection !== null && pendingSaveRef.current && (

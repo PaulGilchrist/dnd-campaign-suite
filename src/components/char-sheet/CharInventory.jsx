@@ -40,20 +40,12 @@ function CharInventory({ playerStats }) {
             
             // If not found, try removing trailing 's' (plural to singular)
             if (!item && lookupName.endsWith('s')) {
-                const singularName = lookupName.slice(0, -1);
-                item = findItem(singularName);
-                if (item) {
-                    // intentionally empty — item handled below
-                }
+                item = findItem(lookupName.slice(0, -1));
             }
             
             // If still not found, try adding 's' (singular to plural)
             if (!item) {
-                const pluralName = lookupName + 's';
-                item = findItem(pluralName);
-                if (item) {
-                    // intentionally empty — item handled below
-                }
+                item = findItem(lookupName + 's');
             }
             
             if (item) {

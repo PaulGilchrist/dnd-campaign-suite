@@ -46,6 +46,16 @@ function computeEffectiveAc(props) {
         + (props.shieldAcBonus || 0) + (props.shieldOfFaithAcBonus || 0) + (props.wardingBondAcBonus || 0) - (props.slowAcPenalty || 0);
 }
 
+function computeHomingStrikesApplied(rollType, homingStrikesBonus, isAutoMiss) {
+    return rollType === 'attack' && Number(homingStrikesBonus) > 0 && !isAutoMiss;
+}
+
+function computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTotal }) {
+    if (isAutoMiss) return false;
+    if (targetName && hit !== undefined && effectiveAc !== undefined) return finalTotal >= effectiveAc;
+    return hit;
+}
+
 function computeD20TestFailed({ waitingForPlayerSave, computedHit, isAutoMiss, saveResult, success }) {
     if (waitingForPlayerSave) return false;
     if (computedHit !== undefined) return !computedHit && !isAutoMiss;
@@ -134,7 +144,7 @@ export function useDiceRollState(props) {
     // CLA-320: Homing Strikes (Soul Blades) — the authoritative resolver has
     // already folded the psionic die into the attack; mirror it here so the
     // popup's recomputed hit agrees with the flipped hit and "Done" appears.
-    const homingStrikesApplied = rollType === 'attack' && Number(homingStrikesBonus) > 0 && !isAutoMiss;
+    const homingStrikesApplied = computeHomingStrikesApplied(rollType, homingStrikesBonus, isAutoMiss);
     const finalTotal = baseTotal + (homingStrikesApplied ? Number(homingStrikesBonus) : 0);
     const showFumble = isNatural1 && rollType === 'attack';
 
@@ -142,7 +152,7 @@ export function useDiceRollState(props) {
     // (covers Shield of Faith, Shield, cover, reactions); otherwise recompute
     // from the forwarded per-bonus fields so computedHit agrees with hit.
     const effectiveAc = computeEffectiveAc(props);
-    const computedHit = isAutoMiss ? false : (targetName && hit !== undefined && effectiveAc !== undefined ? finalTotal >= effectiveAc : hit);
+    const computedHit = computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTotal });
 
     const isSaveDamageType = type === 'save-damage';
 

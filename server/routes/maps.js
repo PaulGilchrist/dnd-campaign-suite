@@ -48,10 +48,50 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
   res.json({ maps });
 }));
 
+const clampGridSize = (gridSize) => Math.max(5, Math.min(100, gridSize ?? 20));
+
+const buildOutdoorMapData = (name, body) => ({
+  displayName: name.trim(),
+  name: toKebabCase(name.trim()),
+  type: body.type ?? 'indoor',
+  gridSize: clampGridSize(body.gridSize),
+  terrain: body.terrain ?? {},
+  pois: body.pois ?? [],
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+});
+
+const buildIndoorMapData = (name, body) => ({
+  displayName: name.trim(),
+  name: toKebabCase(name.trim()),
+  type: body.type ?? 'indoor',
+  gridSize: clampGridSize(body.gridSize),
+  walls: body.walls ?? [],
+  placedItems: body.placedItems ?? [],
+  paintCells: body.paintCells ?? [],
+  items: body.items ?? [],
+  players: body.players ?? [],
+  fog: body.fog ?? [],
+  rooms: body.rooms ?? [],
+  generationMode: body.generationMode,
+  description: body.description,
+  seed: body.seed,
+  terrain: body.terrain ?? {},
+  pois: body.pois ?? [],
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+  parentHex: body.parentHex,
+  parentTerrain: body.parentTerrain,
+  bgFill: body.bgFill,
+});
+
 // POST /api/campaigns/:campaign/maps - Create a new map
 router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
   const { campaign } = req.params;
-  const { name, gridSize, walls, placedItems, paintCells, items, players, fog, type = 'indoor', terrain = {}, pois = [], parentHex, parentTerrain, bgFill, rooms, generationMode, description, seed } = req.body;
+  const body = req.body;
+  const name = body.name;
 
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Map name is required' });
@@ -70,42 +110,9 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     return res.status(400).json({ error: 'A map with this name already exists' });
   }
 
-  const defaultMapData = type === 'outdoor'
-    ? {
-        displayName: name.trim(),
-        name: toKebabCase(name.trim()),
-        type,
-        gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
-        terrain,
-        pois,
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-      }
-    : {
-        displayName: name.trim(),
-        name: toKebabCase(name.trim()),
-        type,
-        gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
-        walls: walls ?? [],
-        placedItems: placedItems ?? [],
-        paintCells: paintCells ?? [],
-        items: items ?? [],
-        players: players ?? [],
-        fog: fog ?? [],
-        rooms: rooms ?? [],
-        generationMode,
-        description,
-        seed,
-        terrain,
-        pois,
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-        parentHex,
-        parentTerrain,
-        bgFill,
-      };
+  const defaultMapData = (body.type ?? 'indoor') === 'outdoor'
+    ? buildOutdoorMapData(name, body)
+    : buildIndoorMapData(name, body);
 
   fs.writeFileSync(filePath, JSON.stringify(defaultMapData, null, 2));
 

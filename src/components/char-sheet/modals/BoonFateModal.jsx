@@ -2,10 +2,15 @@ import { useState } from 'react';
 import { applyBoonFateChoice } from '../../../services/automation/handlers/reactions/boonOfFateHandler.js';
 import '../../common/SavePromptModal.css';
 
+function computeBoonFateBonus(lastAttack) {
+    if (typeof lastAttack.bonus !== 'object') return lastAttack.bonus || 0;
+    return lastAttack.bonus?.modifier || lastAttack.bonus?.total || 0;
+}
+
 function BoonFateModal({ action, playerStats, campaignName, roll2d4, lastAttack, attackerName: _attackerName, eventLabel, hitStatus, saveStatus, isAttack, isSave, isCheck: _isCheck, onClose }) {
     const [result, setResult] = useState(null);
 
-    const bonusValue = typeof lastAttack.bonus === 'object' ? (lastAttack.bonus?.modifier || lastAttack.bonus?.total || 0) : (lastAttack.bonus || 0);
+    const bonusValue = computeBoonFateBonus(lastAttack);
     const originalTotal = (lastAttack.d20 || 0) + bonusValue;
 
     const handleChoice = async (mode) => {

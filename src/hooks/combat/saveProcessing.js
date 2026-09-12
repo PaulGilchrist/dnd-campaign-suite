@@ -247,23 +247,26 @@ async function processNpcSave({ target, characterName, campaignName, context, bo
 
     const saveTotal = effectiveD20ForSave + bonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
     const saveSuccess = saveDc != null ? (saveTotal >= saveDc) : null;
+    const saveTypeValue = context?.saveType || null;
+    const saveDcValue = context?.saveDc || null;
+    const oldSuccess = saveDcValue != null ? (context.effectiveD20 + bonus >= saveDcValue) : null;
 
     setRuntimeValue(characterName, 'lastSaveRoll', {
         d20: effectiveD20ForSave,
         bonus,
-        saveType: context?.saveType || null,
+        saveType: saveTypeValue,
         targetName,
         timestamp: Date.now(),
     }, campaignName);
 
     setRuntimeValue(characterName, '_lastRollContext', {
         type: 'save',
-        saveType: context?.saveType || null,
-        saveDc: context?.saveDc || null,
+        saveType: saveTypeValue,
+        saveDc: saveDcValue,
         actionName: context?.actionName || context.name,
         targetName,
         oldTotal: context.effectiveD20 + context.effectiveBonus,
-        oldSuccess: context?.saveDc != null ? (context.effectiveD20 + bonus >= context.saveDc) : null,
+        oldSuccess,
         timestamp: Date.now(),
     }, campaignName);
 

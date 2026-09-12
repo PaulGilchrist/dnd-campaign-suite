@@ -35,7 +35,7 @@ export const baseCombatContext = {
   placedItems: [],
 };
 
-export function createFailedSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener, existingConditions = [], existingEffects = [], existingMeta = {}) {
+export function createFailedSaveSetup({ getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener, existingConditions = [], existingEffects = [], existingMeta = {} }) {
   return function failedSaveSetup() {
     getCombatContext.mockResolvedValue(baseCombatContext);
     buildSaveDc.mockReturnValue(15);

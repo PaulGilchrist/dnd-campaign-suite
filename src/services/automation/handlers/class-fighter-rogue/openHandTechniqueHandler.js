@@ -71,7 +71,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
 
     if (chosenOption.effect === 'addled') {
         const combatSummary = await getCombatContext(campaignName);
-        await applyOpenHandEffect(action, playerStats, campaignName, targetName, chosenOption, saveDc, combatSummary);
+        await applyOpenHandEffect({ action, playerStats, campaignName, targetName, option: chosenOption, saveDc, combatSummary });
         addEntry(campaignName, {
             type: 'roll',
             name: action.name,
@@ -134,7 +134,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
 
     if (!success) {
         const combatSummary = await getCombatContext(campaignName);
-        await applyOpenHandEffect(action, playerStats, campaignName, targetName, chosenOption, saveDc, combatSummary, optionSaveType);
+        await applyOpenHandEffect({ action, playerStats, campaignName, targetName, option: chosenOption, saveDc, combatSummary, saveType: optionSaveType });
     }
 
     return {
@@ -149,7 +149,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
     };
 }
 
-async function applyOpenHandEffect(action, playerStats, campaignName, targetName, option, saveDc, combatSummary, saveType) {
+async function applyOpenHandEffect({ action, playerStats, campaignName, targetName, option, saveDc, combatSummary, saveType }) {
     if (!targetName) return;
 
     // Push effects are instant — just log, no targetEffect
@@ -181,12 +181,12 @@ async function applyOpenHandEffect(action, playerStats, campaignName, targetName
 
     if (option.effect === 'prone') {
         const conditionDef = { key: 'prone', label: 'Prone' };
-        addCondition(combatSummary, targetName, conditionDef, saveDc, saveType || 'STR', getRuntimeValue, setRuntimeValue, campaignName, findOpenHandTargetStats(playerStats, campaignName, targetName));
+        addCondition({ combatSummary, creatureName: targetName, conditionDef, dc: saveDc, ability: saveType || 'STR', getRuntimeValue, setRuntimeValue, campaignName, playerStats: findOpenHandTargetStats(playerStats, campaignName, targetName) });
     }
 
     if (option.noOpportunityAttacks) {
         const conditionDef = { key: 'addled', label: 'Addled' };
-        addCondition(combatSummary, targetName, conditionDef, saveDc, saveType || 'STR', getRuntimeValue, setRuntimeValue, campaignName, findOpenHandTargetStats(playerStats, campaignName, targetName));
+        addCondition({ combatSummary, creatureName: targetName, conditionDef, dc: saveDc, ability: saveType || 'STR', getRuntimeValue, setRuntimeValue, campaignName, playerStats: findOpenHandTargetStats(playerStats, campaignName, targetName) });
     }
 }
 

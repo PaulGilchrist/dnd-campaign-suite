@@ -7,6 +7,14 @@ const featureCategories = getCategories('5e');
 
 const MYSTIC_ARCANUM_LEVELS = ['level_6', 'level_7', 'level_8', 'level_9'];
 
+function getLoreMagicalSecrets(playerStats) {
+    if (playerStats.class?.subclass?.name !== 'Lore' || playerStats.level <= 2) {
+        return 0;
+    }
+    const highestSubclassLevel = classRules.getHighestSubclassLevel(playerStats);
+    return highestSubclassLevel?.subclass_specific?.additional_magical_secrets_max_lvl || 0;
+}
+
 function getWarlockArcanumLevels(classSpecific) {
     const levels = {};
     MYSTIC_ARCANUM_LEVELS.forEach((suffix, index) => {
@@ -209,22 +217,15 @@ const classRules = {
                    const expertise = playerStats.expertise || [];
                    return { sneakAttack, expertise };
                },
-              getBardFeatures: (playerStats) => {
+               getBardFeatures: (playerStats) => {
          // 5e Rules: Get Bard class features
           const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-          const bardicDie = classLevel?.class_specific?.bardic_inspiration_die || 0;
-         const songOfRestDie = classLevel?.class_specific?.song_of_rest_die ?? null;
-         const magicalSecrets = classLevel?.class_specific?.magical_secrets_max_5 ?? null;
-         let subclassMagicalSecrets = 0;
-         if (playerStats.class?.subclass?.name === 'Lore' && playerStats.level > 2) {
-             const highestSubclassLevel = classRules.getHighestSubclassLevel(playerStats);
-             subclassMagicalSecrets = highestSubclassLevel?.subclass_specific?.additional_magical_secrets_max_lvl || 0;
-         }
+          const classSpecific = classLevel?.class_specific || {};
          return {
-             bardicDie,
-             songOfRestDie,
-             magicalSecrets,
-             subclassMagicalSecrets
+             bardicDie: classSpecific.bardic_inspiration_die || 0,
+             songOfRestDie: classSpecific.song_of_rest_die ?? null,
+             magicalSecrets: classSpecific.magical_secrets_max_5 ?? null,
+             subclassMagicalSecrets: getLoreMagicalSecrets(playerStats)
          };
      }
      }

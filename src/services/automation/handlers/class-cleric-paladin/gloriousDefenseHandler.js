@@ -15,6 +15,13 @@ function buildOutcomeDescription({ featureName, targetName, attackerName, d20, b
     return description;
 }
 
+function computeChaAdjustedOutcome(attackEvent, chaMod) {
+    const { d20, bonus, targetAc } = attackEvent;
+    const newAc = targetAc != null ? targetAc + chaMod : null;
+    const wouldHit = newAc != null ? (d20 + bonus >= newAc) : null;
+    return { newAc, wouldHit };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -42,17 +49,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const targetName = lastAttack.targetName;
-    const { d20, bonus, targetAc, hit, effectiveAc } = attackEvent;
-    const ac = effectiveAc ?? targetAc;
+    const ac = attackEvent.effectiveAc ?? attackEvent.targetAc;
     const attackerName = lastAttack.attackerName || 'Unknown creature';
     const chaMod = Math.max(1, chaBonus);
-    const newAc = targetAc != null ? targetAc + chaMod : null;
+    const { newAc, wouldHit } = computeChaAdjustedOutcome(attackEvent, chaMod);
 
     // Calculate if the attack would still hit with the CHA bonus applied
-    const originalHit = hit === true;
-    const wouldHit = newAc != null ? (d20 + bonus >= newAc) : null;
+    const originalHit = attackEvent.hit === true;
 
-    let description = buildOutcomeDescription({ featureName, targetName, attackerName, d20, bonus, ac, chaMod, newAc, hit, wouldHit });
+    let description = buildOutcomeDescription({ featureName, targetName, attackerName, d20: attackEvent.d20, bonus: attackEvent.bonus, ac, chaMod, newAc, hit: attackEvent.hit, wouldHit });
 
     if (originalHit && wouldHit === false) {
         return await blockAndCounterattack({ auto, playerStats, playerName, campaignName, featureName, targetName, attackerName, chaMod, currentUses, description });

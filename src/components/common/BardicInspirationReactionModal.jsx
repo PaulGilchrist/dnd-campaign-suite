@@ -23,46 +23,34 @@ function BardicInspirationReactionModal({ campaignName }) {
         });
     }, []);
 
-    const handleEvent = useCallback((event) => {
-        if (!event.key || event.data == null) return;
-        const charMatch = event.key.match(/^change-([^]+)-(.+)$/);
-        if (charMatch) {
-            const characterName = charMatch[2];
-            if (event.data && typeof event.data === 'object' && event.data.biPrompt) {
-                const promptData = event.data.biPrompt;
-                if (promptData && promptData.promptId) {
-                    if (processedPromptIdsRef.current.has(promptData.promptId)) return;
-                    if (activePromptIdRef.current !== null) return;
-                    if (promptsRef.current.some(p => p.promptId === promptData.promptId)) return;
-                    processedPromptIdsRef.current.add(promptData.promptId);
-                    activePromptIdRef.current = promptData.promptId;
-                    setPrompts(prev => {
-                        const next = [...prev, { targetName: characterName, ...promptData }];
-                        promptsRef.current = next;
-                        return next;
-                    });
-                    return;
-                }
-            }
-        }
-        const prefix = `change-${campaignName}-`;
-        if (!event.key.startsWith(prefix)) return;
-        const keySuffix = event.key.slice(prefix.length);
-        const match = keySuffix.match(/^(.+)-biPrompt$/);
-        if (!match) return;
-        const targetName = match[1];
-        if (!event.data?.promptId) return;
-        if (processedPromptIdsRef.current.has(event.data.promptId)) return;
+    const enqueuePrompt = useCallback((targetName, promptData) => {
+        const promptId = promptData?.promptId;
+        if (!promptId) return;
+        if (processedPromptIdsRef.current.has(promptId)) return;
         if (activePromptIdRef.current !== null) return;
-        if (promptsRef.current.some(p => p.promptId === event.data.promptId)) return;
-        processedPromptIdsRef.current.add(event.data.promptId);
-        activePromptIdRef.current = event.data.promptId;
+        if (promptsRef.current.some(p => p.promptId === promptId)) return;
+        processedPromptIdsRef.current.add(promptId);
+        activePromptIdRef.current = promptId;
         setPrompts(prev => {
-            const next = [...prev, { targetName, ...event.data }];
+            const next = [...prev, { targetName, ...promptData }];
             promptsRef.current = next;
             return next;
         });
-    }, [campaignName]);
+    }, []);
+
+    const handleEvent = useCallback((event) => {
+        if (!event.key || event.data == null) return;
+        const charMatch = event.key.match(/^change-([^]+)-(.+)$/);
+        if (charMatch && typeof event.data === 'object' && event.data.biPrompt?.promptId) {
+            enqueuePrompt(charMatch[2], event.data.biPrompt);
+            return;
+        }
+        const prefix = `change-${campaignName}-`;
+        if (!event.key.startsWith(prefix)) return;
+        const match = event.key.slice(prefix.length).match(/^(.+)-biPrompt$/);
+        if (!match) return;
+        enqueuePrompt(match[1], event.data);
+    }, [campaignName, enqueuePrompt]);
 
     const handleClearedEvent = useCallback((event) => {
         if (!event.key || event.data == null) return;

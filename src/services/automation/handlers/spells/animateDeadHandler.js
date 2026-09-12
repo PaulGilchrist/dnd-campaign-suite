@@ -86,7 +86,7 @@ export async function handle(action, playerStats, campaignName) {
     };
 }
 
-function summonSwarm(combatSummary, targetEffects, creatureNames, baseName, monster, initiativeValue, count, casterName) {
+function summonSwarm({ combatSummary, targetEffects, creatureNames, baseName, monster, initiativeValue, count, casterName }) {
     for (let i = 0; i < (count || 0); i++) {
         const creature = buildCreatureEntry(baseName, monster, initiativeValue, i);
         combatSummary.creatures.push(creature);
@@ -139,8 +139,8 @@ export async function confirmAnimateDead(action, playerStats, campaignName, { zo
     let targetEffects = getTargetEffects();
     const creatureNames = [];
 
-    summonSwarm(combatSummary, targetEffects, creatureNames, 'Skeleton', skeletonMonster, initiativeValue, skeletonCount, casterName);
-    summonSwarm(combatSummary, targetEffects, creatureNames, 'Zombie', zombieMonster, initiativeValue, zombieCount, casterName);
+    summonSwarm({ combatSummary, targetEffects, creatureNames, baseName: 'Skeleton', monster: skeletonMonster, initiativeValue, count: skeletonCount, casterName });
+    summonSwarm({ combatSummary, targetEffects, creatureNames, baseName: 'Zombie', monster: zombieMonster, initiativeValue, count: zombieCount, casterName });
 
     combatSummary.creatures.sort((a, b) => {
         const aInit = a.initiative === '' || a.initiative === undefined ? 0 : parseInt(a.initiative, 10);

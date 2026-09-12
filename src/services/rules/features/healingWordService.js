@@ -83,23 +83,28 @@ function logHealingWordEntry(campaignName, targetName, actualHeal, newHp, maxHp,
     }).catch((e) => { console.error("[healingWord] Error:", e); });
 }
 
+// Resolve slot level and heal expression (with MOD substituted). Null when the
+// spell has no heal expression defined for the cast slot level.
+function buildHealingWordExpression(spell, metaCtx, playerStats) {
+    const slotLevel = metaCtx?.slotLevel || spell.level || 1;
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    if (!healAtSlotLevel || !healAtSlotLevel[slotLevel]) return null;
+    let healExpression = healAtSlotLevel[slotLevel];
+    const spellCastingMod = resolveSpellCastingMod(spell, playerStats);
+    if (spellCastingMod !== undefined) {
+        healExpression = healExpression.replace(/\bMOD\b/g, String(spellCastingMod));
+    }
+    return { slotLevel, healExpression };
+}
+
 export async function triggerHealingWord(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isHealingWord(spell)) {
         return null;
     }
 
-    const slotLevel = metaCtx?.slotLevel || spell.level || 1;
-    const healAtSlotLevel = spell.heal_at_slot_level;
-    if (!healAtSlotLevel || !healAtSlotLevel[slotLevel]) {
-        return null;
-    }
-
-    let healExpression = healAtSlotLevel[slotLevel];
-
-    const spellCastingMod = resolveSpellCastingMod(spell, playerStats);
-    if (spellCastingMod !== undefined) {
-        healExpression = healExpression.replace(/\bMOD\b/g, String(spellCastingMod));
-    }
+    const expressionInfo = buildHealingWordExpression(spell, metaCtx, playerStats);
+    if (!expressionInfo) return null;
+    const { slotLevel, healExpression } = expressionInfo;
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) return null;

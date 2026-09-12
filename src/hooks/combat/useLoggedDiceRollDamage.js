@@ -14,17 +14,19 @@ import { applySuperiorityDamageBonuses } from './handlers/handleSuperiorityBonus
 import { resolveTargetMaxHp } from './handlers/damageHandlerUtils.js';
 
 function applyDamageRollAdjustments({ isCrit, context, boostedTotal, boostedRolls, modifier, damageType }) {
-    const gwfBaseRolls = isCrit && context?.doubledRolls ? context.doubledRolls.slice(0, context.doubledRolls.length / 2) : boostedRolls;
-    const rollsForMin = isCrit && context?.doubledRolls ? context.doubledRolls : boostedRolls;
-    let adjustedTotal = applyMinDamageAdjustment(boostedTotal, rollsForMin, context?.playerStats, damageType);
-    let displayRolls = isCrit && context?.doubledRolls ? context.doubledRolls : boostedRolls;
+    const playerStats = context?.playerStats;
+    const doubledRolls = isCrit ? context?.doubledRolls : null;
+    const gwfBaseRolls = doubledRolls ? doubledRolls.slice(0, doubledRolls.length / 2) : boostedRolls;
+    const doubledOrDefaultRolls = doubledRolls ? doubledRolls : boostedRolls;
+    let adjustedTotal = applyMinDamageAdjustment(boostedTotal, doubledOrDefaultRolls, playerStats, damageType);
+    let displayRolls = doubledOrDefaultRolls;
     let gwfDisplayRolls = gwfBaseRolls;
-    if (hasGreatWeaponFighting(context?.playerStats)) {
-        const gwfRolls = applyGreatWeaponFightingToDamage(gwfBaseRolls, context?.playerStats);
+    if (hasGreatWeaponFighting(playerStats)) {
+        const gwfRolls = applyGreatWeaponFightingToDamage(gwfBaseRolls, playerStats);
         const hasChanges = gwfRolls.some((r, i) => r !== gwfBaseRolls[i]);
         if (hasChanges) {
             const gwfTotal = (isCrit ? gwfRolls.reduce((sum, r) => sum + r, 0) * 2 : gwfRolls.reduce((sum, r) => sum + r, 0)) + modifier;
-            adjustedTotal = applyMinDamageAdjustment(gwfTotal, gwfRolls, context?.playerStats, damageType);
+            adjustedTotal = applyMinDamageAdjustment(gwfTotal, gwfRolls, playerStats, damageType);
             displayRolls = isCrit ? gwfRolls.concat(gwfRolls) : gwfRolls;
             gwfDisplayRolls = gwfRolls;
         }
@@ -113,8 +115,8 @@ export function createLogDamageAndShow(deps) {
         // Apply superiority damage bonuses
         const { total: boostedTotal, rolls: boostedRolls } = applySuperiorityDamageBonuses(characterName, campaignName, formula, total, rolls, context);
 
-        const { saveDc, saveType, damageType, isAutoMiss } = context || {};
-        const isCrit = context?.isAutoCrit || context?.isCrit || false;
+        const { saveDc, saveType, damageType, isAutoMiss, isAutoCrit, isCrit: ctxIsCrit } = context || {};
+        const isCrit = isAutoCrit || ctxIsCrit;
         const { adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls } = applyDamageRollAdjustments({ isCrit, context, boostedTotal, boostedRolls, modifier, damageType });
 
         if (await handleMagicMissileImmunity({ characterName, campaignName, name, formula, rolls, total, modifier, context, logEntry, setPopupHtml })) return;
@@ -127,7 +129,7 @@ export function createLogDamageAndShow(deps) {
         }
 
         const targetTargetName = context?.targetName;
-        if (targetTargetName && targetTargetName.startsWith('overlay-')) {
+        if (targetTargetName?.startsWith('overlay-')) {
             await aoeDamageHandler({ name, formula, total, rolls, modifier, context, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls });
             return;
         }

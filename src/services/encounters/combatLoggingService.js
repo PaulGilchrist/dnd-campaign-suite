@@ -31,7 +31,7 @@ function logConditionEvent(campaignName, action, creatureName, conditionLabel, d
     }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
-function logConcentrationSave(campaignName, creatureName, roll, bonus, bonusDetail, spellName, dc, success, mode = 'normal') {
+function logConcentrationSave({ campaignName, creatureName, roll, bonus, bonusDetail, spellName, dc, success, mode = 'normal' }) {
     return addEntry(campaignName, {
         type: 'roll',
         rollType: 'concentration-save',
@@ -52,7 +52,7 @@ function logConcentrationSave(campaignName, creatureName, roll, bonus, bonusDeta
 
 // `roll` accepts a scalar OR the rolled dice array — a multi-dice array means Advantage
 // (CLA-209: Powerful Build grapple escape must log both dice with mode 'advantage').
-function logConditionSave(campaignName, creatureName, roll, bonus, bonusDetail, conditionLabel, abilityLabel, dc, success) {
+function logConditionSave({ campaignName, creatureName, roll, bonus, bonusDetail, conditionLabel, abilityLabel, dc, success }) {
     const rolls = Array.isArray(roll) ? roll : [roll]
     const mode = rolls.length > 1 ? 'advantage' : 'normal'
     const finalRoll = rolls.length > 1 ? Math.max(...rolls) : rolls[0]

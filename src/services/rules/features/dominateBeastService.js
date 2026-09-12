@@ -58,6 +58,25 @@ async function targetIsNotFullHealth(targetName, campaignName) {
     return targetCreature && targetCreature.currentHp != null && targetCreature.maxHp != null && targetCreature.currentHp < targetCreature.maxHp;
 }
 
+function resolveSlotLevel(metaCtx, spell) {
+    return metaCtx?.slotLevel || spell.level || 4;
+}
+
+function resolveSpellSaveDc(metaCtx, playerStats) {
+    return metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+}
+
+async function handleNonBeastTarget(playerStats, targetName, metaCtx, spell, campaignName) {
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Dominate Beast',
+        description: `${playerStats.name} casts Dominate Beast on ${targetName} but it has no effect — ${targetName} is not a Beast.`,
+    }).catch((e) => { console.error("[dominateBeastService:log-error]", e); });
+    refundDominateBeastSlot(playerStats, resolveSlotLevel(metaCtx, spell), campaignName);
+    return dominateInfoPopup(`No effect. ${targetName} is not a Beast. Spell slot refunded.`);
+}
+
 export async function triggerDominateBeast(spell, metaCtx, playerStats, campaignName, mapName) {
     if ((spell.name || '').toLowerCase() !== 'dominate beast') return null;
 
@@ -69,32 +88,22 @@ export async function triggerDominateBeast(spell, metaCtx, playerStats, campaign
     // Check: Target is not a Beast
     const isBeast = await isTargetBeast(targetName, campaignName);
     if (!isBeast) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Dominate Beast',
-            description: `${playerStats.name} casts Dominate Beast on ${targetName} but it has no effect — ${targetName} is not a Beast.`,
-        }).catch((e) => { console.error("[dominateBeastService:log-error]", e); });
-        refundDominateBeastSlot(playerStats, metaCtx?.slotLevel || spell.level || 4, campaignName);
-        return dominateInfoPopup(`No effect. ${targetName} is not a Beast. Spell slot refunded.`);
+        return handleNonBeastTarget(playerStats, targetName, metaCtx, spell, campaignName);
     }
 
     // Check if target is at full health to determine if target gets advantage on save
     const targetNotFullHealth = await targetIsNotFullHealth(targetName, campaignName);
 
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-    const slotLevel = metaCtx?.slotLevel || spell.level || 4;
-
     const action = {
         name: 'Dominate Beast',
         automation: {
             type: 'dominate_beast',
-            saveDc: spellSaveDc,
+            saveDc: resolveSpellSaveDc(metaCtx, playerStats),
             targetName: targetName,
             advantage: targetNotFullHealth,
         },
         spell,
-        spellSlotLevel: slotLevel,
+        spellSlotLevel: resolveSlotLevel(metaCtx, spell),
     };
 
     try {

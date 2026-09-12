@@ -32,32 +32,33 @@ function blocksSleepViaImmunities(immunities) {
     return immunities.includes('exhaustion') || immunities.includes('magical sleep');
 }
 
+const SLEEP_IMMUNE_MONSTER_TYPES = ['undead', 'construct'];
+
+function playerSleepImmunity(csCreature, characters) {
+    const character = (characters || []).find(ch => ch.name === csCreature.name);
+    const stats = character?.computedStats || character;
+    if (!stats) return false;
+    if (hasTranceTrait(stats)) return true;
+    return blocksSleepViaImmunities((stats.immunities || []).map(lower));
+}
+
+function monsterDataSleepImmunity(monster) {
+    const conditionImmunities = (monster.condition_immunities || monster.immunities || []).map(lower);
+    return conditionImmunities.includes('exhaustion');
+}
+
 export async function isSleepImmune(campaignName, csCreature, characters) {
     if (!csCreature) return false;
 
-    const monsterType = lower(csCreature.monsterType);
-    if (monsterType === 'undead' || monsterType === 'construct') return true;
-
-    const csImmunities = (csCreature.immunities || []).map(lower);
-    if (blocksSleepViaImmunities(csImmunities)) return true;
+    if (SLEEP_IMMUNE_MONSTER_TYPES.includes(lower(csCreature.monsterType))) return true;
+    if (blocksSleepViaImmunities((csCreature.immunities || []).map(lower))) return true;
 
     if (csCreature.type === 'player') {
-        const character = (characters || []).find(ch => ch.name === csCreature.name);
-        const stats = character?.computedStats || character;
-        if (stats) {
-            if (hasTranceTrait(stats)) return true;
-            const immunities = (stats.immunities || []).map(lower);
-            if (blocksSleepViaImmunities(immunities)) return true;
-        }
-        return false;
+        return playerSleepImmunity(csCreature, characters);
     }
 
     const monster = await getMonsterData(csCreature.name);
-    if (monster) {
-        const conditionImmunities = (monster.condition_immunities || monster.immunities || []).map(lower);
-        if (conditionImmunities.includes('exhaustion')) return true;
-    }
-    return false;
+    return monster ? monsterDataSleepImmunity(monster) : false;
 }
 
 function applyCondition(targetName, condition, campaignName, skipSync) {
@@ -116,6 +117,48 @@ export async function stageSleepTargets(campaignName, casterName, targetNames, s
     return staged;
 }
 
+// Player repeats via queued save prompt; NPCs auto-roll inline.
+async function resolveSleepRepeatSave(csCreature, targetName, casterName, saveDc, campaignName) {
+    if (csCreature?.type !== 'player') {
+        const saveBonus = csCreature?.saveBonuses?.wis ?? 0;
+        const roll = Math.floor(Math.random() * 20) + 1;
+        return { roll, saveBonus, success: (roll + saveBonus) >= saveDc };
+    }
+
+    const { promptId, promise } = createSaveListener(campaignName, {
+        targetName,
+        saveType: 'WIS',
+        saveDc,
+        dcSuccess: 'none',
+        sourceName: casterName,
+        condition: 'Sleep (repeat save)',
+    });
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: 'Sleep',
+        description: `${targetName} repeats its Wisdom save (DC ${saveDc}) at the end of its turn.`,
+        promptId,
+    }).catch((e) => { console.error('[sleepService] Error logging repeat save:', e); });
+
+    const saveResult = await promise;
+    return { roll: saveResult.roll ?? 0, saveBonus: saveResult.saveBonus ?? 0, success: saveResult.success };
+}
+
+// Successful repeat save: strip the staged Sleep effect and Incapacitated.
+function endSleepOnSaveSuccess(effects, idx, targetName, campaignName, skipSync) {
+    if (idx >= 0) effects.splice(idx, 1);
+    setRuntimeValue('campaign', 'targetEffects', effects, campaignName, skipSync);
+    removeCondition(targetName, 'incapacitated', campaignName, skipSync);
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'removed',
+        characterName: targetName,
+        condition: 'Incapacitated',
+        reason: 'Sleep spell ends (repeat save succeeded)',
+    }).catch((e) => { console.error('[sleepService] Error logging condition removal:', e); });
+}
+
 export async function applySleepTurnEnd(campaignName, targetName, options = {}) {
     const sleepEffect = findSleepEffect(targetName, campaignName);
     if (!sleepEffect || sleepEffect.stage !== 'incapacitated') {
@@ -128,36 +171,7 @@ export async function applySleepTurnEnd(campaignName, targetName, options = {}) 
     const cs = getCombatSummary(campaignName);
     const csCreature = cs?.creatures?.find(c => c.name === targetName);
 
-    let roll;
-    let saveBonus = 0;
-    let success;
-
-    if (csCreature?.type === 'player') {
-        const { promptId, promise } = createSaveListener(campaignName, {
-            targetName,
-            saveType: 'WIS',
-            saveDc,
-            dcSuccess: 'none',
-            sourceName: casterName,
-            condition: 'Sleep (repeat save)',
-        });
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: 'Sleep',
-            description: `${targetName} repeats its Wisdom save (DC ${saveDc}) at the end of its turn.`,
-            promptId,
-        }).catch((e) => { console.error('[sleepService] Error logging repeat save:', e); });
-
-        const saveResult = await promise;
-        roll = saveResult.roll ?? 0;
-        saveBonus = saveResult.saveBonus ?? 0;
-        success = saveResult.success;
-    } else {
-        saveBonus = csCreature?.saveBonuses?.wis ?? 0;
-        roll = Math.floor(Math.random() * 20) + 1;
-        success = (roll + saveBonus) >= saveDc;
-    }
+    const { roll, saveBonus, success } = await resolveSleepRepeatSave(csCreature, targetName, casterName, saveDc, campaignName);
 
     const total = roll + saveBonus;
     const effects = [...(getRuntimeValue('campaign', 'targetEffects', campaignName) || [])];
@@ -180,16 +194,7 @@ export async function applySleepTurnEnd(campaignName, targetName, options = {}) 
     }).catch((e) => { console.error('[sleepService] Error logging repeat save result:', e); });
 
     if (success) {
-        if (idx >= 0) effects.splice(idx, 1);
-        setRuntimeValue('campaign', 'targetEffects', effects, campaignName, skipSync);
-        removeCondition(targetName, 'incapacitated', campaignName, skipSync);
-        addEntry(campaignName, {
-            type: 'condition',
-            action: 'removed',
-            characterName: targetName,
-            condition: 'Incapacitated',
-            reason: 'Sleep spell ends (repeat save succeeded)',
-        }).catch((e) => { console.error('[sleepService] Error logging condition removal:', e); });
+        endSleepOnSaveSuccess(effects, idx, targetName, campaignName, skipSync);
         return { handled: true, success: true, roll, total };
     }
 

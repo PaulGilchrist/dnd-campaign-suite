@@ -24,7 +24,7 @@ export function createEffectAdderHandlers({
             if (!conditionDef) return
             const targetCharacter = characters.find(c => c.name === data.target || c.name.startsWith(data.target + ' '))
             const targetStats = targetCharacter?.computedStats || targetCharacter
-            addCondition(combatSummary, data.target, conditionDef, data.dc, data.ability, getRuntimeValue, setRuntimeValue, campaignName, targetStats)
+            addCondition({ combatSummary, creatureName: data.target, conditionDef, dc: data.dc, ability: data.ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats: targetStats })
             storage.set('combatSummary', combatSummary, campaignName)
             setCombatSummary(cloneDeep(combatSummary))
             logConditionEvent(campaignName, 'applied', data.target, conditionDef.label, data.dc, data.ability)

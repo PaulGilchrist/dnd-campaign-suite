@@ -206,7 +206,8 @@ async function resolveAttackerPosition(_mapName, campaignName, playerStats) {
     return { attackerPos, mapData, attackerPlayer };
 }
 
-async function buildHealModal(action, auto, playerStats, campaignName, _mapName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess) {
+async function buildHealModal(action, auto, playerStats, campaignName, _mapName, resolved) {
+    const { resolvedShape, resolvedDamageType, saveDcValue, dcSuccess } = resolved;
     const cs = await getCombatContext(campaignName);
     const { attackerPos, mapData, attackerPlayer } = await resolveAttackerPosition(_mapName, campaignName, playerStats);
 
@@ -270,7 +271,7 @@ async function buildConditionModal(action, auto, playerStats, campaignName, _map
 }
 
 // Handle AoE damage (not heal, not condition-only)
-async function buildAoeModal(action, auto, playerStats, campaignName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess) {
+async function buildAoeModal({ action, auto, playerStats, campaignName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess }) {
     const cs = getCombatContext(campaignName);
     const attackerTargetName = getAttackerTargetName(cs, playerStats.name);
     const isOverlayTargeted = attackerTargetName?.startsWith('overlay-');
@@ -312,6 +313,33 @@ async function buildAoeModal(action, auto, playerStats, campaignName, resolvedSh
     };
 }
 
+function routeSaveAttack(action, auto, playerStats, campaignName, _mapName, resolved) {
+    const { resolvedShape, resolvedDamageType, saveDcValue, dcSuccess } = resolved;
+    // Handle save_attack with healing expression — use a modal for area + healing
+    if (auto.healExpression && isAreaShape(resolvedShape)) {
+        return buildHealModal(action, auto, playerStats, campaignName, _mapName, resolved);
+    }
+
+    if (auto.conditionInflicted && !auto.damage) {
+        if (isAreaShape(resolvedShape)) {
+            return buildConditionModal(action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue);
+        }
+        return conditionInflictedPopup(action, auto, saveDcValue);
+    }
+
+    // Handle effect-only (no damage) case, e.g. Cold's speed reduction
+    if (!auto.damage && auto.effect) {
+        return effectOnlyPopup(action, auto, saveDcValue);
+    }
+
+    // Handle AoE damage (not heal, not condition-only)
+    if (isAreaShape(resolvedShape) && auto.damage && !auto.healExpression && !auto.conditionInflicted) {
+        return buildAoeModal({ action, auto, playerStats, campaignName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess });
+    }
+
+    return buildSaveAttackRollResult(action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
@@ -338,29 +366,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const saveDcValue = buildSaveDc(auto, playerStats);
 
-    // Handle save_attack with healing expression — use a modal for area + healing
-    if (auto.healExpression && isAreaShape(resolvedShape)) {
-        return buildHealModal(action, auto, playerStats, campaignName, _mapName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess);
-    }
-
-    if (auto.conditionInflicted && !auto.damage) {
-        if (isAreaShape(resolvedShape)) {
-            return buildConditionModal(action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue);
-        }
-        return conditionInflictedPopup(action, auto, saveDcValue);
-    }
-
-    // Handle effect-only (no damage) case, e.g. Cold's speed reduction
-    if (!auto.damage && auto.effect) {
-        return effectOnlyPopup(action, auto, saveDcValue);
-    }
-
-    // Handle AoE damage (not heal, not condition-only)
-    if (isAreaShape(resolvedShape) && auto.damage && !auto.healExpression && !auto.conditionInflicted) {
-        return buildAoeModal(action, auto, playerStats, campaignName, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess);
-    }
-
-    return buildSaveAttackRollResult(action, auto, playerStats, resolvedShape, resolvedDamageType, saveDcValue, dcSuccess);
+    return routeSaveAttack(action, auto, playerStats, campaignName, _mapName, { resolvedShape, resolvedDamageType, saveDcValue, dcSuccess });
 }
 
 function conditionInflictedPopup(action, auto, saveDcValue) {

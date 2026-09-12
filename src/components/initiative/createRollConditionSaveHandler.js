@@ -279,6 +279,6 @@ export function createRollConditionSaveHandler({
         }))
 
         // Pass the full dice array so advantage rolls log both dice + mode 'advantage' (CLA-209)
-        logConditionSave(campaignName, creatureName, Array.isArray(rolls) && rolls.length > 1 ? rolls : r1, bonus, bonusDetail, condition.label, getAbilityLabel(condition.ability), condition.dc, success)
+        logConditionSave({ campaignName, creatureName, roll: Array.isArray(rolls) && rolls.length > 1 ? rolls : r1, bonus, bonusDetail, conditionLabel: condition.label, abilityLabel: getAbilityLabel(condition.ability), dc: condition.dc, success })
     }
 }

@@ -52,19 +52,23 @@ function rollBlessSaveBonus(targetEffects, pending) {
     return r ? r.total : 0;
 }
 
-function computeSaveAdvantage(pending, saveType, targetEffects, targetChar, campaignName) {
-    const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
-    // CLA-324: against_spell advantage only on saves against spells — spell-origin is
-    // identifiable from the pending prompt flag or a spell-save-owned lastAttack stamp.
+// CLA-324: against_spell advantage only on saves against spells — spell-origin is
+// identifiable from the pending prompt flag or a spell-save-owned lastAttack stamp.
+function hasSpellOriginSaveAdvantage(targetSaveModifiers, pending, campaignName) {
     const hasAgainstSpellAdvantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
-    const lastAttackOrigin = hasAgainstSpellAdvantage ? (getRuntimeValue('campaign', 'lastAttack', campaignName) || {}) : {};
+    if (!hasAgainstSpellAdvantage) return false;
+    const lastAttackOrigin = getRuntimeValue('campaign', 'lastAttack', campaignName) || {};
     const spellOrigin = pending.isSpellDamage === true ||
       (lastAttackOrigin.rollType === 'spell-save' && (!pending.attackerName || lastAttackOrigin.attackerName === pending.attackerName));
-    const advantage = hasAgainstSpellAdvantage && spellOrigin;
+    return spellOrigin;
+}
+
+function computeSaveAdvantage(pending, saveType, targetEffects, targetChar, campaignName) {
+    const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
+    const advantage = hasSpellOriginSaveAdvantage(targetSaveModifiers, pending, campaignName);
     const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];
     const isDodging = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
-    const isDexSave = saveType.toUpperCase() === 'DEX';
-    const dodgeAdvantage = isDodging && isDexSave;
+    const dodgeAdvantage = isDodging && saveType.toUpperCase() === 'DEX';
     const beaconWisAdvantage = targetEffects.some(te => te.effect === 'beacon_of_hope') && saveType.toUpperCase() === 'WIS';
     const circleOfPowerAdvantage = isCircleOfPowerActive(pending.targetName, campaignName);
     return {

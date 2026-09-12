@@ -133,7 +133,7 @@ async function knockThrustTargetProne(cs, campaignName, targetName, saveDc, save
     const proneAlready = targetCreature.conditions?.some(c => c.key === 'prone');
     if (proneAlready) return;
     const conditionDef = { key: 'prone', label: 'Prone' };
-    addCondition(cs, targetName, conditionDef, saveDc, saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats);
+    addCondition({ combatSummary: cs, creatureName: targetName, conditionDef, dc: saveDc, ability: saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats });
     storage.set('combatSummary', cs, campaignName);
 }
 
