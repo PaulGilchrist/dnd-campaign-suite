@@ -106,6 +106,33 @@ function collectRestoredResources(playerStats, campaignName, ctx) {
     return { restoredResources, naturalRecoveryDetail };
 }
 
+function buildShortRestLogEntries({ playerStats, hitDie, rollLog, hpBeforeRest, displayHp, naturalRecoveryDetail, mealConsumed, restoredResources }) {
+    const logEntries = [];
+    logEntries.push(`${playerStats.name} takes a short rest.`);
+    if (rollLog.length > 0) {
+        const totalDiceHeal = rollLog.filter(r => !r.isSongOfRest).reduce((sum, r) => sum + r.hp, 0);
+        const totalSongHeal = rollLog.filter(r => r.isSongOfRest).reduce((sum, r) => sum + r.hp, 0);
+        const diceDetail = rollLog.filter(r => !r.isSongOfRest).map(r => `${r.roll}→${r.hp}`).join(', ');
+        logEntries.push(`Hit Dice: ${rollLog.filter(r => !r.isSongOfRest).length}d${hitDie} (${diceDetail}) = ${totalDiceHeal} HP recovered`);
+        if (totalSongHeal > 0) {
+            logEntries.push(`Song of Rest: ${totalSongHeal} HP recovered`);
+        }
+        logEntries.push(`Current HP: ${hpBeforeRest} → ${displayHp}`);
+    } else {
+        logEntries.push(`Hit Dice: 0 used`);
+    }
+    if (naturalRecoveryDetail) {
+        logEntries.push(`Natural Recovery: ${naturalRecoveryDetail}`);
+    }
+    if (mealConsumed) {
+        logEntries.push('Replenishing Meal consumed: +1d8 HP');
+    }
+    if (restoredResources.length > 0) {
+        logEntries.push(`Resources restored: ${restoredResources.join(', ')}`);
+    }
+    return logEntries;
+}
+
 // Pure: resolve Sorcerous Restoration flags the modal gates on.
 function computeSorcererRestFlags(playerStats) {
     const isSorcerer = playerStats?.class?.name === 'Sorcerer';
@@ -625,6 +652,13 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         onComplete && onComplete();
     };
 
+    const applySorcerousRestorationState = () => {
+        const curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');
+        const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
+        setRuntimeValue(playerStats.name, 'sorceryPoints', Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount), campaignName);
+        setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
+    };
+
     const handleComplete = async () => {
         const hpBeforeRest = Number(getRuntimeValue(playerStats.name, 'currentHitPoints') ?? playerStats.hitPoints);
 
@@ -653,10 +687,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
         // UI-driven: Sorcerous Restoration
         if (sorcRestoration && restorationAvailable && restorationRequested) {
-            let curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');
-            const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
-            setRuntimeValue(playerStats.name, 'sorceryPoints', Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount), campaignName);
-            setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
+            applySorcerousRestorationState();
         }
 
         // UI-driven: Arcane Recovery
@@ -670,32 +701,14 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             applyNaturalRecoverySelections(playerStats, campaignName, naturalRecoverySelections);
         }
 
-        const logEntries = [];
-        logEntries.push(`${playerStats.name} takes a short rest.`);
-        if (rollLog.length > 0) {
-            const totalDiceHeal = rollLog.filter(r => !r.isSongOfRest).reduce((sum, r) => sum + r.hp, 0);
-            const totalSongHeal = rollLog.filter(r => r.isSongOfRest).reduce((sum, r) => sum + r.hp, 0);
-            const diceDetail = rollLog.filter(r => !r.isSongOfRest).map(r => `${r.roll}→${r.hp}`).join(', ');
-            logEntries.push(`Hit Dice: ${rollLog.filter(r => !r.isSongOfRest).length}d${hitDie} (${diceDetail}) = ${totalDiceHeal} HP recovered`);
-            if (totalSongHeal > 0) {
-                logEntries.push(`Song of Rest: ${totalSongHeal} HP recovered`);
-            }
-            logEntries.push(`Current HP: ${hpBeforeRest} → ${Math.min(playerStats.hitPoints, currentHp)}`);
-        } else {
-            logEntries.push(`Hit Dice: 0 used`);
-        }
         const { restoredResources, naturalRecoveryDetail } = collectRestoredResources(playerStats, campaignName, {
             arcaneRecoveryRequested, restorationRequested, naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections, hasFontOfInspiration,
         });
-        if (naturalRecoveryDetail) {
-            logEntries.push(`Natural Recovery: ${naturalRecoveryDetail}`);
-        }
-        if (mealConsumed) {
-            logEntries.push('Replenishing Meal consumed: +1d8 HP');
-        }
-        if (restoredResources.length > 0) {
-            logEntries.push(`Resources restored: ${restoredResources.join(', ')}`);
-        }
+        const logEntries = buildShortRestLogEntries({
+            playerStats, hitDie, rollLog, hpBeforeRest,
+            displayHp: Math.min(playerStats.hitPoints, currentHp),
+            naturalRecoveryDetail, mealConsumed, restoredResources,
+        });
         addEntry(campaignName, { type: 'short_rest', message: logEntries.join(' | ') }).catch(err => {
             console.error('[ShortRestModal] Failed to log short rest:', err);
         });

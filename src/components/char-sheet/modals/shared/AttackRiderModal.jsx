@@ -31,6 +31,25 @@ function describeRiderOptionEffects(opt) {
     return effects;
 }
 
+function riderOptionList(action) {
+    return action.options || action.automation?.options || [];
+}
+
+function riderMaxEffects(action) {
+    return action.automation?.maxEffects || action.maxEffects || 1;
+}
+
+function buildRiderLabelText(multiSelect, maxEffects, targetName) {
+    const against = targetName ? ` against <b>${targetName}</b>` : '';
+    if (multiSelect) return `Choose up to ${maxEffects} effect${maxEffects > 1 ? 's' : ''}${against}:`;
+    return `Choose an effect${against}:`;
+}
+
+function riderCanApply(multiSelect, selectedMulti, selected) {
+    if (multiSelect) return selectedMulti.length > 0;
+    return !!selected;
+}
+
 function AttackRiderModal({ action, playerStats, campaignName, targetName, onClose }) {
     const [selected, setSelected] = useState(null);
     const [selectedMulti, setSelectedMulti] = useState([]);
@@ -49,8 +68,8 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
         }
     }, [applied, result, versatileTricksterTargets, stalkersFlurryTargets, onClose]);
 
-    const options = action.options || action.automation?.options || [];
-    const maxEffects = action.automation?.maxEffects || action.maxEffects || 1;
+    const options = riderOptionList(action);
+    const maxEffects = riderMaxEffects(action);
     const multiSelect = maxEffects > 1;
 
     // Check for Versatile Trickster secondary targets after applying.
@@ -245,11 +264,8 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
         return null;
     }
 
-    const labelText = multiSelect
-        ? `Choose up to ${maxEffects} effect${maxEffects > 1 ? 's' : ''}${targetName ? ` against <b>${targetName}</b>` : ''}:`
-        : `Choose an effect${targetName ? ` against <b>${targetName}</b>` : ''}:`;
-
-    const canApply = multiSelect ? selectedMulti.length > 0 : !!selected;
+    const labelText = buildRiderLabelText(multiSelect, maxEffects, targetName);
+    const canApply = riderCanApply(multiSelect, selectedMulti, selected);
 
     return (
         <div className="sp-overlay" onClick={(e) => {

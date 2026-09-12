@@ -4,6 +4,28 @@ import './WizardStepSkills.css';
 import { loadSkills } from '../../services/ui/dataLoader.js';
 import { isEqual } from 'lodash';
 
+// Feat-restricted skills can only use feat expertise slots
+const getFeatSlotBlockReason = (expertiseData, expertiseLimits) => {
+  if (!expertiseLimits?.featCount || expertiseLimits.featCount <= 0) {
+    return 'This skill requires a feat expertise slot';
+  }
+  if (expertiseData.featSlotsUsed >= expertiseLimits.featCount) {
+    return 'All feat expertise slots are used';
+  }
+  return null;
+};
+
+// Non-restricted skills can use class slots or feat slots
+const getClassSlotBlockReason = (expertiseLimits) => {
+  if (!expertiseLimits?.classCount || expertiseLimits.classCount <= 0) {
+    if (!expertiseLimits?.featCount || expertiseLimits.featCount <= 0) {
+      return 'This class does not grant expertise slots';
+    }
+    return 'All expertise slots are used';
+  }
+  return 'All class expertise slots are used';
+};
+
 const getExpertiseBlockReason = (skill, expertiseData, expertiseLimits) => {
   // Check if this skill is in a feat-restricted list
   const isFeatRestricted = expertiseLimits?.featExpertiseSkillLists?.some(list =>
@@ -11,17 +33,9 @@ const getExpertiseBlockReason = (skill, expertiseData, expertiseLimits) => {
   );
 
   if (isFeatRestricted) {
-    // Feat-restricted skills can only use feat slots
-    if (!expertiseLimits?.featCount || expertiseLimits.featCount <= 0) {
-      return 'This skill requires a feat expertise slot';
-    }
-    if (expertiseData.featSlotsUsed >= expertiseLimits.featCount) {
-      return 'All feat expertise slots are used';
-    }
-    return null;
+    return getFeatSlotBlockReason(expertiseData, expertiseLimits);
   }
 
-  // Non-restricted skills can use class slots or feat slots
   const inClassList = !expertiseData.classRestrictedSkills || expertiseData.classRestrictedSkills.has(skill);
   const hasClassSlots = inClassList && expertiseLimits?.classCount && expertiseLimits.classCount > 0 && expertiseData.classSlotsAvailable > 0;
   const hasFeatSlots = expertiseLimits?.featCount && expertiseLimits.featCount > 0 && expertiseData.featSlotsUsed < expertiseLimits.featCount;
@@ -32,13 +46,7 @@ const getExpertiseBlockReason = (skill, expertiseData, expertiseLimits) => {
   if (hasClassSlots || hasFeatSlots) {
     return null;
   }
-  if (!expertiseLimits?.classCount || expertiseLimits.classCount <= 0) {
-    if (!expertiseLimits?.featCount || expertiseLimits.featCount <= 0) {
-      return 'This class does not grant expertise slots';
-    }
-    return 'All expertise slots are used';
-  }
-  return 'All class expertise slots are used';
+  return getClassSlotBlockReason(expertiseLimits);
 };
 
 const areEqual = (prevProps, nextProps) => {

@@ -143,14 +143,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       expect(rollExpression).toHaveBeenCalledWith('2d6');
     });
@@ -164,14 +157,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       expect(rollExpressionMaximized).toHaveBeenCalledWith('3d6');
       expect(rollDamageMock).toHaveBeenCalledWith(
@@ -193,14 +179,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       expect(rollExpression).toHaveBeenCalledWith('2d6');
       expect(rollExpressionMaximized).not.toHaveBeenCalled();
@@ -212,14 +191,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       args.rollDamage = rollDamageMock;
       rollExpression.mockReturnValue(null);
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       expect(rollDamageMock).not.toHaveBeenCalled();
     });
@@ -240,14 +212,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       await Promise.resolve();
       await Promise.resolve();
@@ -265,14 +230,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       const context = rollDamageMock.mock.calls[0][5];
       expect(context.viciousMockerySpell).toBe(args.spell);
@@ -284,14 +242,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       const context = rollDamageMock.mock.calls[0][5];
       expect(context.viciousMockerySpell).toBeUndefined();
@@ -311,14 +262,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         '[spellCast] Soulstitch Spells trigger failed:',
@@ -343,14 +287,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       expect(rollDamageMock).toHaveBeenCalledWith(
         'Fireball',
@@ -377,14 +314,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       const context = rollDamageMock.mock.calls[0][5];
       expect(context.isCantrip).toBe(true);
@@ -398,14 +328,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       const context = rollDamageMock.mock.calls[0][5];
       expect(context.isCantrip).toBe(true);
@@ -418,14 +341,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       const context = rollDamageMock.mock.calls[0][5];
       expect(context.saveType).toBe('con');
@@ -438,14 +354,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       const context = rollDamageMock.mock.calls[0][5];
       expect(context.saveType).toBe('wis');
@@ -460,14 +369,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       const context = rollDamageMock.mock.calls[0][5];
       expect(context.overchannelSpellLevel).toBe(5);
@@ -482,14 +384,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
       const rollDamageMock = vi.fn();
       args.rollDamage = rollDamageMock;
 
-      await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      await handleSavePath(args);
 
       const context = rollDamageMock.mock.calls[0][5];
       expect(context.overchannelSpellLevel).toBe(3);

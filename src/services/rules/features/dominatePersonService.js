@@ -30,41 +30,51 @@ async function isTargetHumanoid(targetName, campaignName) {
     return true;
 }
 
-export async function triggerDominatePerson(spell, metaCtx, playerStats, campaignName, mapName) {
-    const isDominatePerson = (spell.name || '').toLowerCase() === 'dominate person';
-    if (!isDominatePerson) return null;
+function dominatePersonInfoPopup(description) {
+    return { type: 'popup', payload: { type: 'automation_info', name: 'Dominate Person', description } };
+}
 
-    let targetName = metaCtx?.targetName;
-    if (!targetName) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures && cs.creatures.length > 0) {
-            const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
-            if (attackerTarget) targetName = attackerTarget.name;
-        }
-        if (!targetName) {
-            console.error(`[dominatePersonService] No target selected for Dominate Person by ${playerStats.name}. Caster has no target in initiative view.`);
-        }
+async function resolveDominatePersonTarget(playerStats, campaignName) {
+    const cs = await getCombatContext(campaignName);
+    if (cs?.creatures && cs.creatures.length > 0) {
+        const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
+        if (attackerTarget) return attackerTarget.name;
     }
+    console.error(`[dominatePersonService] No target selected for Dominate Person by ${playerStats.name}. Caster has no target in initiative view.`);
+    return null;
+}
+
+function refundDominatePersonSlot(playerStats, refundLevel, campaignName) {
+    const slotKey = `spell_slots_level_${refundLevel}`;
+    const currentSlots = getRuntimeValue(playerStats.name, slotKey);
+    if (currentSlots != null && currentSlots >= 0) {
+        setRuntimeValue(playerStats.name, slotKey, currentSlots + 1, campaignName);
+    }
+}
+
+function logNonHumanoidRejection(targetName, playerStats, campaignName) {
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Dominate Person',
+        description: `${playerStats.name} casts Dominate Person on ${targetName} but it has no effect — ${targetName} is not a Humanoid.`,
+    }).catch((e) => { console.error("[dominatePersonService:log-error]", e); });
+}
+
+export async function triggerDominatePerson(spell, metaCtx, playerStats, campaignName, mapName) {
+    if ((spell.name || '').toLowerCase() !== 'dominate person') return null;
+
+    const targetName = metaCtx?.targetName || await resolveDominatePersonTarget(playerStats, campaignName);
     if (!targetName) {
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Dominate Person', description: 'No target selected for Dominate Person.' } };
+        return dominatePersonInfoPopup('No target selected for Dominate Person.');
     }
 
     // Check: Target is not a Humanoid
     const isHumanoid = await isTargetHumanoid(targetName, campaignName);
     if (!isHumanoid) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: 'Dominate Person',
-            description: `${playerStats.name} casts Dominate Person on ${targetName} but it has no effect — ${targetName} is not a Humanoid.`,
-        }).catch((e) => { console.error("[dominatePersonService:log-error]", e); });
-        const refundLevel = metaCtx?.slotLevel || spell.level || 5;
-        const slotKey = `spell_slots_level_${refundLevel}`;
-        const currentSlots = getRuntimeValue(playerStats.name, slotKey);
-        if (currentSlots != null && currentSlots >= 0) {
-            setRuntimeValue(playerStats.name, slotKey, currentSlots + 1, campaignName);
-        }
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Dominate Person', description: `No effect. ${targetName} is not a Humanoid. Spell slot refunded.` } };
+        logNonHumanoidRejection(targetName, playerStats, campaignName);
+        refundDominatePersonSlot(playerStats, metaCtx?.slotLevel || spell.level || 5, campaignName);
+        return dominatePersonInfoPopup(`No effect. ${targetName} is not a Humanoid. Spell slot refunded.`);
     }
 
     // RAW advantage is "if you or your allies are fighting it" — the gridless app
@@ -86,10 +96,9 @@ export async function triggerDominatePerson(spell, metaCtx, playerStats, campaig
     };
 
     try {
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
-        return result;
+        return await executeHandler(action, playerStats, campaignName, mapName);
     } catch (e) {
         console.error('[dominatePersonService] Failed to execute Dominate Person handler:', e);
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Dominate Person', description: `Failed to execute Dominate Person.` } };
+        return dominatePersonInfoPopup('Failed to execute Dominate Person.');
     }
 }

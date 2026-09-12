@@ -12,6 +12,58 @@ const ACTION_TYPE_LABELS = {
 
 const ACTION_TYPE_ORDER = ['attack_rider', 'bonus_action', 'reaction', 'skill_check', 'movement', 'grant_attack'];
 
+// MN-018: HIT-triggered riders require the attack to have actually hit.
+const TRIGGER_PREDICATES = {
+    weapon_attack_hit: (attack, playerName) => attack.attackerName === playerName && attack.hit === true && (attack.weaponType === 'melee' || attack.weaponType === 'ranged' || attack.isUnarmedStrike),
+    melee_weapon_attack_hit: (attack, playerName) => attack.attackerName === playerName && attack.hit === true && (attack.weaponType === 'melee' || attack.isUnarmedStrike),
+    attack_roll_miss: (attack, playerName) => attack.attackerName === playerName && attack.hit === false,
+    melee_attack_miss: (attack, playerName) => attack.targetName === playerName && (attack.weaponType === 'melee' || attack.isUnarmedStrike) && attack.hit === false,
+    melee_damage_taken: (attack, playerName) => attack.targetName === playerName && (attack.weaponType === 'melee' || attack.isUnarmedStrike),
+    melee_attack_straight_line: (attack, playerName) => attack.attackerName === playerName && (attack.weaponType === 'melee' || attack.isUnarmedStrike),
+    replace_attack: (attack, playerName) => attack.attackerName === playerName && attack.replacingAttack === true,
+};
+
+function buildLastAttackContext(lastAttack) {
+    if (!lastAttack) return null;
+    return {
+        hit: lastAttack.hit,
+        isCrit: lastAttack.isCrit || false,
+        weaponType: lastAttack.weaponType || null,
+        isUnarmedStrike: lastAttack.isUnarmedStrike || false,
+        replacingAttack: lastAttack.replacingAttack || false,
+        attackerName: lastAttack.attackerName || null,
+        targetName: lastAttack.targetName || null,
+    };
+}
+
+function computeManeuverList({ availableManeuvers, allManeuvers, selectionMode, isPromptMode, attackContext, lastAttack, knownManeuvers, playerStats }) {
+    if (availableManeuvers && availableManeuvers.length > 0) return availableManeuvers;
+    if (!allManeuvers || allManeuvers.length === 0) return [];
+    if (selectionMode) return allManeuvers;
+    if (!isPromptMode) {
+        return allManeuvers.filter(m => knownManeuvers.includes(m.name));
+    }
+    const effectiveAttack = attackContext || buildLastAttackContext(lastAttack);
+    if (!effectiveAttack) {
+        return allManeuvers.filter(m => knownManeuvers.includes(m.name));
+    }
+    const playerName = playerStats?.name;
+    return allManeuvers.filter(m => {
+        if (!knownManeuvers.includes(m.name)) return false;
+        if (!m.trigger || m.trigger === 'any') return true;
+        // MN-018: HIT-triggered riders require the attack to have actually hit.
+        const predicate = TRIGGER_PREDICATES[m.trigger];
+        return predicate ? predicate(effectiveAttack, playerName) : false;
+    });
+}
+
+function computeHasSuperiorityDice(playerStats) {
+    if (!playerStats?.name) return true;
+    const dice = getRuntimeValue(playerStats.name, 'superiorityDice');
+    const value = dice != null ? Number(dice) : (playerStats._trackedResources?.superiorityDice?.current || 0);
+    return value > 0;
+}
+
 function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose }) {
     const {
         allManeuvers,
@@ -35,12 +87,7 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
     const isPromptMode = !!attackContext || !!skillContext;
     const isPrompt = isPromptMode;
 
-    const hasSuperiorityDice = (() => {
-        if (!playerStats?.name) return true;
-        const dice = getRuntimeValue(playerStats.name, 'superiorityDice');
-        const value = dice != null ? Number(dice) : (playerStats._trackedResources?.superiorityDice?.current || 0);
-        return value > 0;
-    })();
+    const hasSuperiorityDice = computeHasSuperiorityDice(playerStats);
 
     const toggleSelection = (maneuverName) => {
         setSelectedForSelection(prev => {
@@ -80,53 +127,7 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
         }
     };
 
-    const maneuverList = availableManeuvers && availableManeuvers.length > 0 ? availableManeuvers : (() => {
-        if (!allManeuvers || allManeuvers.length === 0) return [];
-        if (selectionMode) return allManeuvers;
-        if (!isPromptMode) {
-            return allManeuvers.filter(m => knownManeuvers.includes(m.name));
-        }
-        const effectiveAttack = attackContext || (lastAttack ? {
-            hit: lastAttack.hit,
-            isCrit: lastAttack.isCrit || false,
-            weaponType: lastAttack.weaponType || null,
-            isUnarmedStrike: lastAttack.isUnarmedStrike || false,
-            replacingAttack: lastAttack.replacingAttack || false,
-            attackerName: lastAttack.attackerName || null,
-            targetName: lastAttack.targetName || null,
-        } : null);
-        if (!effectiveAttack) {
-            return allManeuvers.filter(m => knownManeuvers.includes(m.name));
-        }
-        const playerName = playerStats?.name;
-        return allManeuvers.filter(m => {
-            if (!knownManeuvers.includes(m.name)) return false;
-            if (!m.trigger || m.trigger === 'any') return true;
-            // MN-018: HIT-triggered riders require the attack to have actually hit.
-            if (m.trigger === 'weapon_attack_hit') {
-                return effectiveAttack.attackerName === playerName && effectiveAttack.hit === true && (effectiveAttack.weaponType === 'melee' || effectiveAttack.weaponType === 'ranged' || effectiveAttack.isUnarmedStrike);
-            }
-            if (m.trigger === 'melee_weapon_attack_hit') {
-                return effectiveAttack.attackerName === playerName && effectiveAttack.hit === true && (effectiveAttack.weaponType === 'melee' || effectiveAttack.isUnarmedStrike);
-            }
-            if (m.trigger === 'attack_roll_miss') {
-                return effectiveAttack.attackerName === playerName && effectiveAttack.hit === false;
-            }
-            if (m.trigger === 'melee_attack_miss') {
-                return effectiveAttack.targetName === playerName && (effectiveAttack.weaponType === 'melee' || effectiveAttack.isUnarmedStrike) && effectiveAttack.hit === false;
-            }
-            if (m.trigger === 'melee_damage_taken') {
-                return effectiveAttack.targetName === playerName && (effectiveAttack.weaponType === 'melee' || effectiveAttack.isUnarmedStrike);
-            }
-            if (m.trigger === 'melee_attack_straight_line') {
-                return effectiveAttack.attackerName === playerName && (effectiveAttack.weaponType === 'melee' || effectiveAttack.isUnarmedStrike);
-            }
-            if (m.trigger === 'replace_attack') {
-                return effectiveAttack.attackerName === playerName && effectiveAttack.replacingAttack === true;
-            }
-            return false;
-        });
-    })();
+    const maneuverList = computeManeuverList({ availableManeuvers, allManeuvers, selectionMode, isPromptMode, attackContext, lastAttack, knownManeuvers, playerStats });
 
     const groupedManeuvers = {};
     for (const m of maneuverList) {

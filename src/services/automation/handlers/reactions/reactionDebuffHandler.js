@@ -17,33 +17,11 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
-async function handleAttackRollDebuff(action, _playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
-    const auto = action.automation;
-
-    const attackResult = await findLastAttack(campaignName);
-    const attackEvent = attackResult.attackEvent;
-    if (!attackEvent || attackResult.attackerName !== attackerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`,
-                automation: auto,
-            },
-        };
-    }
-
-    const { d20, bonus, targetName, targetAc, hit, effectiveAc } = attackEvent;
-    const ac = effectiveAc ?? targetAc;
-    const reducedD20 = Math.max(1, d20 - biDieRoll);
-    const reducedHit = ac != null ? (reducedD20 + bonus >= ac) : null;
-    const defenderName = targetName;
-
+// Reverse the original damage when an attack that hit is turned into a miss.
+function reverseHitDamage(combatSummary, attackResult, defenderName, nowMisses) {
     let defenderHp = null;
     let healedAmount = 0;
-
-    if (hit === true && reducedHit === false && defenderName) {
+    if (nowMisses && defenderName) {
         const healAmount = attackResult.totalDamage || attackResult.primaryDamage || 0;
         if (healAmount > 0) {
             const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount);
@@ -51,14 +29,21 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, _mapNa
             healedAmount = healResult?.actualHeal ?? 0;
         }
     }
+    return { defenderHp, healedAmount };
+}
 
-    let description = `<b>${action.name}</b><br/>Attacker: ${attackerName}<br/>Bardic Inspiration die: 1d${bardicDieSize} = <b>${biDieRoll}</b><br/>`;
-    description += `Attack roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
-    description += `Reduced: d20(${reducedD20}) + ${bonus} = ${reducedD20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${reducedHit == null ? 'N/A' : reducedHit ? 'HIT' : 'MISS'}</b><br/>`;
+function hitOutcomeLabel(hit) {
+    return hit == null ? 'N/A' : hit ? 'HIT' : 'MISS';
+}
 
-    if (hit === true && reducedHit === true) {
+function attackRollHtml(label, d20, bonus, ac, outcome) {
+    return `${label} d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${outcome}</b><br/>`;
+}
+
+function appendAttackOutcomeLines(description, hit, finalHit, defenderName, healedAmount) {
+    if (hit === true && finalHit === true) {
         description += `<br/><i>Attack still hits.</i>`;
-    } else if (hit === true && reducedHit === false) {
+    } else if (hit === true && finalHit === false) {
         description += `<br/><i>The attack now misses!</i>`;
         if (healedAmount > 0) {
             description += `<br/>${defenderName} healed for ${healedAmount} HP.`;
@@ -68,6 +53,30 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, _mapNa
     } else if (hit === false) {
         description += `<br/><i>The attack already missed — no effect.</i>`;
     }
+    return description;
+}
+
+async function handleAttackRollDebuff(action, _playerStats, campaignName, _mapName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
+    const auto = action.automation;
+
+    const attackResult = await findLastAttack(campaignName);
+    const attackEvent = attackResult.attackEvent;
+    if (!attackEvent || attackResult.attackerName !== attackerName) {
+        return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
+    }
+
+    const { d20, bonus, targetName, targetAc, hit, effectiveAc } = attackEvent;
+    const ac = effectiveAc ?? targetAc;
+    const reducedD20 = Math.max(1, d20 - biDieRoll);
+    const reducedHit = ac != null ? (reducedD20 + bonus >= ac) : null;
+    const defenderName = targetName;
+
+    const { defenderHp, healedAmount } = reverseHitDamage(combatSummary, attackResult, defenderName, hit === true && reducedHit === false);
+
+    let description = `<b>${action.name}</b><br/>Attacker: ${attackerName}<br/>Bardic Inspiration die: 1d${bardicDieSize} = <b>${biDieRoll}</b><br/>`;
+    description += attackRollHtml('Attack roll:', d20, bonus, ac, hit ? 'HIT' : 'MISS');
+    description += attackRollHtml('Reduced:', reducedD20, bonus, ac, hitOutcomeLabel(reducedHit));
+    description = appendAttackOutcomeLines(description, hit, reducedHit, defenderName, healedAmount);
 
     return infoPopup(action.name, description, auto, { defenderHp });
 }
@@ -118,34 +127,12 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, _map
     const finalD20 = Math.min(d20, secondD20);
     const finalHit = ac != null ? (finalD20 + bonus >= ac) : null;
 
-    let defenderHp = null;
-    let healedAmount = 0;
-
-    if (hit === true && finalHit === false && defenderName) {
-        const healAmount = attackResult.totalDamage || attackResult.primaryDamage || 0;
-        if (healAmount > 0) {
-            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount);
-            defenderHp = healResult?.newHp ?? null;
-            healedAmount = healResult?.actualHeal ?? 0;
-        }
-    }
+    const { defenderHp, healedAmount } = reverseHitDamage(combatSummary, attackResult, defenderName, hit === true && finalHit === false);
 
     let description = `<b>${action.name}</b><br/>Attacker: ${attackerName}<br/>`;
-    description += `Attack roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
-    description += `Disadvantage (second d20: ${secondD20}): d20(${finalD20}) + ${bonus} = ${finalD20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${finalHit == null ? 'N/A' : finalHit ? 'HIT' : 'MISS'}</b><br/>`;
-
-    if (hit === true && finalHit === true) {
-        description += `<br/><i>Attack still hits.</i>`;
-    } else if (hit === true && finalHit === false) {
-        description += `<br/><i>The attack now misses!</i>`;
-        if (healedAmount > 0) {
-            description += `<br/>${defenderName} healed for ${healedAmount} HP.`;
-        } else if (defenderName) {
-            description += `<br/><i>No damage event found to reverse for ${defenderName}.</i>`;
-        }
-    } else if (hit === false) {
-        description += `<br/><i>The attack already missed — no effect.</i>`;
-    }
+    description += attackRollHtml('Attack roll:', d20, bonus, ac, hit ? 'HIT' : 'MISS');
+    description += attackRollHtml(`Disadvantage (second d20: ${secondD20}):`, finalD20, bonus, ac, hitOutcomeLabel(finalHit));
+    description = appendAttackOutcomeLines(description, hit, finalHit, defenderName, healedAmount);
 
     return infoPopup(action.name, description, auto, { defenderHp, defenderName, healedAmount });
 }

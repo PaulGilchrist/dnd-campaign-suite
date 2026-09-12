@@ -21,63 +21,72 @@ async function getTargetHealthAdvantage(targetName, campaignName) {
     return currentHp > 0 && currentHp < maxHp;
 }
 
+function charmMonsterInfoPopup(description) {
+    return { type: 'popup', payload: { type: 'automation_info', name: 'Charm Monster', description } };
+}
+
+async function executeCharmMonsterAction(action, playerStats, campaignName, mapName) {
+    try {
+        return await executeHandler(action, playerStats, campaignName, mapName);
+    } catch (e) {
+        console.error('[charmMonsterService] Failed to execute Charm Monster handler:', e);
+        return charmMonsterInfoPopup('Failed to execute Charm Monster.');
+    }
+}
+
+// Multi-target path: charmMonsterTargets array from CreatureSelectionModal
+async function charmMonsterMultipleTargets(spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel) {
+    const targetAdvantages = {};
+    for (const targetName of targetNames) {
+        targetAdvantages[targetName] = await getTargetHealthAdvantage(targetName, campaignName);
+    }
+
+    const action = {
+        name: 'Charm Monster',
+        automation: {
+            type: 'charm_monster',
+            saveDc: spellSaveDc,
+            advantage: false,
+        },
+        metaCtx: {
+            charmMonsterTargets: targetNames,
+            charmMonsterAdvantages: targetAdvantages,
+        },
+        spell,
+        spellSlotLevel: slotLevel,
+    };
+
+    return await executeCharmMonsterAction(action, playerStats, campaignName, mapName);
+}
+
+async function resolveCharmMonsterTarget(playerStats, campaignName) {
+    const cs = await getCombatContext(campaignName);
+    if (cs?.creatures && cs.creatures.length > 0) {
+        const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
+        if (attackerTarget) return attackerTarget.name;
+    }
+    console.error(`[charmMonsterService] No target selected for Charm Monster by ${playerStats.name}. Caster has no target in initiative view.`);
+    return null;
+}
+
 export async function triggerCharmMonster(spell, metaCtx, playerStats, campaignName, mapName) {
-    const isCharmMonster = (spell.name || '').toLowerCase() === 'charm monster';
-    if (!isCharmMonster) return null;
+    if ((spell.name || '').toLowerCase() !== 'charm monster') return null;
 
     const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
     const slotLevel = metaCtx?.slotLevel || spell.level || 4;
 
-    // Multi-target path: charmMonsterTargets array from CreatureSelectionModal
     const targetNames = metaCtx?.charmMonsterTargets;
-    if (targetNames && Array.isArray(targetNames) && targetNames.length > 0) {
-        const targetAdvantages = {};
-        for (const targetName of targetNames) {
-            targetAdvantages[targetName] = await getTargetHealthAdvantage(targetName, campaignName);
-        }
-
-        const action = {
-            name: 'Charm Monster',
-            automation: {
-                type: 'charm_monster',
-                saveDc: spellSaveDc,
-                advantage: false,
-            },
-            metaCtx: {
-                charmMonsterTargets: targetNames,
-                charmMonsterAdvantages: targetAdvantages,
-            },
-            spell,
-            spellSlotLevel: slotLevel,
-        };
-
-        try {
-            const result = await executeHandler(action, playerStats, campaignName, mapName);
-            return result;
-        } catch (e) {
-            console.error('[charmMonsterService] Failed to execute Charm Monster handler:', e);
-            return { type: 'popup', payload: { type: 'automation_info', name: 'Charm Monster', description: `Failed to execute Charm Monster.` } };
-        }
+    if (Array.isArray(targetNames) && targetNames.length > 0) {
+        return await charmMonsterMultipleTargets(spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel);
     }
 
-    // Single-target path
-    let targetName = metaCtx?.targetName;
+    const targetName = metaCtx?.targetName || await resolveCharmMonsterTarget(playerStats, campaignName);
     if (!targetName) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures && cs.creatures.length > 0) {
-            const attackerTarget = getTargetFromAttacker(cs, playerStats.name);
-            if (attackerTarget) targetName = attackerTarget.name;
-        }
-        if (!targetName) {
-            console.error(`[charmMonsterService] No target selected for Charm Monster by ${playerStats.name}. Caster has no target in initiative view.`);
-        }
-    }
-    if (!targetName) {
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Charm Monster', description: 'No target selected for Charm Monster.' } };
+        return charmMonsterInfoPopup('No target selected for Charm Monster.');
     }
 
     // Check if target is not at full health to determine if target gets advantage on save
-    const targetNotFullHealth = await getTargetHealthAdvantage(targetName, campaignName);
+    const advantage = await getTargetHealthAdvantage(targetName, campaignName);
 
     const action = {
         name: 'Charm Monster',
@@ -85,17 +94,11 @@ export async function triggerCharmMonster(spell, metaCtx, playerStats, campaignN
             type: 'charm_monster',
             saveDc: spellSaveDc,
             targetName: targetName,
-            advantage: targetNotFullHealth,
+            advantage: advantage,
         },
         spell,
         spellSlotLevel: slotLevel,
     };
 
-    try {
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
-        return result;
-    } catch (e) {
-        console.error('[charmMonsterService] Failed to execute Charm Monster handler:', e);
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Charm Monster', description: `Failed to execute Charm Monster.` } };
-    }
+    return await executeCharmMonsterAction(action, playerStats, campaignName, mapName);
 }

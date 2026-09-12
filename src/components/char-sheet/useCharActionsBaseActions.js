@@ -10,22 +10,27 @@ function sizeIndexFor(size, fallbackIndex) {
     return index === -1 ? fallbackIndex : index;
 }
 
+// Pure: Wisdom (Bardic Inspiration replacement) Stealth bonus recalculation.
+function resolveWisReplaceStealthBonus(playerStats, exhaustionPenalty) {
+    const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+    const wisMod = wisAbility?.bonus || 0;
+    const wisBonus = Math.max(1, wisMod);
+    const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+    const isProficient = playerStats.skillProficiencies?.includes('Stealth');
+    const isExpert = playerStats.expertise?.includes('Stealth');
+    let newBonus = wisBonus;
+    if (isProficient) newBonus += proficiency;
+    if (isExpert) newBonus += proficiency;
+    return newBonus - exhaustionPenalty;
+}
+
 // Pure: resolve the Stealth check bonus from passive/skill modifiers.
 function computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty) {
     const stealthSkill = playerStats?.abilities?.flatMap(a => a.skills || []).find(s => s.name === 'Stealth');
     let stealthBonus = stealthSkill?.bonus ?? 0 - exhaustionPenalty;
     const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes('Stealth');
     if (conditionEffects?.wisCheckReplace && isCharismaSkill) {
-        const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
-        const wisMod = wisAbility?.bonus || 0;
-        const wisBonus = Math.max(1, wisMod);
-        const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-        const isProficient = playerStats.skillProficiencies?.includes('Stealth');
-        const isExpert = playerStats.expertise?.includes('Stealth');
-        let newBonus = wisBonus;
-        if (isProficient) newBonus += proficiency;
-        if (isExpert) newBonus += proficiency;
-        stealthBonus = newBonus - exhaustionPenalty;
+        stealthBonus = resolveWisReplaceStealthBonus(playerStats, exhaustionPenalty);
     }
     const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
     const isNotProficient = !playerStats?.skillProficiencies?.includes('Stealth');
@@ -39,21 +44,39 @@ function computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty) {
     return stealthBonus;
 }
 
+function hasSkulkerFeat(playerStats) {
+    return (playerStats?.feats || []).some(f => String(f).toLowerCase().includes('skulker'));
+}
+
+function hexDexDisadvantageApplies(conditionEffects) {
+    return !!(conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === 'DEX');
+}
+
+function stealthAdvantageApplies(conditionEffects) {
+    return !!(conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === 'Stealth'));
+}
+
+function peerlessStealthAdvantageApplies(conditionEffects) {
+    return !!(conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes('Stealth'));
+}
+
+function applyAdvantageUnlessDisadvantaged(checkContext) {
+    checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+}
+
 // Pure: resolve advantage/disadvantage context + Skulker fog-of-war flag.
 function resolveStealthCheckContext(conditionEffects, playerStats) {
     const checkContext = {};
-    const hasSkulkerFeat = (playerStats?.feats || []).some(f => String(f).toLowerCase().includes('skulker'));
-    const is2024Rules = playerStats?.rules === '2024';
     let skulkerFogOfWarApplied = false;
     if (conditionEffects?.abilityCheckDisadvantage) checkContext.forcedMode = 'disadvantage';
-    if (!checkContext.forcedMode && conditionEffects?.hexAbilityCheckDisadvantage && conditionEffects?.hexAbilityCheckDisadvantageAbility === 'DEX') checkContext.forcedMode = 'disadvantage';
-    if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === 'Stealth')) {
-        checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+    if (!checkContext.forcedMode && hexDexDisadvantageApplies(conditionEffects)) checkContext.forcedMode = 'disadvantage';
+    if (stealthAdvantageApplies(conditionEffects)) {
+        applyAdvantageUnlessDisadvantaged(checkContext);
     }
-    if (conditionEffects?.peerlessAthleteAdvantageSkills && conditionEffects.peerlessAthleteAdvantageSkills.includes('Stealth')) {
-        checkContext.forcedMode = checkContext.forcedMode === 'disadvantage' ? undefined : 'advantage';
+    if (peerlessStealthAdvantageApplies(conditionEffects)) {
+        applyAdvantageUnlessDisadvantaged(checkContext);
     }
-    if (!checkContext.forcedMode && is2024Rules && hasSkulkerFeat) {
+    if (!checkContext.forcedMode && playerStats?.rules === '2024' && hasSkulkerFeat(playerStats)) {
         checkContext.forcedMode = 'advantage';
         skulkerFogOfWarApplied = true;
     }
@@ -90,6 +113,24 @@ function buildHideFailureMessages({ d20Val, stealthBonus, rollTotal, dc, skulker
         failLog = `Stealth check: ${rollTotal} (Naturally Stealthy - obscured by ${obscurement}) (d20: ${d20Val} + ${stealthBonus}) vs DC ${dc} — Failure. Did not gain the Invisible condition.`;
     }
     return { failDesc, failLog };
+}
+
+// Pure: resolve the grapple check ability + bonus (Monk uses DEX; JoAT adds half PB).
+function computeGrappleCheckBonus(playerStats, exhaustionPenalty) {
+    const isMonk = playerStats.class?.name === 'Monk';
+    const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+    const strMod = strAbility?.bonus || 0;
+    const dexAbility = playerStats?.abilities?.find(a => a.name === 'Dexterity');
+    const dexMod = dexAbility?.bonus || 0;
+    const useAbility = isMonk ? 'Dexterity' : 'Strength';
+    const abilityMod = isMonk ? dexMod : strMod;
+    let checkBonus = abilityMod - exhaustionPenalty;
+    const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
+    if (isJackOfAllTrades) {
+        const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+        checkBonus += Math.floor(proficiency / 2);
+    }
+    return { isMonk, useAbility, checkBonus };
 }
 
 export default function useCharActionsBaseActions({
@@ -220,6 +261,13 @@ export default function useCharActionsBaseActions({
         return checkContext;
     }
 
+    // Pure: player target — look up STR bonus from its combatSummary creature entry.
+    function resolvePlayerTargetStrBonus(target, cs) {
+        const targetCharacter = cs?.creatures?.find(c => c.name === target.name);
+        const targetStr = targetCharacter?.computedStats?.abilities?.find(a => a.name === 'Strength') || targetCharacter?.abilities?.find(a => a.name === 'Strength');
+        return targetStr?.bonus || 0;
+    }
+
     async function resolveTargetStrBonus(target, cs) {
         let targetStrBonus = 0;
         if (target.computedStats?.abilities) {
@@ -231,9 +279,7 @@ export default function useCharActionsBaseActions({
         } else if (target.ability_score_modifiers?.str != null) {
             targetStrBonus = target.ability_score_modifiers.str;
         } else if (target.type === 'player') {
-            const targetCharacter = cs?.creatures?.find(c => c.name === target.name);
-            const targetStr = targetCharacter?.computedStats?.abilities?.find(a => a.name === 'Strength') || targetCharacter?.abilities?.find(a => a.name === 'Strength');
-            targetStrBonus = targetStr?.bonus || 0;
+            targetStrBonus = resolvePlayerTargetStrBonus(target, cs);
         } else {
             const monsterData = await getMonsterData(target.name, cs?.creatures || []);
             if (monsterData?.ability_score_modifiers?.str != null) {
@@ -288,19 +334,7 @@ export default function useCharActionsBaseActions({
             setPopupHtml({ type: 'automation_info', name: 'Grapple', description: 'Target is already grappled.' });
             return;
         }
-        const isMonk = playerStats.class?.name === 'Monk';
-        const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-        const strMod = strAbility?.bonus || 0;
-        const dexAbility = playerStats?.abilities?.find(a => a.name === 'Dexterity');
-        const dexMod = dexAbility?.bonus || 0;
-        const useAbility = isMonk ? 'Dexterity' : 'Strength';
-        const abilityMod = isMonk ? dexMod : strMod;
-        let checkBonus = abilityMod - exhaustionPenalty;
-        const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
-        if (isJackOfAllTrades) {
-            const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-            checkBonus += Math.floor(proficiency / 2);
-        }
+        const { isMonk, useAbility, checkBonus } = computeGrappleCheckBonus(playerStats, exhaustionPenalty);
         const checkContext = resolveGrappleCheckContext(isMonk, useAbility);
         await rollAbilityCheck(useAbility, checkBonus, checkContext);
         await new Promise(resolve => setTimeout(resolve, 50));

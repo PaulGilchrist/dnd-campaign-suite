@@ -30,6 +30,14 @@ function findPassive(stats, predicate) {
     return (stats.automation?.passives || []).find(predicate);
 }
 
+function baseRaceSpeed(stats) {
+    return stats.race?.subrace?.speed || stats.race?.speed || 30;
+}
+
+function fallbackSpeed(stats) {
+    return stats.speed || baseRaceSpeed(stats);
+}
+
 function applyCotlLandType(processingSummary, cotlLandTypeRuntime) {
     if (!cotlLandTypeRuntime || !processingSummary.class) return;
     if (processingSummary.class.subclass) {
@@ -82,9 +90,9 @@ function applyAspectOfTheWilds(stats, aspectOption) {
             stats.senses.push({ name: 'Darkvision', value: '60 ft.' });
         }
     } else if (aspectOption === 'Panther') {
-        stats.climbSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+        stats.climbSpeed = baseRaceSpeed(stats);
     } else if (aspectOption === 'Salmon') {
-        stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+        stats.swimSpeed = baseRaceSpeed(stats);
     }
 }
 
@@ -104,10 +112,10 @@ function applyRovingSpeeds(stats) {
     }
     if (isWearingHeavyArmor) return;
     if (!stats.climbSpeed) {
-        stats.climbSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
+        stats.climbSpeed = fallbackSpeed(stats) + 10;
     }
     if (!stats.swimSpeed) {
-        stats.swimSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
+        stats.swimSpeed = fallbackSpeed(stats) + 10;
     }
 }
 
@@ -166,7 +174,7 @@ async function applyMovementPassives(stats, playerName, campaignName) {
     const aquaticAffinityPassive = findPassive(stats, p => p.effect === 'aquatic_affinity');
     if (aquaticAffinityPassive) {
         if (!stats.swimSpeed) {
-            stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+            stats.swimSpeed = baseRaceSpeed(stats);
         }
         await setRuntimeValue(playerName, 'aquaticAffinityEmanationRange', 10, campaignName);
     }
@@ -174,7 +182,7 @@ async function applyMovementPassives(stats, playerName, campaignName) {
     // Apply Second-Storywork passive (Rogue level 3: climb speed = walk speed, jump uses DEX)
     const secondStoryworkPassive = findPassive(stats, p => p.effect === 'second_storywork');
     if (secondStoryworkPassive) {
-        const speed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+        const speed = baseRaceSpeed(stats);
         if (!stats.climbSpeed) {
             stats.climbSpeed = speed;
         }
@@ -183,7 +191,7 @@ async function applyMovementPassives(stats, playerName, campaignName) {
     // Apply Athlete feat: climb speed equal to speed
     const athleteClimbPassive = findPassive(stats, p => p.effect === 'climb_speed');
     if (athleteClimbPassive && !stats.climbSpeed) {
-        stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
+        stats.climbSpeed = fallbackSpeed(stats);
     }
 
     // Apply Roving (Ranger level 6): climb speed and swim speed equal to walking speed

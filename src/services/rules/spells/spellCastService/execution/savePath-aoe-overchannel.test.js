@@ -83,12 +83,27 @@ function callSavePath(spellOverrides = {}, overchannel = {}, metaOverrides = {})
     overchannel.active ?? false,
     overchannel.useCount ?? 0,
   ];
-  return handleSavePath(
-    spell, spell, { slotLevel: 1, ...metaOverrides }, makePlayerStats(), 'test-campaign', null, [],
-    async () => ({ name: 'Zombie 1' }), vi.fn(), false, 'Fire', 17,
-    overchannelFormula, overchannelActive, overchannelUseCount,
-    vi.fn(), vi.fn(), '3d6', false,
-  );
+  return handleSavePath({
+    spell,
+    fullSpell: spell,
+    metaCtx: { slotLevel: 1, ...metaOverrides },
+    playerStats: makePlayerStats(),
+    campaignName: 'test-campaign',
+    mapName: null,
+    characters: [],
+    getTargetInfo: async () => ({ name: 'Zombie 1' }),
+    getRuntimeValue: vi.fn(),
+    innateSorceryActive: false,
+    effectiveDamageType: 'Fire',
+    spellSaveDc: 17,
+    overchannelFormula,
+    overchannelActive,
+    overchannelUseCount,
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    formula: '3d6',
+    hasInvisible: false,
+  });
 }
 
 describe('savePath AoE — CLA-244 overchannel context threading', () => {

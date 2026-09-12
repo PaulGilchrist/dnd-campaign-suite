@@ -137,14 +137,7 @@ describe('savePath.js — handleAoE metadata path', () => {
       const args = makeSavePathArgs({ innateSorceryActive: true });
       args.fullSpell = makeFullSpell({ area_of_effect: { type: 'cone', size: 60 } });
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.payload.saveDc).toBe(18);
     });
@@ -162,14 +155,7 @@ describe('savePath.js — handleAoE metadata path', () => {
         dc: { dc_type: 'dex', dc_success: 0 },
       });
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.payload.dcSuccess).toBe('none');
     });
@@ -181,14 +167,7 @@ describe('savePath.js — handleAoE metadata path', () => {
         dc: { dc_type: 'dex', dc_success: 0.5 },
       });
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.payload.dcSuccess).toBe('half');
     });
@@ -200,14 +179,7 @@ describe('savePath.js — handleAoE metadata path', () => {
         dc: { dc_type: 'dex', dc_success: 'none' },
       });
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.payload.dcSuccess).toBe('none');
     });
@@ -220,14 +192,7 @@ describe('savePath.js — handleAoE metadata path', () => {
       });
       args.spell = { dc: { dc_success: 0 } };
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.payload.dcSuccess).toBe('none');
     });
@@ -242,14 +207,7 @@ describe('savePath.js — handleAoE metadata path', () => {
       const args = makeSavePathArgs({ hasInvisible: true });
       args.fullSpell = makeFullSpell({ area_of_effect: { type: 'cone', size: 60 } });
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.payload.metamagicHeighten).toBe(true);
     });
@@ -259,14 +217,7 @@ describe('savePath.js — handleAoE metadata path', () => {
       args.fullSpell = makeFullSpell({ area_of_effect: { type: 'cone', size: 60 } });
       args.metaCtx = { metamagicHeighten: 'Heightened' };
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.payload.metamagicHeighten).toBe('Heightened');
     });
@@ -291,14 +242,7 @@ describe('savePath.js — handleAoE metadata path', () => {
         },
       };
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.modalName).toBe('aoeCondition');
     });
@@ -317,14 +261,7 @@ describe('savePath.js — handleAoE metadata path', () => {
         },
       };
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.modalName).toBe('aoeCondition');
     });
@@ -338,14 +275,7 @@ describe('savePath.js — handleAoE metadata path', () => {
         dc: { dc_type: 'dex', dc_success: 'half' },
       };
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.modalName).toBe('saveAttackAoe');
       expect(result.automationPopup.payload.damage).toBe('8d6');
@@ -369,14 +299,7 @@ describe('savePath.js — handleAoE metadata path', () => {
         },
       };
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.modalName).toBe('saveAttackAoe');
     });
@@ -396,14 +319,7 @@ describe('savePath.js — handleAoE metadata path', () => {
         dc: { dc_type: 'dex', dc_success: 'half' },
       };
 
-      const result = await handleSavePath(
-        args.spell, args.fullSpell, args.metaCtx, args.playerStats,
-        args.campaignName, args.mapName, args.characters, args.getTargetInfo,
-        args.getRuntimeValue, args.innateSorceryActive, args.effectiveDamageType,
-        args.spellSaveDc, args.overchannelFormula, args.overchannelActive,
-        args.overchannelUseCount, args.rollAttack, args.rollDamage,
-        args.formula, args.hasInvisible,
-      );
+      const result = await handleSavePath(args);
 
       expect(result.automationPopup.modalName).toBe('saveAttackAoe');
     });

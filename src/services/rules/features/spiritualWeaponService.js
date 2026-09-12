@@ -114,6 +114,23 @@ export function buildSpiritualWeaponForceAttack(playerStats, force) {
     };
 }
 
+async function resolveWeaponTarget(cs, casterName, campaignName) {
+    const casterCreature = cs?.creatures?.find(c => c.name === casterName);
+    if (casterCreature?.targetName) return casterCreature.targetName;
+    const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
+    if (lastAttack?.targetName && lastAttack.targetName !== casterName) {
+        return lastAttack.targetName;
+    }
+    return null;
+}
+
+// 5-ft-from-force gate via isWithinRange (§7: gridless resolves lenient —
+// the gate is consulted; once a token named like the force marker exists on
+// the active map it becomes enforceable).
+async function checkNearForce(targetName, force) {
+    return isWithinRange(targetName, force.forceMarkerName || FORCE_MARKER_NAME, force.attackRangeFt || ATTACK_RANGE_FT);
+}
+
 export async function resolveSpiritualWeaponMoveAndAttack(playerStats, campaignName) {
     const casterName = playerStats.name;
     const force = getSpiritualWeaponForce(playerStats, campaignName);
@@ -127,14 +144,7 @@ export async function resolveSpiritualWeaponMoveAndAttack(playerStats, campaignN
     }
 
     const cs = await getCombatContext(campaignName);
-    const casterCreature = cs?.creatures?.find(c => c.name === casterName);
-    let targetName = casterCreature?.targetName || null;
-    if (!targetName) {
-        const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
-        if (lastAttack?.targetName && lastAttack.targetName !== casterName) {
-            targetName = lastAttack.targetName;
-        }
-    }
+    const targetName = await resolveWeaponTarget(cs, casterName, campaignName);
     if (!targetName) {
         return refusal(casterName, campaignName, `${casterName} has no target armed for the Spiritual Weapon attack — arm a target on the initiative card first.`);
     }
@@ -144,10 +154,7 @@ export async function resolveSpiritualWeaponMoveAndAttack(playerStats, campaignN
         return refusal(casterName, campaignName, `${targetName} is dead — choose a living target within 5 feet of the force.`);
     }
 
-    // 5-ft-from-force gate via isWithinRange (§7: gridless resolves lenient —
-    // the gate is consulted; once a token named like the force marker exists on
-    // the active map it becomes enforceable).
-    const nearForce = await isWithinRange(targetName, force.forceMarkerName || FORCE_MARKER_NAME, force.attackRangeFt || ATTACK_RANGE_FT);
+    const nearForce = await checkNearForce(targetName, force);
     if (!nearForce) {
         return refusal(casterName, campaignName, `${targetName} is not within ${force.attackRangeFt || ATTACK_RANGE_FT} feet of the Spiritual Weapon force.`);
     }

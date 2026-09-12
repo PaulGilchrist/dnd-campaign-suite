@@ -488,6 +488,126 @@ function LegacyLineageModals({ mergedModalState, setModalState, playerStats, cam
     );
 }
 
+function CombatChoiceModals({
+    mergedModalState,
+    setModalState,
+    combatSuperiorityModal,
+    setCombatSuperiorityModal,
+    handleCombatSuperiorityConfirm,
+    handleAttackRiderManeuverUse,
+    handleAttackRiderManeuverSkip,
+    handleConstellationSelect,
+    playerStats,
+    campaignName,
+}) {
+    return (
+        <>
+            {combatSuperiorityModal && (
+                <CombatSuperiorityModal
+                    {...combatSuperiorityModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setCombatSuperiorityModal(null)}
+                    onConfirm={handleCombatSuperiorityConfirm}
+                />
+            )}
+            {mergedModalState.attackRiderManeuverPrompt && (
+                <AttackRiderManeuverPrompt
+                    maneuvers={mergedModalState.attackRiderManeuverPrompt.maneuvers}
+                    attack={mergedModalState.attackRiderManeuverPrompt.attack}
+                    popupHtml={mergedModalState.attackRiderManeuverPrompt.popupHtml}
+                    isMiss={mergedModalState.attackRiderManeuverPrompt.isMiss}
+                    onUse={handleAttackRiderManeuverUse}
+                    onSkip={handleAttackRiderManeuverSkip}
+                />
+            )}
+            {mergedModalState.starryFormConstellationModal && (
+                <ConstellationSelectionModal
+                    action={mergedModalState.starryFormConstellationModal.action}
+                    playerStats={mergedModalState.starryFormConstellationModal.playerStats}
+                    campaignName={mergedModalState.starryFormConstellationModal.campaignName}
+                    isTwinkled={mergedModalState.starryFormConstellationModal.playerStats?.level >= 10}
+                    onConfirm={(option) => handleConstellationSelect(mergedModalState.starryFormConstellationModal, option)}
+                    onClose={() => setModalState({ starryFormConstellationModal: null })}
+                />
+            )}
+            {mergedModalState.twinklingConstellationModal && (
+                <ConstellationSelectionModal
+                    action={mergedModalState.twinklingConstellationModal.action}
+                    playerStats={mergedModalState.twinklingConstellationModal.playerStats}
+                    campaignName={mergedModalState.twinklingConstellationModal.campaignName}
+                    isTwinkled={true}
+                    onConfirm={(option) => handleConstellationSelect(mergedModalState.twinklingConstellationModal, option)}
+                    onClose={() => setModalState({ twinklingConstellationModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
+function EnemySelectionModals({
+    mergedModalState,
+    setModalState,
+    handleBulwarkOfForceConfirm,
+    handleZealousPresenceConfirm,
+    handlePsychicWhispersConfirm,
+    handleCoronaEnemySelectionConfirm,
+    handleRadianceOfDawnConfirm,
+}) {
+    return (
+        <>
+            {mergedModalState.bulwarkOfForceModal && (
+                <BulwarkOfForceModal
+                    targets={mergedModalState.bulwarkOfForceModal.creatureTargets}
+                    maxTargets={mergedModalState.bulwarkOfForceModal.maxTargets}
+                    onConfirm={handleBulwarkOfForceConfirm}
+                    onSkip={() => setModalState({ bulwarkOfForceModal: null })}
+                />
+            )}
+            {mergedModalState.zealousPresenceModal && (
+                <ZealousPresenceModal
+                    targets={mergedModalState.zealousPresenceModal.creatureTargets}
+                    maxTargets={mergedModalState.zealousPresenceModal.maxTargets}
+                    onConfirm={handleZealousPresenceConfirm}
+                    onSkip={() => setModalState({ zealousPresenceModal: null })}
+                />
+            )}
+            {mergedModalState.psychicWhispersModal && (
+                <CreatureSelectionModal
+                    title="Psychic Whispers"
+                    icon="fa-brain"
+                    targets={mergedModalState.psychicWhispersModal.creatureTargets}
+                    maxTargets={mergedModalState.psychicWhispersModal.maxTargets}
+                    description={`Choose up to ${mergedModalState.psychicWhispersModal.maxTargets} creatures within 35 feet to form a telepathic link. Roll one Psionic Energy Die (d${mergedModalState.psychicWhispersModal.dieSize}): link lasts for hours equal to the roll. First use after a Long Rest doesn't expend a die.`}
+                    confirmLabel="Establish Link"
+                    confirmIcon="fa-brain"
+                    onConfirm={handlePsychicWhispersConfirm}
+                    onSkip={() => setModalState({ psychicWhispersModal: null })}
+                />
+            )}
+            {mergedModalState.coronaEnemySelectionModal && (
+                <CoronaEnemySelectionModal
+                    creatureTargets={mergedModalState.coronaEnemySelectionModal.creatureTargets}
+                    onConfirm={handleCoronaEnemySelectionConfirm}
+                    onSkip={() => setModalState({ coronaEnemySelectionModal: null })}
+                />
+            )}
+            {mergedModalState.radianceOfDawnModal && (
+                <RadianceOfDawnModal
+                    creatureTargets={mergedModalState.radianceOfDawnModal.creatureTargets}
+                    saveType={mergedModalState.radianceOfDawnModal.saveType}
+                    saveDc={mergedModalState.radianceOfDawnModal.saveDc}
+                    damageExpression={mergedModalState.radianceOfDawnModal.damageExpression}
+                    damageType={mergedModalState.radianceOfDawnModal.damageType}
+                    rangeFeet={mergedModalState.radianceOfDawnModal.rangeFeet}
+                    onConfirm={handleRadianceOfDawnConfirm}
+                    onSkip={() => setModalState({ radianceOfDawnModal: null })}
+                />
+            )}
+        </>
+    );
+}
+
 function SecondaryModals({
     mergedModalState,
     setModalState,
@@ -658,93 +778,27 @@ function SecondaryModals({
             )}
             <ArcaneFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} />
             <LegacyLineageModals mergedModalState={mergedModalState} setModalState={setModalState} playerStats={playerStats} campaignName={campaignName} />
-            {combatSuperiorityModal && (
-                <CombatSuperiorityModal
-                    {...combatSuperiorityModal}
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    onClose={() => setCombatSuperiorityModal(null)}
-                    onConfirm={handleCombatSuperiorityConfirm}
-                />
-            )}
-            {mergedModalState.attackRiderManeuverPrompt && (
-                <AttackRiderManeuverPrompt
-                    maneuvers={mergedModalState.attackRiderManeuverPrompt.maneuvers}
-                    attack={mergedModalState.attackRiderManeuverPrompt.attack}
-                    popupHtml={mergedModalState.attackRiderManeuverPrompt.popupHtml}
-                    isMiss={mergedModalState.attackRiderManeuverPrompt.isMiss}
-                    onUse={handleAttackRiderManeuverUse}
-                    onSkip={handleAttackRiderManeuverSkip}
-                />
-            )}
-            {mergedModalState.starryFormConstellationModal && (
-                <ConstellationSelectionModal
-                    action={mergedModalState.starryFormConstellationModal.action}
-                    playerStats={mergedModalState.starryFormConstellationModal.playerStats}
-                    campaignName={mergedModalState.starryFormConstellationModal.campaignName}
-                    isTwinkled={mergedModalState.starryFormConstellationModal.playerStats?.level >= 10}
-                    onConfirm={(option) => handleConstellationSelect(mergedModalState.starryFormConstellationModal, option)}
-                    onClose={() => setModalState({ starryFormConstellationModal: null })}
-                />
-            )}
-            {mergedModalState.twinklingConstellationModal && (
-                <ConstellationSelectionModal
-                    action={mergedModalState.twinklingConstellationModal.action}
-                    playerStats={mergedModalState.twinklingConstellationModal.playerStats}
-                    campaignName={mergedModalState.twinklingConstellationModal.campaignName}
-                    isTwinkled={true}
-                    onConfirm={(option) => handleConstellationSelect(mergedModalState.twinklingConstellationModal, option)}
-                    onClose={() => setModalState({ twinklingConstellationModal: null })}
-                />
-            )}
-            {mergedModalState.bulwarkOfForceModal && (
-                <BulwarkOfForceModal
-                    targets={mergedModalState.bulwarkOfForceModal.creatureTargets}
-                    maxTargets={mergedModalState.bulwarkOfForceModal.maxTargets}
-                    onConfirm={handleBulwarkOfForceConfirm}
-                    onSkip={() => setModalState({ bulwarkOfForceModal: null })}
-                />
-            )}
-            {mergedModalState.zealousPresenceModal && (
-                <ZealousPresenceModal
-                    targets={mergedModalState.zealousPresenceModal.creatureTargets}
-                    maxTargets={mergedModalState.zealousPresenceModal.maxTargets}
-                    onConfirm={handleZealousPresenceConfirm}
-                    onSkip={() => setModalState({ zealousPresenceModal: null })}
-                />
-            )}
-            {mergedModalState.psychicWhispersModal && (
-                <CreatureSelectionModal
-                    title="Psychic Whispers"
-                    icon="fa-brain"
-                    targets={mergedModalState.psychicWhispersModal.creatureTargets}
-                    maxTargets={mergedModalState.psychicWhispersModal.maxTargets}
-                    description={`Choose up to ${mergedModalState.psychicWhispersModal.maxTargets} creatures within 35 feet to form a telepathic link. Roll one Psionic Energy Die (d${mergedModalState.psychicWhispersModal.dieSize}): link lasts for hours equal to the roll. First use after a Long Rest doesn't expend a die.`}
-                    confirmLabel="Establish Link"
-                    confirmIcon="fa-brain"
-                    onConfirm={handlePsychicWhispersConfirm}
-                    onSkip={() => setModalState({ psychicWhispersModal: null })}
-                />
-            )}
-            {mergedModalState.coronaEnemySelectionModal && (
-                <CoronaEnemySelectionModal
-                    creatureTargets={mergedModalState.coronaEnemySelectionModal.creatureTargets}
-                    onConfirm={handleCoronaEnemySelectionConfirm}
-                    onSkip={() => setModalState({ coronaEnemySelectionModal: null })}
-                />
-            )}
-            {mergedModalState.radianceOfDawnModal && (
-                <RadianceOfDawnModal
-                    creatureTargets={mergedModalState.radianceOfDawnModal.creatureTargets}
-                    saveType={mergedModalState.radianceOfDawnModal.saveType}
-                    saveDc={mergedModalState.radianceOfDawnModal.saveDc}
-                    damageExpression={mergedModalState.radianceOfDawnModal.damageExpression}
-                    damageType={mergedModalState.radianceOfDawnModal.damageType}
-                    rangeFeet={mergedModalState.radianceOfDawnModal.rangeFeet}
-                    onConfirm={handleRadianceOfDawnConfirm}
-                    onSkip={() => setModalState({ radianceOfDawnModal: null })}
-                />
-            )}
+            <CombatChoiceModals
+                mergedModalState={mergedModalState}
+                setModalState={setModalState}
+                combatSuperiorityModal={combatSuperiorityModal}
+                setCombatSuperiorityModal={setCombatSuperiorityModal}
+                handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
+                handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
+                handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
+                handleConstellationSelect={handleConstellationSelect}
+                playerStats={playerStats}
+                campaignName={campaignName}
+            />
+            <EnemySelectionModals
+                mergedModalState={mergedModalState}
+                setModalState={setModalState}
+                handleBulwarkOfForceConfirm={handleBulwarkOfForceConfirm}
+                handleZealousPresenceConfirm={handleZealousPresenceConfirm}
+                handlePsychicWhispersConfirm={handlePsychicWhispersConfirm}
+                handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
+                handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
+            />
             <AllySelectionModals
                 mergedModalState={mergedModalState}
                 setModalState={setModalState}

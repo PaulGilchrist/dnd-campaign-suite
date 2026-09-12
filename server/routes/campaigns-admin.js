@@ -95,65 +95,50 @@ router.post('/api/campaigns', asyncHandler((req, res) => {
     res.status(201).json({ message: 'Campaign created successfully', campaignName: campaignName.trim() });
 }));
 
-// API endpoint to rename a campaign directory
-router.put('/api/campaigns/:campaign', asyncHandler((req, res) => {
-    const { campaign } = req.params;
-    const { newName } = req.body;
-
-    if (!newName || newName.trim() === '') {
-        return res.status(400).json({ error: 'New campaign name is required' });
+// Move in-memory Maps keyed by campaign name from old to new
+function migrateCampaignMemoryMaps(oldName, newName) {
+    if (characterChangeData.has(oldName)) {
+        characterChangeData.set(newName, characterChangeData.get(oldName));
+        characterChangeData.delete(oldName);
     }
-
-    const oldCampaignDir = campaignDir(campaign);
-    const newCampaignDir = campaignDir(newName.trim());
-
-    if (!fs.existsSync(oldCampaignDir)) {
-        return res.status(404).json({ error: 'Campaign not found' });
+    if (spellOverlayData.has(oldName)) {
+        spellOverlayData.set(newName, spellOverlayData.get(oldName));
+        spellOverlayData.delete(oldName);
     }
-
-    if (fs.existsSync(newCampaignDir)) {
-        return res.status(400).json({ error: 'Campaign already exists' });
+    if (activeMaps.has(oldName)) {
+        activeMaps.set(newName, activeMaps.get(oldName));
+        activeMaps.delete(oldName);
     }
+}
 
-    fs.renameSync(oldCampaignDir, newCampaignDir);
+function isCharacterJsonFile(file) {
+    return file.endsWith('.json') && !file.startsWith('campaign-') && !file.startsWith('npcs') && !file.startsWith('quests') && !file.startsWith('factions') && !file.startsWith('settlements');
+}
 
-    // Migrate in-memory Maps from old campaign name to new
-    if (characterChangeData.has(campaign)) {
-        characterChangeData.set(newName.trim(), characterChangeData.get(campaign));
-        characterChangeData.delete(campaign);
-    }
-    if (spellOverlayData.has(campaign)) {
-        spellOverlayData.set(newName.trim(), spellOverlayData.get(campaign));
-        spellOverlayData.delete(campaign);
-    }
-    if (activeMaps.has(campaign)) {
-        activeMaps.set(newName.trim(), activeMaps.get(campaign));
-        activeMaps.delete(campaign);
-    }
-
-    // Update imagePath fields in character JSON files
+// Update imagePath fields in character JSON files after a campaign rename
+function renameImagePathsInCharacterFiles(newCampaignDir, campaign) {
     try {
         const files = fs.readdirSync(newCampaignDir);
         for (const file of files) {
-            if (file.endsWith('.json') && !file.startsWith('campaign-') && !file.startsWith('npcs') && !file.startsWith('quests') && !file.startsWith('factions') && !file.startsWith('settlements')) {
-                const filePath = path.join(newCampaignDir, file);
-                try {
-                    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-                    if (data.imagePath && typeof data.imagePath === 'string' && data.imagePath.includes('campaigns/')) {
-                        data.imagePath = data.imagePath.replace(`campaigns/${campaign}`, 'images');
-                        fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-                    }
-                } catch (_err) {
-                    // Skip files that can't be parsed as JSON
+            if (!isCharacterJsonFile(file)) continue;
+            const filePath = path.join(newCampaignDir, file);
+            try {
+                const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+                if (data.imagePath && typeof data.imagePath === 'string' && data.imagePath.includes('campaigns/')) {
+                    data.imagePath = data.imagePath.replace(`campaigns/${campaign}`, 'images');
+                    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
                 }
+            } catch (_err) {
+                // Skip files that can't be parsed as JSON
             }
         }
     } catch (err) {
         console.error(`Failed to update imagePath in character files:`, err.message);
     }
+}
 
-    // Update imagePath fields in NPC data
-    const npcsPath = campaignDataFile(newName.trim(), 'npcs.json');
+// Update imagePath fields in NPC data after a campaign rename
+function renameImagePathsInNpcData(npcsPath, campaign) {
     try {
         if (fs.existsSync(npcsPath)) {
             const npcs = JSON.parse(fs.readFileSync(npcsPath, 'utf-8'));
@@ -173,12 +158,40 @@ router.put('/api/campaigns/:campaign', asyncHandler((req, res) => {
     } catch (err) {
         console.error(`Failed to update imagePath in NPC data:`, err.message);
     }
+}
+
+// API endpoint to rename a campaign directory
+router.put('/api/campaigns/:campaign', asyncHandler((req, res) => {
+    const { campaign } = req.params;
+    const { newName } = req.body;
+
+    if (!newName || newName.trim() === '') {
+        return res.status(400).json({ error: 'New campaign name is required' });
+    }
+
+    const trimmedName = newName.trim();
+    const oldCampaignDir = campaignDir(campaign);
+    const newCampaignDir = campaignDir(trimmedName);
+
+    if (!fs.existsSync(oldCampaignDir)) {
+        return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    if (fs.existsSync(newCampaignDir)) {
+        return res.status(400).json({ error: 'Campaign already exists' });
+    }
+
+    fs.renameSync(oldCampaignDir, newCampaignDir);
+
+    migrateCampaignMemoryMaps(campaign, trimmedName);
+    renameImagePathsInCharacterFiles(newCampaignDir, campaign);
+    renameImagePathsInNpcData(campaignDataFile(trimmedName, 'npcs.json'), campaign);
 
     // Persist the migrated change data to the new campaign path
     saveFile();
-    markDirty(newName.trim());
+    markDirty(trimmedName);
 
-    res.json({ message: 'Campaign renamed successfully', campaignName: newName.trim() });
+    res.json({ message: 'Campaign renamed successfully', campaignName: trimmedName });
 }));
 
 // API endpoint to delete a campaign and all its files/images

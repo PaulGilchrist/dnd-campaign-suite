@@ -413,7 +413,7 @@ describe('CharSheet condition effects computation', () => {
   });
 
   // CLA-209 regression: hasPowerfulBuild must be forwarded to computeConditionEffects
-  // (arg 17) so the powerful_build_grapple_escape save modifier can apply there.
+  // (options.hasPowerfulBuild) so the powerful_build_grapple_escape save modifier can apply there.
   it('forwards hasPowerfulBuild=true to computeConditionEffects (CLA-209)', async () => {
     const stats = createMockPlayerStats({
       hasPowerfulBuild: true,
@@ -432,6 +432,6 @@ describe('CharSheet condition effects computation', () => {
     });
 
     expect(computeConditionEffects).toHaveBeenCalled();
-    expect(computeConditionEffects.mock.calls[0][16]).toBe(true);
+    expect(computeConditionEffects.mock.calls[0][0].hasPowerfulBuild).toBe(true);
   });
 });

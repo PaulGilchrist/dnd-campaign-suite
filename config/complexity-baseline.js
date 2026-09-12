@@ -4,54 +4,37 @@
 // Complexity ratchet: per-directory thresholds equal each directory's current
 // worst metric (non-test code). New code must not exceed its directory baseline,
 // since npm run lint runs with --max-warnings 0.
-// NOTE: step mode — src/services/ui complexity temporarily dropped to 26.
-// Fix the reported violations, then run npm run lint:complexity-baseline to lock.
 export default [
   {
-    files: ['src/components/character-creation/**'],
+    files: ['src/hooks/combat/**'],
     rules: {
-      'complexity': ['warn', 29],
+      'complexity': ['warn', 25],
+      'max-params': ['warn', 15],
     },
   },
   {
     files: ['src/hooks/wizard/**'],
     rules: {
-      'complexity': ['warn', 29],
+      'complexity': ['warn', 25],
     },
   },
   {
-    files: ['server/routes/campaigns-admin.js'],
+    files: ['src/components/character-creation/**'],
     rules: {
-      'complexity': ['warn', 28],
-      'max-depth': ['warn', 5],
-    },
-  },
-  {
-    files: ['src/components/char-sheet/**'],
-    rules: {
-      'complexity': ['warn', 28],
-      'max-depth': ['warn', 6],
-      'max-statements': ['warn', 68],
-      'max-params': ['warn', 11],
+      'complexity': ['warn', 24],
     },
   },
   {
     files: ['src/components/encounter/**'],
     rules: {
-      'complexity': ['warn', 28],
+      'complexity': ['warn', 24],
       'max-params': ['warn', 10],
-    },
-  },
-  {
-    files: ['src/components/sidebar/**'],
-    rules: {
-      'complexity': ['warn', 28],
     },
   },
   {
     files: ['src/services/automation/**'],
     rules: {
-      'complexity': ['warn', 27],
+      'complexity': ['warn', 24],
       'max-depth': ['warn', 6],
       'max-params': ['warn', 10],
     },
@@ -59,47 +42,10 @@ export default [
   {
     files: ['src/services/rules/**'],
     rules: {
-      'complexity': ['warn', 27],
+      'complexity': ['warn', 24],
       'max-depth': ['warn', 6],
       'max-statements': ['warn', 65],
-      'max-params': ['warn', 19],
-    },
-  },
-  {
-    files: ['src/components/common/**'],
-    rules: {
-      'complexity': ['warn', 26],
-      'max-params': ['warn', 7],
-    },
-  },
-  {
-    files: ['src/services/character/**'],
-    rules: {
-      'complexity': ['warn', 26],
-      'max-depth': ['warn', 5],
-      'max-statements': ['warn', 63],
-    },
-  },
-  {
-    files: ['src/services/combat/**'],
-    rules: {
-      'complexity': ['warn', 26],
-      'max-depth': ['warn', 6],
-      'max-params': ['warn', 18],
-    },
-  },
-  {
-    files: ['src/services/ui/**'],
-    rules: {
-      'complexity': ['warn', 26],
-      'max-depth': ['warn', 5],
-    },
-  },
-  {
-    files: ['src/hooks/combat/**'],
-    rules: {
-      'complexity': ['warn', 25],
-      'max-params': ['warn', 15],
+      'max-params': ['warn', 13],
     },
   },
   {
@@ -110,9 +56,33 @@ export default [
     },
   },
   {
+    files: ['src/components/common/**'],
+    rules: {
+      'complexity': ['warn', 23],
+      'max-params': ['warn', 7],
+    },
+  },
+  {
     files: ['src/components/log/**'],
     rules: {
       'complexity': ['warn', 23],
+    },
+  },
+  {
+    files: ['src/services/combat/**'],
+    rules: {
+      'complexity': ['warn', 23],
+      'max-depth': ['warn', 6],
+      'max-params': ['warn', 10],
+    },
+  },
+  {
+    files: ['src/components/char-sheet/**'],
+    rules: {
+      'complexity': ['warn', 22],
+      'max-depth': ['warn', 6],
+      'max-statements': ['warn', 68],
+      'max-params': ['warn', 11],
     },
   },
   {
@@ -120,7 +90,7 @@ export default [
     rules: {
       'complexity': ['warn', 22],
       'max-depth': ['warn', 6],
-      'max-statements': ['warn', 72],
+      'max-statements': ['warn', 64],
     },
   },
   {
@@ -136,6 +106,13 @@ export default [
     rules: {
       'complexity': ['warn', 22],
       'max-params': ['warn', 6],
+    },
+  },
+  {
+    files: ['src/services/character/**'],
+    rules: {
+      'complexity': ['warn', 22],
+      'max-statements': ['warn', 63],
     },
   },
   {
@@ -248,9 +225,21 @@ export default [
     },
   },
   {
+    files: ['server/routes/campaigns-admin.js'],
+    rules: {
+      'max-depth': ['warn', 5],
+    },
+  },
+  {
     files: ['src/hooks/runtime/**'],
     rules: {
       'max-params': ['warn', 7],
+    },
+  },
+  {
+    files: ['src/services/ui/**'],
+    rules: {
+      'max-depth': ['warn', 5],
     },
   },
 ];

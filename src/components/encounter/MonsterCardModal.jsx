@@ -210,6 +210,18 @@ function buildAttackRollOptions(v) {
   };
 }
 
+function hasPassiveRule(computedStats, effect) {
+  return computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === effect);
+}
+
+function resolveCurrentAllies(storedAllies, monsterName) {
+  return Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : [monsterName];
+}
+
+function computeShieldOfFaithBonus(activeBuffs) {
+  return Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0;
+}
+
 function blockStinkingCloudAction(campaignName, monsterName, name) {
   addEntry(campaignName, {
     type: 'automation blocked',
@@ -229,7 +241,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const [showAllyModal, setShowAllyModal] = useState(false);
   const [allyModalCreatures, setAllyModalCreatures] = useState([]);
   const storedAllies = useRuntimeValue(monsterName, 'selectedAllies', campaignName);
-  const currentAllies = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : [monsterName];
+  const currentAllies = resolveCurrentAllies(storedAllies, monsterName);
   const pendingSaveRef = useRef(null);
 
   useEffect(() => {
@@ -256,10 +268,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const inspiringMoveNoOA = useRuntimeValue(monsterName, 'inspiringMovementNoOA', campaignName);
   const remarkableNoOA = useRuntimeValue(monsterName, 'remarkableAthleteNoOA', campaignName);
   const monsterCharacter = characters?.find(c => c.name === monsterName);
-  const speedyOpportunityDisadvantage = monsterCharacter?.computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'opportunity_attacks_disadvantage');
-  const speedyDifficultTerrainIgnore = monsterCharacter?.computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash');
+  const speedyOpportunityDisadvantage = hasPassiveRule(monsterCharacter?.computedStats, 'opportunity_attacks_disadvantage');
+  const speedyDifficultTerrainIgnore = hasPassiveRule(monsterCharacter?.computedStats, 'ignore_difficult_terrain_on_dash');
   const monsterActiveBuffs = getRuntimeValue(monsterName, 'activeBuffs') || [];
-  const shieldOfFaithBonus = Array.isArray(monsterActiveBuffs) && monsterActiveBuffs.some(b => b.effect === 'shield_of_faith') ? 2 : 0;
+  const shieldOfFaithBonus = computeShieldOfFaithBonus(monsterActiveBuffs);
 
   const monsterSensesArray = useMemo(() => {
     if (!monster?.senses) return null;
@@ -399,7 +411,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
     const targetSaveModifiers = target?.type === 'player' ? targetComputed?.saveModifiers : (target?.saveModifiers || []);
 
-    const attackerEffects = computeConditionEffects(attackerConditions, targetSaveModifiers, monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false, false, false, monsterSensesArray)
+    const attackerEffects = computeConditionEffects({ conditions: attackerConditions, saveModifiers: targetSaveModifiers, targetEffects: monsterTargetEffects, attackerSenses: monsterSensesArray })
     const cloudActionBlock = monsterTargetEffects.some(te => te.effect === 'no_action_and_bonus_action')
     const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c)) || cloudActionBlock
     if (attackerCannotAct) {
@@ -410,7 +422,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     }
 
     const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
-    const targetEffectData = computeConditionEffects(targetConditions, targetSaveModifiers, targetRiderForTarget, false, false, false, false, null, false, null, false, false, false, false, false, false, false, null)
+    const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget })
 
     const riderAttackBonus = targetEffectData.riderAttackBonus || 0;
     const effectiveBonus = bonus + riderAttackBonus;

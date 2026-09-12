@@ -22,6 +22,45 @@ function getQualifyingArcanumLevels(charLevel) {
   return ARCANUM_LEVEL_REQUIREMENTS.filter(req => charLevel >= req.charLevel);
 }
 
+// Banner offering to reopen a feat configuration modal
+function FeatEditBanner({ icon, children, onClick }) {
+  return (
+    <div className="mi-wizard-banner">
+      <button
+        type="button"
+        className="mi-wizard-edit-btn"
+        onClick={onClick}
+      >
+        <i className={`fa-solid ${icon}`}></i> {children}
+      </button>
+    </div>
+  );
+}
+
+const featNameMatches = (feat, name) =>
+  feat === name || (typeof feat === 'object' && feat.name === name);
+
+// Edit banners shown when a feat is selected, configured, and its modal is closed
+function getEditBannerDescriptors({ formData, modals }) {
+  const feats = formData.feats || [];
+  const ritualMasterChosenCount = (formData.ritualMasterSpells || []).length;
+  const descriptors = [];
+  if (feats.some(f => featNameMatches(f, 'Magic Initiate')) && !modals.magicInitiate) {
+    descriptors.push({ id: 'magic-initiate', modal: 'magicInitiate', icon: 'fa-hat-wizard', label: 'Edit Magic Initiate' });
+  }
+  if (feats.some(f => featNameMatches(f, 'Fey Touched')) && formData.feyTouchedSpell && !modals.feyTouched) {
+    descriptors.push({ id: 'fey-touched', modal: 'feyTouched', icon: 'fa-leaf', label: 'Edit Fey Magic' });
+  }
+  if (feats.some(f => featNameMatches(f, 'Shadow Touched')) && formData.shadowTouchedSpell && !modals.shadowTouched) {
+    descriptors.push({ id: 'shadow-touched', modal: 'shadowTouched', icon: 'fa-mask', label: 'Edit Shadow Magic' });
+  }
+  const hasRitualMaster = feats.some(f => featNameMatches(f, 'Ritual Master') || (typeof f === 'object' && f.index === 'ritual-master'));
+  if (hasRitualMaster && ritualMasterChosenCount > 0 && !modals.ritualMaster) {
+    descriptors.push({ id: 'ritual-master', modal: 'ritualMaster', icon: 'fa-scroll', label: `Edit Ritual Spells (${ritualMasterChosenCount})` });
+  }
+  return descriptors;
+}
+
 // Mystic Arcanum selection component for Warlock
 function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelectedSpells }) {
   const preSelected = useMemo(() => preSelectedSpells || [], [preSelectedSpells]);
@@ -534,12 +573,21 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
       );
     };
 
-    const magicInitiateFeats = (formData.feats || []).filter(f => f === 'Magic Initiate' || (typeof f === 'object' && f.name === 'Magic Initiate'));
-    const hasMagicInitiate = magicInitiateFeats.length > 0;
-    const hasFeyTouched = (formData.feats || []).some(f => f === 'Fey Touched' || (typeof f === 'object' && f.name === 'Fey Touched'));
-    const hasShadowTouched = (formData.feats || []).some(f => f === 'Shadow Touched' || (typeof f === 'object' && f.name === 'Shadow Touched'));
-    const hasRitualMaster = (formData.feats || []).some(f => f === 'Ritual Master' || (typeof f === 'object' && (f.name === 'Ritual Master' || f.index === 'ritual-master')));
-    const ritualMasterChosenCount = (formData.ritualMasterSpells || []).length;
+    const editBannerDescriptors = getEditBannerDescriptors({
+      formData,
+      modals: {
+        magicInitiate: showMagicInitiateModal,
+        feyTouched: showFeyTouchedModal,
+        shadowTouched: showShadowTouchedModal,
+        ritualMaster: showRitualMasterModal,
+      },
+    });
+    const openFeatModal = (modal) => {
+      if (modal === 'magicInitiate') setShowMagicInitiateModal(true);
+      else if (modal === 'feyTouched') setShowFeyTouchedModal(true);
+      else if (modal === 'shadowTouched') setShowShadowTouchedModal(true);
+      else setShowRitualMasterModal(true);
+    };
 
     return (
         <div className="wizard-step-spells">
@@ -576,50 +624,15 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
         />
       )}
       {renderArcanumSelection()}
-      {hasMagicInitiate && !showMagicInitiateModal && (
-        <div className="mi-wizard-banner">
-          <button
-            type="button"
-            className="mi-wizard-edit-btn"
-            onClick={() => setShowMagicInitiateModal(true)}
-          >
-            <i className="fa-solid fa-hat-wizard"></i> Edit Magic Initiate
-          </button>
-        </div>
-      )}
-      {hasFeyTouched && formData.feyTouchedSpell && !showFeyTouchedModal && (
-        <div className="mi-wizard-banner">
-          <button
-            type="button"
-            className="mi-wizard-edit-btn"
-            onClick={() => setShowFeyTouchedModal(true)}
-          >
-            <i className="fa-solid fa-leaf"></i> Edit Fey Magic
-          </button>
-        </div>
-      )}
-      {hasShadowTouched && formData.shadowTouchedSpell && !showShadowTouchedModal && (
-        <div className="mi-wizard-banner">
-          <button
-            type="button"
-            className="mi-wizard-edit-btn"
-            onClick={() => setShowShadowTouchedModal(true)}
-          >
-            <i className="fa-solid fa-mask"></i> Edit Shadow Magic
-          </button>
-        </div>
-      )}
-      {hasRitualMaster && ritualMasterChosenCount > 0 && !showRitualMasterModal && (
-        <div className="mi-wizard-banner">
-          <button
-            type="button"
-            className="mi-wizard-edit-btn"
-            onClick={() => setShowRitualMasterModal(true)}
-          >
-            <i className="fa-solid fa-scroll"></i> Edit Ritual Spells ({ritualMasterChosenCount})
-          </button>
-        </div>
-      )}
+      {editBannerDescriptors.map((banner) => (
+        <FeatEditBanner
+          key={banner.id}
+          icon={banner.icon}
+          onClick={() => openFeatModal(banner.modal)}
+        >
+          {banner.label}
+        </FeatEditBanner>
+      ))}
         <SelectableList
         items={availableSpells}
         fieldName="spells"

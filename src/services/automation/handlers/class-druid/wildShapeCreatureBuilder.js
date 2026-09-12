@@ -59,6 +59,40 @@ export function cleanupWildShape(druidName, campaignName) {
     setRuntimeValue(druidName, 'circleFormsAC', null, campaignName);
 }
 
+async function applyCircleOfTheMoon(combatSummary, druidName, baseMonster, druidStats, campaignName) {
+    const wis = druidStats.abilities?.find(a => a.name === 'Wisdom');
+    const wisMod = wis?.bonus ?? 0;
+    const beastAC = typeof baseMonster.armor_class === 'number' ? baseMonster.armor_class : 10;
+    const circleFormsAC = Math.max(beastAC, 13 + wisMod);
+    setRuntimeValue(druidName, 'circleFormsAC', circleFormsAC, campaignName);
+
+    const monsters = await loadMonsters();
+    const baseMonsterData = monsters.find(m => m.index === baseMonster.index);
+    if (!baseMonsterData) return;
+
+    const beastSaves = getMonsterSaveBonuses(baseMonsterData);
+    const beastConSave = beastSaves.con ?? 0;
+    const druidCreature = combatSummary.creatures?.find(c => c.name === druidName && c.type === 'player');
+    if (!druidCreature) return;
+
+    druidCreature.wildShapeConSaveBonus = beastConSave + wisMod;
+    const saving_throws = {};
+    for (const [abbr, bonus] of Object.entries(beastSaves)) {
+        saving_throws[abbr] = { modifier: bonus };
+    }
+    saving_throws.con.modifier = beastConSave + wisMod;
+    druidCreature.saving_throws = saving_throws;
+
+    if (druidStats.level >= 14) {
+        druidCreature.lunarFormAction = {
+            name: 'Lunar Form',
+            damage_dice_primary: '2d10',
+            damage_type_primary: 'Radiant',
+            description: 'Once per turn on a hit with a Wild Shape form attack, you can deal an extra 2d10 Radiant damage to the target.',
+        };
+    }
+}
+
 export async function activateWildShape(druidName, baseMonster, druidStats, campaignName) {
     setRuntimeValue(druidName, 'activeConditions', [], campaignName);
 
@@ -72,37 +106,7 @@ export async function activateWildShape(druidName, baseMonster, druidStats, camp
     setTempHp(druidName, amount, campaignName);
 
     if (isMoonDruid) {
-        const wis = druidStats.abilities?.find(a => a.name === 'Wisdom');
-        const wisMod = wis?.bonus ?? 0;
-        const beastAC = typeof baseMonster.armor_class === 'number' ? baseMonster.armor_class : 10;
-        const circleFormsAC = Math.max(beastAC, 13 + wisMod);
-        setRuntimeValue(druidName, 'circleFormsAC', circleFormsAC, campaignName);
-
-        const monsters = await loadMonsters();
-        const baseMonsterData = monsters.find(m => m.index === baseMonster.index);
-        if (baseMonsterData) {
-            const beastSaves = getMonsterSaveBonuses(baseMonsterData);
-            const beastConSave = beastSaves.con ?? 0;
-            const druidCreature = combatSummary.creatures?.find(c => c.name === druidName && c.type === 'player');
-            if (druidCreature) {
-                druidCreature.wildShapeConSaveBonus = beastConSave + wisMod;
-                const saving_throws = {};
-                for (const [abbr, bonus] of Object.entries(beastSaves)) {
-                    saving_throws[abbr] = { modifier: bonus };
-                }
-                saving_throws.con.modifier = beastConSave + wisMod;
-                druidCreature.saving_throws = saving_throws;
-
-                if (druidStats.level >= 14) {
-                    druidCreature.lunarFormAction = {
-                        name: 'Lunar Form',
-                        damage_dice_primary: '2d10',
-                        damage_type_primary: 'Radiant',
-                        description: 'Once per turn on a hit with a Wild Shape form attack, you can deal an extra 2d10 Radiant damage to the target.',
-                    };
-                }
-            }
-        }
+        await applyCircleOfTheMoon(combatSummary, druidName, baseMonster, druidStats, campaignName);
     }
 
     await storage.set('combatSummary', combatSummary, campaignName);

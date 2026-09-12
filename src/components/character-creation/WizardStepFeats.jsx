@@ -124,17 +124,38 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
         );
     };
 
-    // Render summary
-  const renderSummary = () => {
-    const preSelected = preSelectedFeats || [];
+  const countSelections = (preSelected) => {
     const allSelected = formData.feats || [];
-    const userSelectedCount = allSelected.filter(f => !preSelected.includes(f)).length;
-    const preSelectedCount = allSelected.filter(f => preSelected.includes(f)).length;
-    const totalASI = computedBuffs?.abilityScoreIncreases?.filter(inc => inc.name && inc.name !== 'any').length || 0;
-    const totalProfs = computedBuffs?.proficiencies?.length || 0;
-    const totalResists = computedBuffs?.resistances?.length || 0;
-    const totalFeatures = computedBuffs?.features?.length || 0;
-    const hasBuffs = totalASI > 0 || totalProfs > 0 || totalResists > 0 || totalFeatures > 0;
+    return {
+      userSelectedCount: allSelected.filter(f => !preSelected.includes(f)).length,
+      preSelectedCount: allSelected.filter(f => preSelected.includes(f)).length,
+    };
+  };
+
+  const countBuffTotals = (buffs) => {
+    const totals = {
+      abilityScoreIncreases: buffs?.abilityScoreIncreases?.filter(inc => inc.name && inc.name !== 'any').length || 0,
+      proficiencies: buffs?.proficiencies?.length || 0,
+      resistances: buffs?.resistances?.length || 0,
+      features: buffs?.features?.length || 0,
+    };
+    return {
+      ...totals,
+      hasBuffs: Object.values(totals).some(count => count > 0)
+    };
+  };
+
+  const BUFF_LINE_LABELS = {
+    abilityScoreIncreases: 'ability score increase(s)',
+    proficiencies: 'proficiency/proficiencie(s)',
+    resistances: 'resistance(s)',
+    features: 'passive/feature buff(s)',
+  };
+
+  // Render summary
+  const renderSummary = () => {
+    const { userSelectedCount, preSelectedCount } = countSelections(preSelectedFeats || []);
+    const buffTotals = countBuffTotals(computedBuffs);
 
     return (
       <div className="rule-info">
@@ -148,13 +169,14 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
             <p><strong>Versatile Trait:</strong> Your race grants an Origin feat of your choice. Available options: {raceFeatChoices.join(', ')}. Skilled is recommended.</p>
           </div>
         )}
-        {hasBuffs && (
+        {buffTotals.hasBuffs && (
           <div className="feat-buffs-summary">
             <p><strong>Applied Buffs:</strong></p>
-            {totalASI > 0 && <p className="feat-buff-line">• {totalASI} ability score increase(s)</p>}
-            {totalProfs > 0 && <p className="feat-buff-line">• {totalProfs} proficiency/proficiencie(s)</p>}
-            {totalResists > 0 && <p className="feat-buff-line">• {totalResists} resistance(s)</p>}
-            {totalFeatures > 0 && <p className="feat-buff-line">• {totalFeatures} passive/feature buff(s)</p>}
+            {Object.entries(BUFF_LINE_LABELS)
+              .filter(([key]) => buffTotals[key] > 0)
+              .map(([key, label]) => (
+                <p key={key} className="feat-buff-line">• {buffTotals[key]} {label}</p>
+              ))}
           </div>
         )}
       </div>

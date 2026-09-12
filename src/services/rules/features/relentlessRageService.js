@@ -8,32 +8,34 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
+function getBarbarianLevel(playerComputed) {
+    return playerComputed?.class?.class_levels?.find(
+        cl => cl.name === 'Barbarian'
+    )?.level || playerComputed?.level || 1;
+}
+
+const HEAL_FIELD_RESOLVERS = {
+    barbarian_level: getBarbarianLevel,
+    level: (playerComputed) => playerComputed?.level || 1,
+};
+
+function evaluateMultiplierExpression(numericMatch, playerComputed) {
+    const multiplier = parseInt(numericMatch[1], 10);
+    const resolve = HEAL_FIELD_RESOLVERS[numericMatch[2].toLowerCase()];
+    return multiplier * (resolve ? resolve(playerComputed) : 0);
+}
+
 function evaluateHealExpression(expression, playerComputed) {
     if (typeof expression === 'number') return expression;
     if (!expression) return playerComputed?.level || 1;
 
-    const match = String(expression).match(/2\s*\*\s*barbarian_level/i);
-    if (match) {
-        const barbarianLevel = playerComputed?.class?.class_levels?.find(
-            cl => cl.name === 'Barbarian'
-        )?.level || playerComputed?.level || 1;
-        return 2 * barbarianLevel;
+    const text = String(expression);
+    if (/2\s*\*\s*barbarian_level/i.test(text)) {
+        return 2 * getBarbarianLevel(playerComputed);
     }
 
-    const numericMatch = String(expression).match(/^(\d+)\s*\*\s*(\w+)$/);
-    if (numericMatch) {
-        const multiplier = parseInt(numericMatch[1], 10);
-        const field = numericMatch[2].toLowerCase();
-        let value = 0;
-        if (field === 'barbarian_level') {
-            value = playerComputed?.class?.class_levels?.find(
-                cl => cl.name === 'Barbarian'
-            )?.level || playerComputed?.level || 1;
-        } else if (field === 'level') {
-            value = playerComputed?.level || 1;
-        }
-        return multiplier * value;
-    }
+    const numericMatch = text.match(/^(\d+)\s*\*\s*(\w+)$/);
+    if (numericMatch) return evaluateMultiplierExpression(numericMatch, playerComputed);
 
     return playerComputed?.level || 1;
 }

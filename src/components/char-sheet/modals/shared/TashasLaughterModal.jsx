@@ -8,6 +8,64 @@ import { addExpiration } from '../../../../services/rules/effects/expirations.js
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
+function buildLaughterConditionEntry(targetName, actionName) {
+    return {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Prone, Incapacitated',
+        reason: actionName,
+        note: `${targetName} is Prone and Incapacitated by Tasha's Hideous Laughter. The target can't end the Prone condition on itself.`,
+        timestamp: Date.now(),
+    };
+}
+
+function buildLaughterSaveResultEntry({ casterName, targetName, saveDc, saveType, success, detail }) {
+    return {
+        type: 'save_result',
+        characterName: casterName,
+        targetName,
+        saveDc: saveDc,
+        saveType,
+        success,
+        roll: detail.roll ?? 0,
+        total: detail.total ?? 0,
+        saveBonus: detail.saveBonus ?? 0,
+        description: `${targetName} ${success ? 'succeeded on' : 'failed'} ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})${success ? '' : ' and is Prone and Incapacitated.'}`,
+        timestamp: Date.now(),
+    };
+}
+
+function buildLaughterTargetResult(targetName, success, detail) {
+    return {
+        targetName,
+        saveResult: success ? 'success' : 'failure',
+        roll: detail.roll ?? 0,
+        total: detail.total ?? 0,
+        conditions: success ? [] : ['prone', 'incapacitated'],
+        appliedDamage: 0,
+    };
+}
+
+function finishLaughterResolution(allResults, actionName, onClose, setPopupHtml) {
+    const failedResults = allResults.filter(r => !r.success);
+    const savedCount = allResults.filter(r => r.success).length;
+    if (failedResults.length > 0) {
+        const failedNames = failedResults.map(r => r.targetName).join(', ');
+        const popupDesc = `${failedResults.length} creature(s) failed their save and are Prone and Incapacitated: ${failedNames}. ${savedCount} creature(s) saved.`;
+        if (setPopupHtml) {
+            setTimeout(() => {
+                setPopupHtml({
+                    type: 'automation_info',
+                    name: actionName,
+                    description: popupDesc,
+                });
+            }, 0);
+        }
+    }
+    setTimeout(() => onClose(), 500);
+}
+
 function TashasLaughterModal({
     action,
     playerStats,
@@ -214,97 +272,26 @@ function TashasLaughterModal({
 
         if (!success) {
             applyLaughterConditionsToTarget(targetName, campaignName, saveDc, casterName);
-
-            await addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Prone, Incapacitated',
-                reason: action.name,
-                note: `${targetName} is Prone and Incapacitated by Tasha's Hideous Laughter. The target can't end the Prone condition on itself.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[TashasLaughterModal] Error logging condition:', e); });
-
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc: saveDc,
-                saveType,
-                success: false,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0}) and is Prone and Incapacitated.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[TashasLaughterModal] Error logging save result:', e); });
-
-            addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                conditions: ['prone', 'incapacitated'],
-                appliedDamage: 0,
-            });
-        } else {
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                targetName,
-                saveDc: saveDc,
-                saveType,
-                success: true,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[TashasLaughterModal] Error logging save result:', e); });
-
-            addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
+            await addEntry(campaignName, buildLaughterConditionEntry(targetName, action.name)).catch((e) => { console.error('[TashasLaughterModal] Error logging condition:', e); });
         }
+        await addEntry(campaignName, buildLaughterSaveResultEntry({ casterName, targetName, saveDc, saveType, success, detail })).catch((e) => { console.error('[TashasLaughterModal] Error logging save result:', e); });
+        addTargetResult(campaignName, buildLaughterTargetResult(targetName, success, detail));
 
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
-        const resultEntry = {
+        allResultsRef.current = [...allResultsRef.current, {
             targetName,
             success,
             roll: detail.roll ?? 0,
             total: detail.total ?? 0,
             saveBonus: detail.saveBonus ?? 0,
             conditionApplied: !success,
-        };
-
-        allResultsRef.current = [...allResultsRef.current, resultEntry];
+        }];
 
         setPendingPrompts(prompts => {
             const updated = prompts.filter(p => p.promptId !== detail.promptId);
             if (updated.length === 0) {
-                const allResults = allResultsRef.current;
-                const failedResults = allResults.filter(r => !r.success);
-                const savedCount = allResults.filter(r => r.success).length;
-                if (failedResults.length > 0) {
-                    const failedNames = failedResults.map(r => r.targetName).join(', ');
-                    const popupDesc = `${failedResults.length} creature(s) failed their save and are Prone and Incapacitated: ${failedNames}. ${savedCount} creature(s) saved.`;
-                    if (setPopupHtml) {
-                        setTimeout(() => {
-                            setPopupHtml({
-                                type: 'automation_info',
-                                name: action.name,
-                                description: popupDesc,
-                            });
-                        }, 0);
-                    }
-                }
-                setTimeout(() => onClose(), 500);
+                finishLaughterResolution(allResultsRef.current, action.name, onClose, setPopupHtml);
             }
             return updated;
         });

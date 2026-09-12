@@ -7,6 +7,17 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { storeSpellLastAttack } from '../../common/damageRollback.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 
+function mazePopup(name, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name,
+            description,
+        },
+    };
+}
+
 function getMazeEffects() {
     return (getRuntimeValue('campaign', 'targetEffects') || []).filter(te => te.effect === 'maze');
 }
@@ -59,70 +70,22 @@ export function isMazeBlocked(attackerName, targetName, _campaignName) {
  * The target is simply banished. The only escape is the DC 20 INT (Investigation) Study action.
  */
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation || {};
-    const dc = buildSaveDc(auto, playerStats);
+function hasSense(casterSenses, senseName) {
+    return casterSenses.some(s => String(s.name || s.type || '').toLowerCase() === senseName);
+}
 
-    const cs = await getCombatContext(campaignName);
-    if (!cs?.creatures || cs.creatures.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No creatures in combat. ${action.name} has no effect.`,
-            },
-        };
-    }
-
-    const casterName = playerStats.name;
-
-    const targetInfo = await resolveTarget(campaignName, casterName);
-    const targetName = targetInfo?.target?.name;
-
-    if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No target selected. ${action.name} has no effect.`,
-            },
-        };
-    }
-
-    const targetCreature = cs.creatures.find(c => c.name === targetName);
-    if (!targetCreature) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `Target "${targetName}" not found in combat. ${action.name} has no effect.`,
-            },
-        };
-    }
-
-    // Check if target is invisible and caster doesn't have truesight/blindsight
+function isTargetInvisibleButUnseen(targetCreature, casterCreature) {
     const targetInvisible = targetCreature.conditions?.some(c => {
         const cStr = typeof c === 'object' ? String(c.key || c) : String(c);
         return cStr.toLowerCase() === 'invisible';
     });
-    const casterCreature = cs.creatures.find(c => c.name === casterName);
     const casterSenses = casterCreature?.senses || [];
-    const hasTruesight = casterSenses.some(s => String(s.name || s.type || '').toLowerCase() === 'truesight');
-    const hasBlindsight = casterSenses.some(s => String(s.name || s.type || '').toLowerCase() === 'blindsight');
-    if (targetInvisible && !hasTruesight && !hasBlindsight) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${targetName} is invisible. You can't see the target. ${action.name} has no effect.`,
-            },
-        };
-    }
+    const hasTruesight = hasSense(casterSenses, 'truesight');
+    const hasBlindsight = hasSense(casterSenses, 'blindsight');
+    return targetInvisible && !hasTruesight && !hasBlindsight;
+}
 
+function applyMazeBanishment(campaignName, casterName, action, targetName, dc, casterCreature, playerStats, cs) {
     // Maze doesn't require a save — the target is simply banished
     // Store spell last attack for rollback tracking
     storeSpellLastAttack(campaignName, {
@@ -213,15 +176,41 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         success: false,
         description: `${targetName} is banished to a labyrinthine demiplane by ${action.name}.`,
     }).catch((e) => { console.error("[maze] Error:", e); });
+}
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: `${targetName} is banished to a labyrinthine demiplane. ${targetName} is Incapacitated and can take a Study action (DC 20 INT Investigation) to escape.`,
-        },
-    };
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation || {};
+    const dc = buildSaveDc(auto, playerStats);
+
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.creatures || cs.creatures.length === 0) {
+        return mazePopup(action.name, `No creatures in combat. ${action.name} has no effect.`);
+    }
+
+    const casterName = playerStats.name;
+
+    const targetInfo = await resolveTarget(campaignName, casterName);
+    const targetName = targetInfo?.target?.name;
+
+    if (!targetName) {
+        return mazePopup(action.name, `No target selected. ${action.name} has no effect.`);
+    }
+
+    const targetCreature = cs.creatures.find(c => c.name === targetName);
+    if (!targetCreature) {
+        return mazePopup(action.name, `Target "${targetName}" not found in combat. ${action.name} has no effect.`);
+    }
+
+    const casterCreature = cs.creatures.find(c => c.name === casterName);
+
+    // Check if target is invisible and caster doesn't have truesight/blindsight
+    if (isTargetInvisibleButUnseen(targetCreature, casterCreature)) {
+        return mazePopup(action.name, `${targetName} is invisible. You can't see the target. ${action.name} has no effect.`);
+    }
+
+    applyMazeBanishment(campaignName, casterName, action, targetName, dc, casterCreature, playerStats, cs);
+
+    return mazePopup(action.name, `${targetName} is banished to a labyrinthine demiplane. ${targetName} is Incapacitated and can take a Study action (DC 20 INT Investigation) to escape.`);
 }
 
 export function removeMazeEffect(targetName, sourceName, campaignName) {

@@ -60,6 +60,23 @@ function formatSpellDuration(spell) {
     return spell.duration.replace('Instantaneous','Instant').replace('minute','min').replace('minutes','min').replace('up to ','');
 }
 
+function computeShowPreparedColumn(is2024, isWizard) {
+    // Only 5e shows the prepared column for everyone; in 2024 it's Wizard-only (spellbook vs prepared).
+    return !is2024 || (is2024 && isWizard);
+}
+
+function SpellAbilitySummary({ spellAbilities, showPreparedColumn }) {
+    return (
+        <div>
+            <b>Cantrips Known:</b> {spellAbilities.cantrips_known ? spellAbilities.cantrips_known : 0}<br/>
+            {showPreparedColumn && <div>
+                <b>Prepared Spells:</b> {spellAbilities.prepared_spells || spellAbilities.spells_known ? (spellAbilities.prepared_spells || spellAbilities.spells_known) : 'All'}<br/>
+                <b>Max Prepared:</b> {spellAbilities.maxPreparedSpells ? spellAbilities.maxPreparedSpells : 'All'}
+            </div>}
+        </div>
+    );
+}
+
 function SpellPreparedCell({ spell, handleTogglePreparedSpells }) {
     if (spell.prepared !== 'Prepared' && spell.prepared !== '') return <td>{spell.prepared}</td>;
     return <td><input tabIndex={0} type="checkbox" checked={spell.prepared === 'Prepared'} onChange={() => handleTogglePreparedSpells(spell.name)}/></td>;
@@ -112,8 +129,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
     const is2024 = playerStats.rules === '2024';
-    // Only 5e shows the prepared column for everyone; in 2024 it's Wizard-only (spellbook vs prepared).
-    const showPreparedColumn = !is2024 || (is2024 && isWizard);
+    const showPreparedColumn = computeShowPreparedColumn(is2024, isWizard);
 
     React.useEffect(() => {
         if(playerStats.spellAbilities) {
@@ -394,13 +410,7 @@ return (
                     <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>
                       <b>Save DC:</b> {playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0)}
                 </div>
-                <div>
-                    <b>Cantrips Known:</b> {playerStats.spellAbilities.cantrips_known ? playerStats.spellAbilities.cantrips_known : 0}<br/>
-                    {showPreparedColumn && <div>
-                        <b>Prepared Spells:</b> {playerStats.spellAbilities.prepared_spells || playerStats.spellAbilities.spells_known ? (playerStats.spellAbilities.prepared_spells || playerStats.spellAbilities.spells_known) : 'All'}<br/>                    
-                        <b>Max Prepared:</b> {playerStats.spellAbilities.maxPreparedSpells ? playerStats.spellAbilities.maxPreparedSpells : 'All'}
-                    </div>}
-                </div>
+                 <SpellAbilitySummary spellAbilities={playerStats.spellAbilities} showPreparedColumn={showPreparedColumn} />
                 <CharSpellSlots playerStats={playerStats} campaignName={campaignName}></CharSpellSlots>
             </div>
             {spells.length > 0 && <table className='table-spells table-striped'>

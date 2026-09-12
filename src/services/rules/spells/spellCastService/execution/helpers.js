@@ -471,6 +471,71 @@ function getMagicMissileCount(slotLevel) {
     return 3 + (slotLevel - 1);
 }
 
+function rollTargetMissiles(missileDamage, missileCount) {
+    let totalTargetDamage = 0;
+    const missileRolls = [];
+    for (let i = 0; i < missileCount; i++) {
+        const missileResult = rollExpression(missileDamage);
+        if (!missileResult) continue;
+        missileRolls.push(missileResult.total);
+        totalTargetDamage += missileResult.total;
+    }
+    return { missileRolls, totalTargetDamage };
+}
+
+function resolveIgnoreResistance(playerStats) {
+    const passives = playerStats.automation?.passives;
+    if (passives == null) {
+        console.error('[spellCast] executeMagicMissile: playerStats.automation.passives is missing');
+        throw new Error('playerStats.automation.passives is required for ignore resistance check');
+    }
+    return passives.some(p => p.type === 'auto_effect' && p.effect === 'ignore_resistance');
+}
+
+function applyMissileDamage(combatSummary, targetName, totalTargetDamage, damageType, campaignName, characters, casterName, playerStats) {
+    const isShieldActive = getRuntimeValue(targetName, 'activeBuffs', campaignName)?.some(b => b.effect === 'shield');
+    if (isShieldActive) {
+        return { finalDamage: 0, damageReduced: true, isShieldActive };
+    }
+    const ignoreResistance = resolveIgnoreResistance(playerStats);
+    const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, characters, ignoreResistance, casterName);
+    if (applyResult && applyResult.finalDamage > 0) {
+        endInvisibilityOnHostileAction(casterName, campaignName);
+    }
+    return {
+        finalDamage: applyResult?.finalDamage ?? totalTargetDamage,
+        damageReduced: applyResult?.damageReduced,
+        isShieldActive,
+    };
+}
+
+function logMagicMissileSpell(campaignName, casterName, spell, slotLevel, numMissiles, missileDamage, damageType, logEntries) {
+    const allMissileDamage = logEntries.reduce((sum, e) => sum + e.total, 0);
+    const allFinalDamage = logEntries.reduce((sum, e) => sum + e.finalDamage, 0);
+    rollExpression(`${numMissiles}× ${missileDamage}`);
+
+    addEntry(campaignName, {
+        type: 'spell',
+        characterName: casterName,
+        spellName: spell.name,
+        spellLevel: slotLevel,
+        castingTime: spell.casting_time,
+        missileCount: numMissiles,
+        missileDamage,
+        damageType,
+        targets: logEntries.map(e => ({
+            name: e.targetName,
+            missiles: e.rolls.length,
+            rawDamage: e.total,
+            finalDamage: e.finalDamage,
+            shieldImmune: e.shieldImmune,
+        })),
+        totalRawDamage: allMissileDamage,
+        totalFinalDamage: allFinalDamage,
+        timestamp: Date.now(),
+    });
+}
+
 async function executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo: _getTargetInfo, campaignName, mapName: _mapName, characters }) {
     const slotLevel = metaCtx?.slotLevel || spell.level;
     const numMissiles = getMagicMissileCount(slotLevel);
@@ -488,45 +553,10 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, ge
     for (const [targetName, missileCount] of Object.entries(distribution)) {
         if (missileCount <= 0) continue;
 
-        let totalTargetDamage = 0;
-        const missileRolls = [];
-
-        for (let i = 0; i < missileCount; i++) {
-            const missileResult = rollExpression(missileDamage);
-            if (!missileResult) continue;
-
-            missileRolls.push(missileResult.total);
-            totalTargetDamage += missileResult.total;
-        }
-
+        const { missileRolls, totalTargetDamage } = rollTargetMissiles(missileDamage, missileCount);
         if (totalTargetDamage <= 0) continue;
 
-        const target = combatSummary.creatures?.find(c => c.name === targetName) || null;
-        void target;
-
-        const isShieldActive = getRuntimeValue(targetName, 'activeBuffs', campaignName)?.some(b => b.effect === 'shield');
-        let finalDamage;
-        let damageReduced;
-
-        if (isShieldActive) {
-            finalDamage = 0;
-            damageReduced = true;
-        } else {
-            const ignoreResistance = (function () {
-                const passives = playerStats.automation?.passives;
-                if (passives == null) {
-                    console.error('[spellCast] executeMagicMissile: playerStats.automation.passives is missing');
-                    throw new Error('playerStats.automation.passives is required for ignore resistance check');
-                }
-                return passives.some(p => p.type === 'auto_effect' && p.effect === 'ignore_resistance');
-            })();
-            const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, characters, ignoreResistance, casterName);
-            if (applyResult && applyResult.finalDamage > 0) {
-                endInvisibilityOnHostileAction(casterName, campaignName);
-            }
-            finalDamage = applyResult?.finalDamage ?? totalTargetDamage;
-            damageReduced = applyResult?.damageReduced;
-        }
+        const { finalDamage, damageReduced, isShieldActive } = applyMissileDamage(combatSummary, targetName, totalTargetDamage, damageType, campaignName, characters, casterName, playerStats);
 
         const missileFormula = missileCount === 1 ? missileDamage : `${missileCount}× ${missileDamage}`;
 
@@ -556,30 +586,7 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, ge
     }
 
     if (logEntries.length > 0) {
-        const allMissileDamage = logEntries.reduce((sum, e) => sum + e.total, 0);
-        const allFinalDamage = logEntries.reduce((sum, e) => sum + e.finalDamage, 0);
-        rollExpression(`${numMissiles}× ${missileDamage}`);
-
-        addEntry(campaignName, {
-            type: 'spell',
-            characterName: casterName,
-            spellName: spell.name,
-            spellLevel: slotLevel,
-            castingTime: spell.casting_time,
-            missileCount: numMissiles,
-            missileDamage,
-            damageType,
-            targets: logEntries.map(e => ({
-                name: e.targetName,
-                missiles: e.rolls.length,
-                rawDamage: e.total,
-                finalDamage: e.finalDamage,
-                shieldImmune: e.shieldImmune,
-            })),
-            totalRawDamage: allMissileDamage,
-            totalFinalDamage: allFinalDamage,
-            timestamp: Date.now(),
-        });
+        logMagicMissileSpell(campaignName, casterName, spell, slotLevel, numMissiles, missileDamage, damageType, logEntries);
     }
 }
 

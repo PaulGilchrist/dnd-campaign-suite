@@ -402,6 +402,25 @@ function resolveFlurryHealingHarm(playerStats, campaignName) {
     return { hasFlurryHealingHarm, flurryHealingHarmUses, handOfHarmAuto };
 }
 
+function resolveFlurryWeaponStats(playerStats) {
+    return {
+        attackBonus: playerStats.attacks?.[0]?.hitBonus ?? 0,
+        damageFormula: playerStats.attacks?.[0]?.damage ?? '1d4+0',
+        damageType: playerStats.attacks?.[0]?.damageType || 'Bludgeoning',
+    };
+}
+
+function attachPendingOpenHandTargets(result, pendingOpenHandTargets) {
+    if (pendingOpenHandTargets.size === 0) return;
+    result.openHandTargets = Array.from(pendingOpenHandTargets.values()).map(target => ({
+        targetName: target.targetName,
+        action: target.action,
+        playerStats: target.playerStats,
+        campaignName: target.campaignName,
+        mapName: target.mapName,
+    }));
+}
+
 export async function applyFlurryOfBlows(action, playerStats, campaignName, _mapName, distribution, numAttacks, healingTarget = null) {
     const playerName = playerStats.name;
     const featureName = action.name;
@@ -413,9 +432,7 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, _map
     const cs = getCombatSummary(campaignName);
     if (!cs) return null;
 
-    const attackBonus = playerStats.attacks?.[0]?.hitBonus ?? 0;
-    const damageFormula = playerStats.attacks?.[0]?.damage ?? '1d4+0';
-    const damageType = playerStats.attacks?.[0]?.damageType || 'Bludgeoning';
+    const { attackBonus, damageFormula, damageType } = resolveFlurryWeaponStats(playerStats);
 
     const targetSnapshots = buildFlurryTargetSnapshots(cs, playerName);
 
@@ -507,16 +524,7 @@ export async function applyFlurryOfBlows(action, playerStats, campaignName, _map
         result.handOfHarmSavePromises = handOfHarmSavePromises;
     }
 
-    if (pendingOpenHandTargets.size > 0) {
-        const openHandTargets = Array.from(pendingOpenHandTargets.values()).map(target => ({
-            targetName: target.targetName,
-            action: target.action,
-            playerStats: target.playerStats,
-            campaignName: target.campaignName,
-            mapName: target.mapName,
-        }));
-        result.openHandTargets = openHandTargets;
-    }
+    attachPendingOpenHandTargets(result, pendingOpenHandTargets);
 
     return result;
 }

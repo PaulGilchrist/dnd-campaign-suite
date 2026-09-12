@@ -40,6 +40,90 @@ function getBeastActionsSummary(actions) {
     return actions.map(a => a.name).join(', ');
 }
 
+function filterCreatureList(allMonsters, { allowAnyCreature, excludeTypes, mode, effectiveMaxCR, wildShapeLimitations }) {
+    let creatureList = allMonsters;
+    if (!allowAnyCreature) {
+        creatureList = creatureList.filter(m => m.type && m.type.toLowerCase() === 'beast');
+    }
+
+    if (excludeTypes.length > 0) {
+        const lowerExclude = excludeTypes.map(t => t.toLowerCase());
+        creatureList = creatureList.filter(m => !lowerExclude.includes((m.type || '').toLowerCase()));
+    }
+
+    if (mode === 'object_into_creature') {
+        creatureList = creatureList.filter(m => {
+            const cr = parseChallengeRating(m.challenge_rating);
+            return cr <= 9;
+        });
+    } else {
+        creatureList = creatureList.filter(m => {
+            const cr = parseChallengeRating(m.challenge_rating);
+            return cr <= effectiveMaxCR;
+        });
+    }
+
+    if (!allowAnyCreature) {
+        creatureList = creatureList.filter(m => {
+            if (!wildShapeLimitations) return true;
+            const filteredSpeeds = filterBeastSpeeds(m.speed, wildShapeLimitations);
+            return filteredSpeeds.walk;
+        });
+    }
+
+    return creatureList.sort((a, b) => {
+        const crA = parseChallengeRating(a.challenge_rating);
+        const crB = parseChallengeRating(b.challenge_rating);
+        if (crA !== crB) return crA - crB;
+        return a.name.localeCompare(b.name);
+    });
+}
+
+function computeListCopy({ allowAnyCreature, mode, effectiveMaxCR, wildShapeLimitations }) {
+    const listLabel = allowAnyCreature
+        ? (mode === 'object_into_creature' ? 'Choose a creature form (CR 9 or lower)' : `Choose a creature form (CR ${effectiveMaxCR} or lower)`)
+        : `Choose a beast form (CR ${effectiveMaxCR} or lower)`;
+    const searchPlaceholder = allowAnyCreature ? 'Search creatures...' : 'Search beasts...';
+    const noResultsMsg = allowAnyCreature
+        ? (mode === 'object_into_creature' ? 'No creatures match the CR 9 requirement.' : `No creatures match the target's CR requirement.`)
+        : `No beasts match ${wildShapeLimitations ? 'your Wild Shape limitations' : 'the target\'s CR requirement'}.`;
+    return { listLabel, searchPlaceholder, noResultsMsg };
+}
+
+function BeastRow({ beast, isSelected, wildShapeLimitations, onSelect }) {
+    const cr = parseChallengeRating(beast.challenge_rating);
+    const beastSpeeds = filterBeastSpeeds(beast.speed, wildShapeLimitations);
+    const imageUrl = `https://paulgilchrist.github.io/dnd-tools/images/${beast.index}.jpg`;
+
+    return (
+        <div
+            className={`wild-shape-beast-item ${isSelected ? 'selected' : ''}`}
+            onClick={() => onSelect(beast)}
+        >
+            <div className="wild-shape-beast-avatar">
+                <img
+                    src={imageUrl}
+                    alt={beast.name}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                />
+            </div>
+            <div className="wild-shape-beast-info">
+                <div className="wild-shape-beast-name">
+                    {beast.name}
+                    <span className="wild-shape-beast-cr">CR {cr}</span>
+                </div>
+                <div className="wild-shape-beast-stats">
+                    <span>{beast.size}</span>
+                    <span>{formatSpeed(beastSpeeds)}</span>
+                </div>
+                <div className="wild-shape-beast-actions">
+                    {getBeastActionsSummary(beast.actions)}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wild Shape', icon = 'fa-paw', actionLabel = 'Wild Shape', allowAnyCreature = false, mode = 'creature_to_creature', excludeTypes = [], onConfirm, onCancel }) {
     const [beasts, setBeasts] = React.useState([]);
     const [selectedBeast, setSelectedBeast] = React.useState(null);
@@ -58,45 +142,7 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
         async function loadBeasts() {
             try {
                 const allMonsters = await loadMonsters();
-
-                let creatureList = allMonsters;
-                if (!allowAnyCreature) {
-                    creatureList = creatureList.filter(m => m.type && m.type.toLowerCase() === 'beast');
-                }
-
-                if (excludeTypes.length > 0) {
-                    const lowerExclude = excludeTypes.map(t => t.toLowerCase());
-                    creatureList = creatureList.filter(m => !lowerExclude.includes((m.type || '').toLowerCase()));
-                }
-
-                if (mode === 'object_into_creature') {
-                    creatureList = creatureList.filter(m => {
-                        const cr = parseChallengeRating(m.challenge_rating);
-                        return cr <= 9;
-                    });
-                } else {
-                    creatureList = creatureList.filter(m => {
-                        const cr = parseChallengeRating(m.challenge_rating);
-                        return cr <= effectiveMaxCR;
-                    });
-                }
-
-                if (!allowAnyCreature) {
-                    creatureList = creatureList.filter(m => {
-                        if (!wildShapeLimitations) return true;
-                        const filteredSpeeds = filterBeastSpeeds(m.speed, wildShapeLimitations);
-                        return filteredSpeeds.walk;
-                    });
-                }
-
-                creatureList = creatureList.sort((a, b) => {
-                    const crA = parseChallengeRating(a.challenge_rating);
-                    const crB = parseChallengeRating(b.challenge_rating);
-                    if (crA !== crB) return crA - crB;
-                    return a.name.localeCompare(b.name);
-                });
-
-                setBeasts(creatureList);
+                setBeasts(filterCreatureList(allMonsters, { allowAnyCreature, excludeTypes, mode, effectiveMaxCR, wildShapeLimitations }));
             } catch (err) {
                 console.error('[PolymorphSelectionModal] Error loading beasts:', err);
                 setError('Failed to load creature data.');
@@ -154,13 +200,7 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
         );
     }
 
-    const listLabel = allowAnyCreature
-        ? (mode === 'object_into_creature' ? 'Choose a creature form (CR 9 or lower)' : `Choose a creature form (CR ${effectiveMaxCR} or lower)`)
-        : `Choose a beast form (CR ${effectiveMaxCR} or lower)`;
-    const searchPlaceholder = allowAnyCreature ? 'Search creatures...' : 'Search beasts...';
-    const noResultsMsg = allowAnyCreature
-        ? (mode === 'object_into_creature' ? 'No creatures match the CR 9 requirement.' : `No creatures match the target's CR requirement.`)
-        : `No beasts match ${wildShapeLimitations ? 'your Wild Shape limitations' : 'the target\'s CR requirement'}.`;
+    const { listLabel, searchPlaceholder, noResultsMsg } = computeListCopy({ allowAnyCreature, mode, effectiveMaxCR, wildShapeLimitations });
 
     return (
         <div className="sp-overlay sp-overlay--evasion" onClick={(e) => {
@@ -193,41 +233,15 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
                         {filteredBeasts.length === 0 ? (
                             <p className="sp-note">{noResultsMsg}</p>
                         ) : (
-                            filteredBeasts.map((beast) => {
-                                const cr = parseChallengeRating(beast.challenge_rating);
-                                const isSelected = selectedBeast?.index === beast.index;
-                                const beastSpeeds = filterBeastSpeeds(beast.speed, wildShapeLimitations);
-                                const imageUrl = `https://paulgilchrist.github.io/dnd-tools/images/${beast.index}.jpg`;
-
-                                return (
-                                    <div
-                                        key={beast.index}
-                                        className={`wild-shape-beast-item ${isSelected ? 'selected' : ''}`}
-                                        onClick={() => handleSelect(beast)}
-                                    >
-                                        <div className="wild-shape-beast-avatar">
-                                            <img
-                                                src={imageUrl}
-                                                alt={beast.name}
-                                                onError={(e) => { e.target.style.display = 'none'; }}
-                                            />
-                                        </div>
-                                        <div className="wild-shape-beast-info">
-                                            <div className="wild-shape-beast-name">
-                                                {beast.name}
-                                                <span className="wild-shape-beast-cr">CR {cr}</span>
-                                            </div>
-                                            <div className="wild-shape-beast-stats">
-                                                <span>{beast.size}</span>
-                                                <span>{formatSpeed(beastSpeeds)}</span>
-                                            </div>
-                                            <div className="wild-shape-beast-actions">
-                                                {getBeastActionsSummary(beast.actions)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })
+                            filteredBeasts.map((beast) => (
+                                <BeastRow
+                                    key={beast.index}
+                                    beast={beast}
+                                    isSelected={selectedBeast?.index === beast.index}
+                                    wildShapeLimitations={wildShapeLimitations}
+                                    onSelect={handleSelect}
+                                />
+                            ))
                         )}
                     </div>
                 </div>

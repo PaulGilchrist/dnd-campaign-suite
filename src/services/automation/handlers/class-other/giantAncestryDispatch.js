@@ -6,7 +6,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getRuntimeUsesKey } from './giantAncestryOptions.js';
-import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate } from './giantAncestryUtils.js';
+import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate, attackerRollGate, resolveAncestryUses, applyAncestryDamage, logAncestryDamageRoll, ancestryDamagePopup, applySpeedReductionEffect, logSpeedReductionCondition, stonesEnduranceDamageGate, stonesEnduranceRoundRefusal, stonesEnduranceCapNote } from './giantAncestryUtils.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
@@ -53,71 +53,15 @@ export async function handleCloudsJaunt(action, playerStats, campaignName, optio
 export async function handleFiresBurn(action, playerStats, campaignName, option) {
     const optName = (option?.name || action.name || "Fire's Burn");
     const opt = option || action.automation;
-    const usesKey = getRuntimeUsesKey(optName);
-    const usesMax = playerStats.proficiency || 0;
-    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+    const { usesKey, currentUses } = resolveAncestryUses(playerStats, optName, campaignName);
 
-    if (currentUses <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
-                automation: action.automation,
-            },
-        };
-    }
+    if (currentUses <= 0) return ancestryNoUsesPopup(optName, action.automation, currentUses);
 
     const lastAttack = await findLastAttack(campaignName);
-    if (!lastAttack?.attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a recent attack. Use it after hitting a creature.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.attackerName !== playerStats.name) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} can only be used after you make an attack. Wait for your turn.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.attackEvent.rollType !== 'attack') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} can only be used after an attack roll.`,
-                automation: action.automation,
-            },
-        };
-    }
+    const gateRefusal = attackerRollGate(optName, action.automation, playerStats, lastAttack);
+    if (gateRefusal) return gateRefusal;
 
     const targetName = lastAttack.targetName;
-    if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a target. No target found from the last attack.`,
-                automation: action.automation,
-            },
-        };
-    }
 
     const damageResult = rollExpression(opt.damage);
     const damageType = opt.damageType || 'Fire';
@@ -125,47 +69,17 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
-    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
-    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
-    const newHp = applyResult?.newHp;
+    const { actualDamage, newHp } = applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats);
 
-    await addEntry(campaignName, {
-        type: 'roll',
-        characterName: playerStats.name,
-        rollType: 'damage',
-        name: optName + ' Damage',
-        targetName,
-        damageType,
-        total: actualDamage,
-        formula: opt.damage,
-        rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${optName} to deal ${actualDamage} ${damageType} damage to ${targetName}.`,
-    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+    await logAncestryDamageRoll(campaignName, playerStats, optName, targetName, damageType, actualDamage, opt.damage, damageResult);
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'damage',
-            name: optName,
-            formula: opt.damage,
-            rolls: damageResult?.rolls,
-            total: actualDamage,
-            finalDamage: actualDamage,
-            damageApplied: true,
-            targetName,
-            targetCurrentHp: newHp,
-            damageType,
-        },
-    };
+    return ancestryDamagePopup(optName, opt.damage, damageResult, actualDamage, targetName, newHp, damageType);
 }
 
 export async function handleFrostsChill(action, playerStats, campaignName, option) {
     const optName = (option?.name || action.name || "Frost's Chill");
     const opt = option || action.automation;
-    const usesKey = getRuntimeUsesKey(optName);
-    const usesMax = playerStats.proficiency || 0;
-    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+    const { usesKey, currentUses } = resolveAncestryUses(playerStats, optName, campaignName);
 
     const noUses = ancestryNoUsesPopup(optName, action.automation, currentUses);
     if (noUses) return noUses;
@@ -183,59 +97,14 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
-    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
-    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
-    const newHp = applyResult?.newHp;
+    const { actualDamage, newHp } = applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats);
 
-    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const filteredEffects = storedEffects.filter(te => !(te.target === targetName && te.effect === 'speed_reduction'));
-    const speedEffect = {
-        target: targetName,
-        source: optName,
-        effect: 'speed_reduction',
-        value: speedReduction,
-        duration: 'until_end_of_next_turn',
-    };
-    await setRuntimeValue('campaign', 'targetEffects', [...filteredEffects, speedEffect], campaignName);
+    await applySpeedReductionEffect(targetName, optName, speedReduction, campaignName);
 
-    await addEntry(campaignName, {
-        type: 'roll',
-        characterName: playerStats.name,
-        rollType: 'damage',
-        name: optName + ' Damage',
-        targetName,
-        damageType,
-        total: actualDamage,
-        formula: opt.damage,
-        rolls: damageResult?.rolls,
-        description: `${playerStats.name} used ${optName} to deal ${actualDamage} ${damageType} damage to ${targetName}.`,
-    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+    await logAncestryDamageRoll(campaignName, playerStats, optName, targetName, damageType, actualDamage, opt.damage, damageResult);
+    await logSpeedReductionCondition(campaignName, playerStats, optName, targetName, speedReduction);
 
-    await addEntry(campaignName, {
-        type: 'condition',
-        characterName: playerStats.name,
-        targetName,
-        condition: 'speed_reduction',
-        source: optName,
-        description: `${playerStats.name} used ${optName} to reduce ${targetName}'s speed by ${speedReduction} ft until the end of their next turn.`,
-    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'damage',
-            name: optName,
-            formula: opt.damage,
-            rolls: damageResult?.rolls,
-            total: actualDamage,
-            finalDamage: actualDamage,
-            damageApplied: true,
-            targetName,
-            targetCurrentHp: newHp,
-            damageType,
-        },
-    };
+    return ancestryDamagePopup(optName, opt.damage, damageResult, actualDamage, targetName, newHp, damageType);
 }
 
 export async function handleHillsTumble(action, playerStats, campaignName, option) {
@@ -362,59 +231,15 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
 export async function handleStonesEndurance(action, playerStats, campaignName, option) {
     const optName = (option?.name || action.name || "Stone's Endurance");
     const opt = option || action.automation;
-    const usesKey = getRuntimeUsesKey(optName);
-    const usesMax = playerStats.proficiency || 0;
-    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+    const { usesKey, currentUses } = resolveAncestryUses(playerStats, optName, campaignName);
 
-    if (currentUses <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
-                automation: action.automation,
-            },
-        };
-    }
+    if (currentUses <= 0) return ancestryNoUsesPopup(optName, action.automation, currentUses);
 
     const lastAttack = await findLastAttack(campaignName);
-    if (!lastAttack?.attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a recent attack where you were the target and took damage.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.targetName !== playerStats.name) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} can only be used when you were the target of the attack and took damage.`,
-                automation: action.automation,
-            },
-        };
-    }
+    const gateRefusal = stonesEnduranceDamageGate(optName, action.automation, playerStats, lastAttack);
+    if (gateRefusal) return gateRefusal;
 
     const totalDamage = lastAttack.totalDamage || 0;
-    if (totalDamage <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires that you took damage from the attack. No damage was dealt.`,
-                automation: action.automation,
-            },
-        };
-    }
 
     // CLA-335: Reaction-economy round latch — one triggering hit can only be
     // reduced once. Mirrors the CLA-315 Slow Fall / CLA-297 Retaliation /
@@ -427,24 +252,7 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
     const usedRoundKey = '_Stones_Endurance_usedRound';
     const usedRound = Number(getRuntimeValue(playerStats.name, usedRoundKey, campaignName) ?? 0);
     if (usedRound === currentRound) {
-        const refusalText = `You have already used ${optName} this round — your Reaction is spent until your next turn.`;
-        addEntry(campaignName, {
-            type: 'automation',
-            characterName: playerStats.name,
-            automationType: 'stones_endurance_refused',
-            name: optName,
-            description: refusalText,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[giantAncestry] Error:", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: refusalText,
-                automation: action.automation,
-            },
-        };
+        return stonesEnduranceRoundRefusal(campaignName, playerStats, optName, action.automation);
     }
 
     const enduranceRoll = rollExpression('1d12');
@@ -459,12 +267,7 @@ export async function handleStonesEndurance(action, playerStats, campaignName, o
     const healResult = applyHealingToTarget(cs, playerStats.name, rawHeal, campaignName);
     const finalHeal = healResult?.actualHeal ?? rawHeal;
 
-    let capNote = '';
-    if (totalHeal > rawHeal) {
-        capNote = `capped at ${rawHeal} (damage taken)`;
-    } else if (finalHeal < rawHeal) {
-        capNote = `capped at ${finalHeal} (HP deficit)`;
-    }
+    const capNote = stonesEnduranceCapNote(totalHeal, rawHeal, finalHeal);
     const capText = capNote ? `, ${capNote}` : '';
 
     await addEntry(campaignName, {

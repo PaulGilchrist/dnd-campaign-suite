@@ -64,6 +64,148 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+async function processRadianceNpcTarget(combatSummary, target, targetName, ctx) {
+    const { saveType, saveDc, dcSuccess, damageType, totalDamage, damageExpression, rolls, modifier, playerName, featureName, campaignName, playerStats, ignoreResistance } = ctx;
+
+    // Roll save for NPC
+    const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    const saveRoll = Math.floor(Math.random() * 20) + 1;
+    const saveTotal = saveRoll + saveBonus;
+    const success = saveTotal >= saveDc;
+
+    // Calculate damage
+    const finalDamage = computeDamageAfterSave(totalDamage, success, dcSuccess);
+    const applyResult = applyDamageToTarget(
+        combatSummary, targetName, finalDamage, [damageType], campaignName,
+        playerStats ? [playerStats] : null, ignoreResistance, playerName, true
+    );
+
+    const actualDamage = applyResult?.finalDamage ?? finalDamage;
+    const newHp = applyResult?.newHp ?? target.currentHp;
+
+    if (actualDamage > 0) {
+        endInvisibilityOnHostileAction(playerName, campaignName);
+    }
+
+    const result = {
+        targetName,
+        success,
+        roll: saveRoll,
+        total: saveTotal,
+        saveBonus,
+        damage: actualDamage,
+        newHp,
+    };
+    ctx.results.push(result);
+
+    // Log the save
+    await addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerName,
+        rollType: 'save-damage',
+        name: featureName,
+        formula: damageExpression,
+        rolls,
+        total: totalDamage,
+        modifier,
+        damageType,
+        targetName,
+        saveType,
+        saveDc,
+        dcSuccess,
+        saveResult: success ? 'success' : 'failure',
+        saveRoll,
+        saveBonus,
+        saveRawRolls: [saveRoll],
+        finalDamage: actualDamage,
+        note: 'combined_save_damage_roll',
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[radianceOfDawn] Log error:', e); });
+
+    return result;
+}
+
+async function promptRadiancePlayerTarget(targetName, ctx) {
+    const { saveType, saveDc, dcSuccess, damageType, totalDamage, damageExpression, rolls, modifier, playerName, featureName, campaignName } = ctx;
+
+    // Send save prompt for player targets
+    const promptId = `${featureName.replace(/\s+/g, '_')}_${targetName}_${Date.now()}`;
+
+    // Store pending save for damage application
+    registerPendingSavePrompt(promptId, {
+        targetName,
+        rawDamage: totalDamage,
+        saveDc,
+        saveType,
+        dcSuccess,
+        damageType,
+        attackerName: playerName,
+        name: featureName,
+        formula: damageExpression,
+        modifier,
+        rolls,
+        campaignName,
+        setPopupHtml: () => { },
+    });
+
+    // Send save prompt via SSE
+    const key = `savePrompt-${targetName}`;
+    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            value: {
+                promptId,
+                targetName,
+                saveType,
+                saveDc,
+                dcSuccess,
+                damageFormula: damageExpression,
+                damageType,
+                sourceName: featureName,
+                rawDamage: totalDamage,
+            },
+        }),
+    }).catch((e) => { console.error('[radianceOfDawn] Save prompt error:', e); });
+
+    ctx.playerPrompts.push({ promptId, targetName });
+
+    // Log the pending save
+    await addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerName,
+        rollType: 'save-prompt',
+        name: featureName,
+        formula: damageExpression,
+        rolls,
+        total: totalDamage,
+        modifier,
+        damageType,
+        targetName,
+        saveType,
+        saveDc,
+        dcSuccess,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[radianceOfDawn] Log error:', e); });
+}
+
+function buildRadianceResultsHtml(results, playerCount, featureName, saveDc, damageExpression, totalDamage, damageType) {
+    let resultsHtml = `<b>${featureName} used!</b><br/><br/>`;
+    resultsHtml += `<b>Save DC: ${saveDc}</b> (CON)<br/><br/>`;
+    resultsHtml += `<b>Rolls:</b> ${damageExpression} = ${totalDamage} ${damageType} damage<br/><br/>`;
+
+    for (const r of results) {
+        const saveResult = r.success ? '<span style="color: #4caf50;">Passed</span>' : '<span style="color: #f44336;">Failed</span>';
+        const damageWord = r.success ? 'no' : 'full';
+        resultsHtml += `<b>${r.targetName}</b>: ${saveResult} (${r.roll}+${r.saveBonus}=${r.total} vs DC ${saveDc}) — ${damageWord} damage: ${r.damage}<br/>`;
+    }
+
+    if (playerCount > 0) {
+        resultsHtml += `<br/><b>${playerCount} player${playerCount !== 1 ? 's' : ''} rolling saves...</b>`;
+    }
+    return resultsHtml;
+}
+
 export async function confirmRadianceOfDawn(action, playerStats, campaignName, selectedTargets) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -116,6 +258,23 @@ export async function confirmRadianceOfDawn(action, playerStats, campaignName, s
 
     const results = [];
     const playerPrompts = [];
+    const ctx = {
+        saveType,
+        saveDc,
+        dcSuccess,
+        damageType,
+        damageExpression,
+        totalDamage,
+        rolls,
+        modifier,
+        playerName,
+        featureName,
+        campaignName,
+        playerStats,
+        ignoreResistance,
+        results,
+        playerPrompts,
+    };
 
     for (const targetName of selectedTargets) {
         const target = combatSummary.creatures.find(c => c.name === targetName);
@@ -124,119 +283,9 @@ export async function confirmRadianceOfDawn(action, playerStats, campaignName, s
         const isNpc = !targetName.startsWith('player-') || target.type === 'npc';
 
         if (isNpc) {
-            // Roll save for NPC
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
-            const saveRoll = Math.floor(Math.random() * 20) + 1;
-            const saveTotal = saveRoll + saveBonus;
-            const success = saveTotal >= saveDc;
-
-            // Calculate damage
-            const finalDamage = computeDamageAfterSave(totalDamage, success, dcSuccess);
-            const applyResult = applyDamageToTarget(
-                combatSummary, targetName, finalDamage, [damageType], campaignName,
-                playerStats ? [playerStats] : null, ignoreResistance, playerName, true
-            );
-
-            const actualDamage = applyResult?.finalDamage ?? finalDamage;
-            const newHp = applyResult?.newHp ?? target.currentHp;
-
-            if (actualDamage > 0) {
-                endInvisibilityOnHostileAction(playerName, campaignName);
-            }
-
-            results.push({
-                targetName,
-                success,
-                roll: saveRoll,
-                total: saveTotal,
-                saveBonus,
-                damage: actualDamage,
-                newHp,
-            });
-
-            // Log the save
-            await addEntry(campaignName, {
-                type: 'roll',
-                characterName: playerName,
-                rollType: 'save-damage',
-                name: featureName,
-                formula: damageExpression,
-                rolls,
-                total: totalDamage,
-                modifier,
-                damageType,
-                targetName,
-                saveType,
-                saveDc,
-                dcSuccess,
-                saveResult: success ? 'success' : 'failure',
-                saveRoll,
-                saveBonus,
-                saveRawRolls: [saveRoll],
-                finalDamage: actualDamage,
-                note: 'combined_save_damage_roll',
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[radianceOfDawn] Log error:', e); });
+            await processRadianceNpcTarget(combatSummary, target, targetName, ctx);
         } else {
-            // Send save prompt for player targets
-            const promptId = `${featureName.replace(/\s+/g, '_')}_${targetName}_${Date.now()}`;
-
-            // Store pending save for damage application
-            registerPendingSavePrompt(promptId, {
-                targetName,
-                rawDamage: totalDamage,
-                saveDc,
-                saveType,
-                dcSuccess,
-                damageType,
-                attackerName: playerName,
-                name: featureName,
-                formula: damageExpression,
-                modifier,
-                rolls,
-                campaignName,
-                setPopupHtml: () => { },
-            });
-
-            // Send save prompt via SSE
-            const key = `savePrompt-${targetName}`;
-            fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    value: {
-                        promptId,
-                        targetName,
-                        saveType,
-                        saveDc,
-                        dcSuccess,
-                        damageFormula: damageExpression,
-                        damageType,
-                        sourceName: featureName,
-                        rawDamage: totalDamage,
-                    },
-                }),
-            }).catch((e) => { console.error('[radianceOfDawn] Save prompt error:', e); });
-
-            playerPrompts.push({ promptId, targetName });
-
-            // Log the pending save
-            await addEntry(campaignName, {
-                type: 'roll',
-                characterName: playerName,
-                rollType: 'save-prompt',
-                name: featureName,
-                formula: damageExpression,
-                rolls,
-                total: totalDamage,
-                modifier,
-                damageType,
-                targetName,
-                saveType,
-                saveDc,
-                dcSuccess,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[radianceOfDawn] Log error:', e); });
+            await promptRadiancePlayerTarget(targetName, ctx);
         }
     }
 
@@ -249,19 +298,7 @@ export async function confirmRadianceOfDawn(action, playerStats, campaignName, s
     const playerCount = playerPrompts.length;
 
     // Build detailed results HTML for popup
-    let resultsHtml = `<b>${featureName} used!</b><br/><br/>`;
-    resultsHtml += `<b>Save DC: ${saveDc}</b> (CON)<br/><br/>`;
-    resultsHtml += `<b>Rolls:</b> ${damageExpression} = ${totalDamage} ${damageType} damage<br/><br/>`;
-
-    for (const r of results) {
-        const saveResult = r.success ? '<span style="color: #4caf50;">Passed</span>' : '<span style="color: #f44336;">Failed</span>';
-        const damageWord = r.success ? 'no' : 'full';
-        resultsHtml += `<b>${r.targetName}</b>: ${saveResult} (${r.roll}+${r.saveBonus}=${r.total} vs DC ${saveDc}) — ${damageWord} damage: ${r.damage}<br/>`;
-    }
-
-    if (playerCount > 0) {
-        resultsHtml += `<br/><b>${playerCount} player${playerCount !== 1 ? 's' : ''} rolling saves...</b>`;
-    }
+    const resultsHtml = buildRadianceResultsHtml(results, playerCount, featureName, saveDc, damageExpression, totalDamage, damageType);
 
     return {
         type: 'popup',

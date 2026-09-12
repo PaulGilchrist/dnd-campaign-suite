@@ -117,16 +117,9 @@ function applyElusive(conditionEffects, playerStats, activeConditions) {
     }
 }
 
-// Post-compute buff/feature modifiers applied to the base conditionEffects, in original order.
-function applyPostComputeModifiers(conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions) {
-    if (playerStats) {
-        const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
-        if (speedHalvedTime) conditionEffects.speedHalved = true;
-        if (conditionEffects.autoRerollBonus) {
-            conditionEffects.autoRerollBonus = evaluateAutoExpression(conditionEffects.autoRerollBonus, playerStats);
-        }
-        applyRerollKillSwitches(conditionEffects, playerStats, campaignName);
-    }
+// Advantage/disadvantage counting buffs: Reckless Attack, Blessing of the
+// Trickster, buff-ally effects (e.g., Zealous Presence), Cloak of Shadows.
+function applyAttackAdvantageBuffs(conditionEffects, activeBuffs) {
     // Reckless Attack: enemies have Advantage on attack rolls against you
     if (hasBuffEffect(activeBuffs, 'advantage_attacks_advantage_against')) {
         conditionEffects.targetAdvantageCount = (conditionEffects.targetAdvantageCount || 0) + 1;
@@ -149,6 +142,21 @@ function applyPostComputeModifiers(conditionEffects, activeBuffs, playerSummary,
         conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
         conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
     }
+    return { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive };
+}
+
+// Post-compute buff/feature modifiers applied to the base conditionEffects, in original order.
+function applyPostComputeModifiers(conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions) {
+    if (playerStats) {
+        const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
+        if (speedHalvedTime) conditionEffects.speedHalved = true;
+        if (conditionEffects.autoRerollBonus) {
+            conditionEffects.autoRerollBonus = evaluateAutoExpression(conditionEffects.autoRerollBonus, playerStats);
+        }
+        applyRerollKillSwitches(conditionEffects, playerStats, campaignName);
+    }
+    const advantageBuffFlags = applyAttackAdvantageBuffs(conditionEffects, activeBuffs);
+    const { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive } = advantageBuffFlags;
     // Shield: +5 AC until start of next turn, immune to Magic Missile
     const shieldActive = hasBuffEffect(activeBuffs, 'shield');
     if (shieldActive) {
@@ -232,7 +240,25 @@ export function computeCharConditionEffects(playerSummary, playerStats, campaign
     const myTargetEffects = allTargetEffects.filter(te => te.target === (playerSummary?.name));
     const flags = computeConditionFlags(activeBuffs, playerStats, campaignName);
     const combatContext = getCombatSummary(campaignName);
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, flags.isRaging, flags.shapeShiftActive, flags.isPeerlessAthlete, flags.isLargeFormActive, combatContext, flags.seeInvisibilityActive, playerStats?.name, flags.isLivingLegendActive, flags.isElderChampionActive, false, flags.isHolyAuraActive, flags.isProtectionFromPoisonActive, flags.isTranceOfOrderActive, playerStats?.hasPowerfulBuild === true);
+    const conditionEffects = computeConditionEffects({
+        conditions: activeConditions,
+        saveModifiers: allSaveModifiers,
+        targetEffects: myTargetEffects,
+        isRaging: flags.isRaging,
+        shapeShiftActive: flags.shapeShiftActive,
+        isPeerlessAthlete: flags.isPeerlessAthlete,
+        isLargeFormActive: flags.isLargeFormActive,
+        combatContext,
+        seeInvisibilityActive: flags.seeInvisibilityActive,
+        attackerName: playerStats?.name,
+        isLivingLegendActive: flags.isLivingLegendActive,
+        isElderChampionActive: flags.isElderChampionActive,
+        isElderChampionAttackerActive: false,
+        holyAuraTargets: flags.isHolyAuraActive,
+        isProtectionFromPoisonActive: flags.isProtectionFromPoisonActive,
+        isTranceOfOrderActive: flags.isTranceOfOrderActive,
+        hasPowerfulBuild: playerStats?.hasPowerfulBuild === true,
+    });
 
     const { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive, shieldActive, shieldOfFaithActive, hasteActive, wardingBondAcBonus, wardingBondSaveBonus } =
         applyPostComputeModifiers(conditionEffects, activeBuffs, playerSummary, playerStats, combatContext, campaignName, pfeagActive, activeConditions);

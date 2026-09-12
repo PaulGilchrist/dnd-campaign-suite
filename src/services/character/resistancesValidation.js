@@ -275,6 +275,57 @@ function extractClassImmunities(classData, version, level) {
   return Array.from(immunities);
 }
 
+async function collectLimits2024(raceName, subraceName, className, level) {
+  let resistances = [];
+  let immunities = [];
+
+  // 2024 rules: Check race traits for resistances
+  if (raceName) {
+    const raceData = await fetchRaceData(raceName, '2024');
+    resistances = extract2024RaceResistances(raceData, subraceName);
+  }
+
+  // Check class features for immunities
+  if (className) {
+    const classData = await fetchClassData(className, '2024');
+    immunities = extractClassImmunities(classData, '2024', level);
+  }
+
+  return { resistances, immunities };
+}
+
+async function collectLimits5e(raceName, subraceName, className, level) {
+  let resistances = [];
+  let immunities = [];
+
+  // 5e rules: Check race traits for resistances
+  if (raceName) {
+    const raceData = await fetchRaceData(raceName, '5e');
+    resistances = extract5eRaceResistances(raceData, subraceName);
+
+    // Dragonborn special case - determine resistance from subrace JSON data
+    if (raceName === 'Dragonborn' && subraceName) {
+      const subrace = raceData?.subraces?.find(sr => sr.name === subraceName);
+      const desc = subrace?.description || '';
+      const match = desc.match(/resistance to (\w+)/i);
+      if (match) {
+        const resistanceType = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+        if (!resistances.includes(resistanceType)) {
+          resistances.push(resistanceType);
+        }
+      }
+    }
+  }
+
+  // Check class features for immunities (rare in 5e base rules)
+  if (className) {
+    const classData = await fetchClassData(className, '5e');
+    immunities = extractClassImmunities(classData, '5e', level);
+  }
+
+  return { resistances, immunities };
+}
+
 /**
  * Gets the allowed resistances and immunities based on ruleset, class, race, and background
  * @param {object} formData - The character form data
@@ -287,55 +338,13 @@ export async function getResistanceLimits(formData) {
   const subraceName = formData.race?.subrace?.name || formData.race?.subrace || '';
   const level = formData.level || 1;
 
-  let resistances = [];
-  let immunities = [];
-
-  if (ruleset === '2024') {
-    // 2024 rules: Check race traits for resistances
-    if (raceName) {
-      const raceData = await fetchRaceData(raceName, '2024');
-      resistances = extract2024RaceResistances(raceData, subraceName);
-    }
-
-    // Check class features for immunities
-    if (className) {
-      const classData = await fetchClassData(className, '2024');
-      immunities = extractClassImmunities(classData, '2024', level);
-      }
-    } else {
-      // 5e rules: Check race traits for resistances
-    if (raceName) {
-      const raceData = await fetchRaceData(raceName, '5e');
-      resistances = extract5eRaceResistances(raceData, subraceName);
-    }
-
-      // Dragonborn special case - determine resistance from subrace JSON data
-    if (raceName === 'Dragonborn' && subraceName) {
-      const raceData = await fetchRaceData(raceName, '5e');
-      const subrace = raceData?.subraces?.find(sr => sr.name === subraceName);
-      if (subrace) {
-          // Check subrace description for resistance type
-         const desc = subrace.description || '';
-        if (desc.match(/resistance to (\w+)/i)) {
-          const match = desc.match(/resistance to (\w+)/i);
-          const resistanceType = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
-          if (!resistances.includes(resistanceType)) {
-            resistances.push(resistanceType);
-            }
-          }
-        }
-      }
-
-    // Check class features for immunities (rare in 5e base rules)
-    if (className) {
-      const classData = await fetchClassData(className, '5e');
-      immunities = extractClassImmunities(classData, '5e', level);
-      }
-    }
+  const limits = ruleset === '2024'
+    ? await collectLimits2024(raceName, subraceName, className, level)
+    : await collectLimits5e(raceName, subraceName, className, level);
 
   return {
-    resistances,
-    immunities,
+    resistances: limits.resistances,
+    immunities: limits.immunities,
     details: ruleset === '2024'
        ? `In 2024 rules, resistances and immunities come from your race (${raceName}) and class (${className}) features`
        : `In 5e rules, resistances come from your race (${raceName}) and class (${className}) features`

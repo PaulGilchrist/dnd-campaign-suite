@@ -314,6 +314,119 @@ function ResistanceImmunityLines({ allResistances, allImmunities, auraResistance
     );
 }
 
+function findHunterMarkCaster(creatures, playerName) {
+    return creatures.find(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === playerName) || null;
+}
+
+function resolveCurrentAllies(storedAllies, playerName) {
+    return Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : [playerName];
+}
+
+function computeLevelSuffix(isInXpMode, displayXp) {
+    return isInXpMode ? ` (${displayXp.toLocaleString()} XP)` : ' (milestone)';
+}
+
+function filterMyTargetEffects(allTargetEffects, playerName) {
+    const effects = allTargetEffects || [];
+    return effects.filter(te => {
+        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
+        return teTarget === playerName;
+    });
+}
+
+function buildConditionObjects(rawConditions, rawConditionMeta) {
+    const storedConditions = rawConditions ?? [];
+    const conditionMeta = rawConditionMeta ?? {};
+    return storedConditions.map((key, i) => {
+        const condKey = String(key).toLowerCase();
+        const meta = conditionMeta[condKey] || {};
+        return {
+            id: `runtime-${key}-${i}`,
+            key,
+            label: key.charAt(0).toUpperCase() + key.slice(1),
+            dc: meta.dc || 0,
+            ability: meta.ability || 'con',
+        };
+    });
+}
+
+// CLA-252: Nature's Sanctuary — find the druid protecting this character.
+function computeSanctuaryInfo(creatures, playerName, campaignName) {
+    for (const other of creatures) {
+        if (other.type !== 'player') continue;
+        const active = getRuntimeValue(other.name, 'naturesSanctuaryActive', campaignName);
+        if (!active) continue;
+        const creatureList = getRuntimeValue(other.name, 'naturesSanctuaryCreatures', campaignName) || [];
+        if (creatureList.includes(playerName)) {
+            const resistance = getRuntimeValue(other.name, 'naturesSanctuaryResistance', campaignName) || 'None';
+            return { druid: other.name, resistance };
+        }
+    }
+    return null;
+}
+
+function computeAllyTargets(campaignName, characters) {
+    const combatSummary = getCombatSummary(campaignName);
+    return combatSummary?.creatures?.map(c => ({
+        name: c.name,
+        type: c.type,
+        currentHp: c.currentHp,
+        maxHp: c.maxHp,
+    })) || characters.map(c => ({ name: c.name, type: c.type }));
+}
+
+function showFeatDetailPopup(feat, setPopupHtml) {
+    if (!feat.desc && !feat.description) return;
+    // Handle both array (5e) and string (2024) description formats
+    let descriptionHtml;
+    if (Array.isArray(feat.desc)) {
+        descriptionHtml = feat.desc.map(desc => desc || '').join('<br/>');
+    } else if (feat.description) {
+        descriptionHtml = feat.description;
+    } else {
+        descriptionHtml = feat.desc || '';
+    }
+    let html = `<b>${feat.name}</b><br/><br/>${descriptionHtml}<br/>`;
+    if (feat.prerequisites) {
+        html += `<br/><b>Prerequisites:</b><br/>`;
+        if (feat.prerequisites.level) {
+            html += `Level ${feat.prerequisites.level}<br/>`;
+        }
+        if (feat.prerequisites.ability_scores) {
+            feat.prerequisites.ability_scores.forEach(as => {
+                html += `${as.name} ${as.minimum} or higher<br/>`;
+            });
+        }
+        if (feat.prerequisites.proficiency) {
+            html += `Proficiency with ${feat.prerequisites.proficiency}<br/>`;
+        }
+    }
+    if (feat.benefits && feat.benefits.length > 0) {
+        html += `<br/><b>Benefits:</b><ul>`;
+        feat.benefits.forEach(benefit => {
+            html += `<li>${benefit.description || benefit}</li>`;
+        });
+        html += `</ul>`;
+    }
+    setPopupHtml(html);
+}
+
+function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effectiveInitiative, hasInspiration, handleInitiative, handleToggleInspiration, handleAllyModalOpen, currentAllies, setPopupHtml }) {
+    return (
+        <div>
+            <b>Proficiency: </b>+{playerStats.proficiency}<br />
+            <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={handleInitiative}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
+            <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
+            {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml, playerStats.rules || '5e')}>{playerStats.background}</span></div>}
+            <CharFeats playerStats={playerStats} showPopup={(feat) => showFeatDetailPopup(feat, setPopupHtml)} />
+            <span className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
+                <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
+            </span>
+            <ContextFeatureBadges ctx={ctx} />
+        </div>
+    );
+}
+
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
@@ -327,7 +440,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [allyModalCreatures, setAllyModalCreatures] = React.useState([]);
     const storedAllies = useRuntimeValue(playerStats.name, 'selectedAllies', campaignName);
     const [surgeEffects, setSurgeEffects] = useSyncedState(playerStats.name, 'wildMagicSurgeEffects', null, campaignName);
-    const currentAllies = Array.isArray(storedAllies) && storedAllies.length > 0 ? storedAllies : [playerStats.name];
+    const currentAllies = resolveCurrentAllies(storedAllies, playerStats.name);
     React.useEffect(() => {
         const handleInitiative = () => {
             setSurgeEffects(null);
@@ -410,59 +523,25 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         seeInvisibilityActive, effectiveInitiative,
     } = ctx;
     const allTargetEffects = useRuntimeValue('campaign', 'targetEffects');
-    const myTargetEffects = React.useMemo(() => {
-        const effects = allTargetEffects || [];
-        const filtered = effects.filter(te => {
-            const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-            return teTarget === playerStats.name;
-        });
-        return filtered;
-    }, [allTargetEffects, playerStats.name]);
+    const myTargetEffects = React.useMemo(() => filterMyTargetEffects(allTargetEffects, playerStats.name), [allTargetEffects, playerStats.name]);
     const rawConditions = useRuntimeValue(playerStats.name, 'activeConditions');
     const rawConditionMeta = useRuntimeValue(playerStats.name, 'activeConditionMeta');
-    const conditionObjects = React.useMemo(() => {
-        const storedConditions = rawConditions ?? [];
-        const conditionMeta = rawConditionMeta ?? {};
-        return storedConditions.map((key, i) => {
-            const condKey = String(key).toLowerCase();
-            const meta = conditionMeta[condKey] || {};
-            return {
-                id: `runtime-${key}-${i}`,
-                key,
-                label: key.charAt(0).toUpperCase() + key.slice(1),
-                dc: meta.dc || 0,
-                ability: meta.ability || 'con',
-            };
-        });
-    }, [rawConditions, rawConditionMeta]);
+    const conditionObjects = React.useMemo(() => buildConditionObjects(rawConditions, rawConditionMeta), [rawConditions, rawConditionMeta]);
 
     const rawCombatSummary = getCombatSummary(campaignName);
     const rawCreaturesForBadges = rawCombatSummary?.creatures;
-    const playerCreatureForBadges = (rawCreaturesForBadges || []).find(c => c.name === playerStats.name);
+    const allCreaturesForBadges = rawCreaturesForBadges || [];
+    const playerCreatureForBadges = allCreaturesForBadges.find(c => c.name === playerStats.name);
     const concentrationForBadges = playerCreatureForBadges?.concentration ?? null;
     const wildShapeActiveChar = isBuffActive(playerStats.name, 'Wild Shape', campaignName);
     const isMajestyActiveChar = isUnbreakableMajestyActive(playerStats.name, campaignName);
     const majestyDcChar = isMajestyActiveChar ? getUnbreakableMajestySaveDc(playerStats.name, campaignName) : 0;
     const recklessAttackActiveChar = myTargetEffects.some(te => te.effect === 'reckless_attack');
 
-    const sanctuaryInfoChar = React.useMemo(() => {
-        const creatures = rawCreaturesForBadges || [];
-        for (const other of creatures) {
-            if (other.type !== 'player') continue;
-            const active = getRuntimeValue(other.name, 'naturesSanctuaryActive', campaignName);
-            if (!active) continue;
-            const creatureList = getRuntimeValue(other.name, 'naturesSanctuaryCreatures', campaignName) || [];
-            if (creatureList.includes(playerStats.name)) {
-                const resistance = getRuntimeValue(other.name, 'naturesSanctuaryResistance', campaignName) || 'None';
-                return { druid: other.name, resistance };
-            }
-        }
-        return null;
-    }, [rawCreaturesForBadges, campaignName, playerStats?.name]);
+    const sanctuaryInfoChar = React.useMemo(() => computeSanctuaryInfo(rawCreaturesForBadges || [], playerStats.name, campaignName), [rawCreaturesForBadges, campaignName, playerStats.name]);
 
-    const allCreaturesForBadges = rawCreaturesForBadges || [];
-    const huntersMarkOnCreature = allCreaturesForBadges?.some(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === playerStats.name);
-    const markCreature = huntersMarkOnCreature ? allCreaturesForBadges.find(c => c.concentration?.spell === "Hunter's Mark" && c.concentration?.target === playerStats.name) : null;
+    const markCreature = findHunterMarkCaster(allCreaturesForBadges, playerStats.name);
+    const huntersMarkOnCreature = !!markCreature;
 
     const showArmorClassFormulaPopup = () => {
         const html = `Armor Class (${playerStats.armorClass}) = ${playerStats.armorClassFormula}`
@@ -485,14 +564,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     };
 
     const handleAllyModalOpen = () => {
-        const combatSummary = getCombatSummary(campaignName);
-        const targets = combatSummary?.creatures?.map(c => ({
-            name: c.name,
-            type: c.type,
-            currentHp: c.currentHp,
-            maxHp: c.maxHp,
-        })) || characters.map(c => ({ name: c.name, type: c.type }));
-        setAllyModalCreatures(targets);
+        setAllyModalCreatures(computeAllyTargets(campaignName, characters));
         setShowAllyModal(true);
     };
 
@@ -512,9 +584,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         setShowAllyModal(false);
     };
 
-    const levelSuffix = isInXpMode
-        ? ` (${displayXp.toLocaleString()} XP)`
-        : ' (milestone)';
+    const levelSuffix = computeLevelSuffix(isInXpMode, displayXp);
 
     return (
         <div>
@@ -542,52 +612,18 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                       <SpeedSummary ctx={ctx} conditionEffects={conditionEffects} exhaustionLevel={exhaustionLevel} />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
-                <div>
-                    <b>Proficiency: </b>+{playerStats.proficiency}<br />
-                    <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={handleInitiative}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
-                    <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
-                    {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml, playerStats.rules || '5e')}>{playerStats.background}</span></div>}
-                    <CharFeats playerStats={playerStats} showPopup={(feat) => {
-                                             if (feat.desc || feat.description) {
-                            // Handle both array (5e) and string (2024) description formats
-                             let descriptionHtml;
-                             if (Array.isArray(feat.desc)) {
-                                descriptionHtml = feat.desc.map(desc => desc || '').join('<br/>');
-                            } else if (feat.description) {
-                                descriptionHtml = feat.description;
-                            } else {
-                                descriptionHtml = feat.desc || '';
-                            }
-                            let html = `<b>${feat.name}</b><br/><br/>${descriptionHtml}<br/>`;
-                            if (feat.prerequisites) {
-                                html += `<br/><b>Prerequisites:</b><br/>`;
-                                if (feat.prerequisites.level) {
-                                    html += `Level ${feat.prerequisites.level}<br/>`;
-                                }
-                                if (feat.prerequisites.ability_scores) {
-                                    feat.prerequisites.ability_scores.forEach(as => {
-                                        html += `${as.name} ${as.minimum} or higher<br/>`;
-                                    });
-                                }
-                                if (feat.prerequisites.proficiency) {
-                                    html += `Proficiency with ${feat.prerequisites.proficiency}<br/>`;
-                                }
-                            }
-                            if (feat.benefits && feat.benefits.length > 0) {
-                                html += `<br/><b>Benefits:</b><ul>`;
-                                feat.benefits.forEach(benefit => {
-                                    html += `<li>${benefit.description || benefit}</li>`;
-                                });
-                                html += `</ul>`;
-                            }
-                            setPopupHtml(html);
-                        }
-                    }} />
-                    <span className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
-                        <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
-                    </span>
-                    <ContextFeatureBadges ctx={ctx} />
-                </div>
+                <SummaryProficiencyColumn
+                    playerStats={playerStats}
+                    ctx={ctx}
+                    exhaustionLevel={exhaustionLevel}
+                    effectiveInitiative={effectiveInitiative}
+                    hasInspiration={hasInspiration}
+                    handleInitiative={handleInitiative}
+                    handleToggleInspiration={handleToggleInspiration}
+                    handleAllyModalOpen={handleAllyModalOpen}
+                    currentAllies={currentAllies}
+                    setPopupHtml={setPopupHtml}
+                />
                 <div>
                     <TrackedResourceInput label="Short Rest Hit Dice" resourceKey="shortRestHitDice" playerName={playerStats.name} getMax={() => playerStats.level} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                     <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />

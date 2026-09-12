@@ -4,10 +4,9 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
-import { rollD20 } from '../../../dice/diceRoller.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
+import { rollNpcSave } from './charmSpellUtils.js';
 
 function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
     sendSaveResult(campaignName, targetName, {
@@ -32,6 +31,87 @@ function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc
             rawRolls: saveResult.rawRolls,
         },
     }));
+}
+
+async function recordDominateSuccess(campaignName, casterName, spellName, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: `save-${spellName.toLowerCase().replace(/\s+/g, '-')}`,
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: true,
+        description: `${targetName} succeeded on WIS save against ${spellName}.`,
+    }).catch((e) => { console.error(`[${spellName}] Error:`, e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: spellName,
+            description: `${targetName} succeeded on WIS save (DC ${dc}) against ${spellName}. Roll: ${saveResult.roll ?? 0} + ${saveResult.bonus ?? 0} = ${saveResult.total ?? 0}.`,
+        },
+    };
+}
+
+async function applyDominateCharm(campaignName, casterName, spellName, targetName, dc, saveResult) {
+    // Failed save: apply Charmed condition
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['charmed'],
+        appliedDamage: 0,
+    });
+
+    addExpiration(casterName, targetName, [
+        { type: 'dominated', condition: 'charmed' },
+    ], campaignName);
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Charmed',
+        reason: `${spellName} spell`,
+        note: `${targetName} is Charmed by ${casterName} and regards them as a friendly acquaintance. You have a telepathic link with the target as long as you are on the same plane of existence. You can use this link to issue commands to the target (no action required). The spell ends if ${casterName} or allies deal damage to the target, or when the target takes damage and succeeds on a WIS save.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error(`[${spellName}] Error:`, e); });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: `save-${spellName.toLowerCase().replace(/\s+/g, '-')}`,
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: false,
+        description: `${targetName} failed WIS save against ${spellName} and is Charmed.`,
+    }).catch((e) => { console.error(`[${spellName}] Error:`, e); });
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: spellName,
+            description: `${targetName} failed WIS save (DC ${dc}) against ${spellName}. Roll: ${saveResult.roll ?? 0} + ${saveResult.bonus ?? 0} = ${saveResult.total ?? 0} — ${targetName} is Charmed by ${casterName}. You have a telepathic link with the target and can issue commands to it (no action required). The spell ends if concentration is lost, on initiative roll, short rest, or long rest.`,
+        },
+    };
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -84,100 +164,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error(`[${spellName}] Error:`, e); });
 
     if (targetInfo?.target?.type === 'npc') {
-        const cs = targetInfo.cs;
-        const creature = cs?.creatures?.find(c => c.name === targetName);
-        const saveResult = creature
-            ? rollSaveForCreature(creature, 'WIS', dc, false, saveAdvantage)
-            : (() => {
-                const r1 = rollD20();
-                const r2 = rollD20();
-                const roll = saveAdvantage ? Math.max(r1, r2) : r1;
-                const total = roll;
-                const success = total >= dc;
-                return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
-            })();
-
-        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, saveResult);
+        const creature = targetInfo.cs?.creatures?.find(c => c.name === targetName);
+        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcSave(creature, dc, saveAdvantage));
     }
 
     const saveResult = await promise;
 
     if (saveResult.success) {
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'success',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: [],
-            appliedDamage: 0,
-        });
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: `save-${spellName.toLowerCase().replace(/\s+/g, '-')}`,
-            targetName,
-            saveDc: dc,
-            saveType: 'WIS',
-            success: true,
-            description: `${targetName} succeeded on WIS save against ${spellName}.`,
-        }).catch((e) => { console.error(`[${spellName}] Error:`, e); });
-
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: spellName,
-                description: `${targetName} succeeded on WIS save (DC ${dc}) against ${spellName}. Roll: ${saveResult.roll ?? 0} + ${saveResult.bonus ?? 0} = ${saveResult.total ?? 0}.`,
-            },
-        };
+        return recordDominateSuccess(campaignName, casterName, spellName, targetName, dc, saveResult);
     }
 
-    // Failed save: apply Charmed condition
-    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
-    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
-
-    await addTargetResult(campaignName, {
-        targetName,
-        saveResult: 'failure',
-        roll: saveResult.roll ?? 0,
-        total: saveResult.total ?? 0,
-        conditions: ['charmed'],
-        appliedDamage: 0,
-    });
-
-    addExpiration(casterName, targetName, [
-        { type: 'dominated', condition: 'charmed' },
-    ], campaignName);
-
-    addEntry(campaignName, {
-        type: 'condition',
-        action: 'applied',
-        characterName: targetName,
-        condition: 'Charmed',
-        reason: `${spellName} spell`,
-        note: `${targetName} is Charmed by ${casterName} and regards them as a friendly acquaintance. You have a telepathic link with the target as long as you are on the same plane of existence. You can use this link to issue commands to the target (no action required). The spell ends if ${casterName} or allies deal damage to the target, or when the target takes damage and succeeds on a WIS save.`,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error(`[${spellName}] Error:`, e); });
-
-    addEntry(campaignName, {
-        type: 'save_result',
-        characterName: casterName,
-        rollType: `save-${spellName.toLowerCase().replace(/\s+/g, '-')}`,
-        targetName,
-        saveDc: dc,
-        saveType: 'WIS',
-        success: false,
-        description: `${targetName} failed WIS save against ${spellName} and is Charmed.`,
-    }).catch((e) => { console.error(`[${spellName}] Error:`, e); });
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: spellName,
-            description: `${targetName} failed WIS save (DC ${dc}) against ${spellName}. Roll: ${saveResult.roll ?? 0} + ${saveResult.bonus ?? 0} = ${saveResult.total ?? 0} — ${targetName} is Charmed by ${casterName}. You have a telepathic link with the target and can issue commands to it (no action required). The spell ends if concentration is lost, on initiative roll, short rest, or long rest.`,
-        },
-    };
+    return applyDominateCharm(campaignName, casterName, spellName, targetName, dc, saveResult);
 }

@@ -595,7 +595,72 @@ function applyProtectionFromPoisonAdvantage(effects, conditionSet, isProtectionF
   effects.saveAdvantageReasons = [...(effects.saveAdvantageReasons || []), 'Protection from Poison'];
 }
 
-function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false, attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, holyAuraTargets = [], isProtectionFromPoisonActive = false, isTranceOfOrderActive = false, hasPowerfulBuild = false, attackerSenses = null) {
+function normalizeConditionEffectOptions(options = {}) {
+  const {
+    conditions = [],
+    saveModifiers = [],
+    targetEffects = [],
+    isRaging = false,
+    shapeShiftActive = false,
+    isPeerlessAthlete = false,
+    isLargeFormActive = false,
+    combatContext = null,
+    seeInvisibilityActive = false,
+    attackerName = null,
+    isLivingLegendActive = false,
+    isElderChampionActive = false,
+    isElderChampionAttackerActive = false,
+    holyAuraTargets = [],
+    isProtectionFromPoisonActive = false,
+    isTranceOfOrderActive = false,
+    hasPowerfulBuild = false,
+    attackerSenses = null,
+  } = options
+
+  return {
+    conditions,
+    saveModifiers,
+    targetEffects,
+    isRaging,
+    shapeShiftActive,
+    isPeerlessAthlete,
+    isLargeFormActive,
+    combatContext,
+    seeInvisibilityActive,
+    attackerName,
+    isLivingLegendActive,
+    isElderChampionActive,
+    isElderChampionAttackerActive,
+    holyAuraTargets,
+    isProtectionFromPoisonActive,
+    isTranceOfOrderActive,
+    hasPowerfulBuild,
+    attackerSenses,
+  }
+}
+
+function computeConditionEffects(options = {}) {
+  const {
+    conditions,
+    saveModifiers,
+    targetEffects,
+    isRaging,
+    shapeShiftActive,
+    isPeerlessAthlete,
+    isLargeFormActive,
+    combatContext,
+    seeInvisibilityActive,
+    attackerName,
+    isLivingLegendActive,
+    isElderChampionActive,
+    isElderChampionAttackerActive,
+    holyAuraTargets,
+    isProtectionFromPoisonActive,
+    isTranceOfOrderActive,
+    hasPowerfulBuild,
+    attackerSenses,
+  } = normalizeConditionEffectOptions(options)
+
   const effects = buildBaseEffects()
 
   const conditionSet = new Set(conditions)
@@ -612,7 +677,26 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
   const activeSaveModifiers = isIncapacitated
     ? saveModifiers.filter(mod => mod.condition !== 'visible_effect')
     : saveModifiers;
-  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, holyAuraTargets, isProtectionFromPoisonActive, isTranceOfOrderActive, hasPowerfulBuild);
+  applySaveModifiers({
+    effects,
+    modifiers: activeSaveModifiers,
+    saveType: null,
+    abilityName: null,
+    isRaging,
+    shapeShiftActive,
+    isPeerlessAthlete,
+    isLargeFormActive,
+    combatContext,
+    conditions,
+    attackerName,
+    isLivingLegendActive,
+    isElderChampionActive,
+    isElderChampionAttackerActive,
+    holyAuraTargets,
+    isProtectionFromPoisonActive,
+    isTranceOfOrderActive,
+    hasPowerfulBuild,
+  });
 
   applyProtectionFromPoisonAdvantage(effects, conditionSet, isProtectionFromPoisonActive);
 

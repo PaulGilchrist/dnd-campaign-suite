@@ -30,6 +30,60 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js'
 import { logHealingToSSE } from '../../services/automation/common/healingRoll.js'
 import { addEntry } from '../../services/ui/logService.js'
 import SecondaryModals from './CharActionModals.SecondaryModals.jsx';
+
+const CLOCKWORK_CHOICE_MODAL_KEYS = {
+    heal: 'clockworkCavalcadeHealModal',
+    dispel: 'clockworkCavalcadeDispelModal',
+    repair: 'clockworkCavalcadeRepairModal',
+};
+
+const findCreatureMaxHp = (targetName, combatSummary, characters) => {
+    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
+    if (creature?.maxHp) return creature.maxHp;
+    const char = characters?.find(c => c.name === targetName);
+    return char?.maxHp;
+};
+
+const findCreatureCurrentHp = (targetName, combatSummary) => {
+    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
+    return creature?.currentHp;
+};
+
+const resolveHealingIllusionHp = (targetName, playerStats, campaignName, combatSummary, characters) => {
+    const maxHp = targetName === playerStats.name
+        ? playerStats.hitPoints
+        : (Number(getRuntimeValue(targetName, 'hitPoints', campaignName)) || findCreatureMaxHp(targetName, combatSummary, characters) || 0);
+    const currentHp = Number(getRuntimeValue(targetName, 'currentHitPoints', campaignName)) || findCreatureCurrentHp(targetName, combatSummary) || 0;
+    return { maxHp, currentHp };
+};
+
+const getFlurryTarget = (flurry) => flurry?.targets[flurry.currentIndex] ?? {};
+
+const isMoonlightStepTeleport = (teleportModal) => teleportModal.action?.automation?.effect === 'moonlight_step_teleport';
+
+const handleHealingIllusionConfirm = async (targetName, payload, characters, campaignName, combatSummary, onClose) => {
+    const { action, playerStats } = payload;
+    const casterName = playerStats.name;
+    const stored = getRuntimeValue(casterName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(stored) ? stored : [];
+    const newBuffs = activeBuffs.filter(b => b.name !== action.name);
+    setRuntimeValue(casterName, 'activeBuffs', newBuffs, campaignName);
+    setRuntimeValue(casterName, 'invokeDuplicityAdvantageTargets', [], campaignName);
+    const healAmount = playerStats.level || 1;
+    const { maxHp, currentHp } = resolveHealingIllusionHp(targetName, playerStats, campaignName, combatSummary, characters);
+    const newHp = Math.min(maxHp, currentHp + healAmount);
+    await setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
+    logHealingToSSE(campaignName, {
+        targetName,
+        sourceName: action.name,
+        actualHeal: newHp - currentHp,
+        newHp,
+        maxHp,
+        healingName: 'Healing Illusion',
+    });
+    onClose();
+};
+
 function CharActionModals({
     playerStats,
     campaignName,
@@ -118,13 +172,8 @@ function CharActionModals({
         const choiceModal = mergedModalState.clockworkCavalcadeModal;
         if (!choiceModal) return;
         setModalState({ clockworkCavalcadeModal: null });
-        if (choice === 'heal') {
-            setModalState({ clockworkCavalcadeHealModal: choiceModal });
-        } else if (choice === 'dispel') {
-            setModalState({ clockworkCavalcadeDispelModal: choiceModal });
-        } else if (choice === 'repair') {
-            setModalState({ clockworkCavalcadeRepairModal: choiceModal });
-        }
+        const modalKey = CLOCKWORK_CHOICE_MODAL_KEYS[choice];
+        if (modalKey) setModalState({ [modalKey]: choiceModal });
     }, [mergedModalState.clockworkCavalcadeModal, setModalState]);
 
     const handleStarryChaliceConfirm = async (targetName) => {
@@ -177,44 +226,6 @@ function CharActionModals({
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
-    };
-
-    const handleHealingIllusionConfirm = async (targetName, payload, characters, campaignName, combatSummary, onClose) => {
-        const { action, playerStats } = payload;
-        const casterName = playerStats.name;
-        const stored = getRuntimeValue(casterName, 'activeBuffs', campaignName);
-        const activeBuffs = Array.isArray(stored) ? stored : [];
-        const newBuffs = activeBuffs.filter(b => b.name !== action.name);
-        setRuntimeValue(casterName, 'activeBuffs', newBuffs, campaignName);
-        setRuntimeValue(casterName, 'invokeDuplicityAdvantageTargets', [], campaignName);
-        const healAmount = playerStats.level || 1;
-        const maxHp = targetName === playerStats.name
-            ? playerStats.hitPoints
-            : (Number(getRuntimeValue(targetName, 'hitPoints', campaignName)) || findCreatureMaxHp(targetName, combatSummary, characters) || 0);
-        const currentHp = Number(getRuntimeValue(targetName, 'currentHitPoints', campaignName)) || findCreatureCurrentHp(targetName, combatSummary) || 0;
-        const newHp = Math.min(maxHp, currentHp + healAmount);
-        await setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
-        logHealingToSSE(campaignName, {
-            targetName,
-            sourceName: action.name,
-            actualHeal: newHp - currentHp,
-            newHp,
-            maxHp,
-            healingName: 'Healing Illusion',
-        });
-        onClose();
-    };
-
-    const findCreatureMaxHp = (targetName, combatSummary, characters) => {
-        const creature = combatSummary?.creatures?.find(c => c.name === targetName);
-        if (creature?.maxHp) return creature.maxHp;
-        const char = characters?.find(c => c.name === targetName);
-        return char?.maxHp;
-    };
-
-    const findCreatureCurrentHp = (targetName, combatSummary) => {
-        const creature = combatSummary?.creatures?.find(c => c.name === targetName);
-        return creature?.currentHp;
     };
 
     const buildHealingIllusionTargets = () => {
@@ -281,6 +292,8 @@ function CharActionModals({
             resumeAttackPipeline?.();
         }
     };
+
+    const flurryTarget = getFlurryTarget(mergedModalState.openHandFromFlurry);
 
     return (
         <>
@@ -388,10 +401,10 @@ function CharActionModals({
             )}
             {mergedModalState.openHandFromFlurry && (
                 <OpenHandTechniqueModal
-                    action={mergedModalState.openHandFromFlurry.targets[mergedModalState.openHandFromFlurry.currentIndex]?.action}
-                    playerStats={mergedModalState.openHandFromFlurry.targets[mergedModalState.openHandFromFlurry.currentIndex]?.playerStats}
-                    campaignName={mergedModalState.openHandFromFlurry.targets[mergedModalState.openHandFromFlurry.currentIndex]?.campaignName}
-                    targetName={mergedModalState.openHandFromFlurry.targets[mergedModalState.openHandFromFlurry.currentIndex]?.targetName}
+                    action={flurryTarget.action}
+                    playerStats={flurryTarget.playerStats}
+                    campaignName={flurryTarget.campaignName}
+                    targetName={flurryTarget.targetName}
                     saveDc={mergedModalState.openHandFromFlurry.saveDc}
                     onClose={() => { handleOpenHandFromFlurrySkip(); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
                     onConfirm={(optionName) => { handleOpenHandFromFlurryConfirm({ optionName }); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
@@ -454,7 +467,7 @@ function CharActionModals({
                 <TeleportModal
                     {...mergedModalState.teleportModal}
                     onClose={() => { setModalState({ teleportModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
-                    isMoonlightStep={mergedModalState.teleportModal.action?.automation?.effect === 'moonlight_step_teleport'}
+                    isMoonlightStep={isMoonlightStepTeleport(mergedModalState.teleportModal)}
                 />
             )}
             <SecondaryModals

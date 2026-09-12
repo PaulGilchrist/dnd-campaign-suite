@@ -35,7 +35,8 @@ function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc
     }));
 }
 
-function rollNpcSave(targetCreature, dc, advantage) {
+// Shared WIS NPC save (also used by Crown of Madness).
+export function rollNpcSave(targetCreature, dc, advantage) {
     if (targetCreature) {
         return rollSaveForCreature(targetCreature, 'WIS', dc, false, advantage);
     }

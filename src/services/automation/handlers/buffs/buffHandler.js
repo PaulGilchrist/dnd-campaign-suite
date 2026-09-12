@@ -701,6 +701,35 @@ async function handlePsychicWhispers(action, playerStats, campaignName, _mapName
     };
 }
 
+function hoursLabel(hours) {
+    return `${hours} hour${hours !== 1 ? 's' : ''}`;
+}
+
+function relinkTelepathicTargets(playerName, featureName, buffAuto, finalTargets, campaignName) {
+    // Re-activation replaces the previous link: drop stale targets first.
+    const storedPrevious = getRuntimeValue(playerName, PSYCHIC_WHISPERS_TARGETS_KEY, campaignName);
+    const previousTargets = Array.isArray(storedPrevious) ? storedPrevious : [];
+    for (const staleName of previousTargets) {
+        if (!finalTargets.includes(staleName) && isBuffActive(staleName, featureName, campaignName)) {
+            toggleBuff(staleName, featureName, buffAuto, campaignName);
+        }
+    }
+
+    const { wasActive } = toggleBuff(playerName, featureName, buffAuto, campaignName);
+    if (wasActive) {
+        // toggleBuff removed the existing buff on re-activation — re-apply refreshed duration.
+        toggleBuff(playerName, featureName, buffAuto, campaignName);
+    }
+
+    for (const targetName of finalTargets) {
+        const { wasActive: targetWasActive } = toggleBuff(targetName, featureName, buffAuto, campaignName);
+        if (targetWasActive) {
+            // Re-link: refresh the existing buff with the new duration.
+            toggleBuff(targetName, featureName, buffAuto, campaignName);
+        }
+    }
+}
+
 export async function confirmPsychicWhispers(action, playerStats, campaignName, targetNames) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -741,32 +770,11 @@ export async function confirmPsychicWhispers(action, playerStats, campaignName, 
 
     const buffAuto = {
         effect: 'telepathic_speech',
-        duration: `${hours} hour${hours !== 1 ? 's' : ''}`,
+        duration: hoursLabel(hours),
         casting_time: auto?.casting_time || '1 action',
     };
 
-    // Re-activation replaces the previous link: drop stale targets first.
-    const storedPrevious = getRuntimeValue(playerName, PSYCHIC_WHISPERS_TARGETS_KEY, campaignName);
-    const previousTargets = Array.isArray(storedPrevious) ? storedPrevious : [];
-    for (const staleName of previousTargets) {
-        if (!finalTargets.includes(staleName) && isBuffActive(staleName, featureName, campaignName)) {
-            toggleBuff(staleName, featureName, buffAuto, campaignName);
-        }
-    }
-
-    const { wasActive } = toggleBuff(playerName, featureName, buffAuto, campaignName);
-    if (wasActive) {
-        // toggleBuff removed the existing buff on re-activation — re-apply refreshed duration.
-        toggleBuff(playerName, featureName, buffAuto, campaignName);
-    }
-
-    for (const targetName of finalTargets) {
-        const { wasActive: targetWasActive } = toggleBuff(targetName, featureName, buffAuto, campaignName);
-        if (targetWasActive) {
-            // Re-link: refresh the existing buff with the new duration.
-            toggleBuff(targetName, featureName, buffAuto, campaignName);
-        }
-    }
+    relinkTelepathicTargets(playerName, featureName, buffAuto, finalTargets, campaignName);
 
     await setRuntimeValue(playerName, PSYCHIC_WHISPERS_TARGETS_KEY, [...finalTargets], campaignName);
 
@@ -781,7 +789,7 @@ export async function confirmPsychicWhispers(action, playerStats, campaignName, 
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${playerName} activated ${featureName}: Rolled d${dieSize} for ${hours} hour${hours !== 1 ? 's' : ''} — ${linkText} (within 35 feet). ${costText}`,
+        description: `${playerName} activated ${featureName}: Rolled d${dieSize} for ${hoursLabel(hours)} — ${linkText} (within 35 feet). ${costText}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[buffHandler] Psychic Whispers log error:', e); });
 
@@ -791,7 +799,7 @@ export async function confirmPsychicWhispers(action, playerStats, campaignName, 
             type: 'automation_info',
             name: featureName,
             automationType: auto.type,
-            description: `${featureName} activated: ${linkText} for ${hours} hour${hours !== 1 ? 's' : ''} (Rolled d${dieSize}: ${dieRoll}). ${costText}`,
+            description: `${featureName} activated: ${linkText} for ${hoursLabel(hours)} (Rolled d${dieSize}: ${dieRoll}). ${costText}`,
             automation: auto,
         },
     };

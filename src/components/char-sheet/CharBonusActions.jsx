@@ -387,6 +387,22 @@ function buildHordeBreakerAttackItem(hordeBreakerMarker, hordeBreakerWeapon) {
     };
 }
 
+function hasWeaponKindMastery(playerStats) {
+    return (playerStats.automation?.passives || []).some(p => p.type === 'weapon_kind_mastery');
+}
+
+function hasPositiveCount(value) {
+    return Number(value ?? 0) > 0;
+}
+
+function resolveWarBondMax(warBondInfo) {
+    return warBondInfo?.bondedWeaponCount || 2;
+}
+
+function filterKnownBonusSpells(playerStats, bonusSpellNameSet) {
+    return (playerStats.spellAbilities?.spells || []).filter(spell => bonusSpellNameSet.has(spell.name));
+}
+
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState, modalState }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
@@ -405,12 +421,12 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const hordeBreakerUsedRound = useRuntimeValue(playerStats.name, '_Hunters_Prey_HordeBreaker_UsedRound', campaignName);
 
     const is2024Rules = playerStats.rules === '2024';
-    const hasWeaponMastery = (playerStats.automation?.passives || []).some(p => p.type === 'weapon_kind_mastery');
+    const hasWeaponMastery = hasWeaponKindMastery(playerStats);
 
     const bolsteringTreat = useRuntimeValue(playerStats.name, 'bolsteringTreat', campaignName);
     const chefBolsteringTreats = useRuntimeValue(playerStats.name, 'chefBolsteringTreats', campaignName);
-    const hasBolsteringTreat = Number(bolsteringTreat ?? 0) > 0;
-    const hasChefBolsteringTreats = Number(chefBolsteringTreats ?? 0) > 0;
+    const hasBolsteringTreat = hasPositiveCount(bolsteringTreat);
+    const hasChefBolsteringTreats = hasPositiveCount(chefBolsteringTreats);
     const showEatTreat = hasBolsteringTreat || hasChefBolsteringTreats;
 
     const poisonDoses = useRuntimeValue(playerStats.name, 'poisonDoses', campaignName);
@@ -422,7 +438,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     // (cap bondedWeaponCount) that persists warBondWeapons via handleBond.
     const warBondRow = findWarBondRow(playerStats.bonusActions);
     const warBondInfo = findWarBondAutomation(warBondRow);
-    const warBondMax = warBondInfo?.bondedWeaponCount || 2;
+    const warBondMax = resolveWarBondMax(warBondInfo);
     const storedBonded = useRuntimeValue(playerStats.name, 'warBondWeapons', campaignName);
     const bondedWeapons = React.useMemo(() => (Array.isArray(storedBonded) ? storedBonded : []), [storedBonded]);
     const [warBondBondModal, setWarBondBondModal] = useState(null);
@@ -564,7 +580,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         return true;
     });
     const bonusSpellNameSet = getBonusActionSpellNames(playerStats, campaignName);
-    const bonusActionSpells = (playerStats.spellAbilities?.spells || []).filter(spell => bonusSpellNameSet.has(spell.name));
+    const bonusActionSpells = filterKnownBonusSpells(playerStats, bonusSpellNameSet);
     const hasBonusActions = playerStats.bonusActions.length > 0;
 
     const hordeBreakerMarker = (playerStats.attacks || []).find(a => a.isHordeBreaker);

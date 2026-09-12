@@ -8,6 +8,41 @@ const BRUTAL_STRIKE_DESCRIPTIONS = {
     'Sundering Blow': '+5 to next attack against target',
 };
 
+function BrutalStrikeOptionsPicker({ multiSelect, maxEffects, selectedEffects, brutalStrikeOptions, handleEffectToggle }) {
+    if (!brutalStrikeOptions || brutalStrikeOptions.length === 0) return null;
+    return (
+        <div style={{ marginTop: '8px', marginLeft: '16px' }}>
+            <p style={{ opacity: 0.7, fontSize: '0.85em', marginBottom: '8px' }}>
+                Choose {multiSelect ? `up to ${maxEffects}` : 'one'} effect{multiSelect ? 's' : ''}:
+            </p>
+            {brutalStrikeOptions.map((opt, i) => {
+                const isSelected = multiSelect ? selectedEffects.includes(opt.name) : selectedEffects[0] === opt.name;
+                const inputType = multiSelect ? 'checkbox' : 'radio';
+                return (
+                    <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                        <input
+                            type={inputType}
+                            name={multiSelect ? `brutalOption_${i}` : 'brutalOption'}
+                            checked={isSelected}
+                            onChange={() => handleEffectToggle(opt.name)}
+                            style={{ marginRight: '8px' }}
+                        />
+                        <strong>{opt.name}</strong>
+                        {BRUTAL_STRIKE_DESCRIPTIONS[opt.name] && (
+                            <span style={{ opacity: 0.8, marginLeft: '8px' }}>— {BRUTAL_STRIKE_DESCRIPTIONS[opt.name]}</span>
+                        )}
+                    </label>
+                );
+            })}
+            {multiSelect && (
+                <p style={{ opacity: 0.7, fontSize: '0.85em', marginTop: '8px' }}>
+                    {selectedEffects.length}/{maxEffects} selected
+                </p>
+            )}
+        </div>
+    );
+}
+
 function RecklessAttackModal({ playerStats: _playerStats, campaignName: _campaignName, attack, onConfirm, onCancel, mode = 'full', hasBrutalStrike = false, brutalStrikeOptions = [], maxEffects = 1 }) {
     const [useBrutalStrike, setUseBrutalStrike] = useState(false);
     const [selectedEffects, setSelectedEffects] = useState([]);
@@ -73,37 +108,7 @@ function RecklessAttackModal({ playerStats: _playerStats, campaignName: _campaig
                                     />
                                     <strong>Use Brutal Strike</strong>
                                 </label>
-                                {useBrutalStrike && brutalStrikeOptions.length > 0 && (
-                                    <div style={{ marginTop: '8px', marginLeft: '16px' }}>
-                                        <p style={{ opacity: 0.7, fontSize: '0.85em', marginBottom: '8px' }}>
-                                            Choose {multiSelect ? `up to ${maxEffects}` : 'one'} effect{multiSelect ? 's' : ''}:
-                                        </p>
-                                        {brutalStrikeOptions.map((opt, i) => {
-                                            const isSelected = multiSelect ? selectedEffects.includes(opt.name) : selectedEffects[0] === opt.name;
-                                            const inputType = multiSelect ? 'checkbox' : 'radio';
-                                            return (
-                                                <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
-                                                    <input
-                                                        type={inputType}
-                                                        name={multiSelect ? `brutalOption_${i}` : 'brutalOption'}
-                                                        checked={isSelected}
-                                                        onChange={() => handleEffectToggle(opt.name)}
-                                                        style={{ marginRight: '8px' }}
-                                                    />
-                                                    <strong>{opt.name}</strong>
-                                                    {BRUTAL_STRIKE_DESCRIPTIONS[opt.name] && (
-                                                        <span style={{ opacity: 0.8, marginLeft: '8px' }}>— {BRUTAL_STRIKE_DESCRIPTIONS[opt.name]}</span>
-                                                    )}
-                                                </label>
-                                            );
-                                        })}
-                                        {multiSelect && (
-                                            <p style={{ opacity: 0.7, fontSize: '0.85em', marginTop: '8px' }}>
-                                                {selectedEffects.length}/{maxEffects} selected
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
+                                {useBrutalStrike && <BrutalStrikeOptionsPicker multiSelect={multiSelect} maxEffects={maxEffects} selectedEffects={selectedEffects} brutalStrikeOptions={brutalStrikeOptions} handleEffectToggle={handleEffectToggle} />}
                             </div>
                         )}
                     </div>
@@ -140,37 +145,7 @@ function RecklessAttackModal({ playerStats: _playerStats, campaignName: _campaig
                                 />
                                 <strong>Use Brutal Strike</strong> — Forgo Advantage for extra {maxEffects > 1 ? '2d10' : '1d10'} damage
                             </label>
-                            {useBrutalStrike && brutalStrikeOptions.length > 0 && (
-                                <div style={{ marginTop: '8px', marginLeft: '16px' }}>
-                                    <p style={{ opacity: 0.7, fontSize: '0.85em', marginBottom: '8px' }}>
-                                        Choose {multiSelect ? `up to ${maxEffects}` : 'one'} effect{multiSelect ? 's' : ''}:
-                                    </p>
-                                    {brutalStrikeOptions.map((opt, i) => {
-                                        const isSelected = multiSelect ? selectedEffects.includes(opt.name) : selectedEffects[0] === opt.name;
-                                        const inputType = multiSelect ? 'checkbox' : 'radio';
-                                        return (
-                                            <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
-                                                <input
-                                                    type={inputType}
-                                                    name={multiSelect ? `brutalOption_${i}` : 'brutalOption'}
-                                                    checked={isSelected}
-                                                    onChange={() => handleEffectToggle(opt.name)}
-                                                    style={{ marginRight: '8px' }}
-                                                />
-                                                <strong>{opt.name}</strong>
-                                                {BRUTAL_STRIKE_DESCRIPTIONS[opt.name] && (
-                                                    <span style={{ opacity: 0.8, marginLeft: '8px' }}>— {BRUTAL_STRIKE_DESCRIPTIONS[opt.name]}</span>
-                                                )}
-                                            </label>
-                                        );
-                                    })}
-                                    {multiSelect && (
-                                        <p style={{ opacity: 0.7, fontSize: '0.85em', marginTop: '8px' }}>
-                                            {selectedEffects.length}/{maxEffects} selected
-                                        </p>
-                                    )}
-                                </div>
-                            )}
+                            {useBrutalStrike && <BrutalStrikeOptionsPicker multiSelect={multiSelect} maxEffects={maxEffects} selectedEffects={selectedEffects} brutalStrikeOptions={brutalStrikeOptions} handleEffectToggle={handleEffectToggle} />}
                         </div>
                     )}
                 </div>

@@ -4,9 +4,8 @@ import { rangeToFeet } from '../../../combat/rangeValidation.js';
 import { getCombatContext } from '../../../combat/damageUtils.js';
 import { computeEmpoweredEvocation } from './damageCalculation.js';
 
-async function handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
-    getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
-    overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible) {
+async function handleSavePath(opts) {
+    const { fullSpell, metaCtx, playerStats, campaignName, mapName } = opts;
 
     // CLA-321: chooser applies the stamp before resolution; the selection list flags this
     // cast so single-target save consumers consume (clear) the stamp at cast resolution.
@@ -26,14 +25,10 @@ async function handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignNa
     const isAreaShape = aoeShape ? ['emanation','cone','line','sphere','cube','cylinder','square','circle','wall','cage','floor','area'].includes(String(aoeShape).toLowerCase()) : false;
 
     if (isAreaShape) {
-        return await handleAoE(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, getTargetInfo, getRuntimeValue,
-            innateSorceryActive, effectiveDamageType, spellSaveDc, aoeShape, rangeToFeet, hasInvisible,
-            overchannelActive, overchannelUseCount);
+        return await handleAoE({ ...opts, aoeShape });
     }
 
-    return await handleSingleTargetSave(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
-        getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
-        overchannelFormula, overchannelActive, overchannelUseCount, rollDamage, formula, hasInvisible, soulstitchSelection);
+    return await handleSingleTargetSave({ ...opts, soulstitchSelection });
 }
 
 // Resolve the active spell overlay when the attacker is currently overlay-targeted.
@@ -147,9 +142,20 @@ function buildSaveAttackAoePopup({ fullSpell, spell, metaCtx, playerStats, campa
     };
 }
 
-async function handleAoE(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, getTargetInfo, getRuntimeValue,
-    innateSorceryActive, effectiveDamageType, spellSaveDc, aoeShape, rangeToFeet, hasInvisible,
-    overchannelActive, overchannelUseCount) {
+// Mirror the single-target save formula builder: Empowered Evocation bonus + Overchannel maximize suffix
+function resolveAoeDamageInfo(playerStats, fullSpell, spell, slotLevel, overchannelActive) {
+    const damageAtSlotLevel = fullSpell.damage?.damage_at_slot_level || fullSpell.damage?.damage_at_character_level || spell.damage?.damage_at_slot_level || {};
+    const damageExpression = resolveAoeDamageExpression(damageAtSlotLevel, slotLevel);
+    const hasDamage = !!damageExpression && damageExpression !== '0' && damageExpression !== '';
+    const { empEvocFormula } = computeEmpoweredEvocation(playerStats, fullSpell, damageExpression || null);
+    const damageFormula = empEvocFormula || damageExpression || '0';
+    const payloadDamage = overchannelActive ? `${damageFormula} [Overchannel Maximize]` : damageFormula;
+    return { damageExpression, hasDamage, payloadDamage };
+}
+
+async function handleAoE({ spell, fullSpell, metaCtx, playerStats, campaignName, getRuntimeValue,
+    innateSorceryActive, effectiveDamageType, spellSaveDc, aoeShape, hasInvisible,
+    overchannelActive, overchannelUseCount }) {
 
     const cs = getCombatContext(campaignName);
     const attackerTargetName = cs ? cs.creatures?.find(c => c.name === playerStats.name)?.targetName : null;
@@ -157,17 +163,10 @@ async function handleAoE(spell, fullSpell, metaCtx, playerStats, campaignName, m
 
     const rangeFeet = rangeToFeet(fullSpell.range || spell.range);
     const slotLevel = metaCtx?.slotLevel || spell.level;
-    const damageAtSlotLevel = fullSpell.damage?.damage_at_slot_level || fullSpell.damage?.damage_at_character_level || spell.damage?.damage_at_slot_level || {};
-    const damageExpression = resolveAoeDamageExpression(damageAtSlotLevel, slotLevel);
+    const { hasDamage, payloadDamage } = resolveAoeDamageInfo(playerStats, fullSpell, spell, slotLevel, overchannelActive);
 
-    const hasDamage = !!damageExpression && damageExpression !== '0' && damageExpression !== '';
     const automationEffects = fullSpell.automation?.effects;
     const isConditionOnlyAoe = !hasDamage && automationEffects?.fail?.length > 0;
-
-    // Mirror the single-target save formula builder: Empowered Evocation bonus + Overchannel maximize suffix
-    const { empEvocFormula } = computeEmpoweredEvocation(playerStats, fullSpell, damageExpression || null);
-    const damageFormula = empEvocFormula || damageExpression || '0';
-    const payloadDamage = overchannelActive ? `${damageFormula} [Overchannel Maximize]` : damageFormula;
 
     const radiantSoulChaMod = hasDamage ? resolveRadiantSoulChaMod(playerStats, effectiveDamageType, getRuntimeValue, campaignName) : 0;
 
@@ -181,9 +180,10 @@ async function handleAoE(spell, fullSpell, metaCtx, playerStats, campaignName, m
         hasInvisible, overchannelActive, overchannelUseCount, slotLevel });
 }
 
-async function handleSingleTargetSave(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
-    getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
-    overchannelFormula, overchannelActive, overchannelUseCount, rollDamage, formula, hasInvisible, soulstitchSelection = []) {
+async function handleSingleTargetSave({ spell, fullSpell, metaCtx, playerStats, mapName,
+    getTargetInfo, innateSorceryActive, effectiveDamageType, spellSaveDc,
+    overchannelFormula, overchannelActive, overchannelUseCount, rollDamage, formula, hasInvisible,
+    soulstitchSelection = [] }) {
 
     const target = await getTargetInfo();
     const context = {

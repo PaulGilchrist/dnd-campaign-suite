@@ -204,22 +204,34 @@ function oncePerTurnUsedKey(action) {
     return isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
 }
 
+function expandPushOrProneOptions(auto, options) {
+    // Expand push_or_prone effect into options (used by Shield Master 2024)
+    if (options.length > 0 || auto.effect !== 'push_or_prone') return options;
+    return [
+        {
+            name: 'Prone',
+            effect: 'prone',
+            saveType: auto.saveType || 'STR',
+            saveDc: auto.saveDc || 'ability',
+            saveAbility: auto.saveAbility || 'STR',
+        },
+    ];
+}
+
+async function markAndApplySingleRiderOption(action, auto, options, playerStats, campaignName, targetName, _mapName) {
+    if (auto.oncePerTurn) {
+        const usedKey = oncePerTurnUsedKey(action);
+        await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
+    }
+    const chosen = options[0];
+    return applyRiderEffect(action, playerStats, campaignName, targetName, chosen, _mapName);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || action;
     let options = auto.options || [];
 
-    // Expand push_or_prone effect into options (used by Shield Master 2024)
-    if (options.length === 0 && auto.effect === 'push_or_prone') {
-        options = [
-            {
-                name: 'Prone',
-                effect: 'prone',
-                saveType: auto.saveType || 'STR',
-                saveDc: auto.saveDc || 'ability',
-                saveAbility: auto.saveAbility || 'STR',
-            },
-        ];
-    }
+    options = expandPushOrProneOptions(auto, options);
 
     if (auto.trigger === 'slashing_damage_hit') {
         const invalid = await validateSlashingHit(action, playerStats, campaignName);
@@ -262,13 +274,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Single option — apply immediately
     if (options.length === 1) {
-        if (auto.oncePerTurn) {
-            const usedKey = oncePerTurnUsedKey(action);
-            await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
-        }
-        const chosen = options[0];
-        const result = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen, _mapName);
-        return result;
+        return markAndApplySingleRiderOption(action, auto, options, playerStats, campaignName, targetName, _mapName);
     }
 
     return {

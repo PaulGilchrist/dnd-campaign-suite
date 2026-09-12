@@ -41,21 +41,7 @@ export const superiorHuntersPrey = {
     const isFoeSlayer = ctx.playerStats.class?.name === 'Ranger' && ctx.playerStats.level >= 20;
     const die = isFoeSlayer ? '1d10' : '1d6';
 
-    const mapName = ctx.playerStats?.mapName;
-    const hasMapPositions = mapName;
-
-    let targets = cs.creatures?.filter(c => c.name !== ctx.playerStats.name && c.name !== markedTarget.name) || [];
-
-    if (hasMapPositions) {
-      targets = [];
-      for (const c of cs.creatures) {
-        if (c.name === ctx.playerStats.name || c.name === markedTarget.name) continue;
-        const inRange = await isWithinRange(markedTarget.name, c.name, MAX_RANGE_FEET);
-        if (inRange) targets.push(c);
-      }
-    }
-
-    targets = targets.map(c => ({ ...c, ...resolveHp(c) }));
+    const targets = (await collectSpreadTargets(cs, ctx, markedTarget)).map(c => ({ ...c, ...resolveHp(c) }));
 
     if (targets.length === 0) return { data: prevData };
 
@@ -93,3 +79,21 @@ export const superiorHuntersPrey = {
     return { data: prevData };
   },
 };
+
+// Candidates for the spread attack: everyone except the attacker and the
+// marked target, narrowed by map range when the attacker is on a map.
+async function collectSpreadTargets(cs, ctx, markedTarget) {
+  const mapName = ctx.playerStats?.mapName;
+  let targets = cs.creatures?.filter(c => c.name !== ctx.playerStats.name && c.name !== markedTarget.name) || [];
+
+  if (mapName) {
+    targets = [];
+    for (const c of cs.creatures) {
+      if (c.name === ctx.playerStats.name || c.name === markedTarget.name) continue;
+      const inRange = await isWithinRange(markedTarget.name, c.name, MAX_RANGE_FEET);
+      if (inRange) targets.push(c);
+    }
+  }
+
+  return targets;
+}

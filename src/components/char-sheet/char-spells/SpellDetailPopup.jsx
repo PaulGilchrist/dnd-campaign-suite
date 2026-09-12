@@ -172,6 +172,10 @@ function PsychicDamageCheckbox({ usePsychicDamage, onTogglePsychicDamage }) {
   );
 }
 
+function computeHasAnySlots({ isCantrip, freeCastAuthorized, upcastLevels, isWarlock, warlockSlotLevel, psionicSorceryAvailable }) {
+  return isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0) || (isWarlock && warlockSlotLevel !== null) || psionicSorceryAvailable > 0;
+}
+
 // CLA-252: Phantasmal Creatures free cast — spectral Illusion version, halved HP.
 function computeIsPhantasmalFreeCast(playerStats, spell, freeCastAuthorized) {
   if (!freeCastAuthorized) return false;
@@ -239,7 +243,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     return null;
   };
   const warlockSlotLevel = getWarlockSlotLevel(spell.level);
-  const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0) || (isWarlock && warlockSlotLevel !== null) || _psionicSorceryAvailable > 0;
+  const hasAnySlots = computeHasAnySlots({ isCantrip, freeCastAuthorized, upcastLevels, isWarlock, warlockSlotLevel, psionicSorceryAvailable: _psionicSorceryAvailable });
 
   // CLA-322: Spell Breaker bonus-action conversion is registry-driven (bonusActionSpells)
   const isDispelMagicAsBonusAction = isSpellBreakerBonusActionSpell(playerStats, spell.name);

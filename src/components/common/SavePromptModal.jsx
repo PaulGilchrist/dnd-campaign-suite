@@ -16,7 +16,7 @@ import './SavePromptModal.css';
 import { getPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasBuffEffect } from '../../services/automation/common/buffToggle.js';
-import { createFanaticalFocusHandler, createDisciplinedSurvivorHandler, createGuardedMindHandler, createLivingLegendHandler, createIndomitableHandler } from './savePromptHandlers.js';
+import { useSaveRerollHandlers } from './useSaveRerollHandlers.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 
 const GUARDED_MIND_SAVE_TYPES = ['Intelligence', 'Wisdom', 'Charisma', 'INT', 'WIS', 'CHA'];
@@ -328,14 +328,45 @@ function submitResultAndClear(campaignName, current, result, { includeBaneRoll, 
   advance();
 }
 
+function applyRerollToCombatSummary(campaignName, { roll, rawRolls, saveBonus, total, saveType, saveDc, success, condition, secondaryFormula, secondaryDamageType, secondaryRawDamage }) {
+  const cs = getCombatSummary(campaignName);
+  if (!cs) return;
+  cs.lastAttack = {
+    ...cs.lastAttack, d20: roll, d20Rolls: rawRolls, bonus: saveBonus, total,
+    saveType: saveType || null, saveDc, saveResult: success ? 'success' : 'failure',
+    saveConditions: condition ? [condition] : [], timestamp: Date.now(),
+    ...(secondaryFormula ? {
+      secondaryFormula, secondaryDamageType: secondaryDamageType || null,
+      secondaryRawDamage: secondaryRawDamage || 0, secondaryTotal: secondaryRawDamage || 0,
+    } : {}),
+  };
+  storage.set('combatSummary', cs, campaignName);
+}
+
+function restoreHpAfterSuccessfulReroll(campaignName, { targetName, rawDamage, dcSuccess, healingName, healingNote }) {
+  const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
+  const actualDamageApplied = lastAttack?.finalDamage ?? lastAttack?.primaryDamage ?? rawDamage;
+  const damageToRestore = dcSuccess === 'half' ? Math.ceil(actualDamageApplied / 2) : actualDamageApplied;
+  const currentHp = getRuntimeValue(targetName, 'hitPoints', campaignName);
+  const maxHp = getRuntimeValue(targetName, 'maxHitPoints', campaignName) ?? (currentHp + actualDamageApplied);
+  const restoredHp = Math.min(maxHp, (currentHp ?? 0) + damageToRestore);
+  setRuntimeValue(targetName, 'hitPoints', restoredHp, campaignName);
+
+  addEntry(campaignName, {
+    type: 'roll', characterName: targetName, rollType: 'healing',
+    name: healingName || 'Save Reroll', rolls: [], total: damageToRestore,
+    modifier: 0, damageType: null, targetName, finalDamage: null,
+    note: healingNote || 'save_reroll_hp_restore', timestamp: Date.now(),
+  }).catch((e) => { console.error('[SavePromptModal] Error logging HP restore:', e); });
+}
+
 // Reroll submit path: posts the rerolled result, logs it, updates combat
 // summary, restores HP on success, and clears the prompt.
 function createSubmitSaveResult(campaignName, setPrompts) {
   return (saveData) => {
     const {
       promptId, targetName, success, roll, total, saveBonus, rawRolls, mode, bonusDetail,
-      saveType, saveDc, condition, sourceName, damageFormula, damageType, rawDamage, dcSuccess,
-      secondaryFormula, secondaryDamageType, secondaryRawDamage,
+      saveType, saveDc, sourceName, damageFormula, damageType, rawDamage, dcSuccess,
       note, healingName, healingNote,
     } = saveData;
 
@@ -357,35 +388,10 @@ function createSubmitSaveResult(campaignName, setPrompts) {
       note: note || 'save_reroll', timestamp: Date.now(),
     }).catch((e) => { console.error('[SavePromptModal] Error logging reroll:', e); });
 
-    const cs = getCombatSummary(campaignName);
-    if (cs) {
-      cs.lastAttack = {
-        ...cs.lastAttack, d20: roll, d20Rolls: rawRolls, bonus: saveBonus, total,
-        saveType: saveType || null, saveDc, saveResult: success ? 'success' : 'failure',
-        saveConditions: condition ? [condition] : [], timestamp: Date.now(),
-        ...(secondaryFormula ? {
-          secondaryFormula, secondaryDamageType: secondaryDamageType || null,
-          secondaryRawDamage: secondaryRawDamage || 0, secondaryTotal: secondaryRawDamage || 0,
-        } : {}),
-      };
-      storage.set('combatSummary', cs, campaignName);
-    }
+    applyRerollToCombatSummary(campaignName, saveData);
 
     if (success && rawDamage > 0) {
-      const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
-      const actualDamageApplied = lastAttack?.finalDamage ?? lastAttack?.primaryDamage ?? rawDamage;
-      const damageToRestore = dcSuccess === 'half' ? Math.ceil(actualDamageApplied / 2) : actualDamageApplied;
-      const currentHp = getRuntimeValue(targetName, 'hitPoints', campaignName);
-      const maxHp = getRuntimeValue(targetName, 'maxHitPoints', campaignName) ?? (currentHp + actualDamageApplied);
-      const restoredHp = Math.min(maxHp, (currentHp ?? 0) + damageToRestore);
-      setRuntimeValue(targetName, 'hitPoints', restoredHp, campaignName);
-
-      addEntry(campaignName, {
-        type: 'roll', characterName: targetName, rollType: 'healing',
-        name: healingName || 'Save Reroll', rolls: [], total: damageToRestore,
-        modifier: 0, damageType: null, targetName, finalDamage: null,
-        note: healingNote || 'save_reroll_hp_restore', timestamp: Date.now(),
-      }).catch((e) => { console.error('[SavePromptModal] Error logging HP restore:', e); });
+      restoreHpAfterSuccessfulReroll(campaignName, { targetName, rawDamage, dcSuccess, healingName, healingNote });
     }
 
     clearSavePrompt(campaignName, targetName);
@@ -564,6 +570,68 @@ function EvasionSelectionOverlay({ prompts, evasionSelection, onSelectionChange,
   );
 }
 
+function SavePromptDialog({
+  current, prompts, dimmed, characters, campaignName, display, hasResult,
+  rerollUsedForSave, rerollAvailability, handlers,
+}) {
+  const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = display;
+  const queueCount = prompts.length;
+  return (
+    <div className={`sp-overlay${dimmed ? ' sp-overlay--dimmed' : ''}`} onClick={(e) => {
+      if (e.target.closest('.sp-modal')) return;
+      handlers.dismiss?.();
+    }}>
+      <div className="sp-modal">
+        <div className="sp-header">
+          <i className="fa-solid fa-shield-halved"></i> Saving Throw Required
+          {queueCount > 1 && (
+            <span className="sp-queue-info"> ({prompts.findIndex(p => p.promptId === current.promptId) + 1} of {queueCount})</span>
+          )}
+        </div>
+        <div className="sp-body">
+          <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.{promptHasAdvantage ? <span className="sp-advantage-badge"> (Advantage)</span> : ''}{promptHasDisadvantage ? <span className="sp-disadvantage-badge"> (Disadvantage)</span> : ''}</p>
+          <p className="sp-dc">DC {current.saveDc}</p>
+          {current.dcSuccess === 'half' && (
+            <EvasionNote current={current} characters={characters} campaignName={campaignName} />
+          )}
+          {current.dcSuccess === 'none' && <p className="sp-note">No damage on successful save</p>}
+          {current.sourceName && <p className="sp-source">Source: {current.sourceName}</p>}
+          {hasResult && (
+            <SaveResultPanel
+              current={current}
+              rerollUsedForSave={rerollUsedForSave}
+              availability={rerollAvailability}
+              handlers={{
+                fanaticalFocus: handlers.fanaticalFocus,
+                indomitable: handlers.indomitable,
+                disciplinedSurvivor: handlers.disciplinedSurvivor,
+                livingLegend: handlers.livingLegend,
+                guardedMind: handlers.guardedMind,
+              }}
+            />
+          )}
+        </div>
+        <div className="sp-actions">
+          {!hasResult ? (
+            <>
+              <button className="sp-roll-btn" onClick={handlers.rollSave} type="button">
+                <i className="fa-solid fa-dice-d20"></i> Roll Save
+              </button>
+              <button className="sp-dismiss-btn" onClick={handlers.dismiss} type="button">
+                Dismiss
+              </button>
+            </>
+          )               : (
+            <button className="sp-roll-btn" onClick={handlers.done} type="button">
+              {queueCount > 1 ? 'Next Save' : 'Done'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SavePromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
   const [evasionSelection, setEvasionSelection] = useState(null);
@@ -664,7 +732,6 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   }, []);
 
   const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = computePromptDisplayState(current, campaignName);
-  const queueCount = prompts.length;
   const hasResult = current?.result != null;
 
   useEffect(() => {
@@ -682,41 +749,23 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
   const submitSaveResult = useMemo(() => createSubmitSaveResult(campaignName, setPrompts), [campaignName]);
 
-  const handleFanaticalFocus = useCallback(async () => {
-    if (!fanaticalFocusAvailable || !current) return;
-    setRerollUsedForSave(true);
-    setRuntimeValue(current.targetName, 'fanaticalFocusUsed', true, campaignName);
-    const handler = createFanaticalFocusHandler({ campaignName, characters, activeMapName, current, rageDamageBonus, fanaticalFocusAvailable, setRerollUsedForSave, submitSaveResult });
-    await handler();
-  }, [fanaticalFocusAvailable, rageDamageBonus, current, campaignName, characters, activeMapName, submitSaveResult]);
+  const rerollAvailability = {
+    fanaticalFocusAvailable,
+    rageDamageBonus,
+    currentFocusPoints,
+    indomitableAvailable,
+    indomitableUses,
+    indomitableMaxUses,
+    indomitableRerollBonus,
+    disciplinedSurvivorAvailable,
+    livingLegendAvailable,
+    guardedMindAvailable,
+  };
 
-  const handleDisciplinedSurvivor = useCallback(async () => {
-    if (!disciplinedSurvivorAvailable || !current) return;
-    setRerollUsedForSave(true);
-    setRuntimeValue(current.targetName, 'focusPoints', currentFocusPoints - 1, campaignName);
-    const handler = createDisciplinedSurvivorHandler({ campaignName, current, currentFocusPoints, disciplinedSurvivorAvailable, setRerollUsedForSave, submitSaveResult });
-    await handler();
-  }, [disciplinedSurvivorAvailable, currentFocusPoints, current, campaignName, submitSaveResult]);
-
-  const handleIndomitable = useCallback(async () => {
-    if (!indomitableAvailable || !current) return;
-    setRerollUsedForSave(true);
-    const handler = createIndomitableHandler({ campaignName, characters, activeMapName, current, indomitableAvailable, currentUses: indomitableUses, maxUses: indomitableMaxUses, rerollBonus: indomitableRerollBonus, setRerollUsedForSave, submitSaveResult });
-    await handler();
-  }, [indomitableAvailable, indomitableUses, indomitableMaxUses, indomitableRerollBonus, current, campaignName, characters, activeMapName, submitSaveResult]);
-
-  const handleLivingLegend = useCallback(async () => {
-    const handler = createLivingLegendHandler({ campaignName, characters, activeMapName, current, livingLegendAvailable, setRerollUsedForSave, submitSaveResult });
-    await handler();
-  }, [campaignName, characters, activeMapName, current, livingLegendAvailable, submitSaveResult]);
-
-  const handleGuardedMind = useCallback(async () => {
-    if (!guardedMindAvailable || !current) return;
-    setRerollUsedForSave(true);
-    setRuntimeValue(current.targetName, '_guardedMind_usedRest', 'rest', campaignName);
-    const handler = createGuardedMindHandler({ campaignName, current, guardedMindAvailable, setRerollUsedForSave, submitSaveResult });
-    await handler();
-  }, [guardedMindAvailable, current, campaignName, submitSaveResult]);
+  const {
+    handleFanaticalFocus, handleDisciplinedSurvivor, handleIndomitable,
+    handleLivingLegend, handleGuardedMind,
+  } = useSaveRerollHandlers({ campaignName, characters, activeMapName, current, setRerollUsedForSave, submitSaveResult, availability: rerollAvailability });
 
   return (
     <>
@@ -730,66 +779,27 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         />
       )}
       {current && (
-        <div className={`sp-overlay${evasionSelection !== null ? ' sp-overlay--dimmed' : ''}`} onClick={(e) => {
-          if (e.target.closest('.sp-modal')) return;
-          handleDismiss?.();
-        }}>
-          <div className="sp-modal">
-            <div className="sp-header">
-              <i className="fa-solid fa-shield-halved"></i> Saving Throw Required
-              {queueCount > 1 && (
-                <span className="sp-queue-info"> ({prompts.findIndex(p => p.promptId === current.promptId) + 1} of {queueCount})</span>
-              )}
-            </div>
-            <div className="sp-body">
-              <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.{promptHasAdvantage ? <span className="sp-advantage-badge"> (Advantage)</span> : ''}{promptHasDisadvantage ? <span className="sp-disadvantage-badge"> (Disadvantage)</span> : ''}</p>
-              <p className="sp-dc">DC {current.saveDc}</p>
-              {current.dcSuccess === 'half' && (
-                <EvasionNote current={current} characters={characters} campaignName={campaignName} />
-              )}
-              {current.dcSuccess === 'none' && <p className="sp-note">No damage on successful save</p>}
-              {current.sourceName && <p className="sp-source">Source: {current.sourceName}</p>}
-              {hasResult && (
-                <SaveResultPanel
-                  current={current}
-                  rerollUsedForSave={rerollUsedForSave}
-                  availability={{
-                    fanaticalFocusAvailable,
-                    rageDamageBonus,
-                    indomitableAvailable,
-                    indomitableRerollBonus,
-                    disciplinedSurvivorAvailable,
-                    livingLegendAvailable,
-                    guardedMindAvailable,
-                  }}
-                  handlers={{
-                    fanaticalFocus: handleFanaticalFocus,
-                    indomitable: handleIndomitable,
-                    disciplinedSurvivor: handleDisciplinedSurvivor,
-                    livingLegend: handleLivingLegend,
-                    guardedMind: handleGuardedMind,
-                  }}
-                />
-              )}
-            </div>
-            <div className="sp-actions">
-              {!hasResult ? (
-                <>
-                  <button className="sp-roll-btn" onClick={handleRollSave} type="button">
-                    <i className="fa-solid fa-dice-d20"></i> Roll Save
-                  </button>
-                  <button className="sp-dismiss-btn" onClick={handleDismiss} type="button">
-                    Dismiss
-                  </button>
-                </>
-              )               : (
-                <button className="sp-roll-btn" onClick={handleDone} type="button">
-                  {queueCount > 1 ? 'Next Save' : 'Done'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <SavePromptDialog
+          current={current}
+          prompts={prompts}
+          dimmed={evasionSelection !== null}
+          characters={characters}
+          campaignName={campaignName}
+          display={{ abilityLabel, promptHasDisadvantage, promptHasAdvantage }}
+          hasResult={hasResult}
+          rerollUsedForSave={rerollUsedForSave}
+          rerollAvailability={rerollAvailability}
+          handlers={{
+            rollSave: handleRollSave,
+            dismiss: handleDismiss,
+            done: handleDone,
+            fanaticalFocus: handleFanaticalFocus,
+            indomitable: handleIndomitable,
+            disciplinedSurvivor: handleDisciplinedSurvivor,
+            livingLegend: handleLivingLegend,
+            guardedMind: handleGuardedMind,
+          }}
+        />
       )}
       {evasionSelection !== null && (
         <EvasionSelectionOverlay

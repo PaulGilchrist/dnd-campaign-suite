@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import './DiceRollResult.css';
 import { useDiceRollState } from './DiceRollResult.computed.js';
 import { createDiceRollHandlers } from './DiceRollResult.handlers.js';
@@ -607,69 +608,80 @@ function PunctureResultRow({ punctureResult }) {
     );
 }
 
+function RerollResultRow({ rerollResult }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-rotate"></i> Rerolled: {rerollResult.roll} + {rerollResult.total - rerollResult.roll} = <strong>{rerollResult.total}</strong>
+        </div>
+    );
+}
+
+function StrokeOfLuckResultRow({ strokeResult }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-star"></i> Stroke of Luck: d20 → 20 + {strokeResult.total - 20} = <strong>{strokeResult.total}</strong>
+        </div>
+    );
+}
+
+function BoonOfCombatProwessRow() {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-shield-halved"></i> Boon of Combat Prowess: Miss converted to Hit
+        </div>
+    );
+}
+
+function BardicInspirationResultRow({ bardicInspirationResult }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-music"></i> Bardic Inspiration: 1d{bardicInspirationResult.dieSize} → {bardicInspirationResult.dieValue} + <strong>{bardicInspirationResult.total}</strong>
+        </div>
+    );
+}
+
+function BardicInspirationOffenseRow({ bardicInspirationOffenseResult }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense: 1d{bardicInspirationOffenseResult.dieSize} → +{bardicInspirationOffenseResult.dieValue} → <strong>{bardicInspirationOffenseResult.bonusTotal}</strong>
+        </div>
+    );
+}
+
+function DarkOnesLuckRow({ darkOnesLuckResult }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-fire"></i> Dark One's Own Luck: +{darkOnesLuckResult.dieValue} (d10) → <strong>{darkOnesLuckResult.total}</strong>
+        </div>
+    );
+}
+
+function SuperiorityResultRow({ superiorityResult }) {
+    return (
+        <div className="dice-roll-reroll-result">
+            <i className="fa-solid fa-bolt"></i> {superiorityResult.maneuverName}: d12 {superiorityResult.dieValue} → <strong>{superiorityResult.total}</strong> (+{superiorityResult.dieValue})
+        </div>
+    );
+}
+
 function FeatureResultSummary({ props, state, handlers }) {
-    const { rerollUsed, rerollResult, strokeUsed, strokeResult, boonUsed,
-        bardicInspirationUsed, bardicInspirationResult, bardicInspirationDefenseUsed,
-        bardicInspirationDefenseResult, bardicInspirationOffenseUsed, bardicInspirationOffenseResult,
-        empoweredSpellUsed, empoweredSpellResult, punctureUsed, punctureResult,
-        savageAttackerUsed, savageAttackerResult, darkOnesLuckUsed, darkOnesLuckResult,
-        superiorityUsed, superiorityResult } = state;
-    const autoRerollForAttack = props.autoRerollForAttack;
+    const sections = [
+        { key: 'reroll', when: () => state.rerollUsed && state.rerollResult !== null, render: () => <RerollResultRow rerollResult={state.rerollResult} /> },
+        { key: 'stroke', when: () => state.strokeUsed && state.strokeResult !== null, render: () => <StrokeOfLuckResultRow strokeResult={state.strokeResult} /> },
+        { key: 'boon', when: () => state.boonUsed && props.autoRerollForAttack, render: () => <BoonOfCombatProwessRow /> },
+        { key: 'bardic', when: () => state.bardicInspirationUsed && state.bardicInspirationResult !== null, render: () => <BardicInspirationResultRow bardicInspirationResult={state.bardicInspirationResult} /> },
+        { key: 'bardicDefense', when: () => state.bardicInspirationDefenseUsed && state.bardicInspirationDefenseResult !== null, render: () => <BardicInspirationDefenseRow bardicInspirationDefenseResult={state.bardicInspirationDefenseResult} /> },
+        { key: 'bardicOffense', when: () => state.bardicInspirationOffenseUsed && state.bardicInspirationOffenseResult !== null, render: () => <BardicInspirationOffenseRow bardicInspirationOffenseResult={state.bardicInspirationOffenseResult} /> },
+        { key: 'empowered', when: () => state.empoweredSpellUsed && state.empoweredSpellResult, render: () => <EmpoweredSpellResult empoweredSpellResult={state.empoweredSpellResult} /> },
+        { key: 'puncture', when: () => state.punctureUsed && state.punctureResult, render: () => <PunctureResultRow punctureResult={state.punctureResult} /> },
+        { key: 'savage', when: () => state.savageAttackerUsed && state.savageAttackerResult, render: () => <SavageAttackerResult savageAttackerResult={state.savageAttackerResult} onKeep={handlers.handleSavageAttackerKeep} onSavageAttackerChoice={props.onSavageAttackerChoice} /> },
+        { key: 'tactical', when: () => true, render: () => <TacticalMindAdjudicationPanel tacticalUsed={state.tacticalUsed} tacticalResult={state.tacticalResult} tacticalDeclared={state.tacticalDeclared} onDeclare={handlers.handleTacticalDeclare} /> },
+        { key: 'darkOnesLuck', when: () => state.darkOnesLuckUsed && state.darkOnesLuckResult !== null, render: () => <DarkOnesLuckRow darkOnesLuckResult={state.darkOnesLuckResult} /> },
+        { key: 'superiority', when: () => state.superiorityUsed && state.superiorityResult !== null, render: () => <SuperiorityResultRow superiorityResult={state.superiorityResult} /> }
+    ];
     return (
         <>
-            {rerollUsed && rerollResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-rotate"></i> Rerolled: {rerollResult.roll} + {rerollResult.total - rerollResult.roll} = <strong>{rerollResult.total}</strong>
-              </div>
-            )}
-            {strokeUsed && strokeResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-star"></i> Stroke of Luck: d20 → 20 + {strokeResult.total - 20} = <strong>{strokeResult.total}</strong>
-              </div>
-            )}
-            {boonUsed && autoRerollForAttack && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-shield-halved"></i> Boon of Combat Prowess: Miss converted to Hit
-              </div>
-            )}
-            {bardicInspirationUsed && bardicInspirationResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-music"></i> Bardic Inspiration: 1d{bardicInspirationResult.dieSize} → {bardicInspirationResult.dieValue} + <strong>{bardicInspirationResult.total}</strong>
-              </div>
-            )}
-            {bardicInspirationDefenseUsed && bardicInspirationDefenseResult !== null && (
-              <BardicInspirationDefenseRow bardicInspirationDefenseResult={bardicInspirationDefenseResult} />
-            )}
-            {bardicInspirationOffenseUsed && bardicInspirationOffenseResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense: 1d{bardicInspirationOffenseResult.dieSize} → +{bardicInspirationOffenseResult.dieValue} → <strong>{bardicInspirationOffenseResult.bonusTotal}</strong>
-              </div>
-            )}
-            {empoweredSpellUsed && empoweredSpellResult && (
-              <EmpoweredSpellResult empoweredSpellResult={empoweredSpellResult} />
-            )}
-            {punctureUsed && punctureResult && (
-              <PunctureResultRow punctureResult={punctureResult} />
-            )}
-            {savageAttackerUsed && savageAttackerResult && (
-              <SavageAttackerResult savageAttackerResult={savageAttackerResult} onKeep={handlers.handleSavageAttackerKeep} onSavageAttackerChoice={props.onSavageAttackerChoice} />
-            )}
-            <TacticalMindAdjudicationPanel
-                tacticalUsed={state.tacticalUsed}
-                tacticalResult={state.tacticalResult}
-                tacticalDeclared={state.tacticalDeclared}
-                onDeclare={handlers.handleTacticalDeclare}
-            />
-            {darkOnesLuckUsed && darkOnesLuckResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-fire"></i> Dark One's Own Luck: +{darkOnesLuckResult.dieValue} (d10) → <strong>{darkOnesLuckResult.total}</strong>
-              </div>
-            )}
-            {superiorityUsed && superiorityResult !== null && (
-              <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-bolt"></i> {superiorityResult.maneuverName}: d12 {superiorityResult.dieValue} → <strong>{superiorityResult.total}</strong> (+{superiorityResult.dieValue})
-              </div>
-            )}
+            {sections.map(section => section.when() ? <Fragment key={section.key}>{section.render()}</Fragment> : null)}
         </>
     );
 }

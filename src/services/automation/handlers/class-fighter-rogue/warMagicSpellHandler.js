@@ -107,12 +107,57 @@ function rollMagicMissileDamage(slotLevel) {
     return { rolls, total, formula };
 }
 
+function resolveWeaponAttackStats(playerStats) {
+    return {
+        playerName: playerStats.name,
+        attackBonus: playerStats.attacks?.[0]?.hitBonus ?? 0,
+        damageFormula: playerStats.attacks?.[0]?.damage ?? '1d4+0',
+        damageType: playerStats.attacks?.[0]?.damageType || 'Slashing',
+    };
+}
+
+async function applyWeaponHitDamage(playerName, targetName, damageFormula, damageType, isCrit, campaignName) {
+    const rollResult = isCrit ? rollExpressionDoubled(damageFormula) : rollExpression(damageFormula);
+    const rawDamage = rollResult?.total || 0;
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    const applyResult = await applyDamageToTarget(
+        getCombatSummary(campaignName),
+        targetName,
+        rawDamage,
+        [damageType],
+        campaignName,
+        characters,
+        false,
+        playerName
+    );
+    const finalDamage = applyResult?.finalDamage || 0;
+    if (finalDamage > 0) {
+        endInvisibilityOnHostileAction(playerName, campaignName);
+    }
+    return { rollResult, finalDamage };
+}
+
+function logWeaponDamageRoll(action, playerName, targetName, damageFormula, damageType, rollResult, finalDamage, isCrit, campaignName) {
+    addEntry(campaignName, {
+        type: 'roll',
+        characterName: playerName,
+        rollType: 'damage',
+        name: `${action.name} (weapon attack)`,
+        formula: damageFormula,
+        rolls: rollResult?.rolls || [],
+        total: rollResult?.total || 0,
+        modifier: rollResult?.modifier || 0,
+        damageType,
+        targetName,
+        finalDamage,
+        isCrit,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[warMagicSpellHandler:weapon-damage-log-error]', e); });
+}
+
 // Per-attack roll/damage mirrors bonusAttacksHandler.applyFlurryOfBlows.
 async function rollWeaponAttack(action, playerStats, campaignName, targetName, targetAc) {
-    const playerName = playerStats.name;
-    const attackBonus = playerStats.attacks?.[0]?.hitBonus ?? 0;
-    const damageFormula = playerStats.attacks?.[0]?.damage ?? '1d4+0';
-    const damageType = playerStats.attacks?.[0]?.damageType || 'Slashing';
+    const { playerName, attackBonus, damageFormula, damageType } = resolveWeaponAttackStats(playerStats);
 
     const d20Roll = rollD20();
     const totalAttack = d20Roll + attackBonus;
@@ -122,23 +167,7 @@ async function rollWeaponAttack(action, playerStats, campaignName, targetName, t
     let finalDamage = 0;
     let rollResult = null;
     if (hit) {
-        rollResult = isCrit ? rollExpressionDoubled(damageFormula) : rollExpression(damageFormula);
-        const rawDamage = rollResult?.total || 0;
-        const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-        const applyResult = await applyDamageToTarget(
-            getCombatSummary(campaignName),
-            targetName,
-            rawDamage,
-            [damageType],
-            campaignName,
-            characters,
-            false,
-            playerName
-        );
-        finalDamage = applyResult?.finalDamage || 0;
-        if (finalDamage > 0) {
-            endInvisibilityOnHostileAction(playerName, campaignName);
-        }
+        ({ rollResult, finalDamage } = await applyWeaponHitDamage(playerName, targetName, damageFormula, damageType, isCrit, campaignName));
     }
 
     addEntry(campaignName, {
@@ -160,21 +189,7 @@ async function rollWeaponAttack(action, playerStats, campaignName, targetName, t
     }).catch((e) => { console.error('[warMagicSpellHandler:attack-roll-log-error]', e); });
 
     if (hit) {
-        addEntry(campaignName, {
-            type: 'roll',
-            characterName: playerName,
-            rollType: 'damage',
-            name: `${action.name} (weapon attack)`,
-            formula: damageFormula,
-            rolls: rollResult?.rolls || [],
-            total: rollResult?.total || 0,
-            modifier: rollResult?.modifier || 0,
-            damageType,
-            targetName,
-            finalDamage,
-            isCrit,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[warMagicSpellHandler:weapon-damage-log-error]', e); });
+        logWeaponDamageRoll(action, playerName, targetName, damageFormula, damageType, rollResult, finalDamage, isCrit, campaignName);
     }
 
     return { d20Roll, totalAttack, hit, isCrit, finalDamage, damageType, ac: targetAc };

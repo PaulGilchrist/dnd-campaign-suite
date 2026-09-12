@@ -151,7 +151,7 @@ function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COM
 
 function extractConditionEffectsCall() {
     expect(computeConditionEffects).toHaveBeenCalledTimes(1);
-    return computeConditionEffects.mock.calls[0];
+    return computeConditionEffects.mock.calls[0][0];
 }
 
 describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
@@ -186,7 +186,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,, , , shapeShiftActive] = extractConditionEffectsCall();
+            const { shapeShiftActive } = extractConditionEffectsCall();
             expect(shapeShiftActive).toBe(true);
         });
 
@@ -200,7 +200,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,, , , shapeShiftActive] = extractConditionEffectsCall();
+            const { shapeShiftActive } = extractConditionEffectsCall();
             expect(shapeShiftActive).toBe(false);
         });
 
@@ -214,7 +214,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,, , , shapeShiftActive] = extractConditionEffectsCall();
+            const { shapeShiftActive } = extractConditionEffectsCall();
             expect(shapeShiftActive).toBe(false);
         });
     });
@@ -230,7 +230,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,, seeInvisibilityActive] = extractConditionEffectsCall();
+            const { seeInvisibilityActive } = extractConditionEffectsCall();
             expect(seeInvisibilityActive).toBe(true);
         });
 
@@ -244,7 +244,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,, seeInvisibilityActive] = extractConditionEffectsCall();
+            const { seeInvisibilityActive } = extractConditionEffectsCall();
             expect(seeInvisibilityActive).toBe(false);
         });
     });
@@ -260,7 +260,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,, isRaging] = extractConditionEffectsCall();
+            const { isRaging } = extractConditionEffectsCall();
             expect(isRaging).toBe(true);
         });
 
@@ -274,7 +274,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,, isRaging] = extractConditionEffectsCall();
+            const { isRaging } = extractConditionEffectsCall();
             expect(isRaging).toBe(false);
         });
 
@@ -288,7 +288,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,, isRaging] = extractConditionEffectsCall();
+            const { isRaging } = extractConditionEffectsCall();
             expect(isRaging).toBe(false);
         });
     });
@@ -305,7 +305,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,, isLivingLegendActive] = extractConditionEffectsCall();
+            const { isLivingLegendActive } = extractConditionEffectsCall();
             expect(isLivingLegendActive).toBe(true);
         });
 
@@ -320,7 +320,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,, isLivingLegendActive] = extractConditionEffectsCall();
+            const { isLivingLegendActive } = extractConditionEffectsCall();
             expect(isLivingLegendActive).toBe(false);
         });
 
@@ -335,7 +335,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,, isLivingLegendActive] = extractConditionEffectsCall();
+            const { isLivingLegendActive } = extractConditionEffectsCall();
             expect(isLivingLegendActive).toBe(false);
         });
     });
@@ -352,7 +352,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,,, isElderChampionActive] = extractConditionEffectsCall();
+            const { isElderChampionActive } = extractConditionEffectsCall();
             expect(isElderChampionActive).toBe(true);
         });
 
@@ -367,7 +367,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,,, isElderChampionActive] = extractConditionEffectsCall();
+            const { isElderChampionActive } = extractConditionEffectsCall();
             expect(isElderChampionActive).toBe(false);
         });
     });
@@ -387,7 +387,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
 
             await invokeHandler(handler, context);
 
-            const [,,,,,,,,,,,, isElderChampionAttackerActive] = extractConditionEffectsCall();
+            const { isElderChampionAttackerActive } = extractConditionEffectsCall();
             expect(isElderChampionAttackerActive).toBe(true);
         });
 
@@ -402,7 +402,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,,,, isElderChampionAttackerActive] = extractConditionEffectsCall();
+            const { isElderChampionAttackerActive } = extractConditionEffectsCall();
             expect(isElderChampionAttackerActive).toBe(false);
         });
 
@@ -420,7 +420,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
 
             await invokeHandler(handler, context);
 
-            const [,,,,,,,,,,,, isElderChampionAttackerActive] = extractConditionEffectsCall();
+            const { isElderChampionAttackerActive } = extractConditionEffectsCall();
             expect(isElderChampionAttackerActive).toBe(false);
         });
     });
@@ -436,7 +436,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,,,,,, isProtectionFromPoisonActive] = extractConditionEffectsCall();
+            const { isProtectionFromPoisonActive } = extractConditionEffectsCall();
             expect(isProtectionFromPoisonActive).toBe(true);
         });
 
@@ -450,7 +450,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,,,,,, isProtectionFromPoisonActive] = extractConditionEffectsCall();
+            const { isProtectionFromPoisonActive } = extractConditionEffectsCall();
             expect(isProtectionFromPoisonActive).toBe(false);
         });
 
@@ -464,7 +464,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,,,,,, isProtectionFromPoisonActive] = extractConditionEffectsCall();
+            const { isProtectionFromPoisonActive } = extractConditionEffectsCall();
             expect(isProtectionFromPoisonActive).toBe(false);
         });
 
@@ -478,7 +478,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [,,,,,,,,,,,,,, isProtectionFromPoisonActive] = extractConditionEffectsCall();
+            const { isProtectionFromPoisonActive } = extractConditionEffectsCall();
             expect(isProtectionFromPoisonActive).toBe(false);
         });
     });
@@ -498,7 +498,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [, , targetEffects] = extractConditionEffectsCall();
+            const { targetEffects } = extractConditionEffectsCall();
             expect(targetEffects).toHaveLength(2);
             expect(targetEffects).toEqual([
                 { target: 'TestWizard', effect: 'relevant_effect' },
@@ -518,7 +518,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [, , targetEffects] = extractConditionEffectsCall();
+            const { targetEffects } = extractConditionEffectsCall();
             expect(targetEffects).toEqual([]);
         });
 
@@ -532,7 +532,7 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
             const handler = createPlayerSaveDamageHandler(deps);
             await invokeHandler(handler);
 
-            const [, , targetEffects] = extractConditionEffectsCall();
+            const { targetEffects } = extractConditionEffectsCall();
             expect(targetEffects).toEqual([]);
         });
     });

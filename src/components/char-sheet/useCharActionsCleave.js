@@ -1,5 +1,24 @@
 import { rollExpression } from '../../services/dice/diceRoller.js'
 
+// Pure: first-ability-based Cleave attack bonus.
+function computeCleaveAttackBonus(playerStats) {
+    const abilityName = playerStats?.abilities?.[0]?.name || 'STR';
+    const ability = playerStats?.abilities?.find(a => a.name === abilityName);
+    const abilityMod = ability?.bonus || 0;
+    return abilityMod + (playerStats.proficiency || 0);
+}
+
+// Pure: weapon damage without ability modifier to damage; fall back to raw formula.
+function resolveCleaveDamageFormula(lastAttack) {
+    const stripped = lastAttack.damageFormula
+        .replace(/\+\s*\d+/g, '')
+        .trim();
+    if (!stripped || !/d\d/.test(stripped)) {
+        return lastAttack.damageFormula;
+    }
+    return stripped;
+}
+
 export default function useCharActionsCleave({
     setShowCleaveTargetSelection,
     setTacticalMasterModal,
@@ -24,10 +43,7 @@ export default function useCharActionsCleave({
         const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
         if (!lastAttack) return;
 
-        const abilityName = playerStats?.abilities?.[0]?.name || 'STR';
-        const ability = playerStats?.abilities?.find(a => a.name === abilityName);
-        const abilityMod = ability?.bonus || 0;
-        const attackBonus = abilityMod + (playerStats.proficiency || 0);
+        const attackBonus = computeCleaveAttackBonus(playerStats);
 
         const target = combatSummary?.creatures?.find(c => c.name === cleaveTargetName);
         const targetAc = target?.ac || 0;
@@ -37,12 +53,7 @@ export default function useCharActionsCleave({
         const hit = totalRoll >= targetAc;
 
         // Cleave deals weapon damage without ability modifier to damage
-        let cleaveDamageFormula = lastAttack.damageFormula
-            .replace(/\+\s*\d+/g, '')
-            .trim();
-        if (!cleaveDamageFormula || !/d\d/.test(cleaveDamageFormula)) {
-            cleaveDamageFormula = lastAttack.damageFormula;
-        }
+        const cleaveDamageFormula = resolveCleaveDamageFormula(lastAttack);
 
         let damageResult = null;
         if (hit) {

@@ -497,7 +497,7 @@ function removeBadgeEffect(badge, ctx) {
 
 function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, allCreatures, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage, playerStats: _playerStats, characters: _characters, activeMapName: _activeMapName, onRollConditionSave }) {
     const condKeys = (conditions || []).map(c => c.key)
-    const effects = computeConditionEffects(condKeys, [], targetEffects, false, false, false, false, null, false, false, false, false, false, false, false, false, false, false, false, false)
+    const effects = computeConditionEffects({ conditions: condKeys, saveModifiers: [], targetEffects })
     const activeBuffs = creatureName && campaignName ? (getRuntimeValue(creatureName, 'activeBuffs', campaignName) || []) : []
     applyActiveBuffs(effects, activeBuffs)
     // Check if any creature has Vow of Enmity against this creature

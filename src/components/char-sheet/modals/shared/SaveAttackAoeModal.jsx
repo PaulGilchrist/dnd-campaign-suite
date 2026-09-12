@@ -62,6 +62,18 @@ function buildNpcSaveLogEntry({ action, playerStats, targetDamageFormula, damage
     };
 }
 
+function rollDamageFormula(formula, overchannelActive) {
+    return overchannelActive ? rollExpressionMaximized(formula) : rollExpression(formula);
+}
+
+function getTargetDefenses(combatSummary, targetName) {
+    const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
+    const resistances = targetCreature?.resistances || [];
+    const immunities = targetCreature?.immunities || [];
+    const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
+    return { resistances, immunities, evasionEffects: targetChar?.computedStats?.evasionEffects };
+}
+
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
     const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName } = ctx;
@@ -100,14 +112,10 @@ function resolveNpcTarget(ctx) {
 
     const isRadiantSoulTarget = targetName === radiantSoulTarget;
     const targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
-    const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
+    const damageRoll = rollDamageFormula(targetDamageFormula, overchannelActive);
     const rawDamage = damageRoll?.total ?? 0;
-    const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
-    const resistances = targetCreature?.resistances || [];
-    const immunities = targetCreature?.immunities || [];
-    const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
+    const { resistances, immunities, evasionEffects } = getTargetDefenses(combatSummary, targetName);
     const normalizedSaveType = normalizeSaveType(saveType);
-    const evasionEffects = targetChar?.computedStats?.evasionEffects;
     const evasionActive = hasEvasionForSave(evasionEffects, normalizedSaveType);
     const damageAfterSave = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
     const resResult = computeDamageAfterResistancesWithDetails(damageAfterSave, [damageType], resistances, immunities, false);

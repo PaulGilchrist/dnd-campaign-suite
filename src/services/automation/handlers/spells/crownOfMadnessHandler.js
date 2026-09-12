@@ -3,12 +3,11 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
-import { rollD20 } from '../../../dice/diceRoller.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
+import { rollNpcSave } from './charmSpellUtils.js';
 import storage from '../../../ui/storage.js';
 
 function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
@@ -36,103 +35,37 @@ function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc
     }));
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation || {};
-    const dc = buildSaveDc(auto, playerStats);
-    const saveAdvantage = auto.advantage || false;
-
-    const casterName = playerStats.name;
-
-    storeSpellLastAttack(campaignName, {
-        casterName,
-        spellName: action.name,
-        saveType: 'WIS',
-        saveDc: dc,
-        attackScope: 'single',
-    });
-
-    const targetInfo = await resolveTarget(campaignName, casterName);
-    const targetName = targetInfo?.target?.name;
-
-    if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No target selected. Crown of Madness has no effect.',
-            },
-        };
-    }
-
-    const { promptId, promise } = createSaveListener(campaignName, {
+async function recordCrownSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
         targetName,
-        attackerName: casterName,
-        saveType: 'WIS',
-        saveDc: dc,
-        dcSuccess: 'none',
-        advantage: saveAdvantage,
-        disadvantage: !!action.metaCtx?.metamagicHeighten,
-        condition: 'charmed',
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
     });
-
     addEntry(campaignName, {
-        type: 'ability_use',
+        type: 'save_result',
         characterName: casterName,
-        abilityName: action.name,
-        description: `${casterName} casts Crown of Madness on ${targetName}! ${targetName} must make a WIS save (DC ${dc})${saveAdvantage ? ' with Advantage' : ''} or become Charmed.`,
-        promptId,
+        rollType: 'save-crown-of-madness',
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: true,
+        description: `${targetName} succeeded on WIS save against Crown of Madness.`,
     }).catch((e) => { console.error("[crownOfMadness] Error:", e); });
 
-    if (targetInfo?.target?.type === 'npc') {
-        const cs = targetInfo.cs;
-        const creature = cs?.creatures?.find(c => c.name === targetName);
-        const saveResult = creature
-            ? rollSaveForCreature(creature, 'WIS', dc, false, saveAdvantage)
-            : (() => {
-                const r1 = rollD20();
-                const r2 = rollD20();
-                const roll = saveAdvantage ? Math.max(r1, r2) : r1;
-                const total = roll;
-                const success = total >= dc;
-                return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
-            })();
-
-        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, saveResult);
-    }
-
-    const saveResult = await promise;
-
-    if (saveResult.success) {
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'success',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: [],
-            appliedDamage: 0,
-        });
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-crown-of-madness',
-            targetName,
-            saveDc: dc,
-            saveType: 'WIS',
-            success: true,
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
             description: `${targetName} succeeded on WIS save against Crown of Madness.`,
-        }).catch((e) => { console.error("[crownOfMadness] Error:", e); });
+        },
+    };
+}
 
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${targetName} succeeded on WIS save against Crown of Madness.`,
-            },
-        };
-    }
-
+async function applyCrownCharm(campaignName, casterName, action, playerStats, targetName, dc, saveResult) {
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
@@ -188,4 +121,66 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: `${targetName} failed WIS save and is Charmed by Crown of Madness. On each of its turns, ${targetName} must use its action to make a melee attack against a creature chosen by ${casterName} before moving.`,
         },
     };
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation || {};
+    const dc = buildSaveDc(auto, playerStats);
+    const saveAdvantage = auto.advantage || false;
+
+    const casterName = playerStats.name;
+
+    storeSpellLastAttack(campaignName, {
+        casterName,
+        spellName: action.name,
+        saveType: 'WIS',
+        saveDc: dc,
+        attackScope: 'single',
+    });
+
+    const targetInfo = await resolveTarget(campaignName, casterName);
+    const targetName = targetInfo?.target?.name;
+
+    if (!targetName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No target selected. Crown of Madness has no effect.',
+            },
+        };
+    }
+
+    const { promptId, promise } = createSaveListener(campaignName, {
+        targetName,
+        attackerName: casterName,
+        saveType: 'WIS',
+        saveDc: dc,
+        dcSuccess: 'none',
+        advantage: saveAdvantage,
+        disadvantage: !!action.metaCtx?.metamagicHeighten,
+        condition: 'charmed',
+    });
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: action.name,
+        description: `${casterName} casts Crown of Madness on ${targetName}! ${targetName} must make a WIS save (DC ${dc})${saveAdvantage ? ' with Advantage' : ''} or become Charmed.`,
+        promptId,
+    }).catch((e) => { console.error("[crownOfMadness] Error:", e); });
+
+    if (targetInfo?.target?.type === 'npc') {
+        const creature = targetInfo.cs?.creatures?.find(c => c.name === targetName);
+        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcSave(creature, dc, saveAdvantage));
+    }
+
+    const saveResult = await promise;
+
+    if (saveResult.success) {
+        return recordCrownSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult);
+    }
+
+    return applyCrownCharm(campaignName, casterName, action, playerStats, targetName, dc, saveResult);
 }

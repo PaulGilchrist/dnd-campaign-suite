@@ -14,7 +14,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
     const creature = getAttackerCreature();
     const monsterConditions = creature?.conditions || [];
     const condKeys = monsterConditions.map(c => c.key);
-    const condEffects = computeConditionEffects(condKeys, [], monsterTargetEffects, false, false, false, false, null, false, null, false, false, false, false, false, false, false);
+    const condEffects = computeConditionEffects({ conditions: condKeys, saveModifiers: [], targetEffects: monsterTargetEffects });
     const condEffectBadges = buildCondEffectBadges(condEffects, {
       inspiringMoveNoOA,
       remarkableNoOA,

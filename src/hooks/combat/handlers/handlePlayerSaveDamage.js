@@ -172,7 +172,22 @@ function resolveTargetSaveContext({ charactersRef, campaignName, target, attacke
     const holyAuraTargets = getHolyAuraTargets(target.name, campaignName);
     const isProtectionFromPoisonActive = Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Protection from Poison' && b.effect === 'protection_from_poison');
     const combatContext = getCombatSummary(campaignName);
-    const targetConditionEffects = computeConditionEffects(targetConditions, targetSaveModifiers, targetEffects, isRaging, shapeShiftActive, false, false, combatContext, seeInvisibilityActive, target.name, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, holyAuraTargets, isProtectionFromPoisonActive, false);
+    const targetConditionEffects = computeConditionEffects({
+        conditions: targetConditions,
+        saveModifiers: targetSaveModifiers,
+        targetEffects,
+        isRaging,
+        shapeShiftActive,
+        combatContext,
+        seeInvisibilityActive,
+        attackerName: target.name,
+        isLivingLegendActive,
+        isElderChampionActive,
+        isElderChampionAttackerActive,
+        holyAuraTargets,
+        isProtectionFromPoisonActive,
+        isTranceOfOrderActive: false,
+    });
     const fanaticalFocusUsed = getRuntimeValue(target.name, 'fanaticalFocusUsed', campaignName);
     const indomitableUses = Number(getRuntimeValue(target.name, 'indomitableUses', campaignName) ?? 0);
     const indomitableMax = computeIndomitableMax(targetChar?.computedStats?.level || 0);

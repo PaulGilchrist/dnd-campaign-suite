@@ -16,16 +16,87 @@ const VIEW_LABELS = {
     campaignRepair: { label: 'Admin', icon: 'fa-gears' },
 };
 
+const RULES_URL = 'https://paulgilchrist.github.io/dnd-tools/rules/general';
+
+const NAV_ITEMS = [
+    { view: 'encounter', onClick: 'onEncounterClick', localhostOnly: true },
+    { view: 'factions', onClick: 'onFactionsClick', localhostOnly: true },
+    { view: 'initiative', onClick: 'onInitiativeClick' },
+    { view: 'campaignLog', onClick: 'onLogClick' },
+    { view: 'mapsManager', onClick: 'onMapsClick', playerLabel: 'Map' },
+    { view: 'npcs', onClick: 'onNPCsClick', localhostOnly: true },
+    { view: 'notes', onClick: 'onNotesClick' },
+    { view: 'quests', onClick: 'onQuestsClick', localhostOnly: true },
+    { external: true, icon: 'fa-book', label: 'Rules' },
+    { view: 'settlements', onClick: 'onSettlementsClick', localhostOnly: true },
+];
+
+function openRules() {
+    window.open(RULES_URL, '_blank');
+}
+
+function activeClass(activeView, view) {
+    return `sidebar-section-header${activeView === view ? ' active' : ''}`;
+}
+
+function getActiveInfo(activeView, activeCharacter) {
+    if (activeView === 'charSheet' && activeCharacter) {
+        return { label: activeCharacter.name, icon: 'fa-user' };
+    }
+    const viewInfo = VIEW_LABELS[activeView];
+    return { label: viewInfo?.label || '', icon: viewInfo?.icon || '' };
+}
+
+function NavButton({ item, activeView, handlers, isLocalhost }) {
+    if (item.localhostOnly && !isLocalhost) return null;
+
+    const { label, icon } = VIEW_LABELS[item.view] || item;
+    const displayLabel = !isLocalhost && item.playerLabel ? item.playerLabel : label;
+
+    if (item.external) {
+        return (
+            <button className="sidebar-section-header" onClick={openRules}>
+                <i className={`fa-solid ${icon}`}></i> {displayLabel} <i className="fa-solid fa-external-link-alt fa-xs"></i>
+            </button>
+        );
+    }
+
+    return (
+        <button className={activeClass(activeView, item.view)} onClick={handlers[item.onClick]}>
+            <i className={`fa-solid ${icon}`}></i> {displayLabel}
+        </button>
+    );
+}
+
+function CharacterList({ characters, activeView, activeCharacter, onAddCharacter, onCharacterClick }) {
+    return (
+        <div className="sidebar-section">
+            <div className="sidebar-section-header sidebar-section-header-static">
+                Characters
+            </div>
+            <div className="sidebar-submenu">
+                <button className="sidebar-link add-character" onClick={onAddCharacter}>
+                    <i className="fa-solid fa-plus"></i> Add Character
+                </button>
+                {characters.map((char, index) => (
+                    <button
+                        key={`${char.name}-${index}`}
+                        className={`sidebar-link${activeView === 'charSheet' && activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
+                        onClick={() => onCharacterClick(char)}
+                    >
+                        {char.name}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView }) {
     const [diceResult, setDiceResult] = useState(null);
 
-    const viewInfo = VIEW_LABELS[activeView];
-    const activeLabel = activeView === 'charSheet' && activeCharacter
-        ? activeCharacter.name
-        : viewInfo?.label || '';
-    const activeIcon = activeView === 'charSheet' && activeCharacter
-        ? 'fa-user'
-        : viewInfo?.icon || '';
+    const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
+    const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onNPCsClick, onNotesClick, onQuestsClick, onSettlementsClick };
 
     return (
         <>
@@ -44,109 +115,27 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     <i className="fa-solid fa-arrow-left"></i> Campaigns
                 </button>
 
-                <div className="sidebar-section">
-                    <div className="sidebar-section-header sidebar-section-header-static">
-                        Characters
-                    </div>
-                    <div className="sidebar-submenu">
-                        <button className="sidebar-link add-character" onClick={onAddCharacter}>
-                            <i className="fa-solid fa-plus"></i> Add Character
-                        </button>
-                        {characters.map((char, index) => (
-                            <button
-                                key={`${char.name}-${index}`}
-                                className={`sidebar-link${activeView === 'charSheet' && activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
-                                onClick={() => onCharacterClick(char)}
-                            >
-                                {char.name}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <CharacterList
+                    characters={characters}
+                    activeView={activeView}
+                    activeCharacter={activeCharacter}
+                    onAddCharacter={onAddCharacter}
+                    onCharacterClick={onCharacterClick}
+                />
 
-                {isLocalhost && (
-                    <button
-                        className={`sidebar-section-header${activeView === 'encounter' ? ' active' : ''}`}
-                        onClick={onEncounterClick}
-                    >
-                        <i className="fa-solid fa-dragon"></i> Encounters
-                    </button>
-                )}
-
-                {isLocalhost && (
-                    <button
-                        className={`sidebar-section-header${activeView === 'factions' ? ' active' : ''}`}
-                        onClick={onFactionsClick}
-                    >
-                        <i className="fa-solid fa-handshake"></i> Factions
-                    </button>
-                )}
-
-                <button
-                    className={`sidebar-section-header${activeView === 'initiative' ? ' active' : ''}`}
-                    onClick={onInitiativeClick}
-                >
-                    <i className="fa-solid fa-shield-alt"></i> Initiative
-                </button>
-
-                <button
-                    className={`sidebar-section-header${activeView === 'campaignLog' ? ' active' : ''}`}
-                    onClick={onLogClick}
-                >
-                    <i className="fa-solid fa-book-journal-whills"></i> Log
-                </button>
-
-                <button
-                    className={`sidebar-section-header${activeView === 'mapsManager' ? ' active' : ''}`}
-                    onClick={onMapsClick}
-                >
-                    <i className="fa-solid fa-map"></i> {isLocalhost ? 'Maps' : 'Map'}
-                </button>
-
-                {isLocalhost && (
-                    <button
-                        className={`sidebar-section-header${activeView === 'npcs' ? ' active' : ''}`}
-                        onClick={onNPCsClick}
-                    >
-                        <i className="fa-solid fa-users"></i> NPCs
-                    </button>
-                )}
-
-                <button
-                    className={`sidebar-section-header${activeView === 'notes' ? ' active' : ''}`}
-                    onClick={onNotesClick}
-                >
-                    <i className="fa-solid fa-book"></i> Notes
-                </button>
-
-                {isLocalhost && (
-                    <button
-                        className={`sidebar-section-header${activeView === 'quests' ? ' active' : ''}`}
-                        onClick={onQuestsClick}
-                    >
-                        <i className="fa-solid fa-scroll"></i> Quests
-                    </button>
-                )}
-
-                <button
-                    className="sidebar-section-header"
-                    onClick={() => window.open('https://paulgilchrist.github.io/dnd-tools/rules/general', '_blank')}
-                >
-                    <i className="fa-solid fa-book"></i> Rules <i className="fa-solid fa-external-link-alt fa-xs"></i>
-                </button>
-
-                {isLocalhost && (
-                    <button
-                        className={`sidebar-section-header${activeView === 'settlements' ? ' active' : ''}`}
-                        onClick={onSettlementsClick}
-                    >
-                        <i className="fa-solid fa-city"></i> Settlements
-                    </button>
-                )}
+                {NAV_ITEMS.map((item) => (
+                    <NavButton
+                        key={item.view || 'rules'}
+                        item={item}
+                        activeView={activeView}
+                        handlers={navHandlers}
+                        isLocalhost={isLocalhost}
+                    />
+                ))}
                 {isLocalhost && (
                     <div className="sidebar-footer">
                         <button
-                            className={`sidebar-section-header${activeView === 'campaignRepair' ? ' active' : ''}`}
+                            className={activeClass(activeView, 'campaignRepair')}
                             onClick={onRepairClick}
                         >
                             <i className="fa-solid fa-gears"></i> Admin

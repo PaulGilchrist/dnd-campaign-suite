@@ -289,18 +289,11 @@ async function applySleetStormProneTarget(campaignName, casterName, targetName, 
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 }
 
-export async function processSleetStormAreaSave(casterName, targetName, campaignName, _mapName) {
-    const trackingKey = `_sleetStorm_${casterName.replace(/\s+/g, '_')}`;
-    const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
-
-    if (!tracking || !tracking.saveDc) {
-        return null;
-    }
-
+async function shouldSkipSleetAreaSave(casterName, targetName, campaignName, _mapName, tracking) {
     if (_mapName) {
         try {
             const inArea = await isWithinRange(casterName, targetName, tracking.radius);
-            if (!inArea) return null;
+            if (!inArea) return true;
         } catch (error) {
             // If map data unavailable, proceed with save
             console.warn('[sleetStormHandler] Map data unavailable, proceeding with save:', error);
@@ -309,7 +302,7 @@ export async function processSleetStormAreaSave(casterName, targetName, campaign
 
     const existingConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const isAlreadyProne = existingConditions.some(c => String(c).toLowerCase() === 'prone');
-    if (isAlreadyProne) return null;
+    if (isAlreadyProne) return true;
 
     const targetCharacter = getCombatContext(campaignName)?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type === 'player') {
@@ -322,8 +315,80 @@ export async function processSleetStormAreaSave(casterName, targetName, campaign
             getRuntimeValue,
             campaignName,
         })) {
-            return null;
+            return true;
         }
+    }
+
+    return false;
+}
+
+async function applySleetAreaSaveFailure(campaignName, casterName, targetName, saveResult, dc) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'prone');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'prone'], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['prone'],
+        appliedDamage: 0,
+    });
+
+    // Track concentration loss
+    const casterConcentrationKey = `_sleetStorm_concentration_${casterName.replace(/\s+/g, '_')}`;
+    const existingConcentration = getRuntimeValue(casterName, casterConcentrationKey, campaignName) || [];
+    const concentrationList = Array.isArray(existingConcentration) ? [...existingConcentration] : [];
+    if (!concentrationList.includes(targetName)) {
+        concentrationList.push(targetName);
+        setRuntimeValue(casterName, casterConcentrationKey, concentrationList, campaignName);
+    }
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-sleet-storm',
+        targetName,
+        saveDc: dc,
+        saveType: 'DEX',
+        success: false,
+        description: `${targetName} failed DEX save against Sleet Storm. Becomes Prone and loses Concentration.`,
+    }).catch((e) => { console.error("[sleetStormAreaSave] Error:", e); });
+}
+
+async function recordSleetAreaSaveSuccess(campaignName, casterName, targetName, saveResult, dc) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-sleet-storm',
+        targetName,
+        saveDc: dc,
+        saveType: 'DEX',
+        success: true,
+        description: `${targetName} succeeded on DEX save against Sleet Storm.`,
+    }).catch((e) => { console.error("[sleetStormAreaSave] Error:", e); });
+}
+
+export async function processSleetStormAreaSave(casterName, targetName, campaignName, _mapName) {
+    const trackingKey = `_sleetStorm_${casterName.replace(/\s+/g, '_')}`;
+    const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
+
+    if (!tracking || !tracking.saveDc) {
+        return null;
+    }
+
+    if (await shouldSkipSleetAreaSave(casterName, targetName, campaignName, _mapName, tracking)) {
+        return null;
     }
 
     const { promptId, promise } = createSaveListener(campaignName, {
@@ -343,58 +408,9 @@ export async function processSleetStormAreaSave(casterName, targetName, campaign
     const saveResult = await promise;
 
     if (!saveResult.success) {
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'prone');
-        setRuntimeValue(targetName, 'activeConditions', [...filtered, 'prone'], campaignName);
-
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'failure',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: ['prone'],
-            appliedDamage: 0,
-        });
-
-        // Track concentration loss
-        const casterConcentrationKey = `_sleetStorm_concentration_${casterName.replace(/\s+/g, '_')}`;
-        const existingConcentration = getRuntimeValue(casterName, casterConcentrationKey, campaignName) || [];
-        const concentrationList = Array.isArray(existingConcentration) ? [...existingConcentration] : [];
-        if (!concentrationList.includes(targetName)) {
-            concentrationList.push(targetName);
-            setRuntimeValue(casterName, casterConcentrationKey, concentrationList, campaignName);
-        }
-
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-sleet-storm',
-            targetName,
-            saveDc: tracking.saveDc,
-            saveType: 'DEX',
-            success: false,
-            description: `${targetName} failed DEX save against Sleet Storm. Becomes Prone and loses Concentration.`,
-        }).catch((e) => { console.error("[sleetStormAreaSave] Error:", e); });
+        await applySleetAreaSaveFailure(campaignName, casterName, targetName, saveResult, tracking.saveDc);
     } else {
-        await addTargetResult(campaignName, {
-            targetName,
-            saveResult: 'success',
-            roll: saveResult.roll ?? 0,
-            total: saveResult.total ?? 0,
-            conditions: [],
-            appliedDamage: 0,
-        });
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: casterName,
-            rollType: 'save-sleet-storm',
-            targetName,
-            saveDc: tracking.saveDc,
-            saveType: 'DEX',
-            success: true,
-            description: `${targetName} succeeded on DEX save against Sleet Storm.`,
-        }).catch((e) => { console.error("[sleetStormAreaSave] Error:", e); });
+        await recordSleetAreaSaveSuccess(campaignName, casterName, targetName, saveResult, tracking.saveDc);
     }
 
     return {

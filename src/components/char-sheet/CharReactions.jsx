@@ -34,6 +34,19 @@ import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from
 import { signFormatter } from '../../services/ui/formatUtils.js';
 import './CharActions.css'
 
+const REACTION_MODAL_KEYS = {
+    arcaneWardRestore: 'arcaneWardRestoreModal',
+    inspiringMovementAlly: 'inspiringMovementAllyModal',
+    beguilingTwist: 'beguilingTwistModal',
+    bastionOfLawSpend: 'bastionOfLawSpendModal',
+    bendFateChoice: 'bendFateModal',
+    boonFateChoice: 'boonFateModal',
+    deflectRedirect: 'deflectRedirectModal',
+    stepsOfTheFeyTaunt: 'stepsOfTheFeyTauntModal',
+    energyRedirection: 'energyRedirectionModal',
+    commandingPresenceReaction: 'commandingPresenceReactionModal',
+};
+
 function appendDynamicReactions(reactions, playerStats, activeBuffs, pwhStance) {
     // Add automation reactions from playerStats.automation.reactions (e.g., Commanding Presence reaction)
     const automationReactions = playerStats.automation?.reactions || [];
@@ -161,6 +174,130 @@ function RedirectForceModals({ modalState, handleRedirectConfirm, handleRedirect
                     description={modalState.energyRedirectionModal.description}
                     onTargetSelected={handleEnergyRedirectionConfirm}
                     onSkip={handleEnergyRedirectionSkip}
+                />
+            )}
+        </>
+    );
+}
+
+function ReactiveSpellPicker({ reactiveSpellEligible, onPick, onDismiss }) {
+    return (
+        <Popup onClickOrKeyDown={onDismiss}>
+            <div className="dice-roll-result">
+                <div className="dice-roll-header">
+                    <i className="fa-solid fa-wand-magic-sparkles"></i>Reactive Spell
+                </div>
+                <div>Select a single target spell with casting time of 1 action to cast as a reaction:</div>
+                <div className="reactive-spell-list">
+                    {[...reactiveSpellEligible].sort((a, b) => a.name.localeCompare(b.name)).map((spellData) => (
+                        <div key={spellData.name} className="clickable reactive-spell-row"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onPick(spellData);
+                            }}>
+                            <span>{spellData.name}</span>
+                        </div>
+                    ))}
+                </div>
+                <div className="dice-roll-hint">click to dismiss</div>
+            </div>
+        </Popup>
+    );
+}
+
+function ReactionModals({ modalState, playerStats, campaignName, mapName, characters, setModalState, setPopupHtml, h }) {
+    return (
+        <>
+            {modalState.arcaneWardRestoreModal && (
+                <ArcaneWardRestoreModal
+                    {...modalState.arcaneWardRestoreModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ arcaneWardRestoreModal: null })}
+                />
+            )}
+            {modalState.inspiringMovementAllyModal && (
+                <SecondaryTargetModal
+                    title="Inspiring Movement — Choose Ally"
+                    targets={modalState.inspiringMovementAllyModal.creatureTargets}
+                    confirmLabel="Move"
+                    confirmIcon="fa-person-walking"
+                    featureDescription="Both you and the chosen ally move up to half your Speeds without provoking Opportunity Attacks."
+                    onTargetSelected={h.handleInspiringMovementConfirm}
+                    onSkip={() => h.handleInspiringMovementConfirm(null)}
+                />
+            )}
+            {modalState.beguilingTwistModal && (
+                <SecondaryTargetModal
+                    title="Beguiling Twist — Choose Target"
+                    targets={modalState.beguilingTwistModal.targets}
+                    confirmLabel="Force Save"
+                    confirmIcon="fa-wand-sparkles"
+                    featureDescription={`Target must make a WIS save (DC ${modalState.beguilingTwistModal.saveDc}) or be ${modalState.beguilingTwistModal.conditionKey} for 1 minute.`}
+                    onTargetSelected={h.handleBeguilingTwistConfirm}
+                    onSkip={() => h.handleBeguilingTwistConfirm(null)}
+                />
+            )}
+            {modalState.bastionOfLawSpendModal && (
+                <BastionOfLawSpendModal
+                    {...modalState.bastionOfLawSpendModal}
+                    playerName={playerStats.name}
+                    campaignName={campaignName}
+                    onClose={() => setModalState({ bastionOfLawSpendModal: null })}
+                    onConfirm={async (diceToSpend, rollResultData) => {
+                        const action = {
+                            automation: { type: 'bastion_of_law_spend' },
+                            numDice: diceToSpend,
+                            preRollResult: rollResultData,
+                        };
+                        const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
+                        if (result) {
+                            if (result.type === 'popup') {
+                                setPopupHtml(result.payload);
+                            }
+                            if (result.type === 'modal') {
+                                setModalState({ bastionOfLawSpendModal: result.payload });
+                            }
+                        }
+                    }}
+                />
+            )}
+            {modalState.bendFateModal && (
+                <BendFateModal
+                    {...modalState.bendFateModal}
+                    onClose={() => setModalState({ bendFateModal: null })}
+                />
+            )}
+            {modalState.boonFateModal && (
+                <BoonFateModal
+                    {...modalState.boonFateModal}
+                    onClose={() => setModalState({ boonFateModal: null })}
+                />
+            )}
+            <RedirectForceModals modalState={modalState} handleRedirectConfirm={h.handleRedirectConfirm} handleRedirectSkip={h.handleRedirectSkip} handleEnergyRedirectionConfirm={h.handleEnergyRedirectionConfirm} handleEnergyRedirectionSkip={h.handleEnergyRedirectionSkip} />
+            {modalState.stepsOfTheFeyTauntModal && (
+                <StepsOfTheFeyTauntModal
+                    {...modalState.stepsOfTheFeyTauntModal}
+                    onClose={() => setModalState({ stepsOfTheFeyTauntModal: null })}
+                />
+            )}
+            {modalState.searingVengeanceModal && (
+                <SearingVengeanceModal
+                    creatureTargets={modalState.searingVengeanceModal.creatureTargets}
+                    onConfirm={h.handleSearingVengeanceConfirm}
+                    onSkip={h.handleSearingVengeanceSkip}
+                />
+            )}
+            {modalState.commandingPresenceReactionModal && (
+                <SecondaryTargetModal
+                    title={modalState.commandingPresenceReactionModal.title}
+                    targets={modalState.commandingPresenceReactionModal.targets}
+                    confirmLabel={modalState.commandingPresenceReactionModal.confirmLabel || 'Force Save'}
+                    confirmIcon={modalState.commandingPresenceReactionModal.confirmIcon || 'fa-wand-sparkles'}
+                    featureDescription={modalState.commandingPresenceReactionModal.featureDescription}
+                    description={modalState.commandingPresenceReactionModal.description}
+                    onTargetSelected={h.handleCommandingPresenceConfirm}
+                    onSkip={h.handleCommandingPresenceSkip}
                 />
             )}
         </>
@@ -347,28 +484,11 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         }
 
         if (result.type === 'modal') {
-            if (result.modalName === 'arcaneWardRestore') {
-                setModalState({ arcaneWardRestoreModal: result.payload });
-            } else if (result.modalName === 'inspiringMovementAlly') {
-                setModalState({ inspiringMovementAllyModal: result.payload });
-            } else if (result.modalName === 'beguilingTwist') {
-                setModalState({ beguilingTwistModal: result.payload });
-            } else if (result.modalName === 'bastionOfLawSpend') {
-                setModalState({ bastionOfLawSpendModal: result.payload });
-            } else if (result.modalName === 'bendFateChoice') {
-                setModalState({ bendFateModal: result.payload });
-            } else if (result.modalName === 'boonFateChoice') {
-                setModalState({ boonFateModal: result.payload });
-            } else if (result.modalName === 'deflectRedirect') {
-                setModalState({ deflectRedirectModal: result.payload });
-            } else if (result.modalName === 'stepsOfTheFeyTaunt') {
-                setModalState({ stepsOfTheFeyTauntModal: result.payload });
-            } else if (result.modalName === 'searingVengeance') {
+            const modalKey = REACTION_MODAL_KEYS[result.modalName];
+            if (result.modalName === 'searingVengeance') {
                 setModalState({ searingVengeanceModal: { ...result.payload, reaction, campaignName, characters } });
-            } else if (result.modalName === 'energyRedirection') {
-                setModalState({ energyRedirectionModal: result.payload });
-            } else if (result.modalName === 'commandingPresenceReaction') {
-                setModalState({ commandingPresenceReactionModal: result.payload });
+            } else if (modalKey) {
+                setModalState({ [modalKey]: result.payload });
             } else {
                 const html = buildFeatureDetailHtml(reaction);
                 if (html) setPopupHtml(html);
@@ -621,32 +741,15 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 </Popup>
             )}
             {reactiveSpellEligible && (
-                <Popup onClickOrKeyDown={() => { setReactiveSpellEligible(null); }}>
-                    <div className="dice-roll-result">
-                        <div className="dice-roll-header">
-                            <i className="fa-solid fa-wand-magic-sparkles"></i>Reactive Spell
-                        </div>
-                        <div>Select a single target spell with casting time of 1 action to cast as a reaction:</div>
-                        <div className="reactive-spell-list">
-                            {[...reactiveSpellEligible].sort((a, b) => a.name.localeCompare(b.name)).map((spellData) => (
-                                <div key={spellData.name} className="clickable reactive-spell-row"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setReactiveSpellEligible(null);
-                                        const fullSpell = {
-                                            ...spellData,
-                                            prepared: 'Always',
-                                        };
-                                        setSelectedSpell(fullSpell);
-                                        setIsReactiveSpellFlow(true);
-                                    }}>
-                                    <span>{spellData.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="dice-roll-hint">click to dismiss</div>
-                    </div>
-                </Popup>
+                <ReactiveSpellPicker
+                    reactiveSpellEligible={reactiveSpellEligible}
+                    onDismiss={() => { setReactiveSpellEligible(null); }}
+                    onPick={(spellData) => {
+                        setReactiveSpellEligible(null);
+                        setSelectedSpell({ ...spellData, prepared: 'Always' });
+                        setIsReactiveSpellFlow(true);
+                    }}
+                />
             )}
             {pendingMetamagic && (
                 <div>
@@ -702,98 +805,27 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     </React.Fragment>;
                 })}<div className='half-line'></div>
             </div>}
-            {modalState.arcaneWardRestoreModal && (
-                <ArcaneWardRestoreModal
-                    {...modalState.arcaneWardRestoreModal}
-                    playerStats={playerStats}
-                    campaignName={campaignName}
-                    onClose={() => setModalState({ arcaneWardRestoreModal: null })}
-                />
-            )}
-            {modalState.inspiringMovementAllyModal && (
-                <SecondaryTargetModal
-                    title="Inspiring Movement — Choose Ally"
-                    targets={modalState.inspiringMovementAllyModal.creatureTargets}
-                    confirmLabel="Move"
-                    confirmIcon="fa-person-walking"
-                    featureDescription="Both you and the chosen ally move up to half your Speeds without provoking Opportunity Attacks."
-                    onTargetSelected={handleInspiringMovementConfirm}
-                    onSkip={() => handleInspiringMovementConfirm(null)}
-                />
-            )}
-            {modalState.beguilingTwistModal && (
-                <SecondaryTargetModal
-                    title="Beguiling Twist — Choose Target"
-                    targets={modalState.beguilingTwistModal.targets}
-                    confirmLabel="Force Save"
-                    confirmIcon="fa-wand-sparkles"
-                    featureDescription={`Target must make a WIS save (DC ${modalState.beguilingTwistModal.saveDc}) or be ${modalState.beguilingTwistModal.conditionKey} for 1 minute.`}
-                    onTargetSelected={handleBeguilingTwistConfirm}
-                    onSkip={() => handleBeguilingTwistConfirm(null)}
-                />
-            )}
-            {modalState.bastionOfLawSpendModal && (
-                <BastionOfLawSpendModal
-                    {...modalState.bastionOfLawSpendModal}
-                    playerName={playerStats.name}
-                    campaignName={campaignName}
-                    onClose={() => setModalState({ bastionOfLawSpendModal: null })}
-                    onConfirm={async (diceToSpend, rollResultData) => {
-                        const action = {
-                            automation: { type: 'bastion_of_law_spend' },
-                            numDice: diceToSpend,
-                            preRollResult: rollResultData,
-                        };
-                        const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
-                        if (result) {
-                            if (result.type === 'popup') {
-                                setPopupHtml(result.payload);
-                            }
-                            if (result.type === 'modal') {
-                                setModalState({ bastionOfLawSpendModal: result.payload });
-                            }
-                        }
-                    }}
-                />
-            )}
-            {modalState.bendFateModal && (
-                <BendFateModal
-                    {...modalState.bendFateModal}
-                    onClose={() => setModalState({ bendFateModal: null })}
-                />
-            )}
-            {modalState.boonFateModal && (
-                <BoonFateModal
-                    {...modalState.boonFateModal}
-                    onClose={() => setModalState({ boonFateModal: null })}
-                />
-            )}
-            <RedirectForceModals modalState={modalState} handleRedirectConfirm={handleRedirectConfirm} handleRedirectSkip={handleRedirectSkip} handleEnergyRedirectionConfirm={handleEnergyRedirectionConfirm} handleEnergyRedirectionSkip={handleEnergyRedirectionSkip} />
-            {modalState.stepsOfTheFeyTauntModal && (
-                <StepsOfTheFeyTauntModal
-                    {...modalState.stepsOfTheFeyTauntModal}
-                    onClose={() => setModalState({ stepsOfTheFeyTauntModal: null })}
-                />
-            )}
-            {modalState.searingVengeanceModal && (
-                <SearingVengeanceModal
-                    creatureTargets={modalState.searingVengeanceModal.creatureTargets}
-                    onConfirm={handleSearingVengeanceConfirm}
-                    onSkip={handleSearingVengeanceSkip}
-                />
-            )}
-            {modalState.commandingPresenceReactionModal && (
-                <SecondaryTargetModal
-                    title={modalState.commandingPresenceReactionModal.title}
-                    targets={modalState.commandingPresenceReactionModal.targets}
-                    confirmLabel={modalState.commandingPresenceReactionModal.confirmLabel || 'Force Save'}
-                    confirmIcon={modalState.commandingPresenceReactionModal.confirmIcon || 'fa-wand-sparkles'}
-                    featureDescription={modalState.commandingPresenceReactionModal.featureDescription}
-                    description={modalState.commandingPresenceReactionModal.description}
-                    onTargetSelected={handleCommandingPresenceConfirm}
-                    onSkip={handleCommandingPresenceSkip}
-                />
-            )}
+            <ReactionModals
+                modalState={modalState}
+                playerStats={playerStats}
+                campaignName={campaignName}
+                mapName={mapName}
+                characters={characters}
+                setModalState={setModalState}
+                setPopupHtml={setPopupHtml}
+                h={{
+                    handleInspiringMovementConfirm,
+                    handleBeguilingTwistConfirm,
+                    handleRedirectConfirm,
+                    handleRedirectSkip,
+                    handleEnergyRedirectionConfirm,
+                    handleEnergyRedirectionSkip,
+                    handleSearingVengeanceConfirm,
+                    handleSearingVengeanceSkip,
+                    handleCommandingPresenceConfirm,
+                    handleCommandingPresenceSkip
+                }}
+            />
             {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {
                 const isClickable = (reaction.details || reaction.name === OPPORTUNITY_ATTACK.name || reaction.name === 'Stand (Power Word Heal)' || hasAutomation(reaction)) && reaction.name !== 'Reactive Strike';
                 return <div key={reaction.name}>

@@ -139,44 +139,61 @@ function findProcessedAttackRider(playerStats, name) {
     );
 }
 
+function nameIn(list, name) {
+    return list.some(f => f.name === name);
+}
+
+function categorizeByCastingTime(playerStats, featFeature, featEntry, featureCategories, ct) {
+    const name = featFeature.name;
+    if (ct === '1 action' && !nameIn(playerStats.actions, name)) {
+        playerStats.actions = [...playerStats.actions, featEntry];
+    } else if (ct === '1 bonus action' && !nameIn(playerStats.bonusActions, name)) {
+        playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+    } else if (ct === '1 reaction' && !nameIn(playerStats.reactions, name)) {
+        playerStats.reactions = [...playerStats.reactions, featEntry];
+    } else if (ct === 'passive' && featureCategories.characterAdvancement.includes(name) && !nameIn(playerStats.characterAdvancement, name)) {
+        playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
+    } else {
+        playerStats.specialActions = [...playerStats.specialActions, featEntry];
+    }
+}
+
+function replaceSpecialActionDescription(playerStats, featFeature, featEntry) {
+    const existingIndex = playerStats.specialActions.findIndex(f => f.name === featFeature.name);
+    if (existingIndex !== -1 && !playerStats.specialActions[existingIndex].description && featEntry.description) {
+        playerStats.specialActions = [...playerStats.specialActions.slice(0, existingIndex), featEntry, ...playerStats.specialActions.slice(existingIndex + 1)];
+    }
+}
+
+// No automation.casting_time — go to specialActions unless name matches a category
+function categorizeByCategory(playerStats, featFeature, featEntry, featureCategories) {
+    const name = featFeature.name;
+    if (featureCategories.characterAdvancement.includes(name) && !nameIn(playerStats.characterAdvancement, name)) {
+        playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
+    } else if (featureCategories.actions.includes(name) && !nameIn(playerStats.actions, name)) {
+        playerStats.actions = [...playerStats.actions, featEntry];
+    } else if (featureCategories.bonusActions.includes(name) && !nameIn(playerStats.bonusActions, name)) {
+        playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+    } else if (featureCategories.reactions.includes(name) && !nameIn(playerStats.reactions, name)) {
+        playerStats.reactions = [...playerStats.reactions, featEntry];
+    } else if (featFeature.isBonusAction && !nameIn(playerStats.bonusActions, name)) {
+        // FT-047: bonus_action feat benefits without automation.casting_time
+        // (e.g. Keen Mind "Quiet Study") were silently dropped by this
+        // replace-only fallback. featBuffService tags them isBonusAction —
+        // append them to Bonus Actions as informational no-roll rows.
+        playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+    } else {
+        replaceSpecialActionDescription(playerStats, featFeature, featEntry);
+    }
+}
+
 function categorizeFeatEntry(playerStats, featFeature, featEntry, featureCategories) {
     // Categorize by automation.casting_time
     const castingTime = featFeature.automation?.casting_time;
     if (castingTime) {
-        const ct = normalizeCastingTime(castingTime);
-        if (ct === '1 action' && !playerStats.actions.some(f => f.name === featFeature.name)) {
-            playerStats.actions = [...playerStats.actions, featEntry];
-        } else if (ct === '1 bonus action' && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
-            playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
-        } else if (ct === '1 reaction' && !playerStats.reactions.some(f => f.name === featFeature.name)) {
-            playerStats.reactions = [...playerStats.reactions, featEntry];
-        } else if (ct === 'passive' && featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
-            playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
-        } else {
-            playerStats.specialActions = [...playerStats.specialActions, featEntry];
-        }
+        categorizeByCastingTime(playerStats, featFeature, featEntry, featureCategories, normalizeCastingTime(castingTime));
     } else {
-        // No automation.casting_time — go to specialActions unless name matches a category
-        if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
-            playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
-        } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions.some(f => f.name === featFeature.name)) {
-            playerStats.actions = [...playerStats.actions, featEntry];
-        } else if (featureCategories.bonusActions.includes(featFeature.name) && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
-            playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
-        } else if (featureCategories.reactions.includes(featFeature.name) && !playerStats.reactions.some(f => f.name === featFeature.name)) {
-            playerStats.reactions = [...playerStats.reactions, featEntry];
-        } else if (featFeature.isBonusAction && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
-            // FT-047: bonus_action feat benefits without automation.casting_time
-            // (e.g. Keen Mind "Quiet Study") were silently dropped by this
-            // replace-only fallback. featBuffService tags them isBonusAction —
-            // append them to Bonus Actions as informational no-roll rows.
-            playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
-        } else {
-            const existingIndex = playerStats.specialActions.findIndex(f => f.name === featFeature.name);
-            if (existingIndex !== -1 && !playerStats.specialActions[existingIndex].description && featEntry.description) {
-                playerStats.specialActions = [...playerStats.specialActions.slice(0, existingIndex), featEntry, ...playerStats.specialActions.slice(existingIndex + 1)];
-            }
-        }
+        categorizeByCategory(playerStats, featFeature, featEntry, featureCategories);
     }
 }
 

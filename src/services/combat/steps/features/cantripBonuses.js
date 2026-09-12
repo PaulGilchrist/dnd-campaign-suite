@@ -21,30 +21,43 @@ export const cantripBonuses = {
     let rolls = [...prevData.rolls];
 
     for (const a of ps.automation.actions.filter(x => x.type === 'damage_bonus' && x.options?.length > 0).filter(b => !upgradedCantrip.has(b.name))) {
-      const optKey = `_${a.name.replace(/\s+/g, '_')}_option`;
-      const chosen = getRuntimeValue(ps.name, optKey, ctx.campaignName);
-      if (a.options.length > 1 && !chosen) continue;
-      if (chosen && !chosen.toLowerCase().includes('spellcasting')) continue;
-      const wis = ps.abilities?.find(x => x.name === 'Wisdom');
-      const wisMod = Math.max(0, wis?.bonus || 0);
-      if (wisMod > 0) { formula += ` + ${wisMod} [Cantrip]`; total += wisMod; }
-
-      const thp = evaluateAutoExpression(a.tempHpExpression, ps);
-      if (thp && !isNaN(thp)) {
-        const cs = await getCombatContext(ctx.campaignName);
-        const allies = cs?.creatures?.filter(c => c.type === 'player' || c.type === 'npc' || c.type === 'monster') || [];
-        if (ctx.setSecondaryTargetModal && allies.length > 0) {
-          return {
-            data: { _cantripTempHp: thp },
-            modal: { type: 'secondaryTarget', props: { title: 'Improved Blessed Strikes — Potent Spellcasting', targets: allies.map(c => ({ name: c.name, currentHp: c.currentHp, maxHp: c.maxHp, size: c.size, type: c.type })), confirmLabel: 'Grant Temp HP' } },
-          };
-        } else {
-          const e = getRuntimeValue(ps.name, 'tempHp', ctx.campaignName) || 0;
-          setRuntimeValue(ps.name, 'tempHp', Math.max(e, thp), ctx.campaignName);
-        }
-      }
+      const result = await applyCantripDamageBonusOption(ps, ctx, a);
+      if (!result) continue;
+      if (result.modal) return result.modal;
+      if (result.wisMod > 0) { formula += ` + ${result.wisMod} [Cantrip]`; total += result.wisMod; }
     }
 
     return { data: { formula, total, rolls } };
   },
 };
+
+// Returns null when the bonus option is not applicable, `{ modal }` when a
+// secondary-target modal must interrupt, otherwise `{ wisMod }` to apply.
+async function applyCantripDamageBonusOption(ps, ctx, a) {
+  const optKey = `_${a.name.replace(/\s+/g, '_')}_option`;
+  const chosen = getRuntimeValue(ps.name, optKey, ctx.campaignName);
+  if (a.options.length > 1 && !chosen) return null;
+  if (chosen && !chosen.toLowerCase().includes('spellcasting')) return null;
+
+  const wis = ps.abilities?.find(x => x.name === 'Wisdom');
+  const wisMod = Math.max(0, wis?.bonus || 0);
+
+  const thp = evaluateAutoExpression(a.tempHpExpression, ps);
+  if (thp && !isNaN(thp)) {
+    const cs = await getCombatContext(ctx.campaignName);
+    const allies = cs?.creatures?.filter(c => c.type === 'player' || c.type === 'npc' || c.type === 'monster') || [];
+    if (ctx.setSecondaryTargetModal && allies.length > 0) {
+      return {
+        modal: {
+          data: { _cantripTempHp: thp },
+          modal: { type: 'secondaryTarget', props: { title: 'Improved Blessed Strikes — Potent Spellcasting', targets: allies.map(c => ({ name: c.name, currentHp: c.currentHp, maxHp: c.maxHp, size: c.size, type: c.type })), confirmLabel: 'Grant Temp HP' } },
+        },
+      };
+    } else {
+      const e = getRuntimeValue(ps.name, 'tempHp', ctx.campaignName) || 0;
+      setRuntimeValue(ps.name, 'tempHp', Math.max(e, thp), ctx.campaignName);
+    }
+  }
+
+  return { wisMod };
+}

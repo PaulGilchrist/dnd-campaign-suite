@@ -719,11 +719,17 @@ function persistAndLogDamageOutcome(combatSummary, combatSummaryChanged, existin
   }
 }
 
+// CLA-324: spell-origin is knowable from the damage payload (options.isSpellDamage) or
+// the campaign lastAttack (spell-save stamps, monster-card save-attack stamps).
+function isSpellOriginDamage(options, existingAttack) {
+  return options?.isSpellDamage === true || existingAttack?.rollType === 'spell-save' || existingAttack?.isSpellDamage === true;
+}
+
 export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false, options = {}) {
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
-  if (isNaN(rawDamage) || rawDamage === null || rawDamage === undefined) return null;
+  if (isNaN(rawDamage) || rawDamage == null) return null;
 
   const existingAttack = getRuntimeValue('campaign', 'lastAttack') || null;
   const isSecondary = existingAttack?.primaryDamage != null;
@@ -735,9 +741,7 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
 
   const defenses = await resolveCreatureDefenses(creature, targetName, isPlayer, characters, campaignName);
   if (!Array.isArray(damageTypes)) { throw new Error('damageTypes must be an array'); }
-  // CLA-324: spell-origin is knowable from the damage payload (options.isSpellDamage) or
-  // the campaign lastAttack (spell-save stamps, monster-card save-attack stamps).
-  const spellOrigin = options?.isSpellDamage === true || existingAttack?.rollType === 'spell-save' || existingAttack?.isSpellDamage === true;
+  const spellOrigin = isSpellOriginDamage(options, existingAttack);
   const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, defenses.resistances, defenses.immunities, ignoreResistance, spellOrigin);
 
   logResistanceOutcomes(creature, rawDamage, resResult.finalDamage, damageTypes, resResult.typeDetails, defenses.passiveResistances, defenses.silenceThunderImmunity, spellOrigin, campaignName);

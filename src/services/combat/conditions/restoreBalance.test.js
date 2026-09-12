@@ -116,7 +116,7 @@ describe('restore_balance feature', () => {
         effect: 'restore_balance',
       }];
 
-      const effects = computeConditionEffects([], saveModifiers);
+      const effects = computeConditionEffects({ saveModifiers });
 
       expect(effects.restoreBalance).toBe(false);
     });
@@ -129,7 +129,7 @@ describe('restore_balance feature', () => {
         effect: 'restore_balance',
       }];
 
-      const effects = computeConditionEffects([], saveModifiers);
+      const effects = computeConditionEffects({ saveModifiers });
 
       expect(effects.restoreBalance).toBe(false);
     });
@@ -141,13 +141,13 @@ describe('restore_balance feature', () => {
         effect: 'advantage',
       }];
 
-      const effects = computeConditionEffects([], saveModifiers);
+      const effects = computeConditionEffects({ saveModifiers });
 
       expect(effects.restoreBalance).toBe(false);
     });
 
     it('sets restoreBalance to false with empty modifiers', () => {
-      const effects = computeConditionEffects([], []);
+      const effects = computeConditionEffects({});
       expect(effects.restoreBalance).toBe(false);
     });
 

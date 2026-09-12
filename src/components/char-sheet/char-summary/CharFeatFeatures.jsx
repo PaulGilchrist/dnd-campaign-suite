@@ -3,6 +3,34 @@ import React from 'react';
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
+function hasChefFeat(playerStats) {
+    return (playerStats.automation?.specialActions ?? []).some(
+        p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
+    );
+}
+
+function hasReplenishingMealFeat(playerStats) {
+    return (playerStats.automation?.passives ?? []).some(
+        p => p.type === 'passive_rule' && p.effect === 'bonus_healing' && p.name === 'Replenishing Meal'
+    );
+}
+
+function hasLuckyFeat(playerStats) {
+    return (playerStats.feats || []).some(f =>
+        f?.toLowerCase?.().includes('lucky')
+    );
+}
+
+function hasPoisonerFeat(playerStats) {
+    return (playerStats.automation?.specialActions ?? []).some(
+        p => p.type === 'brew_poison' && p.name === 'Brew Poison'
+    );
+}
+
+function hasAnyResources({ replenishingMeals, hasChef, chefBolsteringTreats, bolsteringTreat, hasLucky, lpMax, hasPoisoner }) {
+    return (replenishingMeals > 0) || (hasChef && chefBolsteringTreats > 0) || bolsteringTreat > 0 || (hasLucky && lpMax > 0) || hasPoisoner;
+}
+
 function CharFeatFeatures({ playerStats, campaignName }) {
     const replenishingMeals = useRuntimeValue(playerStats.name, 'replenishingMeals', campaignName);
     const chefBolsteringTreats = useRuntimeValue(playerStats.name, 'chefBolsteringTreats', campaignName);
@@ -11,43 +39,40 @@ function CharFeatFeatures({ playerStats, campaignName }) {
     const poisonDoses = useRuntimeValue(playerStats.name, 'poisonDoses', campaignName);
     const poisonedWeaponsActive = useRuntimeValue(playerStats.name, 'poisonedWeaponsActive', campaignName);
 
-    const hasChefFeat = (playerStats.automation?.specialActions ?? []).some(
-        p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
-    );
+    const flags = {
+        replenishingMeals,
+        hasChef: hasChefFeat(playerStats),
+        chefBolsteringTreats,
+        bolsteringTreat,
+        hasLucky: hasLuckyFeat(playerStats),
+        lpMax: playerStats.proficiency || 0,
+        hasPoisoner: hasPoisonerFeat(playerStats)
+    };
 
-    const hasReplenishingMealFeat = (playerStats.automation?.passives ?? []).some(
-        p => p.type === 'passive_rule' && p.effect === 'bonus_healing' && p.name === 'Replenishing Meal'
-    );
-
-    const hasLuckyFeat = (playerStats.feats || []).some(f =>
-        f?.toLowerCase?.().includes('lucky')
-    );
-
-    const hasPoisonerFeat = (playerStats.automation?.specialActions ?? []).some(
-        p => p.type === 'brew_poison' && p.name === 'Brew Poison'
-    );
-
-    const lpMax = playerStats.proficiency || 0;
-
-    const hasAnyResources = (replenishingMeals > 0) || (hasChefFeat && chefBolsteringTreats > 0) || bolsteringTreat > 0 || (hasLuckyFeat && lpMax > 0) || hasPoisonerFeat;
-    if (!hasAnyResources) {
+    if (!hasAnyResources(flags)) {
         return null;
     }
 
-    return (
-        <div data-testid="char-feat-features">
-            {hasLuckyFeat && lpMax > 0 && (
+    const sections = [
+        {
+            key: 'lucky',
+            when: () => flags.hasLucky && flags.lpMax > 0,
+            render: () => (
                 <TrackedResourceInput
                     label="Luck Points"
                     resourceKey="luckyPoints"
                     playerName={playerStats.name}
-                    getMax={() => lpMax}
+                    getMax={() => flags.lpMax}
                     deps={[playerStats, luckyPoints]}
                     campaignName={campaignName}
                     playerStats={playerStats}
                 />
-            )}
-            {hasPoisonerFeat && (
+            )
+        },
+        {
+            key: 'poisoner',
+            when: () => flags.hasPoisoner,
+            render: () => (
                 <div>
                     <TrackedResourceInput
                         label="Poison Doses"
@@ -63,19 +88,27 @@ function CharFeatFeatures({ playerStats, campaignName }) {
                         <span className="automation-badge"><i className="fa-solid fa-vial"></i> Poisoned Weapons active</span>
                     )}
                 </div>
-            )}
-            {replenishingMeals > 0 && (
+            )
+        },
+        {
+            key: 'replenishing',
+            when: () => replenishingMeals > 0,
+            render: () => (
                 <TrackedResourceInput
                     label="Replenishing Meals"
                     resourceKey="replenishingMeals"
                     playerName={playerStats.name}
-                    getMax={() => hasReplenishingMealFeat ? Math.max(replenishingMeals, 4 + (playerStats.proficiency || 0)) : 1}
+                    getMax={() => hasReplenishingMealFeat(playerStats) ? Math.max(replenishingMeals, 4 + (playerStats.proficiency || 0)) : 1}
                     deps={[playerStats, replenishingMeals]}
                     campaignName={campaignName}
                     playerStats={playerStats}
                 />
-            )}
-            {hasChefFeat && chefBolsteringTreats > 0 && (
+            )
+        },
+        {
+            key: 'chefTreats',
+            when: () => flags.hasChef && chefBolsteringTreats > 0,
+            render: () => (
                 <TrackedResourceInput
                     label="Bolstering Treats"
                     resourceKey="chefBolsteringTreats"
@@ -85,8 +118,12 @@ function CharFeatFeatures({ playerStats, campaignName }) {
                     campaignName={campaignName}
                     playerStats={playerStats}
                 />
-            )}
-            {bolsteringTreat > 0 && (
+            )
+        },
+        {
+            key: 'bolsteringTreat',
+            when: () => bolsteringTreat > 0,
+            render: () => (
                 <TrackedResourceInput
                     label="Bolstering Treat"
                     resourceKey="bolsteringTreat"
@@ -96,7 +133,13 @@ function CharFeatFeatures({ playerStats, campaignName }) {
                     campaignName={campaignName}
                     playerStats={playerStats}
                 />
-            )}
+            )
+        }
+    ];
+
+    return (
+        <div data-testid="char-feat-features">
+            {sections.filter(s => s.when()).map(s => <React.Fragment key={s.key}>{s.render()}</React.Fragment>)}
         </div>
     );
 }

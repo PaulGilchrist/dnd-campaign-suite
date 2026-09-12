@@ -73,72 +73,18 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
     result.traits.push({ name: trait.name, description: trait.description });
 
     if (ruleset === '5e') {
-      if (trait.proficiencies) {
-        trait.proficiencies.forEach(prof => {
-          result.proficiencies.push({ name: prof });
-         });
-       }
-      if (trait.proficiency_choices) {
-        trait.proficiency_choices.forEach(pc => {
-          result.proficiencies.push({
-            name: `${pc.choose} from: ${(pc.from || []).join(', ')}`,
-            isChoice: true,
-            choose: pc.choose,
-            from: pc.from,
-           });
-         });
-       }
-     }
-
-    if (trait.trait_type === 'speed' || (trait.name && trait.name.toLowerCase().includes('speed'))) {
-      const speedMatch = trait.description ? trait.description.match(/(\d+)\s*feet?/i) : null;
-      if (speedMatch) {
-        result.speed = parseInt(speedMatch[1], 10);
-       }
-     }
-
-    if (ruleset === '2024' && trait.description) {
-      const skillMatch = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
-      if (skillMatch) {
-        const skillsStr = skillMatch[1]
-          .replace(/\s+and\s+/g, ',')
-          .replace(/\s+or\s+/g, ',')
-          .replace(/,\s*,/g, ',')
-          .split(',')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
-        skillsStr.forEach(sName => {
-          result.proficiencies.push({ name: `Skill: ${sName}` });
-        });
-      }
+      add5eTraitProficiencies(trait, result);
     }
 
-    if (ruleset === '2024' && trait.proficiency_choices) {
-      const pc = trait.proficiency_choices;
-      if (pc.from && pc.from.length > 0) {
-        pc.from.forEach(prof => {
-          result.proficiencies.push({ name: prof, isChoice: true, choose: pc.choose });
-        });
-      }
-    }
+    addTraitSpeed(trait, result);
 
-    if (ruleset === '2024' && trait.proficiency_choices && trait.name === 'Versatile') {
-      const pc = trait.proficiency_choices;
-      if (pc.from && pc.from.length > 0) {
-        pc.from.forEach(featName => {
-          result.feats = result.feats || [];
-          result.feats.push({ name: featName, isChoice: true, choose: pc.choose });
-        });
-      }
+    if (ruleset === '2024') {
+      addSkillProficiencies2024(trait, result);
+      addChoiceOptions2024(trait, result);
     }
 
     if (ruleset === '5e') {
-      if (trait.description) {
-        const resistMatches = [...trait.description.matchAll(/(?:resistance|resistant) to (\w+)/gi)];
-        resistMatches.forEach(match => {
-          result.resistances.push(match[1]);
-        });
-      }
+      add5eTraitResistances(trait, result);
     }
 
     if (trait.name === 'Trance') {
@@ -218,4 +164,70 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
  */
 export function applyRaceBuffsToPlayerData(playerData, buffs) {
   mergeDeduplicated(playerData, 'languages', buffs.languages);
+}
+
+function add5eTraitProficiencies(trait, result) {
+  if (trait.proficiencies) {
+    trait.proficiencies.forEach(prof => {
+      result.proficiencies.push({ name: prof });
+    });
+  }
+  if (trait.proficiency_choices) {
+    trait.proficiency_choices.forEach(pc => {
+      result.proficiencies.push({
+        name: `${pc.choose} from: ${(pc.from || []).join(', ')}`,
+        isChoice: true,
+        choose: pc.choose,
+        from: pc.from,
+      });
+    });
+  }
+}
+
+function addTraitSpeed(trait, result) {
+  if (!(trait.trait_type === 'speed' || (trait.name && trait.name.toLowerCase().includes('speed')))) {
+    return;
+  }
+  const speedMatch = trait.description ? trait.description.match(/(\d+)\s*feet?/i) : null;
+  if (speedMatch) {
+    result.speed = parseInt(speedMatch[1], 10);
+  }
+}
+
+function addSkillProficiencies2024(trait, result) {
+  if (!trait.description) return;
+  const skillMatch = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
+  if (!skillMatch) return;
+  const skillsStr = skillMatch[1]
+    .replace(/\s+and\s+/g, ',')
+    .replace(/\s+or\s+/g, ',')
+    .replace(/,\s*,/g, ',')
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+  skillsStr.forEach(sName => {
+    result.proficiencies.push({ name: `Skill: ${sName}` });
+  });
+}
+
+function addChoiceOptions2024(trait, result) {
+  const pc = trait.proficiency_choices;
+  if (!pc || !pc.from || pc.from.length === 0) return;
+  pc.from.forEach(prof => {
+    result.proficiencies.push({ name: prof, isChoice: true, choose: pc.choose });
+  });
+  if (trait.name === 'Versatile') {
+    result.feats = result.feats || [];
+    pc.from.forEach(featName => {
+      result.feats.push({ name: featName, isChoice: true, choose: pc.choose });
+    });
+  }
+}
+
+function add5eTraitResistances(trait, result) {
+  if (!trait.description) return;
+  const resistMatches = [...trait.description.matchAll(/(?:resistance|resistant) to (\w+)/gi)];
+  resistMatches.forEach(match => {
+    result.resistances.push(match[1]);
+  });
 }

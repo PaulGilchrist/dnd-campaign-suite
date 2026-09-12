@@ -126,6 +126,23 @@ function singleToArray(value) {
     return value ? [value] : []
 }
 
+function collectElementalAdeptTypes(playerStats, campaignName) {
+    return (playerStats.automation?.passives || [])
+        .filter(p => p.type === 'damage_type_choice' && p.effect === 'elemental_adept')
+        .map(p => {
+            const key = '_' + (p.name || '').replace(/\s+/g, '_') + '_chosenType'
+            return getRuntimeValue(playerStats.name, key, campaignName)
+        })
+        .filter(Boolean)
+}
+
+function collectRageConditionalImmunities(playerStats, activeBuffs) {
+    if (!Array.isArray(activeBuffs) || !activeBuffs.some(b => b.name === 'Rage')) return []
+    return (playerStats.automationConditionalImmunities || [])
+        .filter(ci => ci.requiresActive === 'Rage')
+        .flatMap(ci => ci.immunities || [])
+}
+
 function computeResistances(playerStats, activeBuffs, campaignName, auraComboEffects) {
     const stormbornResistances = (playerStats.automation?.passives || [])
         .filter(p => p.type === 'resistance' && p.name === 'Stormborn')
@@ -140,20 +157,9 @@ function computeResistances(playerStats, activeBuffs, campaignName, auraComboEff
     const fiendishResilienceType = getRuntimeValue(playerStats.name, '_Fiendish_Resilience_chosenType', campaignName)
     const boonEnergyResistanceTypes = getRuntimeValue(playerStats.name, '_Energy_Resistances_chosenTypes', campaignName) || []
 
-    const elementalAdeptTypes = (playerStats.automation?.passives || [])
-        .filter(p => p.type === 'damage_type_choice' && p.effect === 'elemental_adept')
-        .map(p => {
-            const key = '_' + (p.name || '').replace(/\s+/g, '_') + '_chosenType'
-            return getRuntimeValue(playerStats.name, key, campaignName)
-        })
-        .filter(Boolean)
+    const elementalAdeptTypes = collectElementalAdeptTypes(playerStats, campaignName)
 
-    const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage')
-    const rageConditionalImmunities = rageActive
-        ? (playerStats.automationConditionalImmunities || [])
-            .filter(ci => ci.requiresActive === 'Rage')
-            .flatMap(ci => ci.immunities || [])
-        : []
+    const rageConditionalImmunities = collectRageConditionalImmunities(playerStats, activeBuffs)
 
     const resistanceDamageType = getResistanceDamageType(playerStats.name, campaignName)
     const protectionFromEnergyDamageType = getProtectionFromEnergyDamageType(playerStats.name, campaignName)

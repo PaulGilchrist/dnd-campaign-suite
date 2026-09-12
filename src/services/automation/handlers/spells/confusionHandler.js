@@ -21,6 +21,86 @@ import storage from '../../../ui/storage.js';
  * - Concentration, up to 1 minute
  */
 
+async function recordConfusionSaveSuccess(campaignName, casterName, targetName, dc, saveResult) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-confusion',
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: true,
+        description: `${targetName} succeeded on WIS save against Confusion.`,
+    }).catch((e) => { console.error("[confusion] Error:", e); });
+}
+
+async function applyConfusionFailure(campaignName, casterName, targetName, dc, saveResult) {
+    // Apply: no bonus actions, no reactions, charmed (for behavior control)
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c =>
+        String(c).toLowerCase() !== 'charmed' &&
+        String(c).toLowerCase() !== 'speed_zero'
+    );
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed', 'speed_zero'], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['charmed', 'speed_zero'],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Confused',
+        reason: 'Confusion spell',
+        note: `${targetName} is Confused. Can't take Bonus Actions or Reactions. At start of each turn, rolls 1d10 for behavior. End of turn: repeat WIS save (DC ${dc}) to end effect.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[confusion] Error:", e); });
+
+    // Register expirations: remove conditions + remove target effect badge + confusion turn-start behavior
+    addExpiration(casterName, targetName, [
+        { type: 'charmed', condition: 'charmed' },
+        { type: 'speed_zero', condition: 'speed_zero' },
+        { type: 'remove_target_effect', effectKey: 'confusion', target: targetName, source: casterName },
+        { type: 'confusion_turn_start', name: 'Confusion' },
+    ], campaignName);
+
+    // Track Confusion effect with DC for cleanup
+    const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
+    const confusionEffect = {
+        target: targetName,
+        effect: 'confusion',
+        source: casterName,
+        conditions: ['charmed', 'speed_zero'],
+        dc: dc,
+        duration: 'concentration',
+    };
+    const existingIdx = effects.findIndex(
+        te => te.target === targetName && te.effect === 'confusion'
+    );
+    if (existingIdx >= 0) {
+        effects[existingIdx] = confusionEffect;
+    } else {
+        effects.push(confusionEffect);
+    }
+    setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -91,84 +171,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         if (saveResult.success) {
             savedCount++;
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-confusion',
-                targetName,
-                saveDc: dc,
-                saveType: 'WIS',
-                success: true,
-                description: `${targetName} succeeded on WIS save against Confusion.`,
-            }).catch((e) => { console.error("[confusion] Error:", e); });
+            await recordConfusionSaveSuccess(campaignName, casterName, targetName, dc, saveResult);
         } else {
             affectedCount++;
-
-            // Apply: no bonus actions, no reactions, charmed (for behavior control)
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c =>
-                String(c).toLowerCase() !== 'charmed' &&
-                String(c).toLowerCase() !== 'speed_zero'
-            );
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed', 'speed_zero'], campaignName);
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['charmed', 'speed_zero'],
-                appliedDamage: 0,
-            });
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Confused',
-                reason: 'Confusion spell',
-                note: `${targetName} is Confused. Can't take Bonus Actions or Reactions. At start of each turn, rolls 1d10 for behavior. End of turn: repeat WIS save (DC ${dc}) to end effect.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[confusion] Error:", e); });
-
-            // Register expirations: remove conditions + remove target effect badge + confusion turn-start behavior
-            addExpiration(casterName, targetName, [
-                { type: 'charmed', condition: 'charmed' },
-                { type: 'speed_zero', condition: 'speed_zero' },
-                { type: 'remove_target_effect', effectKey: 'confusion', target: targetName, source: casterName },
-                { type: 'confusion_turn_start', name: 'Confusion' },
-            ], campaignName);
-
-            // Track Confusion effect with DC for cleanup
-            const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const effects = Array.isArray(targetEffects) ? [...targetEffects] : [];
-            const confusionEffect = {
-                target: targetName,
-                effect: 'confusion',
-                source: casterName,
-                conditions: ['charmed', 'speed_zero'],
-                dc: dc,
-                duration: 'concentration',
-            };
-            const existingIdx = effects.findIndex(
-                te => te.target === targetName && te.effect === 'confusion'
-            );
-            if (existingIdx >= 0) {
-                effects[existingIdx] = confusionEffect;
-            } else {
-                effects.push(confusionEffect);
-            }
-            setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
-
+            await applyConfusionFailure(campaignName, casterName, targetName, dc, saveResult);
             results.push(`${targetName} is Confused.`);
         }
     }

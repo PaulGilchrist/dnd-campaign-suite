@@ -34,28 +34,7 @@ function refusal(action, playerName, campaignName, reason) {
     };
 }
 
-export async function handle(action, playerStats, campaignName) {
-    const auto = action?.automation;
-    const playerName = playerStats?.name;
-
-    // FT-099: once-per-round reaction gate at the row click — refuse before the
-    // picker opens when this round's Reaction is already spent. Zero spend.
-    const cs = await getCombatContext(campaignName);
-    const currentRound = cs?.round || 1;
-    const usedRound = Number(getRuntimeValue(playerName, USED_ROUND_KEY, campaignName) ?? 0);
-    if (usedRound === currentRound) {
-        return refusal(action, playerName, campaignName, 'Once per round — Reactive Spell already used this round.');
-    }
-
-    // Reactive Spell fires at the creature leaving your reach — it needs a
-    // target armed on your initiative card (no leaving-reach position producer
-    // exists; this row is the GM-manual-adjacency affordance).
-    const target = cs ? getTargetFromAttacker(cs, playerName) : null;
-    if (!target) {
-        return refusal(action, playerName, campaignName, 'requires a target — set the Target dropdown on your initiative card first.');
-    }
-
-    const spellList = playerStats?.spellAbilities?.spells || [];
+function collectEligibleReactiveSpells(spellList) {
     const actionCastingTimes = ['1 action', 'Action'];
     const eligibleSpells = [];
     const warnings = [];
@@ -81,15 +60,40 @@ export async function handle(action, playerStats, campaignName) {
         });
     }
 
+    return { eligibleSpells, warnings };
+}
+
+export async function handle(action, playerStats, campaignName) {
+    const auto = action?.automation;
+    const playerName = playerStats?.name;
+
+    // FT-099: once-per-round reaction gate at the row click — refuse before the
+    // picker opens when this round's Reaction is already spent. Zero spend.
+    const cs = await getCombatContext(campaignName);
+    const currentRound = cs?.round || 1;
+    const usedRound = Number(getRuntimeValue(playerName, USED_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return refusal(action, playerName, campaignName, 'Once per round — Reactive Spell already used this round.');
+    }
+
+    // Reactive Spell fires at the creature leaving your reach — it needs a
+    // target armed on your initiative card (no leaving-reach position producer
+    // exists; this row is the GM-manual-adjacency affordance).
+    const target = cs ? getTargetFromAttacker(cs, playerName) : null;
+    if (!target) {
+        return refusal(action, playerName, campaignName, 'requires a target — set the Target dropdown on your initiative card first.');
+    }
+
+    const spellList = playerStats?.spellAbilities?.spells || [];
+    const { eligibleSpells, warnings } = collectEligibleReactiveSpells(spellList);
+
     const descriptionParts = [
         `<b>${action.name}:</b> Select a spell with a casting time of 1 action to cast as a reaction when a creature leaves your reach.`,
     ];
 
-    if (eligibleSpells.length === 0) {
-        descriptionParts.push('No spells with a casting time of 1 action are available.');
-    } else {
-        descriptionParts.push(`Available spells: ${eligibleSpells.map(s => s.name).join(', ')}.`);
-    }
+    descriptionParts.push(eligibleSpells.length === 0
+        ? 'No spells with a casting time of 1 action are available.'
+        : `Available spells: ${eligibleSpells.map(s => s.name).join(', ')}.`);
 
     if (warnings.length > 0) {
         descriptionParts.push(`<i>Excluded: ${warnings.join(', ')} target more than one creature and cannot be cast with Reactive Spell.</i>`);

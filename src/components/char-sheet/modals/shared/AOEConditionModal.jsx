@@ -30,6 +30,61 @@ function isTargetExcludedByTraps(c, attackerName) {
     return TRAP_BLOCKING_EFFECTS.some(name => trapEffectBlocksAttack(effects, name, attackerName, c.name));
 }
 
+function buildAppliedConditions(effects) {
+    return (effects || []).map(e => e.condition || e.type).filter(Boolean);
+}
+
+function buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName }) {
+    return {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: conditionLabel || conditionList.map(e => e.condition || e.type).join(', '),
+        dc: saveDc,
+        ability: saveType,
+        sourceName: casterName,
+        timestamp: Date.now(),
+    };
+}
+
+function buildSaveResultEntry({ casterName, targetName, saveDc, saveType, success, detail }) {
+    return {
+        type: 'save_result',
+        characterName: casterName,
+        targetName,
+        saveDc,
+        saveType,
+        success,
+        roll: detail.roll ?? 0,
+        total: detail.total ?? 0,
+        saveBonus: detail.saveBonus ?? 0,
+        description: `${targetName} ${success ? 'succeeded on' : 'failed'} ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
+        timestamp: Date.now(),
+    };
+}
+
+function buildTargetResultEntry(targetName, success, detail, effects) {
+    return {
+        targetName,
+        saveResult: success ? 'success' : 'failure',
+        roll: detail.roll ?? 0,
+        total: detail.total ?? 0,
+        conditions: success ? [] : buildAppliedConditions(effects),
+        appliedDamage: 0,
+    };
+}
+
+function buildSaveResultRecord(targetName, success, detail) {
+    return {
+        targetName,
+        success,
+        roll: detail.roll ?? 0,
+        total: detail.total ?? 0,
+        saveBonus: detail.saveBonus ?? 0,
+        conditionApplied: !success,
+    };
+}
+
 function AOEConditionModal({
     action,
     playerStats,
@@ -274,76 +329,18 @@ function AOEConditionModal({
             const conditionList = effects || [{ type: 'blinded', condition: 'blinded' }];
             applyConditionsToTarget(targetName, conditionList, campaignName);
 
-            await addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: conditionLabel || conditionList.map(e => e.condition || e.type).join(', '),
-                dc: saveDc,
-                ability: saveType,
-                sourceName: playerStats.name,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
-
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerStats.name,
-                targetName,
-                saveDc,
-                saveType,
-                success: false,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-
-            const appliedConditions = (effects || []).map(e => e.condition || e.type).filter(Boolean);
-            addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                conditions: appliedConditions,
-                appliedDamage: 0,
-            });
+            await addEntry(campaignName, buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName: playerStats.name })).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
+            await addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: false, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+            addTargetResult(campaignName, buildTargetResultEntry(targetName, false, detail, effects));
         } else {
-            await addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerStats.name,
-                targetName,
-                saveDc,
-                saveType,
-                success: true,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-
-            addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
+            await addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: true, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+            addTargetResult(campaignName, buildTargetResultEntry(targetName, true, detail, effects));
         }
 
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
         setResults(prev => {
-            const newResults = [...prev, {
-                targetName,
-                success,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                conditionApplied: !success,
-            }];
+            const newResults = [...prev, buildSaveResultRecord(targetName, success, detail)];
             return newResults;
         });
         setPendingPrompts(prev => {
@@ -495,75 +492,17 @@ function AOEConditionModal({
             const conditionList = effects || [{ type: 'blinded', condition: 'blinded' }];
             applyConditionsToTarget(targetName, conditionList, campaignName);
 
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: conditionLabel || conditionList.map(e => e.condition || e.type).join(', '),
-                dc: saveDc,
-                ability: saveType,
-                sourceName: playerStats.name,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerStats.name,
-                targetName,
-                saveDc,
-                saveType,
-                success: false,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-
-            const appliedConditions = (effects || []).map(e => e.condition || e.type).filter(Boolean);
-            addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                conditions: appliedConditions,
-                appliedDamage: 0,
-            });
+            addEntry(campaignName, buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName: playerStats.name })).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
+            addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: false, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+            addTargetResult(campaignName, buildTargetResultEntry(targetName, false, detail, effects));
         } else {
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerStats.name,
-                targetName,
-                saveDc,
-                saveType,
-                success: true,
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                saveBonus: detail.saveBonus ?? 0,
-                description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-
-            addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
+            addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: true, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+            addTargetResult(campaignName, buildTargetResultEntry(targetName, true, detail, effects));
         }
 
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
-        ctx.setResults(prev => [...prev, {
-            targetName,
-            success,
-            roll: detail.roll ?? 0,
-            total: detail.total ?? 0,
-            saveBonus: detail.saveBonus ?? 0,
-            conditionApplied: !success,
-        }]);
+        ctx.setResults(prev => [...prev, buildSaveResultRecord(targetName, success, detail)]);
         ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
     }, [campaignName, saveDc, saveType, effects, conditionLabel, applyConditionsToTarget, playerStats.name]);
 

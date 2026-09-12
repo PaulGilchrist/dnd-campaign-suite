@@ -327,60 +327,20 @@ export async function applyBendFateChoice(action, playerStats, campaignName, d4R
     });
 }
 
-async function handleAcBonus(action, playerStats, campaignName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const buffName = action.name;
-    const prof = playerStats.proficiency || 0;
-
-    // Check for Finesse weapon in equipped items
+function hasEquippedFinesseWeapon(playerStats) {
     const equipped = playerStats.inventory?.equipped || [];
-    let hasFinesse = false;
     for (const itemName of equipped) {
         if (!itemName || typeof itemName !== 'string') continue;
         const baseName = itemName.charAt(0) === '+' ? itemName.substring(3) : itemName;
         const item = playerStats.equipment?.find(e => e.name === baseName);
-        if (item) {
-            const properties = item.properties || [];
-            if (properties.some(p => p.toLowerCase() === 'finesse')) {
-                hasFinesse = true;
-                break;
-            }
-        }
+        if (!item) continue;
+        const properties = item.properties || [];
+        if (properties.some(p => p.toLowerCase() === 'finesse')) return true;
     }
-    if (!hasFinesse) {
-        return {
-            type: 'popup',
-            payload: { type: 'automation_info', name: buffName, description: `You must be wielding a Finesse weapon to use ${buffName}.`, automation: auto },
-        };
-    }
+    return false;
+}
 
-    // Check lastAttack — was the player the target?
-    const attackResult = await findAttackRollAgainstTarget(playerName, campaignName);
-
-    if (!attackResult.attackEvent) {
-        return {
-            type: 'popup',
-            payload: { type: 'automation_info', name: buffName, description: `No recent attack targeting ${playerName} to react to.`, automation: auto },
-        };
-    }
-
-    // Toggle buff
-    const { wasActive } = toggleBuff(playerName, buffName, { ...auto, effect: 'defensive_duelist', acBonus: prof }, campaignName);
-
-    if (wasActive) {
-        return {
-            type: 'popup',
-            payload: { type: 'automation_info', name: buffName, description: `${buffName} is already active.`, automation: auto },
-        };
-    }
-
-    // Set expiration — auto-removes at start of next turn
-    addExpiration(playerName, playerName, [
-        { type: 'remove_active_buff', buffName }
-    ], campaignName, undefined, playerName);
-
-    // Check if hit would become miss
+async function resolveAcBonusMissDescription(buffName, attackResult, prof, campaignName, playerName) {
     const { d20, bonus, targetAc, rawDamage, attackerName } = attackResult.attackEvent;
     const rollTotal = d20 + bonus;
     const newAc = targetAc != null ? targetAc + prof : null;
@@ -408,6 +368,42 @@ async function handleAcBonus(action, playerStats, campaignName) {
         description += ` The attack still hits. (Roll ${rollTotal} >= AC ${newAc})`;
     }
 
+    return description;
+}
+
+async function handleAcBonus(action, playerStats, campaignName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const buffName = action.name;
+    const prof = playerStats.proficiency || 0;
+
+    // Check for Finesse weapon in equipped items
+    if (!hasEquippedFinesseWeapon(playerStats)) {
+        return infoPopup(buffName, `You must be wielding a Finesse weapon to use ${buffName}.`, auto);
+    }
+
+    // Check lastAttack — was the player the target?
+    const attackResult = await findAttackRollAgainstTarget(playerName, campaignName);
+
+    if (!attackResult.attackEvent) {
+        return infoPopup(buffName, `No recent attack targeting ${playerName} to react to.`, auto);
+    }
+
+    // Toggle buff
+    const { wasActive } = toggleBuff(playerName, buffName, { ...auto, effect: 'defensive_duelist', acBonus: prof }, campaignName);
+
+    if (wasActive) {
+        return infoPopup(buffName, `${buffName} is already active.`, auto);
+    }
+
+    // Set expiration — auto-removes at start of next turn
+    addExpiration(playerName, playerName, [
+        { type: 'remove_active_buff', buffName }
+    ], campaignName, undefined, playerName);
+
+    // Check if hit would become miss
+    const description = await resolveAcBonusMissDescription(buffName, attackResult, prof, campaignName, playerName);
+
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
@@ -415,10 +411,7 @@ async function handleAcBonus(action, playerStats, campaignName) {
         description,
     }).catch((e) => { console.error(`[${buffName}] Error:`, e); });
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: buffName, description, automation: auto },
-    };
+    return infoPopup(buffName, description, auto);
 }
 
 async function handleUnbreakableMajesty(action, playerStats, campaignName) {

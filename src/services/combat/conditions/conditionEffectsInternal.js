@@ -158,10 +158,27 @@ function runConditionChecks(checks, ctx) {
   return undefined;
 }
 
-function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, holyAuraTargets = [], isProtectionFromPoisonActive = false, isTranceOfOrderActive = false, hasPowerfulBuild = false) {
-  if (SAVE_NEVER_APPLIES_EFFECTS.has(modifier.effect)) return false;
-  if (SAVE_ALWAYS_APPLIES_EFFECTS.has(modifier.effect)) return true;
-  const ctx = {
+function buildModifierContext(options) {
+  const {
+    modifier,
+    saveType,
+    abilityName,
+    isRaging = false,
+    shapeShiftActive = false,
+    isPeerlessAthlete = false,
+    isLargeFormActive = false,
+    combatContext = null,
+    conditions = [],
+    attackerName = null,
+    isLivingLegendActive = false,
+    isElderChampionActive = false,
+    isElderChampionAttackerActive = false,
+    holyAuraTargets = [],
+    isProtectionFromPoisonActive = false,
+    isTranceOfOrderActive = false,
+    hasPowerfulBuild = false,
+  } = options;
+  return {
     modifier,
     saveType,
     abilityName,
@@ -181,11 +198,11 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     hasPowerfulBuild,
     conditionSet: new Set(conditions),
   };
-  const preGate = runConditionChecks(PRE_TARGET_GATE_CHECKS, ctx);
-  if (preGate !== undefined) return preGate;
-  if (!SAVE_GATE_TARGETS.has(modifier.target)) return false;
-  const postGate = runConditionChecks(POST_TARGET_GATE_CHECKS, ctx);
-  if (postGate !== undefined) return postGate;
+}
+
+// Fall-through applicability once the modifier has passed the target gate.
+function appliesAfterTargetGate(ctx) {
+  const { modifier, abilityName } = ctx;
   if (CONDITION_KEYWORDS.has(modifier.condition)) return false;
   if (modifier.condition && ctx.conditionSet.has(modifier.condition)) return true;
   if (modifier.abilities && modifier.abilities.length > 0) {
@@ -193,6 +210,19 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     return modifier.abilities.includes(abilityName);
   }
   return true;
+}
+
+function saveModifierApplies(options) {
+  const ctx = buildModifierContext(options);
+  const { modifier } = ctx;
+  if (SAVE_NEVER_APPLIES_EFFECTS.has(modifier.effect)) return false;
+  if (SAVE_ALWAYS_APPLIES_EFFECTS.has(modifier.effect)) return true;
+  const preGate = runConditionChecks(PRE_TARGET_GATE_CHECKS, ctx);
+  if (preGate !== undefined) return preGate;
+  if (!SAVE_GATE_TARGETS.has(modifier.target)) return false;
+  const postGate = runConditionChecks(POST_TARGET_GATE_CHECKS, ctx);
+  if (postGate !== undefined) return postGate;
+  return appliesAfterTargetGate(ctx);
 }
 
 const ABILITY_CHECK_TARGETS = new Set(['ability_check', 'check', 'performance_checks', 'deception_performance_checks']);
@@ -402,13 +432,14 @@ const SAVE_EFFECT_APPLIERS = {
   },
 };
 
-function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, conditions = [], attackerName = null, isLivingLegendActive = false, isElderChampionActive = false, isElderChampionAttackerActive = false, holyAuraTargets = [], isProtectionFromPoisonActive = false, isTranceOfOrderActive = false, hasPowerfulBuild = false) {
+function applySaveModifiers(options = {}) {
+  const { effects, modifiers, ...modifierContext } = options;
   if (!modifiers || modifiers.length === 0) return;
   for (const mod of modifiers) {
-    if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, conditions, attackerName, isLivingLegendActive, isElderChampionActive, isElderChampionAttackerActive, holyAuraTargets, isProtectionFromPoisonActive, isTranceOfOrderActive, hasPowerfulBuild)) continue;
-    if (!applyTargetModifiers(effects, mod, abilityName)) continue;
+    if (!saveModifierApplies({ ...modifierContext, modifier: mod })) continue;
+    if (!applyTargetModifiers(effects, mod, modifierContext.abilityName)) continue;
     if (SAVE_TARGET_SET.has(mod.target)) {
-      applySaveAdvantageDisadvantage(effects, mod, abilityName);
+      applySaveAdvantageDisadvantage(effects, mod, modifierContext.abilityName);
     }
     if (Object.hasOwn(SAVE_EFFECT_APPLIERS, mod.effect)) {
       SAVE_EFFECT_APPLIERS[mod.effect](effects, mod);

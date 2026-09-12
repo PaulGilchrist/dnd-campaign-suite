@@ -69,20 +69,16 @@ function applyPsychicComponents(spell, psychicSpellsConfig) {
     }
 }
 
-// Damage type + to-hit/DC/modifier resolution onto the result object.
-function resolveSpellStats(result, spell, playerStats) {
-    result.spellLevel = spell.level || 1;
-    result.damageInfo = resolveSpellDamageWithTypes(spell, result.spellLevel);
-    result.formula = result.damageInfo?.formula || null;
-    result.damageType = result.damageInfo?.primaryType || spell.damage?.damage_type || '';
-    result.effectiveDamageType = result.damageType;
-    if (result.psychicSpellsConfig && spell.damage && result.damageType) {
+function resolveEffectiveDamageType(result, spell) {
+    const damageType = result.damageInfo?.primaryType || spell.damage?.damage_type || '';
+    result.damageType = damageType;
+    result.effectiveDamageType = damageType;
+    if (result.psychicSpellsConfig && spell.damage && damageType) {
         result.effectiveDamageType = result.psychicSpellsConfig.damageType || 'Psychic';
     }
+}
 
-    result.cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
-    result.spellToHit = playerStats.spellAbilities?.toHit || 0;
-
+function resolveSaveDc(result, playerStats) {
     if (playerStats.spellAbilities?.saveDc == null) {
         if (playerStats.proficiency == null) {
             console.error('[spellCast] executeSpellCast: playerStats.proficiency is missing')
@@ -92,6 +88,27 @@ function resolveSpellStats(result, spell, playerStats) {
     } else {
         result.spellSaveDc = playerStats.spellAbilities.saveDc;
     }
+}
+
+function resolveCastingMod(result, cantripAbility, playerStats) {
+    if (result.cantripSpellAbility && playerStats.abilities) {
+        result.spellCastingMod = cantripAbility ? cantripAbility.bonus : 0;
+    } else if (playerStats.spellAbilities) {
+        result.spellCastingMod = playerStats.spellAbilities.modifier || 0;
+    }
+}
+
+// Damage type + to-hit/DC/modifier resolution onto the result object.
+function resolveSpellStats(result, spell, playerStats) {
+    result.spellLevel = spell.level || 1;
+    result.damageInfo = resolveSpellDamageWithTypes(spell, result.spellLevel);
+    result.formula = result.damageInfo?.formula || null;
+    resolveEffectiveDamageType(result, spell);
+
+    result.cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
+    result.spellToHit = playerStats.spellAbilities?.toHit || 0;
+
+    resolveSaveDc(result, playerStats);
 
     const cantripAbility = result.cantripSpellAbility && playerStats.abilities
         ? playerStats.abilities.find(a => a.name === result.cantripSpellAbility)
@@ -101,11 +118,7 @@ function resolveSpellStats(result, spell, playerStats) {
         result.spellSaveDc = 8 + cantripAbility.bonus + playerStats.proficiency;
     }
 
-    if (result.cantripSpellAbility && playerStats.abilities) {
-        result.spellCastingMod = cantripAbility ? cantripAbility.bonus : 0;
-    } else if (playerStats.spellAbilities) {
-        result.spellCastingMod = playerStats.spellAbilities.modifier || 0;
-    }
+    resolveCastingMod(result, cantripAbility, playerStats);
 }
 
 function resolveSpellResolution(spell, metaCtx, playerStats, campaignName, getTargetInfo) {

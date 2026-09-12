@@ -541,7 +541,9 @@ async function runPostCastTriggers(spell, metaCtx, playerStats, campaignName, ma
 }
 
 // Auto-miss (out of range) — roll a zero-damage result and optionally run the save path.
-async function runAutoMissPath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, innateSorceryActive, effectiveDamageType, spellSaveDc, overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible, rangeResult) {
+async function runAutoMissPath({ spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
+    getTargetInfo, innateSorceryActive, effectiveDamageType, spellSaveDc, overchannelFormula,
+    overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible, rangeResult }) {
     const context = {
         targetName: (await getTargetInfo())?.name,
         attackerName: playerStats.name,
@@ -556,9 +558,9 @@ async function runAutoMissPath(spell, fullSpell, metaCtx, playerStats, campaignN
     };
     rollDamage(spell.name, formula || '0', 0, [], 0, context);
     if (spell.dc || fullSpell.dc) {
-        await handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
+        await handleSavePath({ spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
             getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
-            overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible);
+            overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible });
     }
     return null;
 }
@@ -635,14 +637,16 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     metaCtx = { ...metaCtx, finalFormula };
     const { overchannelFormula, overchannelActive, overchannelUseCount } = computeOverchannel(spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, finalFormula);
 
+    const savePathOpts = { spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
+        getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
+        overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible };
+
     if (rangeResult.isAutoMiss) {
-        return await runAutoMissPath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, innateSorceryActive, effectiveDamageType, spellSaveDc, overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible, rangeResult);
+        return await runAutoMissPath({ ...savePathOpts, rangeResult });
     }
 
     if (spell.dc || fullSpell.dc) {
-        const savePathResult = await handleSavePath(spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
-            getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
-            overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible);
+        const savePathResult = await handleSavePath(savePathOpts);
         if (savePathResult) return savePathResult;
     } else {
         // CLA-200: no-save spells (e.g. Divine Smite — no `dc` in spells.json) must fall

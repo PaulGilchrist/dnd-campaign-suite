@@ -29,14 +29,8 @@ export function buildSaveDc(auto, playerStats) {
     return 10;
  }
 
-export function createSaveListener(campaignName, config) {
-    const promptId = utils.guid();
-    console.debug(`[saveDebug] createSaveListener creating prompt`, { promptId, campaignName, targetName: config.targetName, saveType: config.saveType, saveDc: config.saveDc });
-
-    const pendingSaves = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
-    pendingSaves[promptId] = {
-        promptId,
-        campaignName,
+function buildPromptPayload(config) {
+    return {
         targetName: config.targetName,
         attackerName: config.attackerName || null,
         saveType: config.saveType || 'CON',
@@ -54,31 +48,70 @@ export function createSaveListener(campaignName, config) {
         secondaryRawDamage: config.secondaryRawDamage || 0,
         isSpellDamage: config.isSpellDamage === true,
     };
+}
+
+function resolveSaveOutcome(promptData, detail) {
+    return {
+        attackerName: promptData?.attackerName || detail.attackerName || 'Unknown',
+        targetName: promptData?.targetName || detail.targetName || 'Unknown',
+        saveType: promptData?.saveType || detail.saveType || 'CON',
+        saveDc: promptData?.saveDc || detail.saveDc || 0,
+        success: detail.success,
+        roll: detail.roll ?? 0,
+        saveBonus: detail.saveBonus ?? 0,
+        total: detail.total ?? 0,
+        advantage: promptData?.advantage,
+        disadvantage: promptData?.disadvantage,
+        dcSuccess: promptData?.dcSuccess,
+        sourceName: promptData?.sourceName,
+        condition: promptData?.condition,
+        damageFormula: promptData?.damageFormula,
+        damageType: promptData?.damageType,
+        rawDamage: promptData?.rawDamage,
+    };
+}
+
+function logSaveOutcome(campaignName, config, detail) {
+    const fields = resolveSaveOutcome(config, detail);
+    const rollDetail = describeSaveRoll({ roll: fields.roll, saveBonus: fields.saveBonus, total: fields.total, advantage: fields.advantage, disadvantage: fields.disadvantage, success: fields.success, dcSuccess: fields.dcSuccess });
+
+    const description = `${fields.targetName} ${fields.success ? 'succeeded' : 'failed'} ${fields.saveType} save (DC ${fields.saveDc}, ${rollDetail})`;
+
+    const entry = buildSaveResultEntry({
+        characterName: fields.attackerName,
+        targetName: fields.targetName,
+        saveDc: fields.saveDc,
+        saveType: fields.saveType,
+        success: fields.success,
+        roll: fields.roll,
+        total: fields.total,
+        saveBonus: fields.saveBonus,
+        description,
+        sourceName: fields.sourceName,
+        condition: fields.condition,
+        damageFormula: fields.damageFormula,
+        damageType: fields.damageType,
+        rawDamage: fields.rawDamage,
+    });
+
+    return addEntry(campaignName, entry).catch((e) => { console.error('[savePrompt] Error logging save result:', e); });
+}
+
+export function createSaveListener(campaignName, config) {
+    const promptId = utils.guid();
+    console.debug(`[saveDebug] createSaveListener creating prompt`, { promptId, campaignName, targetName: config.targetName, saveType: config.saveType, saveDc: config.saveDc });
+
+    const payload = buildPromptPayload(config);
+
+    const pendingSaves = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
+    pendingSaves[promptId] = { promptId, campaignName, ...payload };
     setRuntimeValue('campaign', 'pendingSavePrompts', pendingSaves, campaignName);
 
     const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || [];
     listenerPrompts.push(promptId);
     setRuntimeValue('campaign', 'pendingSaveListenerPrompts', listenerPrompts, campaignName);
 
-    sendSavePrompt(campaignName, {
-        promptId,
-        targetName: config.targetName,
-        attackerName: config.attackerName || null,
-        saveType: config.saveType || 'CON',
-        saveDc: config.saveDc,
-        dcSuccess: config.dcSuccess,
-        advantage: config.advantage || false,
-        disadvantage: config.disadvantage || false,
-        condition: config.condition || null,
-        damageFormula: config.damageFormula || null,
-        damageType: config.damageType || null,
-        rawDamage: config.rawDamage || 0,
-        sourceName: config.sourceName || null,
-        secondaryFormula: config.secondaryFormula || null,
-        secondaryDamageType: config.secondaryDamageType || null,
-        secondaryRawDamage: config.secondaryRawDamage || 0,
-        isSpellDamage: config.isSpellDamage === true,
-     });
+    sendSavePrompt(campaignName, { promptId, ...payload });
 
     const promise = new Promise((resolve) => {
         const handler = (event) => {
@@ -93,46 +126,7 @@ export function createSaveListener(campaignName, config) {
      });
 
     const saveResultPromise = promise.then(async (detail) => {
-        const promptData = config;
-        const attackerName = promptData?.attackerName || detail.attackerName || 'Unknown';
-        const targetName = promptData?.targetName || detail.targetName || 'Unknown';
-        const saveType = promptData?.saveType || detail.saveType || 'CON';
-        const saveDc = promptData?.saveDc || detail.saveDc || 0;
-        const success = detail.success;
-        const roll = detail.roll ?? 0;
-        const saveBonus = detail.saveBonus ?? 0;
-        const total = detail.total ?? 0;
-        const advantage = promptData?.advantage;
-        const disadvantage = promptData?.disadvantage;
-        const dcSuccess = promptData?.dcSuccess;
-        const sourceName = promptData?.sourceName;
-        const condition = promptData?.condition;
-        const damageFormula = promptData?.damageFormula;
-        const damageType = promptData?.damageType;
-        const rawDamage = promptData?.rawDamage;
-
-        const rollDetail = describeSaveRoll({ roll, saveBonus, total, advantage, disadvantage, success, dcSuccess });
-
-        const description = `${targetName} ${success ? 'succeeded' : 'failed'} ${saveType} save (DC ${saveDc}, ${rollDetail})`;
-
-        const entry = buildSaveResultEntry({
-            characterName: attackerName,
-            targetName,
-            saveDc,
-            saveType,
-            success,
-            roll,
-            total,
-            saveBonus,
-            description,
-            sourceName,
-            condition,
-            damageFormula,
-            damageType,
-            rawDamage,
-        });
-
-        await addEntry(campaignName, entry).catch((e) => { console.error('[savePrompt] Error logging save result:', e); });
+        await logSaveOutcome(campaignName, config, detail);
         return detail;
     });
 

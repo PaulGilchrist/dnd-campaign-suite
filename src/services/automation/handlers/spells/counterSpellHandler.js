@@ -3,6 +3,34 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { findLastAttack, rollbackSpellEffects } from '../../common/damageRollback.js';
+import { infoPopup } from '../../common/infoPopup.js';
+
+function looksLikeSpellAttack(attackEvent) {
+    return attackEvent.damageFormula ||
+           attackEvent.attackName ||
+           attackEvent.saveType ||
+           attackEvent.rollType === 'spell-save';
+}
+
+// CLA-322: reaction-spent round latch check + slot refund. Returns a refusal
+// popup when this round's Reaction is spent, null otherwise.
+function counterspellRoundRefusal(playerName, featureName, auto, action, campaignName, currentRound) {
+    const usedRoundKey = '_Counterspell_usedRound';
+    const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
+    if (usedRound !== currentRound) return null;
+
+    // The cast path paid the slot before this handler ran — the reaction was
+    // not used, so return the charge to keep the slot ledger neutral.
+    const refusedLevel = (action.spell?.isUpcast && action.spell?.upcastLevel) || action.spell?.level || 3;
+    const refusedKey = `spell_slots_level_${refusedLevel}`;
+    if (!action.spell?.freeCastAuthorized) {
+        const paidSlots = getRuntimeValue(playerName, refusedKey, campaignName);
+        if (paidSlots != null && paidSlots >= 0) {
+            setRuntimeValue(playerName, refusedKey, paidSlots + 1, campaignName);
+        }
+    }
+    return infoPopup(featureName, `${featureName} — Reaction already used this round. Spell slot level ${refusedLevel} returned.`, auto);
+}
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -11,100 +39,34 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const cs = await getCombatContext(campaignName);
     if (!cs) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} requires an active combat. Select a creature in combat and try again.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `${featureName} requires an active combat. Select a creature in combat and try again.`, auto);
     }
 
     const lastAttack = await findLastAttack(campaignName);
     if (!lastAttack.attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} — No recent attack to counter.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `${featureName} — No recent attack to counter.`, auto);
     }
 
-    const hasSpellIndicator = lastAttack.attackEvent.damageFormula ||
-                              lastAttack.attackEvent.attackName ||
-                              lastAttack.attackEvent.saveType ||
-                              lastAttack.attackEvent.rollType === 'spell-save';
-    if (!hasSpellIndicator) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} — No spell detected in the most recent attack.`,
-                automation: auto,
-            },
-        };
+    if (!looksLikeSpellAttack(lastAttack.attackEvent)) {
+        return infoPopup(featureName, `${featureName} — No spell detected in the most recent attack.`, auto);
     }
 
     const attackerName = lastAttack.attackEvent.attackerName;
     if (!attackerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} — Could not identify the spellcaster.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `${featureName} — Could not identify the spellcaster.`, auto);
     }
 
     const attackerCreature = cs.creatures.find(c => c.name === attackerName);
     if (!attackerCreature) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} — ${attackerName} is not in combat.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `${featureName} — ${attackerName} is not in combat.`, auto);
     }
 
     // CLA-322: reaction-spent round latch (CLA-297 house pattern, stamped on
     // playerStats.name) — a used Counterspell must not re-trigger repeatedly
     // against the same lastAttack; re-arms when the round advances.
-    const usedRoundKey = '_Counterspell_usedRound';
-    const currentRound = cs.round || 1;
-    const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
-    if (usedRound === currentRound) {
-        // The cast path paid the slot before this handler ran — the reaction was
-        // not used, so return the charge to keep the slot ledger neutral.
-        const refusedLevel = (action.spell?.isUpcast && action.spell?.upcastLevel) || action.spell?.level || 3;
-        const refusedKey = `spell_slots_level_${refusedLevel}`;
-        if (!action.spell?.freeCastAuthorized) {
-            const paidSlots = getRuntimeValue(playerName, refusedKey, campaignName);
-            if (paidSlots != null && paidSlots >= 0) {
-                setRuntimeValue(playerName, refusedKey, paidSlots + 1, campaignName);
-            }
-        }
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} — Reaction already used this round. Spell slot level ${refusedLevel} returned.`,
-                automation: auto,
-            },
-        };
-    }
-    setRuntimeValue(playerName, usedRoundKey, currentRound, campaignName);
+    const refusal = counterspellRoundRefusal(playerName, featureName, auto, action, campaignName, cs.round || 1);
+    if (refusal) return refusal;
+    setRuntimeValue(playerName, '_Counterspell_usedRound', cs.round || 1, campaignName);
 
     const saveDc = buildSaveDc(auto, playerStats);
 

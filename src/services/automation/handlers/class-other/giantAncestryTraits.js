@@ -6,7 +6,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getRuntimeUsesKey } from './giantAncestryOptions.js';
-import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate } from './giantAncestryUtils.js';
+import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate, attackerRollGate, resolveAncestryUses, applyAncestryDamage, ancestryDamagePopup } from './giantAncestryUtils.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
@@ -50,111 +50,40 @@ export async function handleCloudsJauntDirect(action, playerStats, campaignName)
 }
 
 export async function handleFiresBurnDirect(action, playerStats, campaignName) {
-    const usesKey = getRuntimeUsesKey("Fire's Burn");
-    const usesMax = playerStats.proficiency || 0;
-    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+    const optName = "Fire's Burn";
+    const { usesKey, currentUses } = resolveAncestryUses(playerStats, optName, campaignName);
 
-    if (currentUses <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: "Fire's Burn",
-                description: "Fire's Burn has no uses remaining. Uses will reset on the next Long Rest.",
-                automation: action.automation,
-            },
-        };
-    }
+    if (currentUses <= 0) return ancestryNoUsesPopup(optName, action.automation, currentUses);
 
     const lastAttack = await findLastAttack(campaignName);
-    if (!lastAttack?.attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: "Fire's Burn",
-                description: "Fire's Burn requires a recent attack. Use it after hitting a creature.",
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.attackerName !== playerStats.name) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: "Fire's Burn",
-                description: "Fire's Burn can only be used after you make an attack. Wait for your turn.",
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.attackEvent.rollType !== 'attack') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: "Fire's Burn",
-                description: "Fire's Burn can only be used after an attack roll.",
-                automation: action.automation,
-            },
-        };
-    }
+    const gateRefusal = attackerRollGate(optName, action.automation, playerStats, lastAttack);
+    if (gateRefusal) return gateRefusal;
 
     const targetName = lastAttack.targetName;
-    if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: "Fire's Burn",
-                description: "Fire's Burn requires a target. No target found from the last attack.",
-                automation: action.automation,
-            },
-        };
-    }
 
-    const damageResult = rollExpression(action.automation.damage || '1d10');
+    const formula = action.automation.damage || '1d10';
+    const damageResult = rollExpression(formula);
     const damageType = action.automation.damageType || 'Fire';
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
-    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, false, playerStats.name);
-    const actualDamage = applyResult?.finalDamage ?? damageResult?.total ?? 0;
-    const newHp = applyResult?.newHp;
+    const { actualDamage, newHp } = applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats);
 
     await addEntry(campaignName, {
         type: 'roll',
         characterName: playerStats.name,
         rollType: 'damage',
-        name: "Fire's Burn" + ' Damage',
+        name: optName + ' Damage',
         targetName,
         damageType,
         total: actualDamage,
-        formula: action.automation.damage || '1d10',
+        formula,
         rolls: damageResult?.rolls,
-        description: `${playerStats.name} used Fire's Burn to deal ${actualDamage} fire damage to ${targetName}.`,
+        description: `${playerStats.name} used ${optName} to deal ${actualDamage} fire damage to ${targetName}.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'damage',
-            name: "Fire's Burn",
-            formula: action.automation.damage || '1d10',
-            rolls: damageResult?.rolls,
-            total: actualDamage,
-            finalDamage: actualDamage,
-            damageApplied: true,
-            targetName,
-            targetCurrentHp: newHp,
-            damageType,
-        },
-    };
+    return ancestryDamagePopup(optName, formula, damageResult, actualDamage, targetName, newHp, damageType);
 }
 
 export async function handleFrostsChillDirect(action, playerStats, campaignName) {

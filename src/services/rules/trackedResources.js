@@ -229,21 +229,25 @@ function addWarlockResources(resources, ctx) {
   addPatronPoolResources(resources, scoped)
 }
 
-function addDivineResources(resources, { playerStats, features, charisma }) {
+function addChannelAndInspiration(resources, { playerStats, features, charisma }) {
   const maxCD = features?.maxChannelDivinity || 0
   resources.channelDivinityCharges = { current: maxCD, max: maxCD }
 
   const isBard = playerStats.class?.name === 'Bard'
   const maxBI = isBard ? (charisma?.bonus || 0) : 0
   resources.bardicInspirationUses = { current: maxBI, max: maxBI }
+}
 
+function addPaladinDivineResources(resources, { playerStats, charisma }) {
   const isPaladin = playerStats.class?.name === 'Paladin'
   const maxLoH = isPaladin ? (5 * (playerStats.level || 0)) : 0
   resources.layOnHandsPool = { current: maxLoH, max: maxLoH }
 
   const maxGD = isPaladin ? Math.max(charisma?.bonus || 0, 1) : 0
   resources.gloriousDefenseUses = { current: maxGD, max: maxGD }
+}
 
+function addClericDivineResources(resources, { playerStats }) {
   const isCleric = playerStats.class?.name === 'Cleric'
   const maxDI = isCleric && playerStats.level >= 10 ? 1 : 0
   resources.divineInterventionUses = { current: maxDI, max: maxDI }
@@ -255,6 +259,12 @@ function addDivineResources(resources, { playerStats, features, charisma }) {
   const wis = playerStats.abilities?.find(a => a.name === 'Wisdom')
   const maxWP = wis ? Math.max(wis.bonus, 1) : 1
   resources.warPriestUses = { current: maxWP, max: maxWP }
+}
+
+function addDivineResources(resources, ctx) {
+  addChannelAndInspiration(resources, ctx)
+  addPaladinDivineResources(resources, ctx)
+  addClericDivineResources(resources, ctx)
 }
 
 function addRangerPrimalResources(resources, { playerStats, wis }) {
@@ -313,7 +323,7 @@ function addPrimalResources(resources, ctx) {
   addAncestralPrimalResources(resources, ctx)
 }
 
-function addMiscResources(resources, { playerStats, features, is2024 }) {
+function addRestorationAndTranceResources(resources, { playerStats, features }) {
   const hasRestoration = (playerStats.automation?.passives ?? [])
     .some(a => a.type === 'resource_restoration')
   resources.sorcerousRestorationUses = { current: hasRestoration ? 1 : 0, max: hasRestoration ? 1 : 0 }
@@ -324,7 +334,9 @@ function addMiscResources(resources, { playerStats, features, is2024 }) {
 
   const maxUM = (features?.uncannymetabolismUses || 0)
   resources.uncannymetabolismUses = { current: maxUM, max: maxUM }
+}
 
+function addLuckyAndMonkResources(resources, { playerStats }) {
   const isLucky = (playerStats.feats || []).some(f =>
     f?.toLowerCase?.().includes('lucky')
   )
@@ -334,13 +346,21 @@ function addMiscResources(resources, { playerStats, features, is2024 }) {
   const isMonk = playerStats.class?.name === 'Monk'
   const maxWB = isMonk && playerStats.level >= 6 ? 1 : 0
   resources.wholenessofbodyUses = { current: maxWB, max: maxWB }
+}
 
+function addFeatsOfChaosResources(resources, { playerStats, is2024 }) {
   const isWildMagic = playerStats.class?.subclass?.name === 'Wild Magic Sorcery'
   const isWildMagic2024 = is2024 && isWildMagic
   const hasFeatsOfChaos = (playerStats.automation?.specialActions ?? []).some(a => a.type === 'feats_of_chaos') ||
     (playerStats.automation?.passives ?? []).some(a => a.type === 'feats_of_chaos')
   const maxFoC = (isWildMagic2024 || hasFeatsOfChaos) ? 1 : 0
   resources.featsOfChaosUses = { current: maxFoC, max: maxFoC }
+}
+
+function addMiscResources(resources, ctx) {
+  addRestorationAndTranceResources(resources, ctx)
+  addLuckyAndMonkResources(resources, ctx)
+  addFeatsOfChaosResources(resources, ctx)
 }
 
 export function computeTrackedResources(playerStats) {

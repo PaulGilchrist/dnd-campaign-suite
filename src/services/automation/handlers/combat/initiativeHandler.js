@@ -5,6 +5,34 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import storage from '../../../ui/storage.js';
 import { addEntry } from '../../../ui/logService.js';
 
+function resolveBardicMax(playerStats) {
+    return playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
+        || playerStats?.proficiency || 0;
+}
+
+async function applyInitiativeBonusToAllies(combatSummary, bonusValue, campaignName) {
+    const affected = [];
+    for (const creature of combatSummary.creatures) {
+        if (creature.type !== 'player') continue;
+        const currentInit = creature.initiative !== '' ? Number(creature.initiative) : null;
+        if (currentInit !== null) {
+            creature.initiative = String(currentInit + bonusValue);
+        } else {
+            const existingBonus = Number(getRuntimeValue(creature.name, 'tandemFootworkBonus', campaignName) ?? 0);
+            await setRuntimeValue(creature.name, 'tandemFootworkBonus', existingBonus + bonusValue, campaignName);
+        }
+        affected.push(creature.name);
+    }
+    combatSummary.creatures.sort((a, b) => {
+        const aVal = Number(a.initiative) || 0;
+        const bVal = Number(b.initiative) || 0;
+        return bVal - aVal;
+    });
+    await storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    return affected;
+}
+
 async function handleBonusInitiativeAllies(action, auto, playerStats, campaignName) {
         const activeConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
         if (activeConditions.includes('incapacitated')) {
@@ -19,8 +47,7 @@ async function handleBonusInitiativeAllies(action, auto, playerStats, campaignNa
             };
         }
 
-        const bardicMax = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
-            || playerStats?.proficiency || 0;
+        const bardicMax = resolveBardicMax(playerStats);
         const currentBI = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? bardicMax);
         if (currentBI <= 0) {
             return {
@@ -45,25 +72,7 @@ async function handleBonusInitiativeAllies(action, auto, playerStats, campaignNa
 
         const combatSummary = await getCombatContext(campaignName);
         if (combatSummary?.creatures) {
-            const affected = [];
-            for (const creature of combatSummary.creatures) {
-                if (creature.type !== 'player') continue;
-                const currentInit = creature.initiative !== '' ? Number(creature.initiative) : null;
-                if (currentInit !== null) {
-                    creature.initiative = String(currentInit + bonusValue);
-                } else {
-                    const existingBonus = Number(getRuntimeValue(creature.name, 'tandemFootworkBonus', campaignName) ?? 0);
-                    await setRuntimeValue(creature.name, 'tandemFootworkBonus', existingBonus + bonusValue, campaignName);
-                }
-                affected.push(creature.name);
-            }
-            combatSummary.creatures.sort((a, b) => {
-                const aVal = Number(a.initiative) || 0;
-                const bVal = Number(b.initiative) || 0;
-                return bVal - aVal;
-            });
-            await storage.set('combatSummary', combatSummary, campaignName);
-            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+            await applyInitiativeBonusToAllies(combatSummary, bonusValue, campaignName);
         }
 
         return {

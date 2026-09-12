@@ -118,6 +118,33 @@ function applyCheckFeatureContext(ctx, conditionEffects, playerStats, checkName,
     applyPsiBolsteredKnack(ctx, playerStats, playerStats?.class || {}, checkName);
 }
 
+function spellResistanceSaveSource(conditionEffects, playerStats) {
+    if (!conditionEffects?.saveAdvantage?.includes('against_spell')) return null;
+    const saveModifiers = playerStats?.saveModifiers || playerStats?.computedStats?.saveModifiers || [];
+    const spellResistMod = saveModifiers.find(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+    return spellResistMod?.source || 'Spell Resistance';
+}
+
+function otherSaveAdvantageSource(conditionEffects, playerStats) {
+    if ((conditionEffects?.saveAdvantageCount || 0) <= 0) return null;
+    const saveModifiers = playerStats?.saveModifiers || playerStats?.computedStats?.saveModifiers || [];
+    const mods = saveModifiers.filter(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition !== 'against_spell');
+    return mods.length > 0 ? mods.map(m => m.source).join(', ') : null;
+}
+
+function wardingBondBonusParts(conditionEffects) {
+    const parts = [];
+    if (!conditionEffects?.saveBonusExpression) return parts;
+    const match = conditionEffects.saveBonusExpression.match(/\+\s*(\d+)/g);
+    if (match) {
+        match.forEach(m => {
+            const val = parseInt(m.replace(/\+\s*/, ''), 10);
+            if (val > 0) parts.push(`+${val} [Warding Bond]`);
+        });
+    }
+    return parts;
+}
+
 function resolveSaveForcedMode(conditionEffects, abbr, autoFail) {
     let forcedMode = undefined;
     const restoreBalance = conditionEffects?.restoreBalance;
@@ -329,26 +356,11 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
 
           const getSaveAdvantageSource = () => {
            const parts = [];
-           if (conditionEffects?.saveAdvantage?.includes('against_spell')) {
-             const saveModifiers = playerStats?.saveModifiers || playerStats?.computedStats?.saveModifiers || [];
-             const spellResistMod = saveModifiers.find(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
-             parts.push(spellResistMod?.source || 'Spell Resistance');
-           }
-           if ((conditionEffects?.saveAdvantageCount || 0) > 0) {
-             const saveModifiers = playerStats?.saveModifiers || playerStats?.computedStats?.saveModifiers || [];
-             const mods = saveModifiers.filter(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition !== 'against_spell');
-             if (mods.length > 0) parts.push(mods.map(m => m.source).join(', '));
-           }
-           if (conditionEffects?.saveBonusExpression) {
-             const expr = conditionEffects.saveBonusExpression;
-             const match = expr.match(/\+\s*(\d+)/g);
-             if (match) {
-               match.forEach(m => {
-                 const val = parseInt(m.replace(/\+\s*/, ''), 10);
-                 if (val > 0) parts.push(`+${val} [Warding Bond]`);
-               });
-             }
-           }
+           const spellSource = spellResistanceSaveSource(conditionEffects, playerStats);
+           if (spellSource) parts.push(spellSource);
+           const otherSource = otherSaveAdvantageSource(conditionEffects, playerStats);
+           if (otherSource) parts.push(otherSource);
+           parts.push(...wardingBondBonusParts(conditionEffects));
            return parts.length > 0 ? parts.join(', ') : null;
           }
 

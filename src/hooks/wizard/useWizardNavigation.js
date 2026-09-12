@@ -71,20 +71,24 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
     checkStep2();
   }, [formData, racesData, classSubtypes, ruleset]);
 
-  const getStepEnabled = useMemo(() => {
-    return (targetStep) => {
-      if (targetStep === 1) return true;
-      if (targetStep === 2) return step1Valid;
-      if (targetStep === 3) return step1Valid && step2Valid;
-      if (targetStep === 4) return step1Valid && step2Valid && step3Valid;
-      if (targetStep === 5) return step1Valid && step2Valid && step3Valid && step4Valid;
-      if (targetStep === 6) return step1Valid && step2Valid && step3Valid && step4Valid && step5Valid;
-      if (targetStep === 7) return step1Valid && step2Valid && step3Valid && step4Valid && step5Valid && step6Valid;
-      return step1Valid && step2Valid && step3Valid && step4Valid && step5Valid && step6Valid && step7Valid;
-    };
+  const validPrefixes = useMemo(() => {
+    const stepValidities = [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid];
+    const prefixes = [true];
+    stepValidities.reduce((allValidSoFar, valid, index) => {
+      prefixes[index + 1] = allValidSoFar && valid;
+      return prefixes[index + 1];
+    }, true);
+    return prefixes;
   }, [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid]);
 
-  const isSaveEnabled = useMemo(() => step1Valid && step2Valid && step3Valid && step4Valid && step5Valid && step6Valid && step7Valid, [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid]);
+  const getStepEnabled = useMemo(() => {
+    return (targetStep) => {
+      const prefix = Number.isInteger(targetStep) ? validPrefixes[targetStep - 1] : undefined;
+      return prefix === undefined ? validPrefixes[validPrefixes.length - 1] : prefix;
+    };
+  }, [validPrefixes]);
+
+  const isSaveEnabled = validPrefixes[validPrefixes.length - 1];
 
   return {
     currentStep,

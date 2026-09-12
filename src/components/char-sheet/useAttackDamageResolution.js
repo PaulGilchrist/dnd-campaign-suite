@@ -7,6 +7,26 @@ import { executeAttackRiderManeuver as executeAttackRiderManeuverService, applyM
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { buildPipelineForAction } from '../../services/combat/steps/index.js';
 
+function pipelineCtxValue(pipelineCtx, pendingCtxOverrides, key) {
+    return pipelineCtx?.[key] || pendingCtxOverrides?.[key] || null;
+}
+
+// Merge the freshly-built damage-phase ctx with pending overrides and the
+// triggering pipeline ctx, preferring pipeline values then pending overrides.
+function mergeDamagePipelineCtx(ctx, pendingCtxOverrides, pipelineCtx) {
+    return {
+        ...ctx,
+        ...pendingCtxOverrides,
+        autoDamageSecondaryFormula: pipelineCtxValue(pipelineCtx, pendingCtxOverrides, 'autoDamageSecondaryFormula'),
+        autoDamageSecondaryName: pipelineCtxValue(pipelineCtx, pendingCtxOverrides, 'autoDamageSecondaryName'),
+        autoDamageSecondaryDamageType: pipelineCtxValue(pipelineCtx, pendingCtxOverrides, 'autoDamageSecondaryDamageType'),
+        saveDc: pipelineCtxValue(pipelineCtx, pendingCtxOverrides, 'saveDc'),
+        saveType: pipelineCtxValue(pipelineCtx, pendingCtxOverrides, 'saveType'),
+        dcSuccess: pipelineCtxValue(pipelineCtx, pendingCtxOverrides, 'dcSuccess'),
+        tavernBrawlerRerolls: pipelineCtxValue(pipelineCtx, null, 'tavernBrawlerRerolls'),
+    };
+}
+
 /**
  * Standalone resolveAttackDamage for use outside React hooks (e.g., CharSpells, MonsterCardModal).
  */
@@ -285,6 +305,26 @@ async function applyRiderManeuverPostResolution({ result, maneuver, attack, popu
     return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls };
 }
 
+function buildRiderAttackInfo(attack, popupHtmlData) {
+    return {
+        weaponType: attack.weaponType,
+        isUnarmedStrike: attack.weaponType === 'unarmed',
+        targetName: popupHtmlData?.targetName || null,
+    };
+}
+
+function buildCombatSuperiorityAction(playerStats) {
+    const superiorityInfo = [...(playerStats?.automation?.specialActions || []), ...(playerStats?.automation?.actions || [])]
+        .find(a => a.type === 'combat_superiority');
+    return {
+        automation: {
+            type: 'combat_superiority',
+            saveDc: superiorityInfo?.saveDc ?? 'ability',
+            saveAbility: superiorityInfo?.saveAbility || ['STR', 'DEX'],
+        },
+    };
+}
+
 export default function useAttackDamageResolution({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
@@ -300,17 +340,7 @@ export default function useAttackDamageResolution({
         if (buildCtxSync) {
             // WM-008: damage-phase ctx rebuild must NOT consume one-shot attack te.
             (mapName ? buildCtx(attack, { consumeAttackTe: false }) : buildCtxSync(attack, { consumeAttackTe: false })).then(ctx => {
-                const merged = {
-                    ...ctx,
-                    ...pendingCtxOverrides,
-                    autoDamageSecondaryFormula: pipelineCtx?.autoDamageSecondaryFormula || pendingCtxOverrides?.autoDamageSecondaryFormula || null,
-                    autoDamageSecondaryName: pipelineCtx?.autoDamageSecondaryName || pendingCtxOverrides?.autoDamageSecondaryName || null,
-                    autoDamageSecondaryDamageType: pipelineCtx?.autoDamageSecondaryDamageType || pendingCtxOverrides?.autoDamageSecondaryDamageType || null,
-                    saveDc: pipelineCtx?.saveDc || pendingCtxOverrides?.saveDc || null,
-                    saveType: pipelineCtx?.saveType || pendingCtxOverrides?.saveType || null,
-                    dcSuccess: pipelineCtx?.dcSuccess || pendingCtxOverrides?.dcSuccess || null,
-                    tavernBrawlerRerolls: pipelineCtx?.tavernBrawlerRerolls || null,
-                };
+                const merged = mergeDamagePipelineCtx(ctx, pendingCtxOverrides, pipelineCtx);
                 console.log('[sw-debug] rollDamage ctx.damageType=', merged.damageType);
                 rollDamage(attack.name, formula, total, rolls, modifier, { ...merged, ...critLabels });
             }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
@@ -458,23 +488,11 @@ export default function useAttackDamageResolution({
 
     const handleAttackRiderManeuverUse = async (maneuver, attack, popupHtmlData, currentFormula = null, currentTotal = 0, currentRolls = []) => {
         const maneuverName = maneuver?.name || maneuver;
-        const attackInfo = {
-            weaponType: attack.weaponType,
-            isUnarmedStrike: attack.weaponType === 'unarmed',
-            targetName: popupHtmlData?.targetName || null,
-        };
+        const attackInfo = buildRiderAttackInfo(attack, popupHtmlData);
         // MN-015: forward the Combat Superiority feature's save DC spec
         // (classes.json automation saveDc:'ability', saveAbility:['STR','DEX'])
         // so buildSaveDc resolves 8 + STR/DEX mod + PB instead of the DC-10 fallback.
-        const superiorityInfo = [...(playerStats?.automation?.specialActions || []), ...(playerStats?.automation?.actions || [])]
-            .find(a => a.type === 'combat_superiority');
-        const action = {
-            automation: {
-                type: 'combat_superiority',
-                saveDc: superiorityInfo?.saveDc ?? 'ability',
-                saveAbility: superiorityInfo?.saveAbility || ['STR', 'DEX'],
-            },
-        };
+        const action = buildCombatSuperiorityAction(playerStats);
         const result = await executeAttackRiderManeuverService(action, playerStats, campaignName, maneuverName, attackInfo);
 
         let updatedFormula = currentFormula;

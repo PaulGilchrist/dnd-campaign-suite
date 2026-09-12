@@ -9,6 +9,55 @@ function getCreatureTargets(campaignName) {
   return cs.creatures.map(c => c.name);
 }
 
+function NoOptionsView({ onSkip }) {
+  return (
+    <div className="popup-overlay" onClick={(e) => {
+      if (e.target.closest('.popup-modal')) return;
+      onSkip?.();
+    }}>
+      <div className="popup-modal metamagic-popup">
+        <div className="metamagic-popup-inner">
+          <h3>Metamagic</h3>
+          <p>Your character is not a Sorcerer with available Metamagic options.</p>
+          <button className="btn" onClick={onSkip}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PsionicOptionRow({ psionicActive, psionicAffordable, psionicCost, onToggle }) {
+  return (
+    <label className={`metamagic-option ${psionicActive ? 'metamagic-option-selected' : ''} ${!psionicAffordable ? 'metamagic-option-disabled' : ''}`}>
+      <input
+        type="checkbox"
+        checked={psionicActive}
+        disabled={!psionicAffordable}
+        onChange={onToggle}
+      />
+      <span className="metamagic-option-name">Psionic Sorcery</span>
+      <span className="metamagic-option-cost">{psionicCost} SP</span>
+      <span className="metamagic-option-desc">Cast without Verbal or Somatic components. No Material components unless consumed or have cost.</span>
+    </label>
+  );
+}
+
+function TwinTargetSelector({ twinTarget, creatureTargets, onChange }) {
+  return (
+    <div className="metamagic-twin-target">
+      <label>
+        <strong>Twinned Spell — Second Target:</strong>
+        <select value={twinTarget} onChange={e => onChange(e.target.value)}>
+          <option value="">-- Select target --</option>
+          {creatureTargets.map(name => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
 export default function MetamagicPopup({ spell, playerStats, campaignName, onConfirm, onSkip }) {
   const spellLevel = spell?.level || 0;
   const currentSP = Number(playerStats._metamagicCurrentSP) || 0;
@@ -79,20 +128,7 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
   }, [onSkip]);
 
   if (options.length === 0) {
-    return (
-      <div className="popup-overlay" onClick={(e) => {
-        if (e.target.closest('.popup-modal')) return;
-        onSkip?.();
-      }}>
-        <div className="popup-modal metamagic-popup">
-          <div className="metamagic-popup-inner">
-            <h3>Metamagic</h3>
-            <p>Your character is not a Sorcerer with available Metamagic options.</p>
-            <button className="btn" onClick={onSkip}>Close</button>
-          </div>
-        </div>
-      </div>
-    );
+    return <NoOptionsView onSkip={onSkip} />;
   }
 
   const isAffordable = (opt) => {
@@ -125,19 +161,14 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
            <p className="metamagic-sp-remaining">
              Sorcery Points: <strong>{currentSP}</strong> available — <strong>{grandTotalCost}</strong> selected — <strong className={remainingAfter >= 0 ? '' : 'metamagic-insufficient'}>{remainingAfter}</strong> remaining
            </p>
-           {isPsionicSpell && (
-             <label className={`metamagic-option ${psionicActive ? 'metamagic-option-selected' : ''} ${!psionicAffordable ? 'metamagic-option-disabled' : ''}`}>
-               <input
-                 type="checkbox"
-                 checked={psionicActive}
-                 disabled={!psionicAffordable}
-                 onChange={togglePsionic}
-               />
-               <span className="metamagic-option-name">Psionic Sorcery</span>
-               <span className="metamagic-option-cost">{psionicCost} SP</span>
-               <span className="metamagic-option-desc">Cast without Verbal or Somatic components. No Material components unless consumed or have cost.</span>
-             </label>
-           )}
+            {isPsionicSpell && (
+              <PsionicOptionRow
+                psionicActive={psionicActive}
+                psionicAffordable={psionicAffordable}
+                psionicCost={psionicCost}
+                onToggle={togglePsionic}
+              />
+            )}
             <div className="metamagic-options">
               {options.map(opt => {
                 const checked = selected.includes(opt.name);
@@ -170,19 +201,9 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
              </p>
            )}
 
-           {hasTwinned && (
-             <div className="metamagic-twin-target">
-               <label>
-                 <strong>Twinned Spell — Second Target:</strong>
-                 <select value={twinTarget} onChange={e => setTwinTarget(e.target.value)}>
-                   <option value="">-- Select target --</option>
-                   {creatureTargets.map(name => (
-                     <option key={name} value={name}>{name}</option>
-                   ))}
-                 </select>
-               </label>
-             </div>
-           )}
+            {hasTwinned && (
+              <TwinTargetSelector twinTarget={twinTarget} creatureTargets={creatureTargets} onChange={setTwinTarget} />
+            )}
 
            <div className="metamagic-actions">
              <button className="btn btn-secondary" onClick={onSkip}>

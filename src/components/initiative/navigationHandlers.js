@@ -14,6 +14,91 @@ function turnStartGateKey(round, creatureName) {
     return `${round}:${creatureName}`
 }
 
+// Once-per-round/turn latches cleared for every player at the round wrap.
+const PLAYER_ROUND_LATCH_KEYS = [
+    // CLA-370: pass roundToSet — the cache still shows the old round here.
+    '_CunningStrike_usedRound',
+    '_Charge_Attack_usedRound',
+    '_FastHands_usedRound',
+    '_CunningAction_usedRound',
+    '_Cleave_UsedRound',
+    '_Nick_UsedRound',
+    '_PsychicBlade_attack_round',
+    '_PsychicBlade_secondBlade_round',
+    '_Retaliation_usedRound',
+    '_ShadowyDodge_usedRound',
+    '_ShadowyDodge_appliedAttack',
+    '_Slow_Fall_usedRound',
+    '_Stones_Endurance_usedRound',
+    // CLA-393: Wrath of the Sea once-per-turn attack latch re-arms at round wrap.
+    '_Wrath_of_the_Sea_usedRound',
+    // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
+    '_Warding_Flare_usedRound',
+    // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.
+    '_War_Magic_usedRound',
+    // FT-099: War Caster Reactive Spell once-per-round reaction latch re-arms at round wrap.
+    '_Reactive_Spell_usedRound',
+    // FT-094: Telekinetic Shove once-per-turn latch re-arms at round wrap.
+    '_Telekinetic_Shove_usedRound',
+    // CLA-361: Thought Shield reflect round latch re-arms at round wrap.
+    '_Thought_Shield_usedRound',
+    '_Superior_Hunters_Defense_usedRound',
+    '_Riposte_usedRound',
+    '_Riposte_appliedAttack',
+    'pendingRiposteDieValue',
+    'surgeUsedRound',
+    'illusoryRealityUsedRound',
+    'portentUsedThisTurn',
+    'psionicStrikeUsedThisTurn',
+    '_BrutalStrike_usedRound',
+    '_fortifiedHealth_usedRound',
+    '_Shield_Bash_usedRound',
+    'piercerPunctureUsedThisTurn',
+    // CLA-356: Telekinetic Master bonus-action weapon attack — once per turn latch re-arms at round wrap.
+    '_Telekinetic_Master_attack_usedRound',
+]
+
+function clearPlayerRoundLatches(creatureName, campaignName) {
+    setRuntimeValue(creatureName, '_cunningStrikeCostUsed', 0, campaignName)
+    for (const key of PLAYER_ROUND_LATCH_KEYS) {
+        setRuntimeValue(creatureName, key, null, campaignName)
+    }
+}
+
+// Round-wrap-only work: bump the round counter, strip structural second-turn
+// entries, re-arm per-creature round latches (CLA-360 double-tick guard).
+function runRoundWrapHousekeeping({ updatedSummary, creatures, campaignName, roundToSet, setCombatSummary }) {
+    updatedSummary.round = roundToSet
+    updatedSummary.creatures = updatedSummary.creatures.filter(c => !isSecondTurnEntry(c))
+    setCombatSummary(updatedSummary)
+    // WM-008: campaign-level weapon-mastery auto-apply latch re-arms at round wrap.
+    setRuntimeValue('campaign', '_Vex_appliedTarget', null, campaignName)
+    for (const creature of creatures) {
+        if (isSecondTurnEntry(creature)) continue
+        // CLA-370: pass roundToSet — the cache still shows the old round here.
+        clearPerRoundMajestyTrackers(creature.name, campaignName, roundToSet)
+        if (creature.type === 'player') clearPlayerRoundLatches(creature.name, campaignName)
+    }
+}
+
+// BUG CLA-307: run the OUTGOING owner's turn-END pass (Self-Restoration
+// condition_removal) BEFORE the new active creature's turn-start effects, so the
+// owner's Charmed/Frightened/Poisoned vanish at the end of their own turn, not at
+// their next turn start. Sync POST here (GM client is the writer of truth).
+function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters) {
+    const outgoingChar = characters.find(ch => ch.name === activeCreatureName || ch.name.startsWith(activeCreatureName + ' '))
+    applyTurnEndConditionRemoval(activeCreatureName, outgoingChar?.computedStats || outgoingChar, campaignName)
+        .catch((e) => { console.error('[navigationHandlers] CLA-307 turn-end removal failed:', e) })
+    // SP-107: staged Sleep targets repeat their WIS save at the end of their own turn —
+    // success sheds Incapacitated, failure escalates to Unconscious for the duration.
+    applySleepTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] SP-107 sleep turn-end save failed:', e) })
+    // SP-111: Stinking Cloud Poisoned + action/bonus-action block last only
+    // until the end of the OUTGOING creature's current turn.
+    applyStinkingCloudTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] SP-111 stinking cloud turn-end cleanup failed:', e) })
+}
+
 /**
  * Creates the handleNextCreature handler.
  */
@@ -41,77 +126,12 @@ export function createNextCreatureHandler({
         const roundToSet = (roundRef.current ?? 1) + (roundIncrement ? 1 : 0)
         const updatedSummary = cloneDeep(cs)
         if (roundIncrement) {
-            updatedSummary.round = roundToSet
-            updatedSummary.creatures = updatedSummary.creatures.filter(c => !isSecondTurnEntry(c))
-            setCombatSummary(updatedSummary)
-            // WM-008: campaign-level weapon-mastery auto-apply latch re-arms at round wrap.
-            setRuntimeValue('campaign', '_Vex_appliedTarget', null, campaignName)
-            for (const creature of cs.creatures) {
-                if (isSecondTurnEntry(creature)) continue
-                // CLA-370: pass roundToSet — the cache still shows the old round here.
-                clearPerRoundMajestyTrackers(creature.name, campaignName, roundToSet)
-                if (creature.type === 'player') {
-                    setRuntimeValue(creature.name, '_cunningStrikeCostUsed', 0, campaignName)
-                    setRuntimeValue(creature.name, '_CunningStrike_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Charge_Attack_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_FastHands_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_CunningAction_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Cleave_UsedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Nick_UsedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_PsychicBlade_attack_round', null, campaignName)
-                    setRuntimeValue(creature.name, '_PsychicBlade_secondBlade_round', null, campaignName)
-                    setRuntimeValue(creature.name, '_Retaliation_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_ShadowyDodge_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_ShadowyDodge_appliedAttack', null, campaignName)
-                    setRuntimeValue(creature.name, '_Slow_Fall_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Stones_Endurance_usedRound', null, campaignName)
-                    // CLA-393: Wrath of the Sea once-per-turn attack latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Wrath_of_the_Sea_usedRound', null, campaignName)
-                    // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Warding_Flare_usedRound', null, campaignName)
-                    // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_War_Magic_usedRound', null, campaignName)
-                    // FT-099: War Caster Reactive Spell once-per-round reaction latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Reactive_Spell_usedRound', null, campaignName)
-                    // FT-094: Telekinetic Shove once-per-turn latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Telekinetic_Shove_usedRound', null, campaignName)
-                    // CLA-361: Thought Shield reflect round latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Thought_Shield_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Superior_Hunters_Defense_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Riposte_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Riposte_appliedAttack', null, campaignName)
-                    setRuntimeValue(creature.name, 'pendingRiposteDieValue', null, campaignName)
-                    setRuntimeValue(creature.name, 'surgeUsedRound', null, campaignName)
-                    setRuntimeValue(creature.name, 'illusoryRealityUsedRound', null, campaignName)
-                    setRuntimeValue(creature.name, 'portentUsedThisTurn', null, campaignName)
-                    setRuntimeValue(creature.name, 'psionicStrikeUsedThisTurn', null, campaignName)
-                    setRuntimeValue(creature.name, '_BrutalStrike_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_fortifiedHealth_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, '_Shield_Bash_usedRound', null, campaignName)
-                    setRuntimeValue(creature.name, 'piercerPunctureUsedThisTurn', null, campaignName)
-                    // CLA-356: Telekinetic Master bonus-action weapon attack — once per turn latch re-arms at round wrap.
-                    setRuntimeValue(creature.name, '_Telekinetic_Master_attack_usedRound', null, campaignName)
-                }
-            }
+            runRoundWrapHousekeeping({ updatedSummary, creatures: cs.creatures, campaignName, roundToSet, setCombatSummary })
         }
         storage.set('activeCreatureName', newActiveName, campaignName)
         setActiveCreatureName(newActiveName)
-        // BUG CLA-307: run the OUTGOING owner's turn-END pass (Self-Restoration
-        // condition_removal) BEFORE the new active creature's turn-start effects, so the
-        // owner's Charmed/Frightened/Poisoned vanish at the end of their own turn, not at
-        // their next turn start. Sync POST here (GM client is the writer of truth).
         if (activeCreatureName && !isSecondTurnEntry(activeEntry)) {
-            const outgoingChar = characters.find(ch => ch.name === activeCreatureName || ch.name.startsWith(activeCreatureName + ' '))
-            applyTurnEndConditionRemoval(activeCreatureName, outgoingChar?.computedStats || outgoingChar, campaignName)
-                .catch((e) => { console.error('[navigationHandlers] CLA-307 turn-end removal failed:', e) })
-            // SP-107: staged Sleep targets repeat their WIS save at the end of their own turn —
-            // success sheds Incapacitated, failure escalates to Unconscious for the duration.
-            applySleepTurnEnd(campaignName, activeCreatureName)
-                .catch((e) => { console.error('[navigationHandlers] SP-107 sleep turn-end save failed:', e) })
-            // SP-111: Stinking Cloud Poisoned + action/bonus-action block last only
-            // until the end of the OUTGOING creature's current turn.
-            applyStinkingCloudTurnEnd(campaignName, activeCreatureName)
-                .catch((e) => { console.error('[navigationHandlers] SP-111 stinking cloud turn-end cleanup failed:', e) })
+            applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters)
         }
         expireStaleEffects(campaignName, newActiveName)
         // BUG CLA-198: turn-start effects must run for EVERY newly active creature, not just

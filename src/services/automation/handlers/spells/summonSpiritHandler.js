@@ -176,6 +176,35 @@ function summonDurationRounds(duration) {
     return match[2] === 'hour' ? n * 600 : n * 10;
 }
 
+function resolveSummonFlags(playerStats, action) {
+    // CLA-252: a Phantasmal Creatures free cast (spellPreparationService stamps the spell)
+    // summons a spectral creature with halved HP; a normal slotted cast keeps full HP.
+    const phantasmalPassive = (playerStats.automation?.passives || []).find(p => p.type === 'phantasmal_creatures');
+    const isPhantasmalFreeCast = !!action.spell?._phantasmalCreatures;
+    const halveHp = isPhantasmalFreeCast && !!(phantasmalPassive?.halvesHp ?? action.spell?._phantasmalHalvesHp);
+    return { isPhantasmalFreeCast, halveHp };
+}
+
+function applyThrallTempHp(creature, playerStats, campaignName) {
+    const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+    const tempHp = playerStats.level + chaMod;
+    setTempHpOnKey(creature.name, 'tempHp', tempHp, campaignName);
+}
+
+function pushSummonedEffect(targetEffects, creature, casterName, noConcentration) {
+    const existingSummoned = targetEffects.find(
+        te => te.target === creature.name && te.effect === 'summoned' && te.source === casterName
+    );
+    if (existingSummoned) return;
+    targetEffects.push({
+        target: creature.name,
+        source: casterName,
+        effect: 'summoned',
+        summonSource: 'spell',
+        duration: noConcentration ? '1_minute' : 'concentration',
+    });
+}
+
 async function performSummon(action, playerStats, campaignName, variant) {
     const auto = action.automation;
     const casterName = playerStats.name;
@@ -199,11 +228,7 @@ async function performSummon(action, playerStats, campaignName, variant) {
     const noConcentration = !!auto.noConcentration || createThrall;
     const initiativeValue = getCasterInitiativeValue(combatSummary, casterName);
 
-    // CLA-252: a Phantasmal Creatures free cast (spellPreparationService stamps the spell)
-    // summons a spectral creature with halved HP; a normal slotted cast keeps full HP.
-    const phantasmalPassive = (playerStats.automation?.passives || []).find(p => p.type === 'phantasmal_creatures');
-    const isPhantasmalFreeCast = !!action.spell?._phantasmalCreatures;
-    const halveHp = isPhantasmalFreeCast && !!(phantasmalPassive?.halvesHp ?? action.spell?._phantasmalHalvesHp);
+    const { isPhantasmalFreeCast, halveHp } = resolveSummonFlags(playerStats, action);
 
     const creature = buildSpiritCreature(monster, variant.name, casterName, initiativeValue, slotLevel, auto, playerStats, { noConcentration, createThrall, warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp });
     if (isPhantasmalFreeCast) {
@@ -213,25 +238,11 @@ async function performSummon(action, playerStats, campaignName, variant) {
     combatSummary.creatures.push(creature);
 
     if (createThrall) {
-        const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
-        const warlockLevel = playerStats.level;
-        const tempHp = warlockLevel + chaMod;
-        setTempHpOnKey(creature.name, 'tempHp', tempHp, campaignName);
+        applyThrallTempHp(creature, playerStats, campaignName);
     }
 
-    let targetEffects = getTargetEffects();
-    const existingSummoned = targetEffects.find(
-        te => te.target === creature.name && te.effect === 'summoned' && te.source === casterName
-    );
-    if (!existingSummoned) {
-        targetEffects.push({
-            target: creature.name,
-            source: casterName,
-            effect: 'summoned',
-            summonSource: 'spell',
-            duration: noConcentration ? '1_minute' : 'concentration',
-        });
-    }
+    const targetEffects = getTargetEffects();
+    pushSummonedEffect(targetEffects, creature, casterName, noConcentration);
 
     combatSummary.creatures.sort((a, b) => {
         const aInit = a.initiative === '' || a.initiative === undefined ? 0 : Number(a.initiative);

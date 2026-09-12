@@ -5,6 +5,37 @@ import { isApplyBusy, setApplyBusy } from './areaEffectModalInstances.js';
 import { createOverlay, hitTestOverlay } from '../../../../models/SpellOverlay.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
+// CLA-303: Turn Undead target validity — dead creatures are invalid; trust the
+// monsterType joined onto combatSummary first, then fall back to a suffix-strip
+// monsters.json lookup ("Skeleton 1" -> "Skeleton") for legacy combatSummaries.
+function isTurnUndeadValidTarget(c, monsters) {
+  if ((c.currentHp ?? 1) <= 0) return false;
+  if (c.monsterType) return String(c.monsterType).toLowerCase() === 'undead';
+  const baseName = (c.name || '').replace(/\s+\d+$/, '');
+  const monster = Array.isArray(monsters) ? monsters.find(m => m.name?.toLowerCase() === baseName.toLowerCase()) : undefined;
+  if (!monster || String(monster.type).toLowerCase() !== 'undead') return false;
+  return true;
+}
+
+function findTargetGridPosition(mapData, name) {
+  return mapData.players?.find(p => p.name === name) || mapData.placedItems?.find(i => i.name === name);
+}
+
+function canUseShapeOverlay(shape, gridX, gridY) {
+  return !!shape && gridX != null && gridY != null;
+}
+
+function shapeOverlayCovers(shape, gridX, gridY, targetPos, rangeFeet, coneAngle, widthFt) {
+  const tempOverlay = createOverlay(shape, gridX, gridY, 0, {
+    radiusFt: rangeFeet,
+    sizeFt: rangeFeet,
+    distanceFt: rangeFeet,
+    coneAngle: coneAngle || 53,
+    widthFt: widthFt || 5,
+  });
+  return hitTestOverlay(tempOverlay, targetPos.gridX, targetPos.gridY);
+}
+
 function AreaEffectTargetModalBase({
   combatSummary,
   attackerName,
@@ -115,36 +146,17 @@ function AreaEffectTargetModalBase({
     if (!combatSummary?.creatures) return [];
     return combatSummary.creatures.filter(c => {
       if (!includeCaster && c.name === attackerName) return false;
-      if (turnUndead) {
-        // CLA-303: dead creatures are not valid Turn Undead targets.
-        if ((c.currentHp ?? 1) <= 0) return false;
-        // CLA-303 (MN-015 precedent): monsterType rides on combatSummary at join
-        // time — trust it first. Fall back to a suffix-strip monsters.json lookup
-        // ("Skeleton 1" -> "Skeleton") for legacy combatSummaries.
-        if (c.monsterType) return String(c.monsterType).toLowerCase() === 'undead';
-        const baseName = (c.name || '').replace(/\s+\d+$/, '');
-        const monster = Array.isArray(monsters) ? monsters.find(m => m.name?.toLowerCase() === baseName.toLowerCase()) : undefined;
-        if (!monster || String(monster.type).toLowerCase() !== 'undead') return false;
-      }
+      if (turnUndead && !isTurnUndeadValidTarget(c, monsters)) return false;
       if (getForcecageBlocked(c.name)) return false;
       if (getMazeBlocked(c.name)) return false;
       if (getBanishmentBlocked(c.name)) return false;
       if (getImprisonmentBlocked(c.name)) return false;
       if (!mapData || !attackerPos) return true;
-      const targetPos = mapData.players?.find(p => p.name === c.name) || mapData.placedItems?.find(i => i.name === c.name);
+      const targetPos = findTargetGridPosition(mapData, c.name);
       if (!targetPos) return true;
-      
-      if (shape && attackerGridX != null && attackerGridY != null) {
-        const tempOverlay = createOverlay(shape, attackerGridX, attackerGridY, 0, {
-          radiusFt: rangeFeet,
-          sizeFt: rangeFeet,
-          distanceFt: rangeFeet,
-          coneAngle: coneAngle || 53,
-          widthFt: widthFt || 5,
-        });
-        return hitTestOverlay(tempOverlay, targetPos.gridX, targetPos.gridY);
+      if (canUseShapeOverlay(shape, attackerGridX, attackerGridY)) {
+        return shapeOverlayCovers(shape, attackerGridX, attackerGridY, targetPos, rangeFeet, coneAngle, widthFt);
       }
-      
       return isDistanceInRange(getDistanceFeet(attackerPos, { gridX: targetPos.gridX, gridY: targetPos.gridY }), rangeFeet);
     });
   }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet, turnUndead, monsters, shape, coneAngle, widthFt, attackerGridX, attackerGridY, includeCaster, getForcecageBlocked, getMazeBlocked, getBanishmentBlocked, getImprisonmentBlocked]);

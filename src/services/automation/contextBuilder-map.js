@@ -197,6 +197,23 @@ function applyRangeEffect(base, attack, attackerPlayer, targetPos, isRanged, eff
     }
 }
 
+async function applyHalfCoverGrants(base, coverResult, mapData, playerStats, campaignName) {
+    let current = coverResult;
+    const grants = [
+        { check: () => getRuntimeValue(playerStats.name, 'naturesSanctuaryCreatures', campaignName)?.includes(base.targetName), reason: 'Nature\'s Sanctuary' },
+        { check: () => hasBulwarkCoverAgainst(mapData, base.targetName), reason: 'Bulwark of Force' },
+        { check: () => hasSmiteOfProtectionCover(playerStats, mapData, base.targetName, campaignName), reason: 'Smite of Protection' },
+    ];
+    for (const grant of grants) {
+        if (current.acBonus >= 2) break;
+        if (await grant.check()) {
+            current = { level: 'half', acBonus: 2 };
+            base.coverReason = grant.reason;
+        }
+    }
+    return current;
+}
+
 async function applyCoverModifiers(base, attack, attackerPlayer, targetPos, mapData, playerStats, campaignName, isRanged) {
     const walls = mapData?.walls || new Set();
     let coverResult = computeCover(
@@ -220,24 +237,8 @@ async function applyCoverModifiers(base, attack, attackerPlayer, targetPos, mapD
         base.coverReason = 'Sharpshooter';
     }
 
-    // Check Nature's Sanctuary half cover — any creature in the sanctuary list
-    const sanctuaryCreatures = getRuntimeValue(playerStats.name, 'naturesSanctuaryCreatures', campaignName);
-    if (sanctuaryCreatures?.includes(base.targetName) && coverResult.acBonus < 2) {
-        coverResult = { level: 'half', acBonus: 2 };
-        base.coverReason = 'Nature\'s Sanctuary';
-    }
-
-    // Check Bulwark of Force half cover — any PC with the buff can grant cover to the target
-    if (coverResult.acBonus < 2 && hasBulwarkCoverAgainst(mapData, base.targetName)) {
-        coverResult = { level: 'half', acBonus: 2 };
-        base.coverReason = 'Bulwark of Force';
-    }
-
-    // Check Smite of Protection half cover (allies within Aura of Protection range)
-    if (coverResult.acBonus < 2 && await hasSmiteOfProtectionCover(playerStats, mapData, base.targetName, campaignName)) {
-        coverResult = { level: 'half', acBonus: 2 };
-        base.coverReason = 'Smite of Protection';
-    }
+    // Half-cover grants: Nature's Sanctuary, Bulwark of Force, Smite of Protection
+    coverResult = await applyHalfCoverGrants(base, coverResult, mapData, playerStats, campaignName);
 
     // Check Defensive Duelist AC bonus (2024 rules)
     const ddActiveBuffs = getRuntimeValue(base.targetName, 'activeBuffs', campaignName) || [];

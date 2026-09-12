@@ -4,6 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 
 import storage from '../../../ui/storage.js';
 import { resolveTarget } from '../../common/targetResolver.js';
+import { infoPopup } from '../../common/infoPopup.js';
 import { hasHealingMaximization, resolveDiceExpression } from '../../../combat/automation/automationService.js';
 
 const CUREABLE_CONDITIONS = ['Blinded', 'Deafened', 'Paralyzed', 'Poisoned', 'Stunned'];
@@ -12,83 +13,21 @@ function conditionMatches(c, targetCondition) {
     return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-
-    const costAmount = auto.resourceCostAmount || 5;
-
+function resolveFocusPoints(playerName, campaignName, playerStats) {
     const storedFP = getRuntimeValue(playerName, 'focusPoints', campaignName);
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
     const maxFP = classLevel?.focus_points || 0;
-    const currentFP = storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
+    return storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
+}
 
-    if (currentFP < costAmount) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `Not enough Focus Points. Need ${costAmount}, have ${currentFP}.`,
-                automation: auto,
-            },
-        };
-    }
-
-    const targetInfo = await resolveTarget(campaignName, playerName);
-    if (!targetInfo?.target) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'Select a target in combat first.',
-                automation: auto,
-            },
-        };
-    }
-
-    const targetName = targetInfo.target.name;
-
-    let targetHp;
+function resolveTargetHp(targetInfo, targetName, campaignName) {
     if (targetInfo.target.type === 'player') {
-        targetHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? 0;
-    } else {
-        targetHp = targetInfo.target.currentHp ?? 0;
+        return getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? 0;
     }
+    return targetInfo.target.currentHp ?? 0;
+}
 
-    if (targetHp > 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${targetName} is not at 0 Hit Points.`,
-                automation: auto,
-            },
-        };
-    }
-
-    const maximize = hasHealingMaximization(playerStats);
-    const resolvedExpression = resolveDiceExpression(auto.healExpression || '4d10', playerStats);
-    const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
-    if (!rollResult) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'Failed to roll healing dice.',
-                automation: auto,
-            },
-        };
-    }
-
-    await setRuntimeValue(playerName, 'focusPoints', currentFP - costAmount, campaignName);
-    window.dispatchEvent(new CustomEvent('focus-points-updated'));
-
-    const healAmount = rollResult.total;
-
+async function applyResurrectionHeal(targetInfo, targetName, healAmount, campaignName) {
     if (targetInfo.target.type === 'player') {
         await setRuntimeValue(targetName, 'currentHitPoints', healAmount, campaignName);
     } else {
@@ -97,9 +36,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             storage.set('combatSummary', targetInfo.cs, campaignName);
         }
     }
+}
 
-    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-
+function cureConditionsFor(targetName, auto, campaignName) {
     const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
     const condArray = Array.isArray(conditions) ? conditions : [];
     const cureConditions = (auto.cureConditions || CUREABLE_CONDITIONS)
@@ -109,8 +48,54 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const filtered = condArray.filter(c =>
             !cureConditions.some(cc => conditionMatches(c, cc))
         );
-        await setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        return { cureConditions, promise: setRuntimeValue(targetName, 'activeConditions', filtered, campaignName) };
     }
+    return { cureConditions, promise: null };
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+
+    const costAmount = auto.resourceCostAmount || 5;
+
+    const currentFP = resolveFocusPoints(playerName, campaignName, playerStats);
+
+    if (currentFP < costAmount) {
+        return infoPopup(action.name, `Not enough Focus Points. Need ${costAmount}, have ${currentFP}.`, auto);
+    }
+
+    const targetInfo = await resolveTarget(campaignName, playerName);
+    if (!targetInfo?.target) {
+        return infoPopup(action.name, 'Select a target in combat first.', auto);
+    }
+
+    const targetName = targetInfo.target.name;
+
+    const targetHp = resolveTargetHp(targetInfo, targetName, campaignName);
+
+    if (targetHp > 0) {
+        return infoPopup(action.name, `${targetName} is not at 0 Hit Points.`, auto);
+    }
+
+    const maximize = hasHealingMaximization(playerStats);
+    const resolvedExpression = resolveDiceExpression(auto.healExpression || '4d10', playerStats);
+    const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
+    if (!rollResult) {
+        return infoPopup(action.name, 'Failed to roll healing dice.', auto);
+    }
+
+    await setRuntimeValue(playerName, 'focusPoints', currentFP - costAmount, campaignName);
+    window.dispatchEvent(new CustomEvent('focus-points-updated'));
+
+    const healAmount = rollResult.total;
+
+    await applyResurrectionHeal(targetInfo, targetName, healAmount, campaignName);
+
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+
+    const { cureConditions, promise: curePromise } = cureConditionsFor(targetName, auto, campaignName);
+    if (curePromise) await curePromise;
 
     addEntry(campaignName, {
         type: 'healing',
@@ -127,13 +112,5 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         ? ` Also removed: ${cureConditions.join(', ')}.`
         : '';
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: `${playerName} uses ${action.name} on ${targetName}. Returns to life with ${healAmount} HP. Expended ${costAmount} Focus Points.${cureMsg}`,
-            automation: auto,
-        },
-    };
+    return infoPopup(action.name, `${playerName} uses ${action.name} on ${targetName}. Returns to life with ${healAmount} HP. Expended ${costAmount} Focus Points.${cureMsg}`, auto);
 }
