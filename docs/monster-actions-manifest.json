@@ -400,7 +400,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The aboleth casts phantasmal force (no components required) on any number of creatures it can see within 60 feet of it. While maintaining concentration on this effect, the aboleth can't take other lair actions. If a tar­get succeeds on the saving throw or if the effect ends for it, the target is immune to the aboleth's phantasmal force lair action for the next 24 hours, although such a creature can choose to be affected.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0024-lair-phantasmal-force.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0025",

@@ -22,6 +22,7 @@ import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSa
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal } from '../../services/encounters/monsterLegendaryUses.js';
+import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import './MonsterCardModal.css';
 
 function getDamageTypeChoices(action) {
@@ -868,6 +869,25 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage,
   });
 
+  // MA-0024: lair-row gated click — mirrors the legendary gated-row model.
+  // Save rows resolve through the untouched block-save seam (authored DC/
+  // type, half-on-success math, MA-0017 damageless-condition leg for the
+  // Grasping Tide prone); advisory rows (phantasmal force) log a spell-named
+  // ability_use record (CLA-325 — GM-enforced initiative-20 cadence + 24h
+  // immunity, no illusion-engine consumer); unresolvable rows refuse with a
+  // lair_action_refused log and zero effect.
+  const handleLairRow = (action) => resolveLairRow({
+    action,
+    monsterName,
+    campaignName,
+    setPopupHtml,
+    handleSaveRoll,
+    handleAttack,
+    handleDamage,
+    saveDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary),
+    saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
+  });
+
   // MA-0007: GM-adjudicated charge-damage clause (monsters.json conditional_damage).
   // Grant: roll the clause dice, apply as its own damage roll + hp_change, log the
   // clause. Decline: base damage only, logged. Base "Done" still applies the primary
@@ -988,6 +1008,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         monsterLegendaryUses={monsterLegendaryUses}
         handleGatedReaction={handleGatedReaction}
         handleLegendaryRow={handleLegendaryRow}
+        handleLairRow={handleLairRow}
       />
       {popupHtml && (
         <MonsterAttackPopup

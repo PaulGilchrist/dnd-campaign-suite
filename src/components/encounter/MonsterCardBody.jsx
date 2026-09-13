@@ -6,9 +6,10 @@ import { resolveMonsterIRV } from '../../services/npcs/monsterIrvUtils.js';
 import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js';
 import { MonsterAction } from './MonsterAction.jsx';
 import { legendaryHeaderAction, legendaryUsesRemaining } from '../../services/encounters/monsterLegendaryUses.js';
+import { isLairRowClickable, lairRowAffordance } from '../../services/encounters/monsterLairActions.js';
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses } from './MonsterCardHelpers.js';
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow }) {
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -57,7 +58,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
             )
           ))}
           {lairActions && (
-            <MonsterNamedEffectSection title="Lair Actions" items={lairActions} renderItem={(la, i) => <MonsterLairAction key={i} la={la} />} />
+            <MonsterNamedEffectSection title="Lair Actions" items={lairActions} renderItem={(la, i) => <MonsterLairAction key={i} la={la} attackerCannotAct={attackerActionBlocked} handleLairRow={handleLairRow} />} />
           )}
           {regionalEffects && (
             <MonsterNamedEffectSection title="Regional Effects" items={regionalEffects} renderItem={(re, i) => <MonsterRegionalEffect key={i} re={re} />} />
@@ -71,7 +72,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         </div>
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, handleGatedReaction, handleLegendaryRow]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, handleGatedReaction, handleLegendaryRow, handleLairRow]);
 
   return content;
 }
@@ -330,17 +331,44 @@ function MonsterCardDefenses({ monster, monsterName, campaignName, handleSaveThr
   );
 }
 
-function MonsterLairAction({ la }) {
+// MA-0024: legacy plain-string rows (and nameless dicts, MV-24) keep the
+// static render untouched (~600 monsters regression-protected). Structured
+// rows with an authored mechanic route through the SAME gated affordance as
+// legendary rows — one click = one adjudicated effect (save prompt at the
+// authored DC/type, damage chip, or CLA-325 advisory record).
+function MonsterLairAction({ la, attackerCannotAct, handleLairRow }) {
+  if (typeof la === 'string' || !isLairRowClickable(la)) {
+    return (
+      <div className="mc-action">
+        {typeof la === 'string' ? (
+          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la) }} />
+        ) : (
+          <>
+            <strong>{la.name}.</strong>{' '}
+            <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
+          </>
+        )}
+      </div>
+    );
+  }
+  const affordance = lairRowAffordance(la);
+  const label = affordance === 'save'
+    ? `DC ${la.save_dc} ${la.save_type || ''}`.trim()
+    : affordance === 'damage' ? la.damage_dice_primary : la.name;
+  const clickable = !attackerCannotAct && !!handleLairRow;
   return (
-    <div className="mc-action">
-      {typeof la === 'string' ? (
-        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la) }} />
-      ) : (
-        <>
-          <strong>{la.name}.</strong>{' '}
-          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
-        </>
-      )}
+    <div className={`mc-action${attackerCannotAct ? ' mc-action-disabled' : ''}`}>
+      <strong>{la.name}.</strong>{' '}
+      <span
+        className={`mc-dice-link mc-dice-link-lair${clickable ? '' : ' mc-dice-link-spell-spent'}`}
+        onClick={clickable ? () => handleLairRow(la) : undefined}
+        role="button"
+        tabIndex={0}
+        title={`Lair action — ${label}. Chosen on initiative 20, GM-enforced.`}
+      >
+        <i className="fa-solid fa-hurricane" /> {label}
+      </span>{' '}
+      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
     </div>
   );
 }

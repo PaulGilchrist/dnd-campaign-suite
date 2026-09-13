@@ -796,9 +796,29 @@
       }
     ],
     "lair_actions": [
-      "The aboleth casts phantasmal force (no components required) on any number of creatures it can see within 60 feet of it. While maintaining concentration on this effect, the aboleth can't take other lair actions. If a tar­get succeeds on the saving throw or if the effect ends for it, the target is immune to the aboleth's phantasmal force lair action for the next 24 hours, although such a creature can choose to be affected.",
-      "Pools of water within 90 feet of the aboleth surge out­ ward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 14 Strength saving throw or be pulled up to 20 feet into the water and knocked prone. The aboleth can't use this lair action again until it has used a different one.",
-      "Water in the aboleth's lair magically becomes a con­ duit for the creature's rage. The aboleth can target any number of creatures it can see in such water within 90 feet of it. A target must succeed on a DC 14 Wisdom saving throw or take 7 (2d6) psychic damage. The aboleth can't use this lair action again until it has used a different one."
+      {
+        "name": "Phantasmal Force",
+        "advisory": "phantasmal_force",
+        "save_dc": 16,
+        "save_type": "Intelligence",
+        "description": "The aboleth casts phantasmal force (no components required) on any number of creatures it can see within 60 feet of it. While maintaining concentration on this effect, the aboleth can't take other lair actions. If a tar­get succeeds on the saving throw or if the effect ends for it, the target is immune to the aboleth's phantasmal force lair action for the next 24 hours, although such a creature can choose to be affected."
+      },
+      {
+        "name": "Grasping Tide",
+        "save_dc": 14,
+        "save_type": "Strength",
+        "save_effect": "Failure: The target is pulled up to 20 feet into the water and knocked prone. Success: unaffected.",
+        "description": "Pools of water within 90 feet of the aboleth surge out­ ward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 14 Strength saving throw or be pulled up to 20 feet into the water and knocked prone. The aboleth can't use this lair action again until it has used a different one."
+      },
+      {
+        "name": "Conduit for Rage",
+        "save_dc": 14,
+        "save_type": "Wisdom",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Psychic",
+        "save_effect": "Failure: 7 (2d6) Psychic damage. Success: Half damage.",
+        "description": "Water in the aboleth's lair magically becomes a con­ duit for the creature's rage. The aboleth can target any number of creatures it can see in such water within 90 feet of it. A target must succeed on a DC 14 Wisdom saving throw or take 7 (2d6) psychic damage. The aboleth can't use this lair action again until it has used a different one."
+      }
     ],
     "environments": [
       "underdark"
