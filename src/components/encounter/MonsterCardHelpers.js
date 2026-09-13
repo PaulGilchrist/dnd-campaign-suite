@@ -101,6 +101,41 @@ export function spellDamageFormulaAtBaseLevel(spell) {
     || null;
 }
 
+// MA-0033: spells.json attack_type marks a spell as attack-roll based
+// (ranged/melee) — it must resolve as an attack roll vs an armed target
+// through the attack seam, NEVER as a block save.
+export function isSpellAttackSpell(spell) {
+  return spell?.attack_type === 'ranged' || spell?.attack_type === 'melee';
+}
+
+export function spellDamageFormulaAtLevel(spell, level) {
+  if (!spellHasDamage(spell)) return null;
+  const atLevel = spell.damage.damage_at_slot_level?.[String(level)];
+  if (atLevel) return atLevel;
+  return spellDamageFormulaAtBaseLevel(spell);
+}
+
+// MA-0033: "(level N version)" is the monsters.json authored-upcast
+// convention (adult black dragon "Melf's Acid Arrow (level 3 version)").
+// Parsed at cast time; falls back to the spell's base level.
+export function spellCastLevelFromSpellcasting(description, spellName, spell) {
+  const base = spell?.level ?? null;
+  if (!description || !spellName) return base;
+  const esc = String(spellName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const near = new RegExp(`${esc}(?:</(?:strong|em)>)?\\s*\\(level (\\d+) version\\)`, 'i');
+  const m = description.match(near) || description.match(/\(level (\d+) version\)/i);
+  return m ? Number(m[1]) : base;
+}
+
+// MA-0033: to-hit for a monster spell attack — authored spell_attack_bonus
+// (bullywug-bog-sage convention) or the "+N to hit with spell attacks"
+// prose in the Spellcasting row.
+export function monsterSpellAttackBonus(action) {
+  if (action?.spell_attack_bonus != null) return Number(action.spell_attack_bonus);
+  const m = /(\+\d+)\s+to hit with spell attacks/i.exec(action?.description || '');
+  return m ? Number(m[1]) : null;
+}
+
 export function toAbbr(name) {
   const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
   return ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();

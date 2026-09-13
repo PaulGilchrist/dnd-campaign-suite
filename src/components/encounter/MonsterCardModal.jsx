@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal } from '../../services/encounters/monsterLegendaryUses.js';
@@ -508,6 +508,86 @@ function buildMonsterSpellCastEntry({ monsterName, spellName, spell, action, use
   };
 }
 
+// MA-0033: spell-ATTACK monster casts (Melf's Acid Arrow +9 at lv3) route
+// through the same attack seam as delegated rows (MA-0022 shape) — d20+bonus
+// vs the armed target's AC, spell-named roll/damage logs, isSpellDamage
+// marker (CLA-324). Spell-attack spells must NEVER hit the block-save path.
+// Validation happens BEFORE the N/Day spend so a refusal leaks no charge.
+function resolveSpellAttackPlan({ spell, spellName, action, target, spellCastLogBase }) {
+  const bonus = monsterSpellAttackBonus(action);
+  const castLevel = spellCastLevelFromSpellcasting(action.description, spellName, spell);
+  const formula = spellDamageFormulaAtLevel(spell, castLevel);
+  const missing = [];
+  if (!target) missing.push('no armed target (arm via the initiative card Target selector)');
+  if (bonus == null || !Number.isFinite(bonus)) missing.push('no spell attack bonus authored on the row');
+  if (!formula) missing.push('no damage formula in spells.json');
+  if (missing.length > 0) {
+    return { ok: false, reason: missing.join('; ') };
+  }
+  const concentrationNote = spell.concentration ? ` Concentration (${spell.duration || 'up to 1 minute'}).` : '';
+  return {
+    ok: true,
+    bonus,
+    formula,
+    castLevel,
+    range: spell.range,
+    damageType: spell.damage?.damage_type || 'Acid',
+    castLog: `${spellCastLogBase} — level ${castLevel} ranged spell attack +${bonus} vs ${target.name}, formula ${formula}.${concentrationNote} Delayed/miss-splash dice are GM-enforced for monsters.`,
+  };
+}
+
+async function refuseMonsterSpellAttack({ monsterName, spellName, reason, campaignName, setPopupHtml }) {
+  console.error(`[MonsterCardModal] Spell attack cast refused for '${spellName}': ${reason}`);
+  setPopupHtml(`<div class="mc-prerequisite-refusal"><h3>Spell Cast Refused</h3><p>${monsterName} ${spellName}: ${reason}. Nothing spent, no roll.</p></div>`);
+  await addEntry(campaignName, {
+    type: 'automation blocked',
+    characterName: monsterName,
+    abilityName: spellName,
+    description: `${monsterName} ${spellName} spell attack refused — ${reason}. Zero spend, no roll.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MonsterCardModal] Error logging spell-attack refusal:', e); });
+}
+
+async function spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName }) {
+  if (gate.usesMax == null) return null;
+  const usesNote = ` ${gate.usesMax}/Day use spent — ${gate.usesMax - gate.used - 1} remaining today (resets at a long rest, GM-enforced for monsters).`;
+  await setRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, { ...gate.storedUses, [spellName]: gate.used + 1 }, campaignName);
+  await addEntry(campaignName, {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: spellName,
+    description: `${monsterName} casts ${spellName} via Spellcasting.${usesNote}`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MonsterCardModal] Error logging monster spell use spend:', e); });
+  return usesNote;
+}
+
+// Save-attack spells keep the MA-0003 spell-attributed save routing
+// (own dc_type/dc_success); hoisted to keep handleSpellCast branch-free.
+function executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll }) {
+  const dcSuccess = spell?.dc?.dc_success === 'none' ? 'none' : 'half';
+  handleSaveRoll(action, spellDamageFormulaAtBaseLevel(spell), extractConditionsFromSaveEffect(spell?.save_effect), {
+    spellName, saveType: spell?.dc?.dc_type || action.save_type, dcSuccess,
+  });
+}
+
+async function executeMonsterSpellAttackCast({ monsterName, spellName, plan, usesNote, campaignName, handleAttack }) {
+  await addEntry(campaignName, {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: spellName,
+    description: `${plan.castLog}${usesNote || ''}`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MonsterCardModal] Error logging spell-attack cast:', e); });
+  handleAttack(spellName, plan.bonus, {
+    name: spellName,
+    damage_dice_primary: plan.formula,
+    damage_type_primary: plan.damageType,
+    spell_attack_bonus: plan.bonus,
+    range: plan.range,
+  });
+}
+
 function spellUsesGate(monsterName, action, spellName) {
   const usesMax = extractSpellcastingSpellUses(action.description)[spellName] ?? null;
   const storedUses = getRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY) || {};
@@ -812,6 +892,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     }));
   };
 
+  // MA-0033: handleSpellCast (useCallback) must not depend on the
+  // un-memoized attack seam handler — the ref keeps the callback stable.
+  const rollHandlerRef = useRef(null);
+  rollHandlerRef.current = handleAttack;
+
   const handleDamage = (name, formula, damageType, action) => {
     const target = getTarget();
     const wasCrit = popupHtml?.isCrit;
@@ -884,23 +969,22 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     if (!spell) {
       console.error(`[MonsterCardModal] Spell '${spellName}' not found in spells.json (5e or 2024)`);
     }
-    let usesNote = null;
-    if (gate.usesMax != null) {
-      usesNote = ` ${gate.usesMax}/Day use spent — ${gate.usesMax - gate.used - 1} remaining today (resets at a long rest, GM-enforced for monsters).`;
-      await setRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, { ...gate.storedUses, [spellName]: gate.used + 1 }, campaignName);
-      await addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: monsterName,
-        abilityName: spellName,
-        description: `${monsterName} casts ${spellName} via Spellcasting.${usesNote}`,
-        timestamp: Date.now(),
-      }).catch((e) => { console.error('[MonsterCardModal] Error logging monster spell use spend:', e); });
+    // MA-0033: attack-roll spells validate BEFORE any uses spend, then roll
+    // through the attack seam — never the block-save prompt.
+    const attackPlan = spell && isSpellAttackSpell(spell)
+      ? resolveSpellAttackPlan({ spell, spellName, action, target: getTarget(), spellCastLogBase: `${monsterName} casts ${spellName} via Spellcasting` })
+      : null;
+    if (attackPlan && !attackPlan.ok) {
+      await refuseMonsterSpellAttack({ monsterName, spellName, reason: attackPlan.reason, campaignName, setPopupHtml });
+      return;
+    }
+    const usesNote = await spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName });
+    if (attackPlan) {
+      await executeMonsterSpellAttackCast({ monsterName, spellName, plan: attackPlan, usesNote, campaignName, handleAttack: rollHandlerRef.current });
+      return;
     }
     if (spellHasDamage(spell)) {
-      const dcSuccess = spell?.dc?.dc_success === 'none' ? 'none' : 'half';
-      handleSaveRoll(action, spellDamageFormulaAtBaseLevel(spell), extractConditionsFromSaveEffect(spell?.save_effect), {
-        spellName, saveType: spell?.dc?.dc_type || action.save_type, dcSuccess,
-      });
+      executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll });
       return;
     }
     // CLA-325 advisory model (GM-enforced for monsters): a non-damage utility spell
@@ -908,7 +992,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // there is no wind-line/zone engine consumer, so the effect is adjudicated by the GM.
     await addEntry(campaignName, buildMonsterSpellCastEntry({ monsterName, spellName, spell, action, usesNote }))
       .catch((e) => { console.error('[MonsterCardModal] Error logging monster spell cast:', e); });
-  }, [campaignName, monsterName, handleSaveRoll]);
+  }, [campaignName, monsterName, handleSaveRoll, getTarget, setPopupHtml]);
 
   // MA-0006: gated monster reactions (Feather Fall 1/Day) — consumer of the
   // CLA-315 campaign lastAttack `trigger:'falling'` seam on the monster-card
