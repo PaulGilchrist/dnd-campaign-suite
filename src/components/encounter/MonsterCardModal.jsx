@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import './MonsterCardModal.css';
 
@@ -320,18 +320,37 @@ async function findMonsterSpell(spellName) {
   return spells2024.find(s => s.name === spellName) || null;
 }
 
-function buildMonsterSpellCastLog({ monsterName, spellName, spell, action }) {
+const MONSTER_SPELL_USES_KEY = 'monsterSpellUses';
+
+function buildMonsterSpellCastLog({ monsterName, spellName, spell, action, usesNote }) {
   const saveNote = spell?.dc ? ` (save DC ${action.save_dc}, ${spell.dc.dc_type || action.save_type})` : '';
   const concentrationNote = spell?.concentration ? ` Concentration (${spell.duration || 'up to 1 minute'}).` : '';
-  return `${monsterName} casts ${spellName} via Spellcasting${saveNote}.${concentrationNote} Spell effect is recorded; GM-enforced for monsters.`;
+  return `${monsterName} casts ${spellName} via Spellcasting${saveNote}.${concentrationNote}${usesNote || ''} Spell effect is recorded; GM-enforced for monsters.`;
 }
 
-function buildMonsterSpellCastEntry({ monsterName, spellName, spell, action }) {
+function buildMonsterSpellCastEntry({ monsterName, spellName, spell, action, usesNote }) {
   return {
     type: 'ability_use',
     characterName: monsterName,
     abilityName: spellName,
-    description: buildMonsterSpellCastLog({ monsterName, spellName, spell, action }),
+    description: buildMonsterSpellCastLog({ monsterName, spellName, spell, action, usesNote }),
+    timestamp: Date.now(),
+  };
+}
+
+function spellUsesGate(monsterName, action, spellName) {
+  const usesMax = extractSpellcastingSpellUses(action.description)[spellName] ?? null;
+  const storedUses = getRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY) || {};
+  const used = Number(storedUses[spellName]) || 0;
+  return { usesMax, used, storedUses, exhausted: usesMax != null && used >= usesMax };
+}
+
+function buildMonsterSpellRefusalEntry({ monsterName, spellName, usesMax }) {
+  return {
+    type: 'automation blocked',
+    characterName: monsterName,
+    abilityName: spellName,
+    description: `${monsterName} has already cast ${spellName} today (${usesMax}/Day) — ${spellName} refused. Uses reset at a long rest; GM-enforced for monsters.`,
     timestamp: Date.now(),
   };
 }
@@ -391,6 +410,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const speedyDifficultTerrainIgnore = hasMonsterPassive(monsterCharacter, 'ignore_difficult_terrain_on_dash');
   const monsterActiveBuffs = getRuntimeValue(monsterName, 'activeBuffs') || [];
   const shieldOfFaithBonus = computeShieldOfFaithBonus(monsterActiveBuffs);
+  const monsterSpellUses = useRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, campaignName);
 
   const monsterSensesArray = useMemo(() => {
     if (!monster?.senses) return null;
@@ -628,9 +648,27 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction]);
 
   const handleSpellCast = useCallback(async (action, spellName) => {
+    const gate = spellUsesGate(monsterName, action, spellName);
+    if (gate.exhausted) {
+      await addEntry(campaignName, buildMonsterSpellRefusalEntry({ monsterName, spellName, usesMax: gate.usesMax }))
+        .catch((e) => { console.error('[MonsterCardModal] Error logging monster spell refusal:', e); });
+      return;
+    }
     const spell = await findMonsterSpell(spellName);
     if (!spell) {
       console.error(`[MonsterCardModal] Spell '${spellName}' not found in spells.json (5e or 2024)`);
+    }
+    let usesNote = null;
+    if (gate.usesMax != null) {
+      usesNote = ` ${gate.usesMax}/Day use spent — ${gate.usesMax - gate.used - 1} remaining today (resets at a long rest, GM-enforced for monsters).`;
+      await setRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, { ...gate.storedUses, [spellName]: gate.used + 1 }, campaignName);
+      await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: monsterName,
+        abilityName: spellName,
+        description: `${monsterName} casts ${spellName} via Spellcasting.${usesNote}`,
+        timestamp: Date.now(),
+      }).catch((e) => { console.error('[MonsterCardModal] Error logging monster spell use spend:', e); });
     }
     if (spellHasDamage(spell)) {
       const dcSuccess = spell?.dc?.dc_success === 'none' ? 'none' : 'half';
@@ -642,7 +680,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // CLA-325 advisory model (GM-enforced for monsters): a non-damage utility spell
     // (e.g. Gust of Wind) records a spell-named cast + concentration marker and logs it;
     // there is no wind-line/zone engine consumer, so the effect is adjudicated by the GM.
-    await addEntry(campaignName, buildMonsterSpellCastEntry({ monsterName, spellName, spell, action }))
+    await addEntry(campaignName, buildMonsterSpellCastEntry({ monsterName, spellName, spell, action, usesNote }))
       .catch((e) => { console.error('[MonsterCardModal] Error logging monster spell cast:', e); });
   }, [campaignName, monsterName, handleSaveRoll]);
 
@@ -727,6 +765,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         campaignName={campaignName}
         characters={characters}
         creatures={creatures}
+        monsterSpellUses={monsterSpellUses}
       />
       {popupHtml && (
         <MonsterAttackPopup

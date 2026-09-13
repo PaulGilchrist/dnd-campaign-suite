@@ -1,7 +1,7 @@
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
-import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting } from './MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -27,22 +27,28 @@ function ActionDamageLinks({ action, actionDamageFormula, actionDamageTypeLabel,
   );
 }
 
-function SpellCastLinks({ spellNames, action, attackerCannotAct, onSpellCast }) {
+function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast }) {
+  const spellNames = extractSpellNamesFromSpellcasting(action.description);
   if (spellNames.length === 0) return null;
+  const spellUses = extractSpellcastingSpellUses(action.description);
   const clickable = !attackerCannotAct;
   return (
     <>
-      {spellNames.map(spellName => (
-        <span
-          key={spellName}
-          className="mc-dice-link mc-dice-link-spell"
-          onClick={clickable ? () => onSpellCast(action, spellName) : undefined}
-          role="button"
-          tabIndex={0}
-        >
-          <i className="fa-solid fa-hurricane" /> {spellName}
-        </span>
-      ))}
+      {spellNames.map(spellName => {
+        const usesMax = spellUses[spellName] ?? null;
+        const remaining = usesMax == null ? null : Math.max(0, usesMax - (Number(spellUsesUsed?.[spellName]) || 0));
+        return (
+          <span
+            key={spellName}
+            className={`mc-dice-link mc-dice-link-spell${remaining === 0 ? ' mc-dice-link-spell-spent' : ''}`}
+            onClick={clickable ? () => onSpellCast(action, spellName) : undefined}
+            role="button"
+            tabIndex={0}
+          >
+            <i className="fa-solid fa-hurricane" /> {spellName}{remaining != null && <em> ({usesMax}/Day · {remaining} left)</em>}
+          </span>
+        );
+      })}
     </>
   );
 }
@@ -69,15 +75,13 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll }) {
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast }) {
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {} }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
   const actionDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
   const actionDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
   const actionDamageTypeLabel = formatDamageTypeList(actionDamageType);
-  const spellNames = /^spellcasting$/i.test(action.name || '')
-    ? extractSpellNamesFromSpellcasting(action.description)
-    : [];
+  const isSpellcastingRow = /^spellcasting$/i.test(action.name || '');
 
   return (
     <div key={index} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
@@ -89,8 +93,8 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
         </span>
       )}
       <ActionDamageLinks action={action} actionDamageFormula={actionDamageFormula} actionDamageTypeLabel={actionDamageTypeLabel} onDamage={onDamage} />
-      {spellNames.length > 0 ? (
-        <SpellCastLinks spellNames={spellNames} action={action} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} />
+      {isSpellcastingRow ? (
+        <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} />
       ) : (
         actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} />
       )}

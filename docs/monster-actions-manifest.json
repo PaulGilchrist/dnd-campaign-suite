@@ -105,7 +105,7 @@
       "saveDc": 13,
       "saveType": "Wisdom",
       "description": "The aarakocra casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 13):At Will: Elementalism, Gust of Wind, Mage Hand, Message1/Day: Lightning Bolt",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0005-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0006",

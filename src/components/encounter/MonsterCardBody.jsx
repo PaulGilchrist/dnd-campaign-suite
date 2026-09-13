@@ -7,7 +7,7 @@ import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDesc
 import { MonsterAction } from './MonsterAction.jsx';
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses } from './MonsterCardHelpers.js';
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {} }) {
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -45,7 +45,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <hr />
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
           {actionSections.map(s => (
-            <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} />
+            <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} />
           ))}
           {lairActions && (
             <MonsterNamedEffectSection title="Lair Actions" items={lairActions} renderItem={(la, i) => <MonsterLairAction key={i} la={la} />} />
@@ -62,7 +62,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         </div>
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses]);
 
   return content;
 }
@@ -195,14 +195,14 @@ function MonsterCardAbilities({ monster, handleAbilityCheck }) {
   );
 }
 
-function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast }) {
+function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, spellUsesUsed }) {
   return (
     <>
       <hr />
       {title && <h5 className="mc-section-title">{title}</h5>}
       <div className="mc-section">
         {actions.map((a, i) => (
-          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} onSpellCast={handleSpellCast} />
+          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} onSpellCast={handleSpellCast} spellUsesUsed={spellUsesUsed} />
         ))}
       </div>
     </>

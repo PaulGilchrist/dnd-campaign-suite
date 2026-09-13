@@ -8,7 +8,7 @@ import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
-import { extractSpellNamesFromSpellcasting, spellHasDamage, spellDamageFormulaAtBaseLevel } from './MonsterCardHelpers.js';
+import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, spellHasDamage, spellDamageFormulaAtBaseLevel } from './MonsterCardHelpers.js';
 
 const AEROMANCASTER_SPELLCASTING = {
   name: 'Spellcasting',
@@ -106,10 +106,21 @@ vi.mock('../../services/shared/abilityLookup.js', () => ({
   getAbilitySaveModifier: vi.fn(() => 0),
 }));
 
+const runtime = vi.hoisted(() => {
+  const store = {};
+  return {
+    store,
+    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
+    setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
+    getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
+    useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
+  };
+});
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: vi.fn(() => null),
-  setRuntimeValue: vi.fn(),
-  getRuntimeValue: vi.fn(() => null),
+  useRuntimeValue: runtime.useRuntimeValue,
+  setRuntimeValue: runtime.setRuntimeValue,
+  getRuntimeValue: runtime.getRuntimeValue,
 }));
 
 // ── Re-import mocked modules ────────────────────────────────────────────────
@@ -150,12 +161,15 @@ describe('MonsterCardHelpers spellcasting extraction', () => {
 describe('MonsterCardModal - Spellcasting per-spell cast links (MA-0003)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
     loadSpells.mockImplementation((version) => Promise.resolve(version === '2024' ? SPELLS_2024 : SPELLS_5E));
   });
 
   function renderAeromancer() {
     const m = makeMonster({ name: 'Aarakocra Aeromancer', actions: [AEROMANCASTER_SPELLCASTING] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aarakocra Aeromancer 1' })} />);
+    const props = makeProps(m, { creatureName: 'Aarakocra Aeromancer 1' });
+    const { rerender } = render(<MonsterCardModal {...props} />);
+    return () => rerender(<MonsterCardModal {...props} />);
   }
 
   it('renders per-spell clickable links and drops the anonymous generic DC-save link', () => {
@@ -213,5 +227,70 @@ describe('MonsterCardModal - Spellcasting per-spell cast links (MA-0003)', () =>
     expect(context.dcSuccess).toBe('half');
     expect(context.autoDamageFormula).toBe('8d6');
     expect(context.isSpellDamage).toBe(true);
+  });
+
+  it('renders a per-day uses counter on limited spells only', () => {
+    renderAeromancer();
+    expect(linkByText('Lightning Bolt').textContent).toMatch(/\(1\/Day · 1 left\)/);
+    expect(linkByText('Gust of Wind').textContent).not.toMatch(/\/Day/);
+  });
+
+  it('spends the 1/Day use on cast and refuses a second same-day cast with a spell-named refusal log', async () => {
+    renderAeromancer();
+    const bolt = linkByText('Lightning Bolt');
+
+    await act(async () => { fireEvent.click(bolt); });
+    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(1));
+
+    expect(runtime.store['Aarakocra Aeromancer 1.monsterSpellUses']).toEqual({ 'Lightning Bolt': 1 });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && String(e.description).includes('Lightning Bolt'));
+    expect(spend).toBeTruthy();
+    expect(spend.description).toMatch(/1\/Day use spent — 0 remaining today/);
+    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
+
+    await act(async () => { fireEvent.click(bolt); });
+
+    expect(rollSavingThrow).toHaveBeenCalledTimes(1);
+    expect(runtime.store['Aarakocra Aeromancer 1.monsterSpellUses']).toEqual({ 'Lightning Bolt': 1 });
+    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'automation blocked');
+    expect(refusal).toBeTruthy();
+    expect(refusal.abilityName).toBe('Lightning Bolt');
+    expect(refusal.characterName).toBe('Aarakocra Aeromancer 1');
+    expect(refusal.description).toMatch(/already cast Lightning Bolt today \(1\/Day\)/);
+    expect(refusal.description).toMatch(/refused/);
+  });
+
+  it('marks the spell link spent after its 1/Day use is burned', async () => {
+    const rerender = renderAeromancer();
+    await act(async () => { fireEvent.click(linkByText('Lightning Bolt')); });
+    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(1));
+
+    await act(async () => { rerender(); });
+    const spent = linkByText('Lightning Bolt');
+    expect(spent.textContent).toMatch(/\(1\/Day · 0 left\)/);
+    expect(spent.className).toContain('mc-dice-link-spell-spent');
+  });
+
+  it('At Will spells remain castable repeatedly with no uses spend or refusal', async () => {
+    renderAeromancer();
+    const gust = linkByText('Gust of Wind');
+    await act(async () => { fireEvent.click(gust); });
+    await act(async () => { fireEvent.click(gust); });
+
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    const gustCasts = addEntry.mock.calls.map(c => c[1]).filter(e => e.abilityName === 'Gust of Wind');
+    expect(gustCasts.length).toBe(2);
+    expect(gustCasts.every(e => e.type === 'ability_use')).toBe(true);
+    expect(runtime.store['Aarakocra Aeromancer 1.monsterSpellUses'] ?? null).toBeNull();
+    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
+  });
+});
+
+describe('extractSpellcastingSpellUses', () => {
+  it('parses N/Day grouped spells and ignores At Will groups', () => {
+    expect(extractSpellcastingSpellUses(AEROMANCASTER_SPELLCASTING.description)).toEqual({ 'Lightning Bolt': 1 });
+    expect(extractSpellcastingSpellUses('<strong>At Will:</strong> <strong>Message</strong>')).toEqual({});
+    expect(extractSpellcastingSpellUses('<strong>2/Day:</strong> <strong>Scorching Ray</strong>, <strong>Shatter</strong>')).toEqual({ 'Scorching Ray': 2, 'Shatter': 2 });
+    expect(extractSpellcastingSpellUses(null)).toEqual({});
   });
 });

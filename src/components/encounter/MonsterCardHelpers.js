@@ -60,6 +60,23 @@ export function extractSpellNamesFromSpellcasting(description) {
   return names;
 }
 
+export function extractSpellcastingSpellUses(description) {
+  if (!description || typeof description !== 'string') return {};
+  const uses = {};
+  const re = /<strong>([^<]+)<\/strong>/g;
+  let match;
+  let limit = null;
+  while ((match = re.exec(description)) !== null) {
+    const text = match[1].trim();
+    if (!text) continue;
+    const dayHeader = text.match(/^(\d+)\s*\/\s*Day:?$/i);
+    if (dayHeader) { limit = parseInt(dayHeader[1], 10); continue; }
+    if (text.endsWith(':')) { limit = null; continue; }
+    if (limit != null) uses[text] = limit;
+  }
+  return uses;
+}
+
 export function spellHasDamage(spell) {
   if (!spell) return false;
   const damage = spell.damage;
