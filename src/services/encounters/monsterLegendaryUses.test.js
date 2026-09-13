@@ -389,3 +389,37 @@ describe('MA-0040 Adult Black Dragon Pounce delegates_to Rend', () => {
     expect(spend.description).toMatch(/expends a legendary use for Pounce \(Rend attack\)/);
   });
 });
+
+describe('MA-0050 Adult Blue Dracolich "General" header authors uses:3', () => {
+  const dracolich = monstersData.find(m => m.index === 'adult-blue-dracolich');
+
+  it('legendary_actions[0] is the General header with uses:3', () => {
+    const header = legendaryHeaderAction(dracolich);
+    expect(header?.name).toBe('General');
+    expect(header?.uses).toBe(3);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+  });
+
+  it('economy is live: expend after another turn, exhaust, refuse, regain', async () => {
+    const r = await expendLegendaryUse({ monsterName: 'Adult Blue Dracolich 1', monster: dracolich, actionName: 'Detect', campaignName: 'test-campaign', deps });
+    expect(r).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Adult Blue Dracolich 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Adult Blue Dracolich 1', monster: dracolich, actionName: 'Tail Attack', campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    await expendLegendaryUse({ monsterName: 'Adult Blue Dracolich 1', monster: dracolich, actionName: 'Tail Attack', campaignName: 'test-campaign', deps });
+    cs.activeCreatureName = 'HexWarlock';
+    const third = await expendLegendaryUse({ monsterName: 'Adult Blue Dracolich 1', monster: dracolich, actionName: 'Tail Attack', campaignName: 'test-campaign', deps });
+    expect(third).toEqual({ spent: true, remaining: 0, max: 3 });
+    cs.activeCreatureName = 'FeyRanger';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Adult Blue Dracolich 1', monster: dracolich, actionName: 'Detect', campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+
+    const regain = await regainLegendaryUses({ monsterName: 'Adult Blue Dracolich 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Adult Blue Dracolich 1.monsterLegendaryUses'].used).toBe(0);
+  });
+});

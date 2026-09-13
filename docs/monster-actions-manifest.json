@@ -795,7 +795,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dracolich can take 3 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only at the end ofanother creature's turn. The dracolich regains spent legendary actions at the start of its turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0050-legendary-general.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0051",
