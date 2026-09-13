@@ -11,6 +11,8 @@ import {
   spendMonsterRecharge,
   rollMonsterRecharges,
   buildRechargeRefusalLog,
+  rechargeUsageOf,
+  rechargeDisplayText,
 } from './monsterRecharge.js';
 
 const COLD_BREATH = {
@@ -120,5 +122,63 @@ describe('MA-0031 turn-start recharge d6', () => {
 
   it('MONSTER_RECHARGE_KEY names the monster-store map', () => {
     expect(MONSTER_RECHARGE_KEY).toBe('monsterRecharge');
+  });
+});
+
+// MA-0049: Adult Blue Dracolich Lightning Breath authors recharge as a
+// structured usage OBJECT {type:"recharge on roll", dice:"1d6", min_value:5}
+// — the gate, spend, refusal, chip label and turn-start d6 regain must all
+// consume that shape (threshold 5), never render "[object Object]".
+const DRACOLICH_BREATH = {
+  name: 'Lightning Breath',
+  description: 'The dracolich exhales lightning in a 90-foot line that is 5 feet wide. Each creature in that line must make a DC 20 Dexterity saving throw.',
+  save_dc: 20,
+  save_type: 'Dexterity',
+  usage: { type: 'recharge on roll', dice: '1d6', min_value: 5 },
+  damage_dice_primary: '12d10',
+  damage_type_primary: 'Lightning',
+};
+
+describe('MA-0049 structured usage{recharge on roll} shape', () => {
+  it('gate consumes the usage object: threshold 5 from min_value; spent refused', () => {
+    expect(rechargeUsageOf(DRACOLICH_BREATH)).toEqual({ threshold: 5 });
+    const fresh = monsterRechargeGate(DRACOLICH_BREATH, null);
+    expect(fresh).toEqual({ key: 'Lightning Breath', threshold: 5, available: true });
+    expect(monsterRechargeGate(DRACOLICH_BREATH, { 'Lightning Breath': { recharged: false, threshold: 5 } }).available).toBe(false);
+    expect(monsterRechargeGate(DRACOLICH_BREATH, { 'Lightning Breath': { recharged: true, threshold: 5 } }).available).toBe(true);
+  });
+
+  it('"recharge after rest" usage is NOT a d6-recharge shape — ungated (null)', () => {
+    expect(monsterRechargeGate({ name: 'Enlarge', save_dc: 12, usage: { type: 'recharge after rest', rest_types: ['short', 'long'] } }, null)).toBeNull();
+    expect(rechargeUsageOf({ name: 'Enlarge', usage: { type: 'recharge after rest', rest_types: ['short'] } })).toBeNull();
+  });
+
+  it('chip label renders "(Recharge 5+)" text — never [object Object]; flat text verbatim', () => {
+    expect(rechargeDisplayText(DRACOLICH_BREATH)).toBe('Recharge 5+');
+    expect(rechargeDisplayText(COLD_BREATH)).toBe('6');
+    expect(rechargeDisplayText({ name: 'Claw' })).toBeNull();
+  });
+
+  it('fire-spend stores threshold 5 and logs "Recharge 5+"', async () => {
+    const d = deps();
+    const gate = await spendMonsterRecharge({ monsterName: 'Adult Blue Dracolich 1', action: DRACOLICH_BREATH, campaignName: 'test-campaign', deps: d });
+    expect(gate).toEqual({ key: 'Lightning Breath', threshold: 5, available: true });
+    expect(d.store['Adult Blue Dracolich 1.monsterRecharge']).toEqual({ 'Lightning Breath': { recharged: false, threshold: 5 } });
+    expect(d.addEntry.mock.calls[0][1].description).toMatch(/Lightning Breath — Recharge 5\+; unavailable until a d6 5\+/);
+  });
+
+  it('turn-start d6 regain at threshold 5: nat 5 recharges, nat 4 stays spent', async () => {
+    const hit = deps(5);
+    hit.store['Adult Blue Dracolich 1.monsterRecharge'] = { 'Lightning Breath': { recharged: false, threshold: 5 } };
+    await rollMonsterRecharges({ monsterName: 'Adult Blue Dracolich 1', campaignName: 'test-campaign', deps: hit });
+    expect(hit.rollExpression).toHaveBeenCalledWith('1d6');
+    expect(hit.store['Adult Blue Dracolich 1.monsterRecharge']['Lightning Breath'].recharged).toBe(true);
+    expect(hit.addEntry.mock.calls[0][1].automationType).toBe('recharge');
+
+    const miss = deps(4);
+    miss.store['Adult Blue Dracolich 1.monsterRecharge'] = { 'Lightning Breath': { recharged: false, threshold: 5 } };
+    await rollMonsterRecharges({ monsterName: 'Adult Blue Dracolich 1', campaignName: 'test-campaign', deps: miss });
+    expect(miss.store['Adult Blue Dracolich 1.monsterRecharge']['Lightning Breath'].recharged).toBe(false);
+    expect(miss.addEntry.mock.calls[0][1].automationType).toBe('recharge_failed');
   });
 });

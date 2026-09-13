@@ -783,7 +783,7 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Lightning",
       "description": "The dracolich exhales lightning in a 90-foot line that is 5 feet wide. Each creature in that line must make a DC 20 Dexterity saving throw, taking 66 (12dl0) lightning damage on a failed save, or halfas much damage on a successful one.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0049-lightning-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0050",

@@ -567,3 +567,35 @@ function buildCounterspellMessage({ monsterName, spellName, outcome, limit, rema
   const verdict = outcome.countered ? 'countered' : 'failed — spell resolves';
   return `${monsterName} Counterspells ${spellName}: ability check d20 (${outcome.d20}) + ${outcome.mod} = ${outcome.total} vs DC ${outcome.targetDC} — ${verdict}. ${tail}`;
 }
+
+// MA-0049: structured `usage` objects must never render as "[object Object]"
+// (MV-26). Flat strings stay verbatim; d6-recharge shapes are owned by
+// RechargeNote/monsterRecharge.js (null here, so the note never doubles up).
+export function formatActionUsage(usage) {
+  if (usage == null) return null;
+  if (typeof usage === 'string') return usage;
+  if (typeof usage !== 'object') return String(usage);
+  const type = String(usage.type || '').toLowerCase();
+  if (/recharge/.test(type)) return null;
+  if (type === 'per day' && usage.times != null) return `${usage.times}/Day`;
+  console.error('[MonsterCardHelpers] unformattable monster action usage', usage);
+  return null;
+}
+
+// MA-0049: save-row safety gate — a single-target block save clicked with no
+// armed target refuses instead of degrading to a self-target roll.
+export function buildNoTargetRefusalPopup({ monsterName, actionName }) {
+  return `<div class="mc-no-target-refusal"><h3>No Target</h3><p>${monsterName} cannot use ${actionName} — no target is armed on ${monsterName}'s initiative card. Arm a target on the initiative card first (AoE rows pick their own area targets). No save rolled, nothing spent.</p></div>`;
+}
+
+export function buildNoTargetRefusalLog({ monsterName, actionName }) {
+  const slug = String(actionName || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return {
+    type: 'automation',
+    automationType: `${slug}_refused`,
+    characterName: monsterName,
+    abilityName: actionName,
+    description: `${monsterName} ${actionName} refused (no target) — no armed target on the initiative card, no self-resolve. Zero spend, no save prompt.`,
+    timestamp: Date.now(),
+  };
+}

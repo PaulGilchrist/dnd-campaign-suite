@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal } from '../../services/encounters/monsterLegendaryUses.js';
@@ -112,6 +112,17 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   const saveType = spellInfo?.saveType || action.save_type;
   const dcSuccess = resolveBlockSaveDcSuccess(spellInfo, action);
   const aoe = breathAoeShape(action, spellInfo);
+  // MA-0049: safety gate — a single-target block save with no armed target
+  // refuses (popup + `<action>_refused (no target)`) instead of degrading
+  // into a self-target save against the monster itself. AoE rows keep the
+  // area picker — the picker IS their target selection.
+  if (aoe == null && !target?.name) {
+    const refusedName = spellName || action.name;
+    setPopupHtml(buildNoTargetRefusalPopup({ monsterName, actionName: refusedName }));
+    addEntry(campaignName, buildNoTargetRefusalLog({ monsterName, actionName: refusedName }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging no-target refusal:', e); });
+    return;
+  }
   const fire = () => {
     console.debug(`[saveDebug] MonsterCardModal.handleSaveRoll`, {
       monsterName, actionName: spellName || action.name, saveDc: action.save_dc, saveType,

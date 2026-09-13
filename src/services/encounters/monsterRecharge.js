@@ -27,14 +27,40 @@ export function parseRechargeThreshold(recharge) {
   return m ? Number(m[1]) : null;
 }
 
+// MA-0049: rows may author recharge as flat text ("5-6", "6") OR a structured
+// usage object {type:"recharge on roll", dice:"1d6", min_value:5} (Adult Blue
+// Dracolich Lightning Breath). Both shapes gate identically on the d6
+// threshold; flat rows stay byte-unchanged. "recharge after rest" is NOT a
+// d6-recharge shape (rest-gated) and never gates here.
+export function rechargeUsageOf(action) {
+  if (!action) return null;
+  if (action.recharge != null) return { threshold: parseRechargeThreshold(action.recharge) };
+  const usage = action.usage;
+  if (usage && typeof usage === 'object' && /recharge\s+on\s+roll/i.test(String(usage.type || ''))) {
+    if (usage.dice && String(usage.dice) !== '1d6') {
+      console.error(`[monsterRecharge] unsupported recharge dice "${usage.dice}" — rolling 1d6`);
+    }
+    const threshold = Number(usage.min_value) || null;
+    return threshold == null ? null : { threshold };
+  }
+  return null;
+}
+
+// Chip label: authored flat text verbatim, structured usage as "(Recharge 5+)"
+// — never "[object Object]" (MV-26 display defect).
+export function rechargeDisplayText(action) {
+  if (action?.recharge != null) return String(action.recharge);
+  const usage = rechargeUsageOf(action);
+  return usage ? `Recharge ${usage.threshold}+` : null;
+}
+
 // null for rows without a recharge value; otherwise { key, available, threshold }.
 export function monsterRechargeGate(action, storedMap) {
-  if (!action || action.recharge == null) return null;
-  const threshold = parseRechargeThreshold(action.recharge);
-  if (threshold == null) return null;
+  const usage = rechargeUsageOf(action);
+  if (!usage || usage.threshold == null) return null;
   const key = rechargeActionKey(action);
   const entry = storedMap?.[key] || null;
-  return { key, threshold, available: !entry || entry.recharged !== false };
+  return { key, threshold: usage.threshold, available: !entry || entry.recharged !== false };
 }
 
 function refusalSlug(rechargeKey) {
@@ -71,7 +97,7 @@ export async function spendMonsterRecharge({ monsterName, action, campaignName, 
     type: 'ability_use',
     characterName: monsterName,
     abilityName: action.name,
-    description: `${monsterName} uses ${action.name} — Recharge ${action.recharge}; unavailable until a d6 ${gate.threshold}+ at the start of ${monsterName}'s next turn.`,
+    description: `${monsterName} uses ${action.name} — Recharge ${action.recharge ?? `${gate.threshold}+`}; unavailable until a d6 ${gate.threshold}+ at the start of ${monsterName}'s next turn.`,
     timestamp: Date.now(),
   });
   return gate;

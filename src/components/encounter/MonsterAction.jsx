@@ -2,9 +2,9 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { canRollExpression } from '../../services/dice/diceRoller.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
-import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining } from './MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage } from './MonsterCardHelpers.js';
 import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
-import { monsterRechargeGate } from '../../services/encounters/monsterRecharge.js';
+import { monsterRechargeGate, rechargeDisplayText } from '../../services/encounters/monsterRecharge.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -15,9 +15,14 @@ function rechargeSpent(gateInfo) {
 }
 
 // MA-0031: recharge label — a spent row reads "(Recharge 6 — unavailable)".
+// MA-0049: structured usage {recharge on roll, min_value 5} reads
+// "(Recharge 5+)" — the rechargeDisplayText helper covers both shapes.
 function RechargeNote({ action, rechargeOut }) {
-  if (action.recharge == null) return null;
-  return <em> ({rechargeOut ? `Recharge ${String(action.recharge)} — unavailable` : String(action.recharge)})</em>;
+  const rechargeText = rechargeDisplayText(action);
+  if (rechargeText == null) return null;
+  if (!rechargeOut) return <em> ({rechargeText})</em>;
+  const label = /^recharge\b/i.test(rechargeText) ? rechargeText : `Recharge ${rechargeText}`;
+  return <em> ({`${label} — unavailable`})</em>;
 }
 
 // MA-0014: unroll­able formulas (e.g. "1d8+3+spell level") must render as
@@ -146,6 +151,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
   const actionDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
   const actionDamageTypeLabel = formatDamageTypeList(actionDamageType);
   const isSpellcastingRow = /^spellcasting$/i.test(action.name || '');
+  const usageText = formatActionUsage(action.usage);
 
   return (
     <div key={index} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
@@ -165,7 +171,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       )}
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
       <GatedReactionSlot action={action} attackerCannotAct={attackerCannotAct} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} />
-      {action.usage && <em> ({String(action.usage)})</em>}
+      {usageText && <em> ({usageText})</em>}
       <RechargeNote action={action} rechargeOut={rechargeOut} />
     </div>
   );
