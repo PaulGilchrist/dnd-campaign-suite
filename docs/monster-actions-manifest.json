@@ -620,7 +620,7 @@
       "damageDicePrimary": "4d10",
       "damageTypePrimary": "Poison",
       "description": "Dexterity Saving Throw: DC 17, one creature the dragon can see within 120 feet. Failure: 22 (4d10) Poison damage, and the target has Disadvantage on saving throws to maintain Concentration until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0038-cloud-of-insects.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0039",

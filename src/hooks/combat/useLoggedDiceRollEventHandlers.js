@@ -538,6 +538,8 @@ export function setupEventListeners(deps) {
                 timestamp: Date.now(),
                 id: utils.guid(),
                 advantageSources: e.detail.advantageSources || null,
+                // MA-0038: te-driven disadvantage attribution (e.g. Cloud of Insects).
+                disadvantageSource: e.detail.disadvantageSource || null,
             });
 
             const combatSummary = getCombatSummary(campaignName);

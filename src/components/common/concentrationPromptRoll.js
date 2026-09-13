@@ -3,6 +3,7 @@ import { rollD20 } from '../../services/dice/diceRoller.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { hasSaveModifier } from '../../services/combat/conditions/conditionEffects.js';
 import { getHolyAuraSaveAdvantage } from './savePromptUtils.js';
+import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 
 function findCharacter(characters, name) {
   return (characters || []).find(c => {
@@ -48,7 +49,12 @@ function getConcentrationAdvantage(current, characters, campaignName) {
   return { saveBonus, saveModifiers, hasAdvantage: !!hasAdvantage, advantageSources };
 }
 
-function hasConcentrationDisadvantage(current, characters) {
+// MA-0038: static concentration_breaker attacker modifiers PLUS the live
+// failed-save te (concentration_disadvantage, e.g. Adult Black Dragon's
+// Cloud of Insects) carried by the concentration holder.
+function hasConcentrationDisadvantage(current, characters, campaignName) {
+  const te = getActiveTargetEffect(campaignName, current.targetName, 'concentration_disadvantage');
+  if (te) return true;
   if (!current.attackerName) return false;
   const attacker = findCharacter(characters, current.attackerName);
   const attackerModifiers = attacker?.saveModifiers || attacker?.computedStats?.saveModifiers;
@@ -66,7 +72,8 @@ function hasStarryFormBuff(current, characters, saveModifiers) {
 
 export function resolveConcentrationRoll({ current, characters, campaignName, auraBonus, auraSourceName }) {
   const { saveBonus, saveModifiers, hasAdvantage, advantageSources } = getConcentrationAdvantage(current, characters, campaignName);
-  const hasDisadvantage = hasConcentrationDisadvantage(current, characters);
+  const teDisadvantage = getActiveTargetEffect(campaignName, current.targetName, 'concentration_disadvantage');
+  const hasDisadvantage = hasConcentrationDisadvantage(current, characters, campaignName);
   const starryFormBuff = hasStarryFormBuff(current, characters, saveModifiers);
 
   let roll;
@@ -89,6 +96,7 @@ export function resolveConcentrationRoll({ current, characters, campaignName, au
   const success = total >= current.dc;
   const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${auraSourceName ? ' from ' + auraSourceName : ''})` : undefined;
   const mode = (hasAdvantage || hasDisadvantage) ? (hasAdvantage ? 'advantage' : 'disadvantage') : 'normal';
+  const disadvantageSource = (hasDisadvantage && teDisadvantage) ? (teDisadvantage.actionName || teDisadvantage.source) : null;
 
-  return { saveBonus, roll, rawRolls, total, success, bonusDetail, mode, advantageSources };
+  return { saveBonus, roll, rawRolls, total, success, bonusDetail, mode, advantageSources, disadvantageSource };
 }

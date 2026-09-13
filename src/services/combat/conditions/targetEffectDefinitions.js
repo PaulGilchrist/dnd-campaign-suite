@@ -37,6 +37,18 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-0038: Adult Black Dragon Cloud of Insects failed-save clause —
+    // Disadvantage on saving throws to maintain Concentration until the
+    // end of the source's next turn (duration: until_end_of_next_turn).
+    effect: 'concentration_disadvantage',
+    label: 'Concentration Disadv',
+    description: 'Disadvantage on saving throws to maintain Concentration until the end of the source\'s next turn.',
+    icon: 'fa-arrow-down',
+    cls: 'effect-disadvantage',
+    group: 'Saves & Checks',
+    fields: ['source'],
+  },
+  {
     effect: 'goad',
     label: 'Goad',
     description: 'Attacks against creatures other than the goader have Disadvantage.',
@@ -848,4 +860,15 @@ function registerTargetEffect(campaignName, targetName, effectKey, source, extra
   setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName, true)
 }
 
-export { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect }
+/**
+ * Read the live te an active creature carries for a registry effect key.
+ * MA-0038: concentration-save consumers use this to see te written by
+ * monster failed-save clauses (e.g. concentration_disadvantage).
+ */
+function getActiveTargetEffect(campaignName, targetName, effectKey) {
+  const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName)
+  if (!Array.isArray(storedEffects)) return null
+  return storedEffects.find(te => te.target === targetName && te.effect === effectKey) || null
+}
+
+export { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect }

@@ -39,6 +39,17 @@ export function formatSenses(senses) {
 
 const CONDITIONS = ['blinded', 'charmed', 'cursed', 'deafened', 'frightened', 'grappled', 'incapacitated', 'paralyzed', 'petrified', 'poisoned', 'prone', 'restrained', 'stunned', 'unconscious'];
 
+// MA-0038: authored failed-save concentration-disadvantage clause (Adult
+// Black Dragon Cloud of Insects — "Disadvantage on saving throws to
+// maintain Concentration until the end of its next turn"). Not a condition,
+// so extractConditionsFromSaveEffect can never see it; this clause parse
+// arms the te producer in saveProcessing on a failed save.
+export function parseConcentrationDisadvantageClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const re = /disadvantage on saving throws to maintain\s*(?:<\/?strong>)?\s*concentration/i;
+  return re.test(saveEffect) ? { effect: 'concentration_disadvantage' } : null;
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];

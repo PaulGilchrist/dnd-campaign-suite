@@ -3,6 +3,7 @@ import storage from '../../ui/storage.js';
 import { rollD20 } from '../../dice/diceRoller.js';
 import utils from '../../ui/utils.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
+import { getActiveTargetEffect } from '../../combat/conditions/targetEffectDefinitions.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js'
 import { cleanupConcentrationEffects } from '../../combat/concentration/concentrationService.js';
 import { addEntry } from '../../ui/logService.js';
@@ -527,7 +528,20 @@ function handleNpcConcentrationBreak(creature, characters, attackerName, combatS
     return false;
   }
 
-  const hasConcentrationBreaker = attackerHasConcentrationBreaker(characters, attackerName);
+  // MA-0038: static concentration_breaker OR the live te written by a
+  // failed-save clause (e.g. Adult Black Dragon Cloud of Insects).
+  const teConcentrationDis = getActiveTargetEffect(campaignName, creature.name, 'concentration_disadvantage');
+  const hasConcentrationBreaker = attackerHasConcentrationBreaker(characters, attackerName) || !!teConcentrationDis;
+  if (teConcentrationDis) {
+    addEntry(campaignName, {
+      type: 'automation',
+      automationType: 'concentration_disadvantage_applied',
+      characterName: creature.name,
+      sourceName: teConcentrationDis.source,
+      abilityName: teConcentrationDis.actionName || 'Concentration Save',
+      description: `${creature.name} rolls this Concentration save with Disadvantage (${teConcentrationDis.source}${teConcentrationDis.actionName ? ` — ${teConcentrationDis.actionName}` : ''}).`,
+    }).catch((e) => { console.error("[applyDamage:concentration-disadvantage]", e); });
+  }
   const { success, roll, total, rawRolls } = rollConcentrationSave(saveBonus, creature.concentration.dc, dragonConstellationActive, hasConcentrationBreaker);
   if (!success) {
     const spellName = creature.concentration.spell;

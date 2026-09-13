@@ -66,6 +66,7 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
 
 vi.mock('../../../services/combat/conditions/targetEffectDefinitions.js', () => ({
     registerTargetEffect: vi.fn(),
+    getActiveTargetEffect: vi.fn(() => null),
     getEffectDefinition: vi.fn((key) => ({ effect: key, label: 'Can\'t Regain Hit Points', group: 'Defensive' })),
 }));
 
