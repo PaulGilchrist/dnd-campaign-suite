@@ -325,8 +325,12 @@ async function findMonsterSpell(spellName) {
 
 const MONSTER_SPELL_USES_KEY = 'monsterSpellUses';
 
+// MA-0012: advisory cast logs print the row's authored save_dc/save_type
+// (e.g. Aberrant Cultist "spell save DC 15, Wisdom") even when the spell's
+// own spells.json entry carries no structured dc.
 function buildMonsterSpellCastLog({ monsterName, spellName, spell, action, usesNote }) {
-  const saveNote = spell?.dc ? ` (save DC ${action.save_dc}, ${spell.dc.dc_type || action.save_type})` : '';
+  const saveAbility = spell?.dc?.dc_type || action?.save_type || null;
+  const saveNote = action?.save_dc != null ? ` (spell save DC ${action.save_dc}${saveAbility ? `, ${saveAbility}` : ''})` : '';
   const concentrationNote = spell?.concentration ? ` Concentration (${spell.duration || 'up to 1 minute'}).` : '';
   return `${monsterName} casts ${spellName} via Spellcasting${saveNote}.${concentrationNote}${usesNote || ''} Spell effect is recorded; GM-enforced for monsters.`;
 }

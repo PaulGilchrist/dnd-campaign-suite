@@ -218,7 +218,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 15):At Will: Detect Thoughts, Minor Illusion",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0012-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0013",

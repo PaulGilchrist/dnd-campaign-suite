@@ -51,10 +51,13 @@ export function extractConditionsFromSaveEffect(saveEffect) {
   return found;
 }
 
+// MA-0003/MA-0012: spell names in Spellcasting descriptions are marked up
+// as either <strong>Name</strong> or <em>Name</em> across monsters.json —
+// both markups yield clickable per-spell links.
 export function extractSpellNamesFromSpellcasting(description) {
   if (!description || typeof description !== 'string') return [];
   const names = [];
-  const re = /<strong>([^<]+)<\/strong>/g;
+  const re = /<(?:strong|em)>([^<]+)<\/(?:strong|em)>/g;
   let match;
   while ((match = re.exec(description)) !== null) {
     const name = match[1].trim();
@@ -67,13 +70,13 @@ export function extractSpellNamesFromSpellcasting(description) {
 export function extractSpellcastingSpellUses(description) {
   if (!description || typeof description !== 'string') return {};
   const uses = {};
-  const re = /<strong>([^<]+)<\/strong>/g;
+  const re = /<(?:strong|em)>([^<]+)<\/(?:strong|em)>/g;
   let match;
   let limit = null;
   while ((match = re.exec(description)) !== null) {
     const text = match[1].trim();
     if (!text) continue;
-    const dayHeader = text.match(/^(\d+)\s*\/\s*Day:?$/i);
+    const dayHeader = text.match(/^(\d+)\s*\/\s*Day(?:\s*Each)?:?$/i);
     if (dayHeader) { limit = parseInt(dayHeader[1], 10); continue; }
     if (text.endsWith(':')) { limit = null; continue; }
     if (limit != null) uses[text] = limit;

@@ -342,7 +342,9 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <em>Detect Thoughts</em>, <em>Minor Illusion</em>"
+        "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <em>Detect Thoughts</em>, <em>Minor Illusion</em>",
+        "save_dc": 15,
+        "save_type": "Wisdom"
       }
     ],
     "reactions": [

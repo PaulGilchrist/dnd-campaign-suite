@@ -4,6 +4,7 @@
 // resolves a spell-attributable record + log ("GM-enforced for monsters") with
 // NO save prompt and NO "Half damage" guidance; damage spells (Lightning Bolt)
 // route a spell-attributed save with the spell's own dc_success.
+import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -19,6 +20,8 @@ const AEROMANCASTER_SPELLCASTING = {
 
 const SPELLS_5E = [
   { name: 'Gust of Wind', level: 2, concentration: true, duration: 'Up to 1 minute', damage: null, dc: { dc_type: 'STR', dc_success: 'none' } },
+  { name: 'Detect Thoughts', level: 2, concentration: true, duration: 'Up to 1 minute', damage: null, dc: null },
+  { name: 'Minor Illusion', level: 0, concentration: false, duration: '1 minute', damage: null, dc: null },
   { name: 'Lightning Bolt', level: 3, concentration: false, duration: 'Instantaneous', damage: { damage_type: 'Lightning', damage_at_slot_level: { 3: '8d6', 4: '9d6' } }, dc: { dc_type: 'DEX', dc_success: 'half' } },
   { name: 'Mage Hand', level: 0, concentration: false, duration: '1 minute', damage: null, dc: null },
   { name: 'Message', level: 0, concentration: false, duration: '1 round', damage: null, dc: null },
@@ -292,5 +295,97 @@ describe('extractSpellcastingSpellUses', () => {
     expect(extractSpellcastingSpellUses('<strong>At Will:</strong> <strong>Message</strong>')).toEqual({});
     expect(extractSpellcastingSpellUses('<strong>2/Day:</strong> <strong>Scorching Ray</strong>, <strong>Shatter</strong>')).toEqual({ 'Scorching Ray': 2, 'Shatter': 2 });
     expect(extractSpellcastingSpellUses(null)).toEqual({});
+  });
+
+  it('MA-0012: parses em-marked spell names and "N/Day Each:" headers', () => {
+    expect(extractSpellcastingSpellUses('<strong>At Will:</strong> <em>Detect Thoughts</em>, <em>Minor Illusion</em>')).toEqual({});
+    expect(extractSpellcastingSpellUses('<strong>At Will:</strong> <em>Elementalism</em>, <em>Mage Hand</em><br><strong>1/Day:</strong> <em>Fireball</em>')).toEqual({ 'Fireball': 1 });
+    expect(extractSpellcastingSpellUses('<strong>At Will:</strong> <em>Detect Magic</em><br><strong>1/Day Each:</strong> <em>Geas</em>')).toEqual({ 'Geas': 1 });
+  });
+});
+
+// ── MA-0012: Aberrant Cultist Spellcasting — em-marked spell names + DC drift ─
+
+const CULTIST_SPELLCASTING = {
+  name: 'Spellcasting',
+  description: 'The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <em>Detect Thoughts</em>, <em>Minor Illusion</em>',
+  save_dc: 15,
+  save_type: 'Wisdom',
+};
+
+describe('MonsterCardHelpers - MA-0012 em-marked spell name extraction', () => {
+  it('extracts em-marked spell names and skips colon headers', () => {
+    expect(extractSpellNamesFromSpellcasting(CULTIST_SPELLCASTING.description)).toEqual(['Detect Thoughts', 'Minor Illusion']);
+  });
+
+  it('authored monsters.json row carries canonical DC 15 (8 + WIS + PB)', () => {
+    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+    const cultist = monsters.find(m => m.index === 'aberrant-cultist');
+    const row = cultist.actions.find(a => a.name === 'Spellcasting');
+    expect(row.save_dc).toBe(15);
+    expect(row.save_type).toBe('Wisdom');
+    expect(8 + cultist.ability_score_modifiers.wis + cultist.proficiency_bonus).toBe(15);
+  });
+});
+
+describe('MonsterCardModal - MA-0012 Aberrant Cultist per-spell links', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    loadSpells.mockImplementation((version) => Promise.resolve(version === '2024' ? SPELLS_2024 : SPELLS_5E));
+  });
+
+  function renderCultist() {
+    const m = makeMonster({ name: 'Aberrant Cultist', actions: [CULTIST_SPELLCASTING] });
+    const props = makeProps(m, { creatureName: 'Aberrant Cultist 1' });
+    render(<MonsterCardModal {...props} />);
+  }
+
+  it('renders clickable per-spell links for em-marked spell names (no more zero-affordance row)', () => {
+    renderCultist();
+    const names = spellLinks().map(el => el.textContent.trim());
+    expect(names).toEqual(expect.arrayContaining([
+      expect.stringContaining('Detect Thoughts'),
+      expect.stringContaining('Minor Illusion'),
+    ]));
+  });
+
+  it('clicking Detect Thoughts logs a spell-attributed cast with the authored DC 15 (no damage in app data — advisory, no save prompt)', async () => {
+    renderCultist();
+    await act(async () => { fireEvent.click(linkByText('Detect Thoughts')); });
+
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    const entry = addEntry.mock.calls.map(c => c[1]).find(e => e.abilityName === 'Detect Thoughts');
+    expect(entry).toBeTruthy();
+    expect(entry.type).toBe('ability_use');
+    expect(entry.characterName).toBe('Aberrant Cultist 1');
+    expect(entry.description).toMatch(/spell save DC 15, Wisdom/);
+    expect(entry.description).toMatch(/Concentration/);
+    expect(entry.description).toMatch(/GM-enforced for monsters/);
+    expect(entry.description).not.toMatch(/half damage/i);
+    expect(rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('clicking Minor Illusion logs a spell-attributed advisory record, no save prompt', async () => {
+    renderCultist();
+    await act(async () => { fireEvent.click(linkByText('Minor Illusion')); });
+
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    const entry = addEntry.mock.calls.map(c => c[1]).find(e => e.abilityName === 'Minor Illusion');
+    expect(entry).toBeTruthy();
+    expect(entry.type).toBe('ability_use');
+    expect(entry.description).toMatch(/Aberrant Cultist 1 casts Minor Illusion via Spellcasting/);
+    expect(entry.description).toMatch(/GM-enforced for monsters/);
+    expect(rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('At Will em spells remain castable repeatedly with no uses spend', async () => {
+    renderCultist();
+    await act(async () => { fireEvent.click(linkByText('Minor Illusion')); });
+    await act(async () => { fireEvent.click(linkByText('Minor Illusion')); });
+
+    await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(2));
+    expect(runtime.store['Aberrant Cultist 1.monsterSpellUses'] ?? null).toBeNull();
+    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
   });
 });
