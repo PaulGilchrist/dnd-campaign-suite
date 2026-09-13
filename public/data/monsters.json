@@ -1146,7 +1146,10 @@
       },
       {
         "name": "Frightful Presence",
-        "description": "The dragon uses Spellcasting to cast <em>Fear</em>. The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Fear</em>. Each creature of the dragon's choice within 60 feet of it that can see and hear the dragon must succeed on a DC 17 Wisdom saving throw or become Frightened. 60-ft selection advisory — single armed target resolves; GM picks targets. The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 17,
+        "save_type": "Wisdom",
+        "save_effect": "The target becomes Frightened. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success."
       },
       {
         "name": "Pounce",
@@ -4301,7 +4304,7 @@
       },
       {
         "name": "Frightful Presence",
-        "description": "The dragon casts *Fear*, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18). The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Fear</em>. The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Pounce",

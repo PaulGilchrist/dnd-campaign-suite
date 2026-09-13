@@ -632,7 +632,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0039-frightful-presence.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0040",
