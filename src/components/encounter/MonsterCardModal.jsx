@@ -21,7 +21,7 @@ import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
 import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
-import { expendLegendaryUse } from '../../services/encounters/monsterLegendaryUses.js';
+import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog } from '../../services/encounters/monsterLegendaryUses.js';
 import './MonsterCardModal.css';
 
 function getDamageTypeChoices(action) {
@@ -30,25 +30,49 @@ function getDamageTypeChoices(action) {
 
 // MA-0021: legendary-row numeric mechanic resolved after a use is spent —
 // routes to the same handlers the numeric chips already use (MA-0014 intact).
-function resolveLegendaryRowMechanic(action, { handleAttack, handleSaveRoll, handleDamage }) {
-  if (action.attack_bonus != null) handleAttack(action.name, action.attack_bonus, action);
+// MA-0022: a non-numeric row that names another action via `delegates_to`
+// resolves using THAT row's attack_bonus/damage through the identical attack
+// seam (Lash → Tentacle +9 / 2d6+5), logs "Lash (Tentacle attack)".
+function legendaryRowHasNumericMechanic(action) {
+  if (action.attack_bonus != null || action.save_dc != null) return true;
+  const formula = extractDamageDiceFromDescription(action.description, action.damage_dice_primary);
+  return !!(formula && canRollExpression(formula));
+}
+
+function resolveLegendaryRowMechanic(action, { monsterName, handledActionName, handleAttack, handleSaveRoll, handleDamage }) {
+  if (action.attack_bonus != null) handleAttack(handledActionName ?? action.name, action.attack_bonus, action);
   else if (action.save_dc != null) handleSaveRoll(action, extractDamageDiceFromDescription(action.description, action.damage_dice_primary), extractConditionsFromSaveEffect(action.save_effect));
   else {
     const formula = extractDamageDiceFromDescription(action.description, action.damage_dice_primary);
-    if (formula && canRollExpression(formula)) handleDamage(action.name, formula, action.damage_type_primary ? formatDamageTypes([action.damage_type_primary]) : '', action);
+    if (formula && canRollExpression(formula)) handleDamage(handledActionName ?? action.name, formula, action.damage_type_primary ? formatDamageTypes([action.damage_type_primary]) : '', action);
+    else console.error(`[MonsterCardModal] legendary action "${action.name}" delegates_to "${action.delegates_to}" — no resolvable mechanic on "${monsterName}"`);
   }
 }
 
 // MA-0021: legendary-row gated click — expend 1 use (round+turn latch, refusal
 // popup + legendary_use_refused zero-spend log), then resolve the row's own
-// mechanic (numeric chips roll as today, MA-0014 gate intact).
+// mechanic (numeric chips roll as today, MA-0014 gate intact). MA-0022: rows
+// with no own numbers delegate to the named row before spending.
 async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage }) {
-  const result = await expendLegendaryUse({ monsterName, monster, actionName: action.name, campaignName });
+  let mechanicAction = action;
+  let actionName = action.name;
+  if (!legendaryRowHasNumericMechanic(action) && action.delegates_to) {
+    const delegate = legendaryDelegateAction(monster, action);
+    if (!delegate) {
+      setPopupHtml(buildLegendaryRefusalPopup({ monsterName, actionName: action.name, reason: 'no-delegate' }));
+      addEntry(campaignName, buildLegendaryRefusalLog({ monsterName, actionName: action.name, reason: 'no-delegate' }))
+        .catch((e) => { console.error('[MonsterCardModal] Error logging legendary delegate refusal:', e); });
+      return;
+    }
+    mechanicAction = delegate;
+    actionName = legendaryDelegateAttackName(action, delegate);
+  }
+  const result = await expendLegendaryUse({ monsterName, monster, actionName, campaignName });
   if (!result.spent) {
     setPopupHtml(result.popupHtml);
     return;
   }
-  resolveLegendaryRowMechanic(action, { handleAttack, handleSaveRoll, handleDamage });
+  resolveLegendaryRowMechanic(mechanicAction, { monsterName, handledActionName: actionName, handleAttack, handleSaveRoll, handleDamage });
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

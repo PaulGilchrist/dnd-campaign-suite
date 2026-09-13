@@ -3,15 +3,20 @@
 // the verbatim action rows beneath become gated clickable rows — click expends
 // a use (+ spend log) / refuses when exhausted (popup + legendary_use_refused,
 // zero spend).
+// MA-0022: the non-numeric Lash row delegates_to Tentacle — clicking spends 1
+// use and rolls the delegated attack (+9 / 2d6+5) via the same attack seam,
+// named "Lash (Tentacle attack)".
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
+const TENTACLE = { name: 'Tentacle', attack_bonus: 9, damage_dice_primary: '2d6 + 5', damage_type_primary: 'Bludgeoning', reach: '15 ft.' };
+
 const LEGENDARY = [
   { name: 'Legendary Action Uses: 3 (4 in Lair)', uses: 3, description: 'Immediately after another creature\'s turn, expend a use.' },
-  { name: 'Lash', description: 'The aboleth makes one Tentacle attack.' },
+  { name: 'Lash', delegates_to: 'Tentacle', description: 'The aboleth makes one Tentacle attack.' },
   { name: 'Psychic Drain', description: 'It uses Consume Memories and regains 5 (1d10) Hit Points.' },
 ];
 
@@ -23,13 +28,20 @@ vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
+const ROLLERS = vi.hoisted(() => ({
+  rollAttack: null, rollDamage: null,
+}));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+  const rollAttack = vi.fn();
+  const rollDamage = vi.fn();
+  ROLLERS.rollAttack = rollAttack;
+  ROLLERS.rollDamage = rollDamage;
   return { default: vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
-    rollAttack: vi.fn(), rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
+    rollAttack, rollDamage, rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(), rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
   })), _setPopupHtml };
 });
@@ -82,7 +94,7 @@ const CREATURES = [
 
 function renderAboleth(uses) {
   if (uses !== undefined) runtime.store['Aboleth 1.monsterLegendaryUses'] = uses;
-  const m = makeMonster({ name: 'Aboleth', legendary_actions: LEGENDARY });
+  const m = makeMonster({ name: 'Aboleth', actions: [TENTACLE], legendary_actions: LEGENDARY });
   render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
 }
 
@@ -127,6 +139,42 @@ describe('MA-0021 MonsterCardModal legendary economy', () => {
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'ability_use')).toBe(false);
     expect(runtime.store['Aboleth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+
+  // MA-0022: Lash has no own numbers — it delegates_to the Tentacle row and
+  // must roll THAT attack (+9 / 2d6+5) via the same attack seam, named
+  // "Lash (Tentacle attack)", after spending 1 legendary use.
+  it('MA-0022 Lash delegates to Tentacle: spends 1 and rolls +9 attack named "Lash (Tentacle attack)"', async () => {
+    renderAboleth({ max: 3, used: 0 });
+    fireEvent.click(lashLink());
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(runtime.store['Aboleth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    const call = ROLLERS.rollAttack.mock.calls[0];
+    expect(call[0]).toBe('Lash (Tentacle attack)');
+    expect(call[1]).toBe(9);
+    expect(call[2]).toMatchObject({ autoDamageFormula: '2d6 + 5', autoDamageName: 'Lash (Tentacle attack)', damageType: 'Bludgeoning' });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
+    expect(spend.description).toMatch(/expends a legendary use for Lash \(Tentacle attack\)/);
+  });
+
+  it('MA-0022 dangling delegates_to: refusal popup + log, zero spend, zero roll', async () => {
+    runtime.store['Aboleth 1.monsterLegendaryUses'] = { max: 3, used: 0 };
+    const m = makeMonster({
+      name: 'Aboleth',
+      actions: [TENTACLE],
+      legendary_actions: [
+        LEGENDARY[0],
+        { name: 'Lash', delegates_to: 'Bite', description: 'The aboleth makes one Bite attack.' },
+      ],
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
+    fireEvent.click(lashLink());
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused' && /no-delegate/.test(e.description))).toBe(true));
+    expect(runtime.store['Aboleth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 0 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
 
   it('same-turn double click: first spends, second refused via turn latch (zero extra spend)', async () => {

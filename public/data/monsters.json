@@ -778,6 +778,7 @@
       },
       {
         "name": "Lash",
+        "delegates_to": "Tentacle",
         "description": "The aboleth makes one Tentacle attack."
       },
       {

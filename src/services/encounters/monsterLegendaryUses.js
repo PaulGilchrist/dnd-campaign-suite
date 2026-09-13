@@ -1,3 +1,18 @@
+// MA-0022: a non-numeric legendary row ("The aboleth makes one Tentacle
+// attack") delegates its mechanic to another named action row on the SAME
+// monster (`delegates_to:"Tentacle"`). Lookup spans actions +
+// legendary_actions (never self); the caller resolves the delegate via the
+// same attack-roll seam the delegated row's own link uses.
+export function legendaryDelegateAction(monster, action) {
+  if (!action?.delegates_to) return null;
+  const rows = [...(monster?.actions || []), ...(monster?.legendary_actions || [])];
+  return rows.find(r => r && r !== action && r.name === action.delegates_to) || null;
+}
+
+export function legendaryDelegateAttackName(action, delegate) {
+  return `${action.name} (${delegate.name} attack)`;
+}
+
 // MA-0021: minimal legendary-uses economy for the "Legendary Action Uses"
 // header row (Aboleth 3 / 4-in-Lair). Mirrors the established finite-uses
 // tracking (MA-0005 monsterSpellUses / MA-0006 monsterReactionUses) with a
@@ -56,7 +71,9 @@ export function buildLegendaryRefusalPopup({ monsterName, actionName, reason }) 
       ? `Only one legendary action can be expended immediately after each creature's turn.`
       : reason === 'own-turn'
         ? `${monsterName} expends legendary uses after ANOTHER creature's turn, not its own.`
-        : `${monsterName} has no legendary uses to expend.`;
+        : reason === 'no-delegate'
+          ? `${actionName} delegates to an attack that could not be found on ${monsterName}. Check the stat block.`
+          : `${monsterName} has no legendary uses to expend.`;
   return `<div class="mc-prerequisite-refusal"><h3>Legendary Action Refused</h3><p>${actionName}: ${why} Nothing spent, no roll.</p></div>`;
 }
 

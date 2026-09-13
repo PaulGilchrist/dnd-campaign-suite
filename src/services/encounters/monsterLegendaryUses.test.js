@@ -1,5 +1,7 @@
 // MA-0021: legendary-uses economy — expend / gate / turn-latch / regain /
 // refusal. Mirrors MA-0005/MA-0020 finite-uses runtime-map tracking.
+// MA-0022: non-numeric legendary rows delegate their mechanic to a named
+// attack row on the same monster (`delegates_to`).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   legendaryHeaderAction,
@@ -7,14 +9,20 @@ import {
   legendaryUsesRemaining,
   legendaryExpendGate,
   buildLegendaryRefusalLog,
+  buildLegendaryRefusalPopup,
   expendLegendaryUse,
   regainLegendaryUses,
+  legendaryDelegateAction,
+  legendaryDelegateAttackName,
 } from './monsterLegendaryUses.js';
 
+const TENTACLE = { name: 'Tentacle', attack_bonus: 9, damage_dice_primary: '2d6 + 5', damage_type_primary: 'Bludgeoning' };
+
 const AB = {
+  actions: [TENTACLE],
   legendary_actions: [
     { name: 'Legendary Action Uses: 3 (4 in Lair)', uses: 3, description: 'Immediately after another creature\'s turn…' },
-    { name: 'Lash', description: 'The aboleth makes one Tentacle attack.' },
+    { name: 'Lash', delegates_to: 'Tentacle', description: 'The aboleth makes one Tentacle attack.' },
     { name: 'Psychic Drain', description: '…regains 5 (1d10) Hit Points.' },
   ],
 };
@@ -139,5 +147,55 @@ describe('MA-0021 turn-start regain', () => {
     const e = buildLegendaryRefusalLog({ monsterName: 'Aboleth 1', actionName: 'Lash', reason: 'turn' });
     expect(e.automationType).toBe('legendary_use_refused');
     expect(e.description).toMatch(/refused \(turn\).*zero spend, no roll/s);
+  });
+});
+
+describe('MA-0022 legendary delegation (Lash → Tentacle)', () => {
+  it('delegates_to resolves to the named attack row with its own numbers', () => {
+    const lash = AB.legendary_actions[1];
+    const d = legendaryDelegateAction(AB, lash);
+    expect(d).toBe(TENTACLE);
+    expect(d.attack_bonus).toBe(9);
+    expect(d.damage_dice_primary).toBe('2d6 + 5');
+  });
+
+  it('finds delegates among legendary_actions siblings too', () => {
+    const m = {
+      legendary_actions: [
+        AB.legendary_actions[0],
+        { name: 'Lash', delegates_to: 'Tentacle' },
+        TENTACLE,
+      ],
+    };
+    expect(legendaryDelegateAction(m, m.legendary_actions[1])).toBe(TENTACLE);
+  });
+
+  it('null when no delegates_to, unknown name, or self-reference', () => {
+    expect(legendaryDelegateAction(AB, AB.legendary_actions[2])).toBeNull();
+    expect(legendaryDelegateAction(AB, { name: 'Lash', delegates_to: 'Bite' })).toBeNull();
+    expect(legendaryDelegateAction(AB, TENTACLE)).toBeNull();
+    expect(legendaryDelegateAction(null, { name: 'Lash', delegates_to: 'Tentacle' })).toBeNull();
+  });
+
+  it('delegate attack log name reads "Lash (Tentacle attack)"', () => {
+    const lash = AB.legendary_actions[1];
+    expect(legendaryDelegateAttackName(lash, TENTACLE)).toBe('Lash (Tentacle attack)');
+  });
+
+  it('spend with the delegate name spends 1 use and logs "Lash (Tentacle attack)"', async () => {
+    const r = await expendLegendaryUse({ monsterName: 'Aboleth 1', monster: AB, actionName: legendaryDelegateAttackName(AB.legendary_actions[1], TENTACLE), campaignName: 'test-campaign', deps });
+    expect(r.spent).toBe(true);
+    expect(store['Aboleth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    const spend = logs.find(e => e.type === 'ability_use');
+    expect(spend.description).toMatch(/expends a legendary use for Lash \(Tentacle attack\)/);
+  });
+
+  it('no-delegate refusal popup + log wording, zero spend', () => {
+    const p = buildLegendaryRefusalPopup({ monsterName: 'Aboleth 1', actionName: 'Lash', reason: 'no-delegate' });
+    expect(p).toMatch(/Legendary Action Refused/);
+    expect(p).toMatch(/delegates to an attack that could not be found/);
+    const e = buildLegendaryRefusalLog({ monsterName: 'Aboleth 1', actionName: 'Lash', reason: 'no-delegate' });
+    expect(e.automationType).toBe('legendary_use_refused');
+    expect(e.description).toMatch(/refused \(no-delegate\).*zero spend, no roll/s);
   });
 });
