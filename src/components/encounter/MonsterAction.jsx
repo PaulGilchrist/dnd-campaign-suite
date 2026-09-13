@@ -80,10 +80,18 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed, 
     onSaveRoll(action, saveDamageFormula, saveConditions);
   };
   if (saveDamageFormula && canRollExpression(saveDamageFormula)) {
+    // MA-0035: the dice chip stays its clean formula text (existing exact-text
+    // selectors intact); the labelled "DC N <Type>" save affordance renders as
+    // a sibling clickable span (same handleSaveRoll), no per-row fork.
     return (
-      <span className={`mc-dice-link${spentClass}`} role="button" tabIndex={0} onClick={handleSaveRoll}>
-        <i className="fa-solid fa-dice" /> {saveDamageFormula}{usesNote}
-      </span>
+      <>
+        <span className={`mc-dice-link${spentClass}`} role="button" tabIndex={0} onClick={handleSaveRoll}>
+          <i className="fa-solid fa-dice" /> {saveDamageFormula}{usesNote}
+        </span>{' '}
+        <span className={`mc-dice-link mc-dice-link-save mc-dice-link-save-clickable${spentClass}`} role="button" tabIndex={0} onClick={handleSaveRoll}>
+          DC {action.save_dc} {action.save_type}{usesNote}
+        </span>
+      </>
     );
   }
   const clickable = !action.attack_bonus && !attackerCannotAct;

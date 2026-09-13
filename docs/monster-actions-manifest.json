@@ -577,7 +577,7 @@
       "damageTypePrimary": "Acid",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 18, each creature in a 60-foot-long, 5-foot-wide Line. Failure: 54 (12d8) Acid damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0035-acid-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0036",

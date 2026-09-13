@@ -27,15 +27,19 @@ import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildR
 import SaveAttackAoeModal from '../char-sheet/modals/shared/SaveAttackAoeModal.jsx';
 import './MonsterCardModal.css';
 
-// MA-0031: a save row whose authored description names a cone is an AoE —
-// route through the existing area picker instead of the single-target block
-// save. Coverage feet parsed from the row text ("30-foot Cone"); gridless
-// coverage stays advisory via isWithinRange lenient mode (§7).
-function coneRangeFeet(action, spellInfo) {
+// MA-0031/MA-0035: a save row whose authored description names a cone or a
+// line is an AoE — route through the existing area picker instead of the
+// single-target block save. Coverage feet parsed from the row text
+// ("30-foot Cone" / "60-foot-long, 5-foot-wide Line"); gridless coverage
+// stays advisory via isWithinRange lenient mode (§7).
+function breathAoeShape(action, spellInfo) {
   if (spellInfo) return null;
-  if (!action || action.save_dc == null || !/\bcone\b/i.test(action.description || '')) return null;
-  const m = String(action.description).match(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/i);
-  return m ? Number(m[1]) : 30;
+  if (!action || action.save_dc == null) return null;
+  const description = String(action.description || '');
+  const shape = /\bcone\b/i.test(description) ? 'Cone' : (/\bline\b/i.test(description) ? 'Line' : null);
+  if (!shape) return null;
+  const m = description.match(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/i);
+  return { shape, feet: m ? Number(m[1]) : (shape === 'Cone' ? 30 : 60) };
 }
 
 // MA-0031: recharge gate at row click — a spent breath weapon refuses with a
@@ -55,7 +59,7 @@ function rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, 
 // MA-0031: post-gate save resolution. Non-recharge/non-cone rows fire the
 // byte-identical single-target block save synchronously (today's flow).
 // A spent-but-passed recharge row awaits its fire-spend first (picker-open
-// spend convention, CLA-384); cone rows then open the existing AoE area
+// spend convention, CLA-384); cone/line rows then open the existing AoE area
 // picker instead of the single-target prompt.
 // Block-save half-on-success is the app-wide dcSuccess convention (MV-20);
 // spell rows carry their own authored dc_success. MA-0030: an authored
@@ -72,7 +76,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   const spellName = spellInfo?.spellName || null;
   const saveType = spellInfo?.saveType || action.save_type;
   const dcSuccess = resolveBlockSaveDcSuccess(spellInfo, action);
-  const coneFt = coneRangeFeet(action, spellInfo);
+  const aoe = breathAoeShape(action, spellInfo);
   const fire = () => {
     console.debug(`[saveDebug] MonsterCardModal.handleSaveRoll`, {
       monsterName, actionName: spellName || action.name, saveDc: action.save_dc, saveType,
@@ -84,11 +88,11 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction,
     }));
   };
-  if (coneFt == null && !recharge.gate) { fire(); return; }
+  if (aoe == null && !recharge.gate) { fire(); return; }
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
-    if (coneFt != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt, damageType: formatDamageTypes(getDamageTypesForAction(action)) });
+    if (aoe != null) {
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)) });
       return;
     }
     fire();
@@ -1207,7 +1211,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           saveType={conePicker.saveType}
           saveDc={conePicker.action.save_dc}
           dcSuccess={conePicker.dcSuccess}
-          titleOverride={`${conePicker.coneFt}-ft Cone (GM positions tokens; selection advisory)`}
+          titleOverride={conePicker.title}
           excludeNames={[monsterName]}
           rangeGateFt={conePicker.coneFt}
           storeLastAttack={false}
