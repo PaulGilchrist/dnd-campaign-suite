@@ -8,6 +8,9 @@ import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } fro
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
+import { registerTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
+import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
+import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -304,11 +307,38 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
     if (context?.monsterAbilityUse) {
         await spendMonsterAbilityUse({ monsterName: attackerName, use: context.monsterAbilityUse, targetName: targetName || characterName, campaignName });
     }
+    // MA-0030: authored success-immunity (Abominable Yeti Chilling Gaze —
+    // "Success: immune to this yeti's Chilling Gaze for 1 hour"). te sourced
+    // from the monster; 1 hour encoded as 600 rounds (CLA-334 minutes×10).
+    if (saveSuccess === true && context?.successImmunity) {
+        await grantSuccessImmunity({ context, campaignName, attackerName, applyTarget: targetName || characterName });
+    }
     if (context?.autoDamageFormula && saveDc != null) {
         await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
     } else {
         applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget: targetName || characterName, attackerName, campaignName });
     }
+}
+
+// MA-0030: successful-save immunity grant. Writes a registry te (e.g.
+// gaze_immunity) on the target sourced from the attacker, with a
+// minutes×10 rounds clock (CLA-334) removing the te via remove_target_effect.
+async function grantSuccessImmunity({ context, campaignName, attackerName, applyTarget }) {
+    const immunity = parseSuccessImmunity({ success_immunity: context.successImmunity });
+    if (!immunity) return;
+    const rounds = immunity.durationMinutes * 10;
+    registerTargetEffect(campaignName, applyTarget, immunity.effect, attackerName, { duration: immunity.duration, rounds });
+    addExpiration({ attackerName, targetName: applyTarget, campaignName, rounds, effects: [{ type: 'remove_target_effect', effectKey: immunity.effect, source: attackerName, target: applyTarget }] });
+    const actionName = context?.actionName || context?.name || 'the gaze';
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: `${immunity.effect}_granted`,
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} succeeded its save against ${attackerName}'s ${actionName} — immune to it for ${immunity.durationMinutes / 60 >= 1 ? `${immunity.durationMinutes / 60} hour(s)` : `${immunity.durationMinutes} minute(s)`} (${rounds} rounds).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:gaze-immunity-granted]', e); });
 }
 
 // MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.

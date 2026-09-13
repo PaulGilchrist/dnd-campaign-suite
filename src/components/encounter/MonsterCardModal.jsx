@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal } from '../../services/encounters/monsterLegendaryUses.js';
@@ -282,7 +282,7 @@ function buildSaveOptions(action) {
   return {
     saveDc: action?.save_dc || null,
     saveType: action?.save_type ? toAbbr(action.save_type) : null,
-    dcSuccess: action?.save_dc != null ? 'half' : null,
+    dcSuccess: action?.save_dc != null ? (action?.dc_success ?? 'half') : null,
     saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
   };
 }
@@ -458,6 +458,10 @@ function resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, 
   return { refused: true, usesGate: null };
 }
 
+function buildGazeImmunityRefusalPopup({ monsterName, actionName, targetName }) {
+  return `<div class="mc-gaze-immunity-refusal"><h3>Gaze Immunity</h3><p>${targetName} is immune to ${monsterName}'s ${actionName} (granted by a previous successful save). No save rolled, nothing spent.</p></div>`;
+}
+
 function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction }) {
   const primaryDamageType = getDamageTypesForAction(action)[0] || null;
   return {
@@ -478,6 +482,8 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     // until-clause rides the condition meta as a GM-enforced durationNote.
     monsterAbilityUse: usesGate ? { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName: spellName || action.name } : undefined,
     conditionDurationNote: extractConditionDurationNote(action?.save_effect),
+    // MA-0030: authored success-immunity clause (granted at save success in saveProcessing).
+    successImmunity: action?.success_immunity || null,
   };
 }
 
@@ -539,7 +545,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     });
   }, [campaignName, mapName]);
 
-  const allTargetEffects = useRuntimeValue('campaign', 'targetEffects') ?? [];
+  const storedTargetEffects = useRuntimeValue('campaign', 'targetEffects');
+  const allTargetEffects = useMemo(() => storedTargetEffects ?? [], [storedTargetEffects]);
   const monsterTargetEffects = allTargetEffects.filter(te => te.target === (creatureName || monster?.name));
   const inspiringMoveNoOA = useRuntimeValue(monsterName, 'inspiringMovementNoOA', campaignName);
   const remarkableNoOA = useRuntimeValue(monsterName, 'remarkableAthleteNoOA', campaignName);
@@ -746,7 +753,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       if (action?.save_dc != null) {
         context.saveDc = action.save_dc;
         context.saveType = toAbbr(action.save_type);
-        context.dcSuccess = 'half';
+        context.dcSuccess = action?.dc_success ?? 'half';
       }
       rollDamage({ name: name, formula: formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
     } else {
@@ -770,14 +777,24 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const handleInitiative = (bonus) => rollInitiative(bonus);
 
   // Block-save half-on-success is the app-wide dcSuccess convention (MV-20);
-  // spell rows carry their own authored dc_success.
+  // spell rows carry their own authored dc_success. MA-0030: an authored
+  // per-action dc_success (e.g. Chilling Gaze "Success: no damage") overrides
+  // the 'half' default — every row without one stays byte-identical.
   function resolveBlockSaveDcSuccess(spellInfo, action) {
     if (spellInfo) return spellInfo.dcSuccess || null;
-    return action.save_dc != null ? 'half' : null;
+    return action.save_dc != null ? (action.dc_success ?? 'half') : null;
   }
 
   const handleSaveRoll = useCallback((action, saveDamageFormula, saveConditions, spellInfo) => {
     const target = getTarget();
+    // MA-0030: authored success-immunity gate — target already immune to this
+    // monster's gaze (te sourced from this monster) → refusal, zero prompt.
+    if (gazeImmunityActive({ action, target, monsterName, targetEffects: allTargetEffects })) {
+      setPopupHtml(buildGazeImmunityRefusalPopup({ monsterName, actionName: action.name, targetName: target?.name }));
+      addEntry(campaignName, buildGazeImmunityRefusalLog({ monsterName, actionName: action.name, targetName: target?.name || 'no target' }))
+        .catch((e) => { console.error('[MonsterCardModal] Error logging gaze-immunity refusal:', e); });
+      return;
+    }
     const gate = evaluateTargetPrerequisiteGate({ action, target, monsterName, campaignName, getRuntimeValue });
     if (!gate.satisfied) {
       setPopupHtml(gate.popupHtml);
@@ -800,7 +817,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction,
     }));
-  }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction, campaignName, setPopupHtml]);
+  }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction, campaignName, setPopupHtml, allTargetEffects]);
 
   const handleSpellCast = useCallback(async (action, spellName) => {
     const gate = spellUsesGate(monsterName, action, spellName);

@@ -495,7 +495,7 @@
         "paralyzed"
       ],
       "description": "Constitution Saving Throw: DC 18, one creature the yeti can see within 30 feet. Failure: 21 (6d6) Cold damage, and the target has the Paralyzed condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. Success: The target is immune to this yeti's Chilling Gaze for 1 hour.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0030-chilling-gaze.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0031",

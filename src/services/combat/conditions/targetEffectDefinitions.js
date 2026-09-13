@@ -120,6 +120,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    effect: 'gaze_immunity',
+    label: 'Gaze Immunity',
+    description: 'Immune to the source creature\u2019s gaze on a successful save (e.g. Abominable Yeti Chilling Gaze \u2014 1 hour).',
+    icon: 'fa-eye-slash',
+    cls: 'effect-buff',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
     effect: 'multiattack_defense',
     label: 'Multiattack Defense',
     description: 'Attacks against the target have Disadvantage (Multiattack Defense).',

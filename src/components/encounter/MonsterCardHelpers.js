@@ -245,6 +245,41 @@ export function buildTargetPrerequisiteRefusalLog({ monsterName, actionName, tar
   };
 }
 
+// MA-0030: authored success-immunity (e.g. Abominable Yeti Chilling Gaze —
+// "Success: immune to this yeti's Chilling Gaze for 1 hour"). A target that
+// already carries the te sourced from this monster refuses the row click:
+// popup + <action>_refused (immunity) log, zero save prompt.
+export function parseSuccessImmunity(action) {
+  const si = action?.success_immunity;
+  if (!si || !si.effect) return null;
+  return {
+    effect: String(si.effect),
+    duration: si.duration || '1_hour',
+    durationMinutes: Number(si.duration_minutes) || 60,
+  };
+}
+
+export function gazeImmunityActive({ action, target, monsterName, targetEffects }) {
+  const immunity = parseSuccessImmunity(action);
+  if (!immunity || !target) return null;
+  const te = (targetEffects || []).find(e =>
+    e.target === target.name && e.effect === immunity.effect && e.source === monsterName);
+  return te ? immunity : null;
+}
+
+export function buildGazeImmunityRefusalLog({ monsterName, actionName, targetName }) {
+  const slug = String(actionName || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return {
+    type: 'automation',
+    automationType: `${slug}_refused (immunity)`,
+    characterName: monsterName,
+    abilityName: actionName,
+    targetName,
+    description: `${targetName} is immune to ${monsterName}'s ${actionName} (gaze immunity) — no save rolled, no damage, nothing spent.`,
+    timestamp: Date.now(),
+  };
+}
+
 export function buildChargeBonusGrantLog({ monsterName, offer, total }) {
   return {
     type: 'automation',

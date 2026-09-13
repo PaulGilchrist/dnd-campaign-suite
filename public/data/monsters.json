@@ -920,8 +920,10 @@
         "description": "Constitution Saving Throw: DC 18, one creature the yeti can see within 30 feet. <strong>Failure:</strong> 21 (6d6) Cold damage, and the target has the <strong>Paralyzed</strong> condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. <strong>Success:</strong> The target is immune to this yeti's Chilling Gaze for 1 hour.",
         "save_dc": 18,
         "save_type": "Constitution",
+        "dc_success": "none",
         "damage_dice_primary": "6d6",
         "damage_type_primary": "Cold",
+        "success_immunity": { "effect": "gaze_immunity", "duration": "1_hour", "duration_minutes": 60 },
         "save_effect": "Failure: 21 (6d6) Cold damage, and the target has the Paralyzed condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. Success: The target is immune to this yeti's Chilling Gaze for 1 hour."
       },
       {
