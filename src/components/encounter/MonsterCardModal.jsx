@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionGate, MONSTER_REACTION_USES_KEY } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionGate, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog } from './MonsterCardHelpers.js';
 import { findLastAttack } from '../../services/automation/common/damageRollback.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import './MonsterCardModal.css';
@@ -244,6 +244,7 @@ function buildAttackRollOptions(v) {
     grazeAbilityName: 'STR',
     ...buildSaveOptions(v.action),
     isSpellDamage: isSpellOriginAction(v.action),
+    chargeBonusOffer: buildChargeBonusOffer(v.action, v.name),
   };
 }
 
@@ -356,7 +357,7 @@ function buildMonsterSpellRefusalEntry({ monsterName, spellName, usesMax }) {
   };
 }
 
-function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll }) {
+function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll, onChargeBonus, onChargeBonusDecline }) {
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <AttackResultPopup
@@ -366,6 +367,8 @@ function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml
         attackerName={monsterName}
         setPopupHtml={setPopupHtml}
         onQuickRoll={popupHtml.waitingForPlayerSave ? () => onQuickRoll(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined}
+        onChargeBonus={onChargeBonus}
+        onChargeBonusDecline={onChargeBonusDecline}
       />
     </div>
   );
@@ -729,6 +732,40 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     }).catch((e) => { console.error('[MonsterCardModal] Error logging gated reaction spend:', e); });
   }, [campaignName, monsterName]);
 
+  // MA-0007: GM-adjudicated charge-damage clause (monsters.json conditional_damage).
+  // Grant: roll the clause dice, apply as its own damage roll + hp_change, log the
+  // clause. Decline: base damage only, logged. Base "Done" still applies the primary
+  // formula in both cases. No offer is rendered on misses (gated in DiceRollResult).
+  const resolveChargeBonus = useCallback(async (decision) => {
+    const offer = popupHtml?.chargeBonusOffer;
+    if (!offer || popupHtml?.chargeBonusResolved) return;
+    const attackPopupSnapshot = popupHtml;
+    if (decision === 'granted') {
+      const target = getTarget();
+      const wasCrit = Boolean(attackPopupSnapshot.isCrit || attackPopupSnapshot.isAutoCrit);
+      const result = wasCrit ? rollExpressionDoubled(offer.formula) : rollExpression(offer.formula);
+      if (!result) {
+        console.error('[MonsterCardModal] Charge bonus roll failed for formula', offer.formula);
+        return;
+      }
+      await rollDamage({
+        name: `${offer.attackName} — Charge Bonus`,
+        formula: offer.formula,
+        total: result.total,
+        rolls: result.rolls,
+        modifier: result.modifier,
+        context: { damageType: offer.damageType, targetName: target?.name, attackerName: monsterName, isAutoCrit: wasCrit },
+      });
+      await addEntry(campaignName, buildChargeBonusGrantLog({ monsterName, offer, total: result.total }))
+        .catch((e) => { console.error('[MonsterCardModal] Error logging charge bonus grant:', e); });
+      setPopupHtml({ ...attackPopupSnapshot, chargeBonusResolved: 'granted' });
+      return;
+    }
+    await addEntry(campaignName, buildChargeBonusDeclineLog({ monsterName, offer }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging charge bonus decline:', e); });
+    setPopupHtml({ ...attackPopupSnapshot, chargeBonusResolved: 'declined' });
+  }, [popupHtml, getTarget, rollDamage, setPopupHtml, campaignName, monsterName]);
+
   const attackerCannotAct = useMemo(() => {
     const creature = getAttackerCreature();
     if (!creature) return false;
@@ -821,6 +858,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           monsterName={monsterName}
           setPopupHtml={setPopupHtml}
           onQuickRoll={handleQuickRollWithEvasion}
+          onChargeBonus={() => resolveChargeBonus('granted')}
+          onChargeBonusDecline={() => resolveChargeBonus('declined')}
         />
       )}
     </div>

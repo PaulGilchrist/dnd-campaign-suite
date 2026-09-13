@@ -133,7 +133,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage, or 9 (3d4 + 2) Slashing damage if the aarakocra moved 30+ feet straight toward the target immediately before the hit.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0007-talons.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0008",

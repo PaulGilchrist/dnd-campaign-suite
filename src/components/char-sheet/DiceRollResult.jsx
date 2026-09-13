@@ -822,6 +822,35 @@ function HolyAuraSaveNotice({ props }) {
     );
 }
 
+// MA-0007: GM-adjudication offer for monster conditional charge-damage clauses
+// (monsters.json conditional_damage). Offered on HIT only — never on misses,
+// auto-misses, or after a decision has been made.
+function ChargeBonusOffer({ props, state }) {
+    const offer = props.chargeBonusOffer;
+    if (!offer) return null;
+    if (props.chargeBonusResolved) {
+        return (
+            <div className="dice-roll-reroll-result">
+                <i className={`fa-solid ${props.chargeBonusResolved === 'granted' ? 'fa-bolt' : 'fa-ban'}`}></i>
+                {props.chargeBonusResolved === 'granted'
+                    ? `Charge bonus applied (+${offer.formula} ${offer.damageType}).`
+                    : 'Charge bonus declined — base damage only.'}
+            </div>
+        );
+    }
+    if (state.computedHit !== true) return null;
+    return (
+        <div className="dice-roll-reroll">
+            <button className="dice-roll-reroll-btn" onClick={() => props.onChargeBonus?.()} type="button">
+                <i className="fa-solid fa-wind"></i> {offer.label}
+            </button>
+            <button className="dice-roll-reroll-btn" onClick={() => props.onChargeBonusDecline?.()} type="button">
+                <i className="fa-solid fa-ban"></i> No charge (base damage only)
+            </button>
+        </div>
+    );
+}
+
 function DiceRollResult(props) {
     const {
         bonus = 0, modifier = 0,
@@ -951,6 +980,8 @@ function DiceRollResult(props) {
             />
 
             <DamageFeatureTriggers props={props} state={state} handlers={handlers} />
+
+            <ChargeBonusOffer props={props} state={state} />
 
             <FeatureResultSummary props={props} state={state} handlers={handlers} />
 

@@ -136,6 +136,61 @@ export function getSaveModifierForSaveType(saveType, target, characters, creatur
 // negation is recorded advisory, GM-enforced for monsters, CLA-325 precedent).
 export const MONSTER_REACTION_USES_KEY = 'monsterReactionUses';
 
+// MA-0007: conditional charge-damage clause (e.g. Aarakocra Skirmisher Talons
+// "3d4+2 if moved 30+ ft straight toward the target"). The app has no monster
+// movement-distance subsystem (§7), so the clause surfaces as a GM-adjudication
+// offer on the attack HIT popup (CLA-325 advisory precedent).
+function chargeClauseFeet(condition) {
+  const m = /(\d+)\s*(?:\+\s*)?feet/i.exec(condition);
+  return m ? Number(m[1]) : null;
+}
+
+function chargeOfferLabel(feet, dice, modifier, damageType) {
+  const head = feet ? `${feet}+ ft Charge` : 'Charge';
+  const modText = modifier ? `+${modifier}` : '';
+  return `${head}: +${dice}${modText} ${damageType}?`;
+}
+
+export function buildChargeBonusOffer(action, name) {
+  const cd = action?.conditional_damage;
+  if (!cd?.dice) return null;
+  const modifier = Number(cd.modifier) || 0;
+  const damageType = cd.damage_type || action?.damage_type_primary || '';
+  const condition = cd.condition || '';
+  const formula = modifier ? `${cd.dice} + ${modifier}` : cd.dice;
+  return {
+    dice: cd.dice,
+    modifier,
+    damageType,
+    condition,
+    formula,
+    label: chargeOfferLabel(chargeClauseFeet(condition), cd.dice, modifier, damageType),
+    attackName: name || action?.name || 'Attack',
+  };
+}
+
+export function buildChargeBonusGrantLog({ monsterName, offer, total }) {
+  return {
+    type: 'automation',
+    automationType: 'conditional_damage_granted',
+    characterName: monsterName,
+    abilityName: offer.attackName,
+    description: `${monsterName} ${offer.attackName} charge bonus granted (${offer.condition}) — +${total} ${offer.damageType} (${offer.formula}).`,
+    timestamp: Date.now(),
+  };
+}
+
+export function buildChargeBonusDeclineLog({ monsterName, offer }) {
+  return {
+    type: 'automation',
+    automationType: 'conditional_damage_declined',
+    characterName: monsterName,
+    abilityName: offer.attackName,
+    description: `${monsterName} ${offer.attackName} charge bonus declined (${offer.condition}) — base damage only.`,
+    timestamp: Date.now(),
+  };
+}
+
 const GATED_MONSTER_REACTIONS = {
   feather_fall: { effect: 'feather_fall', trigger: 'falling', label: 'Feather Fall', icon: 'fa-feather' },
 };
