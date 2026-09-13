@@ -415,7 +415,7 @@
         "prone"
       ],
       "description": "Pools of water within 90 feet of the aboleth surge out­ ward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 14 Strength saving throw or be pulled up to 20 feet into the water and knocked prone. The aboleth can't use this lair action again until it has used a different one.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0025-lair-water-tide.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0026",
