@@ -5,9 +5,10 @@ import { computeConditionEffects } from '../../services/combat/conditions/condit
 import { resolveMonsterIRV } from '../../services/npcs/monsterIrvUtils.js';
 import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js';
 import { MonsterAction } from './MonsterAction.jsx';
+import { legendaryHeaderAction, legendaryUsesRemaining } from '../../services/encounters/monsterLegendaryUses.js';
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses } from './MonsterCardHelpers.js';
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, handleGatedReaction }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow }) {
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -31,6 +32,10 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
 
     const lairActions = getLairActions(monster);
     const regionalEffects = getRegionalEffects(monster);
+    // MA-0021: header row authors `uses` → the section becomes a gated
+    // legendary economy (counter + clickable gated rows).
+    const legendaryHeader = legendaryHeaderAction(monster);
+    const legendaryRemaining = legendaryUsesRemaining(legendaryHeader, monsterLegendaryUses);
 
     return (
       <div className="mc-card" onClick={(e) => e.stopPropagation()}>
@@ -45,7 +50,11 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <hr />
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
           {actionSections.map(s => (
-            <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} />
+            s.key === 'legendary_actions' && legendaryHeader ? (
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1)} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
+            ) : (
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} />
+            )
           ))}
           {lairActions && (
             <MonsterNamedEffectSection title="Lair Actions" items={lairActions} renderItem={(la, i) => <MonsterLairAction key={i} la={la} />} />
@@ -62,7 +71,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         </div>
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, handleGatedReaction]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, handleGatedReaction, handleLegendaryRow]);
 
   return content;
 }
@@ -195,14 +204,19 @@ function MonsterCardAbilities({ monster, handleAbilityCheck }) {
   );
 }
 
-function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, spellUsesUsed, reactionUsesUsed, onGatedReaction }) {
+function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, spellUsesUsed, reactionUsesUsed, onGatedReaction, legendaryGate, headerRow }) {
+  const atk = legendaryGate ? (name, bonus, action) => legendaryGate(action) : handleAttack;
+  const dmg = legendaryGate ? (_name, _formula, _type, action) => legendaryGate(action) : handleDamage;
+  const save = legendaryGate ? (action) => legendaryGate(action) : handleSaveRoll;
+  const cast = legendaryGate ? (action) => legendaryGate(action) : handleSpellCast;
   return (
     <>
       <hr />
       {title && <h5 className="mc-section-title">{title}</h5>}
       <div className="mc-section">
+        {headerRow}
         {actions.map((a, i) => (
-          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} onSpellCast={handleSpellCast} spellUsesUsed={spellUsesUsed} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} />
+          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={atk} onDamage={dmg} onSaveRoll={save} onSpellCast={cast} spellUsesUsed={spellUsesUsed} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} legendaryGate={legendaryGate} />
         ))}
       </div>
     </>
@@ -218,6 +232,19 @@ function MonsterNamedEffectSection({ title, items, renderItem }) {
         {items.map(renderItem)}
       </div>
     </>
+  );
+}
+
+// MA-0021: legendary-uses economy header row — "(N left)" counter reads the
+// monsterLegendaryUses runtime map (max from the header row's authored uses).
+function MonsterLegendaryHeaderRow({ header, remaining }) {
+  const spent = remaining === 0;
+  return (
+    <div className={`mc-action mc-legendary-header-row${spent ? ' mc-dice-link-spell-spent' : ''}`} title="Legendary action uses — regain at the start of this creature's turn">
+      <strong>{header.name}</strong>{' '}
+      <span className="mc-legendary-counter">({remaining ?? header.uses} left)</span>{' '}
+      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(header.description) }} />
+    </div>
   );
 }
 

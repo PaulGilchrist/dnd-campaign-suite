@@ -102,7 +102,21 @@ function GatedReactionSlot({ action, attackerCannotAct, reactionUsesUsed, onGate
   return <GatedReactionLink def={def} remaining={monsterReactionUsesRemaining(action, reactionUsesUsed)} attackerCannotAct={attackerCannotAct} onClick={() => onGatedReaction(action)} />;
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction }) {
+// MA-0021: legendary rows carry no numeric affordance (Lash/Psychic Drain) —
+// the gated spend click lives on the row name so the economy can't be bypassed.
+function LegendarySpendLink({ action, attackerCannotAct, legendaryGate }) {
+  if (!legendaryGate) return null;
+  const formula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
+  const numericAffordance = action.attack_bonus != null || action.save_dc != null || canRollExpression(formula);
+  if (numericAffordance) return null;
+  return (
+    <span className={`mc-dice-link mc-dice-link-legendary${attackerCannotAct ? ' mc-dice-link-spell-spent' : ''}`} onClick={attackerCannotAct ? undefined : () => legendaryGate(action)} role="button" tabIndex={0} title={`Expend 1 legendary use — ${action.name}`}>
+      <i className="fa-solid fa-bolt" /> Expend Legendary
+    </span>
+  );
+}
+
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
   const actionDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
@@ -113,6 +127,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
   return (
     <div key={index} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
       <strong>{action.name}.</strong>{' '}
+      <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
         <span className="mc-dice-link" onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>

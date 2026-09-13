@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled, canRollExpression } from '../../services/dice/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/combat/damageUtils.js';
@@ -21,10 +21,34 @@ import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
 import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
+import { expendLegendaryUse } from '../../services/encounters/monsterLegendaryUses.js';
 import './MonsterCardModal.css';
 
 function getDamageTypeChoices(action) {
   return action?.damage_type_choices?.length > 0 ? action.damage_type_choices : undefined;
+}
+
+// MA-0021: legendary-row numeric mechanic resolved after a use is spent —
+// routes to the same handlers the numeric chips already use (MA-0014 intact).
+function resolveLegendaryRowMechanic(action, { handleAttack, handleSaveRoll, handleDamage }) {
+  if (action.attack_bonus != null) handleAttack(action.name, action.attack_bonus, action);
+  else if (action.save_dc != null) handleSaveRoll(action, extractDamageDiceFromDescription(action.description, action.damage_dice_primary), extractConditionsFromSaveEffect(action.save_effect));
+  else {
+    const formula = extractDamageDiceFromDescription(action.description, action.damage_dice_primary);
+    if (formula && canRollExpression(formula)) handleDamage(action.name, formula, action.damage_type_primary ? formatDamageTypes([action.damage_type_primary]) : '', action);
+  }
+}
+
+// MA-0021: legendary-row gated click — expend 1 use (round+turn latch, refusal
+// popup + legendary_use_refused zero-spend log), then resolve the row's own
+// mechanic (numeric chips roll as today, MA-0014 gate intact).
+async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage }) {
+  const result = await expendLegendaryUse({ monsterName, monster, actionName: action.name, campaignName });
+  if (!result.spent) {
+    setPopupHtml(result.popupHtml);
+    return;
+  }
+  resolveLegendaryRowMechanic(action, { handleAttack, handleSaveRoll, handleDamage });
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -480,6 +504,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const shieldOfFaithBonus = computeShieldOfFaithBonus(monsterActiveBuffs);
   const monsterSpellUses = useRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, campaignName);
   const monsterReactionUses = useRuntimeValue(monsterName, MONSTER_REACTION_USES_KEY, campaignName);
+  // MA-0021: legendary uses map + round+turn latch subscription (header
+  // counter reads used/max; the latch gates one-expend-per-turn server-side).
+  const monsterLegendaryUses = useRuntimeValue(monsterName, 'monsterLegendaryUses', campaignName);
 
   const monsterSensesArray = useMemo(() => {
     if (!monster?.senses) return null;
@@ -788,6 +815,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     });
   }, [campaignName, monsterName, spellAbilityMod]);
 
+  // MA-0021: legendary-row gated click — expend 1 use (round+turn latch,
+  // refusal popup + legendary_use_refused zero-spend log) then resolve the
+  // row's own mechanic as today (numeric chips roll via the existing
+  // handlers, MA-0014 chip gate intact; non-numeric rows log the advisory).
+  const handleLegendaryRow = (action) => resolveLegendaryRow({
+    action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage,
+  });
+
   // MA-0007: GM-adjudicated charge-damage clause (monsters.json conditional_damage).
   // Grant: roll the clause dice, apply as its own damage roll + hp_change, log the
   // clause. Decline: base damage only, logged. Base "Done" still applies the primary
@@ -905,7 +940,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         creatures={creatures}
         monsterSpellUses={monsterSpellUses}
         monsterReactionUses={monsterReactionUses}
+        monsterLegendaryUses={monsterLegendaryUses}
         handleGatedReaction={handleGatedReaction}
+        handleLegendaryRow={handleLegendaryRow}
       />
       {popupHtml && (
         <MonsterAttackPopup

@@ -363,6 +363,19 @@
   background: #7f8c8d;
 }
 
+.mc-legendary-header-row {
+  font-style: italic;
+}
+
+.mc-legendary-counter {
+  color: #9b59b6;
+  font-weight: bold;
+}
+
+.mc-dice-link-legendary {
+  margin-left: 6px;
+}
+
 .mc-ally-badge {
   display: inline-flex;
   align-items: center;
