@@ -764,7 +764,10 @@
         "description": "Wisdom Saving Throw: DC 16, one creature the aboleth can see within 30 feet. <strong>Failure:</strong> The target has the <strong>Charmed</strong> condition until the aboleth dies or is on a different plane of existence from the target. While Charmed, the target acts as an ally to the aboleth and is under its control while within 60 feet of it. In addition, the aboleth and the target can communicate telepathically with each other over any distance. The target repeats the save whenever it takes damage as well as after every 24 hours it spends at least 1 mile away from the aboleth, ending the effect on itself on a success.",
         "save_dc": 16,
         "save_type": "Wisdom",
-        "save_effect": "Failure: The target has the Charmed condition until the aboleth dies or is on a different plane of existence from the target"
+        "save_effect": "Failure: The target has the Charmed condition until the aboleth dies or is on a different plane of existence from the target",
+        "usage": "2/Day",
+        "uses": 2,
+        "maxUses": 2
       }
     ],
     "legendary_actions": [

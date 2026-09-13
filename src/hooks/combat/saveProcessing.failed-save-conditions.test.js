@@ -153,3 +153,95 @@ describe('MA-0017 failed-save conditions without damage formula', () => {
         expect(gmLog.some(e => e.rollType === 'save-damage')).toBe(true);
     });
 });
+
+// MA-0020: 2/Day spend lands at prompt-confirm (applySaveOutcome) + duration
+// note rides activeConditionMeta with a CLA-325 advisory log.
+const MA2020_CONTEXT = {
+    ...domContext,
+    monsterAbilityUse: { useKey: 'Dominate Mind', maxUses: 2, actionName: 'Dominate Mind (2/Day)' },
+    conditionDurationNote: 'until the aboleth dies or is on a different plane of existence from the target (GM-enforced)',
+};
+
+describe('MA-0020 Dominate Mind 2/Day spend at prompt-confirm', () => {
+    async function resolveFailedSave(context) {
+        const promise = processSaveRoll({
+            rollType: 'save',
+            target: { name: 'AberrantSorcerer', type: 'player' },
+            characterName: 'AberrantSorcerer',
+            campaignName,
+            context,
+            logEntry,
+            setPopupHtml: vi.fn(),
+        });
+        pendingSaveResolve({ success: false, roll: 4, total: 4, saveBonus: 0, rawRolls: [], mode: 'normal' });
+        await promise;
+    }
+
+    it('first confirmed failed save spends 1/2, counter + ability_use log, charmed still applied', async () => {
+        await resolveFailedSave({ ...MA2020_CONTEXT });
+
+        expect(runtimeStore['Aboleth.monsterSpellUses']).toEqual({ 'Dominate Mind': 1 });
+        const spend = conditionLogs.find(e => e.type === 'ability_use');
+        expect(spend).toBeTruthy();
+        expect(spend.characterName).toBe('Aboleth');
+        expect(spend.description).toMatch(/1 use spent, 1 left today/);
+        expect(runtimeStore['AberrantSorcerer.activeConditions']).toEqual(['charmed']);
+        expect(conditionLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(true);
+    });
+
+    it('second use reaches max 2 with 0 left today', async () => {
+        runtimeStore['Aboleth.monsterSpellUses'] = { 'Dominate Mind': 1 };
+        await resolveFailedSave({ ...MA2020_CONTEXT });
+
+        expect(runtimeStore['Aboleth.monsterSpellUses']).toEqual({ 'Dominate Mind': 2 });
+        expect(conditionLogs.find(e => e.type === 'ability_use').description).toMatch(/0 left today/);
+    });
+
+    it('guard: save already resolved at max — counter unchanged, refusal logged, charmed still applied', async () => {
+        runtimeStore['Aboleth.monsterSpellUses'] = { 'Dominate Mind': 2 };
+        await resolveFailedSave({ ...MA2020_CONTEXT });
+
+        expect(runtimeStore['Aboleth.monsterSpellUses']).toEqual({ 'Dominate Mind': 2 });
+        expect(conditionLogs.some(e => e.automationType === 'dominate_mind_refused')).toBe(true);
+        expect(conditionLogs.some(e => e.type === 'ability_use')).toBe(false);
+        expect(runtimeStore['AberrantSorcerer.activeConditions']).toEqual(['charmed']);
+    });
+
+    it('condition meta carries the until-clause durationNote + CLA-325 advisory log', async () => {
+        await resolveFailedSave({ ...MA2020_CONTEXT });
+
+        expect(runtimeStore['AberrantSorcerer.activeConditionMeta'].charmed).toMatchObject({
+            source: 'Aboleth',
+            durationNote: 'until the aboleth dies or is on a different plane of existence from the target (GM-enforced)',
+        });
+        const advisory = conditionLogs.find(e => e.automationType === 'condition_clauses_advisory');
+        expect(advisory).toBeTruthy();
+        expect(advisory.characterName).toBe('AberrantSorcerer');
+        expect(advisory.description).toMatch(/until the aboleth dies/);
+        expect(advisory.description).toMatch(/GM-enforced \(no control subsystem\)/);
+    });
+
+    it('successful save still spends the use (ability was used)', async () => {
+        const promise = processSaveRoll({
+            rollType: 'save',
+            target: { name: 'AberrantSorcerer', type: 'player' },
+            characterName: 'AberrantSorcerer',
+            campaignName,
+            context: { ...MA2020_CONTEXT },
+            logEntry,
+            setPopupHtml: vi.fn(),
+        });
+        pendingSaveResolve({ success: true, roll: 18, total: 18, saveBonus: 0, rawRolls: [], mode: 'normal' });
+        await promise;
+
+        expect(runtimeStore['Aboleth.monsterSpellUses']).toEqual({ 'Dominate Mind': 1 });
+        expect(runtimeStore['AberrantSorcerer.activeConditions']).toBeUndefined();
+    });
+
+    it('rows without monsterAbilityUse spend nothing (no counter written)', async () => {
+        await resolveFailedSave({ ...domContext });
+
+        expect(runtimeStore['Aboleth.monsterSpellUses']).toBeUndefined();
+        expect(conditionLogs.some(e => e.type === 'ability_use')).toBe(false);
+    });
+});

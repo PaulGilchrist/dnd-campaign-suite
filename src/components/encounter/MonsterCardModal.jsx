@@ -20,6 +20,7 @@ import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
 import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
+import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import './MonsterCardModal.css';
 
 function getDamageTypeChoices(action) {
@@ -347,8 +348,6 @@ async function findMonsterSpell(spellName) {
   return spells2024.find(s => s.name === spellName) || null;
 }
 
-const MONSTER_SPELL_USES_KEY = 'monsterSpellUses';
-
 // MA-0012: advisory cast logs print the row's authored save_dc/save_type
 // (e.g. Aberrant Cultist "spell save DC 15, Wisdom") even when the spell's
 // own spells.json entry carries no structured dc.
@@ -374,6 +373,42 @@ function spellUsesGate(monsterName, action, spellName) {
   const storedUses = getRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY) || {};
   const used = Number(storedUses[spellName]) || 0;
   return { usesMax, used, storedUses, exhausted: usesMax != null && used >= usesMax };
+}
+
+// MA-0020: N/Day ability save rows (Aboleth Dominate Mind 2/Day) gate at
+// click — exhausted means refusal popup + <slug>_refused log, zero save
+// prompts. Spell-cast rows already paid their uses in handleSpellCast
+// (MA-0005) so spellInfo rows skip this gate.
+function resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, setPopupHtml }) {
+  const usesGate = spellInfo ? null : monsterAbilitySaveUsesGate(action, getRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY));
+  if (!usesGate?.exhausted) return { refused: false, usesGate };
+  setPopupHtml(buildAbilitySaveRefusalPopup({ monsterName, useKey: usesGate.useKey, maxUses: usesGate.maxUses }));
+  addEntry(campaignName, buildAbilitySaveRefusalLog({ monsterName, useKey: usesGate.useKey, maxUses: usesGate.maxUses }))
+    .catch((e) => { console.error('[MonsterCardModal] Error logging ability uses refusal:', e); });
+  return { refused: true, usesGate: null };
+}
+
+function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction }) {
+  const primaryDamageType = getDamageTypesForAction(action)[0] || null;
+  return {
+    attackerName: monsterName,
+    targetName: target?.name,
+    actionName: spellName || action.name,
+    spellName,
+    saveDc: action.save_dc,
+    saveType,
+    dcSuccess,
+    autoDamageFormula: saveDamageFormula,
+    autoDamageDamageType: saveDamageFormula && primaryDamageType ? formatDamageTypes([primaryDamageType]) : null,
+    autoDamageName: spellName || action.name,
+    saveConditions,
+    isSpellDamage: !!spellName,
+    consumeMemoriesClause: !!prerequisite,
+    // MA-0020: spend marker lands at prompt-confirm (saveProcessing); the
+    // until-clause rides the condition meta as a GM-enforced durationNote.
+    monsterAbilityUse: usesGate ? { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName: spellName || action.name } : undefined,
+    conditionDurationNote: extractConditionDurationNote(action?.save_effect),
+  };
 }
 
 function buildMonsterSpellRefusalEntry({ monsterName, spellName, usesMax }) {
@@ -681,27 +716,17 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const spellName = spellInfo?.spellName || null;
     const saveType = spellInfo?.saveType || action.save_type;
     const dcSuccess = resolveBlockSaveDcSuccess(spellInfo, action);
+    const { refused, usesGate } = resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, setPopupHtml });
+    if (refused) return;
     console.debug(`[saveDebug] MonsterCardModal.handleSaveRoll`, {
       monsterName, actionName: spellName || action.name, saveDc: action.save_dc, saveType,
       target: target ? { name: target.name, type: target.type } : null,
       creaturesAvailable: Array.isArray(creatures),
     });
     const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
-    rollSavingThrow(saveAbilityAbbr(saveType), saveMod, {
-      attackerName: monsterName,
-      targetName: target?.name,
-      actionName: spellName || action.name,
-      spellName,
-      saveDc: action.save_dc,
-      saveType,
-      dcSuccess,
-      autoDamageFormula: saveDamageFormula,
-      autoDamageDamageType: saveDamageFormula ? (getDamageTypesForAction(action)[0] ? formatDamageTypes([getDamageTypesForAction(action)[0]]) : null) : null,
-      autoDamageName: spellName || action.name,
-      saveConditions: saveConditions,
-      isSpellDamage: !!spellName,
-      consumeMemoriesClause: !!prerequisite,
-    });
+    rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
+      monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction,
+    }));
   }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction, campaignName, setPopupHtml]);
 
   const handleSpellCast = useCallback(async (action, spellName) => {

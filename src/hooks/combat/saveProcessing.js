@@ -7,6 +7,7 @@ import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -298,6 +299,11 @@ function resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveTy
 }
 
 async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
+    // MA-0020: ability N/Day spend lands here — prompt-confirm seam (reaches
+    // this point only once the save has resolved), regardless of the outcome.
+    if (context?.monsterAbilityUse) {
+        await spendMonsterAbilityUse({ monsterName: attackerName, use: context.monsterAbilityUse, targetName: targetName || characterName, campaignName });
+    }
     if (context?.autoDamageFormula && saveDc != null) {
         await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
     } else {
@@ -332,15 +338,7 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
         }
     }
     setRuntimeValue(applyTarget, 'activeConditions', newConditions, campaignName);
-    // MA-0019 provenance: stamp the inflicting creature into condition meta
-    // so "by <source>" prerequisites (target_prerequisite.by_attacker) can
-    // be enforced. Existing meta consumers read dc/ability only — additive.
-    const existingMeta = getRuntimeValue(applyTarget, 'activeConditionMeta', campaignName) || {};
-    const newMeta = { ...existingMeta };
-    for (const cond of saveConditions) {
-        newMeta[cond] = { ...(existingMeta[cond] || {}), source: attackerName };
-    }
-    setRuntimeValue(applyTarget, 'activeConditionMeta', newMeta, campaignName);
+    stampConditionMetaAndLogClauses({ applyTarget, saveConditions, attackerName, context, campaignName });
     const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
     addEntry(campaignName, {
         type: 'condition',
@@ -351,6 +349,34 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
         sourceAbility: context?.actionName || context.name,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[saveProcessing:log-error]", e); });
+}
+
+// MA-0019 provenance: stamp the inflicting creature into condition meta so
+// "by <source>" prerequisites (target_prerequisite.by_attacker) can be
+// enforced. MA-0020: an authored "until …" clause (Dominate Mind) rides the
+// same stamp as a durationNote — advisory only, no auto-expiry subsystem
+// (CLA-325). Existing meta consumers read dc/ability only — additive.
+function stampConditionMetaAndLogClauses({ applyTarget, saveConditions, attackerName, context, campaignName }) {
+    const existingMeta = getRuntimeValue(applyTarget, 'activeConditionMeta', campaignName) || {};
+    const newMeta = { ...existingMeta };
+    for (const cond of saveConditions) {
+        newMeta[cond] = { ...(existingMeta[cond] || {}), source: attackerName };
+        if (context?.conditionDurationNote && !newMeta[cond].durationNote) {
+            newMeta[cond].durationNote = context.conditionDurationNote;
+        }
+    }
+    setRuntimeValue(applyTarget, 'activeConditionMeta', newMeta, campaignName);
+    if (!context?.conditionDurationNote) return;
+    const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'condition_clauses_advisory',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: context?.actionName || context.name,
+        description: `${applyTarget} is ${conditionNames.join(', ')} ${context.conditionDurationNote} — control/telepathy/repeat-save clauses are GM-enforced (no control subsystem).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[saveProcessing:clause-advisory-log]", e); });
 }
 
 function logSaveEvasionRoll({ applyTarget, hasOwnEvasion, saveType, saveDc, saveSuccess, context, logEntry }) {

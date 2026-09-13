@@ -3,6 +3,7 @@ import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { canRollExpression } from '../../services/dice/diceRoller.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
 import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining } from './MonsterCardHelpers.js';
+import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -57,24 +58,26 @@ function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast 
   );
 }
 
-function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll }) {
+function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed }) {
   if (action.save_dc == null) return null;
   const saveDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
   const saveConditions = extractConditionsFromSaveEffect(action?.save_effect);
+  const usesGate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
+  const usesNote = usesGate ? <em> ({usesGate.maxUses}/Day · {usesGate.remaining} left)</em> : null;
   const handleSaveRoll = () => {
     onSaveRoll(action, saveDamageFormula, saveConditions);
   };
   if (saveDamageFormula && canRollExpression(saveDamageFormula)) {
     return (
       <span className="mc-dice-link" role="button" tabIndex={0} onClick={handleSaveRoll}>
-        <i className="fa-solid fa-dice" /> {saveDamageFormula}
+        <i className="fa-solid fa-dice" /> {saveDamageFormula}{usesNote}
       </span>
     );
   }
   const clickable = !action.attack_bonus && !attackerCannotAct;
   return (
-    <span className={`mc-dice-link ${clickable ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}`} onClick={clickable ? handleSaveRoll : undefined} role="button" tabIndex={0}>
-      DC {action.save_dc} {action.save_type}
+    <span className={`mc-dice-link ${clickable ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}${usesGate && usesGate.remaining === 0 ? ' mc-dice-link-spell-spent' : ''}`} onClick={clickable ? handleSaveRoll : undefined} role="button" tabIndex={0}>
+      DC {action.save_dc} {action.save_type}{usesNote}
     </span>
   );
 }
@@ -120,7 +123,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       {isSpellcastingRow ? (
         <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} />
       ) : (
-        actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} />
+        actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} />
       )}
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
       <GatedReactionSlot action={action} attackerCannotAct={attackerCannotAct} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} />
