@@ -333,14 +333,16 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
         duration: zoneTe.duration || null,
         affectedNames: [...selectedNames],
     }, campaignName);
+    const saveNote = saveDc != null ? `${saveType} save DC ${saveDc}` : 'no save';
     const repeatNote = zoneTe.repeatTurnEnd
         ? ` Repeat ${zoneTe.damage || 'damage'} at turn end — GM-enforced (no turn-end zone-damage consumer).`
         : '';
+    const clauseNote = zoneTe.clause ? ` ${zoneTe.clause}` : '';
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: casterName,
         abilityName: actionName,
-        description: `${casterName} ${actionName}: ${zoneTe.effectKey} zone armed (radius ${zoneTe.radiusFt} ft, ${saveType} save DC ${saveDc}) over ${selectedNames.join(', ') || 'no targets'}.${repeatNote} Duration ${zoneTe.duration || 'GM-adjudicated'} — GM-enforced.`,
+        description: `${casterName} ${actionName}: ${zoneTe.effectKey} zone armed (radius ${zoneTe.radiusFt} ft, ${saveNote}) over ${selectedNames.join(', ') || 'no targets'}.${repeatNote}${clauseNote} Duration ${zoneTe.duration || 'GM-adjudicated'} — GM-enforced.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging zone arm:', e); });
 }
@@ -361,6 +363,23 @@ function useRangeAllowedSet(eligibleTargets, rangeGateFt, attackerName) {
 
 function aoePickerTitle(action, titleOverride) {
     return titleOverride || action.name;
+}
+
+// MA-0043: zoneOnly rows (Shroud of Darkness) read as save-less darkness
+// copy; every other consumer keeps the byte-identical save picker text.
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten }) {
+    if (!zoneOnly) {
+        return {
+            icon: 'fa-bomb',
+            description: `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`,
+            note: `On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+        };
+    }
+    return {
+        icon: 'fa-moon',
+        description: `Select creatures inside the <strong>${zoneTe?.radiusFt ?? range}-foot</strong> darkness. No saving throw — the GM positions the origin (selection advisory).`,
+        note: `${zoneTe?.clause || ''} Duration ${zoneTe?.duration || 'GM-adjudicated'} — GM-enforced.`,
+    };
 }
 
 function buildEligibleTargets(combatSummary, attackerName, isCarefulSpell, isCarefulAlly, excludeNames) {
@@ -384,6 +403,12 @@ function toPickerTargets(eligibleTargets, rangeAllowed) {
             maxHp: c.maxHp,
             carefulSpellProtected: c.carefulSpellProtected,
         }));
+}
+
+// MA-0043: zone-armed confirmation line on the save-less picker results view.
+function ZoneArmedNote({ zoneOnly, zoneTe, selected }) {
+    if (!zoneOnly) return null;
+    return <p>{zoneTe?.effectKey || 'Zone'} armed over {Array.from(selected).join(', ') || 'no targets'} — GM-enforced.</p>;
 }
 
 function SaveAttackAoeModal({
@@ -415,8 +440,12 @@ function SaveAttackAoeModal({
     rangeGateFt,
     storeLastAttack,
     // MA-0042 optional persisting-zone seam (byte-inert null default):
-    // { effectKey, trackingPrefix, radiusFt, repeatTurnEnd, damage, duration }
+    // { effectKey, trackingPrefix, radiusFt, repeatTurnEnd, damage, duration, clause? }
     zoneTe = null,
+    // MA-0043 zoneOnly (byte-inert false default): save-less zone rows
+    // (Shroud of Darkness) — confirm arms the zone and logs, but resolves
+    // NO saves and applies NO damage (canonical darkness lair = no save).
+    zoneOnly = false,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -716,6 +745,15 @@ function SaveAttackAoeModal({
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
         setSelected(new Set(selectedNames));
 
+        if (zoneOnly) {
+            // MA-0043: zone arming only — no saves, no damage, no lastAttack.
+            armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
+            setResults([]);
+            setPendingPrompts([]);
+            setSummary({ results: [], selected: new Set(selectedNames) });
+            return;
+        }
+
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
@@ -735,7 +773,7 @@ function SaveAttackAoeModal({
         if (prompts.length === 0 && results.length > 0) {
             setSummary({ results, selected: new Set(selectedNames) });
         }
-    }, [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSavesAndDamage]);
+    }, [campaignName, playerStats.name, action.name, saveDc, saveType, zoneOnly, zoneTe, resolveAllSavesAndDamage]);
 
     const handleCreatureSelectionSkip = useCallback(() => {
         onClose();
@@ -819,6 +857,7 @@ function SaveAttackAoeModal({
                         <i className="fa-solid fa-bomb"></i> {action.name} — Results
                     </div>
                     <div className="sp-body">
+                        <ZoneArmedNote zoneOnly={zoneOnly} zoneTe={zoneTe} selected={summary.selected} />
                         <div className="abjure-results-list">
                             {summary.results.map(r => (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
@@ -866,13 +905,15 @@ function SaveAttackAoeModal({
         );
     }
 
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten });
+
     return (
         <CreatureSelectionModal
             title={aoePickerTitle(action, titleOverride)}
-            icon="fa-bomb"
+            icon={pickerCopy.icon}
             targets={toPickerTargets(eligibleTargets, rangeAllowed)}
-            description={`Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`}
-            note={`On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`}
+            description={pickerCopy.description}
+            note={pickerCopy.note}
             confirmLabel={action.name}
             confirmIcon="fa-bomb"
             onConfirm={handleCreatureSelectionConfirm}

@@ -1180,7 +1180,17 @@
         "duration": "until dismissed or used again (advisory)",
         "description": "A cloud of swarming insects fills a 20-foot-radius sphere centered on a point the dragon chooses within 120 feet of it. The cloud spreads around corners and remains until the dragon dismisses it as an action, uses this lair action again, or dies. The cloud is lightly obscured. Any creature in the cloud when it appears must make on a DC 15 Constitution saving throw, taking 10 (3d6) piercing damage on a failed save, or half as much damage on a successful one. A creature that ends its turn in the cloud takes 10 (3d6) piercing damage."
       },
-      "Magical darkness spreads from a point the dragon chooses within 60 feet of it, filling a 15-foot-radius sphere until the dragon dismisses it as an action, uses this lair action again, or dies. The darkness spreads around corners. A creature with darkvision can't see through this darkness, and nonmagical light can't illuminate it. If any of the effect's area overlaps with an area of light created by a spell of 2nd level or lower, the spell that created the light is dispelled."
+      {
+        "name": "Shroud of Darkness",
+        "description": "Magical darkness spreads from a point the dragon chooses within 60 feet of it, filling a 15-foot-radius sphere until the dragon dismisses it as an action, uses this lair action again, or dies. The darkness spreads around corners. A creature with darkvision can't see through this darkness, and nonmagical light can't illuminate it. If any of the effect's area overlaps with an area of light created by a spell of 2nd level or lower, the spell that created the light is dispelled.",
+        "zone": {
+          "radius_ft": 15,
+          "no_save": true,
+          "effect_key": "lair_darkness",
+          "advisory": "No saving throw (canonical darkness lair action). Darkvision blocking and light-spell overlap — dispel only by 2nd-level+ light — GM-enforced (no light model in this engine)."
+        },
+        "duration": "until dismissed or used again (advisory)"
+      }
     ],
     "environments": [
       "coastal"

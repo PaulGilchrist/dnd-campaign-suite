@@ -25,14 +25,19 @@ const LAIR_ADVISORY_NOTE = 'Lair actions are chosen on initiative 20 (GM-enforce
 export function isLairRowClickable(row) {
   if (!row || typeof row !== 'object' || !row.name) return false;
   if (row.save_dc != null || row.attack_bonus != null || row.advisory) return true;
+  if (row.zone?.radius_ft != null) return true;
   return !!(row.damage_dice_primary && canRollExpression(row.damage_dice_primary));
 }
 
-// 'save' | 'attack' | 'damage' | 'advisory' | null (null = unresolvable).
-// `advisory` is checked FIRST: a control spell's authored save stays a
-// GM-adjudicated record (CLA-325) — no illusion-engine consumer exists.
+// 'save' | 'attack' | 'damage' | 'zone' | 'advisory' | null (null = unresolvable).
+// `advisory` is checked FIRST (except for save-less zone rows): a control
+// spell's authored save stays a GM-adjudicated record (CLA-325) — no
+// illusion-engine consumer exists. MA-0043: a zone row with NO authored save
+// (canonical darkness lair action) arms its zone through the area picker with
+// the save legs skipped (zoneOnly) — no fake save prompts.
 export function lairRowAffordance(row) {
   if (!isLairRowClickable(row)) return null;
+  if (row.zone?.radius_ft != null && row.save_dc == null) return 'zone';
   if (row.advisory) return 'advisory';
   if (row.save_dc != null) return 'save';
   if (row.attack_bonus != null) return 'attack';
@@ -75,7 +80,7 @@ export function buildLairAdvisoryPopup({ monsterName, action }) {
 
 // One click = one adjudicated effect. Save rows resolve through the existing
 // save seam untouched; advisory rows log the spell-named ability_use record.
-export async function resolveLairRow({ action, monsterName, campaignName, setPopupHtml, handleSaveRoll, handleAttack, handleDamage, saveDamageFormula = null, saveConditions = [], deps = {} }) {
+export async function resolveLairRow({ action, monsterName, campaignName, setPopupHtml, handleSaveRoll, handleAttack, handleDamage, handleZone = null, saveDamageFormula = null, saveConditions = [], deps = {} }) {
   const log = deps.addEntry || addEntry;
   const affordance = lairRowAffordance(action);
   if (!affordance) {
@@ -85,6 +90,10 @@ export async function resolveLairRow({ action, monsterName, campaignName, setPop
   }
   if (affordance === 'save') {
     handleSaveRoll(action, saveDamageFormula, saveConditions);
+    return { resolved: true, affordance };
+  }
+  if (affordance === 'zone') {
+    handleZone(action);
     return { resolved: true, affordance };
   }
   if (affordance === 'attack') {

@@ -755,6 +755,15 @@ const TARGET_EFFECT_DEFINITIONS = [
 
   // ── Lair ─────────────────────────────────────────────────
   {
+    effect: 'lair_darkness',
+    label: 'Magical Darkness (Lair)',
+    description: 'Inside magical darkness (15-foot radius, lair action): heavily obscured — darkvision can\'t see through it and nonmagical light can\'t illuminate it. Overlapping light created by a spell of 2nd level or lower is dispelled — GM-enforced (no light-level model in this engine). No saving throw. Lasts until the dragon dismisses it, uses this lair action again, or dies.',
+    icon: 'fa-moon',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source'],
+  },
+  {
     effect: 'lair_insect_cloud',
     label: 'Insect Cloud (Lair)',
     description: 'Inside a swarming-insect cloud (20-foot radius, lair action): Lightly Obscured. CON save (DC indicated) when the cloud appears, taking Piercing damage on a failed save, half on a success. A creature that ends its turn in the cloud takes the same damage again — GM-enforced (no turn-end zone-damage consumer exists). Lasts until the dragon dismisses it, uses this lair action again, or dies.',

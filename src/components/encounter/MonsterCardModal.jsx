@@ -61,14 +61,20 @@ function breathAoeShape(action, spellInfo) {
 function zoneTeForAction(action) {
   if (!action?.zone?.radius_ft || !action.name) return null;
   const slug = String(action.name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  return {
-    effectKey: `lair_${slug}`,
-    trackingPrefix: `lair_${slug}`,
+  const baseKey = action.zone.effect_key || `lair_${slug}`;
+  const payload = {
+    effectKey: baseKey,
+    trackingPrefix: baseKey,
     radiusFt: Number(action.zone.radius_ft),
     repeatTurnEnd: action.zone.repeat_turn_end === true,
     damage: action.damage_dice_primary || null,
     duration: action.duration || null,
   };
+  // MA-0043: authored advisory clause (e.g. darkness "dispel only by
+  // 2nd-level+ light — GM-enforced") rides the arm log. Absent on
+  // MA-0042's insect-cloud row (payload byte-identical there).
+  if (action.zone.advisory) payload.clause = action.zone.advisory;
+  return payload;
 }
 
 // MA-0031: recharge gate at row click — a spent breath weapon refuses with a
@@ -1067,6 +1073,16 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   // ability_use record (CLA-325 — GM-enforced initiative-20 cadence + 24h
   // immunity, no illusion-engine consumer); unresolvable rows refuse with a
   // lair_action_refused log and zero effect.
+  // MA-0043: a save-less authored zone row (Shroud of Darkness) opens the
+  // same area picker in zoneOnly mode — confirm arms the zone te + tracking
+  // key and logs, but rolls NO save (canonical darkness lair = no save) and
+  // applies NO damage. Light/darkvision/dispel adjudication stays advisory
+  // (§7 no light model).
+  const handleLairZone = useCallback((action) => {
+    const radiusFt = Number(action.zone?.radius_ft) || 0;
+    setConePicker({ action, saveDamageFormula: null, saveConditions: [], saveType: null, dcSuccess: null, coneFt: radiusFt, rangeGateFt: null, title: `${radiusFt}-ft radius (GM positions; selection advisory)`, damageType: null, zoneTe: zoneTeForAction(action), zoneOnly: true });
+  }, []);
+
   const handleLairRow = (action) => resolveLairRow({
     action,
     monsterName,
@@ -1075,6 +1091,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     handleSaveRoll,
     handleAttack,
     handleDamage,
+    handleZone: handleLairZone,
     saveDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary),
     saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
   });
@@ -1247,6 +1264,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           excludeNames={[monsterName]}
           rangeGateFt={conePicker.rangeGateFt}
           zoneTe={conePicker.zoneTe}
+          zoneOnly={conePicker.zoneOnly === true}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}
         />

@@ -180,3 +180,59 @@ describe('MA-0042 adult-black-dragon insect cloud data lock', () => {
     expect(cloud.description).toMatch(/ends its turn in the cloud takes 10 \(3d6\) piercing damage/i);
   });
 });
+
+// MA-0043: Adult Black Dragon lair_actions[2] "Shroud of Darkness" was a
+// plain string (inert, no light/zone consumer). Now structured with a
+// machine-readable 15-ft save-less zone: affordance 'zone' routes through the
+// area picker in zoneOnly mode (arm te + tracking + log, NO save roll).
+describe('MA-0043 adult-black-dragon shroud of darkness data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-black-dragon');
+  const dark = dragon.lair_actions[2];
+
+  it('row is now a structured clickable ZONE row named Shroud of Darkness', () => {
+    expect(typeof dark).toBe('object');
+    expect(dark.name).toBe('Shroud of Darkness');
+    expect(isLairRowClickable(dark)).toBe(true);
+    expect(lairRowAffordance(dark)).toBe('zone');
+  });
+
+  it('canonical darkness lair = NO save: no save_dc authored, zone flagged no_save', () => {
+    expect(dark.save_dc).toBeUndefined();
+    expect(dark.zone.radius_ft).toBe(15);
+    expect(dark.zone.no_save).toBe(true);
+    expect(dark.description).not.toMatch(/saving throw/i);
+  });
+
+  it('description verbatim + advisory light/dispel clause (GM-enforced)', () => {
+    expect(dark.description).toMatch(/15-foot-radius sphere/i);
+    expect(dark.description).toMatch(/darkvision can't see through this darkness/i);
+    expect(dark.description).toMatch(/spell of 2nd level or lower, the spell that created the light is dispelled/i);
+    expect(dark.zone.advisory).toMatch(/dispel only by 2nd-level\+ light — GM-enforced/);
+    expect(dark.duration).toBe('until dismissed or used again (advisory)');
+  });
+
+  it('insect cloud (zone WITH save) keeps its save affordance untouched', () => {
+    expect(lairRowAffordance(dragon.lair_actions[1])).toBe('save');
+  });
+
+  it('legacy plain-string rows never become zone-clickable', () => {
+    expect(isLairRowClickable('Magical darkness spreads from a point…')).toBe(false);
+    expect(lairRowAffordance({ name: 'Mists', description: 'prose only' })).toBeNull();
+  });
+
+  it('zone row routes through handleZone, zero save/attack/damage handler calls', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      monsterName: 'Adult Black Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+      action: dark,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(dark);
+  });
+});
