@@ -154,6 +154,7 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         isAutoCrit: ctx.isCrit,
         sneakAttackDice: context?.sneakAttackDice || 0,
         d20Roll: ctx.effectiveD20Roll,
+        hitClause: context?.hitClause || null,
     };
 }
 

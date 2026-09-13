@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionGate, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionGate, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause } from './MonsterCardHelpers.js';
 import { findLastAttack } from '../../services/automation/common/damageRollback.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import './MonsterCardModal.css';
@@ -204,6 +204,7 @@ function buildAutoDamageOptions(action, name) {
     autoDamageSecondaryFormula: action?.damage_dice_secondary || null,
     autoDamageSecondaryName: name,
     autoDamageSecondaryDamageType: action?.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
+    hitClause: buildHitConditionClause(action),
   };
 }
 
@@ -497,6 +498,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               context.overchannelActive = autoDamage.overchannelActive;
               context.overchannelUseCount = autoDamage.overchannelUseCount;
               context.overchannelSpellLevel = autoDamage.overchannelSpellLevel;
+            }
+            if (autoDamage.hitClause) {
+              context.hitClause = autoDamage.hitClause;
             }
             rollDamage({ name: autoDamage.name, formula: autoDamage.formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
           }

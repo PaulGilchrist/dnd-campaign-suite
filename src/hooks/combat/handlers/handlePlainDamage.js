@@ -460,6 +460,53 @@ function maybeApplyRamProne({ context, target, applyResult, campaignName, logEnt
     applyRamProneCondition(target, campaignName, logEntry);
 }
 
+// MA-0010: monster attack-hit conditions (monsters.json hit_conditions +
+// escape_dc, e.g. Aberrant Cultist Tentacle Lash → Grappled/Restrained).
+// Applied on the resolved hit via the canonical activeConditions write path,
+// with activeConditionMeta {dc, ability} so the target's condition badge
+// (CharConditions) offers the escape save. Escape is a badge click —
+// GM-enforced re-save; no token/movement grapple subsystem.
+function applyHitClauseConditions({ hitClause, target, campaignName, logEntry }) {
+    const currentConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+    const newConditions = [...currentConditions];
+    for (const cond of hitClause.conditions) {
+        if (!newConditions.some(c => String(c).toLowerCase() === cond)) {
+            newConditions.push(cond);
+        }
+    }
+    setRuntimeValue(target.name, 'activeConditions', newConditions, campaignName);
+    if (hitClause.escapeDc != null) {
+        const existingMeta = getRuntimeValue(target.name, 'activeConditionMeta', campaignName) || {};
+        const newMeta = { ...existingMeta };
+        for (const cond of hitClause.conditions) {
+            newMeta[cond] = { ...(existingMeta[cond] || {}), dc: hitClause.escapeDc, ability: 'str' };
+        }
+        setRuntimeValue(target.name, 'activeConditionMeta', newMeta, campaignName);
+    }
+    const conditionLabels = hitClause.conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+    logEntry({
+        type: 'condition',
+        action: 'applied',
+        characterName: target.name,
+        condition: conditionLabels,
+        reason: `${hitClause.attackName} (escape DC ${hitClause.escapeDc ?? '—'})`,
+        note: hitClause.escapeDc != null
+            ? `${target.name} is held by a tentacle — escape via the condition badge save (DC ${hitClause.escapeDc}, STR); Restrained lasts until the grapple ends.`
+            : null,
+        timestamp: Date.now(),
+    });
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
+function maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry }) {
+    const hitClause = context?.hitClause;
+    if (!hitClause || !Array.isArray(hitClause.conditions) || hitClause.conditions.length === 0) return;
+    if (!target || !applyResult) return;
+    const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
+    if (!isLargeOrSmaller) return;
+    applyHitClauseConditions({ hitClause, target, campaignName, logEntry });
+}
+
 function attachPopupHpFallbacks(popupData, target, targetMaxHp) {
     popupData.targetCurrentHp = popupData.targetCurrentHp || (target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : (target?.currentHp ?? target?.maxHp));
     popupData.targetMaxHp = popupData.targetMaxHp || targetMaxHp;
@@ -564,6 +611,7 @@ export function createPlainDamageHandler(deps) {
         applyResult = await resolveDeathStrike({ applyResult, context, combatSummary, target, characters, campaignName, characterName, adjustedTotal, formula, rolls, modifier, damageType, setPopupHtml, logEntry });
 
         maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry });
+        maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 

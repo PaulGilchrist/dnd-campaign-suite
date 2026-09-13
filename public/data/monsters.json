@@ -327,7 +327,9 @@
         "damage_dice_primary": "1d6 + 4",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "4d6",
-        "damage_type_secondary": "Psychic"
+        "damage_type_secondary": "Psychic",
+        "hit_conditions": ["grappled", "restrained"],
+        "escape_dc": 14
       },
       {
         "name": "Mind Rot",
