@@ -275,12 +275,13 @@ describe('MonsterCardModal - handleSaveRoll: autoDamage context', () => {
     damageUtils.__setFindCreatureReturn({
       name: 'Goblin',
       conditions: [],
+      targetName: 'Player A',
     });
 
     const m = makeMonster({
       actions: [{ name: 'Stinking Cloud', save_dc: 13, save_type: 'Constitution', damage_dice_primary: '4d6', damage_type_primary: 'poison', save_effect: 'On a failed save, the target is poisoned.', description: 'A cloud of noxious gas.' }],
     });
-    render(<MonsterCardModal {...makeProps(m)} />);
+    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
 
     clickDiceLink('4d6');
     expect(rollSavingThrow).toHaveBeenCalledWith(

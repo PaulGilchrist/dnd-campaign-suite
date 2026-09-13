@@ -44,7 +44,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   formatDamageTypes: vi.fn((t) => (t || []).join(', ') || ''),
   getTargetFromAttacker: vi.fn(() => null),
   getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(() => null),
+  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
 }));
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({

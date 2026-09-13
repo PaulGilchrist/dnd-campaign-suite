@@ -79,7 +79,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 const CREATURES = [
-  { name: 'Adult Black Dragon 1', type: 'npc', monsterType: 'dragon', targetName: null, currentHp: 195, maxHp: 195, ac: 19, conditions: [] },
+  { name: 'Adult Black Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 195, maxHp: 195, ac: 19, conditions: [] },
   { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, ac: 11, conditions: [] },
   { name: 'ElderPaladin', type: 'player', currentHp: 60, maxHp: 60, conditions: [] },
 ];

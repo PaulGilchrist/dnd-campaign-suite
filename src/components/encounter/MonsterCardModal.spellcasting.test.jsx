@@ -91,7 +91,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
   getTargetFromAttacker: vi.fn(() => null),
   getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(() => ({ name: 'Aarakocra Aeromancer 1', conditions: [] })),
+  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn().mockResolvedValue(null),
 }));
 
@@ -171,7 +171,11 @@ describe('MonsterCardModal - Spellcasting per-spell cast links (MA-0003)', () =>
 
   function renderAeromancer() {
     const m = makeMonster({ name: 'Aarakocra Aeromancer', actions: [AEROMANCASTER_SPELLCASTING] });
-    const props = makeProps(m, { creatureName: 'Aarakocra Aeromancer 1' });
+    const creatures = [
+      { name: 'Aarakocra Aeromancer 1', type: 'npc', monsterType: 'beast', targetName: 'TestPC', currentHp: 18, maxHp: 18, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 60, maxHp: 60, conditions: [] },
+    ];
+    const props = makeProps(m, { creatureName: 'Aarakocra Aeromancer 1', creatures });
     const { rerender } = render(<MonsterCardModal {...props} />);
     return () => rerender(<MonsterCardModal {...props} />);
   }
