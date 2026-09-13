@@ -94,6 +94,15 @@ const TARGET_EFFECT_DEFINITIONS = [
 
   // ── Defensive ──────────────────────────────────────────
   {
+    effect: 'no_healing',
+    label: "Can't Regain Hit Points",
+    description: 'The target can\'t regain Hit Points while this effect lasts (e.g. Aberrant Spirit Claw — until the start of the spirit\'s next turn). Healing via the canonical heal helpers is refused and logged.',
+    icon: 'fa-heart-circle-xmark',
+    cls: 'effect-debuff',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
     effect: 'dodge',
     label: 'Disadvantage on attacks',
     description: 'Attacks against the target have Disadvantage. The target has Advantage on Dexterity saving throws.',

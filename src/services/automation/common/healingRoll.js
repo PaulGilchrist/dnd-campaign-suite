@@ -3,6 +3,7 @@ import { hasHealingMaximizationForTarget } from '../../combat/automation/automat
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
+import { isHealingBlocked } from '../../rules/combat/healingBlock.js';
 import { addEntry } from '../../ui/logService.js';
 
 
@@ -48,6 +49,10 @@ export function applyHealingDirectly(playerStats, targetName, amount, campaignNa
 
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
     const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+
+    if (isHealingBlocked(targetName, campaignName, amount)) {
+        return { maxHp, newHp: currentHp, actualHeal: 0 };
+    }
 
     const newHp = Math.min(maxHp, currentHp + amount);
     const actualHeal = newHp - currentHp;

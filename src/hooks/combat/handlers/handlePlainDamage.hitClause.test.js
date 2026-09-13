@@ -64,6 +64,15 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     clearReTriggeredSequence: vi.fn(),
 }));
 
+vi.mock('../../../services/combat/conditions/targetEffectDefinitions.js', () => ({
+    registerTargetEffect: vi.fn(),
+    getEffectDefinition: vi.fn((key) => ({ effect: key, label: 'Can\'t Regain Hit Points', group: 'Defensive' })),
+}));
+
+vi.mock('../../../services/rules/effects/expirationQueue.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
     hasBardicInspirationOffense: vi.fn(),
     getBardicInspirationDieSize: vi.fn(),
@@ -83,6 +92,8 @@ import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
+import { registerTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
+import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 
 const TENTACLE_LASH_ACTION = {
     name: 'Tentacle Lash',
@@ -97,6 +108,7 @@ describe('MA-0010 buildHitConditionClause', () => {
             conditions: ['grappled', 'restrained'],
             escapeDc: 14,
             attackName: 'Tentacle Lash',
+            targetEffect: null,
         });
     });
 
@@ -212,6 +224,98 @@ describe('MA-0010 hit-clause condition application on monster attack damage', ()
         const fn = createLogDamageAndShow(deps);
         await fn({ name: 'Tentacle Lash', formula: '1d6 + 4', total: 8, rolls: [4], modifier: 4, context: hitContext() });
 
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'FeyRanger', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+    });
+});
+
+const SLAAD_CLAW_ACTION = {
+    name: 'Claw',
+    attack_bonus: null,
+    reach: '5 ft.',
+    damage_dice_primary: '1d10+3+spell level',
+    damage_type_primary: 'Slashing',
+    hit_target_effect: 'no_healing',
+};
+
+describe('MA-0016 Aberrant Spirit (Slaad) Claw no_healing producer', () => {
+    const deps = {
+        characterName: 'Aberrant Spirit (Slaad) 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Aberrant Spirit (Slaad) 1', computedStats: { armorClass: 11 } },
+            { name: 'FeyRanger', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 13, newHp: 76, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'FeyRanger', type: 'player', ac: 12, currentHp: 89, maxHp: 89 }],
+        });
+    });
+
+    function clawContext() {
+        return {
+            targetName: 'FeyRanger',
+            damageType: 'Slashing',
+            attackerName: 'Aberrant Spirit (Slaad) 1',
+            hitClause: buildHitConditionClause(SLAAD_CLAW_ACTION),
+        };
+    }
+
+    it('builds a targetEffect-only clause (no conditions) from hit_target_effect', () => {
+        expect(buildHitConditionClause(SLAAD_CLAW_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Claw',
+            targetEffect: 'no_healing',
+        });
+    });
+
+    it('registers the no_healing te on the target, sourced from the spirit, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claw', formula: '1d10+3', total: 13, rolls: [10], modifier: 3, context: clawContext() });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'FeyRanger',
+            'no_healing',
+            'Aberrant Spirit (Slaad) 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('expires the te anchored on the spirit (until its next turn start)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claw', formula: '1d10+3', total: 13, rolls: [10], modifier: 3, context: clawContext() });
+
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Aberrant Spirit (Slaad) 1',
+            targetName: 'FeyRanger',
+            effects: [{ type: 'remove_target_effect', effectKey: 'no_healing', source: 'Aberrant Spirit (Slaad) 1', target: 'FeyRanger' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Aberrant Spirit (Slaad) 1',
+        });
+    });
+
+    it('logs a condition-applied entry naming the Claw effect and does NOT write grapple conditions', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claw', formula: '1d10+3', total: 13, rolls: [10], modifier: 3, context: clawContext() });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'FeyRanger',
+            condition: "Can't Regain Hit Points",
+        }));
         expect(setRuntimeValue).not.toHaveBeenCalledWith(
             'FeyRanger', 'activeConditions', expect.anything(), 'test-campaign'
         );

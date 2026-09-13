@@ -12,8 +12,8 @@ vi.mock('../../shared/hpModifier.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn(),
-  getStore: vi.fn(() => ({ keys: () => [] })),
+    setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(() => null),
 }));
 
 vi.mock('../../ui/storage.js', () => ({ default: { set: vi.fn() } }));

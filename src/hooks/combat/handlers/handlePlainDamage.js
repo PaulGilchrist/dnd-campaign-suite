@@ -9,6 +9,8 @@ import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInsp
 import { hasEmpoweredSpell } from '../../../services/rules/spells/empoweredSpellService.js';
 import { getChaModifier } from '../../../services/rules/spells/metamagicRules.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
+import { registerTargetEffect, getEffectDefinition } from '../../../services/combat/conditions/targetEffectDefinitions.js';
+import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
 
@@ -498,13 +500,51 @@ function applyHitClauseConditions({ hitClause, target, campaignName, logEntry })
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-function maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry }) {
+function maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry, characterName }) {
     const hitClause = context?.hitClause;
-    if (!hitClause || !Array.isArray(hitClause.conditions) || hitClause.conditions.length === 0) return;
-    if (!target || !applyResult) return;
+    if (!hitClause || !target || !applyResult) return;
+    const hasConditions = Array.isArray(hitClause.conditions) && hitClause.conditions.length > 0;
+    if (!hasConditions && !hitClause.targetEffect) return;
     const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
     if (!isLargeOrSmaller) return;
-    applyHitClauseConditions({ hitClause, target, campaignName, logEntry });
+    if (hasConditions) {
+        applyHitClauseConditions({ hitClause, target, campaignName, logEntry });
+    }
+    if (hitClause.targetEffect) {
+        applyHitClauseTargetEffect({ hitClause, target, attackerName: characterName, campaignName, logEntry });
+    }
+}
+
+// MA-0016: Aberrant Spirit (Slaad) Claw — "the target can't regain Hit
+// Points until the start of the spirit's next turn". Registers the
+// registered 'no_healing' te on the target (registry:
+// targetEffectDefinitions.js; consumed by applyHealingToTarget /
+// applyHealingDirectly via healingBlock.js) and expires it anchored on the
+// spirit (attacker) — fires at the spirit's NEXT turn start (stepOfTheWind
+// until_start_of_next_turn + CLA-345 expireOnCreatureName pattern).
+function applyHitClauseTargetEffect({ hitClause, target, attackerName, campaignName, logEntry }) {
+    const def = getEffectDefinition(hitClause.targetEffect);
+    registerTargetEffect(campaignName, target.name, hitClause.targetEffect, attackerName, {
+        duration: 'until_start_of_next_turn',
+    });
+    addExpiration({
+        attackerName,
+        targetName: target.name,
+        effects: [{ type: 'remove_target_effect', effectKey: hitClause.targetEffect, source: attackerName, target: target.name }],
+        campaignName,
+        rounds: undefined,
+        expireOnCreatureName: attackerName,
+    });
+    logEntry({
+        type: 'condition',
+        action: 'applied',
+        characterName: target.name,
+        condition: def?.label || hitClause.targetEffect,
+        reason: `${hitClause.attackName} — until the start of ${attackerName}'s next turn`,
+        note: `Healing blocked for ${target.name} (GM-enforced for direct-HP writes: turn-start ticks, rests, initiative-card HP edits).`,
+        timestamp: Date.now(),
+    });
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
 function attachPopupHpFallbacks(popupData, target, targetMaxHp) {
@@ -611,7 +651,7 @@ export function createPlainDamageHandler(deps) {
         applyResult = await resolveDeathStrike({ applyResult, context, combatSummary, target, characters, campaignName, characterName, adjustedTotal, formula, rolls, modifier, damageType, setPopupHtml, logEntry });
 
         maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry });
-        maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry });
+        maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry, characterName });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 

@@ -175,12 +175,17 @@ export function buildChargeBonusOffer(action, name) {
 // MA-0010: monster attack-hit grapple/restrain clause (monsters.json
 // hit_conditions + escape_dc). Forwarded onto the attack context so the
 // plain-damage handler can apply the conditions to the target on a hit.
+// MA-0016: hit_target_effect (e.g. 'no_healing' — Aberrant Spirit (Slaad)
+// Claw "can't regain Hit Points") rides the same clause as a te write.
 export function buildHitConditionClause(action) {
-  if (!Array.isArray(action?.hit_conditions) || action.hit_conditions.length === 0) return null;
+  const conditions = Array.isArray(action?.hit_conditions) ? action.hit_conditions.map(c => String(c).toLowerCase()) : [];
+  const targetEffect = action?.hit_target_effect || null;
+  if (conditions.length === 0 && !targetEffect) return null;
   return {
-    conditions: action.hit_conditions.map(c => String(c).toLowerCase()),
+    conditions,
     escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,
     attackName: action?.name || 'Attack',
+    targetEffect,
   };
 }
 

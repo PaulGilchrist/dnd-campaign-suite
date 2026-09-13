@@ -278,7 +278,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d10+3+spell level Slashing damage, and the target can't regain Hit Points until the start of the spirit's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0016-claw.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0017",

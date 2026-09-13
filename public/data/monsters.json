@@ -644,7 +644,8 @@
         "attack_bonus": null,
         "reach": "5 ft.",
         "damage_dice_primary": "1d10+3+spell level",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_target_effect": "no_healing"
       }
     ],
     "traits": [
