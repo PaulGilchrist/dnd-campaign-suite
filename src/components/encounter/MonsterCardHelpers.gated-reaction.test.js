@@ -9,6 +9,9 @@ import {
   monsterReactionGate,
   resolveMonsterGatedReaction,
   MONSTER_REACTION_USES_KEY,
+  isSpellOriginLastAttack,
+  resolveCounterspellCheck,
+  counterspellGate,
 } from './MonsterCardHelpers.js';
 import monsters from '../../../public/data/monsters.json';
 
@@ -154,5 +157,149 @@ describe('MA-0006 resolveMonsterGatedReaction spend + refusal logging', () => {
     expect(logs[0].description).toMatch(/1\/Day/);
     expect(deps.setRuntimeValue).not.toHaveBeenCalled();
     expect(state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ feather_fall: 1 });
+  });
+});
+
+// MA-0013: Aberrant Cultist Counterspell (2/Day). Reactive gate on a
+// spell-origin campaign lastAttack by a PC attacker; RAW level <3 auto,
+// ≥3 d20+WIS(+4) vs DC 10+level (CLA-322 shape); 2/Day spend; refusals
+// log counterspell_refused zero-spend; the triggering cast is stamped
+// counterspellResolved so the same cast can't be double-countered.
+const COUNTERSPELL_ACTION = monsters.find(m => m.index === 'aberrant-cultist').reactions[0];
+const CULTIST = 'Aberrant Cultist 1';
+const PC = 'DivinationWizard';
+
+function pcSpellAttack(overrides = {}) {
+  return { attackerName: PC, targetName: CULTIST, attackName: 'Fire Bolt', rollType: 'attack', damageSchool: 'Evocation', isCantrip: true, ...overrides };
+}
+
+function csWithPC(round = 1) {
+  return { round, creatures: [{ name: PC, type: 'player' }, { name: CULTIST, type: 'npc' }] };
+}
+
+function makeCounterDeps({ lastAttack = pcSpellAttack(), round = 1, store = {}, d20 = 1, resolveSpellLevel } = {}) {
+  const state = { ...store };
+  const logs = [];
+  const campaignWrites = [];
+  return {
+    state,
+    logs,
+    campaignWrites,
+    deps: {
+      findLastAttack: vi.fn(async () => lastAttack),
+      getCombatContext: vi.fn(async () => csWithPC(round)),
+      getRuntimeValue: vi.fn((key, prop) => state[`${key}.${prop}`] ?? null),
+      setRuntimeValue: vi.fn(async (key, prop, value) => {
+        if (key === 'campaign' && prop === 'lastAttack') campaignWrites.push(value);
+        state[`${key}.${prop}`] = value;
+      }),
+      addEntry: vi.fn(async (c, e) => { logs.push(e); }),
+      rollD20: vi.fn(() => d20),
+      spellAbilityMod: 4,
+      resolveSpellLevel: resolveSpellLevel || vi.fn(async la => (la?.isCantrip ? 0 : 3)),
+    },
+  };
+}
+
+describe('MA-0013 Counterspell registry + pure check', () => {
+  it('monsters.json aberrant-cultist reactions[0] carries the automation + 2/Day shape', () => {
+    expect(COUNTERSPELL_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'enemy_spell_cast', effect: 'counterspell' });
+    expect(COUNTERSPELL_ACTION.uses).toBe(2);
+    expect(COUNTERSPELL_ACTION.maxUses).toBe(2);
+    expect(getGatedMonsterReaction(COUNTERSPELL_ACTION)?.effect).toBe('counterspell');
+  });
+
+  it('isSpellOriginLastAttack accepts spell-save, spell-attack, isSpellDamage and stamped spell school', () => {
+    expect(isSpellOriginLastAttack(null)).toBe(false);
+    expect(isSpellOriginLastAttack({ rollType: 'save', isSpellDamage: true })).toBe(true);
+    expect(isSpellOriginLastAttack({ attackType: 'spell', spellLevel: 3 })).toBe(true);
+    expect(isSpellOriginLastAttack(pcSpellAttack())).toBe(true);
+    expect(isSpellOriginLastAttack({ attackerName: PC, attackName: 'Mace', weaponType: 'melee' })).toBe(false);
+  });
+
+  it('resolveCounterspellCheck: level <3 auto-counters (no roll)', () => {
+    const r = resolveCounterspellCheck({ spellLevel: 0, abilityMod: 4, rollD20: () => 1 });
+    expect(r).toMatchObject({ auto: true, countered: true, spellLevel: 0 });
+    const r2 = resolveCounterspellCheck({ spellLevel: 2, abilityMod: 0, rollD20: () => 1 });
+    expect(r2.auto).toBe(true);
+    expect(r2.countered).toBe(true);
+  });
+
+  it('resolveCounterspellCheck: level >=3 uses d20+WIS vs DC 10+level (CLA-322)', () => {
+    const hit = resolveCounterspellCheck({ spellLevel: 3, abilityMod: 4, rollD20: () => 9 });
+    expect(hit).toMatchObject({ auto: false, total: 13, targetDC: 13, countered: true });
+    const miss = resolveCounterspellCheck({ spellLevel: 3, abilityMod: 4, rollD20: () => 8 });
+    expect(miss).toMatchObject({ total: 12, targetDC: 13, countered: false });
+  });
+
+  it('counterspellGate refuses a non-spell or monster-origin lastAttack', () => {
+    const g1 = counterspellGate({ lastAttack: { attackerName: PC, attackName: 'Mace' }, attackerIsPC: true, monsterName: CULTIST, currentRound: 1, storedUses: {}, usedRound: 0, action: COUNTERSPELL_ACTION });
+    expect(g1.reason).toBe('trigger');
+    const g2 = counterspellGate({ lastAttack: pcSpellAttack({ attackerName: 'Thug 1' }), attackerIsPC: false, monsterName: CULTIST, currentRound: 1, storedUses: {}, usedRound: 0, action: COUNTERSPELL_ACTION });
+    expect(g2.reason).toBe('trigger');
+  });
+});
+
+describe('MA-0013 resolveMonsterGatedReaction — Counterspell', () => {
+  it('cantrip (<3) auto-countered, 2→1 spend, counterspell log names the trigger spell, cast marked resolved', async () => {
+    const { state, logs, campaignWrites, deps } = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 0 }) });
+    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.countered).toBe(true);
+    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
+    const spend = logs.find(l => l.type === 'ability_use');
+    expect(spend.abilityName).toBe('Counterspell');
+    expect(spend.description).toMatch(/Fire Bolt/);
+    expect(spend.description).toMatch(/auto-countered/);
+    expect(spend.description).toMatch(/1 left today/);
+    expect(campaignWrites[0]).toMatchObject({ counterspellResolved: true, counteredBy: CULTIST, counteredSpell: 'Fire Bolt' });
+    expect(deps.rollD20).not.toHaveBeenCalled();
+  });
+
+  it('level >=3 failed check: reaction is spent, spell NOT countered, check logged vs DC', async () => {
+    const { state, logs, campaignWrites, deps } = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 3, isCantrip: false }), d20: 1 });
+    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.countered).toBe(false);
+    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
+    const spend = logs.find(l => l.abilityName === 'Counterspell');
+    expect(spend.description).toMatch(/d20 \(1\) \+ 4 = 5 vs DC 13/);
+    expect(spend.description).toMatch(/failed — spell resolves/);
+    expect(campaignWrites[0]).toMatchObject({ counterspellResolved: true, counterspellCheckFailed: true });
+  });
+
+  it('second click on the SAME resolved cast: counterspell_refused (countered), zero additional spend', async () => {
+    const { state, logs, deps } = makeCounterDeps({
+      lastAttack: pcSpellAttack({ spellLevel: 0, counterspellResolved: true }),
+      store: { [`${CULTIST}._counterspell_usedRound`]: 1, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 1 } },
+    });
+    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs[0].automationType).toBe('counterspell_refused');
+    expect(logs[0].description).toMatch(/countered|resolved/);
+    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
+  });
+
+  it('no spell lastAttack: counterspell_refused (trigger), zero spend', async () => {
+    const { state, logs, deps } = makeCounterDeps({ lastAttack: { attackerName: PC, attackName: 'Mace', weaponType: 'melee' } });
+    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs[0].automationType).toBe('counterspell_refused');
+    expect(logs[0].description).toMatch(/trigger/);
+    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('at 2/Day exhaustion a fresh PC spell still refuses with zero spend', async () => {
+    const { state, logs, deps } = makeCounterDeps({
+      lastAttack: pcSpellAttack({ spellLevel: 0 }),
+      round: 5,
+      store: { [`${CULTIST}._counterspell_usedRound`]: 2, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 2 } },
+    });
+    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs[0].automationType).toBe('counterspell_refused');
+    expect(logs[0].description).toMatch(/2\/Day/);
+    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 2 });
   });
 });

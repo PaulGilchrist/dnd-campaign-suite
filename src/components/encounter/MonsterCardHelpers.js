@@ -208,7 +208,63 @@ export function buildChargeBonusDeclineLog({ monsterName, offer }) {
 
 const GATED_MONSTER_REACTIONS = {
   feather_fall: { effect: 'feather_fall', trigger: 'falling', label: 'Feather Fall', icon: 'fa-feather' },
+  // MA-0013: Aberrant Cultist Counterspell (2/Day) — reactive spell-cast
+  // reaction. Gate is a spell-origin campaign lastAttack by a NON-monster
+  // attacker, unresolved-as-countered (CLA-325 spell-origin seam). RAW:
+  // spell level <3 auto-countered; ≥3 ability check d20+spellcasting mod
+  // vs DC 10+spellLevel (CLA-322 dispel shape, single ability mod — no PB).
+  counterspell: { effect: 'counterspell', trigger: 'enemy_spell_cast', label: 'Counterspell', icon: 'fa-shield' },
 };
+
+export function isSpellOriginLastAttack(lastAttack) {
+  if (!lastAttack) return false;
+  return lastAttack.rollType === 'spell-attack'
+    || lastAttack.rollType === 'spell-save'
+    || lastAttack.attackType === 'spell'
+    || lastAttack.isSpellDamage === true
+    || !!lastAttack.damageSchool
+    || (lastAttack.saveType != null && lastAttack.saveDc != null);
+}
+
+// A counterspell reaction must be provoked by someone ELSE's spell — a
+// monster-origin lastAttack (this creature's own spell, or any monster cast)
+// never satisfies the trigger, so PC attacker type is required.
+export function counterspellTriggerSatisfied({ lastAttack, attackerIsPC }) {
+  return isSpellOriginLastAttack(lastAttack) && attackerIsPC === true;
+}
+
+export function counterspellGate({ lastAttack, attackerIsPC, monsterName, currentRound, storedUses, usedRound, action }) {
+  if (!counterspellTriggerSatisfied({ lastAttack, attackerIsPC })) {
+    return { ok: false, reason: 'trigger', message: `Counterspell: no enemy spell to counter — ${monsterName} can only react to a spell cast by another creature.` };
+  }
+  if (lastAttack.counterspellResolved === true) {
+    return { ok: false, reason: 'countered', message: `Counterspell: ${lastAttack.attackName || 'that spell'} is already resolved against — refused.` };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: `Counterspell: Reaction already used this round — refused.` };
+  }
+  const used = Number((storedUses && storedUses.counterspell) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: `Counterspell: ${limit}/Day uses already spent today — refused. Uses reset at a long rest; GM-enforced for monsters.` };
+  }
+  return { ok: true, used, limit };
+}
+
+// CLA-322 dispel-check shape: level <3 auto-countered (no roll); ≥3 d20 +
+// spellcasting ability modifier vs DC 10 + spell level (ability mod only,
+// never PB stacked). rollD20 is a thunk so the auto path never rolls.
+export function resolveCounterspellCheck({ spellLevel, abilityMod, rollD20 }) {
+  const level = Number(spellLevel) || 0;
+  if (level < 3) return { auto: true, countered: true, spellLevel: level };
+  const raw = typeof rollD20 === 'function' ? rollD20() : rollD20;
+  const d20 = Number(raw);
+  const mod = Number(abilityMod) || 0;
+  const total = d20 + mod;
+  const targetDC = 10 + level;
+  return { auto: false, countered: total >= targetDC, d20, mod, total, targetDC, spellLevel: level };
+}
 
 export function getGatedMonsterReaction(action) {
   const effect = action?.automation?.effect;
@@ -272,6 +328,14 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
   const currentRound = Number(cs?.round ?? 1);
   const storedUses = getRV(monsterName, MONSTER_REACTION_USES_KEY) || {};
   const usedRound = Number(getRV(monsterName, latchKey) ?? 0);
+
+  if (def.effect === 'counterspell') {
+    // Read the RAW campaign lastAttack (not findLastAttack's normalized
+    // wrapper, which drops spell-origin fields like rollType/damageSchool).
+    const rawLastAttack = await getRV('campaign', 'lastAttack') || lastAttack;
+    return resolveMonsterCounterspell({ action, monsterName, campaignName, lastAttack: rawLastAttack, cs, currentRound, storedUses, usedRound, latchKey, deps });
+  }
+
   const gate = monsterReactionGate({ def, action, monsterName, lastAttack, currentRound, storedUses, usedRound });
   if (!gate.ok) {
     await log(campaignName, {
@@ -296,4 +360,68 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
     timestamp: Date.now(),
   });
   return { ok: true, message, remaining };
+}
+
+// MA-0013: reactive Counterspell for monsters. Mirrors MA-0006 gated-reaction
+// economy (round latch + MONSTER_REACTION_USES spend + zero-spend refusals) and
+// CLA-322 dispel-check shape (level <3 auto; ≥3 d20+ability mod vs DC 10+level).
+// The triggering lastAttack is stamped `counterspellResolved:true` so a second
+// click on the same cast is refused (no double-countering), pass or fail.
+async function resolveMonsterCounterspell({ action, monsterName, campaignName, lastAttack, cs, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const rollD20 = deps.rollD20 || (() => Math.floor(Math.random() * 20) + 1);
+  const getCreature = deps.findCreatureByName || ((ctx, name) => (ctx?.creatures || []).find(c => c.name === name) || null);
+  // Spell level of the triggering cast: prefer a stamped level, else resolve
+  // via the spells.json lookup the modal provides (deps.resolveSpellLevel).
+  const resolveLevel = deps.resolveSpellLevel || (async (la) => Number(la?.spellLevel ?? la?.overchannelSpellLevel ?? 0));
+  const attackerCreature = lastAttack?.attackerName ? getCreature(cs, lastAttack.attackerName) : null;
+  const attackerIsPC = attackerCreature?.type === 'player';
+  // The ability check is the MONSTER's spellcasting check (Aberrant Cultist
+  // WIS +4) — the counter, not the original caster's, per RAW "same
+  // spellcasting ability as Spellcasting".
+  const abilityMod = Number(deps.spellAbilityMod) || 0;
+  const gate = counterspellGate({ lastAttack, attackerIsPC, monsterName, currentRound, storedUses, usedRound, action });
+  if (!gate.ok) {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: 'counterspell_refused',
+      name: 'Counterspell',
+      description: `Counterspell refused (${gate.reason}): ${gate.message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message: gate.message };
+  }
+  const spellLevel = await resolveLevel(lastAttack);
+  const outcome = resolveCounterspellCheck({ spellLevel, abilityMod, rollD20 });
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, counterspell: gate.used + 1 }, campaignName);
+  const spellName = lastAttack?.attackName || 'the triggering spell';
+  const remaining = Math.max(0, gate.limit - gate.used - 1);
+  // Stamp the triggering lastAttack as resolved against (MA-0013) — a second
+  // click on the same cast is refused, whether the counter succeeded or failed.
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    counterspellResolved: true,
+    counteredSpell: spellName,
+    counteredBy: monsterName,
+    counterspellCheckFailed: outcome.countered !== true,
+  }, campaignName);
+  const message = buildCounterspellMessage({ monsterName, spellName, outcome, limit: gate.limit, remaining });
+  await log(campaignName, {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Counterspell',
+    description: message,
+    timestamp: Date.now(),
+  });
+  return { ok: true, countered: outcome.countered, message, remaining };
+}
+
+function buildCounterspellMessage({ monsterName, spellName, outcome, limit, remaining }) {
+  const tail = `${limit}/Day · ${remaining} left today.`;
+  if (outcome.auto) return `${monsterName} Counterspells ${spellName} (spell level ${outcome.spellLevel} < 3) — auto-countered. ${tail}`;
+  const verdict = outcome.countered ? 'countered' : 'failed — spell resolves';
+  return `${monsterName} Counterspells ${spellName}: ability check d20 (${outcome.d20}) + ${outcome.mod} = ${outcome.total} vs DC ${outcome.targetDC} — ${verdict}. ${tail}`;
 }

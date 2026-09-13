@@ -230,7 +230,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The cultist casts Counterspell in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0013-counterspell.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0014",

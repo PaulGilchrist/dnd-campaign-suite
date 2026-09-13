@@ -350,7 +350,11 @@
     "reactions": [
       {
         "name": "Counterspell (2/Day)",
-        "description": "The cultist casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The cultist casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "2/Day",
+        "uses": 2,
+        "maxUses": 2,
+        "automation": { "type": "reaction", "trigger": "enemy_spell_cast", "effect": "counterspell" }
       }
     ],
     "environments": [
