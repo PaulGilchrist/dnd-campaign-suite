@@ -11,6 +11,7 @@ import {
   buildLairAdvisoryLog,
 } from './monsterLairActions.js';
 import { addEntry } from '../ui/logService.js';
+import monstersData from '../../../public/data/monsters.json';
 
 vi.mock('../ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 
@@ -113,5 +114,33 @@ describe('MA-0024 resolveLairRow', () => {
   it('log builders carry monster name and GM-enforced advisory note', () => {
     expect(buildLairRefusalLog({ monsterName: 'Aboleth 1', actionName: 'X' }).automationType).toBe('lair_action_refused');
     expect(buildLairAdvisoryLog({ monsterName: 'Aboleth 1', action: PHANTASMAL }).description).toMatch(/24[- ]hour/i);
+  });
+});
+
+// MA-0041: Adult Black Dragon water-surge data-consistency lock — authored
+// description (repo truth) says "DC 15 Strength saving throw … knocked prone"
+// with NO damage; the row previously carried save_type Constitution plus
+// fabricated 3d6 Piercing copied from the insect-swarm row.
+describe('MA-0041 adult-black-dragon water surge data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-black-dragon');
+  const surge = dragon.lair_actions[0];
+
+  it('structured clickable row named per MA-0024 convention', () => {
+    expect(surge.name).toBe('Water Surge');
+    expect(lairRowAffordance(surge)).toBe('save');
+  });
+
+  it('save_type matches the authored description (Strength, not Constitution)', () => {
+    expect(surge.save_dc).toBe(15);
+    expect(surge.save_type).toBe('Strength');
+    expect(surge.description).toMatch(/DC 15 Strength saving throw/i);
+  });
+
+  it('no fabricated damage — description is pull+prone only (Grasping Tide shape)', () => {
+    expect(surge.damage_dice_primary).toBeUndefined();
+    expect(surge.damage_type_primary).toBeUndefined();
+    expect(surge.save_effect).toMatch(/knocked prone/i);
+    expect(surge.save_effect).not.toMatch(/damage/i);
+    expect(surge.description).not.toMatch(/damage/i);
   });
 });

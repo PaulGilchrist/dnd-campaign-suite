@@ -188,8 +188,24 @@ describe('MA-0024 MonsterCardModal lair rows', () => {
     expect(staticRows[0].querySelectorAll('span[role="button"]')).toHaveLength(0);
   });
 
-  it('nameless dict rows (dragon shape, MV-24) stay static too', () => {
-    const m = makeMonster({ name: 'Adult Black Dragon', lair_actions: [{ description: 'Pools of water surge outward.', save_dc: 15, save_type: 'Constitution' }] });
+  it('MA-0041 adult black dragon water surge: real data row renders + opens STR DC 15 prompt, zero damage', async () => {
+    const dragon = monstersData.find(m => m.index === 'adult-black-dragon');
+    const m = makeMonster({ name: 'Adult Black Dragon', lair_actions: dragon.lair_actions });
+    const creatures = [{ name: 'Adult Black Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 195, maxHp: 195, ac: 19, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Black Dragon 1', creatures })} />);
+    const chip = lairLinkWithName('DC 15 Strength');
+    expect(chip).toBeTruthy();
+    fireEvent.click(chip);
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const call = ROLLERS.rollSavingThrow.mock.calls[0];
+    expect(call[0]).toBe('STR');
+    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Strength', attackerName: 'Adult Black Dragon 1', targetName: 'TestPC' });
+    expect(call[2].saveConditions).toEqual(['prone']);
+    expect(call[2].autoDamageFormula).toBeNull();
+  });
+
+  it('nameless dict rows (MV-24 shape) stay static too', () => {
+    const m = makeMonster({ name: 'Some Serpent', lair_actions: [{ description: 'Pools of water surge outward.', save_dc: 15, save_type: 'Constitution' }] });
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Dragon 1', creatures: CREATURES })} />);
     expect(lairLinks()).toHaveLength(0);
   });
