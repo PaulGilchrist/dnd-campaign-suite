@@ -332,6 +332,15 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
         }
     }
     setRuntimeValue(applyTarget, 'activeConditions', newConditions, campaignName);
+    // MA-0019 provenance: stamp the inflicting creature into condition meta
+    // so "by <source>" prerequisites (target_prerequisite.by_attacker) can
+    // be enforced. Existing meta consumers read dc/ability only — additive.
+    const existingMeta = getRuntimeValue(applyTarget, 'activeConditionMeta', campaignName) || {};
+    const newMeta = { ...existingMeta };
+    for (const cond of saveConditions) {
+        newMeta[cond] = { ...(existingMeta[cond] || {}), source: attackerName };
+    }
+    setRuntimeValue(applyTarget, 'activeConditionMeta', newMeta, campaignName);
     const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
     addEntry(campaignName, {
         type: 'condition',
@@ -431,4 +440,31 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
     setPopupHtml(buildSaveDamagePopupData({ context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, targetName, effectiveD20ForSave, saveTotal, saveSuccess, saveDc, saveType }));
 
     applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    maybeLogMemoryGainAtZeroHp({ context, combatSummary: combatSummaryForSave, applyTarget, attackerName, applyResult, saveSuccess, campaignName });
+}
+
+// MA-0019: "The aboleth gains the target's memories if the target is a
+// Humanoid and is reduced to 0 Hit Points by this action." Advisory log —
+// no memory subsystem (CLA-325 GM-enforced precedent).
+function isHumanoidCreature(csCreature) {
+    if (!csCreature) return false;
+    if (csCreature.type === 'player') return true;
+    return String(csCreature.monsterType || '').toLowerCase() === 'humanoid';
+}
+
+function maybeLogMemoryGainAtZeroHp({ context, combatSummary, applyTarget, attackerName, applyResult, saveSuccess, campaignName }) {
+    if (!context?.consumeMemoriesClause || saveSuccess !== false) return;
+    if (!applyResult || applyResult.newHp > 0) return;
+    const csCreature = (combatSummary?.creatures || []).find(c => c.name === applyTarget);
+    if (!isHumanoidCreature(csCreature)) return;
+    const memoryActionName = context?.actionName || context?.autoDamageName || 'the action';
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'consume_memories',
+        characterName: attackerName,
+        abilityName: memoryActionName,
+        targetName: applyTarget,
+        description: `${attackerName} gains ${applyTarget}'s memories — target reduced to 0 Hit Points by ${memoryActionName} (Humanoid, GM-enforced).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[saveProcessing:consume-memories-log]", e); });
 }

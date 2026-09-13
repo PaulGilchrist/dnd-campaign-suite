@@ -176,6 +176,15 @@ describe('MA-0010 hit-clause condition application on monster attack damage', ()
         });
     });
 
+    it('MA-0019: stamps the attacking monster into meta source for by-attacker prerequisites', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Tentacle Lash', formula: '1d6 + 4', total: 8, rolls: [4], modifier: 4, context: hitContext() });
+
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2].grappled.source).toBe('Aberrant Cultist 1');
+        expect(metaCall[2].restrained.source).toBe('Aberrant Cultist 1');
+    });
+
     it('logs a condition-applied entry naming the action and escape DC', async () => {
         const fn = createLogDamageAndShow(deps);
         await fn({ name: 'Tentacle Lash', formula: '1d6 + 4', total: 8, rolls: [4], modifier: 4, context: hitContext() });

@@ -330,7 +330,7 @@
         "grappled"
       ],
       "description": "Intelligence Saving Throw: DC 16, one creature within 30 feet that is Charmed or Grappled by the aboleth. Failure: 10 (3d6) Psychic damage. Success: Half damage. Failure or Success: The aboleth gains the target's memories if the target is a Humanoid and is reduced to 0 Hit Points by this action.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0019-consume-memories.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0020",

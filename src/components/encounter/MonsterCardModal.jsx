@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import './MonsterCardModal.css';
 
@@ -661,11 +661,26 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleInitiative = (bonus) => rollInitiative(bonus);
 
+  // Block-save half-on-success is the app-wide dcSuccess convention (MV-20);
+  // spell rows carry their own authored dc_success.
+  function resolveBlockSaveDcSuccess(spellInfo, action) {
+    if (spellInfo) return spellInfo.dcSuccess || null;
+    return action.save_dc != null ? 'half' : null;
+  }
+
   const handleSaveRoll = useCallback((action, saveDamageFormula, saveConditions, spellInfo) => {
     const target = getTarget();
+    const gate = evaluateTargetPrerequisiteGate({ action, target, monsterName, campaignName, getRuntimeValue });
+    if (!gate.satisfied) {
+      setPopupHtml(gate.popupHtml);
+      addEntry(campaignName, gate.refusalLog)
+        .catch((e) => { console.error('[MonsterCardModal] Error logging prerequisite refusal:', e); });
+      return;
+    }
+    const prerequisite = gate.prerequisite;
     const spellName = spellInfo?.spellName || null;
     const saveType = spellInfo?.saveType || action.save_type;
-    const dcSuccess = spellInfo ? (spellInfo.dcSuccess || null) : (action.save_dc != null ? 'half' : null);
+    const dcSuccess = resolveBlockSaveDcSuccess(spellInfo, action);
     console.debug(`[saveDebug] MonsterCardModal.handleSaveRoll`, {
       monsterName, actionName: spellName || action.name, saveDc: action.save_dc, saveType,
       target: target ? { name: target.name, type: target.type } : null,
@@ -685,8 +700,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       autoDamageName: spellName || action.name,
       saveConditions: saveConditions,
       isSpellDamage: !!spellName,
+      consumeMemoriesClause: !!prerequisite,
     });
-  }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction]);
+  }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction, campaignName, setPopupHtml]);
 
   const handleSpellCast = useCallback(async (action, spellName) => {
     const gate = spellUsesGate(monsterName, action, spellName);

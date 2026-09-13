@@ -468,7 +468,7 @@ function maybeApplyRamProne({ context, target, applyResult, campaignName, logEnt
 // with activeConditionMeta {dc, ability} so the target's condition badge
 // (CharConditions) offers the escape save. Escape is a badge click —
 // GM-enforced re-save; no token/movement grapple subsystem.
-function applyHitClauseConditions({ hitClause, target, campaignName, logEntry }) {
+function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, attackerName }) {
     const currentConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
     const newConditions = [...currentConditions];
     for (const cond of hitClause.conditions) {
@@ -477,14 +477,19 @@ function applyHitClauseConditions({ hitClause, target, campaignName, logEntry })
         }
     }
     setRuntimeValue(target.name, 'activeConditions', newConditions, campaignName);
-    if (hitClause.escapeDc != null) {
-        const existingMeta = getRuntimeValue(target.name, 'activeConditionMeta', campaignName) || {};
-        const newMeta = { ...existingMeta };
-        for (const cond of hitClause.conditions) {
-            newMeta[cond] = { ...(existingMeta[cond] || {}), dc: hitClause.escapeDc, ability: 'str' };
+    // MA-0019 provenance: always stamp the inflicting creature into meta
+    // (escape dc/ability ride along when authored) so "by <source>"
+    // prerequisites can be enforced. Additive for existing dc consumers.
+    const existingMeta = getRuntimeValue(target.name, 'activeConditionMeta', campaignName) || {};
+    const newMeta = { ...existingMeta };
+    for (const cond of hitClause.conditions) {
+        newMeta[cond] = { ...(existingMeta[cond] || {}), source: attackerName };
+        if (hitClause.escapeDc != null) {
+            newMeta[cond].dc = hitClause.escapeDc;
+            newMeta[cond].ability = 'str';
         }
-        setRuntimeValue(target.name, 'activeConditionMeta', newMeta, campaignName);
     }
+    setRuntimeValue(target.name, 'activeConditionMeta', newMeta, campaignName);
     const conditionLabels = hitClause.conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
     logEntry({
         type: 'condition',
@@ -508,7 +513,7 @@ function maybeApplyHitClause({ context, target, applyResult, campaignName, logEn
     const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
     if (!isLargeOrSmaller) return;
     if (hasConditions) {
-        applyHitClauseConditions({ hitClause, target, campaignName, logEntry });
+        applyHitClauseConditions({ hitClause, target, campaignName, logEntry, attackerName: characterName });
     }
     if (hitClause.targetEffect) {
         applyHitClauseTargetEffect({ hitClause, target, attackerName: characterName, campaignName, logEntry });

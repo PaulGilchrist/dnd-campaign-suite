@@ -753,7 +753,11 @@
         "save_type": "Intelligence",
         "damage_dice_primary": "3d6",
         "damage_type_primary": "Psychic",
-        "save_effect": "Failure: 10 (3d6) Psychic damage. Success: Half damage"
+        "save_effect": "Failure: 10 (3d6) Psychic damage. Success: Half damage",
+        "target_prerequisite": {
+          "conditions": ["charmed", "grappled"],
+          "by_attacker": true
+        }
       },
       {
         "name": "Dominate Mind (2/Day)",

@@ -189,6 +189,62 @@ export function buildHitConditionClause(action) {
   };
 }
 
+// MA-0019: structured target-eligibility prerequisite (monsters.json
+// target_prerequisite, e.g. Aboleth Consume Memories — "Charmed or
+// Grappled by the aboleth"). by_attacker requires the condition's
+// activeConditionMeta[cond].source to match the monster (provenance
+// stamped by the MA-0010 hit-clause and save-fail condition seams).
+export function parseTargetPrerequisite(action) {
+  const tp = action?.target_prerequisite;
+  if (!tp || !Array.isArray(tp.conditions) || tp.conditions.length === 0) return null;
+  return {
+    conditions: tp.conditions.map(c => String(c).toLowerCase()),
+    byAttacker: tp.by_attacker === true,
+    attackName: action?.name || 'Action',
+  };
+}
+
+export function targetPrerequisiteSatisfied({ prerequisite, conditions, conditionMeta, monsterName }) {
+  if (!prerequisite) return { satisfied: true };
+  for (const cond of prerequisite.conditions) {
+    if (!(conditions || []).some(c => String(c).toLowerCase() === cond)) continue;
+    if (!prerequisite.byAttacker) return { satisfied: true, condition: cond };
+    if ((conditionMeta?.[cond]?.source || null) === monsterName) return { satisfied: true, condition: cond };
+  }
+  return { satisfied: false };
+}
+
+export function evaluateTargetPrerequisiteGate({ action, target, monsterName, campaignName, getRuntimeValue }) {
+  const prerequisite = parseTargetPrerequisite(action);
+  if (!prerequisite) return { prerequisite: null, satisfied: true };
+  const conditions = getRuntimeValue(target?.name, 'activeConditions', campaignName) || [];
+  const conditionMeta = getRuntimeValue(target?.name, 'activeConditionMeta', campaignName) || {};
+  const result = targetPrerequisiteSatisfied({ prerequisite, conditions, conditionMeta, monsterName });
+  if (result.satisfied) return { prerequisite, satisfied: true };
+  const conditionLabels = prerequisite.conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(' or ');
+  const targetLabel = target?.name || 'the target';
+  return {
+    prerequisite,
+    satisfied: false,
+    popupHtml: `<div class="mc-prerequisite-refusal"><h3>Prerequisite Not Met</h3><p>${monsterName} can't use ${action.name} on ${targetLabel} — the target must be ${conditionLabels} by ${monsterName}. No save rolled, nothing spent (GM-enforced target eligibility).</p></div>`,
+    refusalLog: buildTargetPrerequisiteRefusalLog({ monsterName, actionName: action.name, targetName: target?.name || 'no target', prerequisite }),
+  };
+}
+
+export function buildTargetPrerequisiteRefusalLog({ monsterName, actionName, targetName, prerequisite }) {
+  const slug = String(actionName || prerequisite?.attackName || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const conditionLabels = prerequisite.conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(' or ');
+  return {
+    type: 'automation',
+    automationType: `${slug}_refused`,
+    characterName: monsterName,
+    abilityName: actionName || prerequisite?.attackName,
+    targetName,
+    description: `${monsterName} ${actionName} refused — ${targetName} does not satisfy the prerequisite (${conditionLabels}${prerequisite.byAttacker ? ` by ${monsterName}` : ''}). No save rolled, nothing spent.`,
+    timestamp: Date.now(),
+  };
+}
+
 export function buildChargeBonusGrantLog({ monsterName, offer, total }) {
   return {
     type: 'automation',
