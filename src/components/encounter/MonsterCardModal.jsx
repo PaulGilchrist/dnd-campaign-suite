@@ -18,7 +18,8 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel } from './MonsterCardHelpers.js';
+import { loadSpells } from '../../services/ui/dataLoader.js';
 import './MonsterCardModal.css';
 
 function getDamageTypeChoices(action) {
@@ -311,6 +312,30 @@ function rayDisadvantageContext(applies) {
   return applies ? { forcedMode: 'disadvantage' } : undefined;
 }
 
+async function findMonsterSpell(spellName) {
+  const fiveESpells = await loadSpells('5e');
+  const found = fiveESpells.find(s => s.name === spellName);
+  if (found) return found;
+  const spells2024 = await loadSpells('2024');
+  return spells2024.find(s => s.name === spellName) || null;
+}
+
+function buildMonsterSpellCastLog({ monsterName, spellName, spell, action }) {
+  const saveNote = spell?.dc ? ` (save DC ${action.save_dc}, ${spell.dc.dc_type || action.save_type})` : '';
+  const concentrationNote = spell?.concentration ? ` Concentration (${spell.duration || 'up to 1 minute'}).` : '';
+  return `${monsterName} casts ${spellName} via Spellcasting${saveNote}.${concentrationNote} Spell effect is recorded; GM-enforced for monsters.`;
+}
+
+function buildMonsterSpellCastEntry({ monsterName, spellName, spell, action }) {
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: spellName,
+    description: buildMonsterSpellCastLog({ monsterName, spellName, spell, action }),
+    timestamp: Date.now(),
+  };
+}
+
 function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll }) {
   return (
     <div onClick={(e) => e.stopPropagation()}>
@@ -575,27 +600,51 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleInitiative = (bonus) => rollInitiative(bonus);
 
-  const handleSaveRoll = useCallback((action, saveDamageFormula, saveConditions) => {
+  const handleSaveRoll = useCallback((action, saveDamageFormula, saveConditions, spellInfo) => {
     const target = getTarget();
+    const spellName = spellInfo?.spellName || null;
+    const saveType = spellInfo?.saveType || action.save_type;
+    const dcSuccess = spellInfo ? (spellInfo.dcSuccess || null) : (action.save_dc != null ? 'half' : null);
     console.debug(`[saveDebug] MonsterCardModal.handleSaveRoll`, {
-      monsterName, actionName: action.name, saveDc: action.save_dc, saveType: action.save_type,
+      monsterName, actionName: spellName || action.name, saveDc: action.save_dc, saveType,
       target: target ? { name: target.name, type: target.type } : null,
       creaturesAvailable: Array.isArray(creatures),
     });
-    const saveMod = getSaveModifierForSaveType(action.save_type, target, characters, creatures);
-    rollSavingThrow(saveAbilityAbbr(action.save_type), saveMod, {
+    const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
+    rollSavingThrow(saveAbilityAbbr(saveType), saveMod, {
       attackerName: monsterName,
       targetName: target?.name,
-      actionName: action.name,
+      actionName: spellName || action.name,
+      spellName,
       saveDc: action.save_dc,
-      saveType: action.save_type,
-      dcSuccess: action.save_dc != null ? 'half' : null,
+      saveType,
+      dcSuccess,
       autoDamageFormula: saveDamageFormula,
       autoDamageDamageType: saveDamageFormula ? (getDamageTypesForAction(action)[0] ? formatDamageTypes([getDamageTypesForAction(action)[0]]) : null) : null,
-      autoDamageName: action.name,
+      autoDamageName: spellName || action.name,
       saveConditions: saveConditions,
+      isSpellDamage: !!spellName,
     });
   }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction]);
+
+  const handleSpellCast = useCallback(async (action, spellName) => {
+    const spell = await findMonsterSpell(spellName);
+    if (!spell) {
+      console.error(`[MonsterCardModal] Spell '${spellName}' not found in spells.json (5e or 2024)`);
+    }
+    if (spellHasDamage(spell)) {
+      const dcSuccess = spell?.dc?.dc_success === 'none' ? 'none' : 'half';
+      handleSaveRoll(action, spellDamageFormulaAtBaseLevel(spell), extractConditionsFromSaveEffect(spell?.save_effect), {
+        spellName, saveType: spell?.dc?.dc_type || action.save_type, dcSuccess,
+      });
+      return;
+    }
+    // CLA-325 advisory model (GM-enforced for monsters): a non-damage utility spell
+    // (e.g. Gust of Wind) records a spell-named cast + concentration marker and logs it;
+    // there is no wind-line/zone engine consumer, so the effect is adjudicated by the GM.
+    await addEntry(campaignName, buildMonsterSpellCastEntry({ monsterName, spellName, spell, action }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging monster spell cast:', e); });
+  }, [campaignName, monsterName, handleSaveRoll]);
 
   const attackerCannotAct = useMemo(() => {
     const creature = getAttackerCreature();
@@ -666,6 +715,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         handleAttack={handleAttack}
         handleDamage={handleDamage}
         handleSaveRoll={handleSaveRoll}
+        handleSpellCast={handleSpellCast}
         handleAllyModalOpen={handleAllyModalOpen}
         currentAllies={currentAllies}
         monsterTargetEffects={monsterTargetEffects}

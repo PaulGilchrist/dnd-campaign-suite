@@ -72,7 +72,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The aarakocra makes two Wind Staff attacks, and it can use Spellcasting to cast Gust of Wind.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0003-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0004",

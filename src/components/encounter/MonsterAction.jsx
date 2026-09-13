@@ -1,7 +1,7 @@
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
-import { extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting } from './MonsterCardHelpers.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -23,6 +23,26 @@ function ActionDamageLinks({ action, actionDamageFormula, actionDamageTypeLabel,
           <i className="fa-solid fa-dice" /> {action.damage_dice_secondary}
         </span>
       )}
+    </>
+  );
+}
+
+function SpellCastLinks({ spellNames, action, attackerCannotAct, onSpellCast }) {
+  if (spellNames.length === 0) return null;
+  const clickable = !attackerCannotAct;
+  return (
+    <>
+      {spellNames.map(spellName => (
+        <span
+          key={spellName}
+          className="mc-dice-link mc-dice-link-spell"
+          onClick={clickable ? () => onSpellCast(action, spellName) : undefined}
+          role="button"
+          tabIndex={0}
+        >
+          <i className="fa-solid fa-hurricane" /> {spellName}
+        </span>
+      ))}
     </>
   );
 }
@@ -49,12 +69,15 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll }) {
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll }) {
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
   const actionDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
   const actionDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
   const actionDamageTypeLabel = formatDamageTypeList(actionDamageType);
+  const spellNames = /^spellcasting$/i.test(action.name || '')
+    ? extractSpellNamesFromSpellcasting(action.description)
+    : [];
 
   return (
     <div key={index} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
@@ -66,7 +89,11 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
         </span>
       )}
       <ActionDamageLinks action={action} actionDamageFormula={actionDamageFormula} actionDamageTypeLabel={actionDamageTypeLabel} onDamage={onDamage} />
-      {actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} />}
+      {spellNames.length > 0 ? (
+        <SpellCastLinks spellNames={spellNames} action={action} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} />
+      ) : (
+        actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} />
+      )}
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
       {action.usage && <em> ({String(action.usage)})</em>}
       {action.recharge && <em> ({String(action.recharge)})</em>}

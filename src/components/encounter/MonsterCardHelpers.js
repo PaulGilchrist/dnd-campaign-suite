@@ -47,6 +47,36 @@ export function extractConditionsFromSaveEffect(saveEffect) {
   return found;
 }
 
+export function extractSpellNamesFromSpellcasting(description) {
+  if (!description || typeof description !== 'string') return [];
+  const names = [];
+  const re = /<strong>([^<]+)<\/strong>/g;
+  let match;
+  while ((match = re.exec(description)) !== null) {
+    const name = match[1].trim();
+    if (!name || name.endsWith(':')) continue;
+    if (!names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+export function spellHasDamage(spell) {
+  if (!spell) return false;
+  const damage = spell.damage;
+  if (!damage) return false;
+  if (damage.damage_dice) return true;
+  return Object.keys(damage.damage_at_slot_level || {}).length > 0;
+}
+
+export function spellDamageFormulaAtBaseLevel(spell) {
+  if (!spellHasDamage(spell)) return null;
+  const damage = spell.damage;
+  return damage.damage_dice
+    || damage.damage_at_slot_level?.[String(spell.level)]
+    || Object.values(damage.damage_at_slot_level || {})[0]
+    || null;
+}
+
 export function toAbbr(name) {
   const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
   return ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
