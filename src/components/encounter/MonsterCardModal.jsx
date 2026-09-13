@@ -23,7 +23,77 @@ import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
+import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
+import SaveAttackAoeModal from '../char-sheet/modals/shared/SaveAttackAoeModal.jsx';
 import './MonsterCardModal.css';
+
+// MA-0031: a save row whose authored description names a cone is an AoE —
+// route through the existing area picker instead of the single-target block
+// save. Coverage feet parsed from the row text ("30-foot Cone"); gridless
+// coverage stays advisory via isWithinRange lenient mode (§7).
+function coneRangeFeet(action, spellInfo) {
+  if (spellInfo) return null;
+  if (!action || action.save_dc == null || !/\bcone\b/i.test(action.description || '')) return null;
+  const m = String(action.description).match(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/i);
+  return m ? Number(m[1]) : 30;
+}
+
+// MA-0031: recharge gate at row click — a spent breath weapon refuses with a
+// popup + `<action-slug>_refused (not recharged)` log, zero save prompts.
+// Returns { refused, gate } (gate null when refused or row not rechargeable).
+function rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml }) {
+  const gate = spellInfo ? null : monsterRechargeGate(action, getRuntimeValue(monsterName, MONSTER_RECHARGE_KEY));
+  if (gate && !gate.available) {
+    setPopupHtml(buildRechargeRefusalPopup({ monsterName, actionName: action.name, threshold: gate.threshold }));
+    addEntry(campaignName, buildRechargeRefusalLog({ monsterName, actionName: action.name, rechargeKey: gate.key, threshold: gate.threshold }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging recharge refusal:', e); });
+    return { refused: true, gate: null };
+  }
+  return { refused: false, gate };
+}
+
+// MA-0031: post-gate save resolution. Non-recharge/non-cone rows fire the
+// byte-identical single-target block save synchronously (today's flow).
+// A spent-but-passed recharge row awaits its fire-spend first (picker-open
+// spend convention, CLA-384); cone rows then open the existing AoE area
+// picker instead of the single-target prompt.
+// Block-save half-on-success is the app-wide dcSuccess convention (MV-20);
+// spell rows carry their own authored dc_success. MA-0030: an authored
+// per-action dc_success (e.g. Chilling Gaze "Success: no damage") overrides
+// the 'half' default — every row without one stays byte-identical.
+function resolveBlockSaveDcSuccess(spellInfo, action) {
+  if (spellInfo) return spellInfo.dcSuccess || null;
+  return action.save_dc != null ? (action.dc_success ?? 'half') : null;
+}
+
+function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
+  const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
+  if (recharge.refused) return;
+  const spellName = spellInfo?.spellName || null;
+  const saveType = spellInfo?.saveType || action.save_type;
+  const dcSuccess = resolveBlockSaveDcSuccess(spellInfo, action);
+  const coneFt = coneRangeFeet(action, spellInfo);
+  const fire = () => {
+    console.debug(`[saveDebug] MonsterCardModal.handleSaveRoll`, {
+      monsterName, actionName: spellName || action.name, saveDc: action.save_dc, saveType,
+      target: target ? { name: target.name, type: target.type } : null,
+      creaturesAvailable: Array.isArray(creatures),
+    });
+    const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
+    rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
+      monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction,
+    }));
+  };
+  if (coneFt == null && !recharge.gate) { fire(); return; }
+  (async () => {
+    if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
+    if (coneFt != null) {
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt, damageType: formatDamageTypes(getDamageTypesForAction(action)) });
+      return;
+    }
+    fire();
+  })().catch((e) => { console.error('[MonsterCardModal] Error resolving recharge/cone save leg:', e); });
+}
 
 function getDamageTypeChoices(action) {
   return action?.damage_type_choices?.length > 0 ? action.damage_type_choices : undefined;
@@ -560,6 +630,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   // MA-0021: legendary uses map + round+turn latch subscription (header
   // counter reads used/max; the latch gates one-expend-per-turn server-side).
   const monsterLegendaryUses = useRuntimeValue(monsterName, 'monsterLegendaryUses', campaignName);
+  // MA-0031: recharge map + cone picker overlay state (breath-weapon AoE).
+  const monsterRecharge = useRuntimeValue(monsterName, MONSTER_RECHARGE_KEY, campaignName);
+  const [conePicker, setConePicker] = useState(null);
 
   const monsterSensesArray = useMemo(() => {
     if (!monster?.senses) return null;
@@ -776,15 +849,6 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleInitiative = (bonus) => rollInitiative(bonus);
 
-  // Block-save half-on-success is the app-wide dcSuccess convention (MV-20);
-  // spell rows carry their own authored dc_success. MA-0030: an authored
-  // per-action dc_success (e.g. Chilling Gaze "Success: no damage") overrides
-  // the 'half' default — every row without one stays byte-identical.
-  function resolveBlockSaveDcSuccess(spellInfo, action) {
-    if (spellInfo) return spellInfo.dcSuccess || null;
-    return action.save_dc != null ? (action.dc_success ?? 'half') : null;
-  }
-
   const handleSaveRoll = useCallback((action, saveDamageFormula, saveConditions, spellInfo) => {
     const target = getTarget();
     // MA-0030: authored success-immunity gate — target already immune to this
@@ -803,20 +867,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       return;
     }
     const prerequisite = gate.prerequisite;
-    const spellName = spellInfo?.spellName || null;
-    const saveType = spellInfo?.saveType || action.save_type;
-    const dcSuccess = resolveBlockSaveDcSuccess(spellInfo, action);
     const { refused, usesGate } = resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, setPopupHtml });
     if (refused) return;
-    console.debug(`[saveDebug] MonsterCardModal.handleSaveRoll`, {
-      monsterName, actionName: spellName || action.name, saveDc: action.save_dc, saveType,
-      target: target ? { name: target.name, type: target.type } : null,
-      creaturesAvailable: Array.isArray(creatures),
-    });
-    const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
-    rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
-      monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction,
-    }));
+    // MA-0031: recharge gate + fire-spend + cone routing live downstream.
+    executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml });
   }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction, campaignName, setPopupHtml, allTargetEffects]);
 
   const handleSpellCast = useCallback(async (action, spellName) => {
@@ -1023,6 +1077,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         monsterSpellUses={monsterSpellUses}
         monsterReactionUses={monsterReactionUses}
         monsterLegendaryUses={monsterLegendaryUses}
+        monsterRecharge={monsterRecharge}
         handleGatedReaction={handleGatedReaction}
         handleLegendaryRow={handleLegendaryRow}
         handleLairRow={handleLairRow}
@@ -1050,13 +1105,31 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       />
     )}
     {showAllyModal && (
-      <AllySelectionModal
-        creatures={allyModalCreatures}
-        currentAllies={currentAllies}
-        onConfirm={handleAllyModalConfirm}
-        onCancel={handleAllyModalCancel}
-      />
-    )}
+        <AllySelectionModal
+          creatures={allyModalCreatures}
+          currentAllies={currentAllies}
+          onConfirm={handleAllyModalConfirm}
+          onCancel={handleAllyModalCancel}
+        />
+      )}
+      {conePicker && (
+        <SaveAttackAoeModal
+          action={conePicker.action}
+          playerStats={{ name: monsterName }}
+          campaignName={campaignName}
+          range={conePicker.coneFt}
+          damage={conePicker.saveDamageFormula}
+          damageType={conePicker.damageType}
+          saveType={conePicker.saveType}
+          saveDc={conePicker.action.save_dc}
+          dcSuccess={conePicker.dcSuccess}
+          titleOverride={`${conePicker.coneFt}-ft Cone (GM positions tokens; selection advisory)`}
+          excludeNames={[monsterName]}
+          rangeGateFt={conePicker.coneFt}
+          storeLastAttack={false}
+          onClose={() => setConePicker(null)}
+        />
+      )}
     </>
   );
 }

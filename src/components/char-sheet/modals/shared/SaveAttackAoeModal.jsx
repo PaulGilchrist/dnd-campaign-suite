@@ -9,6 +9,7 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { registerTargetEffect } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
+import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -260,6 +261,15 @@ function appendPromptTargetResult(setResultsFn, setPendingPromptsFn, targetResul
     setPendingPromptsFn(prev => prev.filter(p => p.promptId !== promptId));
 }
 
+// MA-0031 optional seams (byte-inert when props are null).
+function isExcludedByName(name, excludeNames) {
+    return (excludeNames || []).includes(name);
+}
+
+function isInAllowedRange(name, rangeAllowed) {
+    return rangeAllowed == null || rangeAllowed.has(name);
+}
+
 const TRAP_BLOCKING_EFFECTS = ['forcecage', 'maze', 'banishment', 'imprisonment'];
 
 function trapEffectBlocksAttack(effects, effectName, attackerName, targetName) {
@@ -292,6 +302,51 @@ function resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignNam
     return { resolvedDamage, radiantSoulFlagKey, isRadiantSoulTarget, targetDamageFormula, damageRoll };
 }
 
+function maybeStoreLastAttack(enabled, campaignName, cfg) {
+    if (enabled) storeSpellLastAttack(campaignName, cfg);
+}
+
+// MA-0031: advisory cone/area coverage gate — isWithinRange from the attacker
+// (gridless lenient §7); null rangeGateFt = no gate (PC-spell default).
+function useRangeAllowedSet(eligibleTargets, rangeGateFt, attackerName) {
+    const [rangeAllowed, setRangeAllowed] = useState(null);
+    useEffect(() => {
+        if (rangeGateFt == null) return undefined;
+        let cancelled = false;
+        Promise.all(eligibleTargets.map(async c => ({ name: c.name, ok: await isWithinRange(attackerName, c.name, rangeGateFt) })))
+            .then(rows => { if (!cancelled) setRangeAllowed(new Set(rows.filter(r => r.ok).map(r => r.name))); });
+        return () => { cancelled = true; };
+    }, [rangeGateFt, eligibleTargets, attackerName]);
+    return rangeAllowed;
+}
+
+function aoePickerTitle(action, titleOverride) {
+    return titleOverride || action.name;
+}
+
+function buildEligibleTargets(combatSummary, attackerName, isCarefulSpell, isCarefulAlly, excludeNames) {
+    if (!combatSummary?.creatures) return [];
+    return combatSummary.creatures
+        .filter(c => !isTargetExcludedByTraps(c, attackerName))
+        .filter(c => !isExcludedByName(c.name, excludeNames))
+        .map(c => ({
+            ...c,
+            carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),
+        }));
+}
+
+function toPickerTargets(eligibleTargets, rangeAllowed) {
+    return eligibleTargets
+        .filter(c => isInAllowedRange(c.name, rangeAllowed))
+        .map(c => ({
+            name: c.name,
+            type: c.type,
+            currentHp: c.currentHp,
+            maxHp: c.maxHp,
+            carefulSpellProtected: c.carefulSpellProtected,
+        }));
+}
+
 function SaveAttackAoeModal({
     action,
     playerStats,
@@ -312,6 +367,14 @@ function SaveAttackAoeModal({
     overchannelSpellLevel = 1,
     pullMarkerEffect = null,
     logSaveSuccess = false,
+    // MA-0031 optional seams (byte-inert defaults for all PC-spell consumers):
+    // monster-card cone rows pass a title label, exclude the attacker itself,
+    // an advisory isWithinRange coverage gate, and skip the spell lastAttack
+    // stamp (a breath weapon is not spell-origin — keeps counterspell gates clean).
+    titleOverride,
+    excludeNames,
+    rangeGateFt,
+    storeLastAttack,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -344,7 +407,7 @@ function SaveAttackAoeModal({
         const combatSummary = getCombatSummary(campaignName);
         if (!combatSummary) return;
 
-        storeSpellLastAttack(campaignName, {
+        maybeStoreLastAttack(storeLastAttack !== false, campaignName, {
             casterName: playerStats.name,
             spellName: action.name,
             saveType,
@@ -401,7 +464,7 @@ function SaveAttackAoeModal({
         clearSoulstitchStamp(playerStats.name, campaignName);
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -586,25 +649,12 @@ function SaveAttackAoeModal({
     const combatSummary = getCombatSummary(campaignName);
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');
 
-    const eligibleTargets = React.useMemo(() => {
-        if (!combatSummary?.creatures) return [];
-        return combatSummary.creatures
-            .filter(c => !isTargetExcludedByTraps(c, playerStats.name))
-            .map(c => ({
-                ...c,
-                carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),
-            }));
-    }, [combatSummary, isCarefulSpell, isCarefulAlly, playerStats.name]);
+    const eligibleTargets = React.useMemo(
+        () => buildEligibleTargets(combatSummary, playerStats.name, isCarefulSpell, isCarefulAlly, excludeNames),
+        [combatSummary, isCarefulSpell, isCarefulAlly, playerStats.name, excludeNames]);
 
-    const getCreatureTargets = () => {
-        return eligibleTargets.map(c => ({
-            name: c.name,
-            type: c.type,
-            currentHp: c.currentHp,
-            maxHp: c.maxHp,
-            carefulSpellProtected: c.carefulSpellProtected,
-        }));
-    };
+    const rangeAllowed = useRangeAllowedSet(eligibleTargets, rangeGateFt, playerStats.name);
+
 
     const toggleTarget = useCallback((name) => {
         setSelected(prev => {
@@ -773,9 +823,9 @@ function SaveAttackAoeModal({
 
     return (
         <CreatureSelectionModal
-            title={action.name}
+            title={aoePickerTitle(action, titleOverride)}
             icon="fa-bomb"
-            targets={getCreatureTargets()}
+            targets={toPickerTargets(eligibleTargets, rangeAllowed)}
             description={`Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`}
             note={`On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`}
             confirmLabel={action.name}

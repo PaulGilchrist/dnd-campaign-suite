@@ -513,7 +513,7 @@
       "damageTypePrimary": "Cold",
       "recharge": "6",
       "description": "Constitution Saving Throw: DC 18, each creature in a 30-foot Cone. Failure: 45 (10d8) Cold damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0031-cold-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0032",

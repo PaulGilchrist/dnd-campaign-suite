@@ -4,9 +4,20 @@ import { canRollExpression } from '../../services/dice/diceRoller.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
 import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining } from './MonsterCardHelpers.js';
 import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
+import { monsterRechargeGate } from '../../services/encounters/monsterRecharge.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
+}
+
+function rechargeSpent(gateInfo) {
+  return !!gateInfo && !gateInfo.available;
+}
+
+// MA-0031: recharge label — a spent row reads "(Recharge 6 — unavailable)".
+function RechargeNote({ action, rechargeOut }) {
+  if (action.recharge == null) return null;
+  return <em> ({rechargeOut ? `Recharge ${String(action.recharge)} — unavailable` : String(action.recharge)})</em>;
 }
 
 // MA-0014: unroll­able formulas (e.g. "1d8+3+spell level") must render as
@@ -58,25 +69,26 @@ function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast 
   );
 }
 
-function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed }) {
+function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed, rechargeOut = false }) {
   if (action.save_dc == null) return null;
   const saveDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
   const saveConditions = extractConditionsFromSaveEffect(action?.save_effect);
   const usesGate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
   const usesNote = usesGate ? <em> ({usesGate.maxUses}/Day · {usesGate.remaining} left)</em> : null;
+  const spentClass = (usesGate && usesGate.remaining === 0) || rechargeOut ? ' mc-dice-link-spell-spent' : '';
   const handleSaveRoll = () => {
     onSaveRoll(action, saveDamageFormula, saveConditions);
   };
   if (saveDamageFormula && canRollExpression(saveDamageFormula)) {
     return (
-      <span className="mc-dice-link" role="button" tabIndex={0} onClick={handleSaveRoll}>
+      <span className={`mc-dice-link${spentClass}`} role="button" tabIndex={0} onClick={handleSaveRoll}>
         <i className="fa-solid fa-dice" /> {saveDamageFormula}{usesNote}
       </span>
     );
   }
   const clickable = !action.attack_bonus && !attackerCannotAct;
   return (
-    <span className={`mc-dice-link ${clickable ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}${usesGate && usesGate.remaining === 0 ? ' mc-dice-link-spell-spent' : ''}`} onClick={clickable ? handleSaveRoll : undefined} role="button" tabIndex={0}>
+    <span className={`mc-dice-link ${clickable ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}${spentClass}`} onClick={clickable ? handleSaveRoll : undefined} role="button" tabIndex={0}>
       DC {action.save_dc} {action.save_type}{usesNote}
     </span>
   );
@@ -116,9 +128,12 @@ function LegendarySpendLink({ action, attackerCannotAct, legendaryGate }) {
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate }) {
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {} }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
+  // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
+  // runtime map; a spent row reads "(Recharge 6 — unavailable)" and refuses.
+  const rechargeOut = rechargeSpent(monsterRechargeGate(action, rechargeState));
   const actionDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
   const actionDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
   const actionDamageTypeLabel = formatDamageTypeList(actionDamageType);
@@ -138,12 +153,12 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       {isSpellcastingRow ? (
         <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} />
       ) : (
-        actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} />
+        actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />
       )}
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
       <GatedReactionSlot action={action} attackerCannotAct={attackerCannotAct} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} />
       {action.usage && <em> ({String(action.usage)})</em>}
-      {action.recharge && <em> ({String(action.recharge)})</em>}
+      <RechargeNote action={action} rechargeOut={rechargeOut} />
     </div>
   );
 }
