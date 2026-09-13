@@ -355,3 +355,37 @@ describe('MA-0023 self-heal leg', () => {
     expect(r.applied).toBeLessThanOrEqual(10);
   });
 });
+
+describe('MA-0040 Adult Black Dragon Pounce delegates_to Rend', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-black-dragon');
+  const pounce = dragon.legendary_actions.find(a => a.name === 'Pounce');
+  const rend = dragon.actions.find(a => a.name === 'Rend');
+
+  it('row carries delegates_to Rend + movement advisory in description', () => {
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.attack_bonus == null && pounce.save_dc == null).toBe(true);
+    expect(pounce.description).toMatch(/movement advisory/i);
+  });
+
+  it('delegates_to resolves to the real Rend attack row (+11 / 2d6 + 6 Slashing + 1d8 Acid)', () => {
+    const d = legendaryDelegateAction(dragon, pounce);
+    expect(d).toBe(rend);
+    expect(d.attack_bonus).toBe(11);
+    expect(d.damage_dice_primary).toBe('2d6 + 6');
+    expect(d.damage_type_primary).toBe('Slashing');
+    expect(d.damage_dice_secondary).toBe('1d8');
+    expect(d.damage_type_secondary).toBe('Acid');
+  });
+
+  it('attack log name reads "Pounce (Rend attack)"', () => {
+    expect(legendaryDelegateAttackName(pounce, rend)).toBe('Pounce (Rend attack)');
+  });
+
+  it('spend with the delegate name spends 1 use and logs "Pounce (Rend attack)"', async () => {
+    const r = await expendLegendaryUse({ monsterName: 'Adult Black Dragon 1', monster: dragon, actionName: legendaryDelegateAttackName(pounce, rend), campaignName: 'test-campaign', deps });
+    expect(r.spent).toBe(true);
+    expect(store['Adult Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    const spend = logs.find(e => e.type === 'ability_use');
+    expect(spend.description).toMatch(/expends a legendary use for Pounce \(Rend attack\)/);
+  });
+});

@@ -644,7 +644,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0040-pounce.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0041",
