@@ -8,7 +8,7 @@ import { sendSaveResult } from '../../../combat/conditions/savePromptService.js'
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { rollNpcSave } from './charmSpellUtils.js';
 
-function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
+function dispatchSaveResult({ campaignName, promptId, targetName, saveType, saveDc, saveResult }) {
     sendSaveResult(campaignName, targetName, {
         promptId,
         success: saveResult.success,
@@ -33,7 +33,7 @@ function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc
     }));
 }
 
-async function recordDominateSuccess(campaignName, casterName, spellName, targetName, dc, saveResult) {
+async function recordDominateSuccess({ campaignName, casterName, spellName, targetName, dc, saveResult }) {
     await addTargetResult(campaignName, {
         targetName,
         saveResult: 'success',
@@ -63,7 +63,7 @@ async function recordDominateSuccess(campaignName, casterName, spellName, target
     };
 }
 
-async function applyDominateCharm(campaignName, casterName, spellName, targetName, dc, saveResult) {
+async function applyDominateCharm({ campaignName, casterName, spellName, targetName, dc, saveResult }) {
     // Failed save: apply Charmed condition
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
@@ -79,9 +79,9 @@ async function applyDominateCharm(campaignName, casterName, spellName, targetNam
         appliedDamage: 0,
     });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'dominated', condition: 'charmed' },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'condition',
@@ -165,14 +165,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (targetInfo?.target?.type === 'npc') {
         const creature = targetInfo.cs?.creatures?.find(c => c.name === targetName);
-        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcSave(creature, dc, saveAdvantage));
+        dispatchSaveResult({
+    campaignName,
+    promptId,
+    targetName,
+    saveType: 'WIS',
+    saveDc: dc,
+    saveResult: rollNpcSave(creature, dc, saveAdvantage),
+});
     }
 
     const saveResult = await promise;
 
     if (saveResult.success) {
-        return recordDominateSuccess(campaignName, casterName, spellName, targetName, dc, saveResult);
+        return recordDominateSuccess({ campaignName, casterName, spellName, targetName, dc, saveResult });
     }
 
-    return applyDominateCharm(campaignName, casterName, spellName, targetName, dc, saveResult);
+    return applyDominateCharm({ campaignName, casterName, spellName, targetName, dc, saveResult });
 }

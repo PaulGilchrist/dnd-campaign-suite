@@ -139,7 +139,14 @@ function stampTruePolymorphEffect(targetName, casterName, creature, mode, campai
 export async function confirmTruePolymorphTransform({ targetName, creature, casterName, spell, playerStats, campaignName, mode }) {
     if (mode === 'object_into_creature' && !targetName) {
         const initiativeValue = resolveSummonInitiative(casterName, campaignName);
-        return await summonCreatureFromObject(creature.index, casterName, initiativeValue, spell.level || 9, playerStats, campaignName);
+        return await summonCreatureFromObject({
+    monsterIndex: creature.index,
+    casterName,
+    initiativeValue,
+    slotLevel: spell.level || 9,
+    playerStats,
+    campaignName,
+});
     }
 
     const cs = await getCombatContext(campaignName);
@@ -187,7 +194,7 @@ export async function confirmTruePolymorphTransform({ targetName, creature, cast
     return { ok: true };
 }
 
-export async function applyObjectTransform(targetName, objectType, casterName, spell, campaignName, playerStats) {
+export async function applyObjectTransform({ targetName, objectType, casterName, spell, campaignName, playerStats }) {
     const cs = await getCombatContext(campaignName);
     const creatureObj = cs.creatures.find(c => c.name === targetName);
     if (!creatureObj) {
@@ -264,7 +271,7 @@ export async function applyObjectTransform(targetName, objectType, casterName, s
     return { ok: true };
 }
 
-export async function summonCreatureFromObject(monsterIndex, casterName, initiativeValue, slotLevel, playerStats, campaignName) {
+export async function summonCreatureFromObject({ monsterIndex, casterName, initiativeValue, playerStats, campaignName }) {
     const monsters = await loadMonsters();
     const monster = monsters.find(m => m.index === monsterIndex);
     if (!monster) {

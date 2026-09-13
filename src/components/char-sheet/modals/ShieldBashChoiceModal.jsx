@@ -12,7 +12,7 @@ function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, 
         if (!selected) return;
 
         try {
-            const res = await applyShieldBashEffect(action, playerStats, campaignName, targetName, selected, saveDc);
+            const res = await applyShieldBashEffect({ action, playerStats, campaignName, targetName, chosenOption: selected, saveDc });
             setResult(res);
             setApplied(true);
         } catch (e) {
@@ -79,7 +79,7 @@ function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, 
                     <button className="sp-roll-btn" onClick={handleApply} disabled={!selected}>
                         <i className="fa-solid fa-shield-halved"></i> Apply Effect
                     </button>
-                    <button className="sp-dismiss-btn" onClick={() => { applyShieldBashEffect(action, playerStats, campaignName, targetName, 'skip', saveDc).catch((e) => console.error('Shield Bash skip failed', e)); onClose(); }}>Skip (do not consume use)</button>
+                    <button className="sp-dismiss-btn" onClick={() => { applyShieldBashEffect({ action, playerStats, campaignName, targetName, chosenOption: 'skip', saveDc }).catch((e) => console.error('Shield Bash skip failed', e)); onClose(); }}>Skip (do not consume use)</button>
                 </div>
             </div>
         </div>

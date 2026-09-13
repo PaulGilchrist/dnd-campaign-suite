@@ -175,7 +175,7 @@ describe('useSpellMetamagicFlow — simple spell gates', () => {
 
       it(`sets ${spell.pendingKey} with expected structure`, () => {
         const { result } = renderHookWithSpell(
-          (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+          (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
           spell.name,
           { level: spell.level },
         );
@@ -218,7 +218,7 @@ describe('useSpellMetamagicFlow — gated spells with creatureTargets checks', (
 
       it(`sets ${spell.pendingKey} with correct creatureTargets`, () => {
         const { result } = renderHookWithSpell(
-          (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+          (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
           spell.name,
           { level: spell.level },
         );
@@ -251,7 +251,7 @@ describe('useSpellMetamagicFlow — monster-data-gated spells', () => {
 
   it('sets pending holdMonster with maxTargets from upcast_at_slot_level', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -273,7 +273,7 @@ describe('useSpellMetamagicFlow — monster-data-gated spells', () => {
   it('sets pending holdPerson for humanoid monsters', async () => {
     getMonsterData.mockResolvedValue({ type: 'humanoid' });
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     await act(async () => {
@@ -286,7 +286,7 @@ describe('useSpellMetamagicFlow — monster-data-gated spells', () => {
   it('excludes non-humanoid monsters from holdPerson', async () => {
     getMonsterData.mockResolvedValue({ type: 'Ooze' });
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     await act(async () => {
@@ -299,7 +299,7 @@ describe('useSpellMetamagicFlow — monster-data-gated spells', () => {
   it('sets pending charmPerson for humanoids', async () => {
     getMonsterData.mockResolvedValue({ type: 'humanoid' });
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     await act(async () => {
@@ -312,7 +312,7 @@ describe('useSpellMetamagicFlow — monster-data-gated spells', () => {
   it('sets pending animalFriendship for beasts', async () => {
     getMonsterData.mockResolvedValue({ type: 'beast' });
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     await act(async () => {
@@ -333,7 +333,7 @@ describe('useSpellMetamagicFlow — Sorcerer-only gates', () => {
 
   it('sets pending shapechange for Sorcerer', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Shapechange',
       { level: 9 },
     );
@@ -344,7 +344,7 @@ describe('useSpellMetamagicFlow — Sorcerer-only gates', () => {
   it('does not set pending shapechange for non-Sorcerer', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ name: 'TestWizard', class: { name: 'Wizard' }, level: 5 }, 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 }, campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -366,7 +366,7 @@ describe('useSpellMetamagicFlow — Animal Shapes gate', () => {
   it('sets pending animalShapes filtering by allies', () => {
     getAllyList.mockReturnValueOnce(['goblin a']);
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Animal Shapes',
       { level: 8 },
     );
@@ -388,7 +388,7 @@ describe('useSpellMetamagicFlow — Protection from Energy gate', () => {
 
   it('sets pending protectionFromEnergy with damageTypes from spell automation', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Protection from Energy',
       { level: 3 },
     );
@@ -401,7 +401,7 @@ describe('useSpellMetamagicFlow — Protection from Energy gate', () => {
 
   it('uses default damageTypes when spell has no automation', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -426,7 +426,7 @@ describe('useSpellMetamagicFlow — Revivify gate with no creatures', () => {
     getCombatSummary.mockReturnValueOnce({ creatures: [] });
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -447,7 +447,7 @@ describe('useSpellMetamagicFlow — Shield of Faith gate', () => {
 
   it('does not gate Shield of Faith (falls through to Sorcerer flow)', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Shield of Faith',
       { level: 1 },
     );
@@ -479,7 +479,7 @@ describe('useSpellMetamagicFlow — caster-included spells always include the ca
       it('includes the caster even when combat has no creatures', () => {
         getCombatSummary.mockReturnValueOnce({ creatures: [] });
         const { result } = renderHook(() =>
-          useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
         );
 
         act(() => {
@@ -504,7 +504,7 @@ describe('useSpellMetamagicFlow — Magic Missile missile count', () => {
 
   it('calculates totalMissiles based on spell level (3 + level - 1)', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -516,7 +516,7 @@ describe('useSpellMetamagicFlow — Magic Missile missile count', () => {
 
   it('calculates totalMissiles for upcast (level 3 = 5 missiles)', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -537,7 +537,7 @@ describe('useSpellMetamagicFlow — Resistance damage types', () => {
 
   it('includes all 11 standard damage types', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {

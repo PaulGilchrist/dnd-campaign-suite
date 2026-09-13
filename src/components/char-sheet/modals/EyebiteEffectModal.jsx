@@ -70,9 +70,9 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
                 const filtered = conditions.filter(c => String(c).toLowerCase() !== effect.condition);
                 setRuntimeValue(targetName, 'activeConditions', [...filtered, effect.condition], campaignName);
 
-                addExpiration(attackerName, targetName, [
+                addExpiration({ attackerName, targetName, effects: [
                     { type: effect.condition, condition: effect.condition },
-                ], campaignName);
+                ], campaignName });
 
                 const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
                 const effectKey = `eyebite_${effect.key}`;
@@ -280,9 +280,9 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
             const filtered = conditions.filter(c => String(c).toLowerCase() !== effect.condition);
             setRuntimeValue(targetName, 'activeConditions', [...filtered, effect.condition], campaignName);
 
-            addExpiration(attackerName, targetName, [
+            addExpiration({ attackerName, targetName, effects: [
                 { type: effect.condition, condition: effect.condition },
-            ], campaignName);
+            ], campaignName });
 
             const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
             const effectKey = `eyebite_${effect.key}`;

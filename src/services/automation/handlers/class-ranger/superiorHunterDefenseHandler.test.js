@@ -765,13 +765,7 @@ describe('superiorHunterDefenseHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Test Ranger',
-                'Test Ranger',
-                [{ type: 'remove_active_buff', buffName: "Superior Hunter's Defense" }],
-                'test-campaign',
-                1
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Test Ranger', targetName: 'Test Ranger', effects: [{ type: 'remove_active_buff', buffName: "Superior Hunter's Defense" }], campaignName: 'test-campaign', rounds: 1 });
         });
     });
 });

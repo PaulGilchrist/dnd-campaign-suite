@@ -236,7 +236,7 @@ describe('FT-047 Keen Mind — rules.js', () => {
       featBuffs.abilityScoreIncreases = [{ name: 'Intelligence', amount: 1, isChoice: false, featName: 'Keen Mind' }]
       const summary = keenMindSummary(1)
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       const int = result.abilities.find(a => a.name === 'Intelligence')
 
       expect(int.featIncrease).toBe(1)
@@ -248,7 +248,7 @@ describe('FT-047 Keen Mind — rules.js', () => {
       featBuffs.abilityScoreIncreases = [{ name: 'Intelligence', amount: 1, isChoice: false, featName: 'Keen Mind' }]
       const summary = keenMindSummary(0)
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       const int = result.abilities.find(a => a.name === 'Intelligence')
 
       expect(int.featIncrease).toBe(1)
@@ -259,8 +259,8 @@ describe('FT-047 Keen Mind — rules.js', () => {
       featBuffs.abilityScoreIncreases = [{ name: 'Intelligence', amount: 1, isChoice: false, featName: 'Keen Mind' }]
       const summary = keenMindSummary(1)
 
-      const first = await rules.getPlayerStats([], [], [], [], [], summary)
-      const second = await rules.getPlayerStats([], [], [], [], [], summary)
+      const first = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
+      const second = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
       expect(first.abilities.find(a => a.name === 'Intelligence').featIncrease).toBe(1)
       expect(second.abilities.find(a => a.name === 'Intelligence').featIncrease).toBe(1)
@@ -272,7 +272,7 @@ describe('FT-047 Keen Mind — rules.js', () => {
       const summary = keenMindSummary(0)
       summary.abilities[1].featIncrease = 2
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
       expect(result.abilities[1].featIncrease).toBe(2)
     })
@@ -282,7 +282,7 @@ describe('FT-047 Keen Mind — rules.js', () => {
       const summary = keenMindSummary(0)
       summary.abilities[1].featIncrease = 1
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
       expect(result.abilities[1].featIncrease).toBe(1)
       expect(result.abilities[1].totalScore).toBe(9)
@@ -302,7 +302,7 @@ describe('FT-047 Keen Mind — rules.js', () => {
       featBuffs.features = [quietStudy]
       const summary = keenMindSummary(1)
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       const row = result.bonusActions.find(b => b.name === 'Quiet Study')
 
       expect(row).toBeDefined()
@@ -315,7 +315,7 @@ describe('FT-047 Keen Mind — rules.js', () => {
       const summary = keenMindSummary(1)
       summary.bonusActions = [{ name: 'Quiet Study', description: 'existing', type: 'bonus_action' }]
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
       expect(result.bonusActions.filter(b => b.name === 'Quiet Study').length).toBe(1)
     })

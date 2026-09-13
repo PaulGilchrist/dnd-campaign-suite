@@ -390,12 +390,13 @@ describe('confirmVitalityOfTheTree', () => {
   });
 
   it('applies temp HP to a single selected target', async () => {
-    const result = await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      8,
-      1,
-    );
+    const result = await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 8,
+      });
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('Ally1');
@@ -410,12 +411,13 @@ describe('confirmVitalityOfTheTree', () => {
   });
 
   it('logs to campaign log with correct metadata', async () => {
-    await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      8,
-      1,
-    );
+    await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 8,
+      });
 
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
       type: 'ability_use',
@@ -427,12 +429,13 @@ describe('confirmVitalityOfTheTree', () => {
   });
 
   it('CLA-378 clamps multi-target selections to 1 creature', async () => {
-    await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1', 'Ally2', 'Ally3', 'Ally4'],
-      8,
-      4,
-    );
+    await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1', 'Ally2', 'Ally3', 'Ally4'],
+          tempHp: 8,
+      });
 
     const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       (c) => c[1] === 'tempHp',
@@ -442,12 +445,13 @@ describe('confirmVitalityOfTheTree', () => {
   });
 
   it('CLA-378 clamps to 1 creature even when maxTargets is falsy', async () => {
-    await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['A', 'B', 'C', 'D', 'E'],
-      8,
-      0,
-    );
+    await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['A', 'B', 'C', 'D', 'E'],
+          tempHp: 8,
+      });
 
     const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       (c) => c[1] === 'tempHp',
@@ -457,47 +461,51 @@ describe('confirmVitalityOfTheTree', () => {
   });
 
   it('handles empty selected targets array', async () => {
-    const result = await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      [],
-      8,
-      1,
-    );
+    const result = await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: [],
+          tempHp: 8,
+      });
 
     expect(result.payload.description).toContain('No targets granted');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
   it('handles null selected targets', async () => {
-    const result = await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      null,
-      8,
-      1,
-    );
+    const result = await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: null,
+          tempHp: 8,
+      });
 
     expect(result.payload.description).toContain('No targets granted');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
   it('handles undefined selected targets', async () => {
-    const result = await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      undefined,
-      8,
-      1,
-    );
+    const result = await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: undefined,
+          tempHp: 8,
+      });
 
     expect(result.payload.description).toContain('No targets granted');
   });
 
   it('returns popup with automation_info type and correct metadata', async () => {
-    const result = await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      8,
-      1,
-    );
+    const result = await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 8,
+      });
 
     expect(result.payload.type).toBe('automation_info');
     expect(result.payload.name).toBe('Second Wind');
@@ -512,12 +520,13 @@ describe('confirmVitalityOfTheTree', () => {
       return 0;
     });
 
-    await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      8,
-      1,
-    );
+    await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 8,
+      });
 
     const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       (c) => c[1] === 'tempHp',
@@ -533,12 +542,13 @@ describe('confirmVitalityOfTheTree', () => {
       return 0;
     });
 
-    await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      10,
-      1,
-    );
+    await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 10,
+      });
 
     const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       (c) => c[1] === 'tempHp',
@@ -549,12 +559,13 @@ describe('confirmVitalityOfTheTree', () => {
   it('CLA-378 refuses the grant without a live Rage buff, logging refusal and granting nothing', async () => {
     gateMocks({ rage: false });
 
-    const result = await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      8,
-      1,
-    );
+    const result = await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 8,
+      });
 
     expect(result.payload.description).toContain('Requires Rage');
     const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
@@ -569,12 +580,13 @@ describe('confirmVitalityOfTheTree', () => {
   it('CLA-378 refuses an out-of-range target with a refusal log', async () => {
     rangeCheck.isWithinRange.mockResolvedValue(false);
 
-    const result = await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      8,
-      1,
-    );
+    const result = await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 8,
+      });
 
     expect(result.payload.description).toContain('No targets granted');
     expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Barbarian1', 'Ally1', 10);
@@ -588,12 +600,13 @@ describe('confirmVitalityOfTheTree', () => {
   });
 
   it('CLA-378 refuses self-targeting with a refusal log', async () => {
-    const result = await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Barbarian1'],
-      8,
-      1,
-    );
+    const result = await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Barbarian1'],
+          tempHp: 8,
+      });
 
     expect(result.payload.description).toContain('No targets granted');
     const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
@@ -608,12 +621,13 @@ describe('confirmVitalityOfTheTree', () => {
   it('CLA-378 records attribution on the rage anchor and spends availability', async () => {
     combatData.getCurrentCombatRound.mockReturnValue(2);
 
-    await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      8,
-      1,
-    );
+    await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 8,
+      });
 
     expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith('Barbarian1', {
       vitalityOfTheTreeGrantedTargets: [{ target: 'Ally1', amount: 8, round: 2 }],
@@ -629,12 +643,13 @@ describe('confirmVitalityOfTheTree', () => {
     });
     combatData.getCurrentCombatRound.mockReturnValue(2);
 
-    await confirmVitalityOfTheTree(
-      vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName,
-      ['Ally1'],
-      8,
-      1,
-    );
+    await confirmVitalityOfTheTree({
+          action: vitalityAction(),
+          playerStats: makePlayerStats({ name: 'Barbarian1' }),
+          campaignName,
+          selectedTargets: ['Ally1'],
+          tempHp: 8,
+      });
 
     expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith('Barbarian1', expect.objectContaining({
       vitalityOfTheTreeGrantedTargets: [

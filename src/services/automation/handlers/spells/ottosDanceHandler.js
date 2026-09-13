@@ -18,9 +18,9 @@ export async function processOttoDanceSuccessSave(casterName, targetName, spellN
     );
     setRuntimeValue(targetName, 'activeConditions', [...filtered, 'speed_zero'], campaignName);
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'speed_zero', condition: 'speed_zero' },
-    ], campaignName, undefined, casterName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 
     addEntry(campaignName, {
         type: 'condition',
@@ -114,14 +114,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Failed save: apply Charmed + speed_zero conditions
-    return await processOttoDanceFailedSave(casterName, targetName, action, dc, saveResult, campaignName);
+    return await processOttoDanceFailedSave({ casterName, targetName, action, dc, saveResult, campaignName });
 }
 
 /**
  * Process the failed save: Charmed + speed_zero conditions, condition meta,
  * concentration badge targetEffect, and log entries.
  */
-async function processOttoDanceFailedSave(casterName, targetName, action, dc, saveResult, campaignName) {
+async function processOttoDanceFailedSave({ casterName, targetName, action, dc, saveResult, campaignName }) {
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     const filtered = conditions.filter(c =>
@@ -150,10 +150,10 @@ async function processOttoDanceFailedSave(casterName, targetName, action, dc, sa
         appliedDamage: 0,
     });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
         { type: 'speed_zero', condition: 'speed_zero' },
-    ], campaignName);
+    ], campaignName });
 
     // Register the spell badge targetEffect. Its `conditions` array and
     // `duration: 'concentration'` let concentrationService remove the badge and

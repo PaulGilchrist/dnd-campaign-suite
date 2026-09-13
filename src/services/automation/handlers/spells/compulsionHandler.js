@@ -9,7 +9,7 @@ import { rollD20 } from '../../../dice/diceRoller.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 
-function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
+function dispatchSaveResult({ campaignName, promptId, targetName, saveType, saveDc, saveResult }) {
     sendSaveResult(campaignName, targetName, {
         promptId,
         success: saveResult.success,
@@ -53,7 +53,7 @@ async function applyCompulsionCharm(targetName, campaignName) {
     setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
 }
 
-async function applyCompulsionSaveSuccess(campaignName, casterName, actionName, targetName, dc, saveResult) {
+async function applyCompulsionSaveSuccess({ campaignName, casterName, actionName, targetName, dc, saveResult }) {
     await addTargetResult(campaignName, {
         targetName,
         saveResult: 'success',
@@ -133,13 +133,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (targetInfo?.target?.type === 'npc') {
         const saveResult = rollNpcCompulsionSave(targetInfo, targetName, dc, saveAdvantage);
-        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, saveResult);
+        dispatchSaveResult({ campaignName, promptId, targetName, saveType: 'WIS', saveDc: dc, saveResult });
     }
 
     const saveResult = await promise;
 
     if (saveResult.success) {
-        return await applyCompulsionSaveSuccess(campaignName, casterName, action.name, targetName, dc, saveResult);
+        return await applyCompulsionSaveSuccess({ campaignName, casterName, actionName: action.name, targetName, dc, saveResult });
     }
 
     await applyCompulsionCharm(targetName, campaignName);
@@ -153,9 +153,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         appliedDamage: 0,
     });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'condition',

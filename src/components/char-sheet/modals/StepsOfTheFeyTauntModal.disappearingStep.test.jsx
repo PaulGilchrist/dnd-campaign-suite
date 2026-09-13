@@ -88,14 +88,7 @@ describe('StepsOfTheFeyTauntModal - Disappearing Step', () => {
                     expect.arrayContaining(['invisible']),
                     'test-campaign'
                 );
-                expect(addExpiration).toHaveBeenCalledWith(
-                    'FeyTrickster',
-                    'FeyTrickster',
-                    expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'invisible' })]),
-                    'test-campaign',
-                    undefined,
-                    'FeyTrickster'
-                );
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'FeyTrickster', targetName: 'FeyTrickster', effects: expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'invisible' })]), campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'FeyTrickster' });
                 const body = document.querySelector('.sp-body');
                 expect(body.textContent).toContain('Disappearing Step');
                 expect(body.textContent).toContain('Invisible condition');

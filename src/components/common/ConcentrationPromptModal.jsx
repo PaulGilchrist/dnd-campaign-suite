@@ -6,6 +6,61 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { resolveConcentrationRoll } from './concentrationPromptRoll.js';
 import './ConcentrationPromptModal.css';
 
+function ConcentrationDiceRow({ result }) {
+  if (result.rawRolls && result.rawRolls.length === 2) {
+    const [dieA, dieB] = result.rawRolls;
+    const keepFirst = result.mode === 'advantage' ? dieA >= dieB : dieA <= dieB;
+    return (
+      <>
+        <span className={`cnp-die${keepFirst ? ' cnp-die-selected' : ' cnp-die-discarded'}`}>
+          d20: {dieA} {keepFirst ? '(kept)' : '(discarded)'}
+        </span>
+        <span className={`cnp-die${!keepFirst ? ' cnp-die-selected' : ' cnp-die-discarded'}`}>
+          d20: {dieB} {!keepFirst ? '(kept)' : '(discarded)'}
+        </span>
+      </>
+    );
+  }
+  return <span className="cnp-die cnp-die-selected">d20: {result.roll}</span>;
+}
+
+function ConcentrationResultPanel({ current }) {
+  const result = current.result;
+  return (
+    <div className={`cnp-result ${result.success ? 'cnp-result-success' : 'cnp-result-fail'}`}>
+      <p className="cnp-result-label">{result.success ? 'CONCENTRATION MAINTAINED' : 'CONCENTRATION BROKEN'}</p>
+      <p className="cnp-result-total">Total: <strong>{result.total}</strong> vs DC {current.dc}</p>
+      <div className="cnp-dice-row">
+        <ConcentrationDiceRow result={result} />
+        {result.mode && result.mode !== 'normal' && (
+          <span className={`cnp-mode-badge ${result.mode}`}>{result.mode.toUpperCase()}</span>
+        )}
+      </div>
+      <p className="cnp-result-breakdown">d20 ({result.roll}) + {result.saveBonus}{result.bonusDetail ? ' ' + result.bonusDetail : ''}</p>
+    </div>
+  );
+}
+
+function ConcentrationActions({ hasResult, queueCount, onRoll, onDismiss, onNext }) {
+  if (!hasResult) {
+    return (
+      <>
+        <button className="cnp-roll-btn" onClick={onRoll} type="button">
+          <i className="fa-solid fa-dice-d20"></i> Roll Con Save
+        </button>
+        <button className="cnp-dismiss-btn" onClick={onDismiss} type="button">
+          Dismiss
+        </button>
+      </>
+    );
+  }
+  return (
+    <button className="cnp-roll-btn" onClick={onNext} type="button">
+      {queueCount > 1 ? 'Next Check' : 'Done'}
+    </button>
+  );
+}
+
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
 
@@ -108,50 +163,10 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
             <div className="cnp-body">
               <p><strong>{current.targetName}</strong> must make a <strong>CONSTITUTION</strong> saving throw to maintain concentration on <strong>{current.spellName}</strong>.</p>
               <p className="cnp-dc">DC {current.dc}</p>
-              {hasResult && (
-                <div className={`cnp-result ${current.result.success ? 'cnp-result-success' : 'cnp-result-fail'}`}>
-                  <p className="cnp-result-label">{current.result.success ? 'CONCENTRATION MAINTAINED' : 'CONCENTRATION BROKEN'}</p>
-                  <p className="cnp-result-total">Total: <strong>{current.result.total}</strong> vs DC {current.dc}</p>
-                  <div className="cnp-dice-row">
-                    {current.result.rawRolls && current.result.rawRolls.length === 2 ? (() => {
-                      const [dieA, dieB] = current.result.rawRolls;
-                      const keepFirst = current.result.mode === 'advantage' ? dieA >= dieB : dieA <= dieB;
-                      return (
-                      <>
-                        <span className={`cnp-die${keepFirst ? ' cnp-die-selected' : ' cnp-die-discarded'}`}>
-                          d20: {dieA} {keepFirst ? '(kept)' : '(discarded)'}
-                        </span>
-                        <span className={`cnp-die${!keepFirst ? ' cnp-die-selected' : ' cnp-die-discarded'}`}>
-                          d20: {dieB} {!keepFirst ? '(kept)' : '(discarded)'}
-                        </span>
-                      </>
-                      );
-                    })() : (
-                      <span className="cnp-die cnp-die-selected">d20: {current.result.roll}</span>
-                    )}
-                    {current.result.mode && current.result.mode !== 'normal' && (
-                      <span className={`cnp-mode-badge ${current.result.mode}`}>{current.result.mode.toUpperCase()}</span>
-                    )}
-                  </div>
-                  <p className="cnp-result-breakdown">d20 ({current.result.roll}) + {current.result.saveBonus}{current.result.bonusDetail ? ' ' + current.result.bonusDetail : ''}</p>
-                </div>
-              )}
+              {hasResult && <ConcentrationResultPanel current={current} />}
             </div>
             <div className="cnp-actions">
-              {!hasResult ? (
-                <>
-                  <button className="cnp-roll-btn" onClick={handleRoll} type="button">
-                    <i className="fa-solid fa-dice-d20"></i> Roll Con Save
-                  </button>
-                  <button className="cnp-dismiss-btn" onClick={handleDismiss} type="button">
-                    Dismiss
-                  </button>
-                </>
-              ) : (
-                <button className="cnp-roll-btn" onClick={handleNext} type="button">
-                  {queueCount > 1 ? 'Next Check' : 'Done'}
-                </button>
-              )}
+              <ConcentrationActions hasResult={hasResult} queueCount={queueCount} onRoll={handleRoll} onDismiss={handleDismiss} onNext={handleNext} />
             </div>
           </div>
         </div>

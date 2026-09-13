@@ -111,10 +111,10 @@ export async function confirmZealousPresence(action, playerStats, campaignName, 
         );
 
         // Register expiration for start of barbarian's next turn
-        addExpiration(playerName, targetName, [
+        addExpiration({ attackerName: playerName, targetName, effects: [
             { type: 'remove_active_buff', buffName: 'Zealous Presence' },
             { type: 'clear_runtime_value', creatureName: playerName, key: ZEALOUS_PRESENCE_KEY }
-        ], campaignName, undefined, playerName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
     }
 
     // Log the ability use

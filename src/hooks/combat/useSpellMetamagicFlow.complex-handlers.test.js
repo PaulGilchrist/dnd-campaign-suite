@@ -135,7 +135,7 @@ describe('useSpellMetamagicFlow — Enhance Ability confirm/skip', () => {
 
   it('applies enhance ability effect, logs entry, and clears state on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Enhance Ability',
       { level: 2 },
     );
@@ -167,7 +167,7 @@ describe('useSpellMetamagicFlow — Enhance Ability confirm/skip', () => {
 
   it('clears two-stage state and pending on skip', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Enhance Ability',
       { level: 2 },
     );
@@ -188,7 +188,7 @@ describe('useSpellMetamagicFlow — Enhance Ability confirm/skip', () => {
 
   it('does nothing when confirming without selecting an ability first', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Enhance Ability',
       { level: 2 },
     );
@@ -204,7 +204,7 @@ describe('useSpellMetamagicFlow — Enhance Ability confirm/skip', () => {
   it('does nothing when confirming with no pending state', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -222,7 +222,7 @@ describe('useSpellMetamagicFlow — Protection from Poison confirm/skip', () => 
 
   it('applies protection from poison handler, logs entry, and clears pending on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Protection from Poison',
       { level: 2 },
     );
@@ -247,7 +247,7 @@ describe('useSpellMetamagicFlow — Protection from Poison confirm/skip', () => 
 
   it('clears pending on skip', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Protection from Poison',
       { level: 2 },
     );
@@ -262,7 +262,7 @@ describe('useSpellMetamagicFlow — Protection from Poison confirm/skip', () => 
   it('does nothing when confirming with no pending state', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -280,7 +280,7 @@ describe('useSpellMetamagicFlow — Stone Skin confirm/skip', () => {
 
   it('consumes material, applies handler, logs entry, and clears pending on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Stone Skin',
       { level: 3 },
     );
@@ -311,7 +311,7 @@ describe('useSpellMetamagicFlow — Stone Skin confirm/skip', () => {
 
   it('clears pending on skip', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Stone Skin',
       { level: 3 },
     );
@@ -326,7 +326,7 @@ describe('useSpellMetamagicFlow — Stone Skin confirm/skip', () => {
   it('does nothing when confirming with no pending state', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     await act(async () => {

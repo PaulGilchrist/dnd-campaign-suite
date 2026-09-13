@@ -62,9 +62,9 @@ export function resolveAncestryUses(playerStats, optName, campaignName) {
     return { usesKey, currentUses };
 }
 
-export function applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats) {
+export function applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats }) {
     const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
-    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
+    const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name });
     return { actualDamage: applyResult?.finalDamage ?? damageResult?.total ?? 0, newHp: applyResult?.newHp };
 }
 
@@ -163,7 +163,7 @@ export function stonesEnduranceCapNote(totalHeal, rawHeal, finalHeal) {
 }
 
 // Shared Storm's Thunder range-gate refusal (dispatch + direct handlers).
-export function stormsThunderRangeRefusal(campaignName, playerStats, optName, automation, attackerName, rangeFt) {
+export function stormsThunderRangeRefusal({ campaignName, playerStats, optName, automation, attackerName, rangeFt }) {
     const refusalText = `${optName} requires the attacker to be within ${rangeFt} feet of you. ${attackerName} is out of range.`;
     addEntry(campaignName, {
         type: 'automation',

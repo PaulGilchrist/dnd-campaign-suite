@@ -91,6 +91,26 @@ function resolveShieldBashSaveDc(auto, playerStats) {
     return auto.saveDc || (8 + (playerStats.abilities?.find(a => a.name === 'Strength')?.bonus || 0) + (playerStats.proficiency || 0));
 }
 
+function logShieldBashSaveOutcome({ action, playerStats, campaignName, targetName, saveDc, saveResult, success }) {
+    const saveBonus = saveResult.saveBonus ?? 0;
+    addEntry(campaignName, {
+        type: 'roll',
+        name: action.name,
+        characterName: playerStats.name,
+        rollType: 'save-damage',
+        targetName,
+        saveDc,
+        saveType: 'STR',
+        saveResult: success ? 'success' : 'failure',
+        total: saveResult.total ?? 0,
+        rolls: [saveResult.roll ?? 0],
+        bonus: saveBonus,
+        formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
+        description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Shield Bash effect applied.' : ''}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+}
+
 // Shield Bash with push_or_prone: validate prerequisites and do save first
 async function handleShieldBash(action, auto, options, playerStats, campaignName) {
     if (!hasEquippedShield(playerStats)) {
@@ -151,22 +171,7 @@ async function handleShieldBash(action, auto, options, playerStats, campaignName
     const saveResult = await promise;
     const success = saveResult.success;
 
-    addEntry(campaignName, {
-        type: 'roll',
-        name: action.name,
-        characterName: playerStats.name,
-        rollType: 'save-damage',
-        targetName,
-        saveDc,
-        saveType: 'STR',
-        saveResult: success ? 'success' : 'failure',
-        total: saveResult.total ?? 0,
-        rolls: [saveResult.roll ?? 0],
-        bonus: saveResult.saveBonus ?? 0,
-        formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
-        description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Shield Bash effect applied.' : ''}`,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
+    logShieldBashSaveOutcome({ action, playerStats, campaignName, targetName, saveDc, saveResult, success });
 
     if (success) {
         await restoreBaseAttackAfterBash(playerStats, campaignName);
@@ -224,7 +229,7 @@ async function markAndApplySingleRiderOption({ action, auto, options, playerStat
         await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
     }
     const chosen = options[0];
-    return applyRiderEffect(action, playerStats, campaignName, targetName, chosen, _mapName);
+    return applyRiderEffect({ action, playerStats, campaignName, targetName, option: chosen });
 }
 
 function logRiderUse(campaignName, playerStats, action, targetName) {
@@ -394,19 +399,24 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     // Deduct Sneak Attack dice if Cunning Strike cost is specified
     if (totalCostD6 > 0) {
-        await applyCunningStrikeCost(playerStats, campaignName, totalCostD6, getRuntimeValue, setRuntimeValue, addEntry);
+        await applyCunningStrikeCost({
+    playerStats,
+    campaignName,
+    costD6: totalCostD6,
+    getRuntimeValue,
+    setRuntimeValue,
+    addEntry,
+});
     }
 
     const results = [];
     let versatileTricksterSecondaryTarget = null;
 
     // Check if Versatile Trickster is available (Arcane Trickster level 13+)
-    const hasVersatileTricksterPassive = (playerStats.automation?.passives || []).some(
-        p => p.type === 'passive_rule' && p.effect === 'versatile_trickster'
-    );
+    const hasVersatileTricksterPassive = hasVersatileTrickster(playerStats);
 
     for (const chosen of chosenOptions) {
-        const res = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen, undefined);
+        const res = await applyRiderEffect({ action, playerStats, campaignName, targetName, option: chosen });
         results.push(res);
 
         const secondaryTargets = await scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive, targetName, campaignName);
@@ -419,11 +429,19 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         return results[0];
     }
 
+    return buildRiderApplySummary({ action, auto, targetName, chosenOptions, totalCostD6 });
+}
+
+function buildRiderApplySummary({ action, auto, targetName, chosenOptions, totalCostD6 }) {
     const effectDescriptions = chosenOptions.map(opt => describeRiderOption(opt, targetName));
-
     const costNote = totalCostD6 > 0 ? `<br/><em>(Forgoing ${totalCostD6}d6 Sneak Attack damage dice)</em>` : '';
-
     return riderNotice(action.name, auto, `Applied to ${targetName || 'target'}:<br/>• ${effectDescriptions.join('<br/>• ')}${costNote}`);
+}
+
+function hasVersatileTrickster(playerStats) {
+    return (playerStats.automation?.passives || []).some(
+        p => p.type === 'passive_rule' && p.effect === 'versatile_trickster'
+    );
 }
 
 async function stampRiderSecondaryTargets(playerStats, campaignName, targetName, versatileTricksterSecondaryTarget, chosenOptions) {
@@ -509,7 +527,7 @@ function stripPsychicVeil(playerStats, campaignName) {
 }
 
 // Push effect: just log and popup, no targetEffect (push is instant)
-function applyPushEffect(action, auto, playerStats, campaignName, targetName, option) {
+function applyPushEffect({ action, auto, playerStats, campaignName, targetName, option }) {
     const pushDistance = option.value || 10;
     addEntry(campaignName, {
         type: 'ability_use',
@@ -572,9 +590,9 @@ function logSpeedReduction(action, playerStats, campaignName, targetName, option
     // Scoped by effect+source+option+target so other speed_reduction
     // writers (Slow mastery, giant ancestry) are untouched.
     if (!option.saveType) {
-        addExpiration(playerStats.name, targetName, [
+        addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'remove_target_effect', effectKey: 'speed_reduction', source: playerStats.name, option: option.name, target: targetName }
-        ], campaignName, undefined, playerStats.name);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
     }
 }
 
@@ -596,7 +614,7 @@ async function applyEnvenomWeapons(playerStats, campaignName, targetName) {
     if (!combatSummary) return;
 
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    await applyDamageToTarget(combatSummary, targetName, poisonDamage, [envenomPassive.automation?.damageType || 'Poison'], campaignName, characters, { ignoreResistance: true, attackerName: playerStats.name });
+    await applyDamageToTarget(combatSummary, targetName, poisonDamage, [envenomPassive.automation?.damageType || 'Poison'], { campaignName, characters: characters, ignoreResistance: true, attackerName: playerStats.name });
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -674,7 +692,7 @@ function buildNoSaveDescription(action, playerStats, campaignName, targetName, o
     return desc;
 }
 
-async function applyRiderEffect(action, playerStats, campaignName, targetName, option, _mapName) {
+async function applyRiderEffect({ action, playerStats, campaignName, targetName, option }) {
     const auto = action.automation || action;
     if (!targetName) {
         return riderNotice(action.name, auto, `${option.name}: ${option.effect}<br/><br/><i>No target selected — effect noted for manual application.</i>`);
@@ -689,11 +707,17 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
     // Handle mass_fear: resolve saves directly
     if (option.effect === 'mass_fear') {
         stripPsychicVeil(playerStats, campaignName);
-        return resolveMassFear(campaignName, playerStats.name, targetName, option, playerStats, _mapName);
+        return resolveMassFear({
+    campaignName,
+    casterName: playerStats.name,
+    primaryTargetName: targetName,
+    option,
+    playerStats,
+});
     }
 
     if (option.effect === 'push') {
-        return applyPushEffect(action, auto, playerStats, campaignName, targetName, option);
+        return applyPushEffect({ action, auto, playerStats, campaignName, targetName, option });
     }
 
     // Default: apply standard rider effect

@@ -70,9 +70,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     })();
 
     if (durationRounds) {
-        addExpiration(casterName, casterName, [
+        addExpiration({ attackerName: casterName, targetName: casterName, effects: [
             { type: 'remove_sleet_storm_area', sleetKey: trackingKey }
-        ], campaignName, durationRounds);
+        ], campaignName, rounds: durationRounds });
     }
 
     // Register concentration for this spell
@@ -193,9 +193,9 @@ async function applySleetStormProneTarget(campaignName, casterName, targetName, 
     });
 
     // Add expiration for concentration — Prone removed when concentration breaks
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'prone' },
-    ], campaignName);
+    ], campaignName });
 
     // Actually break concentration for this creature if they have one
     const combatSummary = getCombatSummary(campaignName);

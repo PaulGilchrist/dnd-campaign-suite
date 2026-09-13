@@ -87,7 +87,7 @@ describe('logConditionEvent', () => {
     });
 
     it('posts a condition entry for add action', () => {
-        logConditionEvent(campaignName, 'add', 'Orc', 'charmed', 12, 'CHA');
+        logConditionEvent({ campaignName, action: 'add', creatureName: 'Orc', conditionLabel: 'charmed', dc: 12, ability: 'CHA' });
 
         const entry = capturedEntry();
         expect(entry).toEqual({
@@ -103,7 +103,7 @@ describe('logConditionEvent', () => {
     });
 
     it('posts a condition entry for remove action without dc/ability', () => {
-        logConditionEvent(campaignName, 'remove', 'Goblin', 'stunned', undefined, undefined);
+        logConditionEvent({ campaignName, action: 'remove', creatureName: 'Goblin', conditionLabel: 'stunned' });
 
         const entry = capturedEntry();
         expect(entry.type).toBe('condition');
@@ -290,7 +290,7 @@ describe('error handling', () => {
 
     it('logConditionEvent does not throw when addEntry rejects', async () => {
         mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logConditionEvent(campaignName, 'add', 'Orc', 'charmed', 12, 'CHA')).resolves.toBeUndefined();
+        await expect(logConditionEvent({ campaignName, action: 'add', creatureName: 'Orc', conditionLabel: 'charmed', dc: 12, ability: 'CHA' })).resolves.toBeUndefined();
     });
 
     it('logConcentrationSave does not throw when addEntry rejects', async () => {

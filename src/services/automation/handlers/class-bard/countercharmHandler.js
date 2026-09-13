@@ -137,8 +137,8 @@ async function maybeLiftEnchantment(cs, rollEvent, rollType, targetName, newTota
     const oldSuccess = saveResult === 'success';
     const newSuccess = newTotal >= rollEvent.saveDc;
     if (!oldSuccess && newSuccess) {
-        await removeCondition(cs, targetName, 'charmed', getRuntimeValue, setRuntimeValue);
-        await removeCondition(cs, targetName, 'frightened', getRuntimeValue, setRuntimeValue);
+        await removeCondition({ combatSummary: cs, creatureName: targetName, condition: 'charmed', getRuntimeValue, setRuntimeValue });
+        await removeCondition({ combatSummary: cs, creatureName: targetName, condition: 'frightened', getRuntimeValue, setRuntimeValue });
     }
 }
 

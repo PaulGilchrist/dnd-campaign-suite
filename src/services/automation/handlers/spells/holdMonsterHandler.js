@@ -50,9 +50,9 @@ async function applyParalyzedOnFail({ campaignName, auto, playerStats, action, c
         appliedDamage: 0,
     });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'paralyzed' },
-    ], campaignName);
+    ], campaignName });
 
     const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
     if (casterCreature) {

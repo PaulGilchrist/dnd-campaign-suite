@@ -413,12 +413,7 @@ describe('crownOfMadnessHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]),
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]), campaignName });
     });
 
     it('calls addConcentration for the caster', async () => {

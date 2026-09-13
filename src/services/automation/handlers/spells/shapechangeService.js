@@ -42,6 +42,15 @@ export async function applyShapechange(spell, metaCtx, playerStats, campaignName
     }
 }
 
+async function stampShapechangeConcentration({ cs, casterName, spell, playerStats, campaignName }) {
+    const casterCreature = cs.creatures.find(c => c.name === casterName);
+    if (!casterCreature) return;
+    const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
+    addConcentration(cs, casterName, spell?.name || 'Shapechange', concentrationDc);
+    await storage.set('combatSummary', cs, campaignName);
+    setCombatSummaryCache(cs, campaignName);
+}
+
 export async function confirmShapechangeTransform({ targetName, form, casterName, spell, playerStats, campaignName }) {
     const cs = await getCombatContext(campaignName) || { creatures: [] };
     const creature = cs.creatures.find(c => c.name === targetName);
@@ -94,13 +103,7 @@ export async function confirmShapechangeTransform({ targetName, form, casterName
     });
     setRuntimeValue('campaign', 'targetEffects', cleaned, campaignName, true);
 
-    const casterCreature = cs.creatures.find(c => c.name === casterName);
-    if (casterCreature) {
-        const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
-        addConcentration(cs, casterName, spell?.name || 'Shapechange', concentrationDc);
-        await storage.set('combatSummary', cs, campaignName);
-        setCombatSummaryCache(cs, campaignName);
-    }
+    await stampShapechangeConcentration({ cs, casterName, spell, playerStats, campaignName });
 
     const expirations = getRuntimeValue(casterName, 'pendingExpirations', campaignName);
     const expList = Array.isArray(expirations) ? expirations : [];

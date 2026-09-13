@@ -91,20 +91,13 @@ describe('viciousMockeryHandler', () => {
 
         await handle(makeAction(), makePlayerStats(), 'TestCampaign', 'TestMap');
 
-        expect(addExpiration).toHaveBeenCalledWith(
-            'TestBard',
-            'Goblin',
-            expect.arrayContaining([
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestBard', targetName: 'Goblin', effects: expect.arrayContaining([
                 expect.objectContaining({
                     type: 'remove_target_effect',
                     effectKey: 'disadvantage_next_attack',
                     source: 'TestBard',
                 }),
-            ]),
-            'TestCampaign',
-            undefined,
-            'TestBard',
-        );
+            ]), campaignName: 'TestCampaign', rounds: undefined, expireOnCreatureName: 'TestBard' });
     });
 
     it('replaces an existing disadvantage_next_attack effect from the same source', async () => {

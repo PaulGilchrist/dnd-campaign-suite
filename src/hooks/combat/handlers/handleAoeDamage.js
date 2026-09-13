@@ -22,7 +22,7 @@ function reducedAllyResult(creatureName, applyResult, extra) {
 
 async function applyZeroDamageResults({ combatSummary, creatures, damageType, campaignName, characters, casterName, results, extra }) {
     for (const { creature } of creatures) {
-        const applyResult = await applyDamageToTarget(combatSummary, creature.name, 0, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: casterName });
+        const applyResult = await applyDamageToTarget(combatSummary, creature.name, 0, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: casterName });
         results.push(reducedAllyResult(creature.name, applyResult, extra));
     }
 }
@@ -39,7 +39,7 @@ async function processNonSaveCreatures({ combatSummary, affected, isCarefulAlly,
     const carefulAffected = affected.filter(a => isCarefulAlly(a.creature.name));
 
     for (const { creature } of nonCarefulAffected) {
-        const applyResult = await applyDamageToTarget(combatSummary, creature.name, adjustedTotal, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: casterName });
+        const applyResult = await applyDamageToTarget(combatSummary, creature.name, adjustedTotal, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: casterName });
         if (applyResult && applyResult.finalDamage > 0) {
             endInvisibilityOnHostileAction(casterName, campaignName);
         }

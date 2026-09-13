@@ -189,12 +189,7 @@ describe('stoneSkinHandler', () => {
         CAMPAIGN_NAME,
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        PLAYER_NAME,
-        TARGET_NAME,
-        expect.any(Array),
-        CAMPAIGN_NAME,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: TARGET_NAME, effects: expect.any(Array), campaignName: CAMPAIGN_NAME });
 
       expect(concentrationService.addConcentration).toHaveBeenCalled();
       expect(logService.addEntry).toHaveBeenCalled();

@@ -61,9 +61,9 @@ export async function applyShieldOfFaith(action, playerStats, campaignName, _map
             setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
         }
 
-        addExpiration(playerStats.name, targetName, [
+        addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'remove_active_buff', buffName: SHIELD_OF_FAITH_BUFF_NAME }
-        ], campaignName);
+        ], campaignName });
 
         addEntry(campaignName, {
             type: 'ability_use',

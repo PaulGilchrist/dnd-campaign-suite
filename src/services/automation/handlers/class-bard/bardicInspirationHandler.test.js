@@ -266,7 +266,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
 
   describe('uses decrement', () => {
     it('decrements uses when uses_expression is present', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         playerName,
@@ -279,7 +286,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('does not decrement uses when uses_expression is absent', async () => {
       delete action.automation.uses_expression;
 
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         playerName,
@@ -292,7 +306,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('does not decrement uses when usesMax is 0', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(0);
 
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         playerName,
@@ -305,7 +326,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('uses usesMax as current when runtime value is null', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         playerName,
@@ -318,7 +346,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
 
   describe('target state setting', () => {
     it('sets bardicInspirationDie on the target', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
@@ -329,7 +364,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     });
 
     it('sets bardicInspirationGrantedBy on the target', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
@@ -340,7 +382,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     });
 
     it('sets bardicInspirationUses on the target with current:1 max:1', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
@@ -355,7 +404,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('sets combat options when hasCombatOptions and options are specified', async () => {
       action.automation.options = ['custom_option'];
 
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, true);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: true,
+});
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
@@ -368,7 +424,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('sets default combat options when hasCombatOptions but no options specified', async () => {
       delete action.automation.options;
 
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, true);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: true,
+});
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
@@ -381,7 +444,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('sets self-target state when targetName equals playerStats.name with combat options', async () => {
       action.automation.options = ['custom'];
 
-      await applyBardicInspiration(action, playerStats, campaignName, playerName, 8, true);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: playerName,
+    dieSize: 8,
+    hasCombatOptions: true,
+});
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         playerName,
@@ -406,20 +476,29 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
 
   describe('expiration', () => {
     it('calls addExpiration with correct parameters', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        playerName,
-        'Fighter',
-        [{ type: 'remove_bardic_inspiration' }],
-        campaignName,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: 'Fighter', effects: [{ type: 'remove_bardic_inspiration' }], campaignName });
     });
   });
 
   describe('log entry', () => {
     it('posts a log entry with the die size and target name', async () => {
-      await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
@@ -440,7 +519,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         payload: { type: 'automation_info', description: 'Agile strike applied' },
       });
 
-      const result = await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      const result = await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('Agile strike applied');
@@ -461,7 +547,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
       ];
       executeHandlerModule.executeHandler.mockResolvedValue(null);
 
-      const result = await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      const result = await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('d8');
@@ -469,7 +562,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     });
 
     it('returns normal popup when hasAgileStrikes is false', async () => {
-      const result = await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      const result = await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(result.type).toBe('popup');
       expect(executeHandlerModule.executeHandler).not.toHaveBeenCalled();
@@ -478,7 +578,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
 
   describe('return value', () => {
     it('returns a popup with the correct die size and target in the description', async () => {
-      const result = await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      const result = await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -494,7 +601,14 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('returns success popup even when addEntry rejects', async () => {
       addEntry.mockImplementation(() => Promise.reject(new Error('log service failed')));
 
-      const result = await applyBardicInspiration(action, playerStats, campaignName, 'Fighter', 8, false);
+      const result = await applyBardicInspiration({
+    action,
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+});
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('d8');

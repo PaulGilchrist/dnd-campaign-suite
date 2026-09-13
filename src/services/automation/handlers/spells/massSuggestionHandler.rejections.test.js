@@ -190,12 +190,7 @@ describe('massSuggestionHandler — addEntry rejection handling', () => {
         ['charmed'],
         campaignName,
       );
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        [{ type: 'charmed', condition: 'charmed' }],
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: [{ type: 'charmed', condition: 'charmed' }], campaignName });
     });
 
     it('should still apply addTargetResult when addEntry rejects on save_result entry', async () => {

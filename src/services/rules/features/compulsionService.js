@@ -15,6 +15,14 @@ async function resolveCompulsionTarget(metaCtx, campaignName) {
     return null;
 }
 
+function defaultSpellSaveDc(playerStats) {
+    return playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+}
+
+function targetInCombat(cs, targetName, casterName) {
+    return cs?.creatures?.some(c => c.name === targetName && c.name !== casterName) ?? false;
+}
+
 export async function triggerCompulsion(spell, metaCtx, playerStats, campaignName, mapName) {
     const isCompulsion = (spell.name || '').toLowerCase() === 'compulsion';
     if (!isCompulsion) return null;
@@ -26,9 +34,9 @@ export async function triggerCompulsion(spell, metaCtx, playerStats, campaignNam
 
     // Check if caster/target are in combat to determine if target gets advantage on save
     const cs = await getCombatContext(campaignName);
-    const targetInCombat = cs?.creatures?.some(c => c.name === targetName && c.name !== playerStats.name) ?? false;
+    const targetInCombatAdvantage = targetInCombat(cs, targetName, playerStats.name);
 
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    const spellSaveDc = metaCtx?.spellSaveDc || defaultSpellSaveDc(playerStats);
     const slotLevel = metaCtx?.slotLevel || spell.level || 4;
 
     const action = {
@@ -37,7 +45,7 @@ export async function triggerCompulsion(spell, metaCtx, playerStats, campaignNam
             type: 'compulsion',
             saveDc: spellSaveDc,
             targetName: targetName,
-            advantage: targetInCombat,
+            advantage: targetInCombatAdvantage,
         },
         spell,
         spellSlotLevel: slotLevel,
@@ -57,7 +65,7 @@ export async function applyCompulsionEffect(spell, playerStats, campaignName, ma
         return null;
     }
 
-    const spellSaveDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    const spellSaveDc = defaultSpellSaveDc(playerStats);
     const casterName = playerStats.name;
 
     const logTargets = [];
@@ -101,9 +109,9 @@ export async function applyCompulsionEffect(spell, playerStats, campaignName, ma
             const conditionDef = { key: 'charmed', label: 'Charmed' };
             addCondition({ combatSummary: cs, creatureName: targetName, conditionDef, dc: spellSaveDc, ability: 'WIS', getRuntimeValue, setRuntimeValue, campaignName, playerStats });
 
-            addExpiration(casterName, targetName, [
+            addExpiration({ attackerName: casterName, targetName, effects: [
                 { type: 'charmed', condition: 'charmed' },
-            ], campaignName);
+            ], campaignName });
 
             logTargets.push({ name: targetName, saved: false });
 

@@ -678,8 +678,8 @@ describe('useAttackDamageResolution - feats', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalled();
-            const call = mockRollDamage.mock.calls[0];
-            const formula = call[1];
+            const call = mockRollDamage.mock.calls[0][0];
+            const formula = call.formula;
             expect(formula).toContain('plus 1d8');
             expect(formula).toContain('[Enhanced Critical]');
         });
@@ -713,8 +713,8 @@ describe('useAttackDamageResolution - feats', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalled();
-            const call = mockRollDamage.mock.calls[0];
-            const formula = call[1];
+            const call = mockRollDamage.mock.calls[0][0];
+            const formula = call.formula;
             expect(formula).not.toContain('[Enhanced Critical]');
         });
     });

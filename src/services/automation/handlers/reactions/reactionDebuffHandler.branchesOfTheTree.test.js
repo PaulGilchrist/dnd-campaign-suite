@@ -287,20 +287,14 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
       detail: { promptId: 'test-prompt-id', success: false },
     }).catch(() => {});
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Thulgar',
-      'Orc',
-      [
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Thulgar', targetName: 'Orc', effects: [
         {
           type: 'remove_target_effect',
           effectKey: 'speed_reduction',
           source: 'Branches of the Tree',
           target: 'Orc',
         },
-      ],
-      campaignName,
-      1
-    );
+      ], campaignName, rounds: 1 });
   });
 
   it('on fail: logs save_result with failure', async () => {

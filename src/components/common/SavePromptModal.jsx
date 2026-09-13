@@ -43,34 +43,44 @@ function getEvasionContext(current, characters, campaignName) {
   return { isIncapacitated, hasOwnEvasion };
 }
 
-function resolveTargetSaveBonus(current, characters, campaignName) {
+function safeFindTargetCharacter(current, characters) {
+  try {
+    return findTargetCharacter(current, characters);
+  } catch { /* ignore */ }
+  return null;
+}
+
+function characterSaveFields(character, current) {
   let saveBonus = 0;
   let saveModifiers = null;
   let activeConditions = [];
-  let character = null;
   try {
-    character = (characters || []).find(c => {
-      const name = typeof c === 'string' ? c : c.name;
-      return name && utils.getName(name) === utils.getName(current.targetName);
-    });
-    if (character && typeof character !== 'string') {
-      saveBonus = getAbilitySaveBonus(character.computedStats || character, current.saveType);
-      saveModifiers = character.saveModifiers || character.computedStats?.saveModifiers;
-      activeConditions = getRuntimeValue(current.targetName, 'activeConditions') || [];
-    }
+    saveBonus = getAbilitySaveBonus(character.computedStats || character, current.saveType);
+    saveModifiers = character.saveModifiers || character.computedStats?.saveModifiers;
+    activeConditions = getRuntimeValue(current.targetName, 'activeConditions') || [];
   } catch { /* ignore */ }
-
-  if (!character) {
-    const combatSummary = getCombatSummary(campaignName);
-    const creature = combatSummary?.creatures?.find(
-      c => utils.getName(c.name) === utils.getName(current.targetName)
-    );
-    if (creature) {
-      saveBonus = creature.saveBonuses?.[current.saveType?.toLowerCase()] ?? 0;
-    }
-  }
-
   return { saveBonus, saveModifiers, activeConditions };
+}
+
+function findCombatCreatureSaveBonus(targetName, saveType, campaignName) {
+  const combatSummary = getCombatSummary(campaignName);
+  const creature = combatSummary?.creatures?.find(
+    c => utils.getName(c.name) === utils.getName(targetName)
+  );
+  return creature ? (creature.saveBonuses?.[saveType?.toLowerCase()] ?? 0) : 0;
+}
+
+function resolveTargetSaveBonus(current, characters, campaignName) {
+  const character = safeFindTargetCharacter(current, characters);
+  if (character) {
+    if (typeof character === 'string') return { saveBonus: 0, saveModifiers: null, activeConditions: [] };
+    return characterSaveFields(character, current);
+  }
+  return {
+    saveBonus: findCombatCreatureSaveBonus(current.targetName, current.saveType, campaignName),
+    saveModifiers: null,
+    activeConditions: [],
+  };
 }
 
 function modifierListGrantsAdvantage(current, saveModifiers, activeConditions, campaignName) {
@@ -231,6 +241,29 @@ function buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, aura
   };
 }
 
+function computeHasEvasion(current, campaignName, hasOwnEvasion, isIncapacitated, hasSelectedEvasion) {
+  const sharedEvasion = !hasOwnEvasion && !isIncapacitated && hasSelectedEvasion;
+  return hasOwnEvasion || sharedEvasion || isCircleOfPowerActive(current.targetName, campaignName);
+}
+
+function rollSaveDice(forceRollTo20, hasAdvantage, hasDisadvantage) {
+  const roll1 = forceRollTo20 ? 20 : rollD20();
+  const roll2 = (hasDisadvantage || hasAdvantage) ? rollD20() : roll1;
+  const finalRoll = hasDisadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
+  return { roll1, roll2, finalRoll };
+}
+
+function saveRollMode(hasAdvantage, hasDisadvantage) {
+  if (hasDisadvantage) return 'disadvantage';
+  if (hasAdvantage) return 'advantage';
+  return 'normal';
+}
+
+function auraBonusString(aura) {
+  if (!(aura.bonus > 0)) return undefined;
+  return `(+${aura.bonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})`;
+}
+
 // Full save-roll resolution: evasion, advantage/disadvantage, dice, and all
 // bonus contributions (aura, cosmic omen, bane, bless, warding bond).
 async function computeSaveRollOutcome({ current, characters, campaignName, activeMapName, hasSelectedEvasion, forceRollTo20 }) {
@@ -240,14 +273,12 @@ async function computeSaveRollOutcome({ current, characters, campaignName, activ
   const auraBonus = aura.bonus;
 
   const { isIncapacitated, hasOwnEvasion } = getEvasionContext(current, characters, campaignName);
-  const hasEvasion = hasOwnEvasion || (!hasOwnEvasion && !isIncapacitated && hasSelectedEvasion) || isCircleOfPowerActive(current.targetName, campaignName);
+  const hasEvasion = computeHasEvasion(current, campaignName, hasOwnEvasion, isIncapacitated, hasSelectedEvasion);
 
   const hasDisadvantage = getSaveDisadvantage(current, campaignName);
   const hasAdvantage = computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, activeConditions, characters });
 
-  const roll1 = forceRollTo20 ? 20 : rollD20();
-  const roll2 = (hasDisadvantage || hasAdvantage) ? rollD20() : roll1;
-  const finalRoll = hasDisadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
+  const { roll1, roll2, finalRoll } = rollSaveDice(forceRollTo20, hasAdvantage, hasDisadvantage);
   const { bonus: cosmicOmenAppliedBonus, detail: cosmicOmenDetail } = consumeCosmicOmen(campaignName);
 
   // Bane (target + attacker) and bless effect dice, then Warding Bond flat bonus.
@@ -257,12 +288,11 @@ async function computeSaveRollOutcome({ current, characters, campaignName, activ
   // Warding Bond: +1 flat bonus to saving throws
   const wardingBondSaveBonus = findWardingBondSaveBonus(current, campaignName);
 
-  const total = finalRoll + saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
-  const success = total >= current.saveDc;
-  const auraBonusStr = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
-  const bonusDetail = buildBonusDetail({ auraBonusStr, cosmicOmenDetail, baneSaveRoll, baneAttackerRoll, blessSaveRoll, wardingBondSaveBonus });
-  const rollMode = hasDisadvantage ? 'disadvantage' : hasAdvantage ? 'advantage' : 'normal';
   const saveBonusTotal = saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
+  const total = finalRoll + saveBonusTotal;
+  const success = total >= current.saveDc;
+  const bonusDetail = buildBonusDetail({ auraBonusStr: auraBonusString(aura), cosmicOmenDetail, baneSaveRoll, baneAttackerRoll, blessSaveRoll, wardingBondSaveBonus });
+  const rollMode = saveRollMode(hasAdvantage, hasDisadvantage);
 
   return {
     hasEvasion, finalRoll, roll1, roll2, saveBonus, auraBonus, cosmicOmenAppliedBonus, total, success,
@@ -430,15 +460,24 @@ function findGuardedMindAction(targetCharacter) {
   );
 }
 
+function isIndomitableModifier(m) {
+  return m.effect === 'reroll' && m.target === 'saving_throw'
+    && (m.source === 'Indomitable' || /fighter_level/i.test(m.bonusExpression || ''));
+}
+
+function indomitableMaxUsesForLevel(featureLevel) {
+  if (featureLevel >= 17) return 3;
+  if (featureLevel >= 13) return 2;
+  return 1;
+}
+
 // Indomitable (Fighter lv9+): reroll a failed save with a +fighter level bonus,
 // tracked via runtime `indomitableUses` (recharged on a Long Rest).
 function resolveIndomitableReroll(targetCharacter) {
   const modifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
-  const modifier = modifiers.find(
-    m => m.effect === 'reroll' && m.target === 'saving_throw' && (m.source === 'Indomitable' || /fighter_level/i.test(m.bonusExpression || ''))
-  );
+  const modifier = modifiers.find(isIndomitableModifier);
   const featureLevel = targetCharacter?.level ?? targetCharacter?.computedStats?.level ?? 0;
-  const maxUses = featureLevel >= 17 ? 3 : featureLevel >= 13 ? 2 : 1;
+  const maxUses = indomitableMaxUsesForLevel(featureLevel);
   const rerollBonus = modifier
     ? (evaluateAutoExpression(modifier.bonusExpression || '0', { level: featureLevel }) || featureLevel)
     : 0;

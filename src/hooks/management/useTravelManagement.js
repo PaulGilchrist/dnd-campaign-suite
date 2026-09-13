@@ -144,7 +144,7 @@ export default function useTravelManagement({
 
   const setDestinationAndPath = useCallback((to) => {
     if (!partyPosition) return;
-    const newPath = calculatePath(partyPosition, to, hexCols, hexRows, terrain, roads);
+    const newPath = calculatePath(partyPosition, to, { hexCols, hexRows, terrain, roads });
     if (newPath.length === 0) return;
     setDestination(to);
     setPath(newPath);

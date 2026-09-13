@@ -39,10 +39,10 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             applyConditionToCreature(targetName, saveDcValue, additionalCondition, ctx);
         }
 
-        addExpiration(attackerName, targetName, [
+        addExpiration({ attackerName, targetName, effects: [
             { type: conditionName.toLowerCase(), condition: conditionName.toLowerCase() },
             ...(additionalCondition ? [{ type: additionalCondition.toLowerCase(), condition: additionalCondition.toLowerCase() }] : []),
-        ], campaignName, durationRounds);
+        ], campaignName, rounds: durationRounds });
     }, [attackerName, campaignName, conditionName, additionalCondition, durationRounds, applyConditionToCreature]);
 
     const logCondition = useCallback((targetName, saveDcValue) => {

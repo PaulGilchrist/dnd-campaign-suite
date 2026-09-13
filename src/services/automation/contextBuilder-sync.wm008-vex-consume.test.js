@@ -93,25 +93,25 @@ describe('WM-008 contextBuilder-sync: vex te consumption', () => {
   });
 
   it('attack-roll ctx consumes the vex te and grants advantage', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(result.forcedMode).toBe('advantage');
     expect(teWrite()).toBeDefined();
     expect(teWrite()[2]).toEqual([]);
   });
 
   it('damage-phase ctx rebuild (consumeAttackTe:false) does NOT consume the freshly-stamped te', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {}, { consumeAttackTe: false });
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', { consumeAttackTe: false });
     expect(result.forcedMode).toBeUndefined();
     expect(teWrite()).toBeUndefined();
   });
 
   it('attack-roll consumption releases the campaign _Vex_appliedTarget latch', async () => {
-    await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_Vex_appliedTarget', null, 'camp');
   });
 
   it('damage-phase rebuild does NOT release the latch', async () => {
-    await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {}, { consumeAttackTe: false });
+    await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', { consumeAttackTe: false });
     expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', '_Vex_appliedTarget', null, 'camp');
   });
 });

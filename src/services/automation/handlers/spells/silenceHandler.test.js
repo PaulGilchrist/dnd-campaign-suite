@@ -154,15 +154,10 @@ describe('silenceHandler', () => {
             it('adds expiration to remove the buff and clear silence zone', async () => {
                 await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-                expect(addExpiration).toHaveBeenCalledWith(
-                    casterName,
-                    casterName,
-                    [
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: [
                         { type: 'remove_active_buff', buffName: 'Silence' },
                         { type: 'clear_silence_zone', casterName },
-                    ],
-                    campaignName,
-                );
+                    ], campaignName });
             });
 
             it('builds target list from combat summary including players and creatures', async () => {
@@ -336,12 +331,7 @@ describe('silenceHandler', () => {
 
             await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                casterName,
-                'Goblin',
-                [{ type: 'condition', condition: 'deafened' }],
-                campaignName,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Goblin', effects: [{ type: 'condition', condition: 'deafened' }], campaignName });
         });
 
         it('posts condition log entry for each target', async () => {
@@ -388,15 +378,10 @@ describe('silenceHandler', () => {
 
             await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                casterName,
-                casterName,
-                [
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: [
                     { type: 'remove_active_buff', buffName: 'Silence' },
                     { type: 'clear_silence_zone', casterName },
-                ],
-                campaignName,
-            );
+                ], campaignName });
         });
 
         it('returns popup with correct summary', async () => {

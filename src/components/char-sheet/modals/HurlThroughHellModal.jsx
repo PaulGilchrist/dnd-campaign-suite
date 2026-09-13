@@ -66,6 +66,102 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
             timestamp: Date.now(),
         }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });
 
+        const hurlDamageNonFiend = async ({ combatSummary, saveRoll, saveTotal }) => {
+            const characters = (combatSummary?.creatures || []).filter(c => c.type === 'player');
+            const dmgResult = applyDamageToTarget(combatSummary, targetName, actualDamageTotal, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
+            const actualDamage = dmgResult?.finalDamage ?? actualDamageTotal;
+
+            await addEntry(campaignName, {
+                type: 'save_result',
+                characterName: playerName,
+                targetName,
+                saveDc,
+                saveType,
+                success: false,
+                saveRoll,
+                saveTotal,
+                description: `${targetName} failed ${saveType} save (rolled ${saveRoll} + ${saveTotal - saveRoll} = ${saveTotal} vs DC ${saveDc}) — hurled through the lower planes.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });
+
+            await addEntry(campaignName, {
+                type: 'roll',
+                characterName: playerName,
+                rollType: 'damage',
+                name: 'Hurl Through Hell Damage',
+                targetName,
+                damageType: damageType,
+                formula: damageExpression,
+                rolls: actualDieRoll?.rolls,
+                total: actualDamage,
+                description: `${targetName} takes ${actualDamage} ${damageType} damage from Hurl Through Hell.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });
+
+            window.dispatchEvent(new CustomEvent('damage-popup', {
+                detail: {
+                    targetName,
+                    sourceName: playerName,
+                    spellName: featureName,
+                    popupText: `${targetName} failed ${saveType} save — hurled through the lower planes and takes ${actualDamage} ${damageType} damage.`,
+                    damageType,
+                    rolls: actualDieRoll?.rolls,
+                    formula: damageExpression,
+                },
+            }));
+        };
+
+        const hurlDamageFiend = async ({ saveRoll, saveTotal }) => {
+            await addEntry(campaignName, {
+                type: 'save_result',
+                characterName: playerName,
+                targetName,
+                saveDc,
+                saveType,
+                success: false,
+                saveRoll,
+                saveTotal,
+                description: `${targetName} (Fiend) failed ${saveType} save (rolled ${saveRoll} + ${saveTotal - saveRoll} = ${saveTotal} vs DC ${saveDc}) — hurled through the lower planes but takes no Psychic damage.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });
+
+            window.dispatchEvent(new CustomEvent('damage-popup', {
+                detail: {
+                    targetName,
+                    sourceName: playerName,
+                    spellName: featureName,
+                    popupText: `${targetName} (Fiend) failed ${saveType} save — hurled through the lower planes but takes no Psychic damage.`,
+                    damageType,
+                },
+            }));
+        };
+
+        const applyIncapacitation = () => {
+            const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+            const newConds = Array.isArray(storedConds) ? [...storedConds, 'incapacitated'] : ['incapacitated'];
+            setRuntimeValue(targetName, 'activeConditions', newConds, campaignName);
+
+            const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+            const newEffects = [...storedEffects, {
+                target: targetName,
+                source: featureName,
+                effect: 'incapacitated',
+                condition: 'incapacitated',
+                duration: 'until_end_of_next_turn',
+                saveType,
+                saveDc,
+                teleport: true,
+                returnToSpace: true,
+            }];
+            setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName);
+
+            // Incapacitated + the return-to-space teleport resolve at the
+            // end of the caster's next turn (2 rounds, codebase convention)
+            addExpiration({ attackerName: playerName, targetName, effects: [
+                { type: 'hurl_through_hell_return', target: targetName, source: featureName },
+            ], campaignName, rounds: 2 });
+        };
+
         const handleSaveResult = async (event) => {
             if (event.detail.promptId !== promptId) return;
 
@@ -74,102 +170,17 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
             const saveSuccess = event.detail.success;
 
             if (!saveSuccess) {
-                const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-                const newConds = Array.isArray(storedConds) ? [...storedConds, 'incapacitated'] : ['incapacitated'];
-                setRuntimeValue(targetName, 'activeConditions', newConds, campaignName);
-
-                const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                const newEffects = [...storedEffects, {
-                    target: targetName,
-                    source: featureName,
-                    effect: 'incapacitated',
-                    condition: 'incapacitated',
-                    duration: 'until_end_of_next_turn',
-                    saveType,
-                    saveDc,
-                    teleport: true,
-                    returnToSpace: true,
-                }];
-                setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName);
-
-                // Incapacitated + the return-to-space teleport resolve at the
-                // end of the caster's next turn (2 rounds, codebase convention)
-                addExpiration(playerName, targetName, [
-                    { type: 'hurl_through_hell_return', target: targetName, source: featureName },
-                ], campaignName, 2);
+                applyIncapacitation();
 
                 const combatSummary = getCombatSummary(campaignName);
                 const targetCreature = combatSummary?.creatures?.find(c => c.name === targetName);
                 const isFiend = targetCreature?.monsterType === 'fiend';
 
-                let actualDamage = 0;
-
+                const ctx = { combatSummary, saveRoll, saveTotal };
                 if (!isFiend) {
-                    const characters = (combatSummary?.creatures || []).filter(c => c.type === 'player');
-                    const dmgResult = applyDamageToTarget(combatSummary, targetName, actualDamageTotal, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
-                    actualDamage = dmgResult?.finalDamage ?? actualDamageTotal;
-
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: playerName,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        success: false,
-                        saveRoll,
-                        saveTotal,
-                        description: `${targetName} failed ${saveType} save (rolled ${saveRoll} + ${saveTotal - saveRoll} = ${saveTotal} vs DC ${saveDc}) — hurled through the lower planes.`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });
-
-                    await addEntry(campaignName, {
-                        type: 'roll',
-                        characterName: playerName,
-                        rollType: 'damage',
-                        name: 'Hurl Through Hell Damage',
-                        targetName,
-                        damageType: damageType,
-                        formula: damageExpression,
-                        rolls: actualDieRoll?.rolls,
-                        total: actualDamage,
-                        description: `${targetName} takes ${actualDamage} ${damageType} damage from Hurl Through Hell.`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });
-
-                    window.dispatchEvent(new CustomEvent('damage-popup', {
-                        detail: {
-                            targetName,
-                            sourceName: playerName,
-                            spellName: featureName,
-                            popupText: `${targetName} failed ${saveType} save — hurled through the lower planes and takes ${actualDamage} ${damageType} damage.`,
-                            damageType,
-                            rolls: actualDieRoll?.rolls,
-                            formula: damageExpression,
-                        },
-                    }));
+                    await hurlDamageNonFiend(ctx);
                 } else {
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: playerName,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        success: false,
-                        saveRoll,
-                        saveTotal,
-                        description: `${targetName} (Fiend) failed ${saveType} save (rolled ${saveRoll} + ${saveTotal - saveRoll} = ${saveTotal} vs DC ${saveDc}) — hurled through the lower planes but takes no Psychic damage.`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[hurlThroughHell] Error:", e); });
-
-                    window.dispatchEvent(new CustomEvent('damage-popup', {
-                        detail: {
-                            targetName,
-                            sourceName: playerName,
-                            spellName: featureName,
-                            popupText: `${targetName} (Fiend) failed ${saveType} save — hurled through the lower planes but takes no Psychic damage.`,
-                            damageType,
-                        },
-                    }));
+                    await hurlDamageFiend(ctx);
                 }
             } else {
                 await addEntry(campaignName, {

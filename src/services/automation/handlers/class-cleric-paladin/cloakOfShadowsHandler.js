@@ -89,9 +89,9 @@ export async function handle(action, playerStats, campaignName) {
     await setRuntimeValue('campaign', `_activeInvisibility_${playerName}`, playerStats.name, campaignName);
 
     // Register initiative expiration (expires at start of player's next turn)
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'condition', condition: 'invisible' }
-    ], campaignName, undefined, playerName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
     // Log to campaign log
     addEntry(campaignName, {

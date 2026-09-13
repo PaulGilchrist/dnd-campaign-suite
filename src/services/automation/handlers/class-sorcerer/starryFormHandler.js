@@ -3,6 +3,18 @@ import { addEntry } from '../../../ui/logService.js';
 
 const CONSTELLATION_OPTIONS = ['Archer', 'Chalice', 'Dragon'];
 
+const CONSTELLATION_OPTION_DESCRIPTIONS = {
+    Archer: (isTwinkled) => [`Ranged Spell Attack: ${isTwinkled ? '2d8' : '1d8'} + Wisdom Modifier Radiant damage`],
+    Chalice: (isTwinkled) => [`Healing Spell Ally Buff: ${isTwinkled ? '2d8' : '1d8'} + Wisdom Modifier HP to ally within 30 feet`],
+    Dragon: (isTwinkled) => {
+        const effects = ['Concentration Benefit: Treat d20 rolls of 9 or lower on Concentration checks/saves as 10'];
+        if (isTwinkled) {
+            effects.push('Fly Speed 20 feet (hover)');
+        }
+        return effects;
+    },
+};
+
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -113,20 +125,8 @@ export async function applyConstellationOption(action, playerStats, campaignName
     const newTargetEffects = [...allTargetEffects.filter(te => te.effect !== 'starry_form' || te.source !== playerName), starryTargetEffect];
     setRuntimeValue('campaign', 'targetEffects', newTargetEffects, campaignName, true);
 
-    const optionEffects = [];
-
-    if (optionName === 'Archer') {
-        const damageDice = isTwinkled ? '2d8' : '1d8';
-        optionEffects.push(`Ranged Spell Attack: ${damageDice} + Wisdom Modifier Radiant damage`);
-    } else if (optionName === 'Chalice') {
-        const healDice = isTwinkled ? '2d8' : '1d8';
-        optionEffects.push(`Healing Spell Ally Buff: ${healDice} + Wisdom Modifier HP to ally within 30 feet`);
-    } else if (optionName === 'Dragon') {
-        optionEffects.push('Concentration Benefit: Treat d20 rolls of 9 or lower on Concentration checks/saves as 10');
-        if (isTwinkled) {
-            optionEffects.push('Fly Speed 20 feet (hover)');
-        }
-    }
+    const describeOption = CONSTELLATION_OPTION_DESCRIPTIONS[optionName];
+    const optionEffects = describeOption ? describeOption(isTwinkled) : [];
 
     const description = `${optionName} constellation chosen. ${optionEffects.join('. ')}.`;
 

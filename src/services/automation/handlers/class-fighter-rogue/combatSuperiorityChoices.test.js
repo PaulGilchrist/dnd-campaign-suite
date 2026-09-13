@@ -168,7 +168,7 @@ describe('executeSweepingAttack', () => {
         expect(result.payload.name).toBe('Sweeping Attack');
         expect(result.payload.description).toContain('hits Skeleton');
         expect(result.payload.description).toContain('slashing');
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: [{ name: 'Skeleton', ac: 11 }] }), 'Skeleton', 4, ['slashing'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestFighter' });
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: [{ name: 'Skeleton', ac: 11 }] }), 'Skeleton', 4, ['slashing'], { campaignName: 'test-campaign', characters: [], ignoreResistance: false, attackerName: 'TestFighter' });
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'pendingSweepingAttack', null, 'test-campaign');
     });
 
@@ -229,7 +229,7 @@ describe('executeSweepingAttack', () => {
             'Ogre'
         );
 
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: [{ name: 'Ogre', ac: 11 }] }), 'Ogre', 6, ['bludgeoning'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestFighter' });
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: [{ name: 'Ogre', ac: 11 }] }), 'Ogre', 6, ['bludgeoning'], { campaignName: 'test-campaign', characters: [], ignoreResistance: false, attackerName: 'TestFighter' });
         expect(result.payload.description).toContain('hits Ogre');
         expect(result.payload.description).toContain('2 bludgeoning damage');
     });
@@ -332,14 +332,7 @@ describe('executeBaitAndSwitchChoice', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'baitAndSwitchActive', true, 'test-campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'baitAndSwitchBonus', 4, 'test-campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'baitAndSwitchSource', 'Bait and Switch', 'test-campaign');
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-            'TestFighter',
-            'Ally1',
-            expect.arrayContaining([{ type: 'bait_and_switch_clear' }]),
-            'test-campaign',
-            undefined,
-            'TestFighter'
-        );
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestFighter', targetName: 'Ally1', effects: expect.arrayContaining([{ type: 'bait_and_switch_clear' }]), campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'TestFighter' });
         expect(result.logEntries).toHaveLength(1);
         expect(result.logEntries[0].type).toBe('ability_use');
         expect(result.logEntries[0].characterName).toBe('TestFighter');
@@ -490,14 +483,7 @@ describe('executeRallyChoice', () => {
         expect(result.payload.name).toBe('Rally');
         expect(result.payload.description).toBe('Rally description');
         expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally1', 8, 'test-campaign');
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-            'TestFighter',
-            'Ally1',
-            expect.arrayContaining([{ type: 'rally_clear' }]),
-            'test-campaign',
-            undefined,
-            'TestFighter'
-        );
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestFighter', targetName: 'Ally1', effects: expect.arrayContaining([{ type: 'rally_clear' }]), campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'TestFighter' });
         expect(result.logEntries).toHaveLength(1);
         expect(result.logEntries[0].type).toBe('ability_use');
         expect(result.logEntries[0].characterName).toBe('TestFighter');

@@ -20,7 +20,7 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
         if (dcSuccess === 'half') return success ? Math.floor(damage / 2) : damage;
         return damage;
     }),
-    computeDamageAfterResistancesWithDetails: vi.fn((damage) => ({ finalDamage: damage })),
+    computeDamageAfterResistancesWithDetails: vi.fn(({ rawDamage }) => ({ finalDamage: rawDamage })),
     applyDamageToTarget: vi.fn(),
 }));
 
@@ -162,7 +162,7 @@ describe('ElementalAttunementModal NPC save resolution', () => {
                 const callArgs = applyDamage.applyDamageToTarget.mock.calls[0];
                 expect(callArgs[1]).toBe('Goblin1');
                 expect(callArgs[3]).toEqual([element.toLowerCase()]);
-                expect(callArgs[4]).toBe('test-campaign');
+                expect(callArgs[4].campaignName).toBe('test-campaign');
             });
         });
 

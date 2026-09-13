@@ -411,7 +411,7 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
     const combatSummaryForSave = await loadCombatSummary(campaignName);
     // CLA-324: save-based spell-like attack damage — flag spell-origin for categorical
     // 'Spell' resistance (Abjurer Spell Resistance).
-    const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: attackerName, suppressHpLog: false, ...{ isSpellDamage: true } });
+    const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: attackerName, suppressHpLog: false, ...{ isSpellDamage: true } });
 
     logEntry(buildSaveDamageLogData({ attackerName, context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, saveSuccess }));
 

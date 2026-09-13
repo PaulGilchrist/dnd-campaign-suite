@@ -20,6 +20,34 @@ import {
     filterMeleeAttacks,
 } from './combatSuperiorityUtils.js';
 
+function resolveManeuverTargetName(targetInfo) {
+    const target = (targetInfo || {}).target;
+    return (target && target.name) || null;
+}
+
+// MN-015: size gate runs BEFORE the die roll so a refusal never expends a die.
+async function checkManeuverSizeGate(maneuver, targetName, playerStats, campaignName, auto) {
+    if (!targetName || !maneuver.sizeLimit) return null;
+    const sizeCheck = await validateSizeLimit(maneuver, targetName, campaignName, playerStats);
+    if (sizeCheck.valid) return null;
+    return {
+        type: 'popup',
+        refused: true,
+        payload: {
+            type: 'automation_info',
+            name: maneuver.name,
+            description: sizeCheck.description,
+            automation: auto,
+        },
+        logEntries: [{
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description: sizeCheck.description,
+        }],
+    };
+}
+
 export async function executeManeuver(action, playerStats, campaignName, maneuverName) {
     const auto = action.automation;
     const maneuver = await findManeuver(maneuverName, playerStats.rules);
@@ -35,29 +63,10 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     }
 
     const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    const targetName = targetInfo?.target?.name || null;
+    const targetName = resolveManeuverTargetName(targetInfo);
 
-    if (targetName && maneuver.sizeLimit) {
-        const sizeCheck = await validateSizeLimit(maneuver, targetName, campaignName, playerStats);
-        if (!sizeCheck.valid) {
-            return {
-                type: 'popup',
-                refused: true,
-                payload: {
-                    type: 'automation_info',
-                    name: maneuver.name,
-                    description: sizeCheck.description,
-                    automation: auto,
-                },
-                logEntries: [{
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: maneuver.name,
-                    description: sizeCheck.description,
-                }],
-            };
-        }
-    }
+    const sizeRefusal = await checkManeuverSizeGate(maneuver, targetName, playerStats, campaignName, auto);
+    if (sizeRefusal) return sizeRefusal;
 
     const { dieValue, dieDescription, expendedDie, superiorityDieSize } = rollManeuverDie(maneuver, playerStats, campaignName, auto.dieExpression);
     await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
@@ -70,7 +79,7 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
 
     if (maneuver.damageBonus) {
         description += ` Added ${dieValue} to the damage roll.`;
-        description += await applyDamageBonusRider(maneuver, auto, targetName, dieValue, playerStats, campaignName);
+        description += await applyDamageBonusRider({ maneuver, targetName, dieValue, playerStats, campaignName });
     }
 
     if (maneuver.saveType && targetName) {
@@ -119,11 +128,24 @@ const RUNNER_STEPS = [
     },
     {
         test: m => m.actionType === 'grant_attack',
-        run: async (m, d, ctx) => buildGrantAttackModal(m, ctx.auto, d + ` Choose a willing ally to add ${ctx.dieValue} to their next attack's damage roll.`, ctx.dieValue, ctx.playerStats, ctx.campaignName),
+        run: async (m, d, ctx) => buildGrantAttackModal({
+    maneuver: m,
+    auto: ctx.auto,
+    description: d + ` Choose a willing ally to add ${ctx.dieValue} to their next attack's damage roll.`,
+    dieValue: ctx.dieValue,
+    playerStats: ctx.playerStats,
+    campaignName: ctx.campaignName,
+}),
     },
     {
         test: m => m.effect === 'ac_bonus_and_swap',
-        run: async (m, d, ctx) => buildBaitAndSwitchModal(m, ctx.auto, d + ` You or an ally gains +${ctx.dieValue} AC until the start of your next turn.`, ctx.dieValue, ctx.playerStats, ctx.campaignName),
+        run: async (m, d, ctx) => buildBaitAndSwitchModal({
+    maneuver: m,
+    description: d + ` You or an ally gains +${ctx.dieValue} AC until the start of your next turn.`,
+    dieValue: ctx.dieValue,
+    playerStats: ctx.playerStats,
+    campaignName: ctx.campaignName,
+}),
     },
     {
         test: m => m.effect === 'ac_bonus_disengage',
@@ -131,9 +153,9 @@ const RUNNER_STEPS = [
             await setRuntimeValue(ctx.playerStats.name, 'baitAndSwitchActive', true, ctx.campaignName);
             await setRuntimeValue(ctx.playerStats.name, 'baitAndSwitchBonus', ctx.dieValue, ctx.campaignName);
             await setRuntimeValue(ctx.playerStats.name, 'baitAndSwitchSource', m.name, ctx.campaignName);
-            await addExpiration(ctx.playerStats.name, ctx.playerStats.name, [
+            await addExpiration({ attackerName: ctx.playerStats.name, targetName: ctx.playerStats.name, effects: [
                 { type: 'bait_and_switch_clear' }
-            ], ctx.campaignName, undefined, ctx.playerStats.name);
+            ], campaignName: ctx.campaignName, rounds: undefined, expireOnCreatureName: ctx.playerStats.name });
             return ` You take the Disengage action and gain +${ctx.dieValue} AC until the start of your next turn.`;
         },
     },
@@ -150,7 +172,13 @@ const RUNNER_STEPS = [
     },
     {
         test: m => m.effect === 'temp_hp',
-        run: (m, d, ctx) => buildRallyModal(m, d, ctx.dieValue, ctx.playerStats, ctx.campaignName),
+        run: (m, d, ctx) => buildRallyModal({
+    maneuver: m,
+    playerStats: d,
+    campaignName: ctx.dieValue,
+    dieValue: ctx.playerStats,
+    rallyAllies: ctx.campaignName,
+}),
     },
     {
         test: m => m.effect === 'damage_reduction',
@@ -217,9 +245,9 @@ async function applyAdvantageAndDamage(maneuver, targetName, dieValue, playerSta
         appliedRound: currentRound,
     };
     await setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
-    addExpiration(playerStats.name, playerStats.name, [
+    addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
         { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: maneuver.name, target: playerStats.name }
-    ], campaignName, 2);
+    ], campaignName, rounds: 2 });
     return ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
 }
 
@@ -235,14 +263,14 @@ const NO_TARGET_SUFFIX_EFFECTS = new Set([
 // ("Combat Superiority — Use Maneuver") have no pipeline consumer for
 // the rolled die — apply it to the target directly (CLA-192 pattern:
 // await applyDamageToTarget and let it log hp_change).
-async function applyDamageBonusRider(maneuver, auto, targetName, dieValue, playerStats, campaignName) {
+async function applyDamageBonusRider({ maneuver, targetName, dieValue, playerStats, campaignName }) {
     if (!(maneuver.actionType === 'attack_rider' && targetName)) return '';
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
     if (!lastAttack?.hit) return '';
     const cs = await getCombatContext(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     const dmgType = lastAttack.damageType || maneuver.damageType || 'force';
-    const applyResult = await applyDamageToTarget(cs, targetName, dieValue, [dmgType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
+    const applyResult = await applyDamageToTarget(cs, targetName, dieValue, [dmgType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name });
     if (applyResult && applyResult.finalDamage > 0) {
         return ` ${targetName} takes ${applyResult.finalDamage} ${dmgType} damage.`;
     }
@@ -261,11 +289,11 @@ async function runManeuverSave(maneuver, auto, targetName, playerStats, campaign
     const success = saveResult.success;
 
     let description = ` Target made ${maneuver.saveType} save DC ${saveDc}: ${success ? 'Success' : 'Failure'}.`;
-    description += await processManeuverSaveResult(maneuver, targetName, saveDc, success, playerStats, campaignName);
+    description += await processManeuverSaveResult({ maneuver, targetName, saveDc, success, playerStats, campaignName });
     return description;
 }
 
-async function buildGrantAttackModal(maneuver, auto, description, dieValue, playerStats, campaignName) {
+async function buildGrantAttackModal({ maneuver, auto, description, dieValue, playerStats, campaignName }) {
     const cs = await getCombatContext(campaignName);
     const allies = (cs?.creatures || []).filter(c => c.name !== playerStats.name);
     const options = allies.map(a => ({ label: a.name, value: a.name }));
@@ -303,7 +331,7 @@ async function buildGrantAttackModal(maneuver, auto, description, dieValue, play
     };
 }
 
-async function buildBaitAndSwitchModal(maneuver, auto, description, dieValue, playerStats, campaignName) {
+async function buildBaitAndSwitchModal({ maneuver, description, dieValue, playerStats, campaignName }) {
     const cs = await getCombatContext(campaignName);
     const allies = cs?.creatures?.filter(c =>
         c.name !== playerStats.name
@@ -333,7 +361,13 @@ async function buildBaitAndSwitchModal(maneuver, auto, description, dieValue, pl
     };
 }
 
-async function buildRallyModal(maneuver, description, dieValue, playerStats, campaignName) {
+async function buildRallyModal({
+    maneuver,
+    playerStats: description,
+    campaignName: dieValue,
+    dieValue: playerStats,
+    rallyAllies: campaignName,
+}) {
     const fighterLevel = playerStats.level || 1;
     const extraHpRaw = maneuver.extraHpExpression
         ? evaluateAutoExpression(maneuver.extraHpExpression, playerStats)

@@ -431,9 +431,14 @@ describe('confirmPowerWordFortify', () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
-    await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 50, '2d8+4',
-    );
+    await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 50,
+    tempHpExpression: '2d8+4',
+});
 
     expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally1', 20, campaignName);
     expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally2', 30, campaignName);
@@ -444,9 +449,14 @@ describe('confirmPowerWordFortify', () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
-    await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 20, '2d8+4',
-    );
+    await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 20,
+    tempHpExpression: '2d8+4',
+});
 
     expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally1', 20, campaignName);
     expect(tempHpService.setTempHp).not.toHaveBeenCalledWith('Ally2', 0, campaignName);
@@ -458,9 +468,14 @@ describe('confirmPowerWordFortify', () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
-    await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 40, '2d6+6',
-    );
+    await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 40,
+    tempHpExpression: '2d6+6',
+});
 
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
@@ -495,9 +510,14 @@ describe('confirmPowerWordFortify', () => {
     const ps = makePlayerStats();
     const totalTempHp = 50;
 
-    const result = await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, totalTempHp, '2d8+4',
-    );
+    const result = await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp,
+    tempHpExpression: '2d8+4',
+});
 
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
@@ -512,9 +532,14 @@ describe('confirmPowerWordFortify', () => {
     const action = makeAction({ type: 'power_word_fortify' });
     const ps = makePlayerStats();
 
-    const result = await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 20, '2d8+4',
-    );
+    const result = await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 20,
+    tempHpExpression: '2d8+4',
+});
 
     expect(result.payload.automationType).toBe('power_word_fortify');
   });
@@ -524,9 +549,14 @@ describe('confirmPowerWordFortify', () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
-    const result = await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 0, '2d8+4',
-    );
+    const result = await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 0,
+    tempHpExpression: '2d8+4',
+});
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('0 temp HP distributed');
@@ -543,9 +573,14 @@ describe('confirmPowerWordFortify', () => {
     let eventFired = null;
     window.dispatchEvent = vi.fn((event) => { eventFired = event; });
 
-    await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 20, '2d8+4',
-    );
+    await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 20,
+    tempHpExpression: '2d8+4',
+});
 
     expect(window.dispatchEvent).toHaveBeenCalled();
     expect(eventFired).toBeInstanceOf(CustomEvent);
@@ -561,9 +596,14 @@ describe('confirmPowerWordFortify', () => {
 
     logService.addEntry.mockRejectedValue(new Error('log failed'));
 
-    const result = await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 20, '2d8+4',
-    );
+    const result = await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 20,
+    tempHpExpression: '2d8+4',
+});
 
     expect(result.type).toBe('popup');
     expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally1', 20, campaignName);
@@ -574,9 +614,14 @@ describe('confirmPowerWordFortify', () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
-    const result = await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 40, '4d8+4',
-    );
+    const result = await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 40,
+    tempHpExpression: '4d8+4',
+});
 
     expect(tempHpService.setTempHp).toHaveBeenCalledWith('SoloAlly', 40, campaignName);
     expect(result.payload.description).toContain('SoloAlly: 40');
@@ -587,9 +632,14 @@ describe('confirmPowerWordFortify', () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
-    const result = await confirmPowerWordFortify(
-      action, ps, campaignName, distribution, 30, '2d6+4',
-    );
+    const result = await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 30,
+    tempHpExpression: '2d6+4',
+});
 
     expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally1', 10, campaignName);
     expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally2', 10, campaignName);

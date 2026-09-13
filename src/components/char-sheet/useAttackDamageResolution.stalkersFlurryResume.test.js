@@ -157,8 +157,8 @@ describe('useAttackDamageResolution — Stalker\'s Flurry featureRiders pause re
     await resumeAttackPipeline();
 
     expect(deps.rollDamage).toHaveBeenCalledTimes(1);
-    expect(deps.rollDamage.mock.calls[0][0]).toBe('Longbow');
-    expect(deps.rollDamage.mock.calls[0][1]).toBe('1d8+2');
+    expect(deps.rollDamage.mock.calls[0][0].name).toBe('Longbow');
+    expect(deps.rollDamage.mock.calls[0][0].formula).toBe('1d8+2');
     expect(stash.ctx._postDamageRan).toBe(true);
     expect(resumeRef.current).toBeNull();
   });

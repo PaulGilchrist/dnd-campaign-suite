@@ -171,10 +171,10 @@ async function applyImprovedShadowStep(action, playerStats, playerName, campaign
         duration: 'until_start_of_next_turn',
     };
     setRuntimeValue('campaign', 'targetEffects', [...currentEffects, perceptionEffect], campaignName);
-    addExpiration(playerName, targetName, [
+    addExpiration({ attackerName: playerName, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'disadvantage_perception_checks', source: 'Improved Shadow Step', target: targetName },
         { type: 'condition', condition: 'blinded' }
-    ], campaignName, undefined, playerName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
     const saveDc = buildSaveDc({ saveDc: 'ability', saveAbility: 'WIS' }, playerStats);
     const { promptId } = createSaveListener(campaignName, {
@@ -206,9 +206,9 @@ async function applySharedMoonlight(playerStats, playerName, campaignName) {
     if (!targetName) return '';
 
     registerNextAttackAdvantage(playerName, campaignName, targetName, 'Shared Moonlight');
-    addExpiration(playerName, targetName, [
+    addExpiration({ attackerName: playerName, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shared Moonlight', target: targetName }
-    ], campaignName, undefined, playerName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
     return ` Shared Moonlight: ${targetName} also gains Advantage on their next attack roll.`;
 }
 
@@ -226,9 +226,9 @@ function applyStepTeleportAdvantage({ action, playerStats, playerName, campaignN
     }).catch((e) => { console.error("[tempTeleport] Error logging:", e); });
 
     registerNextAttackAdvantage(playerName, campaignName, playerName, action.name);
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: action.name, target: playerName }
-    ], campaignName, undefined, playerName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
     if (auto.effect === 'moonlight_step_teleport') {
         const usesKey = 'moonlightStepUses';

@@ -149,7 +149,7 @@ describe('SP-037: Dominate Person repeat WIS save on damage', () => {
       const { caster, cs } = dominatedSetup();
       rollD20.mockReturnValue(1);
 
-      const result = await applyDamageToTarget(cs, 'Thug 1', 19, ['Fire'], 'TestCampaign', [createCasterCharacter('DivinationWizard', 17)]);
+      const result = await applyDamageToTarget(cs, 'Thug 1', 19, ['Fire'], { campaignName: 'TestCampaign', characters: [createCasterCharacter('DivinationWizard', 17)] });
 
       expect(result.newHp).toBe(13);
       expect(getRuntimeValue('Thug 1', 'activeConditions')).toEqual(['charmed']);
@@ -184,7 +184,7 @@ describe('SP-037: Dominate Person repeat WIS save on damage', () => {
       const { caster, cs } = dominatedSetup();
       rollD20.mockReturnValue(17);
 
-      const result = await applyDamageToTarget(cs, 'Thug 1', 19, ['Fire'], 'TestCampaign', [createCasterCharacter('DivinationWizard', 17)]);
+      const result = await applyDamageToTarget(cs, 'Thug 1', 19, ['Fire'], { campaignName: 'TestCampaign', characters: [createCasterCharacter('DivinationWizard', 17)] });
 
       expect(result.newHp).toBe(13);
       expect(caster.concentration).toBeNull();
@@ -216,7 +216,7 @@ describe('SP-037: Dominate Person repeat WIS save on damage', () => {
       const cs = makeCombatSummary([caster, thug]);
       stubRuntime(['charmed'], DOMINATED_EXPIRATIONS);
 
-      await applyDamageToTarget(cs, 'Thug 1', 19, ['Fire'], 'TestCampaign', []);
+      await applyDamageToTarget(cs, 'Thug 1', 19, ['Fire'], { campaignName: 'TestCampaign', characters: [] });
 
       expect(addEntry).not.toHaveBeenCalledWith('TestCampaign', expect.objectContaining({ name: 'Dominate Person Repeat Save' }));
     });
@@ -229,7 +229,7 @@ describe('SP-037: Dominate Person repeat WIS save on damage', () => {
       const cs = makeCombatSummary([caster, pc]);
       stubRuntime(['charmed'], [{ target: 'EvasiveFighter', effects: [{ type: 'dominated', condition: 'charmed' }], appliedRound: 1, expiryRounds: Infinity, expireOnCreatureName: null }]);
 
-      await applyDamageToTarget(cs, 'EvasiveFighter', 10, ['Slashing'], 'TestCampaign', [createCasterCharacter('DivinationWizard', 17)]);
+      await applyDamageToTarget(cs, 'EvasiveFighter', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createCasterCharacter('DivinationWizard', 17)] });
 
       // Repeat save queued through the existing generic save-prompt subsystem
       expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
@@ -265,7 +265,7 @@ describe('SP-037: Dominate Person repeat WIS save on damage', () => {
       const cs = makeCombatSummary([caster, pc]);
       stubRuntime(['charmed'], [{ target: 'EvasiveFighter', effects: [{ type: 'dominated', condition: 'charmed' }], appliedRound: 1, expiryRounds: Infinity, expireOnCreatureName: null }]);
 
-      await applyDamageToTarget(cs, 'EvasiveFighter', 10, ['Slashing'], 'TestCampaign', [createCasterCharacter('DivinationWizard', 17)]);
+      await applyDamageToTarget(cs, 'EvasiveFighter', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createCasterCharacter('DivinationWizard', 17)] });
 
       window.dispatchEvent(new CustomEvent('save-result', {
         detail: { promptId: 'test-guid-001', success: true, roll: 15, total: 20, saveBonus: 5, saveType: 'WIS', saveDc: 17 },
@@ -291,7 +291,7 @@ describe('SP-037: Dominate Person repeat WIS save on damage', () => {
       const cs = makeCombatSummary([caster, thug]);
       stubRuntime(['charmed'], [{ target: 'Thug 1', effects: [{ type: 'charmed', condition: 'charmed' }] }]);
 
-      await applyDamageToTarget(cs, 'Thug 1', 10, ['Slashing'], 'TestCampaign', [createCasterCharacter('HexWarlock', 15)]);
+      await applyDamageToTarget(cs, 'Thug 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createCasterCharacter('HexWarlock', 15)] });
 
       const strip = setRuntimeValue.mock.calls.find(call =>
         call[0] === 'Thug 1' && call[1] === 'activeConditions'
@@ -313,7 +313,7 @@ describe('SP-037: Dominate Person repeat WIS save on damage', () => {
       const cs = makeCombatSummary([pc]);
       stubRuntime(['charmed'], []);
 
-      await applyDamageToTarget(cs, 'EvasiveFighter', 10, ['Slashing'], 'TestCampaign', [createCasterCharacter('HexWarlock', 15)]);
+      await applyDamageToTarget(cs, 'EvasiveFighter', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createCasterCharacter('HexWarlock', 15)] });
 
       const strip = setRuntimeValue.mock.calls.find(call =>
         call[0] === 'EvasiveFighter' && call[1] === 'activeConditions'

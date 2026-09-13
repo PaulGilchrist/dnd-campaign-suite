@@ -11,7 +11,7 @@ import { sendSaveResult } from '../../../combat/conditions/savePromptService.js'
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { spellNoticePopup } from './areaSpellUtils.js';
 
-function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
+function dispatchSaveResult({ campaignName, promptId, targetName, saveType, saveDc, saveResult }) {
     sendSaveResult(campaignName, targetName, {
         promptId,
         success: saveResult.success,
@@ -95,9 +95,9 @@ async function applyCharmFailure({ campaignName, casterName, action, targetName,
         appliedDamage: 0,
     });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'condition',
@@ -163,7 +163,14 @@ async function charmOneTarget({ campaignName, casterName, action, auto, config, 
     }).catch((e) => { console.error(config.logPrefix, e); });
 
     if (isTargetNpc) {
-        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcSave(targetCreature, dc, targetAdvantage));
+        dispatchSaveResult({
+    campaignName,
+    promptId,
+    targetName,
+    saveType: 'WIS',
+    saveDc: dc,
+    saveResult: rollNpcSave(targetCreature, dc, targetAdvantage),
+});
     }
 
     const saveResult = await promise;

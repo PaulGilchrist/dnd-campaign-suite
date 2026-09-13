@@ -50,6 +50,110 @@ function riderCanApply(multiSelect, selectedMulti, selected) {
     return !!selected;
 }
 
+function RiderResultOverlay({ title, description, onClose }) {
+    return (
+        <div className="sp-overlay" onClick={(e) => {
+            if (e.target.closest('.sp-modal')) return;
+            onClose?.();
+        }}>
+            <div className="sp-modal">
+                <div className="sp-header">
+                    <i className="fa-solid fa-bolt"></i> {title}
+                </div>
+                <div className="sp-body" dangerouslySetInnerHTML={{ __html: description }}>
+                </div>
+                <div className="sp-actions">
+                    <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function VersatileTricksterFlow({ targets, vtApplied, vtResult, targetName, playerStats, campaignName, onClose, setVtResult, setVtApplied }) {
+    const handleVtTargetSelected = async (selectedTargetName) => {
+        const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
+        const vtAction = getRuntimeValue(playerStats.name, 'versatileTricksterAction', campaignName);
+        const res = await applyVersatileTrickster(vtAction, playerStats, campaignName, selectedTargetName);
+        setVtResult(res);
+        setVtApplied(true);
+    };
+
+    if (vtApplied && vtResult) {
+        return <RiderResultOverlay title="Versatile Trickster" description={vtResult.payload.description} onClose={onClose} />;
+    }
+    return (
+        <SecondaryTargetModal
+            title="Versatile Trickster"
+            targets={targets}
+            description={`Trip applied to <b>${targetName}</b>. Versatile Trickster allows you to also Trip another creature within 5 feet of the spectral hand:`}
+            onTargetSelected={handleVtTargetSelected}
+            onSkip={onClose}
+            confirmLabel="Trip Secondary Target"
+            confirmIcon="fa-bolt"
+            showSize={true}
+        />
+    );
+}
+
+function StalkersFlurryFlow({ targets, sfApplied, sfResult, targetName, playerStats, campaignName, onClose, setSfResult, setSfApplied }) {
+    const stalkerOptions = getRuntimeValue(playerStats.name, 'stalkersFlurryOptions', campaignName);
+    const isSuddenStrike = stalkerOptions?.includes('Sudden Strike');
+
+    const applyMassFearRetarget = (selectedTargetName) => {
+        const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+        const massFearIndex = targetEffects.findIndex(te => te.effect === 'mass_fear');
+        if (massFearIndex === -1) return;
+        const updatedEffects = [...targetEffects];
+        updatedEffects[massFearIndex] = { ...updatedEffects[massFearIndex], target: selectedTargetName };
+        setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
+    };
+
+    const handleSfTargetSelected = async (selectedTargetName) => {
+        setRuntimeValue(playerStats.name, 'stalkersFlurryChosenTarget', selectedTargetName, campaignName);
+        if (isSuddenStrike) {
+            setRuntimeValue(playerStats.name, 'pendingSuddenStrikeTarget', selectedTargetName, campaignName);
+            setRuntimeValue(playerStats.name, 'pendingSuddenStrike', true, campaignName);
+            onClose();
+            return;
+        }
+        applyMassFearRetarget(selectedTargetName);
+        setSfResult(buildStalkersFlurryResult(isSuddenStrike, selectedTargetName));
+        setSfApplied(true);
+    };
+
+    if (sfApplied && sfResult) {
+        return <RiderResultOverlay title="Stalker's Flurry" description={sfResult.payload.description} onClose={onClose} />;
+    }
+    return (
+        <SecondaryTargetModal
+            title="Stalker's Flurry"
+            targets={targets}
+            description={isSuddenStrike
+                ? `Sudden Strike: Choose a target within 5 ft of <b>${targetName}</b> for your bonus action attack:`
+                : `Mass Fear: Choose a target for the fear effect. The target and creatures within 10 ft will make a Wisdom save or be Frightened.`}
+            onTargetSelected={handleSfTargetSelected}
+            onSkip={onClose}
+            confirmLabel={isSuddenStrike ? "Attack Target" : "Apply Fear"}
+            confirmIcon="fa-bolt"
+            showSize={true}
+        />
+    );
+}
+
+function buildStalkersFlurryResult(isSuddenStrike, selectedTargetName) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: "Stalker's Flurry",
+            description: isSuddenStrike
+                ? `Sudden Strike target set to <b>${selectedTargetName}</b>. You may now make a bonus action attack against this creature.`
+                : `Mass Fear epicenter set to <b>${selectedTargetName}</b>. ${selectedTargetName} and creatures within 10 ft must make a Wisdom save or be Frightened.`,
+        },
+    };
+}
+
 function AttackRiderModal({ action, playerStats, campaignName, targetName, onClose }) {
     const [selected, setSelected] = useState(null);
     const [selectedMulti, setSelectedMulti] = useState([]);
@@ -126,140 +230,17 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
 
     // Versatile Trickster secondary target selection
     if (versatileTricksterTargets && versatileTricksterTargets.length > 0) {
-        if (vtApplied && vtResult) {
-            return (
-                <div className="sp-overlay" onClick={(e) => {
-                    if (e.target.closest('.sp-modal')) return;
-                    onClose?.();
-                }}>
-                    <div className="sp-modal">
-                        <div className="sp-header">
-                            <i className="fa-solid fa-bolt"></i> Versatile Trickster
-                        </div>
-                        <div className="sp-body" dangerouslySetInnerHTML={{ __html: vtResult.payload.description }}>
-                        </div>
-                        <div className="sp-actions">
-                            <button className="sp-roll-btn" onClick={onClose}>Done</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        const handleVtTargetSelected = async (selectedTargetName) => {
-            const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
-            const vtAction = getRuntimeValue(playerStats.name, 'versatileTricksterAction', campaignName);
-            const res = await applyVersatileTrickster(vtAction, playerStats, campaignName, selectedTargetName);
-            setVtResult(res);
-            setVtApplied(true);
-        };
-
-        return (
-            <SecondaryTargetModal
-                title="Versatile Trickster"
-                targets={versatileTricksterTargets}
-                description={`Trip applied to <b>${targetName}</b>. Versatile Trickster allows you to also Trip another creature within 5 feet of the spectral hand:`}
-                onTargetSelected={handleVtTargetSelected}
-                onSkip={onClose}
-                confirmLabel="Trip Secondary Target"
-                confirmIcon="fa-bolt"
-                showSize={true}
-            />
-        );
+        return <VersatileTricksterFlow targets={versatileTricksterTargets} vtApplied={vtApplied} vtResult={vtResult} targetName={targetName} playerStats={playerStats} campaignName={campaignName} onClose={onClose} setVtResult={setVtResult} setVtApplied={setVtApplied} />;
     }
 
     // Stalker's Flurry secondary target selection
     if (stalkersFlurryTargets && stalkersFlurryTargets.length > 0) {
-        if (sfApplied && sfResult) {
-            return (
-                <div className="sp-overlay" onClick={(e) => {
-                    if (e.target.closest('.sp-modal')) return;
-                    onClose?.();
-                }}>
-                    <div className="sp-modal">
-                        <div className="sp-header">
-                            <i className="fa-solid fa-bolt"></i> Stalker's Flurry
-                        </div>
-                        <div className="sp-body" dangerouslySetInnerHTML={{ __html: sfResult.payload.description }}>
-                        </div>
-                        <div className="sp-actions">
-                            <button className="sp-roll-btn" onClick={onClose}>Done</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        const stalkerOptions = getRuntimeValue(playerStats.name, 'stalkersFlurryOptions', campaignName);
-        const isSuddenStrike = stalkerOptions?.includes('Sudden Strike');
-
-        const handleSfTargetSelected = async (selectedTargetName) => {
-            setRuntimeValue(playerStats.name, 'stalkersFlurryChosenTarget', selectedTargetName, campaignName);
-            if (isSuddenStrike) {
-                setRuntimeValue(playerStats.name, 'pendingSuddenStrikeTarget', selectedTargetName, campaignName);
-                setRuntimeValue(playerStats.name, 'pendingSuddenStrike', true, campaignName);
-                onClose();
-                return;
-            } else {
-                const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-                const massFearIndex = targetEffects.findIndex(te => te.effect === 'mass_fear');
-                if (massFearIndex !== -1) {
-                    const updatedEffects = [...targetEffects];
-                    updatedEffects[massFearIndex] = {
-                        ...updatedEffects[massFearIndex],
-                        target: selectedTargetName,
-                    };
-                    setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
-                }
-            }
-            setSfResult({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: "Stalker's Flurry",
-                    description: isSuddenStrike
-                        ? `Sudden Strike target set to <b>${selectedTargetName}</b>. You may now make a bonus action attack against this creature.`
-                        : `Mass Fear epicenter set to <b>${selectedTargetName}</b>. ${selectedTargetName} and creatures within 10 ft must make a Wisdom save or be Frightened.`,
-                },
-            });
-            setSfApplied(true);
-        };
-
-        return (
-            <SecondaryTargetModal
-                title="Stalker's Flurry"
-                targets={stalkersFlurryTargets}
-                description={isSuddenStrike
-                    ? `Sudden Strike: Choose a target within 5 ft of <b>${targetName}</b> for your bonus action attack:`
-                    : `Mass Fear: Choose a target for the fear effect. The target and creatures within 10 ft will make a Wisdom save or be Frightened.`}
-                onTargetSelected={handleSfTargetSelected}
-                onSkip={onClose}
-                confirmLabel={isSuddenStrike ? "Attack Target" : "Apply Fear"}
-                confirmIcon="fa-bolt"
-                showSize={true}
-            />
-        );
+        return <StalkersFlurryFlow targets={stalkersFlurryTargets} sfApplied={sfApplied} sfResult={sfResult} targetName={targetName} playerStats={playerStats} campaignName={campaignName} onClose={onClose} setSfResult={setSfResult} setSfApplied={setSfApplied} />;
     }
 
     if (applied) {
         if (result) {
-            return (
-                <div className="sp-overlay" onClick={(e) => {
-                    if (e.target.closest('.sp-modal')) return;
-                    onClose?.();
-                }}>
-                    <div className="sp-modal">
-                        <div className="sp-header">
-                            <i className="fa-solid fa-bolt"></i> {action.name}
-                        </div>
-                        <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
-                        </div>
-                        <div className="sp-actions">
-                            <button className="sp-roll-btn" onClick={onClose}>Done</button>
-                        </div>
-                    </div>
-                </div>
-            );
+            return <RiderResultOverlay title={action.name} description={result.payload.description} onClose={onClose} />;
         }
         return null;
     }

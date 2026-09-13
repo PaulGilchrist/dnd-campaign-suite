@@ -169,7 +169,7 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Archmage 1' }));
 
-    const result = await handlePowerWordKill(makePowerWordKill(), { multiTarget: 'Wight 1' }, getTargetInfo, makeWizard(), CAMPAIGN, apply);
+    const result = await handlePowerWordKill({ spell: makePowerWordKill(), metaCtx: { multiTarget: 'Wight 1' }, getTargetInfo, playerStats: makeWizard(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
 
     expect(result).toEqual({ handled: true });
     expect(getTargetInfo).toHaveBeenCalledTimes(1);
@@ -182,7 +182,7 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Wight 1' }));
 
-    const result = await handlePowerWordKill(makePowerWordKill(), {}, getTargetInfo, makeWizard(), CAMPAIGN, apply);
+    const result = await handlePowerWordKill({ spell: makePowerWordKill(), metaCtx: {}, getTargetInfo, playerStats: makeWizard(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
 
     expect(result).toEqual({ handled: true });
     expect(getTargetInfo).toHaveBeenCalledTimes(1);
@@ -193,7 +193,7 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Wight 1' }));
 
-    const result = await handlePowerWordKill({ name: 'Fire Bolt' }, {}, getTargetInfo, makeWizard(), CAMPAIGN, apply);
+    const result = await handlePowerWordKill({ spell: { name: 'Fire Bolt' }, metaCtx: {}, getTargetInfo, playerStats: makeWizard(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
 
     expect(result).toEqual({ handled: false });
     expect(apply).not.toHaveBeenCalled();

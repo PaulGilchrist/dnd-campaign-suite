@@ -189,10 +189,10 @@ describe('Player death saves on unconscious', () => {
             });
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'Ally1',
                 damageType: 'fire',
-            });
+            } });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Ally1',
@@ -216,10 +216,10 @@ describe('Player death saves on unconscious', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: -10, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'Ally1',
                 damageType: 'fire',
-            });
+            } });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Ally1',
@@ -243,10 +243,10 @@ describe('Player death saves on unconscious', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 10, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 10, [3, 4, 5, 2], 0, {
+            await fn({ name: 'Fireball', formula: '8d6', total: 10, rolls: [3, 4, 5, 2], modifier: 0, context: {
                 targetName: 'Ally1',
                 damageType: 'fire',
-            });
+            } });
 
             const deathSaveCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'deathSaves' || call[1] === 'deathFailures'
@@ -263,10 +263,10 @@ describe('Player death saves on unconscious', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: -5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 5, [5], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
                 targetName: 'Ally1',
                 damageType: 'fire',
-            });
+            } });
 
             const deathSaveCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'deathSaves' || call[1] === 'deathFailures'
@@ -285,10 +285,10 @@ describe('Player death saves on unconscious', () => {
             });
 
             const fn = createFn();
-            await fn('Claw', '1d4+2', 5, [3], 2, {
+            await fn({ name: 'Claw', formula: '1d4+2', total: 5, rolls: [3], modifier: 2, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             const deathSaveCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'deathSaves' || call[1] === 'deathFailures'

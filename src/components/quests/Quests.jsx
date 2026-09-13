@@ -13,6 +13,130 @@ const STATUS_COLORS = {
   failed: { bg: '#fee2e2', color: '#991b1b', border: '#f87171' }
 };
 
+function QuestEmptyState({ searchQuery }) {
+  return (
+    <div className="ct-empty-state">
+      {searchQuery ? (
+        <>
+          <i className="fa-solid fa-search" />
+          No quests found matching &ldquo;{searchQuery}&rdquo;
+        </>
+      ) : (
+        <>
+          <i className="fa-solid fa-scroll" />
+          No quests yet. Click &ldquo;New Quest&rdquo; to create one.
+        </>
+      )}
+    </div>
+  );
+}
+
+function QuestFormModal({ editingQuest, formData, saving, deleting, onChange, onClose, onSave, onDelete }) {
+  return (
+    <div className="ct-modal-overlay" onClick={(e) => {
+      if (e.target === e.currentTarget) onClose();
+    }}>
+      <div className="ct-modal quests-modal">
+        <div className="ct-modal-header no-print">
+          <h3>{editingQuest ? 'Edit Quest' : 'New Quest'}</h3>
+          <button
+            className="ct-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            &times;
+          </button>
+        </div>
+
+        <div className="ct-modal-body">
+          <label htmlFor="quest-name" className="ct-label">
+            Name <span className="ct-required">*</span>
+          </label>
+          <input
+            id="quest-name"
+            type="text"
+            className="ct-input"
+            value={formData.name}
+            onChange={(e) => onChange('name', e.target.value)}
+            placeholder="Quest name"
+            autoFocus
+          />
+
+          <label htmlFor="quest-status" className="ct-label">
+            Status
+          </label>
+          <select
+            id="quest-status"
+            className="ct-select"
+            value={formData.status}
+            onChange={(e) => onChange('status', e.target.value)}
+          >
+            {STATUS_OPTIONS.map(status => (
+              <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+            ))}
+          </select>
+
+          <PreviewToggle
+            id="quest-description"
+            value={formData.description}
+            onChange={(value) => onChange('description', value)}
+            placeholder="Describe the quest\u2026"
+            label="Description"
+          />
+
+          <PreviewToggle
+            id="quest-rewards"
+            value={formData.rewards}
+            onChange={(value) => onChange('rewards', value)}
+            placeholder="Describe rewards\u2026"
+            label="Rewards"
+          />
+
+          <PreviewToggle
+            id="quest-notes"
+            value={formData.notes}
+            onChange={(value) => onChange('notes', value)}
+            placeholder="Additional notes\u2026"
+            label="Notes"
+          />
+        </div>
+
+        <div className="ct-modal-footer no-print">
+          <div className="ct-modal-actions">
+            {editingQuest && (
+              <button
+                className="ct-btn ct-btn-danger"
+                onClick={() => onDelete(editingQuest)}
+                disabled={deleting}
+              >
+                <i className="fa-solid fa-trash-can" />{' '}
+                {deleting ? 'Deleting\u2026' : 'Delete'}
+              </button>
+            )}
+          </div>
+          <div className="ct-modal-buttons">
+            <button
+              className="ct-btn ct-btn"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              className="ct-btn ct-btn-primary"
+              onClick={onSave}
+              disabled={saving || !formData.name.trim()}
+            >
+              <i className="fa-solid fa-floppy-disk" />{' '}
+              {saving ? 'Saving\u2026' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Quests({ campaignName, isLocalhost, onBack }) {
   const { items: quests, loading, saveItems: saveQuestsList, deleteItem: deleteQuestAction } = useEntityManagement(campaignName, { load: loadQuests, save: saveQuests, delete: deleteQuest });
   const {
@@ -110,19 +234,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
       )}
 
       {!loading && filteredQuests.length === 0 && (
-        <div className="ct-empty-state">
-          {searchQuery ? (
-            <>
-              <i className="fa-solid fa-search" />
-              No quests found matching &ldquo;{searchQuery}&rdquo;
-            </>
-          ) : (
-            <>
-              <i className="fa-solid fa-scroll" />
-              No quests yet. Click &ldquo;New Quest&rdquo; to create one.
-            </>
-          )}
-        </div>
+        <QuestEmptyState searchQuery={searchQuery} />
       )}
 
       {!loading && filteredQuests.length > 0 && (
@@ -169,107 +281,16 @@ function Quests({ campaignName, isLocalhost, onBack }) {
       )}
 
       {modalOpen && formData && (
-        <div className="ct-modal-overlay" onClick={(e) => {
-          if (e.target === e.currentTarget) handleCloseModal();
-        }}>
-          <div className="ct-modal quests-modal">
-            <div className="ct-modal-header no-print">
-              <h3>{editingQuest ? 'Edit Quest' : 'New Quest'}</h3>
-              <button
-                className="ct-modal-close"
-                onClick={handleCloseModal}
-                aria-label="Close"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="ct-modal-body">
-              <label htmlFor="quest-name" className="ct-label">
-                Name <span className="ct-required">*</span>
-              </label>
-              <input
-                id="quest-name"
-                type="text"
-                className="ct-input"
-                value={formData.name}
-                onChange={(e) => handleFormChange('name', e.target.value)}
-                placeholder="Quest name"
-                autoFocus
-              />
-
-              <label htmlFor="quest-status" className="ct-label">
-                Status
-              </label>
-              <select
-                id="quest-status"
-                className="ct-select"
-                value={formData.status}
-                onChange={(e) => handleFormChange('status', e.target.value)}
-              >
-                {STATUS_OPTIONS.map(status => (
-                  <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
-                ))}
-              </select>
-
-              <PreviewToggle
-                id="quest-description"
-                value={formData.description}
-                onChange={(value) => handleFormChange('description', value)}
-                placeholder="Describe the quest\u2026"
-                label="Description"
-              />
-
-              <PreviewToggle
-                id="quest-rewards"
-                value={formData.rewards}
-                onChange={(value) => handleFormChange('rewards', value)}
-                placeholder="Describe rewards\u2026"
-                label="Rewards"
-              />
-
-              <PreviewToggle
-                id="quest-notes"
-                value={formData.notes}
-                onChange={(value) => handleFormChange('notes', value)}
-                placeholder="Additional notes\u2026"
-                label="Notes"
-              />
-            </div>
-
-            <div className="ct-modal-footer no-print">
-              <div className="ct-modal-actions">
-                {editingQuest && (
-                  <button
-                    className="ct-btn ct-btn-danger"
-                    onClick={() => handleDelete(editingQuest)}
-                    disabled={deleting}
-                  >
-                    <i className="fa-solid fa-trash-can" />{' '}
-                    {deleting ? 'Deleting\u2026' : 'Delete'}
-                  </button>
-                )}
-              </div>
-              <div className="ct-modal-buttons">
-                <button
-                  className="ct-btn ct-btn"
-                  onClick={handleCloseModal}
-                  disabled={saving}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="ct-btn ct-btn-primary"
-                  onClick={handleSave}
-                  disabled={saving || !formData.name.trim()}
-                >
-                  <i className="fa-solid fa-floppy-disk" />{' '}
-                  {saving ? 'Saving\u2026' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <QuestFormModal
+          editingQuest={editingQuest}
+          formData={formData}
+          saving={saving}
+          deleting={deleting}
+          onChange={handleFormChange}
+          onClose={handleCloseModal}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
       )}
     </div>
   );

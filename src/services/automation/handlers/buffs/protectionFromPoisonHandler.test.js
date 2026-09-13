@@ -616,10 +616,7 @@ describe('protectionFromPoisonHandler', () => {
                 { targetName: PLAYER_NAME }
             );
 
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                PLAYER_NAME,
-                [
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: PLAYER_NAME, effects: [
                     {
                         type: 'remove_active_buff',
                         buffName: 'Protection from Poison',
@@ -629,11 +626,7 @@ describe('protectionFromPoisonHandler', () => {
                         effectKey: 'protection_from_poison',
                         source: PLAYER_NAME,
                     },
-                ],
-                CAMPAIGN_NAME,
-                Infinity,
-                PLAYER_NAME
-            );
+                ], campaignName: CAMPAIGN_NAME, rounds: Infinity, expireOnCreatureName: PLAYER_NAME });
         });
 
         it('calls addEntry with correct log payload', async () => {

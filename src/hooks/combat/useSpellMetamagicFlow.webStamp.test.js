@@ -104,7 +104,7 @@ describe('useSpellMetamagicFlow — Web confirm stamp (SP-126)', () => {
 
   it('handleWebConfirm dispatches automation type web_area_save with the real save DC', async () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(playerStats, 'test-campaign', vi.fn(), null, [], vi.fn())
+      useSpellMetamagicFlow({ playerStats: playerStats, campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: vi.fn() })
     );
 
     act(() => {

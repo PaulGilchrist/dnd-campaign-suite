@@ -128,12 +128,7 @@ describe('antimagicFieldHandler.handle', () => {
                 campaignName,
             );
 
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                'TestWizard',
-                'TestWizard',
-                [{ type: 'remove_active_buff', buffName: 'Antimagic Field' }],
-                campaignName,
-            );
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'TestWizard', effects: [{ type: 'remove_active_buff', buffName: 'Antimagic Field' }], campaignName });
 
             expect(concentrationService.addConcentration).toHaveBeenCalledWith(
                 combatSummary,

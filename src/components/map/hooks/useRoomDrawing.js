@@ -55,7 +55,7 @@ function useRoomDrawing({ isLocalhost, tool, getGridFromEvent, svgRef }) {
         }
 
         setMapData(prev => {
-            const newWalls = buildRoomWalls(prev.walls, minX, maxX, minY, maxY, gridSize);
+            const newWalls = buildRoomWalls({ walls: prev.walls, minX, maxX, minY, maxY, gridSize });
             const newRoom = createRoom(minX, minY, w, h);
             return {
                 ...prev,

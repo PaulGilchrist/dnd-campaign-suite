@@ -188,10 +188,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Magic Missile', '3d4+2', 8, [2, 3, 3], 2, {
+            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             expect(deps.logEntry).toHaveBeenCalledTimes(1);
             const logArgs = deps.logEntry.mock.calls[0][0];
@@ -213,10 +213,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Magic Missile', '3d4+2', 8, [2, 3, 3], 2, {
+            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
             const popup = deps.setPopupHtml.mock.calls[0][0];
@@ -242,10 +242,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Magic Missile', '3d4+2', 8, [2, 3, 3], 2, {
+            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
@@ -254,10 +254,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Magic Missile', '3d4+2', 8, [2, 3, 3], 2, {
+            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             const logArgs = deps.logEntry.mock.calls[0][0];
             expect(logArgs.formula).toBe('3d4+2');
@@ -268,10 +268,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Magic Missile', '3d4+2', 8, [2, 3, 3], 2, {
+            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             expect(loadCombatSummary).toHaveBeenCalledWith('test-campaign');
         });
@@ -280,10 +280,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Magic Missile', '4d4+1', 11, [3, 2, 4, 2], 1, {
+            await fn({ name: 'Magic Missile', formula: '4d4+1', total: 11, rolls: [3, 2, 4, 2], modifier: 1, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             const logArgs = deps.logEntry.mock.calls[0][0];
             expect(logArgs.rolls).toEqual([3, 2, 4, 2]);
@@ -302,10 +302,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 5, [5], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(applyDamageToTarget).toHaveBeenCalled();
             expect(deps.logEntry).not.toHaveBeenCalledWith(
@@ -317,10 +317,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('magic missile', '1d4+1', 3, [2, 1], 1, {
+            await fn({ name: 'magic missile', formula: '1d4+1', total: 3, rolls: [2, 1], modifier: 1, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             expect(applyDamageToTarget).not.toHaveBeenCalled();
             expect(deps.setPopupHtml).toHaveBeenCalledWith(
@@ -335,10 +335,10 @@ describe('Magic Missile shield immunity', () => {
             loadCombatSummary.mockResolvedValue({ creatures: [] });
 
             const fn = createFn();
-            await fn('Magic Missile', '1d4+1', 3, [2, 1], 1, {
+            await fn({ name: 'Magic Missile', formula: '1d4+1', total: 3, rolls: [2, 1], modifier: 1, context: {
                 targetName: 'NonExistent',
                 damageType: 'force',
-            });
+            } });
 
             expect(deps.setPopupHtml).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -354,10 +354,10 @@ describe('Magic Missile shield immunity', () => {
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Magic Missile Burst', '2d4+1', 5, [3, 2], 1, {
+            await fn({ name: 'Magic Missile Burst', formula: '2d4+1', total: 5, rolls: [3, 2], modifier: 1, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             expect(applyDamageToTarget).toHaveBeenCalled();
         });

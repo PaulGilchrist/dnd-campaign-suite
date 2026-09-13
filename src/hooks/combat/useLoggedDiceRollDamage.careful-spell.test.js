@@ -167,17 +167,17 @@ describe('Careful Spell — player save damage with ally protection', () => {
         getAllyList.mockReturnValue(['Ally1']);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'Ally1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
             metamagicCareful: true,
-        });
+        } });
 
         expect(computeDamageAfterSave).toHaveBeenCalledWith(20, true, 'half');
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 10, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'Wizard1', suppressHpLog: false, ...{ isSpellDamage: true } });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 10, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'Wizard1', suppressHpLog: false, ...{ isSpellDamage: true } });
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('Wizard1', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -202,14 +202,14 @@ describe('Careful Spell — player save damage with ally protection', () => {
         getAllyList.mockReturnValue(['Ally1']);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'Ally1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
             metamagicCareful: false,
-        });
+        } });
 
         expect(computeDamageAfterSave).not.toHaveBeenCalled();
         expect(deps.logEntry).not.toHaveBeenCalledWith(
@@ -224,14 +224,14 @@ describe('Careful Spell — player save damage with ally protection', () => {
         getAllyList.mockReturnValue(['OtherAlly']);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'Ally1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
             metamagicCareful: true,
-        });
+        } });
 
         expect(computeDamageAfterSave).not.toHaveBeenCalled();
         expect(deps.logEntry).not.toHaveBeenCalledWith(
@@ -247,14 +247,14 @@ describe('Careful Spell — player save damage with ally protection', () => {
         applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 20, damageReduced: false });
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 0, [], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 0, rolls: [], modifier: 0, context: {
             targetName: 'Ally1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
             metamagicCareful: true,
-        });
+        } });
 
         expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
@@ -270,14 +270,14 @@ describe('Careful Spell — player save damage with ally protection', () => {
         applyDamageToTarget.mockResolvedValue(null);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'Ally1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
             metamagicCareful: true,
-        });
+        } });
 
         expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
@@ -292,7 +292,7 @@ describe('Careful Spell — player save damage with ally protection', () => {
         hasIgnoreResistance.mockReturnValue(true);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'Ally1',
             damageType: 'fire',
             saveDc: 15,
@@ -300,8 +300,8 @@ describe('Careful Spell — player save damage with ally protection', () => {
             dcSuccess: 'half',
             metamagicCareful: true,
             playerStats: { automation: { passives: [] } },
-        });
+        } });
 
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 10, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: true, attackerName: 'Wizard1', suppressHpLog: false, ...{ isSpellDamage: true } });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 10, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: true, attackerName: 'Wizard1', suppressHpLog: false, ...{ isSpellDamage: true } });
     });
 });

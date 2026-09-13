@@ -64,19 +64,24 @@ async function collectAlliesInRange(combatSummary, playerName, rangeFt) {
     return eligible;
 }
 
+function resolveMassHealConfig(action, auto) {
+    const maxTargets = auto?.maxTargets || 10;
+    const rangeFt = auto?.range ? rangeToFeet(auto.range) : rangeToFeet(action.spell?.range || '60 feet');
+    const slotLevel = auto?.slotLevel || action.spell?.level || 9;
+    return { maxTargets, rangeFt, slotLevel };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const maxTargets = auto?.maxTargets || 10;
-    const rangeFt = auto?.range ? rangeToFeet(auto.range) : rangeToFeet(action.spell?.range || '60 feet');
+    const { maxTargets, rangeFt, slotLevel } = resolveMassHealConfig(action, auto);
 
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) return null;
 
-    const slotLevel = auto?.slotLevel || action.spell?.level || 9;
     const totalPool = resolveTotalHealPool(action, slotLevel);
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
     void (totalPool + (bonusHeal > 0 ? bonusHeal * maxTargets : 0));
 
     const eligible = await collectAlliesInRange(combatSummary, playerName, rangeFt);
@@ -107,41 +112,52 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function resolveTargetMaxHp(combatSummary, targetName, playerStats) {
+    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
+    return creature?.maxHp || playerStats.hitPoints || 0;
+}
+
+async function healMassHealTarget({ combatSummary, targetName, userAmount, totalPool, playerStats, playerName, campaignName, bonusDetails, distributionSize, spell }) {
+    const maxHp = resolveTargetMaxHp(combatSummary, targetName, playerStats);
+    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+    const missingHp = maxHp - currentHp;
+    const actualHeal = Math.min(userAmount, missingHp, totalPool);
+
+    if (actualHeal > 0) {
+        applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+    }
+
+    const newHp = Math.min(maxHp, currentHp + actualHeal);
+
+    await addEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: actualHeal,
+        currentHp: newHp,
+        maxHp,
+        isHealing: true,
+        sourceName: playerName,
+        note: MASS_HEAL_NAME,
+        formula: `${distributionSize} targets`,
+        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[massHeal] Error:', e); });
+
+    await removeConditionsOnTarget(targetName, campaignName, spell, MASS_HEAL_NAME);
+
+    return actualHeal;
+}
+
 export async function confirmMassHeal({ action, playerStats, campaignName, distribution, totalPool, bonusHeal: _bonusHeal, bonusDetails }) {
     const playerName = playerStats.name;
     const combatSummary = await getCombatContext(campaignName);
     const results = [];
+    const distributionSize = Object.keys(distribution).length;
 
     for (const [targetName, userAmount] of Object.entries(distribution)) {
-        const maxHp = combatSummary?.creatures?.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
-        const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-        const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-        const missingHp = maxHp - currentHp;
-        const actualHeal = Math.min(userAmount, missingHp, totalPool);
-
-        if (actualHeal > 0) {
-            applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
-            totalPool -= actualHeal;
-        }
-
-        const newHp = Math.min(maxHp, currentHp + actualHeal);
-
-        await addEntry(campaignName, {
-            type: 'hp_change',
-            targetName,
-            delta: actualHeal,
-            currentHp: newHp,
-            maxHp,
-            isHealing: true,
-            sourceName: playerName,
-            note: MASS_HEAL_NAME,
-            formula: `${Object.keys(distribution).length} targets`,
-            bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[massHeal] Error:', e); });
-
-        await removeConditionsOnTarget(targetName, campaignName, action.spell, MASS_HEAL_NAME);
-
+        const actualHeal = await healMassHealTarget({ combatSummary, targetName, userAmount, totalPool, playerStats, playerName, campaignName, bonusDetails, distributionSize, spell: action.spell });
+        if (actualHeal > 0) totalPool -= actualHeal;
         results.push({ targetName, healAmount: actualHeal });
     }
 

@@ -221,7 +221,7 @@ async function applyMissToHitDamage(context, eventData, campaignName, playerName
     const cs = await getCombatContext(campaignName);
     const characters = [playerStats];
     try {
-        const appliedDmg = applyDamageToTarget(cs, eventData.targetName, dmgResult.total, [context?.damageType || 'unknown'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+        const appliedDmg = applyDamageToTarget(cs, eventData.targetName, dmgResult.total, [context?.damageType || 'unknown'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
         if (appliedDmg) {
             return dmgResult.total;
         }

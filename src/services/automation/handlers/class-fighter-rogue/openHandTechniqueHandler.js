@@ -48,7 +48,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function applyOpenHandTechnique(action, playerStats, campaignName, targetName, selectedOptionName, saveDc) {
+export async function applyOpenHandTechnique({ action, playerStats, campaignName, targetName, selectedOptionName, saveDc }) {
     const auto = action.automation || {};
     const options = auto.options || action.options || [];
     const chosenOption = options.find(o => o.name === selectedOptionName);
@@ -115,22 +115,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
     const saveResult = await promise;
     const success = saveResult.success;
 
-    addEntry(campaignName, {
-        type: 'roll',
-        name: action.name,
-        characterName: playerStats.name,
-        rollType: 'save-damage',
-        targetName,
-        saveDc,
-        saveType: optionSaveType,
-        saveResult: success ? 'success' : 'failure',
-        total: saveResult.total ?? 0,
-        rolls: [saveResult.roll ?? 0],
-        bonus: saveResult.saveBonus ?? 0,
-        formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
-        description: `${chosenOption.name} — ${targetName} ${success ? 'succeeded' : 'failed'} the ${optionSaveType} save (DC ${saveDc}).${!success ? ' Effect applied.' : ''}`,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[openHandTechnique] Error:", e); });
+    logOpenHandSaveOutcome({ action, playerStats, campaignName, targetName, chosenOption, saveDc, optionSaveType, saveResult, success });
 
     if (!success) {
         const combatSummary = await getCombatContext(campaignName);
@@ -143,10 +128,30 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: buildResultMessage(action.name, targetName, chosenOption, saveDc, optionSaveType, success),
+            description: buildResultMessage({ targetName, option: chosenOption, saveDc, saveType: optionSaveType, success }),
             automation: auto,
         },
     };
+}
+
+function logOpenHandSaveOutcome({ action, playerStats, campaignName, targetName, chosenOption, saveDc, optionSaveType, saveResult, success }) {
+    const saveBonus = saveResult.saveBonus ?? 0;
+    addEntry(campaignName, {
+        type: 'roll',
+        name: action.name,
+        characterName: playerStats.name,
+        rollType: 'save-damage',
+        targetName,
+        saveDc,
+        saveType: optionSaveType,
+        saveResult: success ? 'success' : 'failure',
+        total: saveResult.total ?? 0,
+        rolls: [saveResult.roll ?? 0],
+        bonus: saveBonus,
+        formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
+        description: `${chosenOption.name} — ${targetName} ${success ? 'succeeded' : 'failed'} the ${optionSaveType} save (DC ${saveDc}).${!success ? ' Effect applied.' : ''}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[openHandTechnique] Error:", e); });
 }
 
 async function applyOpenHandEffect({ action, playerStats, campaignName, targetName, option, saveDc, combatSummary, saveType }) {

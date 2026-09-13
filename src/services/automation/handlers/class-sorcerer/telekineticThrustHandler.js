@@ -63,7 +63,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const saveDc = buildSaveDc(auto, playerStats);
 
     if (options.length > 0) {
-        return applyTelekineticThrust(action, playerStats, campaignName, targetName, saveDc, auto.saveType || 'STR');
+        return applyTelekineticThrust({
+    action,
+    playerStats,
+    campaignName,
+    targetName,
+    saveDc,
+    saveType: auto.saveType || 'STR',
+});
     }
 
     return {
@@ -78,7 +85,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function applyTelekineticThrust(action, playerStats, campaignName, targetName, saveDc, saveType) {
+export async function applyTelekineticThrust({ action, playerStats, campaignName, targetName, saveDc, saveType }) {
     const auto = action.automation;
     const options = auto.options || [];
     const chosenOption = options[0];
@@ -145,7 +152,7 @@ export async function applyTelekineticThrust(action, playerStats, campaignName, 
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: buildResultMessage(action.name, targetName, chosenOption, saveDc, saveType, success),
+            description: buildResultMessage({ targetName, option: chosenOption, saveDc, saveType, success }),
             automation: auto,
         },
     };

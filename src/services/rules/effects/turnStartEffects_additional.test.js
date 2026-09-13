@@ -496,7 +496,7 @@ describe('applyTurnStartEffects — additional effect types', () => {
     });
 
     // FT-082: Slasher Hamstring te ("until the start of your next turn")
-    // registered via addExpiration(expireOnCreatureName=holder) must drain
+    // registered via addExpiration({ expireOnCreatureName: holder }) must drain
     // exactly at the holder's next turn start (round advanced), and the
     // option-scoped remove_target_effect must not collateral-remove other
     // speed_reduction te from the same holder or other sources.

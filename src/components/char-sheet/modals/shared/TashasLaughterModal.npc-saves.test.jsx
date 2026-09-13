@@ -223,16 +223,11 @@ describe('TashasLaughterModal - NPC Saves', () => {
             mockNpcSaveFailure();
             clickConfirm();
             await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith(
-                    'Wizard1',
-                    'Goblin',
-                    [
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Goblin', effects: [
                         { type: 'condition', condition: 'prone' },
                         { type: 'condition', condition: 'incapacitated' },
                         { type: 'tashas_laughter_expiration' },
-                    ],
-                    campaignName,
-                );
+                    ], campaignName });
             });
         });
 

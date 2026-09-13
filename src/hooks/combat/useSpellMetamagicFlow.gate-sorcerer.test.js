@@ -111,7 +111,7 @@ describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
   it('sets pendingMetamagic with auto-leveled damage cantrip', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -132,7 +132,7 @@ describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
   it('auto-levels using damage_at_slot_level when damage_at_character_level is absent', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -150,7 +150,7 @@ describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
   it('does not auto-level cantrip without damage (sets pending with original level)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -166,7 +166,7 @@ describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
     const lowLevelStats = makeSorcererStats({ level: 4 });
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(lowLevelStats, 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: lowLevelStats, campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -194,7 +194,7 @@ describe('useSpellMetamagicFlow — Sorcerer SP tracking', () => {
   it('stores current SP and psionic flags in pendingMetamagic payload', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -232,7 +232,7 @@ describe('useSpellMetamagicFlow — Sorcerer consumed material blocking', () => 
     const onExecute = vi.fn();
 
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', onExecute, null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     await act(async () => {
@@ -256,7 +256,7 @@ describe('useSpellMetamagicFlow — Sorcerer consumed material blocking', () => 
     const onExecute = vi.fn();
 
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', onExecute, null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     await act(async () => {
@@ -281,7 +281,7 @@ describe('useSpellMetamagicFlow — Sorcerer slotLevel in pending payload', () =
   it('uses metaCtx.slotLevel when provided for spellLevel in pendingMetamagic', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -295,7 +295,7 @@ describe('useSpellMetamagicFlow — Sorcerer slotLevel in pending payload', () =
   it('uses spell level when metaCtx.slotLevel is absent', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {

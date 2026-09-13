@@ -185,10 +185,10 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
     }
 
     function callDamageHandler(fn, contextOverride = {}) {
-        return fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        return fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             ...defaultContext,
             ...contextOverride,
-        });
+        } });
     }
 
     describe('save resolution', () => {
@@ -246,7 +246,7 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
                 'half',
                 true
             );
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 0, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 0, expect.any(Array), { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('applies half damage when save fails with evasion', async () => {
@@ -299,7 +299,7 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
 
             await callDamageHandler(createFn());
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', expect.any(Number), ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', expect.any(Number), ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('does not apply damage when soulstitch protection is active', async () => {
@@ -315,14 +315,14 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
         it('handles target not found in combat summary', async () => {
             loadCombatSummary.mockResolvedValue({ creatures: [] });
             const fn = createFn();
-            const result = await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            const result = await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'NonExistent',
                 damageType: 'fire',
                 saveDc: 15,
                 saveType: 'DEX',
                 dcSuccess: 'half',
                 attackerName: 'TestWizard',
-            });
+            } });
 
             expect(result).toBeUndefined();
             expect(applyDamageToTarget).not.toHaveBeenCalled();
@@ -415,7 +415,7 @@ describe('createLogDamageAndShow - NPC save damage with evasion', () => {
             };
 
             const fn = createLogDamageAndShow(noEvasionDeps);
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             const evasionLog = noEvasionDeps.logEntry.mock.calls.find(
                 (call) => call[0].rollType === 'evasion'

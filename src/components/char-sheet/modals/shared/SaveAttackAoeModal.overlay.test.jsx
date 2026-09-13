@@ -32,7 +32,7 @@ vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
   computeDamageAfterEvasion: vi.fn((raw, _success, dcSuccess) => {
     return dcSuccess === 'half' ? Math.floor(raw / 2) : raw;
   }),
-  computeDamageAfterResistancesWithDetails: vi.fn((raw) => ({ finalDamage: raw })),
+  computeDamageAfterResistancesWithDetails: vi.fn(({ rawDamage }) => ({ finalDamage: rawDamage })),
   hasEvasionForSave: vi.fn(() => false),
   normalizeSaveType: vi.fn((t) => t),
 }));

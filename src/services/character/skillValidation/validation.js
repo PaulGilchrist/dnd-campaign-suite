@@ -13,71 +13,17 @@ export async function validateSkills(formData, allFeats) {
   const warnings = [];
   const selectedSkills = formData.skillProficiencies || [];
   const expertSkills = formData.expertSkills || [];
-  const _ruleset = formData.rules || '5e';
-  void _ruleset;
 
   // Get skill limits
   const limits = await getSkillLimits(formData, allFeats);
   const expertiseLimits = await getExpertiseLimits(formData, allFeats);
 
-  // Validate skill selections against allowed pools
-  if (limits.skillChoiceSources && limits.skillChoiceSources.length > 0) {
-    const skillSourceMap = buildSkillSourceMap(limits.skillChoiceSources);
-
-    warnSkillsOutsidePools(warnings, selectedSkills, skillSourceMap, limits);
-
-    // Count how many selected skills come from each source
-    // For overlapping skills, assign them to the source that needs them most
-    const { sourceCounts, assignedSkills } = assignSkillsToSources(selectedSkills, limits.skillChoiceSources, skillSourceMap);
-
-    warnSourceOverSelection(warnings, sourceCounts, selectedSkills, assignedSkills, limits);
-  }
-
-  // Check if too many skills selected
-  if (selectedSkills.length > limits.allowed) {
-    warnings.push({
-      message: `Rules allow ${limits.allowed} skill proficiency/ies. You have selected ${selectedSkills.length}. (${limits.details})`,
-      type: 'warning'
-    });
-  }
-
-  // Check if too few skills selected (info, not warning)
-  if (selectedSkills.length < limits.allowed && selectedSkills.length > 0) {
-    warnings.push({
-      message: `You can select up to ${limits.allowed} skill proficiencies. You have selected ${selectedSkills.length}.`,
-      type: 'info'
-    });
-  }
+  warnSkillPoolSelection(warnings, selectedSkills, limits);
+  warnSkillCount(warnings, selectedSkills, limits);
 
   // Check expertise validity
   if (expertSkills.length > 0) {
-    // Check if expertise is allowed for this class
-    if (!expertiseLimits.allowed) {
-      warnings.push({
-        message: `Expertise is not available for ${formData.class?.name || 'this class'}. Expertise is typically a Bard or Rogue feature.`,
-        type: 'warning'
-      });
-    }
-
-    // Check if too many expertise selections
-    if (expertSkills.length > expertiseLimits.count) {
-      warnings.push({
-        message: `You can have expertise in ${expertiseLimits.count} skill(s). You have selected ${expertSkills.length}. (${expertiseLimits.details})`,
-        type: 'warning'
-      });
-    }
-
-    // Check if all expert skills are also proficient
-    const nonProficientExperts = expertSkills.filter(skill => !selectedSkills.includes(skill));
-    if (nonProficientExperts.length > 0) {
-      warnings.push({
-        message: `Expertise requires proficiency first. These skills are not proficient: ${nonProficientExperts.join(', ')}`,
-        type: 'warning'
-      });
-    }
-
-    warnFeatRestrictedExpertise(warnings, expertSkills, expertiseLimits);
-    warnClassRestrictedExpertise(warnings, expertSkills, expertiseLimits);
+    warnExpertise(warnings, expertSkills, selectedSkills, formData, expertiseLimits);
   }
 
   // Check for duplicate skills in selection
@@ -90,6 +36,67 @@ export async function validateSkills(formData, allFeats) {
   }
 
   return warnings;
+}
+
+// Validate skill selections against allowed pools
+function warnSkillPoolSelection(warnings, selectedSkills, limits) {
+  if (!limits.skillChoiceSources || limits.skillChoiceSources.length === 0) {
+    return;
+  }
+  const skillSourceMap = buildSkillSourceMap(limits.skillChoiceSources);
+
+  warnSkillsOutsidePools(warnings, selectedSkills, skillSourceMap, limits);
+
+  // Count how many selected skills come from each source
+  // For overlapping skills, assign them to the source that needs them most
+  const { sourceCounts, assignedSkills } = assignSkillsToSources(selectedSkills, limits.skillChoiceSources, skillSourceMap);
+
+  warnSourceOverSelection(warnings, sourceCounts, selectedSkills, assignedSkills, limits);
+}
+
+// Check for too many / too few skill selections against the allowed count
+function warnSkillCount(warnings, selectedSkills, limits) {
+  if (selectedSkills.length > limits.allowed) {
+    warnings.push({
+      message: `Rules allow ${limits.allowed} skill proficiency/ies. You have selected ${selectedSkills.length}. (${limits.details})`,
+      type: 'warning'
+    });
+  }
+
+  if (selectedSkills.length < limits.allowed && selectedSkills.length > 0) {
+    warnings.push({
+      message: `You can select up to ${limits.allowed} skill proficiencies. You have selected ${selectedSkills.length}.`,
+      type: 'info'
+    });
+  }
+}
+
+// Check expertise validity: allowance, count, proficiency prerequisite, restrictions
+function warnExpertise(warnings, expertSkills, selectedSkills, formData, expertiseLimits) {
+  if (!expertiseLimits.allowed) {
+    warnings.push({
+      message: `Expertise is not available for ${formData.class?.name || 'this class'}. Expertise is typically a Bard or Rogue feature.`,
+      type: 'warning'
+    });
+  }
+
+  if (expertSkills.length > expertiseLimits.count) {
+    warnings.push({
+      message: `You can have expertise in ${expertiseLimits.count} skill(s). You have selected ${expertSkills.length}. (${expertiseLimits.details})`,
+      type: 'warning'
+    });
+  }
+
+  const nonProficientExperts = expertSkills.filter(skill => !selectedSkills.includes(skill));
+  if (nonProficientExperts.length > 0) {
+    warnings.push({
+      message: `Expertise requires proficiency first. These skills are not proficient: ${nonProficientExperts.join(', ')}`,
+      type: 'warning'
+    });
+  }
+
+  warnFeatRestrictedExpertise(warnings, expertSkills, expertiseLimits);
+  warnClassRestrictedExpertise(warnings, expertSkills, expertiseLimits);
 }
 
 // Build a map of which sources each skill belongs to

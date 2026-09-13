@@ -101,9 +101,9 @@ function imprisonTarget(targetName, casterName, dc, campaignName) {
     }
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'forcecage', target: targetName, source: casterName },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'condition',

@@ -150,15 +150,22 @@ function computeSanctuaryCover(target, characters, campaignName) {
   return null;
 }
 
+function hasPassiveNamed(playerStats, passiveName) {
+  return Boolean(playerStats?.automation?.passives?.some(p => p.name === passiveName));
+}
+
+function findPlacedPlayer(mapData, name) {
+  return mapData.players?.find(p => p.name === name) || null;
+}
+
 function computeSmiteCover(target, characters, mapData, campaignName) {
   for (const player of characters) {
     if (!getRuntimeValue(player.name, 'smiteOfProtectionActive', campaignName)) continue;
-    const playerStats = player.computedStats;
-    if (!playerStats?.automation?.passives?.some(p => p.name === 'Aura of Protection')) continue;
-    const paladinPos = mapData.players?.find(p => p.name === player.name);
-    const targetPlayer = mapData.players?.find(p => p.name === target.name);
+    if (!hasPassiveNamed(player.computedStats, 'Aura of Protection')) continue;
+    const paladinPos = findPlacedPlayer(mapData, player.name);
+    const targetPlayer = findPlacedPlayer(mapData, target.name);
     if (!paladinPos || !targetPlayer) continue;
-    const auraRange = playerStats?.automation?.passives?.some(p => p.name === 'Aura Expansion') ? 30 : 10;
+    const auraRange = hasPassiveNamed(player.computedStats, 'Aura Expansion') ? 30 : 10;
     if (isDistanceInRange(getDistanceFeet(paladinPos, targetPlayer), auraRange)) {
       return { coverAcBonus: 2, coverLevel: 'half', coverReason: 'Smite of Protection' };
     }
@@ -441,7 +448,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               context.overchannelUseCount = autoDamage.overchannelUseCount;
               context.overchannelSpellLevel = autoDamage.overchannelSpellLevel;
             }
-            rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+            rollDamage({ name: autoDamage.name, formula: autoDamage.formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
           }
           setPopupHtml(null);
         },
@@ -549,7 +556,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         context.saveType = toAbbr(action.save_type);
         context.dcSuccess = 'half';
       }
-      rollDamage(name, formula, result.total, result.rolls, result.modifier, context);
+      rollDamage({ name: name, formula: formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
     }
   };
 

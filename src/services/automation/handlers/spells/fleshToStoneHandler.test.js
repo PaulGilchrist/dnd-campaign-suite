@@ -189,14 +189,7 @@ describe('fleshToStoneHandler.handle', () => {
         expect.arrayContaining(['speed_zero']),
         campaignName,
       );
-      expect(addExpiration).toHaveBeenCalledWith(
-        casterName,
-        targetName,
-        expect.arrayContaining([{ type: 'speed_zero' }]),
-        campaignName,
-        undefined,
-        casterName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName, effects: expect.arrayContaining([{ type: 'speed_zero' }]), campaignName, rounds: undefined, expireOnCreatureName: casterName });
     });
 
     it('does not create save listener for constructs', async () => {
@@ -278,14 +271,9 @@ describe('fleshToStoneHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        casterName,
-        targetName,
-        expect.arrayContaining([
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName, effects: expect.arrayContaining([
           { type: 'condition', condition: 'restrained' },
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
     });
 
     it('posts condition applied log entry', async () => {
@@ -438,14 +426,7 @@ describe('fleshToStoneHandler.handle', () => {
         expect.arrayContaining(['speed_zero']),
         campaignName,
       );
-      expect(addExpiration).toHaveBeenCalledWith(
-        casterName,
-        targetName,
-        expect.arrayContaining([{ type: 'speed_zero' }]),
-        campaignName,
-        undefined,
-        casterName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName, effects: expect.arrayContaining([{ type: 'speed_zero' }]), campaignName, rounds: undefined, expireOnCreatureName: casterName });
     });
 
     it('posts condition log entry for speed_zero on success', async () => {

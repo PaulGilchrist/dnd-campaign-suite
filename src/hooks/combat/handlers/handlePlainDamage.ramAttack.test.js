@@ -151,7 +151,7 @@ describe('Plain damage ram attack / prone condition', () => {
     describe('ram prone application', () => {
         it('applies prone when ramActive and isMelee with NPC target', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, baseContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext() });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Goblin',
@@ -176,7 +176,7 @@ describe('Plain damage ram attack / prone condition', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, baseContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext() });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Goblin',
@@ -188,7 +188,7 @@ describe('Plain damage ram attack / prone condition', () => {
 
         it('does not apply prone when ramActive is false', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', ramActive: false, isMelee: true, });
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', ramActive: false, isMelee: true, } });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',
@@ -200,7 +200,7 @@ describe('Plain damage ram attack / prone condition', () => {
 
         it('does not apply prone when isMelee is false', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'fire', ramActive: true, isMelee: false, });
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'fire', ramActive: true, isMelee: false, } });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',
@@ -217,7 +217,7 @@ describe('Plain damage ram attack / prone condition', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, baseContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext() });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',
@@ -233,7 +233,7 @@ describe('Plain damage ram attack / prone condition', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, baseContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext() });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',
@@ -249,7 +249,7 @@ describe('Plain damage ram attack / prone condition', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, baseContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext() });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Goblin',
@@ -263,7 +263,7 @@ describe('Plain damage ram attack / prone condition', () => {
             applyDamageToTarget.mockReturnValue(null);
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, baseContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext() });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',
@@ -279,7 +279,7 @@ describe('Plain damage ram attack / prone condition', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', ramActive: true, isMelee: true, });
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', ramActive: true, isMelee: true, } });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',
@@ -296,7 +296,7 @@ describe('Plain damage ram attack / prone condition', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, baseContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext() });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Goblin',
@@ -313,7 +313,7 @@ describe('Plain damage ram attack / prone condition', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, baseContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: baseContext() });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',

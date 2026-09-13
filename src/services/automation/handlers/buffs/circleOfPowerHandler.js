@@ -62,9 +62,9 @@ export async function applyCircleOfPower(action, playerStats, campaignName, mapN
         registerTargetEffect(campaignName, targetName, 'circle_of_power', casterName);
 
         // Register expirations: remove buff on initiative roll (concentration expiry)
-        addExpiration(casterName, targetName, [
+        addExpiration({ attackerName: casterName, targetName, effects: [
             { type: 'remove_active_buff', buffName: CIRCLE_OF_POWER_BUFF_NAME },
-        ], campaignName, undefined, casterName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 
         // Add concentration for caster
         const combatSummary = getCombatSummary(campaignName);

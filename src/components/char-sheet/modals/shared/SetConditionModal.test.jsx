@@ -379,16 +379,10 @@ describe('SetConditionModal', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]);
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Attacker',
-      'Goblin A',
-      expect.arrayContaining([
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Attacker', targetName: 'Goblin A', effects: expect.arrayContaining([
         expect.objectContaining({ type: 'frightened' }),
         expect.objectContaining({ type: 'blinded' }),
-      ]),
-      'test-campaign',
-      undefined
-    );
+      ]), campaignName: 'test-campaign', rounds: undefined });
   });
 
   // ── Edge case: confirm with no targets selected is a no-op ──

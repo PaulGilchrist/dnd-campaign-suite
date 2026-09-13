@@ -172,7 +172,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
       it(`clears ${tc.pending} when ${tc.handler} is called`, async () => {
         const setPopupHtml = vi.fn();
         const { result } = renderHook(() =>
-          useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
         );
 
         act(() => {
@@ -217,7 +217,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
       it(`clears ${tc.pending} when ${tc.handler} is called`, async () => {
         const setPopupHtml = vi.fn();
         const { result } = renderHook(() =>
-          useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
         );
 
         act(() => {
@@ -260,7 +260,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
       it(`calls ${tc.automation} when ${tc.handler} is invoked`, async () => {
         const setPopupHtml = vi.fn();
         const { result } = renderHook(() =>
-          useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
         );
 
         act(() => {
@@ -282,7 +282,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('calls executeHandler for Slow', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {
@@ -301,7 +301,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('calls executeHandler for Web', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {
@@ -320,7 +320,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('calls executeHandler for Sleet Storm', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {
@@ -341,7 +341,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('calls triggerFaerieFire for Faerie Fire', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {
@@ -360,7 +360,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('calls triggerForesight for Foresight', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {
@@ -379,7 +379,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('calls triggerRevivify for Revivify', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {
@@ -400,7 +400,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('calls addEntry on confirm', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {
@@ -424,7 +424,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('calls addEntry on skip', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {
@@ -448,7 +448,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('handleConfirm does nothing when pending is null', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       const { addEntry } = await import('../../services/ui/logService.js');
@@ -463,7 +463,7 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     it('handleSkip does nothing when pending is null', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       const { addEntry } = await import('../../services/ui/logService.js');

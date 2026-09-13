@@ -142,9 +142,9 @@ export default function useCharActionsAttackHandlers({
             abilityName: 'Reckless Attack',
             description: `${playerName} uses Reckless Attack, granting advantage on the first attack roll on this turn`,
         }).catch((e) => { console.error("[useCharActionsAttackHandlers:log-error]", e); });
-        addExpiration(playerName, playerName, [
+        addExpiration({ attackerName: playerName, targetName: playerName, effects: [
             { type: 'remove_active_buff', buffName: 'Reckless Attack' }
-        ], campaignName, undefined, playerName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
         const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
         const hasRecklessEffect = storedEffects.some(te => te.effect === 'reckless_attack' && te.target === playerName);
         if (!hasRecklessEffect) {

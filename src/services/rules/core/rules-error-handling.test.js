@@ -32,7 +32,7 @@ describe('rules - missing array error handling', () => {
         inventory: { equipped: [], magicItems: [] },
         skillProficiencies: [], expertise: [], actions: [], bonusActions: [], reactions: [], specialActions: [], activeBuffs: [],
       };
-      await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
+      await expect(rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary })).rejects.toThrow('Missing array: race.traits');
     });
 
 

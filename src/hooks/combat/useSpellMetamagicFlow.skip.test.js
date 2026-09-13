@@ -227,7 +227,7 @@ describe('useSpellMetamagicFlow — complex spell skip handlers', () => {
       it(`clears ${tc.pending} when ${tc.handler} is called for ${tc.spell}`, () => {
         const setPopupHtml = vi.fn();
         const { result } = renderHook(() =>
-          useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
         );
 
         act(() => {
@@ -259,7 +259,7 @@ describe('useSpellMetamagicFlow — complex spell skip handlers', () => {
       it(`clears ${tc.pending} when ${tc.handler} is called for ${tc.spell}`, () => {
         const setPopupHtml = vi.fn();
         const { result } = renderHook(() =>
-          useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
         );
 
         act(() => {
@@ -287,7 +287,7 @@ describe('useSpellMetamagicFlow — complex spell skip handlers', () => {
       it(`clears ${tc.pending} when ${tc.handler} is called for ${tc.spell}`, () => {
         const setPopupHtml = vi.fn();
         const { result } = renderHook(() =>
-          useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
         );
 
         act(() => {
@@ -309,7 +309,7 @@ describe('useSpellMetamagicFlow — complex spell skip handlers', () => {
     it('handleMagicMissileSkip does nothing when no pending', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       const { addEntry } = vi.mocked(await import('../../services/ui/logService.js'));
@@ -324,7 +324,7 @@ describe('useSpellMetamagicFlow — complex spell skip handlers', () => {
     it('handleAnimalShapesSkip does nothing when no pending', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       const { addEntry } = vi.mocked(await import('../../services/ui/logService.js'));
@@ -339,7 +339,7 @@ describe('useSpellMetamagicFlow — complex spell skip handlers', () => {
     it('handleTruePolymorphSkip does nothing when no pending', async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       const { addEntry } = vi.mocked(await import('../../services/ui/logService.js'));

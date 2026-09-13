@@ -97,9 +97,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     addConcentration(combatSummary, playerStats.name, SPELL_NAME, dc);
 
     // Apply expiration (concentration handles duration; 1 minute = 10 rounds default)
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_target_effect', effectKey: EFFECT_KEY, source: playerStats.name },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'condition',

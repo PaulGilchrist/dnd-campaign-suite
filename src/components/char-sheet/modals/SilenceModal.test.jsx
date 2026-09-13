@@ -188,14 +188,10 @@ describe('SilenceModal', () => {
             expect(silenceService.addSilencedTarget).toHaveBeenCalledWith(
                 'Wizard1', 'Orc Warrior', 'test-campaign'
             );
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                'Wizard1', 'Goblin1',
-                [
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Goblin1', effects: [
                     { type: 'condition', condition: 'deafened' },
                     { type: 'remove_active_buff', buffName: 'Silence' },
-                ],
-                'test-campaign'
-            );
+                ], campaignName: 'test-campaign' });
         });
 
         it('writes a Silence activeBuff with sourceCharacter to caster and each targeted creature', async () => {
@@ -293,11 +289,11 @@ describe('SilenceModal', () => {
                 fireEvent.click(confirmButton);
             });
             const casterCalls = expirations.addExpiration.mock.calls.filter(
-                (c) => c[0] === 'Wizard1' && c[1] === 'Wizard1'
+                (c) => c[0].attackerName === 'Wizard1' && c[0].targetName === 'Wizard1'
             );
             expect(casterCalls.length).toBeGreaterThanOrEqual(1);
-            expect(casterCalls[0][2]).toContainEqual({ type: 'remove_active_buff', buffName: 'Silence' });
-            expect(casterCalls[0][2]).toContainEqual({
+            expect(casterCalls[0][0].effects).toContainEqual({ type: 'remove_active_buff', buffName: 'Silence' });
+            expect(casterCalls[0][0].effects).toContainEqual({
                 type: 'clear_silence_zone', casterName: 'Wizard1',
             });
         });

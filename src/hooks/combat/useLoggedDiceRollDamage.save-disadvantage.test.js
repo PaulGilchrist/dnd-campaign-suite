@@ -199,10 +199,10 @@ describe('createLogDamageAndShow - NPC save disadvantage integration', () => {
     }
 
     function callHandler(fn, contextOverride = {}) {
-        return fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        return fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             ...defaultContext,
             ...contextOverride,
-        });
+        } });
     }
 
     describe('corona save disadvantage', () => {

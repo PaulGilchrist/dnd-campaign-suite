@@ -119,13 +119,26 @@ function ArmorClassSummary({ playerStats, conditionEffects, ctx, showArmorClassF
     );
 }
 
+function speedSuffixText(ctx) {
+    const { flySpeed, swimSpeed, climbSpeed, auraSpeedBonus,
+        iceWalkActive, acrobaticMovementActive, glisteningFlightHover, dragonWingsHover, starryFormHover } = ctx;
+    let text = '';
+    if (climbSpeed) text += `, climb ${climbSpeed} ft.`;
+    if (swimSpeed !== null) text += `, swim ${swimSpeed} ft.`;
+    if (flySpeed !== null) {
+        const hoverSuffix = (glisteningFlightHover || dragonWingsHover || starryFormHover) ? ' (hover)' : '';
+        text += `, fly ${flySpeed + auraSpeedBonus} ft. ${hoverSuffix}`;
+    }
+    if (iceWalkActive) text += ', ice walk';
+    if (acrobaticMovementActive) text += ', acrobatic movement';
+    return text;
+}
+
 function SpeedSummary({ ctx, conditionEffects, exhaustionLevel }) {
-    const { flySpeed, swimSpeed, climbSpeed, auraSpeedBonus, auraSpeedSource,
-        iceWalkActive, acrobaticMovementActive, glisteningFlightHover, dragonWingsHover, starryFormHover,
-        totalSpeedWithBuff } = ctx;
+    const { auraSpeedBonus, auraSpeedSource, totalSpeedWithBuff } = ctx;
     return (
         <>
-            <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{climbSpeed ? `, climb ${climbSpeed} ft.` : ''}{swimSpeed !== null ? `, swim ${swimSpeed} ft.` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus} ft. ${(glisteningFlightHover || dragonWingsHover || starryFormHover) ? ' (hover)' : ''}` : ''}{iceWalkActive ? ', ice walk' : ''}{acrobaticMovementActive ? ', acrobatic movement' : ''}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}{conditionEffects?.speedHalved && <span className="stat--penalized" title="Slow spell penalty"> (Speed halved from Slow)</span>}<br />
+            <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{speedSuffixText(ctx)}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}{conditionEffects?.speedHalved && <span className="stat--penalized" title="Slow spell penalty"> (Speed halved from Slow)</span>}<br />
         </>
     );
 }
@@ -179,61 +192,70 @@ function XpModal({ xpDelta, setXpDelta, displayXp, isInXpMode, handleXpSave, han
     );
 }
 
+function starryFormBadge(p) {
+    const starryBuffs = getRuntimeValue(p.playerStats.name, 'activeBuffs') || [];
+    const starryFormBuff = Array.isArray(starryBuffs) ? starryBuffs.find(b => b.name === 'Starry Form' && b.constellation) : null;
+    if (!starryFormBuff) return null;
+    const constellation = starryFormBuff.constellation;
+    return (
+        <CreatureBadge icon='fa-star' label={`Starry Form - ${constellation}`} cls='effect-buff' tooltip={`Starry Form (${constellation} constellation): Luminous form active — Resistance to Bludgeoning, Piercing, and Slashing damage${constellation === 'Archer' ? '; Bonus Action: Luminous Arrow attack' : constellation === 'Chalice' ? '; Healing spells restore extra HP to allies within 30 feet' : '; Concentration checks: Treat d20 rolls of 9 or lower as 10'}`} />
+    );
+}
+
+const SUMMARY_BADGE_SPECS = [
+    { key: 'wildShape', render: (p) => p.wildShapeActiveChar && (
+        <CreatureBadge icon='fa-paw' label='Wild Shape' cls='effect-buff' tooltip='Wild Shape: Animal form active — spellcasting blocked, resistance types apply' />
+    ) },
+    { key: 'starryForm', render: starryFormBadge },
+    { key: 'auraOfLife', render: (p) => isAuraOfLifeActive(p.playerStats.name, p.campaignName) && (
+        <CreatureBadge icon='fa-heart-pulse' label='Aura of Life' cls='effect-buff' tooltip={'Aura of Life: Resistance to Necrotic damage, HP maximum can\'t be reduced, regain 1 HP at start of turn if at 0 HP'} />
+    ) },
+    { key: 'circleOfPower', render: (p) => isCircleOfPowerActive(p.playerStats.name, p.campaignName) && (
+        <CreatureBadge icon='fa-shield-halved' label='Circle of Power' cls='effect-buff' tooltip='Circle of Power: Advantage on saving throws against spells and other magical effects. No damage on a successful save vs half-damage effects.' />
+    ) },
+    { key: 'majesty', render: (p) => p.isMajestyActiveChar && (
+        <CreatureBadge icon='fa-shield-halved' label={`Majesty DC ${p.majestyDcChar}`} cls='effect-buff' tooltip={`Unbreakable Majesty (DC ${p.majestyDcChar})\n\nFirst attack per turn that hits forces attacker to make a CHA save or the attack misses.`} />
+    ) },
+    { key: 'wrathOfTheSea', render: (p) => p.wrathOfTheSeaActive && (
+        <CreatureBadge icon='fa-water' label='Wrath of the Sea' cls='effect-buff' tooltip='Wrath of the Sea: Ocean spray emanation active — Bonus Action to force CON save or take WIS modifier d6 Cold damage' />
+    ) },
+    { key: 'sanctuary', render: (p) => p.sanctuaryInfoChar && (
+        <CreatureBadge icon='fa-leaf' label='Sanctuary' cls='effect-buff' tooltip={`Nature's Sanctuary: Half Cover (AC +2), ${p.sanctuaryInfoChar.resistance} resistance. Protected by ${p.sanctuaryInfoChar.druid}'s Nature's Sanctuary`} />
+    ) },
+    { key: 'recklessAttack', render: (p) => p.recklessAttackActiveChar && (
+        <CreatureBadge icon='fa-shield-halved' label='Reckless Attack' cls='effect-debuff' tooltip='Reckless Attack: Advantage on Strength attack rolls, attack rolls against you have Advantage' />
+    ) },
+    { key: 'concentration', render: (p) => p.concentrationForBadges && (
+        <CreatureBadge icon='fa-spinner' label={`${p.concentrationForBadges.spell} DC ${p.concentrationForBadges.dc}`} cls='effect-neutral' tooltip={`Concentration: ${p.concentrationForBadges.spell} (DC ${p.concentrationForBadges.dc} Constitution)`} />
+    ) },
+    { key: 'barkskin', render: (p) => p.barkskinActive && (
+        <CreatureBadge icon='fa-tree' label='Barkskin (AC 17)' cls='effect-buff' tooltip='Barkskin: AC set to 17. Concentration, up to 1 hour.' />
+    ) },
+    { key: 'huntersMark', render: (p) => p.huntersMarkOnCreature && p.markCreature && (
+        <CreatureBadge icon='fa-crosshairs' label="Hunter's Mark" cls='effect-neutral' tooltip={`Marked by ${p.markCreature?.name}`} />
+    ) },
+    { key: 'deathWard', render: (p) => isDeathWardActive(p.playerStats.name, p.campaignName) && (
+        <CreatureBadge icon='fa-shield-halved' label='Death Ward' cls='effect-buff' tooltip='Death Ward: Protected from death. First time target would drop to 0 HP, drops to 1 HP instead. Spell ends.' />
+    ) },
+    { key: 'heroesFeast', render: (p) => p.heroesFeastResistances.length > 0 && (
+        <CreatureBadge icon='fa-champagne-glasses' label="Heroes' Feast" cls='effect-buff' tooltip={`Heroes' Feast: Resistance to ${p.heroesFeastResistances.join(', ')}, Immune to ${p.heroesFeastConditionImmunities.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')}, HP maximum increased by 2d10. Lasts 24 hours.`} />
+    ) },
+    { key: 'innerRadiance', render: (p) => p.innerRadianceActive && (
+        <CreatureBadge icon='fa-sun' label='Inner Radiance' cls='effect-buff' tooltip='Inner Radiance: Bright Light 10 ft, Dim Light 10 ft more. At the end of each of your turns, each creature within 10 feet takes Radiant damage equal to your Proficiency Bonus.' />
+    ) },
+];
+
 function SummaryBadges({ playerStats, campaignName, activeMapName, characters, exhaustionLevel, conditionEffects, onConditionsChange, ctx, isLocalhost, conditionObjects, myTargetEffects, allCreaturesForBadges, concentrationForBadges, wildShapeActiveChar, isMajestyActiveChar, majestyDcChar, recklessAttackActiveChar, sanctuaryInfoChar, huntersMarkOnCreature, markCreature, innerRadianceActive }) {
     const { barkskinActive, wrathOfTheSeaActive, heroesFeastResistances, heroesFeastConditionImmunities } = ctx;
+    const badgeCtx = { playerStats, campaignName, barkskinActive, wrathOfTheSeaActive, heroesFeastResistances, heroesFeastConditionImmunities, concentrationForBadges, wildShapeActiveChar, isMajestyActiveChar, majestyDcChar, recklessAttackActiveChar, sanctuaryInfoChar, huntersMarkOnCreature, markCreature, innerRadianceActive };
     return (
         <>
             <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
             <ConditionEffectBadges conditions={conditionObjects} targetEffects={myTargetEffects} creatureName={playerStats.name} campaignName={campaignName} allCreatures={allCreaturesForBadges} isLocalhost={isLocalhost} />
-            {wildShapeActiveChar && (
-                <CreatureBadge icon='fa-paw' label='Wild Shape' cls='effect-buff' tooltip='Wild Shape: Animal form active — spellcasting blocked, resistance types apply' />
-            )}
-            {(() => {
-                const starryBuffs = getRuntimeValue(playerStats.name, 'activeBuffs') || [];
-                const starryFormBuff = Array.isArray(starryBuffs) ? starryBuffs.find(b => b.name === 'Starry Form' && b.constellation) : null;
-                if (!starryFormBuff) return null;
-                const constellation = starryFormBuff.constellation;
-                return (
-                    <CreatureBadge icon='fa-star' label={`Starry Form - ${constellation}`} cls='effect-buff' tooltip={`Starry Form (${constellation} constellation): Luminous form active — Resistance to Bludgeoning, Piercing, and Slashing damage${constellation === 'Archer' ? '; Bonus Action: Luminous Arrow attack' : constellation === 'Chalice' ? '; Healing spells restore extra HP to allies within 30 feet' : '; Concentration checks: Treat d20 rolls of 9 or lower as 10'}`} />
-                );
-            })()}
-            {isAuraOfLifeActive(playerStats.name, campaignName) && (
-                <CreatureBadge icon='fa-heart-pulse' label='Aura of Life' cls='effect-buff' tooltip={'Aura of Life: Resistance to Necrotic damage, HP maximum can\'t be reduced, regain 1 HP at start of turn if at 0 HP'} />
-            )}
-            {isCircleOfPowerActive(playerStats.name, campaignName) && (
-                <CreatureBadge icon='fa-shield-halved' label='Circle of Power' cls='effect-buff' tooltip='Circle of Power: Advantage on saving throws against spells and other magical effects. No damage on a successful save vs half-damage effects.' />
-            )}
-            {isMajestyActiveChar && (
-                <CreatureBadge icon='fa-shield-halved' label={`Majesty DC ${majestyDcChar}`} cls='effect-buff' tooltip={`Unbreakable Majesty (DC ${majestyDcChar})\n\nFirst attack per turn that hits forces attacker to make a CHA save or the attack misses.`} />
-            )}
-            {wrathOfTheSeaActive && (
-                <CreatureBadge icon='fa-water' label='Wrath of the Sea' cls='effect-buff' tooltip='Wrath of the Sea: Ocean spray emanation active — Bonus Action to force CON save or take WIS modifier d6 Cold damage' />
-            )}
-            {sanctuaryInfoChar && (
-                <CreatureBadge icon='fa-leaf' label='Sanctuary' cls='effect-buff' tooltip={`Nature's Sanctuary: Half Cover (AC +2), ${sanctuaryInfoChar.resistance} resistance. Protected by ${sanctuaryInfoChar.druid}'s Nature's Sanctuary`} />
-            )}
-            {recklessAttackActiveChar && (
-                <CreatureBadge icon='fa-shield-halved' label='Reckless Attack' cls='effect-debuff' tooltip='Reckless Attack: Advantage on Strength attack rolls, attack rolls against you have Advantage' />
-            )}
-            {concentrationForBadges && (
-                <CreatureBadge icon='fa-spinner' label={`${concentrationForBadges.spell} DC ${concentrationForBadges.dc}`} cls='effect-neutral' tooltip={`Concentration: ${concentrationForBadges.spell} (DC ${concentrationForBadges.dc} Constitution)`} />
-            )}
-            {barkskinActive && (
-                <CreatureBadge icon='fa-tree' label='Barkskin (AC 17)' cls='effect-buff' tooltip='Barkskin: AC set to 17. Concentration, up to 1 hour.' />
-            )}
-            {huntersMarkOnCreature && markCreature && (
-                <CreatureBadge icon='fa-crosshairs' label="Hunter's Mark" cls='effect-neutral' tooltip={`Marked by ${markCreature?.name}`} />
-            )}
-            {isDeathWardActive(playerStats.name, campaignName) && (
-                <CreatureBadge icon='fa-shield-halved' label='Death Ward' cls='effect-buff' tooltip='Death Ward: Protected from death. First time target would drop to 0 HP, drops to 1 HP instead. Spell ends.' />
-            )}
-
-            {heroesFeastResistances.length > 0 && (
-                 <CreatureBadge icon='fa-champagne-glasses' label="Heroes' Feast" cls='effect-buff' tooltip={`Heroes' Feast: Resistance to ${heroesFeastResistances.join(', ')}, Immune to ${heroesFeastConditionImmunities.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')}, HP maximum increased by 2d10. Lasts 24 hours.`} />
-            )}
-            {innerRadianceActive && (
-                <CreatureBadge icon='fa-sun' label='Inner Radiance' cls='effect-buff' tooltip='Inner Radiance: Bright Light 10 ft, Dim Light 10 ft more. At the end of each of your turns, each creature within 10 feet takes Radiant damage equal to your Proficiency Bonus.' />
-            )}
+            {SUMMARY_BADGE_SPECS.map((spec) => {
+                const node = spec.render(badgeCtx);
+                return node ? <React.Fragment key={spec.key}>{node}</React.Fragment> : null;
+            })}
         </>
     );
 }
@@ -524,7 +546,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     };
 
 
-    const ctx = computeCharSummaryContext(playerStats, campaignName, characters, conditionEffects, auraComboEffects, exhaustionLevel);
+    const ctx = computeCharSummaryContext({ playerStats, campaignName, characters, conditionEffects, auraComboEffects, exhaustionLevel });
     const {
         allImmunities, allResistances, auraResistances, auraResistanceSource,
         seeInvisibilityActive, effectiveInitiative,

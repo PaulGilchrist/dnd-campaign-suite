@@ -130,14 +130,14 @@ describe('contextBuilder-sync: saveDc and saveType', () => {
 
   it('includes saveType and dcSuccess from attack when present', async () => {
     const attack = { ...mockAttack, saveDc: 13, saveType: 'DEX', saveSuccess: 0.5 };
-    const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal');
 
     expect(result.saveType).toBe('DEX');
     expect(result.dcSuccess).toBe(0.5);
   });
 
   it('includes saveType and dcSuccess as undefined when not on attack', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.saveType).toBeUndefined();
     expect(result.dcSuccess).toBeUndefined();
@@ -164,7 +164,7 @@ describe('contextBuilder-sync: forcedMode priority chain', () => {
     getInnateSorceryBonus.mockReturnValue({ spellAdvantage: true, saveDcBonus: 0 });
     getWolfAdvantageAgainst.mockReturnValue({ advantage: true });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage');
 
     expect(result.forcedMode).toBe('disadvantage');
   });
@@ -178,7 +178,7 @@ describe('contextBuilder-sync: forcedMode priority chain', () => {
     getLionDisadvantageAgainst.mockReturnValue({ disadvantage: true });
     getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -221,7 +221,7 @@ describe('contextBuilder-sync: precise hunter (2024 Ranger level 17)', () => {
       ],
     });
 
-    const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
     expect(result.advantageReason).toBe('Precise Hunter (Hunter\'s Mark)');
@@ -252,7 +252,7 @@ describe('contextBuilder-sync: precise hunter (2024 Ranger level 17)', () => {
       ],
     });
 
-    const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
     expect(result.advantageReason).toBeUndefined();
@@ -273,7 +273,7 @@ describe('contextBuilder-sync: precise hunter (2024 Ranger level 17)', () => {
       ],
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
     expect(result.advantageReason).toBeUndefined();
@@ -296,7 +296,7 @@ describe('contextBuilder-sync: precise hunter (2024 Ranger level 17)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });

@@ -18,6 +18,15 @@ const resolveHp = (creature) => {
   return { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
 };
 
+// Returns the attacker creature when it holds a valid Hunter's Mark
+// concentration for the current target, else null.
+function findHuntersMarkAttacker(cs, ctx) {
+  const atk = cs.creatures?.find(c => c.name === ctx.playerStats.name);
+  if (atk?.concentration?.spell !== "Hunter's Mark") return null;
+  if (atk.concentration.target && atk.concentration.target !== ctx.targetName) return null;
+  return atk;
+}
+
 export const superiorHuntersPrey = {
   name: 'superiorHuntersPrey',
   condition: (ctx) => {
@@ -27,9 +36,8 @@ export const superiorHuntersPrey = {
     const cs = await getCombatContext(ctx.campaignName);
     if (!cs) return { data: prevData };
 
-    const atk = cs.creatures?.find(c => c.name === ctx.playerStats.name);
-    if (atk?.concentration?.spell !== "Hunter's Mark") return { data: prevData };
-    if (atk.concentration.target && atk.concentration.target !== ctx.targetName) return { data: prevData };
+    const atk = findHuntersMarkAttacker(cs, ctx);
+    if (!atk) return { data: prevData };
 
     const key = '_Superior_Hunters_Prey_UsedRound';
     const round = getCurrentCombatRound();
@@ -61,7 +69,7 @@ export const superiorHuntersPrey = {
 
         const cs2 = await loadCombatSummary(ctx.campaignName);
         const characters = getRuntimeValue('characters', 'characters', ctx.campaignName) || [];
-        const app = cs2 ? applyDamageToTarget(cs2, targetName, r.total, ['Force'], ctx.campaignName, characters, { ignoreResistance: false, attackerName: ctx.playerStats.name }) : null;
+        const app = cs2 ? applyDamageToTarget(cs2, targetName, r.total, ['Force'], { campaignName: ctx.campaignName, characters: characters, ignoreResistance: false, attackerName: ctx.playerStats.name }) : null;
         addEntry(ctx.campaignName, { type: 'roll', characterName: ctx.playerStats.name, rollType: 'damage', name: "Superior Hunter's Prey", formula: `${die} [Superior Hunters Prey]`, rolls: r.rolls, total: r.total, modifier: 0, damageType: 'Force', targetName, finalDamage: app?.finalDamage }).catch((e) => { console.error("[superiorHuntersPrey:log-error]", e); });
         if (app && ctx.setPopupHtml) {
           const target = cs.creatures?.find(c => c.name === targetName);

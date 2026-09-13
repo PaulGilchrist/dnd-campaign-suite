@@ -364,7 +364,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
-                onPointerDown={(e) => { handleSpellPointerDown(e, spellMode, overlays); handleRulerPointerDown(e, rulerMode, rulerStart, rulerEnd, getGridFromEvent, svgRef); handleToolPanStart(e); }}
+                onPointerDown={(e) => { handleSpellPointerDown(e, spellMode, overlays); handleRulerPointerDown(e, { rulerMode, rulerStart, rulerEnd, getGridFromEvent, svgRef }); handleToolPanStart(e); }}
                 onPointerMove={handleToolPointerMove}
                 onPointerUp={handleToolPointerUp}
                 onPointerLeave={handleToolPointerLeave}

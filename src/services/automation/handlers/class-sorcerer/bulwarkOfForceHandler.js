@@ -62,9 +62,9 @@ export async function activateBulwarkOfForce(action, playerStats, campaignName, 
     await setRuntimeValue(playerName, BULWARK_TARGETS_KEY, finalTargets, campaignName);
 
     // Set up expiration for start of next turn
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_bulwark_of_force' }
-    ], campaignName, undefined, playerName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
     // Log the ability use
     await addEntry(campaignName, {

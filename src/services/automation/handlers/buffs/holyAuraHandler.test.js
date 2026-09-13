@@ -296,27 +296,13 @@ describe('holyAuraHandler.applyHolyAura', () => {
 
     await applyHolyAura(action, ps, campaignName, null, targets);
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Cleric',
-      'Ally1',
-      expect.arrayContaining([
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Cleric', targetName: 'Ally1', effects: expect.arrayContaining([
         expect.objectContaining({ type: 'remove_active_buff', buffName: 'Holy Aura' }),
-      ]),
-      campaignName,
-      undefined,
-      'Cleric',
-    );
+      ]), campaignName, rounds: undefined, expireOnCreatureName: 'Cleric' });
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Cleric',
-      'Ally2',
-      expect.arrayContaining([
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Cleric', targetName: 'Ally2', effects: expect.arrayContaining([
         expect.objectContaining({ type: 'remove_active_buff', buffName: 'Holy Aura' }),
-      ]),
-      campaignName,
-      undefined,
-      'Cleric',
-    );
+      ]), campaignName, rounds: undefined, expireOnCreatureName: 'Cleric' });
   });
 
   it('registers concentration for caster', async () => {

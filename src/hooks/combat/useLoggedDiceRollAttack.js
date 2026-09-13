@@ -180,6 +180,20 @@ const LUCK_INSPIRATION_PASSTHROUGH_KEYS = [
     'psiBolsteredKnack', 'psiBolsteredKnackDieSize', 'bardicInspiration', 'bardicInspirationDie',
 ];
 
+function buildInspirationOffenseFlags(context, stats, characterName, campaignName) {
+    return {
+        bardicInspirationOffense: context?.bardicInspirationOffense || (stats ? hasBardicInspirationOffense(stats, campaignName) : false),
+        bardicInspirationOffenseDieSize: context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (stats ? getBardicInspirationDieSizeFromClass(stats) : null),
+    };
+}
+
+function buildEmpoweredSpellFlags(context, stats) {
+    return {
+        empoweredSpell: context?.empoweredSpell || (stats ? hasEmpoweredSpell(stats) : false),
+        empoweredSpellChaMod: context?.empoweredSpellChaMod || getChaModifier(stats),
+    };
+}
+
 function buildLuckInspirationEmpoweredFlags(context, ctx, characterName, campaignName) {
     const stats = context?.playerStats;
     const flags = {};
@@ -189,11 +203,7 @@ function buildLuckInspirationEmpoweredFlags(context, ctx, characterName, campaig
     flags.bardicInspirationDefense = ctx.bardicInspirationDefense;
     flags.bardicInspirationDefenseDieSize = ctx.bardicInspirationDefenseDieSize;
     flags.bardicInspirationDefenseTargetName = ctx.bardicInspirationDefenseTargetName;
-    flags.bardicInspirationOffense = context?.bardicInspirationOffense || (stats ? hasBardicInspirationOffense(stats, campaignName) : false);
-    flags.bardicInspirationOffenseDieSize = context?.bardicInspirationOffenseDieSize || getBardicInspirationDieSize(characterName, campaignName) || (stats ? getBardicInspirationDieSizeFromClass(stats) : null);
-    flags.empoweredSpell = context?.empoweredSpell || (stats ? hasEmpoweredSpell(stats) : false);
-    flags.empoweredSpellChaMod = context?.empoweredSpellChaMod || getChaModifier(stats);
-    return flags;
+    return { ...flags, ...buildInspirationOffenseFlags(context, stats, characterName, campaignName), ...buildEmpoweredSpellFlags(context, stats) };
 }
 
 function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) {
@@ -364,7 +374,7 @@ export function createLogAndShow(deps) {
         const combatSummary = await loadCombatSummary(campaignName);
 
         // Resolve target (needed for compelled duel forcedMode before d20 resolution)
-        const { target, availableSuperiorityManeuvers } = await resolveTarget(characterName, campaignName, ctx, combatSummary, characters, getKnownManeuvers);
+        const { target, availableSuperiorityManeuvers } = await resolveTarget({ characterName, campaignName, context: ctx, combatSummary, getKnownManeuvers });
         ctx._target = target;
 
         // Show compelled duel popup if target resolution set one

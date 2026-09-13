@@ -20,7 +20,7 @@ vi.mock('./rules.js', () => ({
     getProficiencies: vi.fn(() => [0, []]),
     getSpellAbilities: vi.fn(() => ({ spell_slots_level_1: 0 })),
     getSpellMaxLevel: vi.fn(() => 0),
-    getPlayerStats: vi.fn(async (_c, _e, _m, _r, _s, summary) => ({
+    getPlayerStats: vi.fn(async ({ playerSummary: summary }) => ({
       ...summary,
       class: summary.class || { name: 'Druid', class_levels: [] },
       race: {},
@@ -96,18 +96,18 @@ describe('rulesFactory Nature\u2019s Ward land resistance (CLA-237)', () => {
 
   it('resolves lightning resistance from runtime _circleOfTheLandType when class JSON has no type', async () => {
     runtimeStore.set('Wild_Sage_Druid:_circleOfTheLandType', 'Temperate')
-    const result = await rulesFactory.getPlayerStats([], [], [], [], {}, druidSummary())
+    const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: druidSummary() })
     expect(result.resistances).toContain('Lightning')
     expect(result.resistances).not.toContain('Fire')
   })
 
   it('flips resistance when runtime land type switches (Temperate \u2192 Arid)', async () => {
     runtimeStore.set('Wild_Sage_Druid:_circleOfTheLandType', 'Temperate')
-    const temperate = await rulesFactory.getPlayerStats([], [], [], [], {}, druidSummary())
+    const temperate = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: druidSummary() })
     expect(temperate.resistances).toEqual(['Lightning'])
 
     runtimeStore.set('Wild_Sage_Druid:_circleOfTheLandType', 'Arid')
-    const arid = await rulesFactory.getPlayerStats([], [], [], [], {}, druidSummary())
+    const arid = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: druidSummary() })
     expect(arid.resistances).toEqual(['Fire'])
     expect(arid.resistances).not.toContain('Lightning')
   })
@@ -115,18 +115,18 @@ describe('rulesFactory Nature\u2019s Ward land resistance (CLA-237)', () => {
   it('falls back to class major/subclass type when no runtime land type is set', async () => {
     const summary = druidSummary()
     summary.class.major.type = 'temperate'
-    const result = await rulesFactory.getPlayerStats([], [], [], [], {}, summary)
+    const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: summary })
     expect(result.resistances).toContain('Lightning')
   })
 
   it('adds no land resistance when neither runtime key nor class type is set', async () => {
-    const result = await rulesFactory.getPlayerStats([], [], [], [], {}, druidSummary())
+    const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: druidSummary() })
     expect(result.resistances).not.toContain('Lightning')
     expect(result.resistances).not.toContain('Fire')
   })
 
   it('still grants poisoned condition immunity independent of land type', async () => {
-    const result = await rulesFactory.getPlayerStats([], [], [], [], {}, druidSummary())
+    const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: druidSummary() })
     expect(result.immunities).toContain('poisoned')
   })
 })

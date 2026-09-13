@@ -65,9 +65,9 @@ export async function handle(action, playerStats, campaignName) {
             ...storedEffects,
             { target: playerName, source: action.name, effect: 'no_opportunity_attacks', value: null, duration: 'until_start_of_next_turn' },
         ], campaignName);
-        addExpiration(playerName, playerName, [
+        addExpiration({ attackerName: playerName, targetName: playerName, effects: [
             { type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: action.name, target: playerName },
-        ], campaignName, undefined, playerName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
     }
 
     const { description, logDesc } = buildStepOfWindTexts(playerName, action.name, expend, isHeightened, focusRemaining);

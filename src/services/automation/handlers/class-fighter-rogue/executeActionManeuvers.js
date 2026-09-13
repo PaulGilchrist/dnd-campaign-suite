@@ -59,7 +59,7 @@ function computeRallyExtraHp(maneuver, playerStats) {
     return typeof extraHpRaw === 'number' ? Math.floor(extraHpRaw) : fallback;
 }
 
-function buildRallyModal(maneuver, playerStats, campaignName, dieValue, rallyAllies, description) {
+function buildRallyModal({ maneuver, playerStats, campaignName, dieValue, rallyAllies, description }) {
     const extraHp = computeRallyExtraHp(maneuver, playerStats);
     const totalHp = dieValue + extraHp;
     const allyOptions = rallyAllies.map(a => ({ label: a.name, value: a.name }));
@@ -92,9 +92,9 @@ const BONUS_EFFECT_APPLIERS = {
         await setRuntimeValue(playerStats.name, 'baitAndSwitchActive', true, campaignName);
         await setRuntimeValue(playerStats.name, 'baitAndSwitchBonus', dieValue, campaignName);
         await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
-        await addExpiration(playerStats.name, playerStats.name, [
+        await addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
             { type: 'bait_and_switch_clear' }
-        ], campaignName, undefined, playerStats.name);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
         return ` You take the Disengage action and gain +${dieValue} AC until the start of your next turn.`;
     },
     advantage_and_damage: async ({ maneuver, playerStats, campaignName, dieValue, targetName }) => {
@@ -111,9 +111,9 @@ const BONUS_EFFECT_APPLIERS = {
             appliedRound: currentRound,
         };
         await setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
-        addExpiration(playerStats.name, playerStats.name, [
+        addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
             { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: maneuver.name, target: playerStats.name }
-        ], campaignName, 2);
+        ], campaignName, rounds: 2 });
         return ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
     },
     dash_and_damage: async ({ playerStats, campaignName, dieValue }) => {
@@ -163,7 +163,14 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
     }
 
     if (maneuver.effect === 'temp_hp') {
-        return buildRallyModal(maneuver, playerStats, campaignName, dieValue, rallyGate.rallyAllies, description);
+        return buildRallyModal({
+    maneuver,
+    playerStats,
+    campaignName,
+    dieValue,
+    rallyAllies: rallyGate.rallyAllies,
+    description,
+});
     }
 
     const applyEffect = BONUS_EFFECT_APPLIERS[maneuver.effect];
@@ -564,7 +571,7 @@ async function collectCommandingPresenceTargets(cs, playerStats, campaignName, r
     return validTargets;
 }
 
-async function buildCommandingPresenceTargetModal(action, auto, maneuver, playerStats, campaignName, maneuverName) {
+async function buildCommandingPresenceTargetModal({ action, auto, maneuver, playerStats, campaignName, maneuverName }) {
     const cs = await getCombatContext(campaignName);
     if (!cs || !cs.creatures || cs.creatures.length === 0) {
         return {
@@ -633,9 +640,9 @@ async function applyCommandingPresenceDisadvantage(reactionEffect, reactionDurat
         if (!hasDisadvantage) {
             await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'disadvantage'], campaignName);
         }
-        await addExpiration(playerStats.name, targetName, [
+        await addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'condition', condition: 'disadvantage' },
-        ], campaignName, durationInTurns);
+        ], campaignName, rounds: durationInTurns });
         return ` ${targetName} has Disadvantage on their next attack roll.`;
     }
     if (reactionEffect === 'save_disadvantage') {
@@ -664,7 +671,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
 
     // If no target is pre-set, show a modal to select one
     if (!targetName) {
-        return buildCommandingPresenceTargetModal(action, auto, maneuver, playerStats, campaignName, maneuverName);
+        return buildCommandingPresenceTargetModal({ action, auto, maneuver, playerStats, campaignName, maneuverName });
     }
 
     const { dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);

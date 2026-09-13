@@ -23,9 +23,9 @@ export function createAutoBreakConditionHandler({
                 return String(c.key || c).toLowerCase() !== conditionKey
             })
         }
-        removeCondition(combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName)
+        removeCondition({ combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName })
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
-        logConditionEvent(campaignName, 'broken', creatureName, condition.label)
+        logConditionEvent({ campaignName, action: 'broken', creatureName, conditionLabel: condition.label })
     }
 }

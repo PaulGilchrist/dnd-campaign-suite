@@ -43,7 +43,7 @@ export function isImprisonmentBlocked(attackerName, targetName, _campaignName) {
     return true;
 }
 
-function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
+function dispatchSaveResult({ campaignName, promptId, targetName, saveType, saveDc, saveResult }) {
     sendSaveResult(campaignName, targetName, {
         promptId,
         success: saveResult.success,
@@ -104,9 +104,9 @@ async function applyImprisonmentEffect({ action, auto, casterName, targetName, d
     });
 
     // Track for expiration cleanup (badge removal)
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'imprisonment', target: targetName, source: casterName },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'save_result',
@@ -211,7 +211,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }).catch((e) => { console.error("[imprisonment] Error:", e); });
 
     if (isTargetNpc) {
-        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcImprisonmentSave(targetCreature, dc));
+        dispatchSaveResult({
+    campaignName,
+    promptId,
+    targetName,
+    saveType: 'WIS',
+    saveDc: dc,
+    saveResult: rollNpcImprisonmentSave(targetCreature, dc),
+});
     }
 
     const saveResult = await promise;

@@ -71,7 +71,7 @@ describe('executeBonusActionManeuver — MN-007 Evasive Footwork', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'baitAndSwitchActive', true, 'test-campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'baitAndSwitchBonus', 5, 'test-campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'baitAndSwitchSource', 'Evasive Footwork', 'test-campaign');
-        expect(addExpiration).toHaveBeenCalledWith('EvasiveFighter', 'EvasiveFighter', [{ type: 'bait_and_switch_clear' }], 'test-campaign', undefined, 'EvasiveFighter');
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'EvasiveFighter', targetName: 'EvasiveFighter', effects: [{ type: 'bait_and_switch_clear' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'EvasiveFighter' });
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('You take the Disengage action and gain +5 AC until the start of your next turn.');
     });

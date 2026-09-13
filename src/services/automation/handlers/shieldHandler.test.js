@@ -78,14 +78,7 @@ describe('shieldHandler', () => {
 
             const result = await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
 
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                'TestCharacter',
-                'TestCharacter',
-                [{ type: 'remove_active_buff', buffName: 'Shield' }],
-                mockCampaignName,
-                undefined,
-                'TestCharacter'
-            );
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCharacter', targetName: 'TestCharacter', effects: [{ type: 'remove_active_buff', buffName: 'Shield' }], campaignName: mockCampaignName, rounds: undefined, expireOnCreatureName: 'TestCharacter' });
             expect(damageUtils.getCombatContext).toHaveBeenCalled();
             expect(damageRollback.findAttackRollAgainstTarget).not.toHaveBeenCalled();
             expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();

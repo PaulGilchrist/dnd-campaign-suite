@@ -138,18 +138,18 @@ function buildMasteryEffectPayload(masteryName, mastery, playerStats, targetName
             vexTarget: targetName,
             appliedRound: getCurrentCombatRound(),
         };
-        addExpiration(playerStats.name, targetName, [
+        addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Vex', target: targetName }
-        ], campaignName, 2);
+        ], campaignName, rounds: 2 });
     }
     if (masteryName === 'Sap') {
         newEffect = {
             ...newEffect,
             appliedRound: getCurrentCombatRound(),
         };
-        addExpiration(playerStats.name, targetName, [
+        addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'Sap', target: targetName }
-        ], campaignName, undefined, playerStats.name);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
     }
     return newEffect;
 }
@@ -169,9 +169,9 @@ function slowMasteryRefusal(storedEffects, masteryName, targetName, playerStats,
             },
         };
     }
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'Slow', target: targetName }
-    ], campaignName, 1);
+    ], campaignName, rounds: 1 });
     return null;
 }
 

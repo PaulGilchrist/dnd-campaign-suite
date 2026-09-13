@@ -78,9 +78,9 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             await setRuntimeValue(playerName, 'activeConditions', [...conditions, 'invisible'], campaignName);
         }
 
-        addExpiration(playerName, playerName, [
+        addExpiration({ attackerName: playerName, targetName: playerName, effects: [
             { type: 'condition', condition: 'invisible' }
-        ], campaignName, undefined, playerName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
         const remaining = newCount - 1;
         const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn.`;
@@ -180,9 +180,9 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
                 }
                 await setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 
-                addExpiration(playerName, targetName, [
+                addExpiration({ attackerName: playerName, targetName, effects: [
                     { type: 'targetEffect', effect: 'taunting_step', target: targetName }
-                ], campaignName, undefined, playerName);
+                ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
                 addEntry(campaignName, {
                     type: 'save_result',
@@ -267,7 +267,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
                 totalDamage += damageRoll;
 
                 if (combatContext?.creatures) {
-                    applyDamageToTarget(combatContext, targetName, damageRoll, ['Psychic'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+                    applyDamageToTarget(combatContext, targetName, damageRoll, ['Psychic'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
                 }
 
                 addEntry(campaignName, {

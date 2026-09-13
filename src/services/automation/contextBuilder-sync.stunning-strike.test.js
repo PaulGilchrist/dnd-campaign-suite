@@ -144,7 +144,7 @@ describe('contextBuilder-sync: stored save advantage (Stunning Strike)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
     expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -162,7 +162,7 @@ describe('contextBuilder-sync: stored save advantage (Stunning Strike)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
     expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -187,7 +187,7 @@ describe('contextBuilder-sync: condition-based advantage on attacks', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -199,7 +199,7 @@ describe('contextBuilder-sync: condition-based advantage on attacks', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -211,7 +211,7 @@ describe('contextBuilder-sync: condition-based advantage on attacks', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -223,7 +223,7 @@ describe('contextBuilder-sync: condition-based advantage on attacks', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -251,7 +251,7 @@ describe('contextBuilder-sync: grappled + Grappler feat advantage', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, grapplerStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, grapplerStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -268,7 +268,7 @@ describe('contextBuilder-sync: grappled + Grappler feat advantage', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, noGrapplerStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, noGrapplerStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -287,7 +287,7 @@ describe('contextBuilder-sync: grappled + Grappler feat advantage', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, grapplerStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, grapplerStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -311,7 +311,7 @@ describe('contextBuilder-sync: attacker disadvantage effects (sap + slasher)', (
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('disadvantage');
   });
@@ -323,7 +323,7 @@ describe('contextBuilder-sync: attacker disadvantage effects (sap + slasher)', (
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -345,7 +345,7 @@ describe('contextBuilder-sync: condition advantage combines with other sources',
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -357,7 +357,7 @@ describe('contextBuilder-sync: condition advantage combines with other sources',
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });

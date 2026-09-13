@@ -165,7 +165,7 @@ describe('contextBuilder-sync: innate sorcery bonus', () => {
     getInnateSorceryBonus.mockReturnValue({ spellAdvantage: true, saveDcBonus: 2 });
     const attack = { ...mockAttack, saveDc: 13 };
 
-    const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
     expect(result.saveDc).toBe(15);
@@ -196,7 +196,7 @@ describe('contextBuilder-sync: activeBuffs — stance damage (rage)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.autoDamageFormula).toBe('1d8+4 plus 10');
   });
@@ -214,7 +214,7 @@ describe('contextBuilder-sync: activeBuffs — stance damage (rage)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.autoDamageFormula).toBe('1d8+4 plus 5');
   });
@@ -232,7 +232,7 @@ describe('contextBuilder-sync: activeBuffs — stance damage (rage)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.autoDamageFormula).toBe('1d8+4 plus 2');
   });
@@ -243,7 +243,7 @@ describe('contextBuilder-sync: activeBuffs — stance damage (rage)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.autoDamageFormula).toBe('1d8+4');
   });
@@ -267,7 +267,7 @@ describe('contextBuilder-sync: activeBuffs — advantage buffs (reckless attack,
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -287,7 +287,7 @@ describe('contextBuilder-sync: activeBuffs — Ram', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.ramActive).toBe(true);
   });
@@ -307,7 +307,7 @@ describe('contextBuilder-sync: Dodge action', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('disadvantage');
   });
@@ -320,7 +320,7 @@ describe('contextBuilder-sync: Dodge action', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -340,12 +340,12 @@ describe('contextBuilder-sync: activeBuffs — sacred weapon', () => {
       return undefined;
     });
 
-    let result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    let result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(result.sacredWeaponBonus).toBe(2);
     expect(result.hitBonus).toBe(9);
 
     const unarmedAttack = { ...mockAttack, weaponType: 'unarmed' };
-    result = await buildAttackContextSync(unarmedAttack, mockStats, 'camp', 'normal', {});
+    result = await buildAttackContextSync(unarmedAttack, mockStats, 'camp', 'normal');
     expect(result.sacredWeaponBonus).toBe(2);
   });
 
@@ -362,7 +362,7 @@ describe('contextBuilder-sync: activeBuffs — sacred weapon', () => {
       return undefined;
     });
 
-    let result = await buildAttackContextSync(mockAttack, negativeStats, 'camp', 'normal', {});
+    let result = await buildAttackContextSync(mockAttack, negativeStats, 'camp', 'normal');
     expect(result.sacredWeaponBonus).toBe(1);
 
     const missingChaStats = {
@@ -371,7 +371,7 @@ describe('contextBuilder-sync: activeBuffs — sacred weapon', () => {
         { name: 'Strength', bonus: 4 },
       ],
     };
-    result = await buildAttackContextSync(mockAttack, missingChaStats, 'camp', 'normal', {});
+    result = await buildAttackContextSync(mockAttack, missingChaStats, 'camp', 'normal');
     expect(result.sacredWeaponBonus).toBe(1);
   });
 });
@@ -390,7 +390,7 @@ describe('contextBuilder-sync: activeBuffs — vow of enmity', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -411,7 +411,7 @@ describe('contextBuilder-sync: activeBuffs — clairvoyant combatant', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -429,7 +429,7 @@ describe('contextBuilder-sync: activeBuffs — avenging angel', () => {
     isAvengingAngelActive.mockReturnValue(true);
     isAuraTarget.mockReturnValue(true);
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
   });
@@ -449,12 +449,12 @@ describe('contextBuilder-sync: activeBuffs — blessed warrior', () => {
       return undefined;
     });
 
-    let result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    let result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(result.hitBonus).toBe(9);
     expect(result.hitBonusFormula).toBe('To Hit = 4 + 2 + 1 + Blessed Warrior (2)');
 
     const unarmedAttack = { ...mockAttack, weaponType: 'unarmed' };
-    result = await buildAttackContextSync(unarmedAttack, mockStats, 'camp', 'normal', {});
+    result = await buildAttackContextSync(unarmedAttack, mockStats, 'camp', 'normal');
     expect(result.hitBonus).toBe(9);
   });
 });

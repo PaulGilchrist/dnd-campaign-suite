@@ -269,17 +269,10 @@ describe('protectionFromEvilAndGoodHandler', () => {
         CAMPAIGN_NAME
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        PLAYER_NAME,
-        TARGET_NAME,
-        expect.arrayContaining([
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: TARGET_NAME, effects: expect.arrayContaining([
           expect.objectContaining({ type: 'remove_active_buff' }),
           expect.objectContaining({ type: 'remove_target_effect' }),
-        ]),
-        CAMPAIGN_NAME,
-        Infinity,
-        TARGET_NAME
-      );
+        ]), campaignName: CAMPAIGN_NAME, rounds: Infinity, expireOnCreatureName: TARGET_NAME });
 
       expect(logService.addEntry).toHaveBeenCalledWith(
         CAMPAIGN_NAME,

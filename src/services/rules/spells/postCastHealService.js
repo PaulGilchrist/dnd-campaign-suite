@@ -69,7 +69,7 @@ function resolvePostCastLevelContext(playerStats, metaCtx, spell, fnName, resour
 
 // Resolve a passive's heal expression and roll it. Returns 0 when the
 // passive targets self-only spells or the roll is invalid/zero.
-function rollPostCastHealAmount(heal, spell, playerStats, prof, level, slotLevel) {
+function rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel }) {
     if (heal.othersOnly && spell.range === 'Self') {
         return 0;
     }
@@ -104,7 +104,7 @@ export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, camp
 
     const results = [];
     for (const heal of selfHeals) {
-        const amount = rollPostCastHealAmount(heal, spell, playerStats, prof, level, slotLevel);
+        const amount = rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel });
         if (amount <= 0) {
             continue;
         }
@@ -138,7 +138,7 @@ export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, camp
     const { prof, level, slotLevel } = resolvePostCastLevelContext(playerStats, metaCtx, spell, 'triggerPostCastAllyHeals', 'post-cast ally heals');
 
     for (const heal of allyHeals) {
-        const amount = rollPostCastHealAmount(heal, spell, playerStats, prof, level, slotLevel);
+        const amount = rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel });
         if (amount <= 0) {
             continue;
         }

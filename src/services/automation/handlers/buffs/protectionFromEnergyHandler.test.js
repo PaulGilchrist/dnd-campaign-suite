@@ -231,17 +231,12 @@ describe('protectionFromEnergyHandler', () => {
         CAMPAIGN_NAME
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        PLAYER_NAME,
-        TARGET_NAME,
-        expect.arrayContaining([
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: TARGET_NAME, effects: expect.arrayContaining([
           expect.objectContaining({
             type: 'remove_active_buff',
             buffName: 'Protection from Energy',
           }),
-        ]),
-        CAMPAIGN_NAME
-      );
+        ]), campaignName: CAMPAIGN_NAME });
     });
 
     it('normalizes damage type capitalization', async () => {

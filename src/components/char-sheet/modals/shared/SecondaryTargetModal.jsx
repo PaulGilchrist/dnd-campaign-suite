@@ -5,6 +5,66 @@ function isOptionTarget(target) {
     return 'value' in target;
 }
 
+function targetKeyOf(target) {
+    return isOptionTarget(target) ? target.value : target.name;
+}
+
+function hasHpValues(target) {
+    return target.currentHp != null && target.maxHp != null;
+}
+
+function hpPercent(target) {
+    return Math.round((target.currentHp / target.maxHp) * 100);
+}
+
+function rowVisibilityFlags(target, showHp, showSize) {
+    const isNpcOrMonster = !target || target.type === 'npc' || target.type === 'monster';
+    return {
+        shouldShowHp: showHp !== false && !isNpcOrMonster && hasHpValues(target),
+        shouldShowSize: showSize && target.size,
+    };
+}
+
+function TargetNameContent({ target, shouldShowSize, shouldShowHp }) {
+    return (
+        <>
+            <strong>{target.name}</strong>
+            {shouldShowSize && <span className="secondary-target-size">({target.size})</span>}
+            {shouldShowHp && <span className="secondary-target-hp">
+                {target.currentHp}/{target.maxHp} HP ({hpPercent(target)}%)
+            </span>}
+            {!shouldShowHp && hasHpValues(target) && <span className="secondary-target-hp">
+                {hpPercent(target)}%
+            </span>}
+        </>
+    );
+}
+
+function SecondaryTargetRow({ target, selected, showHp, showSize, handleSelect }) {
+    const isSelected = selected === targetKeyOf(target);
+    const { shouldShowHp, shouldShowSize } = rowVisibilityFlags(target, showHp, showSize);
+    return (
+        <label
+            className={`secondary-target-row ${isSelected ? 'secondary-target-selected' : ''}`}
+            onClick={() => handleSelect(targetKeyOf(target))}
+        >
+            <input
+                type="radio"
+                name="secondaryTarget"
+                checked={isSelected}
+                onChange={() => handleSelect(targetKeyOf(target))}
+            />
+            <span className="secondary-target-name">
+                {isOptionTarget(target) ? (
+                    <strong>{target.label}</strong>
+                ) : (
+                    <TargetNameContent target={target} shouldShowSize={shouldShowSize} shouldShowHp={shouldShowHp} />
+                )}
+            </span>
+        </label>
+    );
+}
+
 function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled }) {
     const [selected, setSelected] = useState(null);
 
@@ -33,43 +93,16 @@ function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featur
                     {description && <p dangerouslySetInnerHTML={{ __html: description }} />}
                     {!description && targets.length > 0 && <p>Choose a target from the {targets.length} available:</p>}
                     <div className="secondary-target-list">
-                        {targets.map((target, i) => {
-                            const isSelected = selected === (isOptionTarget(target) ? target.value : target.name);
-                            const targetKey = isOptionTarget(target) ? target.value : target.name;
-                            const isNpcOrMonster = !target || target.type === 'npc' || target.type === 'monster';
-                            const shouldShowHp = showHp !== false && !isNpcOrMonster && target.currentHp != null && target.maxHp != null;
-                            const shouldShowSize = showSize && target.size;
-                            return (
-                                <label
-                                    key={i}
-                                    className={`secondary-target-row ${isSelected ? 'secondary-target-selected' : ''}`}
-                                    onClick={() => handleSelect(targetKey)}
-                                >
-                                    <input
-                                        type="radio"
-                                        name="secondaryTarget"
-                                        checked={isSelected}
-                                        onChange={() => handleSelect(targetKey)}
-                                    />
-                                    <span className="secondary-target-name">
-                                        {isOptionTarget(target) ? (
-                                            <strong>{target.label}</strong>
-                                        ) : (
-                                            <>
-                                                <strong>{target.name}</strong>
-                                                {shouldShowSize && <span className="secondary-target-size">({target.size})</span>}
-                                                {shouldShowHp && <span className="secondary-target-hp">
-                                                    {target.currentHp}/{target.maxHp} HP ({Math.round((target.currentHp / target.maxHp) * 100)}%)
-                                                </span>}
-                                                {!shouldShowHp && target.currentHp != null && target.maxHp != null && <span className="secondary-target-hp">
-                                                    {Math.round((target.currentHp / target.maxHp) * 100)}%
-                                                </span>}
-                                            </>
-                                        )}
-                                    </span>
-                                </label>
-                            );
-                        })}
+                        {targets.map((target, i) => (
+                            <SecondaryTargetRow
+                                key={i}
+                                target={target}
+                                selected={selected}
+                                showHp={showHp}
+                                showSize={showSize}
+                                handleSelect={handleSelect}
+                            />
+                        ))}
                     </div>
                     {variantLabel && (
                         <label className={`secondary-target-variant ${variantDisabled ? 'secondary-target-variant-disabled' : ''}`}>

@@ -65,6 +65,23 @@ function appendAbilityToDamageFormula(damageFormula, abilityName, abilityBonus, 
     return damageFormula;
 }
 
+function buildDamageDisplay({ damageDice, totalDamageModifier, abilityName, abilityBonus, magicBonus, includeAbilityBonusInDamage, extraDamage, extraDamageLabel }) {
+    let damage = damageDice;
+    let damageFormula = `Damage Formula = Weapon (${damageDice})`;
+
+    if (magicBonus || includeAbilityBonusInDamage || extraDamage) {
+        damage += totalDamageModifier >= 0 ? `+${totalDamageModifier}` : `${totalDamageModifier}`;
+    }
+
+    damageFormula = appendAbilityToDamageFormula(damageFormula, abilityName, abilityBonus, magicBonus, includeAbilityBonusInDamage);
+
+    if (extraDamage) {
+        damageFormula += ` + ${extraDamageLabel}`;
+    }
+
+    return { damage, damageFormula };
+}
+
 export function buildWeaponAttack(opts) {
     const {
         weapon,
@@ -87,24 +104,12 @@ export function buildWeaponAttack(opts) {
 
     const { magicBonus } = parseMagicItemName(weaponName);
 
-    let damage = weapon.damage.damage_dice;
-    let damageFormula = `Damage Formula = Weapon (${weapon.damage.damage_dice})`;
+    // Calculate the total numeric modifier for display (combines ability, magic, and extra damage)
+    const totalDamageModifier = computeTotalDamageModifier({ abilityBonus, magicBonus, includeAbilityBonusInDamage, extraDamage });
+    const { damage, damageFormula } = buildDamageDisplay({ damageDice: weapon.damage.damage_dice, totalDamageModifier, abilityName, abilityBonus, magicBonus, includeAbilityBonusInDamage, extraDamage, extraDamageLabel });
 
     let toHitBonus = abilityBonus + proficiency;
     let hitBonusFormula = `To Hit Bonus Formula = ${abilityName} Bonus (${abilityBonus}) + Proficiency (${proficiency})`;
-
-    // Calculate the total numeric modifier for display (combines ability, magic, and extra damage)
-    const totalDamageModifier = computeTotalDamageModifier({ abilityBonus, magicBonus, includeAbilityBonusInDamage, extraDamage });
-
-    if (magicBonus || includeAbilityBonusInDamage || extraDamage) {
-        damage += totalDamageModifier >= 0 ? `+${totalDamageModifier}` : `${totalDamageModifier}`;
-    }
-
-    damageFormula = appendAbilityToDamageFormula(damageFormula, abilityName, abilityBonus, magicBonus, includeAbilityBonusInDamage);
-
-    if (extraDamage) {
-        damageFormula += ` + ${extraDamageLabel}`;
-    }
 
     if (magicBonus) {
         toHitBonus += magicBonus;

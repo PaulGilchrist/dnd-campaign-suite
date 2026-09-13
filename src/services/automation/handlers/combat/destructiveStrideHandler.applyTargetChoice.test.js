@@ -71,14 +71,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
         it('returns null when combatSummary is null', async () => {
             combatData.getCombatSummary.mockReturnValue(null);
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(result).toBeNull();
         });
@@ -86,14 +86,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
         it('returns null when target is not found in combatSummary', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'NonexistentCreature',
-                'Fire',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'NonexistentCreature',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(result).toBeNull();
         });
@@ -101,14 +101,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
         it('returns null for empty string targetName', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                '',
-                'Fire',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: '',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(result).toBeNull();
         });
@@ -119,14 +119,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -137,14 +137,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue(null);
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Orc',
-                'Cold',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Orc',
+                    chosenType: 'Cold',
+                    martialArtsDie: 6,
+                });
 
             expect(result.payload.description).toBe('Orc takes 6 Cold damage.');
         });
@@ -153,14 +153,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ rolls: [3] });
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Orc',
-                'Cold',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Orc',
+                    chosenType: 'Cold',
+                    martialArtsDie: 6,
+                });
 
             expect(result.payload.description).toBe('Orc takes 6 Cold damage.');
         });
@@ -169,14 +169,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d6');
         });
@@ -185,30 +185,30 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Thunder',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Thunder',
+                    martialArtsDie: 6,
+                });
 
-            expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(combatSummaryWithTargets, 'Goblin', 3, ['thunder'], campaignName, expect.any(Array), { ignoreResistance: false, attackerName: 'TestMonk', suppressHpLog: false },);
+            expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(combatSummaryWithTargets, 'Goblin', 3, ['thunder'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestMonk', suppressHpLog: false });
         });
 
         it('passes damage type as lowercase array to applyDamageToTarget', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Lightning',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Lightning',
+                    martialArtsDie: 6,
+                });
 
             const args = applyDamage.applyDamageToTarget.mock.calls[0];
             expect(args[3]).toEqual(['lightning']);
@@ -218,16 +218,16 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
-            const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][5];
+            const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][4].characters;
             expect(charactersArg.length).toBe(1);
             expect(charactersArg[0].name).toBe('TestMonk');
         });
@@ -239,14 +239,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
 
             const action = makeAction();
-            const result = await applyTargetChoice(
-                action,
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action,
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(result.payload.automation).toEqual(action.automation);
         });
@@ -255,14 +255,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(result.payload.automationType).toBe('destructive_stride');
         });
@@ -271,14 +271,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(result.payload.name).toBe('Destructive Stride');
         });
@@ -289,14 +289,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
@@ -311,14 +311,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 2, rolls: [2] });
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Orc',
-                'Acid',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Orc',
+                    chosenType: 'Acid',
+                    martialArtsDie: 6,
+                });
 
             const callArgs = logService.addEntry.mock.calls[0][1];
             expect(callArgs.description).toContain('roll: 2');
@@ -328,14 +328,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue(null);
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Orc',
-                'Cold',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Orc',
+                    chosenType: 'Cold',
+                    martialArtsDie: 6,
+                });
 
             const callArgs = logService.addEntry.mock.calls[0][1];
             expect(callArgs.description).toContain('roll: 6');
@@ -348,14 +348,14 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             logService.addEntry.mockRejectedValue(new Error('log failure'));
 
-            const result = await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            const result = await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
             expect(result.type).toBe('popup');
             expect(consoleErrorSpy).toHaveBeenCalled();
@@ -374,16 +374,16 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             });
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
-            const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][5];
+            const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][4].characters;
             expect(charactersArg.length).toBe(2);
             expect(charactersArg[0].name).toBe('TestMonk');
             expect(charactersArg[1].name).toBe('AllySorcerer');
@@ -397,16 +397,16 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             });
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
 
-            await applyTargetChoice(
-                makeAction(),
-                makePlayerStats(),
-                campaignName,
-                'Goblin',
-                'Fire',
-                6,
-            );
+            await applyTargetChoice({
+                    action: makeAction(),
+                    playerStats: makePlayerStats(),
+                    campaignName,
+                    targetName: 'Goblin',
+                    chosenType: 'Fire',
+                    martialArtsDie: 6,
+                });
 
-            const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][5];
+            const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][4].characters;
             expect(charactersArg).toEqual([]);
         });
     });

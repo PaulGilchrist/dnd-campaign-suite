@@ -2,6 +2,18 @@ import { is2024 } from './rules-helpers.js';
 import { getSubModules } from './rules-core.js';
 import { loadBackgroundData } from '../ui/dataLoader.js';
 
+// Parse "Choose one kind of Artisan's Tools" → { choose, from } for a background tool proficiency.
+function parseChooseToolProficiency(toolProficiencies) {
+    const toolMatch = toolProficiencies.match(/Choose\s+(?:one|(\d+))\s+(?:kind\s+of\s+)?(.+?)(?:\s+of\s+your\s+choice)?\s*$/i);
+    if (toolMatch) {
+        const count = parseInt(toolMatch[1] || '1', 10);
+        const toolName = toolMatch[2].trim();
+        return { choose: count, from: [toolName] };
+    }
+    // Fallback: use the full string as the tool name
+    return { choose: 1, from: [toolProficiencies.replace(/Choose\s+(?:one\s+(?:kind\s+of\s+)?)?/i, '').trim()] };
+}
+
 /**
  * Get proficiencies for a character (ruleset-specific).
  */
@@ -87,16 +99,7 @@ function getProficiencies2024(playerStats, skill, pu) {
                 if (backgrounds) {
                     const bg = backgrounds.find(b => b.name === bgName || b.index === bgName.toLowerCase());
                     if (bg && bg.tool_proficiencies && bg.tool_proficiencies.startsWith('Choose')) {
-                        // Parse "Choose one kind of Artisan's Tools" → extract the tool name
-                        const toolMatch = bg.tool_proficiencies.match(/Choose\s+(?:one|(\d+))\s+(?:kind\s+of\s+)?(.+?)(?:\s+of\s+your\s+choice)?\s*$/i);
-                        if (toolMatch) {
-                            const count = parseInt(toolMatch[1] || '1', 10);
-                            const toolName = toolMatch[2].trim();
-                            choices.push({ choose: count, from: [toolName] });
-                        } else {
-                            // Fallback: use the full string as the tool name
-                            choices.push({ choose: 1, from: [bg.tool_proficiencies.replace(/Choose\s+(?:one\s+(?:kind\s+of\s+)?)?/i, '').trim()] });
-                        }
+                        choices.push(parseChooseToolProficiency(bg.tool_proficiencies));
                     }
                 }
             } catch (_e) {

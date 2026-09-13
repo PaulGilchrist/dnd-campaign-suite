@@ -70,7 +70,7 @@ async function applyForcedSuccessSave({ context, combatSummary, target, characte
         gwfDisplayRolls: gwfDisplayRolls,
     });
 
-    const applyResult = await applyDamageToTarget(combatSummary, target.name, autoSuccessDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: false, ...{ isSpellDamage: true } });
+    const applyResult = await applyDamageToTarget(combatSummary, target.name, autoSuccessDamage, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: false, ...{ isSpellDamage: true } });
 
     if (applyResult && applyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);

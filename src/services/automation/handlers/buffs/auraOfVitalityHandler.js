@@ -154,9 +154,9 @@ export async function applyAuraOfVitality(action, playerStats, campaignName, map
     // Also store on the caster (for free cast checking)
     registerTargetEffect(campaignName, casterName, 'aura_of_vitality', casterName);
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_active_buff', buffName: 'Aura of Vitality' },
-    ], campaignName, undefined, casterName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 
     const cs = getCombatSummary(campaignName);
     addConcentration(cs, casterName, 'Aura of Vitality', 10 + Math.floor(playerStats.concentrationBonus || 0));

@@ -63,16 +63,11 @@ describe('useCharActionsCleave', () => {
 
             expect(testDeps.setShowCleaveTargetSelection).toHaveBeenCalledWith(false);
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
-                'Longsword (Cleave)',
-                '1d8',
-                8,
-                [5, 3],
-                0,
-                {
+                { name: 'Longsword (Cleave)', formula: '1d8', total: 8, rolls: [5, 3], modifier: 0, context: {
                     targetName: 'Goblin',
                     damageType: 'slashing',
                     attackerName: 'TestFighter',
-                }
+                } }
             );
             expect(testDeps.addEntry).toHaveBeenCalledWith('test-campaign', {
                 type: 'ability_use',
@@ -116,17 +111,12 @@ describe('useCharActionsCleave', () => {
             await handleCleaveAttack('Goblin');
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
-                'Longsword (Cleave)',
-                '1d8',
-                0,
-                [],
-                0,
-                {
+                { name: 'Longsword (Cleave)', formula: '1d8', total: 0, rolls: [], modifier: 0, context: {
                     attackerName: 'TestFighter',
                     damageType: 'slashing',
                     isAutoMiss: true,
                     targetName: 'Goblin',
-                }
+                } }
             );
         });
 
@@ -145,17 +135,12 @@ describe('useCharActionsCleave', () => {
             await handleCleaveAttack('Ogre');
 
             expect(testDeps.rollDamage).toHaveBeenCalledWith(
-                'Longsword (Cleave)',
-                '1d8',
-                0,
-                [],
-                0,
-                {
+                { name: 'Longsword (Cleave)', formula: '1d8', total: 0, rolls: [], modifier: 0, context: {
                     attackerName: 'TestFighter',
                     damageType: 'slashing',
                     isAutoMiss: true,
                     targetName: 'Ogre',
-                }
+                } }
             );
             expect(testDeps.addEntry).toHaveBeenCalledWith('test-campaign', {
                 type: 'ability_use',

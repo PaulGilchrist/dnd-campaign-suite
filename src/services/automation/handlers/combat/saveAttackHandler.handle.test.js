@@ -333,12 +333,7 @@ describe('saveAttackHandler - handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'TestCaster',
-        [{ type: 'remove_active_buff', buffName: 'Breath Weapon' }],
-        campaignName,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'TestCaster', effects: [{ type: 'remove_active_buff', buffName: 'Breath Weapon' }], campaignName });
     });
 
     it('should not set expiration for non-area shape', async () => {

@@ -62,14 +62,7 @@ describe('applyManeuveringAllyGrant (MN-011)', () => {
     it('registers a maneuvering_step_granted expiration keyed to the caster', async () => {
         await applyManeuveringAllyGrant('HeroesFeastBard', 'GoliathFireGiant', 'Animated Rug of Smothering 1', 'test-campaign');
 
-        expect(addExpiration).toHaveBeenCalledWith(
-            'GoliathFireGiant',
-            'HeroesFeastBard',
-            [{ type: 'maneuvering_step_granted' }],
-            'test-campaign',
-            undefined,
-            'GoliathFireGiant'
-        );
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'GoliathFireGiant', targetName: 'HeroesFeastBard', effects: [{ type: 'maneuvering_step_granted' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'GoliathFireGiant' });
     });
 
     it('logs a named ability_use grant entry with half-speed and protection source', async () => {

@@ -226,7 +226,7 @@ describe('useTravelManagement', () => {
       expect(result.current.travelMode).toBe('planning');
       expect(result.current.pathIndex).toBe(0);
       expect(calculatePath).toHaveBeenCalledWith(
-        baseArgs.partyPosition, to, baseArgs.hexCols, baseArgs.hexRows, baseArgs.terrain, baseArgs.roads
+        baseArgs.partyPosition, to, { hexCols: baseArgs.hexCols, hexRows: baseArgs.hexRows, terrain: baseArgs.terrain, roads: baseArgs.roads }
       );
     });
 

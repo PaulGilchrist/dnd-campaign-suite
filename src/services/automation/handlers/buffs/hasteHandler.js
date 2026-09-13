@@ -70,9 +70,9 @@ export async function applyHaste(action, playerStats, campaignName, _mapName, ta
         };
         setRuntimeValue(targetName, 'conditionEffects', newConditionEffects, campaignName);
 
-        addExpiration(playerStats.name, targetName, [
+        addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'remove_active_buff', buffName: HASTE_BUFF_NAME }
-        ], campaignName);
+        ], campaignName });
 
         addEntry(campaignName, {
             type: 'ability_use',

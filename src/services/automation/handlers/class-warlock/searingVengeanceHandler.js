@@ -144,7 +144,7 @@ function rangeToFeet(rangeStr) {
     return match ? parseInt(match[1], 10) : 30;
 }
 
-export async function confirmSearingVengeance(automation, playerStats, campaignName, mapName, characters, payload) {
+export async function confirmSearingVengeance({ automation, playerStats, campaignName, characters, payload }) {
     const playerName = playerStats.name;
     const targetName = payload.targetName;
     const name = payload.name;
@@ -209,7 +209,7 @@ export async function confirmSearingVengeance(automation, playerStats, campaignN
     }
 
     // Log healing
-    await logSearingHeal(campaignName, playerName, targetName, healResult, actualHeal, targetMaxHp);
+    await logSearingHeal({ campaignName, playerName, targetName, healResult, actualHeal, targetMaxHp });
 
     // Log ability use with heal + burst amounts
     await addEntry(campaignName, {
@@ -231,7 +231,7 @@ export async function confirmSearingVengeance(automation, playerStats, campaignN
     };
 }
 
-async function logSearingHeal(campaignName, playerName, targetName, healResult, actualHeal, targetMaxHp) {
+async function logSearingHeal({ campaignName, playerName, targetName, healResult, actualHeal, targetMaxHp }) {
     await addEntry(campaignName, {
         type: 'hp_change',
         characterName: playerName,
@@ -259,7 +259,7 @@ function rollSearingDamage(automation, playerStats) {
 }
 
 async function applySearingVengeanceToCreature(cs, { creatureName, damageAmount, damageResult, damageExpr, campaignName, characters, playerName, name, automation }) {
-    applyDamageToTarget(cs, creatureName, damageAmount, ['Radiant'], campaignName, characters || [], { ignoreResistance: false, attackerName: playerName });
+    applyDamageToTarget(cs, creatureName, damageAmount, ['Radiant'], { campaignName, characters: characters || [], ignoreResistance: false, attackerName: playerName });
 
     const storedConditions = getRuntimeValue(creatureName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
@@ -269,9 +269,9 @@ async function applySearingVengeanceToCreature(cs, { creatureName, damageAmount,
     }
 
     // Blinded lasts until end of the current turn (expires next round) per conditionDuration: until_end_of_current_turn
-    await addExpiration(playerName, creatureName, [
+    await addExpiration({ attackerName: playerName, targetName: creatureName, effects: [
         { type: 'condition', condition: 'blinded' },
-    ], campaignName, 1);
+    ], campaignName, rounds: 1 });
 
     // Log damage roll
     await addEntry(campaignName, {

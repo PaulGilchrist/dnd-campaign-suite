@@ -321,14 +321,14 @@ describe('reactionBonusHandler', () => {
             const lastAttack = { ...baseLastAttack, targetAc: 16, hit: false };
             getCombatContext.mockReturnValue({ lastAttack });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
 
             expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastAttack', expect.objectContaining({ bendFateApplied: true }), CAMPAIGN);
             expect(result.payload.description).toContain('Target:');
@@ -347,14 +347,14 @@ describe('reactionBonusHandler', () => {
             rollExpression.mockReturnValueOnce({ total: 10 }).mockReturnValueOnce({ total: 10 });
             applyDamageToTarget.mockReturnValue({ finalDamage: 10 });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
 
             expect(result.payload.description).toContain('The attack now hits');
             expect(result.payload.description).toContain('Rolled 10 damage');
@@ -371,14 +371,14 @@ describe('reactionBonusHandler', () => {
             getCombatContext.mockReturnValue({ lastAttack, creatures: [{ name: 'Goblin' }] });
             applyHealingToTarget.mockReturnValue({ actualHeal: 8, oldHp: 15, newHp: 23 });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'penalty'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'penalty',
+                });
 
             expect(result.payload.description).toContain('The attack now misses');
             expect(result.payload.description).toContain('Undid 8 damage');
@@ -400,14 +400,14 @@ describe('reactionBonusHandler', () => {
                 return null;
             });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
 
             expect(result.payload.description).toContain('The save now succeeds');
             expect(result.payload.description).toContain('Conditions removed');
@@ -429,14 +429,14 @@ describe('reactionBonusHandler', () => {
                 return null;
             });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'penalty'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'penalty',
+                });
 
             expect(result.payload.description).toContain('The save now fails');
             expect(result.payload.description).toContain('Conditions applied');
@@ -445,14 +445,14 @@ describe('reactionBonusHandler', () => {
         it('should spend sorcery points on success', async () => {
             getCombatContext.mockReturnValue({ lastAttack: { ...baseLastAttack } });
 
-            await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                baseLastAttack,
-                'bonus'
-            );
+            await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack: baseLastAttack,
+                    mode: 'bonus',
+                });
 
             expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN, 0);
         });
@@ -461,14 +461,14 @@ describe('reactionBonusHandler', () => {
             const { addEntry } = await import('../../../ui/logService.js');
             getCombatContext.mockReturnValue({ lastAttack: { ...baseLastAttack } });
 
-            await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                baseLastAttack,
-                'bonus'
-            );
+            await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack: baseLastAttack,
+                    mode: 'bonus',
+                });
 
             expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
                 type: 'ability_use',
@@ -485,14 +485,14 @@ describe('reactionBonusHandler', () => {
             };
             getCombatContext.mockReturnValue({ lastAttack });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
 
             expect(result.payload.description).toContain('The attack now hits');
             expect(applyDamageToTarget).not.toHaveBeenCalled();
@@ -509,27 +509,27 @@ describe('reactionBonusHandler', () => {
             getCombatContext.mockReturnValue({ lastAttack });
             rollExpression.mockReturnValueOnce({ total: 3 }).mockReturnValueOnce(null);
 
-            let result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            let result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
             expect(result.payload.description).toContain('The attack now hits');
 
             rollExpression.mockReturnValueOnce({ total: 3 }).mockReturnValueOnce({ total: 5 });
             applyDamageToTarget.mockReturnValue(null);
 
-            result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
             expect(result.payload.description).toContain('The attack now hits');
         });
 
@@ -541,14 +541,14 @@ describe('reactionBonusHandler', () => {
                 hit: true,
             };
             getCombatContext.mockReturnValue({ lastAttack });
-            let result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            let result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
             expect(result.payload.description).toContain('still hits');
 
             // miss-to-miss
@@ -558,14 +558,14 @@ describe('reactionBonusHandler', () => {
                 hit: false,
             };
             getCombatContext.mockReturnValue({ lastAttack });
-            result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'penalty'
-            );
+            result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'penalty',
+                });
             expect(result.payload.description).toContain('still misses');
 
             // save still succeeds
@@ -579,14 +579,14 @@ describe('reactionBonusHandler', () => {
                 saveConditions: ['charmed'],
             };
             getCombatContext.mockReturnValue({ lastAttack });
-            result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'penalty'
-            );
+            result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'penalty',
+                });
             expect(result.payload.description).toContain('still succeeds');
 
             // save still fails
@@ -600,14 +600,14 @@ describe('reactionBonusHandler', () => {
                 saveConditions: ['charmed'],
             };
             getCombatContext.mockReturnValue({ lastAttack });
-            result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
             expect(result.payload.description).toContain('still fails');
         });
 
@@ -622,14 +622,14 @@ describe('reactionBonusHandler', () => {
             };
             getCombatContext.mockReturnValue({ lastAttack });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
 
             expect(result.payload.description).toContain('New total: 22');
         });
@@ -637,23 +637,23 @@ describe('reactionBonusHandler', () => {
         it('should return popup when getCombatContext returns null', async () => {
             getCombatContext.mockReturnValue(null);
 
-            let result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                { ...baseLastAttack },
-                'bonus'
-            );
+            let result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack: { ...baseLastAttack },
+                    mode: 'bonus',
+                });
             expect(result.type).toBe('popup');
 
             // save type with null context
-            result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                {
+            result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack: {
                     d20: 8,
                     bonus: 3,
                     targetName: 'Goblin',
@@ -662,8 +662,8 @@ describe('reactionBonusHandler', () => {
                     saveDc: 13,
                     saveConditions: ['charmed'],
                 },
-                'bonus'
-            );
+                    mode: 'bonus',
+                });
             expect(result.type).toBe('popup');
         });
 
@@ -671,28 +671,28 @@ describe('reactionBonusHandler', () => {
             getCombatContext.mockReturnValue({ lastAttack: { ...baseLastAttack } });
             const d4Roll = { total: 4, rolls: [4] };
 
-            await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                d4Roll,
-                baseLastAttack,
-                'bonus'
-            );
+            await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll,
+                    lastAttack: baseLastAttack,
+                    mode: 'bonus',
+                });
             expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN, 0);
 
             vi.clearAllMocks();
             getCombatContext.mockReturnValue({ lastAttack: { ...baseLastAttack } });
             getCurrentSorceryPoints.mockReturnValue(3);
 
-            await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                2,
-                baseLastAttack,
-                'bonus'
-            );
+            await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 2,
+                    lastAttack: baseLastAttack,
+                    mode: 'bonus',
+                });
             expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN, 0);
         });
 
@@ -712,14 +712,14 @@ describe('reactionBonusHandler', () => {
                 if (key === 'activeConditions' && targetName === 'Goblin') return ['frightened'];
                 return null;
             });
-            let result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'penalty'
-            );
+            let result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'penalty',
+                });
             expect(result.payload.description).toContain('Conditions applied');
             expect(result.payload.description).toContain('charmed');
 
@@ -740,14 +740,14 @@ describe('reactionBonusHandler', () => {
                 if (key === 'activeConditions' && targetName === 'Goblin') return ['charmed'];
                 return null;
             });
-            result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
             expect(result.payload.description).toContain('Conditions removed');
             expect(result.payload.description).toContain('charmed');
         });
@@ -763,14 +763,14 @@ describe('reactionBonusHandler', () => {
             };
             getCombatContext.mockReturnValue({ lastAttack });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
 
             expect(result.payload.description).toContain('The save now succeeds');
         });
@@ -782,14 +782,14 @@ describe('reactionBonusHandler', () => {
             };
             getCombatContext.mockReturnValue({ lastAttack });
 
-            const result = await applyBendFateChoice(
-                { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                makePlayerStats(),
-                CAMPAIGN,
-                3,
-                lastAttack,
-                'bonus'
-            );
+            const result = await applyBendFateChoice({
+                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
+                    playerStats: makePlayerStats(),
+                    campaignName: CAMPAIGN,
+                    d4Roll: 3,
+                    lastAttack,
+                    mode: 'bonus',
+                });
 
             expect(result.payload.description).toContain('Original was a hit');
         });
@@ -857,9 +857,9 @@ describe('reactionBonusHandler', () => {
             const result = await handle(action, makePlayerStats({ equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
 
             expect(toggleBuff).toHaveBeenCalledWith(HERO_NAME, 'Test Reaction', expect.objectContaining({ effect: 'defensive_duelist' }), CAMPAIGN);
-            expect(addExpiration).toHaveBeenCalledWith(HERO_NAME, HERO_NAME, expect.arrayContaining([
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: HERO_NAME, targetName: HERO_NAME, effects: expect.arrayContaining([
                 expect.objectContaining({ type: 'remove_active_buff', buffName: 'Test Reaction' })
-            ]), CAMPAIGN, undefined, HERO_NAME);
+            ]), campaignName: CAMPAIGN, rounds: undefined, expireOnCreatureName: HERO_NAME });
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('activated');
         });

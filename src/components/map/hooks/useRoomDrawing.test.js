@@ -328,12 +328,14 @@ describe('useRoomDrawing', () => {
         result.current.handleRoomPointerUp({ pointerId: 1 }, 64, setMapData);
       });
       expect(buildRoomWallsSpy).toHaveBeenCalledWith(
-        expect.any(Set),
-        5,
-        9,
-        7,
-        11,
-        64
+        expect.objectContaining({
+          walls: expect.any(Set),
+          minX: 5,
+          maxX: 9,
+          minY: 7,
+          maxY: 11,
+          gridSize: 64,
+        })
       );
       buildRoomWallsSpy.mockRestore();
       createRoomSpy.mockRestore();

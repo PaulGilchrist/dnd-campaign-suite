@@ -275,7 +275,14 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const handleObjectTransformConfirm = React.useCallback(async (objectType, popupData) => {
         const targetName = popupData.targetName || popupData.casterName;
-        await applyObjectTransform(targetName, objectType, popupData.casterName, popupData.spell, popupData.campaignName, playerStats);
+        await applyObjectTransform({
+    targetName,
+    objectType,
+    casterName: popupData.casterName,
+    spell: popupData.spell,
+    campaignName: popupData.campaignName,
+    playerStats,
+});
     }, [playerStats]);
 
     const biDieRuntime = useRuntimeValue(playerSummary?.name, 'bardicInspirationDie', campaignName);
@@ -293,7 +300,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
             const processingSummary = cloneDeep(playerSummary);
             applyCotlLandType(processingSummary, cotlLandTypeRuntime);
-            const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, processingSummary);
+            const stats = await rulesFactory.getPlayerStats({ allClasses: effectiveClasses, allEquipment, allMagicItems: effectiveMagicItems, allRaces: effectiveRaces, allSpells: spellData, playerSummary: processingSummary });
 
             applyPreparedSpells(stats, playerSummary);
             applyAspectOfTheWilds(stats, getRuntimeValue(playerSummary.name, 'aspectOfTheWildsOption'));
@@ -460,15 +467,15 @@ function CharSheetContent({
     }, [playerStats, campaignName, characters, popupHtml]);
 
     const handlePunctureWrapped = React.useCallback(async (punctureData) => {
-        return await handlePuncture(playerStats, campaignName, characters, popupHtml, setPopupHtml, punctureData);
+        return await handlePuncture({ playerStats, campaignName, characters, popupHtml, setPopupHtml, punctureData });
     }, [playerStats, campaignName, characters, popupHtml, setPopupHtml]);
 
     const handleSavageAttackerWrapped = React.useCallback(async (savageData) => {
-        return await handleSavageAttacker(playerStats, campaignName, characters, popupHtml, setPopupHtml, savageData);
-    }, [playerStats, campaignName, characters, popupHtml, setPopupHtml]);
+        return await handleSavageAttacker({ playerStats, campaignName, savageData });
+    }, [playerStats, campaignName]);
 
     const handleSavageAttackerChoiceWrapped = React.useCallback(async (choiceData) => {
-        return await handleSavageAttackerChoice(playerStats, campaignName, characters, popupHtml, setPopupHtml, choiceData);
+        return await handleSavageAttackerChoice({ playerStats, campaignName, characters, popupHtml, setPopupHtml, choiceData });
     }, [playerStats, campaignName, characters, popupHtml, setPopupHtml]);
 
     const handleTacticalMindWrapped = React.useCallback(async ({ dieValue, success }) => {
@@ -480,7 +487,7 @@ function CharSheetContent({
     }, [playerStats, campaignName, popupHtml]);
 
     const handleSuperiorityManeuverWrapped = React.useCallback(async (maneuverName, dieValue) => {
-        await handleSuperiorityManeuver(playerStats, campaignName, setPopupHtml, popupHtml, maneuverName, dieValue);
+        await handleSuperiorityManeuver({ playerStats, campaignName, setPopupHtml, popupHtml, maneuverName, dieValue });
     }, [playerStats, campaignName, setPopupHtml, popupHtml]);
 
     const handlePsiBolsteredKnackWrapped = React.useCallback(async ({ dieValue, dieSize, success }) => {

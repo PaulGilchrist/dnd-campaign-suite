@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { applyTypeChoice } from '../../../services/automation/handlers/class-sorcerer/elementalAffinityHandler.js';
 import '../CharSheet.css';
 
+function affinityIntroText(action, existingType) {
+    if (existingType) return 'Change damage type (currently ' + existingType + '):';
+    if (action?.automation?.effect === 'elemental_adept') return 'Choose one of the following damage types (Acid, Cold, Fire, Lightning, or Thunder). Spells you cast ignore Resistance to damage of the chosen type. In addition, when you roll damage for a spell you cast that deals damage of that type, you can treat any 1 on a damage die as a 2.';
+    return 'Choose one damage type (Acid, Cold, Fire, Lightning, or Poison). You gain resistance to that type. When you cast a spell that deals damage of that type, add your Charisma modifier to one damage roll.';
+}
+
 function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
@@ -9,6 +15,7 @@ function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) 
 
     const damageTypes = action?.automation?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'];
     const existingType = action?.existingType;
+    const title = action?.name || 'Elemental Affinity';
 
     const handleApply = async () => {
         if (!selected) return;
@@ -25,7 +32,7 @@ function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) 
     }}>
                 <div className="sp-modal">
                     <div className="sp-header">
-                        <i className="fa-solid fa-bolt"></i> {action?.name || 'Elemental Affinity'}
+                        <i className="fa-solid fa-bolt"></i> {title}
                     </div>
                     <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
                     </div>
@@ -44,28 +51,20 @@ function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) 
     }}>
             <div className="sp-modal">
                 <div className="sp-header">
-                    <i className="fa-solid fa-bolt"></i> {action?.name || 'Elemental Affinity'}
+                    <i className="fa-solid fa-bolt"></i> {title}
                 </div>
                 <div className="sp-body">
-                    <p>{existingType ? 'Change damage type (currently ' + existingType + '):' : (action?.automation?.effect === 'elemental_adept' ? 'Choose one of the following damage types (Acid, Cold, Fire, Lightning, or Thunder). Spells you cast ignore Resistance to damage of the chosen type. In addition, when you roll damage for a spell you cast that deals damage of that type, you can treat any 1 on a damage die as a 2.' : 'Choose one damage type (Acid, Cold, Fire, Lightning, or Poison). You gain resistance to that type. When you cast a spell that deals damage of that type, add your Charisma modifier to one damage roll.')}</p>
+                    <p>{affinityIntroText(action, existingType)}</p>
                     <div style={{ textAlign: 'left', marginTop: '12px' }}>
-                        {damageTypes.map((type, i) => {
-                            const isSelected = selected === type;
-                            const isExisting = type === existingType;
-                            return (
-                                <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : (isExisting ? 'rgba(100,200,255,0.1)' : 'transparent'), border: isSelected ? '1px solid var(--color-link)' : (isExisting ? '1px dashed var(--color-link)' : '1px solid transparent') }}>
-                                    <input
-                                        type="radio"
-                                        name="elementalAffinityOption"
-                                        checked={isSelected}
-                                        onChange={() => setSelected(type)}
-                                        style={{ marginRight: '8px' }}
-                                    />
-                                    <strong>{type}</strong>
-                                    {isExisting && !selected && <span style={{ marginLeft: '8px', opacity: 0.7, fontSize: '0.85em' }}>(current)</span>}
-                                </label>
-                            );
-                        })}
+                        {damageTypes.map((type, i) => (
+                            <AffinityTypeOption
+                                key={i}
+                                type={type}
+                                selected={selected}
+                                setSelected={setSelected}
+                                isExisting={type === existingType}
+                            />
+                        ))}
                     </div>
                 </div>
                 <div className="sp-actions">
@@ -76,6 +75,23 @@ function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) 
                 </div>
             </div>
         </div>
+    );
+}
+
+function AffinityTypeOption({ type, selected, setSelected, isExisting }) {
+    const isSelected = selected === type;
+    return (
+        <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : (isExisting ? 'rgba(100,200,255,0.1)' : 'transparent'), border: isSelected ? '1px solid var(--color-link)' : (isExisting ? '1px dashed var(--color-link)' : '1px solid transparent') }}>
+            <input
+                type="radio"
+                name="elementalAffinityOption"
+                checked={isSelected}
+                onChange={() => setSelected(type)}
+                style={{ marginRight: '8px' }}
+            />
+            <strong>{type}</strong>
+            {isExisting && !selected && <span style={{ marginLeft: '8px', opacity: 0.7, fontSize: '0.85em' }}>(current)</span>}
+        </label>
     );
 }
 

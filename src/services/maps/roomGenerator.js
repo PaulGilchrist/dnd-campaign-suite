@@ -158,7 +158,7 @@ function connectRooms(rooms, grid, gridSize, corridorCells, rng) {
       }
     }
 
-    carveCorridor(rooms[bestA], rooms[bestB], grid, gridSize, corridorCells, rng);
+    carveCorridor({ a: rooms[bestA], b: rooms[bestB], grid, gridSize, corridorCells, rng });
     rooms[bestA].connected.push(bestB);
     rooms[bestB].connected.push(bestA);
     connected[bestB] = true;
@@ -171,7 +171,7 @@ function connectRooms(rooms, grid, gridSize, corridorCells, rng) {
     const a = Math.floor(rng() * rooms.length);
     let b = Math.floor(rng() * rooms.length);
     if (a !== b && rooms[a].connected.indexOf(b) === -1) {
-      carveCorridor(rooms[a], rooms[b], grid, gridSize, corridorCells, rng);
+      carveCorridor({ a: rooms[a], b: rooms[b], grid, gridSize, corridorCells, rng });
       rooms[a].connected.push(b);
       rooms[b].connected.push(a);
     }
@@ -229,7 +229,7 @@ function isAreaAllWalls(grid, rX, rY, rW, rH) {
   return true;
 }
 
-function carveCorridor(a, b, grid, gridSize, corridorCells, rng) {
+function carveCorridor({ a, b, grid, gridSize, corridorCells, rng }) {
   const ca = rectCenter(a.rect);
   const cb = rectCenter(b.rect);
   if (rng() < 0.5) {

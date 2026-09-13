@@ -108,6 +108,20 @@ function rollNpcInitiative(combatSummary, creatureName) {
     return { roll, bonus, total }
 }
 
+// Phantasmal Creatures: halve HP for Bestial Spirit and Fey Spirit when summoned via the feature
+// Check all player creatures for phantasmal tracking
+function resolvePhantasmalHp(combatSummary, creature, hp) {
+    if (!['Bestial Spirit', 'Fey Spirit'].includes(creature.name)) return hp
+    for (const pc of combatSummary.creatures) {
+        if (pc.type !== 'player') continue
+        const phantasmalList = getRuntimeValue(pc.name, '_phantasmalCreatures_list')
+        if (Array.isArray(phantasmalList) && phantasmalList.includes(creature.name)) {
+            return Math.floor(hp / 2)
+        }
+    }
+    return hp
+}
+
 async function applyNpcMonsterData(combatSummary, creatureIndex, monster, campaignNpcs) {
     const creature = combatSummary.creatures[creatureIndex]
     if (!creature) return
@@ -119,21 +133,7 @@ async function applyNpcMonsterData(combatSummary, creatureIndex, monster, campai
     creature.immunities = irv.immunities
     creature.vulnerabilities = irv.vulnerabilities
     creature.initiativeBonus = monster.initiative_details ? parseInt(monster.initiative_details) || 0 : 0
-    let hp = monster.hit_points || 10
-    // Phantasmal Creatures: halve HP for Bestial Spirit and Fey Spirit when summoned via the feature
-    // Check all player creatures for phantasmal tracking
-    const isPhantasmalSummon = ['Bestial Spirit', 'Fey Spirit'].includes(creature.name)
-    if (isPhantasmalSummon) {
-        for (const pc of combatSummary.creatures) {
-            if (pc.type === 'player') {
-                const phantasmalList = getRuntimeValue(pc.name, '_phantasmalCreatures_list')
-                if (phantasmalList && Array.isArray(phantasmalList) && phantasmalList.includes(creature.name)) {
-                    hp = Math.floor(hp / 2)
-                    break
-                }
-            }
-        }
-    }
+    const hp = resolvePhantasmalHp(combatSummary, creature, monster.hit_points || 10)
     creature.maxHp = hp
     creature.currentHp = hp
     creature.saveBonuses = getMonsterSaveBonuses(monster)
@@ -148,7 +148,7 @@ async function applyNpcMonsterData(combatSummary, creatureIndex, monster, campai
     }
 }
 
-async function renameNpc(combatSummary, oldName, newName, campaignNpcs, setNpcImages, campaignName) {
+async function renameNpc({ combatSummary, oldName, newName, campaignNpcs, setNpcImages, campaignName }) {
     const idx = combatSummary.creatures.findIndex(c => c.name === oldName)
     if (idx === -1) return
     combatSummary.creatures[idx].name = newName

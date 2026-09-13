@@ -20,26 +20,27 @@ export function setCombatSummaryCache(summary, campaignName) {
   }
 }
 
-export async function loadCombatSummary(campaignName) {
-  if (campaignName) {
-    try {
-      const fromApi = await getCombatContext(campaignName)
-      if (fromApi) {
-        if (fromApi.creatures?.length > 0 && !fromApi.activeCreatureName) {
-          fromApi.activeCreatureName = fromApi.creatures[0].name
-        }
-        if (!fromApi.activeCreatureName) {
-          const topLevel = getRuntimeValue('campaign', 'activeCreatureName', campaignName)
-          if (topLevel) {
-            fromApi.activeCreatureName = topLevel
-          }
-        }
-        setCombatSummaryCache(fromApi, campaignName)
-        return fromApi
-      }
-    } catch (error) { console.warn('[combatData] Combat context unavailable from API:', error) }
-    return null
+function resolveActiveCreatureName(fromApi, campaignName) {
+  if (fromApi.activeCreatureName) return
+  if (fromApi.creatures?.length > 0) {
+    fromApi.activeCreatureName = fromApi.creatures[0].name
   }
+  if (fromApi.activeCreatureName) return
+  const topLevel = getRuntimeValue('campaign', 'activeCreatureName', campaignName)
+  if (topLevel) {
+    fromApi.activeCreatureName = topLevel
+  }
+}
+
+export async function loadCombatSummary(campaignName) {
+  if (!campaignName) return null
+  try {
+    const fromApi = await getCombatContext(campaignName)
+    if (!fromApi) return null
+    resolveActiveCreatureName(fromApi, campaignName)
+    setCombatSummaryCache(fromApi, campaignName)
+    return fromApi
+  } catch (error) { console.warn('[combatData] Combat context unavailable from API:', error) }
   return null
 }
 

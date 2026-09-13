@@ -1051,7 +1051,7 @@ describe('useCharActionsAutomation', () => {
                     await handleAutomationAction(action);
 
                     expect(deps.rollDamage).toHaveBeenCalledWith(
-                        'Fireball', '8d6', 32, [6, 5, 4, 3, 2, 1, 6, 5], 0, {}
+                        { name: 'Fireball', formula: '8d6', total: 32, rolls: [6, 5, 4, 3, 2, 1, 6, 5], modifier: 0, context: {} }
                     );
                 });
 
@@ -1076,7 +1076,7 @@ describe('useCharActionsAutomation', () => {
                     await handleAutomationAction(action);
 
                     expect(deps.rollDamage).toHaveBeenCalledWith(
-                        'Fireball', '8d6', 32, [6, 5, 4, 3, 2, 1, 6, 5], 0, { source: 'spell' }
+                        { name: 'Fireball', formula: '8d6', total: 32, rolls: [6, 5, 4, 3, 2, 1, 6, 5], modifier: 0, context: { source: 'spell' } }
                     );
                 });
 

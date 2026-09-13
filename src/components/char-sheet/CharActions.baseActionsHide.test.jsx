@@ -583,7 +583,7 @@ describe('CharActions Hide action behavior', () => {
       });
 
       await waitFor(() => {
-        expect(addExpiration).toHaveBeenCalledWith('TestCharacter', 'TestCharacter', expect.any(Array), 'test-campaign', undefined, 'TestCharacter');
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCharacter', targetName: 'TestCharacter', effects: expect.any(Array), campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'TestCharacter' });
       });
     });
 

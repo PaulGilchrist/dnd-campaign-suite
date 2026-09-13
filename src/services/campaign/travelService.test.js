@@ -164,13 +164,13 @@ describe('travelService', () => {
 
   describe('calculatePath', () => {
     it('should return empty array for null inputs or same start/end', () => {
-      expect(calculatePath(null, { q: 1, r: 1 }, 10, 10, {}, [])).toEqual([]);
-      expect(calculatePath({ q: 0, r: 0 }, null, 10, 10, {}, [])).toEqual([]);
-      expect(calculatePath({ q: 0, r: 0 }, { q: 0, r: 0 }, 10, 10, {}, [])).toEqual([]);
+      expect(calculatePath(null, { q: 1, r: 1 }, { hexCols: 10, hexRows: 10, terrain: {}, roads: [] })).toEqual([]);
+      expect(calculatePath({ q: 0, r: 0 }, null, { hexCols: 10, hexRows: 10, terrain: {}, roads: [] })).toEqual([]);
+      expect(calculatePath({ q: 0, r: 0 }, { q: 0, r: 0 }, { hexCols: 10, hexRows: 10, terrain: {}, roads: [] })).toEqual([]);
     });
 
     it('should return a path including start and end hexes', () => {
-      const result = calculatePath({ q: 0, r: 0 }, { q: 2, r: 0 }, 10, 10, {}, []);
+      const result = calculatePath({ q: 0, r: 0 }, { q: 2, r: 0 }, { hexCols: 10, hexRows: 10, terrain: {}, roads: [] });
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]).toEqual({ q: 0, r: 0 });
       expect(result[result.length - 1]).toEqual({ q: 2, r: 0 });
@@ -187,13 +187,13 @@ describe('travelService', () => {
         '3,1': 'plains',
         '4,0': 'plains',
       };
-      const result = calculatePath({ q: 0, r: 0 }, { q: 4, r: 0 }, 5, 5, terrain, []);
+      const result = calculatePath({ q: 0, r: 0 }, { q: 4, r: 0 }, { hexCols: 5, hexRows: 5, terrain, roads: [] });
       const mountainHexes = result.filter(h => terrain[`${h.q},${h.r}`] === 'mountains');
       expect(mountainHexes.length).toBe(0);
     });
 
     it('should respect grid boundaries and use roads when provided', () => {
-      const result = calculatePath({ q: 0, r: 0 }, { q: 3, r: 3 }, 5, 5, {}, []);
+      const result = calculatePath({ q: 0, r: 0 }, { q: 3, r: 3 }, { hexCols: 5, hexRows: 5, terrain: {}, roads: [] });
       for (const hex of result) {
         expect(hex.q).toBeGreaterThanOrEqual(0);
         expect(hex.q).toBeLessThan(5);
@@ -202,12 +202,12 @@ describe('travelService', () => {
       }
       const roads = [{ hexes: ['1,0', '2,0', '3,0'] }];
       const terrain = { '1,0': 'plains', '2,0': 'plains', '3,0': 'plains' };
-      const roadResult = calculatePath({ q: 0, r: 0 }, { q: 4, r: 0 }, 10, 10, terrain, roads);
+      const roadResult = calculatePath({ q: 0, r: 0 }, { q: 4, r: 0 }, { hexCols: 10, hexRows: 10, terrain, roads });
       expect(roadResult.length).toBeGreaterThan(0);
     });
 
     it('should return empty array when destination is unreachable', () => {
-      const result = calculatePath({ q: 0, r: 0 }, { q: 5, r: 5 }, 2, 2, {}, []);
+      const result = calculatePath({ q: 0, r: 0 }, { q: 5, r: 5 }, { hexCols: 2, hexRows: 2, terrain: {}, roads: [] });
       expect(result).toEqual([]);
     });
   });

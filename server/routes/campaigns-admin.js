@@ -140,20 +140,18 @@ function renameImagePathsInCharacterFiles(newCampaignDir, campaign) {
 // Update imagePath fields in NPC data after a campaign rename
 function renameImagePathsInNpcData(npcsPath, campaign) {
     try {
-        if (fs.existsSync(npcsPath)) {
-            const npcs = JSON.parse(fs.readFileSync(npcsPath, 'utf-8'));
-            if (Array.isArray(npcs)) {
-                let changed = false;
-                for (const npc of npcs) {
-                    if (npc.imagePath && typeof npc.imagePath === 'string' && npc.imagePath.includes('campaigns/')) {
-                        npc.imagePath = npc.imagePath.replace(`campaigns/${campaign}`, 'images');
-                        changed = true;
-                    }
-                }
-                if (changed) {
-                    fs.writeFileSync(npcsPath, JSON.stringify(npcs, null, 2));
-                }
+        if (!fs.existsSync(npcsPath)) return;
+        const npcs = JSON.parse(fs.readFileSync(npcsPath, 'utf-8'));
+        if (!Array.isArray(npcs)) return;
+        let changed = false;
+        for (const npc of npcs) {
+            if (npc.imagePath && typeof npc.imagePath === 'string' && npc.imagePath.includes('campaigns/')) {
+                npc.imagePath = npc.imagePath.replace(`campaigns/${campaign}`, 'images');
+                changed = true;
             }
+        }
+        if (changed) {
+            fs.writeFileSync(npcsPath, JSON.stringify(npcs, null, 2));
         }
     } catch (err) {
         console.error(`Failed to update imagePath in NPC data:`, err.message);

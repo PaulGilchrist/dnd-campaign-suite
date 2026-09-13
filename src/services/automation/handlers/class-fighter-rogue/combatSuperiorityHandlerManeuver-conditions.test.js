@@ -283,13 +283,7 @@ describe('executeManeuver — condition/save effects', () => {
         }
 
         if (expectExpiration) {
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                'TestFighter',
-                'Goblin',
-                expect.arrayContaining([{ type: 'condition', condition: 'frightened' }]),
-                'test-campaign',
-                2
-            );
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestFighter', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'condition', condition: 'frightened' }]), campaignName: 'test-campaign', rounds: 2 });
         } else {
             expect(expirations.addExpiration).not.toHaveBeenCalled();
         }

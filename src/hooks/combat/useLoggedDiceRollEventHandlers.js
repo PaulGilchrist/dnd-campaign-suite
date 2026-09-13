@@ -69,7 +69,7 @@ function computeSecondaryRoll(pending) {
 }
 
 async function applySecondaryDamage({ combatSummary, pendingTargetName, secondaryData, campaignName, charactersRef, attacker }) {
-    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], campaignName, charactersRef.current, { ignoreResistance: secondaryData.ignoreResistance, attackerName: attacker, suppressHpLog: true, ...{ skipConcentration: true } });
+    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, pendingTargetName, secondaryData.total, [secondaryData.damageType], { campaignName, characters: charactersRef.current, ignoreResistance: secondaryData.ignoreResistance, attackerName: attacker, suppressHpLog: true, ...{ skipConcentration: true } });
     const secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryData.total;
     if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
         endInvisibilityOnHostileAction(attacker, campaignName);
@@ -97,13 +97,25 @@ function isTargetImmuneToConditionKey(targetStats, condKey, attackerCreature, ca
     });
 }
 
+function resolveStatusEffectTargets(combatSummary, charactersRef, targetName, attackerName) {
+    const targetCharacter = (charactersRef.current || []).find(c => utils.getName(c.name) === targetName);
+    return {
+        targetCreature: combatSummary?.creatures?.find(c => c.name === targetName),
+        targetStats: targetCharacter?.computedStats || targetCharacter,
+        attackerCreature: combatSummary?.creatures?.find(c => c.name === attackerName),
+    };
+}
+
+function applyConditionToTarget(targetName, condKey, campaignName) {
+    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], campaignName);
+}
+
 function applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName }) {
     const targetName = pending.targetName;
-    const targetCreature = combatSummary?.creatures?.find(c => c.name === targetName);
-    const targetCharacter = (charactersRef.current || []).find(c => utils.getName(c.name) === targetName);
-    const targetStats = targetCharacter?.computedStats || targetCharacter;
     const attackerName = pending.attackerName || pending.sourceAttackerName || null;
-    const attackerCreature = combatSummary?.creatures?.find(c => c.name === attackerName);
+    const { targetCreature, targetStats, attackerCreature } = resolveStatusEffectTargets(combatSummary, charactersRef, targetName, attackerName);
     const effectsToExpire = [];
     for (const effect of pending.statusEffects) {
         const condKey = String(effect).toLowerCase();
@@ -114,13 +126,11 @@ function applyFailedSaveStatusEffects({ detail, pending, combatSummary, characte
             continue;
         }
         if (!targetCreature) continue;
-        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-        const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
-        setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
+        applyConditionToTarget(targetName, condKey, pending.campaignName);
         effectsToExpire.push({ type: 'condition', condition: condKey });
     }
     if (effectsToExpire.length > 0) {
-        addExpiration(characterName, targetName, effectsToExpire, pending.campaignName, 2);
+        addExpiration({ attackerName: characterName, targetName, effects: effectsToExpire, campaignName: pending.campaignName, rounds: 2 });
     }
 }
 
@@ -133,7 +143,7 @@ async function applyOverchannelSelfDamage({ pending, characterName, campaignName
     const necroticResult = rollExpression(necroticFormula);
     if (!necroticResult) return;
     const casterCombatSummary = getCombatSummary(campaignName);
-    const casterApplyResult = await applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, charactersRef.current, { ignoreResistance: true, attackerName: characterName });
+    const casterApplyResult = await applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], { campaignName, characters: charactersRef.current, ignoreResistance: true, attackerName: characterName });
     logEntry({
         type: 'roll',
         characterName,
@@ -165,10 +175,8 @@ async function triggerViciousMockeryOnFail({ detail, pending }) {
     }
 }
 
-function buildSaveLastAttackData({ detail, pending, characterName, appliedDamage, finalDamage }) {
+function buildSaveOutcomeFields(detail) {
     return {
-        attackerName: pending.attackerName || pending.sourceAttackerName || characterName,
-        targetName: detail.targetName,
         d20: detail.roll,
         d20Rolls: detail.rawRolls || [detail.roll],
         bonus: detail.saveBonus,
@@ -177,16 +185,31 @@ function buildSaveLastAttackData({ detail, pending, characterName, appliedDamage
         saveType: detail.saveType,
         saveDc: detail.saveDc,
         saveResult: detail.success ? 'success' : 'failure',
+    };
+}
+
+function buildSaveAttackDamageFields(pending, detail, appliedDamage, finalDamage) {
+    const actualDamage = appliedDamage || finalDamage;
+    return {
         damageFormula: pending.formula || null,
         attackName: pending.name || pending.sourceName || null,
         damageType: pending.damageType || null,
         rawDamage: pending.rawDamage || 0,
         primaryDamage: pending.rawDamage || 0,
         primaryDamageType: pending.damageType || null,
-        actualDamage: appliedDamage || finalDamage,
-        damageApplied: (appliedDamage || finalDamage) > 0,
+        actualDamage,
+        damageApplied: actualDamage > 0,
         statusEffects: pending.statusEffects || null,
         affectedTargets: pending.statusEffects ? [detail.targetName] : undefined,
+    };
+}
+
+function buildSaveLastAttackData({ detail, pending, characterName, appliedDamage, finalDamage }) {
+    return {
+        attackerName: pending.attackerName || pending.sourceAttackerName || characterName,
+        targetName: detail.targetName,
+        ...buildSaveOutcomeFields(detail),
+        ...buildSaveAttackDamageFields(pending, detail, appliedDamage, finalDamage),
         timestamp: Date.now(),
     };
 }
@@ -424,7 +447,7 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
     // Apply primary damage with combined concentration total (if secondary exists).
     // CLA-324: carry spell-origin from the pending prompt flag.
     const isSpellDamage = pending.isSpellDamage === true;
-    const applyResult = await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, { ignoreResistance: ignoreResistance, attackerName: attacker, suppressHpLog: true, ...buildApplyDamageOptions(secondaryData, finalDamage, isSpellDamage) });
+    const applyResult = await applyDamageToTarget(combatSummary, pendingTargetName, finalDamage, [pending.damageType], { campaignName: pending.campaignName, characters: charactersRef.current, ignoreResistance: ignoreResistance, attackerName: attacker, suppressHpLog: true, ...buildApplyDamageOptions(secondaryData, finalDamage, isSpellDamage) });
 
     const isIntercepted = applyResult?.intercepted;
     const appliedDamage = resolveAppliedDamage(applyResult, isIntercepted);

@@ -349,8 +349,8 @@ describe('CharSpells - Popup Modal Rendering', () => {
     it.each(testCases)('words of creation: $name', async ({ action, check }) => {
       const wordsOfCreationData = createWordsOfCreationData();
 
-      vi.mocked(useSpellMetamagicFlow).mockImplementation((playerStats, campaignName, castAction, setWordsOfCreationTarget) => {
-        Promise.resolve().then(() => setWordsOfCreationTarget(wordsOfCreationData));
+      vi.mocked(useSpellMetamagicFlow).mockImplementation(({ campaignName: _campaignName, castAction: _castAction, setSecondaryTargetModal }) => {
+        Promise.resolve().then(() => setSecondaryTargetModal(wordsOfCreationData));
         return flow;
       });
 

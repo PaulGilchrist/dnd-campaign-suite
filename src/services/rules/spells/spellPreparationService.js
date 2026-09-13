@@ -319,7 +319,7 @@ const FREE_CAST_RESTORE_OPS = {
 // Shared feature-keyed counter branch. Returns 'break' when the counter was
 // consumed, 'next' when a parsed feature level didn't match, or 'fallthrough'
 // when the entry should be checked against the per-spell branches below.
-function adjustSharedUsesCounter(entry, playerName, spellName, spellLevel, campaignName, ops) {
+function adjustSharedUsesCounter({ entry, playerName, spellName, spellLevel, campaignName, ops }) {
   const featureLevel = parseFeatureSpellLevel(entry);
   const spellMatches = (featureLevel !== null && featureLevel === spellLevel) ||
     (featureLevel === null && entrySpells(entry).includes(spellName));
@@ -358,11 +358,11 @@ function adjustRechargeCounter(entry, playerName, spellName, campaignName, ops) 
 // Consumes the feature-keyed free-cast counter for the first matching automation entry
 // (free_spell/fey_reinforcements/misty_wanderer/dragon_companion). Mirrors the scan
 // order in isFreeCastAuthorized/checkFreeCastEntry — break points are rule-significant.
-function adjustActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName, ops) {
+function adjustActionFreeCastCounters({ allActions, playerName, spellName, spellLevel, campaignName, ops }) {
   for (const entry of allActions) {
     if (!isFreeCastEntryType(entry)) continue;
     if (entry.uses_expression && entry.usesMax) {
-      const outcome = adjustSharedUsesCounter(entry, playerName, spellName, spellLevel, campaignName, ops);
+      const outcome = adjustSharedUsesCounter({ entry, playerName, spellName, spellLevel, campaignName, ops });
       if (outcome === 'break') break;
       if (outcome === 'next') continue;
     }
@@ -375,7 +375,7 @@ function adjustActionFreeCastCounters(allActions, playerName, spellName, spellLe
 }
 
 function consumeActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName) {
-  adjustActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName, FREE_CAST_CONSUME_OPS);
+  adjustActionFreeCastCounters({ allActions, playerName, spellName, spellLevel, campaignName, ops: FREE_CAST_CONSUME_OPS });
 }
 
 // CLA-388: Wild Companion (Druid lv2, 2024) — consume the PAID grant on cast so the
@@ -480,7 +480,7 @@ function decrementFreeCastResource(playerName, spellName, spellLevel, playerStat
 // Roll back the feature-keyed free-cast counter for the first matching automation entry
 // (cancelled/skipped cast). Mirrors consumeActionFreeCastCounters scan order exactly.
 function restoreActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName) {
-  adjustActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName, FREE_CAST_RESTORE_OPS);
+  adjustActionFreeCastCounters({ allActions, playerName, spellName, spellLevel, campaignName, ops: FREE_CAST_RESTORE_OPS });
 }
 
 // Roll back the named-feature free-cast flags after the counter scans (order preserved).
@@ -770,7 +770,7 @@ function applyWarlockSpellBreakerStamps(modifiedSpell, spell, playerStats, usePs
 }
 
 // CLA-252 phantasmal (spectral) free-cast stamping.
-function applyPhantasmalStamp(modifiedSpell, spell, playerStats, freeCastAuthorized, playerName, campaignName) {
+function applyPhantasmalStamp({ modifiedSpell, spell, playerStats, freeCastAuthorized, playerName, campaignName }) {
   const phantasmalPassive = playerStats.automation?.passives?.find(p => p.type === 'phantasmal_creatures');
   if (phantasmalPassive && freeCastAuthorized && (phantasmalPassive.freeCastSpells || []).includes(spell.name)) {
     stampPhantasmalCast(modifiedSpell, spell.name, phantasmalPassive, playerName, campaignName);
@@ -779,9 +779,9 @@ function applyPhantasmalStamp(modifiedSpell, spell, playerStats, freeCastAuthori
 
 // Psychic damage-type override, Spell Breaker bonus-action Dispel Magic, and
 // CLA-252 phantasmal (spectral) free-cast stamping on the modified spell.
-function stampModifiedSpell(modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName) {
+function stampModifiedSpell({ modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName }) {
   applyWarlockSpellBreakerStamps(modifiedSpell, spell, playerStats, usePsychicDamage);
-  applyPhantasmalStamp(modifiedSpell, spell, playerStats, freeCastAuthorized, playerName, campaignName);
+  applyPhantasmalStamp({ modifiedSpell, spell, playerStats, freeCastAuthorized, playerName, campaignName });
 }
 
 function isWarGodsBlessingSpell(playerName, spellName) {
@@ -791,7 +791,7 @@ function isWarGodsBlessingSpell(playerName, spellName) {
 
 // Concentration tracking applied after slot consumption: new concentration, Hunter's
 // Mark / Hex buff tracking, and Eyebite's concentration buff stamp.
-function applyConcentrationTracking(spell, shouldSetConcentration, oldConcentrationSpell, playerName, playerStats, campaignName) {
+function applyConcentrationTracking({ spell, shouldSetConcentration, oldConcentrationSpell, playerName, playerStats, campaignName }) {
   if (oldConcentrationSpell) {
     cleanupConcentrationEffects(playerName, oldConcentrationSpell, campaignName);
   }
@@ -848,14 +848,14 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
 
   consumeSpellResource(spell, result, { isWgbSpell, isEyebiteRecast, isUpcast, isFreeCast, isQuickRitualCast, isWarlock, effectiveSpellLevel, playerName, playerStats, campaignName });
 
-  applyConcentrationTracking(spell, shouldSetConcentration, oldConcentrationSpell, playerName, playerStats, campaignName);
+  applyConcentrationTracking({ spell, shouldSetConcentration, oldConcentrationSpell, playerName, playerStats, campaignName });
 
   // Build modified spell
   const modifiedSpell = effectiveSpellLevel !== spell.level
     ? { ...spell, level: effectiveSpellLevel, baseLevel: spell.level }
     : { ...spell };
 
-  stampModifiedSpell(modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName);
+  stampModifiedSpell({ modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName });
 
   result.modifiedSpell = modifiedSpell;
   return result;

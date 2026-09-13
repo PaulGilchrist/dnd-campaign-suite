@@ -188,13 +188,7 @@ describe('friendsHandler.handle', () => {
 
             await handle(makeAction({ targetName: 'Ally1' }), defaultPlayerStats, campaignName, null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Bard1',
-                'Ally1',
-                expect.any(Array),
-                campaignName,
-                2,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'Ally1', effects: expect.any(Array), campaignName, rounds: 2 });
             expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({ characterName: 'Ally1' }),
@@ -262,13 +256,7 @@ describe('friendsHandler.handle', () => {
 
             await handle(makeAction({ targetName: 'MissingTarget' }), defaultPlayerStats, campaignName, null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Bard1',
-                'MissingTarget',
-                expect.any(Array),
-                campaignName,
-                2,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'MissingTarget', effects: expect.any(Array), campaignName, rounds: 2 });
             expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({ characterName: 'MissingTarget' }),
@@ -325,13 +313,7 @@ describe('friendsHandler.handle', () => {
                 campaignName,
                 expect.objectContaining({ characterName: 'CustomTarget' }),
             );
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Bard1',
-                'CustomTarget',
-                expect.any(Array),
-                campaignName,
-                2,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'CustomTarget', effects: expect.any(Array), campaignName, rounds: 2 });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign',
                 '_activeFriends_Bard1',

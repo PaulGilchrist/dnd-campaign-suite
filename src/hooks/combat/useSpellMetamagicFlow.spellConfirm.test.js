@@ -131,7 +131,7 @@ describe('useSpellMetamagicFlow — multi-target flow', () => {
     getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
     const spell = makeSpell({ name: 'Word of Radiance' });
     act(() => {
@@ -160,7 +160,7 @@ describe('useSpellMetamagicFlow — multi-target flow', () => {
     getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
     const spell = makeSpell({ name: 'Word of Radiance' });
     act(() => {
@@ -183,7 +183,7 @@ describe('useSpellMetamagicFlow — multi-target flow', () => {
     getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
     const spell = makeSpell({ name: 'Word of Radiance' });
     act(() => {
@@ -204,7 +204,7 @@ describe('useSpellMetamagicFlow — multi-target flow', () => {
   it('does nothing when multi-target handler is called without pending state', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -218,7 +218,7 @@ describe('useSpellMetamagicFlow — multi-target flow', () => {
   it('does nothing when multi-target skip is called without pending state', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -239,7 +239,7 @@ describe('useSpellMetamagicFlow — spell confirm handlers verify behavior', () 
 
   it('clears pending state and logs entry for Resistance two-stage confirm flow', async () => {
     const { result, onExecute } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Resistance',
       { level: 0 },
     );
@@ -266,7 +266,7 @@ describe('useSpellMetamagicFlow — spell confirm handlers verify behavior', () 
 
   it('clears pending state and logs entry for Remove Curse confirm', async () => {
     const { result, onExecute } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Remove Curse',
       { level: 3 },
     );
@@ -285,7 +285,7 @@ describe('useSpellMetamagicFlow — spell confirm handlers verify behavior', () 
 
   it('clears pending state and logs entry for Magic Missile confirm with distribution', async () => {
     const { result, onExecute, spell } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Magic Missile',
       { level: 1 },
     );
@@ -306,7 +306,7 @@ describe('useSpellMetamagicFlow — spell confirm handlers verify behavior', () 
 
   it('does not execute or log when Magic Missile distribution is all zeros', async () => {
     const { result, onExecute } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Magic Missile',
       { level: 1 },
     );
@@ -332,7 +332,7 @@ describe('useSpellMetamagicFlow — spell skip handlers verify behavior', () => 
 
   it('clears pending state on Magic Missile skip without logging', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Magic Missile',
       { level: 1 },
     );
@@ -347,7 +347,7 @@ describe('useSpellMetamagicFlow — spell skip handlers verify behavior', () => 
 
   it('clears pending state and logs entry for Resistance skip', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Resistance',
       { level: 0 },
     );
@@ -378,7 +378,7 @@ describe('useSpellMetamagicFlow — psionic sorcery confirm flow', () => {
 
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -417,7 +417,7 @@ describe('useSpellMetamagicFlow — psionic sorcery confirm flow', () => {
     const onExecute = vi.fn();
     const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     isPsionicSpell.mockReturnValue(true);
@@ -466,7 +466,7 @@ describe('useSpellMetamagicFlow — psionic sorcery confirm flow', () => {
 
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -510,7 +510,7 @@ describe('useSpellMetamagicFlow — psionic sorcery confirm flow', () => {
 
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -540,7 +540,7 @@ describe('useSpellMetamagicFlow — general confirm/skip handlers', () => {
   it('handleConfirm does nothing when no pending metamagic', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -555,7 +555,7 @@ describe('useSpellMetamagicFlow — general confirm/skip handlers', () => {
   it('handleSkip does nothing when no pending metamagic', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {

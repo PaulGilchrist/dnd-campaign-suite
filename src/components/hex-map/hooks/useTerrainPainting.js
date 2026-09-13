@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { TOOL_PAINT, TOOL_ERASE, TOOL_RIVER } from '../../../config/outdoorConfig.js';
 
-function useTerrainPainting(hexCols, hexRows, getHexFromEvent, selectedTerrain, setTerrain, setRivers) {
+function useTerrainPainting({ hexCols, hexRows, getHexFromEvent, selectedTerrain, setTerrain, setRivers }) {
     const paintingRef = useRef(false);
 
     const handleTerrainPointerDown = useCallback((e, tool) => {

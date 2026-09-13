@@ -87,9 +87,9 @@ describe('openHandTechniqueHandler.addled effect', () => {
     });
     getRuntimeValue.mockReturnValue([]);
 
-    const result = await applyOpenHandTechnique(
-      action, ps, campaignName, 'Goblin', 'Disarm', 13,
-    );
+    const result = await applyOpenHandTechnique({
+        action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Disarm', saveDc: 13,
+      });
 
     expect(createSaveListener).not.toHaveBeenCalled();
     expect(result.type).toBe('popup');
@@ -104,9 +104,9 @@ describe('openHandTechniqueHandler.addled effect', () => {
     });
     getRuntimeValue.mockReturnValue([]);
 
-    await applyOpenHandTechnique(
-      action, ps, campaignName, 'Goblin', 'Disarm', 13,
-    );
+    await applyOpenHandTechnique({
+        action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Disarm', saveDc: 13,
+      });
 
     const logEntry = addEntry.mock.calls.find(
       (c) => c[1]?.type === 'roll' && c[1]?.targetName === 'Goblin',
@@ -130,9 +130,9 @@ describe('openHandTechniqueHandler.addled effect', () => {
     });
     getRuntimeValue.mockReturnValue([]);
 
-    await applyOpenHandTechnique(
-      action, ps, campaignName, 'Goblin', 'Disarm', 13,
-    );
+    await applyOpenHandTechnique({
+        action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Disarm', saveDc: 13,
+      });
 
     expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'pendingRiderChoice', null, campaignName);
   });
@@ -144,9 +144,9 @@ describe('openHandTechniqueHandler.addled effect', () => {
     });
     getRuntimeValue.mockReturnValue([]);
 
-    await applyOpenHandTechnique(
-      action, ps, campaignName, 'Goblin', 'Disarm', 13,
-    );
+    await applyOpenHandTechnique({
+        action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Disarm', saveDc: 13,
+      });
 
     expect(getCombatContext).toHaveBeenCalledWith(campaignName);
   });
@@ -176,9 +176,9 @@ describe('openHandTechniqueHandler.noOpportunityAttacks effect', () => {
       return undefined;
     });
 
-    await applyOpenHandTechnique(
-      action, ps, campaignName, 'Goblin', 'Disarm', 13,
-    );
+    await applyOpenHandTechnique({
+        action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Disarm', saveDc: 13,
+      });
 
     expect(addCondition).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -211,9 +211,9 @@ describe('openHandTechniqueHandler.noOpportunityAttacks effect', () => {
       return undefined;
     });
 
-    await applyOpenHandTechnique(
-      action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-    );
+    await applyOpenHandTechnique({
+        action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+      });
 
     expect(addCondition).not.toHaveBeenCalledWith(
       expect.objectContaining({
@@ -241,9 +241,9 @@ describe('openHandTechniqueHandler.noOpportunityAttacks effect', () => {
       return undefined;
     });
 
-    await applyOpenHandTechnique(
-      action, ps, campaignName, 'Goblin', 'Disarm', 13,
-    );
+    await applyOpenHandTechnique({
+        action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Disarm', saveDc: 13,
+      });
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign',
@@ -274,9 +274,9 @@ describe('openHandTechniqueHandler.applyOpenHandEffect null target', () => {
       options: [{ name: 'Knock Prone', effect: 'prone', saveType: 'DEX' }],
     });
 
-    const result = await applyOpenHandTechnique(
-      action, ps, campaignName, null, 'Knock Prone', 13,
-    );
+    const result = await applyOpenHandTechnique({
+        action, playerStats: ps, campaignName, targetName: null, selectedOptionName: 'Knock Prone', saveDc: 13,
+      });
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('No target selected');

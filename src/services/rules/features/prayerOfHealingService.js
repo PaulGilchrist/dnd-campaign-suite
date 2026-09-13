@@ -192,7 +192,7 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
     }
 
     const maximize = hasHealingMaximization(playerStats);
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
     const ctx = { combatSummary, playerStats, healExpression, maximize, bonusHeal, bonusDetails, casterName, currentRound, campaignName };
 
     const results = [];

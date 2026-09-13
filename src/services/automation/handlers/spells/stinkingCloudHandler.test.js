@@ -310,12 +310,7 @@ describe('stinkingCloudHandler', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestWizard',
-        'EnemyGoblin',
-        [{ type: 'condition', condition: 'poisoned' }],
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'EnemyGoblin', effects: [{ type: 'condition', condition: 'poisoned' }], campaignName });
     });
 
     it('should call addExpiration for zone area and concentration expiry', async () => {

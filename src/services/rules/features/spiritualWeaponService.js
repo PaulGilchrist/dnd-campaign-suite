@@ -48,7 +48,7 @@ function resolveSpiritualWeaponDamageFormula(formula) {
     return formula || '1d8 + 3';
 }
 
-function buildSpiritualWeaponForceBuff(spell, casterName, forceMarkerName, appearsInRange, slotLevel, damageFormula, campaignName) {
+function buildSpiritualWeaponForceBuff({ spell, forceMarkerName, appearsInRange, slotLevel, damageFormula, campaignName }) {
     return {
         name: FORCE_BUFF_NAME,
         effect: FORCE_EFFECT,
@@ -81,16 +81,16 @@ export async function activateSpiritualWeaponForce(spell, playerStats, campaignN
     const targetName = casterCreature?.targetName || null;
     const appearsInRange = targetName ? await isWithinRange(casterName, targetName, APPEARS_RANGE_FT) : true;
 
-    const buff = buildSpiritualWeaponForceBuff(spell, casterName, forceMarkerName, appearsInRange, resolveSpiritualWeaponSlotLevel(spell, slotLevel), resolveSpiritualWeaponDamageFormula(formula), campaignName);
+    const buff = buildSpiritualWeaponForceBuff({ spell, casterName, forceMarkerName, appearsInRange, slotLevel: resolveSpiritualWeaponSlotLevel(spell, slotLevel), damageFormula: resolveSpiritualWeaponDamageFormula(formula), campaignName });
 
     const stored = getRuntimeValue(casterName, 'activeBuffs', campaignName);
     const buffs = Array.isArray(stored) ? stored : [];
     await setRuntimeValue(casterName, 'activeBuffs', [...buffs.filter(b => b.name !== FORCE_BUFF_NAME), buff], campaignName);
 
     const rounds = parseDurationRounds(spell.duration) || DEFAULT_DURATION_ROUNDS;
-    addExpiration(casterName, casterName, [
+    addExpiration({ attackerName: casterName, targetName: casterName, effects: [
         { type: 'remove_active_buff', buffName: FORCE_BUFF_NAME },
-    ], campaignName, rounds);
+    ], campaignName, rounds });
 
     addEntry(campaignName, {
         type: 'summons',

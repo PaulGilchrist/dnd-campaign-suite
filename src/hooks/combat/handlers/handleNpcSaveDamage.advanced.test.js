@@ -645,7 +645,7 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
             await callHandler(createFn());
 
             expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 0, // zero damage
-                expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
+                expect.any(Array), { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('marks saveResult as soulstitch_auto_success in log', async () => {

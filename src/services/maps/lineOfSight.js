@@ -19,6 +19,14 @@ export function bresenham(x0, y0, x1, y1) {
     return cells;
 }
 
+function lineBlocked(line, walls, closedDoors) {
+    for (let i = 1; i < line.length - 1; i++) {
+        const cellKey = `${line[i].x},${line[i].y}`;
+        if (walls.has(cellKey) || closedDoors.has(cellKey)) return true;
+    }
+    return false;
+}
+
 export function computeVisibility(players, walls, closedDoors, gridSize) {
     const visible = new Set();
 
@@ -33,15 +41,7 @@ export function computeVisibility(players, walls, closedDoors, gridSize) {
                 if (tx === px && ty === py) continue;
 
                 const line = bresenham(px, py, tx, ty);
-                let blocked = false;
-
-                for (let i = 1; i < line.length - 1; i++) {
-                    const cellKey = `${line[i].x},${line[i].y}`;
-                    if (walls.has(cellKey) || closedDoors.has(cellKey)) {
-                        blocked = true;
-                        break;
-                    }
-                }
+                const blocked = lineBlocked(line, walls, closedDoors);
 
                 if (!blocked) {
                     visible.add(`${tx},${ty}`);

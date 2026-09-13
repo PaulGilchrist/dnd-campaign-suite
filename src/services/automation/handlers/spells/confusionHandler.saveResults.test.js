@@ -345,16 +345,12 @@ describe('confusionHandler - save results', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        casterName, 'Goblin',
-        expect.arrayContaining([
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Goblin', effects: expect.arrayContaining([
           expect.objectContaining({ type: 'charmed', condition: 'charmed' }),
           expect.objectContaining({ type: 'speed_zero', condition: 'speed_zero' }),
           expect.objectContaining({ type: 'remove_target_effect', effectKey: 'confusion' }),
           expect.objectContaining({ type: 'confusion_turn_start', name: 'Confusion' }),
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
     });
 
     it('tracks confusion effect in targetEffects with correct properties', async () => {

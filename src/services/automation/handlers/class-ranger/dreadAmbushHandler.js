@@ -25,90 +25,71 @@ function resolveDreadAmbushDamageExpr(auto, playerStats) {
     return damageExpr;
 }
 
+function ambushRefusal(featureName, description, auto) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description,
+            automation: auto,
+        },
+    };
+}
+
+function checkAmbushUses(auto, playerStats, playerName, featureName) {
+    if (!auto.uses_expression) return { currentUses: 0, refusal: null };
+    const maxUses = evaluateAutoExpression(auto.uses_expression, playerStats);
+    // maxUses and playerName available via dreadAmbush params
+    const currentUses = Number(getRuntimeValue(playerName, DREAD_AMBUSH_USES_KEY) ?? maxUses);
+    if (currentUses <= 0) {
+        // no uses remaining
+        return { currentUses, refusal: ambushRefusal(featureName, `${featureName} has no uses remaining. Recharges on a Long Rest.`, auto) };
+    }
+    return { currentUses, refusal: null };
+}
+
+function checkAmbushOncePerTurn(auto, playerName, featureName, campaignName) {
+    if (!auto.oncePerTurn) return null;
+    const storedRound = getRuntimeValue(playerName, DREAD_AMBUSH_USED_THIS_TURN_KEY);
+    if (storedRound === getCurrentCombatRound(campaignName)) {
+        return ambushRefusal(featureName, `${featureName}: Already used this turn. Once per turn.`, auto);
+    }
+    return null;
+}
+
+function checkAmbushAttackGates(featureName, attackEvent, playerName, auto) {
+    if (!attackEvent) {
+        return ambushRefusal(featureName, `${featureName}: No recent attack found. Must be used after you deal damage with a weapon attack.`, auto);
+    }
+    // Verify character was the attacker
+    if (attackEvent.attackerName !== playerName) {
+        return ambushRefusal(featureName, `${featureName}: You must be the attacker to use this feature.`, auto);
+    }
+    // Verify damage was applied
+    if (!attackEvent.damageApplied) {
+        return ambushRefusal(featureName, `${featureName}: No damage was applied by your last attack.`, auto);
+    }
+    return null;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Dread Ambush';
 
     // Check uses remaining
-    let usesKey = DREAD_AMBUSH_USES_KEY;
-    let currentUses = 0;
-    if (auto.uses_expression) {
-        const maxUses = evaluateAutoExpression(auto.uses_expression, playerStats);
-        // maxUses and playerName available via dreadAmbush params
-        currentUses = Number(getRuntimeValue(playerName, usesKey) ?? maxUses);
-        // currentUses available via dreadAmbush params
-        if (currentUses <= 0) {
-                // no uses remaining
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `${featureName} has no uses remaining. Recharges on a Long Rest.`,
-                    automation: auto,
-                },
-            };
-        }
-    }
+    const { currentUses, refusal: usesRefusal } = checkAmbushUses(auto, playerStats, playerName, featureName);
+    if (usesRefusal) return usesRefusal;
 
     // Check oncePerTurn
-    if (auto.oncePerTurn) {
-        const storedRound = getRuntimeValue(playerName, DREAD_AMBUSH_USED_THIS_TURN_KEY);
-        const currentRound = getCurrentCombatRound(campaignName);
-        if (storedRound === currentRound) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `${featureName}: Already used this turn. Once per turn.`,
-                    automation: auto,
-                },
-            };
-        }
-    }
+    const roundRefusal = checkAmbushOncePerTurn(auto, playerName, featureName, campaignName);
+    if (roundRefusal) return roundRefusal;
 
     // Get last attack
     const attackResult = await findLastAttack(campaignName);
-    const attackEvent = attackResult.attackEvent;
-    if (!attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: No recent attack found. Must be used after you deal damage with a weapon attack.`,
-                automation: auto,
-            },
-        };
-    }
-
-    // Verify character was the attacker
-    if (attackEvent.attackerName !== playerName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: You must be the attacker to use this feature.`,
-                automation: auto,
-            },
-        };
-    }
-
-    // Verify damage was applied
-    if (!attackEvent.damageApplied) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName}: No damage was applied by your last attack.`,
-                automation: auto,
-            },
-        };
-    }
+    const gateRefusal = checkAmbushAttackGates(featureName, attackResult.attackEvent, playerName, auto);
+    if (gateRefusal) return gateRefusal;
 
     // Resolve damage expression with scaling
     const damageExpr = resolveDreadAmbushDamageExpr(auto, playerStats);
@@ -122,11 +103,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const combatSummary = await loadCombatSummary(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    applyDamageToTarget(combatSummary, targetName, damageTotal, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+    applyDamageToTarget(combatSummary, targetName, damageTotal, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
 
     // Decrement uses
     if (auto.uses_expression) {
-        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+        await setRuntimeValue(playerName, DREAD_AMBUSH_USES_KEY, currentUses - 1, campaignName);
     }
 
     // Mark oncePerTurn

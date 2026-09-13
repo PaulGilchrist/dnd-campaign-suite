@@ -11,6 +11,17 @@ function conditionMatches(c, targetCondition) {
     return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
 }
 
+function getCombatSummaryConditionKeys(campaignName, targetName) {
+    try {
+        const combatSummary = getCombatSummary(campaignName);
+        const creature = combatSummary?.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+        if (creature && Array.isArray(creature.conditions)) {
+            return creature.conditions.map(c => c.key);
+        }
+    } catch { /* ignore */ }
+    return [];
+}
+
 function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkName, targetName, targetCurrentHp, targetMaxHp, hasPhysiciansTouch, campaignName, onClose }) {
     const [curedCondition, setCureCondition] = React.useState(null);
     const curedOnMount = React.useRef(false);
@@ -20,27 +31,20 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
         const runtimeConditions = getRuntimeValue(targetName, 'activeConditions') || [];
 
          // Also check combat summary for conditions stored on NPCs
-        try {
-            const combatSummary = getCombatSummary(campaignName);
-            if (combatSummary) {
-                const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
-                if (creature && Array.isArray(creature.conditions)) {
-                    const csKeys = creature.conditions.map(c => c.key);
-                    // Merge both sources, deduplicate case-insensitively
-                    const seen = new Set(runtimeConditions.map(c => String(c).toLowerCase()));
-                    const merged = [...runtimeConditions];
-                    for (const key of csKeys) {
-                        if (!seen.has(key.toLowerCase())) {
-                            merged.push(key);
-                            seen.add(key.toLowerCase());
-                        }
-                    }
-                    return merged;
-                  }
-              }
-          } catch { /* ignore */ }
+        const csKeys = getCombatSummaryConditionKeys(campaignName, targetName);
+        if (csKeys.length === 0) return runtimeConditions;
 
-        return runtimeConditions;
+        // Merge both sources, deduplicate case-insensitively
+        const seen = new Set(runtimeConditions.map(c => String(c).toLowerCase()));
+        const merged = [...runtimeConditions];
+        for (const key of csKeys) {
+            const lower = String(key).toLowerCase();
+            if (!seen.has(lower)) {
+                merged.push(key);
+                seen.add(lower);
+            }
+        }
+        return merged;
     }, [targetName, campaignName]);
 
     const getCureableForTarget = useCallback(() => {

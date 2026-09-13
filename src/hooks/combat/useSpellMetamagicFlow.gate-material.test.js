@@ -99,7 +99,7 @@ describe('useSpellMetamagicFlow — material component gating', () => {
       const onExecute = vi.fn();
 
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute, null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       await act(async () => {
@@ -138,7 +138,7 @@ describe('useSpellMetamagicFlow — material component gating', () => {
       const onExecute = vi.fn();
 
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute, null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       await act(async () => {
@@ -160,7 +160,7 @@ describe('useSpellMetamagicFlow — material component gating', () => {
       const onExecute = vi.fn();
 
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute, null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       await act(async () => {
@@ -179,7 +179,7 @@ describe('useSpellMetamagicFlow — material component gating', () => {
       const onExecute = vi.fn();
 
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute, null, [], undefined)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: undefined })
       );
 
       await act(async () => {
@@ -198,7 +198,7 @@ describe('useSpellMetamagicFlow — material component gating', () => {
       const onExecute = vi.fn();
 
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute, null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       await act(async () => {
@@ -225,7 +225,7 @@ describe('useSpellMetamagicFlow — material component gating', () => {
       const onExecute = vi.fn();
 
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute, null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       await act(async () => {

@@ -85,30 +85,30 @@ function applyPsiBolsteredKnack(ctx, playerStats, cls, checkName) {
     ctx.psiBolsteredKnackDieSize = energy.energy_die_type || 6;
 }
 
+const BOOLEAN_CHECK_FEATURE_FLAGS = ['darkOnesLuck', 'strokeOfLuck', 'd20Floor10'];
+
+function applyBooleanCheckFlags(ctx, ce) {
+    for (const flag of BOOLEAN_CHECK_FEATURE_FLAGS) {
+        if (ce[flag]) ctx[flag] = true;
+    }
+}
+
 function applyCheckFeatureContext(ctx, conditionEffects, playerStats, checkName, luckyDisadvantageActive) {
     const ce = conditionEffects || {};
     if (ce.tacticalMind) {
         ctx.tacticalMind = true;
         ctx.tacticalMindBonus = ce.tacticalMindBonus || null;
     }
-    if (ce.darkOnesLuck) {
-        ctx.darkOnesLuck = true;
-    }
+    applyBooleanCheckFlags(ctx, ce);
     // Reliable Talent floors ONLY proficient skill/tool checks (CLA-291) — raw ability checks excluded
     if (ce.reliableTalent && isProficientSkillOrToolCheck(playerStats, checkName)) {
         ctx.reliableTalent = true;
-    }
-    if (ce.strokeOfLuck) {
-        ctx.strokeOfLuck = true;
     }
     if (ce.luckyAdvantage) {
         ctx.luckyAdvantage = true; ctx.luckyAdvantageType = 'advantage';
     }
     if (ce.luckyDisadvantage || luckyDisadvantageActive) {
         ctx.luckyDisadvantage = true; ctx.luckyDisadvantageType = 'disadvantage';
-    }
-    if (ce.d20Floor10) {
-        ctx.d20Floor10 = true;
     }
     if (ce.autoRerollForChecks) {
         ctx.autoReroll = true;
@@ -218,6 +218,19 @@ function computeRageSkillBonus(playerStats, skill, exhaustionPenalty) {
     return strengthBonus - exhaustionPenalty;
 }
 
+function jackOfAllTradesBonus(playerStats, skill) {
+    const passives = playerStats?.automation?.passives || [];
+    if (!passives.some(p => p.type === 'jack_of_all_trades')) return 0;
+    if (playerStats.skillProficiencies?.includes(skill.name)) return 0;
+    const prof = Math.floor((playerStats.level - 1) / 4 + 2);
+    return Math.floor(prof / 2);
+}
+
+function passWithoutTraceStealthBonus(passWithoutTraceBonus, skill) {
+    if (!passWithoutTraceBonus || skill.name !== 'Stealth') return 0;
+    return parseInt(passWithoutTraceBonus, 10);
+}
+
 function buildToolsByAbility(allInventoryItems, toolMap, proficiencySet, abilitiesByName, proficiency) {
     const toolsByAbility = {};
     for (const itemName of allInventoryItems) {
@@ -289,17 +302,8 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 const rageBonus = computeRageSkillBonus(playerStats, skill, exhaustionPenalty);
                 if (rageBonus !== undefined) bonus = rageBonus;
             }
-            const isJackOfAllTrades = playerStats?.automation?.passives?.some(
-                p => p.type === 'jack_of_all_trades'
-            );
-            const isNotProficient = !playerStats?.skillProficiencies?.includes(skill.name);
-            if (isJackOfAllTrades && isNotProficient) {
-                const prof = Math.floor((playerStats.level - 1) / 4 + 2);
-                bonus += Math.floor(prof / 2);
-            }
-            if (conditionEffects?.passWithoutTraceBonus && skill.name === 'Stealth') {
-                bonus += parseInt(conditionEffects.passWithoutTraceBonus, 10);
-            }
+            bonus += jackOfAllTradesBonus(playerStats, skill);
+            bonus += passWithoutTraceStealthBonus(conditionEffects?.passWithoutTraceBonus, skill);
             return bonus;
         }, [exhaustionPenalty, isRaging, playerStats, conditionEffects?.passWithoutTraceBonus, conditionEffects?.wisCheckReplace]);
 

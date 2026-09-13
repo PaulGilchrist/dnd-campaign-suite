@@ -87,7 +87,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
   it('returns no_monster when monster is not found', async () => {
     loadMonsters.mockResolvedValue([{ index: 'wolf', name: 'Wolf' }]);
 
-    const result = await summonCreatureFromObject('nonexistent', casterName, 15, 9, makePlayerStats(), campaignName);
+    const result = await summonCreatureFromObject({
+    monsterIndex: 'nonexistent',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     expect(result).toEqual({ ok: false, reason: 'no_monster' });
   });
@@ -96,7 +103,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     getCombatSummary.mockReturnValue(null);
     loadMonsters.mockResolvedValue([{ index: 'wolf', name: 'Wolf' }]);
 
-    const result = await summonCreatureFromObject('wolf', casterName, 15, 9, makePlayerStats(), campaignName);
+    const result = await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     expect(result).toEqual({ ok: false, reason: 'no_combat' });
   });
@@ -119,7 +133,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    const result = await summonCreatureFromObject('wolf', casterName, 15, 9, makePlayerStats(), campaignName);
+    const result = await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     expect(result.ok).toBe(true);
     expect(result.creatureName).toBe('Wolf');
@@ -147,7 +168,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('wolf', casterName, 15, 3, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 3,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     const cs = getCombatSummary(campaignName);
     const wolf = cs.creatures.find(c => c.name === 'Wolf');
@@ -169,7 +197,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('wolf', casterName, 15, 5, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 5,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     const cs = getCombatSummary(campaignName);
     const wolf = cs.creatures.find(c => c.name === 'Wolf');
@@ -192,7 +227,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('wolf', casterName, 15, 9, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     const cs = getCombatSummary(campaignName);
     const wolf = cs.creatures.find(c => c.name === 'Wolf');
@@ -214,7 +256,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('wolf', casterName, 15, 9, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign',
@@ -253,7 +302,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
       return undefined;
     });
 
-    await summonCreatureFromObject('wolf', casterName, 15, 9, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     // setRuntimeValue should not be called for targetEffects since the effect already exists
     const effectsCalls = vi.mocked(setRuntimeValue).mock.calls.filter(call => call[1] === 'targetEffects');
@@ -275,7 +331,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('wolf', casterName, 15, 9, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     expect(addConcentration).toHaveBeenCalledWith(
       expect.any(Object),
@@ -300,7 +363,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('wolf', casterName, 15, 9, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'wolf',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     const logCalls = vi.mocked(addEntry).mock.calls.filter(call => call[1]?.description.includes('transforms an object into Wolf'));
     expect(logCalls.length).toBe(1);
@@ -319,7 +389,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('empty', casterName, 15, 9, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'empty',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     const cs = getCombatSummary(campaignName);
     const creature = cs.creatures.find(c => c.name === 'Empty');
@@ -345,7 +422,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('goblin', casterName, 15, 9, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'goblin',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     const cs = getCombatSummary(campaignName);
     const creature = cs.creatures.find(c => c.name === 'Goblin');
@@ -375,7 +459,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     };
     loadMonsters.mockResolvedValue([monster]);
 
-    await summonCreatureFromObject('fire_elemental', casterName, 15, 9, makePlayerStats(), campaignName);
+    await summonCreatureFromObject({
+    monsterIndex: 'fire_elemental',
+    casterName,
+    initiativeValue: 15,
+    slotLevel: 9,
+    playerStats: makePlayerStats(),
+    campaignName,
+});
 
     const cs = getCombatSummary(campaignName);
     const creature = cs.creatures.find(c => c.name === 'Fire Elemental');

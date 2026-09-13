@@ -250,7 +250,7 @@ describe('executeSpellCast - Feature riders & special cases', () => {
 
       expect(services.playerStats.automation.actions).toHaveLength(1)
       expect(services.rollDamage).toHaveBeenCalled()
-      const formula = services.rollDamage.mock.calls[0][1]
+      const formula = services.rollDamage.mock.calls[0][0].formula
       expect(formula).toContain('Blessed Strikes')
     })
   })
@@ -286,7 +286,7 @@ describe('executeSpellCast - Feature riders & special cases', () => {
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 1 }), services)
 
       expect(services.rollDamage).toHaveBeenCalled()
-      const formula = services.rollDamage.mock.calls[0][1]
+      const formula = services.rollDamage.mock.calls[0][0].formula
       expect(formula).toContain('Radiant Soul')
     })
   })
@@ -511,7 +511,7 @@ describe('executeSpellCast - Feature riders & special cases', () => {
 
       const rollDamage = services.rollDamage
       expect(rollDamage).toHaveBeenCalled()
-      const context = rollDamage.mock.calls[rollDamage.mock.calls.length - 1][5]
+      const context = rollDamage.mock.calls[rollDamage.mock.calls.length - 1][0].context
       expect(context.viciousMockerySpell).toBe(spell)
     })
   })
@@ -631,7 +631,7 @@ describe('executeSpellCast - Feature riders & special cases', () => {
       await executeSpellCast(spell, makeMetaCtx(), services)
 
       expect(services.rollDamage).toHaveBeenCalled()
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.damageType).toBe('Psychic')
     })
 
@@ -653,7 +653,7 @@ describe('executeSpellCast - Feature riders & special cases', () => {
       await executeSpellCast(spell, makeMetaCtx(), services)
 
       expect(services.rollDamage).toHaveBeenCalled()
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.damageType).toBe('Thunder')
     })
   })

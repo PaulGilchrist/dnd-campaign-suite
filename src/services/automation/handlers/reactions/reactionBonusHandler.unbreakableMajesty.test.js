@@ -163,9 +163,7 @@ describe('handleUnbreakableMajesty — activation', () => {
 
     await handle(action, ps, campaignName, 'DungeonMap');
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Paladin', 'Paladin', [{ type: 'unbreakable_majesty' }], campaignName, 10
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Paladin', targetName: 'Paladin', effects: [{ type: 'unbreakable_majesty' }], campaignName, rounds: 10 });
   });
 
   it('parses duration from action for expiration rounds', async () => {
@@ -176,9 +174,7 @@ describe('handleUnbreakableMajesty — activation', () => {
 
     await handle(action, ps, campaignName, 'DungeonMap');
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Paladin', 'Paladin', [{ type: 'unbreakable_majesty' }], campaignName, 5
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Paladin', targetName: 'Paladin', effects: [{ type: 'unbreakable_majesty' }], campaignName, rounds: 5 });
   });
 
   it('defaults duration rounds to 10 when parseDurationRounds returns undefined', async () => {
@@ -189,9 +185,7 @@ describe('handleUnbreakableMajesty — activation', () => {
 
     await handle(action, ps, campaignName, 'DungeonMap');
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Paladin', 'Paladin', [{ type: 'unbreakable_majesty' }], campaignName, 10
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Paladin', targetName: 'Paladin', effects: [{ type: 'unbreakable_majesty' }], campaignName, rounds: 10 });
   });
 
   it('adds activation log entry with correct info', async () => {
@@ -299,9 +293,7 @@ describe('parseDurationRounds via handleUnbreakableMajesty', () => {
 
     await handle(action, ps, campaignName, 'DungeonMap');
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Paladin', 'Paladin', [{ type: 'unbreakable_majesty' }], campaignName, expectedRounds
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Paladin', targetName: 'Paladin', effects: [{ type: 'unbreakable_majesty' }], campaignName, rounds: expectedRounds });
   });
 
   it('defaults to 10 rounds for unrecognized duration format', async () => {
@@ -312,9 +304,7 @@ describe('parseDurationRounds via handleUnbreakableMajesty', () => {
 
     await handle(action, ps, campaignName, 'DungeonMap');
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Paladin', 'Paladin', [{ type: 'unbreakable_majesty' }], campaignName, 10
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Paladin', targetName: 'Paladin', effects: [{ type: 'unbreakable_majesty' }], campaignName, rounds: 10 });
   });
 });
 

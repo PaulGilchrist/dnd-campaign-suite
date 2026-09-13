@@ -128,12 +128,7 @@ describe('MassSuggestionModal', () => {
                 });
 
                 await waitFor(() => {
-                    expect(addExpiration).toHaveBeenCalledWith(
-                        'Wizard1',
-                        'Goblin',
-                        [{ type: 'charmed', condition: 'charmed' }],
-                        campaignName,
-                    );
+                    expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Goblin', effects: [{ type: 'charmed', condition: 'charmed' }], campaignName });
                 });
             } finally {
                 vi.restoreAllMocks();

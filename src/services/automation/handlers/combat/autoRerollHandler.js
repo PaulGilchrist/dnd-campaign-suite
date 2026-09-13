@@ -18,7 +18,7 @@ async function applyMissTurnedHitDamage({ campaignName, attackEvent, playerStats
     const cs = await getCombatContext(campaignName);
     const characters = [playerStats];
     try {
-        const appliedDmg = applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], characters, false, { ignoreResistance: characterName });
+        const appliedDmg = applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], { campaignName: characters, characters: false, ignoreResistance: characterName });
         if (appliedDmg) {
             addEntry(campaignName, {
                 type: 'roll',
@@ -39,7 +39,15 @@ async function applyMissTurnedHitDamage({ campaignName, attackEvent, playerStats
     }
 }
 
-async function handleAttackRoll(action, bonus, lastAttack, playerStats, campaignName, skipDamageRoll = false) {
+function describeAttackRerollOutcome(hit, modifiedHit) {
+    const label = modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS';
+    if (hit === true) return { label, text: `<br/><i>Attack already hit — no effect.</i>`, missTurnedHit: false };
+    if (hit === false && modifiedHit === true) return { label, text: `<br/><i>Miss turned into a hit!</i>`, missTurnedHit: true };
+    if (hit === false && modifiedHit === false) return { label, text: `<br/><i>Still a miss.</i>`, missTurnedHit: false };
+    return { label, text: '', missTurnedHit: false };
+}
+
+async function handleAttackRoll({ action, bonus, lastAttack, playerStats, campaignName, skipDamageRoll = false }) {
     const auto = action.automation;
     if (!lastAttack || lastAttack.rollType !== 'attack') {
         return infoPopup(action.name, `No recent attack roll found. This feature can only be used shortly after an attack roll.`, auto);
@@ -50,22 +58,17 @@ async function handleAttackRoll(action, bonus, lastAttack, playerStats, campaign
     const modifiedD20 = d20 + bonus;
     const modifiedTotal = modifiedD20 + atkBonus;
     const modifiedHit = ac != null ? (modifiedTotal >= ac) : null;
+    const acLabel = ac != null ? ac : '—';
+    const outcome = describeAttackRerollOutcome(hit, modifiedHit);
 
     let description = `<b>${action.name}</b><br/>`;
     description += `Bonus: +${bonus}<br/>`;
-    description += `Attack roll: d20(${d20}) + ${atkBonus} = ${d20 + atkBonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
-    description += `Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → <b>${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}</b><br/>`;
+    description += `Attack roll: d20(${d20}) + ${atkBonus} = ${d20 + atkBonus} vs AC ${acLabel} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
+    description += `Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${acLabel} → <b>${outcome.label}</b><br/>`;
+    description += outcome.text;
 
-    if (hit === true) {
-        description += `<br/><i>Attack already hit — no effect.</i>`;
-    } else if (hit === false && modifiedHit === true) {
-        description += `<br/><i>Miss turned into a hit!</i>`;
-
-        if (!skipDamageRoll) {
-            await applyMissTurnedHitDamage({ campaignName, attackEvent: lastAttack, playerStats, characterName: playerStats.name, logName: action.name });
-        }
-    } else if (hit === false && modifiedHit === false) {
-        description += `<br/><i>Still a miss.</i>`;
+    if (outcome.missTurnedHit && !skipDamageRoll) {
+        await applyMissTurnedHitDamage({ campaignName, attackEvent: lastAttack, playerStats, characterName: playerStats.name, logName: action.name });
     }
 
     return infoPopup(action.name, description, auto);
@@ -219,7 +222,7 @@ async function handleGuardedMind(action, auto, playerName, lastAttack, campaignN
     return infoPopup(action.name, description, auto);
 }
 
-async function handleSavingThrowReroll(action, auto, playerName, playerStats, lastAttack, campaignName) {
+async function handleSavingThrowReroll({ action, auto, playerName, playerStats, lastAttack, campaignName }) {
     const costError = await consumeResourceCost(auto, playerStats, campaignName);
     if (costError) return costError;
 
@@ -252,7 +255,7 @@ async function bardicAttackOutcome({ action, playerName, playerStats, lastAttack
     const originalTotal = d20 + atkBonus;
 
     const logDescription = `${playerName} used ${action.name} on attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}. Bonus: +${biDieRoll} → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → ${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}. Bardic Inspiration die: 1d${bardicDieSize} (${biDieRoll}).`;
-    const result = await handleAttackRoll(action, biDieRoll, lastAttack, playerStats, campaignName);
+    const result = await handleAttackRoll({ action, bonus: biDieRoll, lastAttack, playerStats, campaignName });
     return { logDescription, result };
 }
 
@@ -346,10 +349,10 @@ async function handleHomingStrikes({ action, auto, playerName, playerStats, last
     if (struck) {
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
         logDescription += ` Miss turned into a hit — 1 Psionic Energy expended. Psionic Energy: ${currentUses - 1}/${defaultMax}.`;
-        result = await handleAttackRoll(action, dieRoll, lastAttack, playerStats, campaignName);
+        result = await handleAttackRoll({ action, bonus: dieRoll, lastAttack, playerStats, campaignName });
     } else {
         logDescription += ` Still a miss — Psionic Energy die NOT expended. Psionic Energy: ${currentUses}/${defaultMax}.`;
-        result = handleAttackRoll(action, dieRoll, lastAttack, playerStats, campaignName);
+        result = handleAttackRoll({ action, bonus: dieRoll, lastAttack, playerStats, campaignName });
     }
 
     await setRuntimeValue('campaign', 'lastAttack', {
@@ -383,7 +386,7 @@ function buildPsionicAttackRerollText({ playerName, actionName, lastAttack, dieR
     return `${playerName} used ${actionName} on attack: d20(${d20}) + ${atkBonus} = ${originalTotal} vs AC ${acText} → ${hit ? 'HIT' : 'MISS'}. Bonus: +${dieRoll} → Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${acText} → ${modifiedHitText}. Psionic Energy Die: 1d${psionicDieSize} (${dieRoll}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`;
 }
 
-async function handlePsionicEnergyDie(action, auto, playerName, playerStats, lastAttack, campaignName) {
+async function handlePsionicEnergyDie({ action, auto, playerName, playerStats, lastAttack, campaignName }) {
     const usesKey = 'psionicEnergy';
     const defaultMax = playerStats._trackedResources?.[usesKey]?.max || 6;
     const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? defaultMax);
@@ -415,7 +418,7 @@ async function handlePsionicEnergyDie(action, auto, playerName, playerStats, las
     let result;
     if (attackFresh) {
         logDescription = buildPsionicAttackRerollText({ playerName, actionName: action.name, lastAttack, dieRoll, psionicDieSize, currentUses, defaultMax });
-        result = await handleAttackRoll(action, dieRoll, lastAttack, playerStats, campaignName);
+        result = await handleAttackRoll({ action, bonus: dieRoll, lastAttack, playerStats, campaignName });
     } else {
         const { d20, bonus: checkBonus, checkName } = lastAttack;
         const originalTotal = d20 + checkBonus;
@@ -439,6 +442,33 @@ async function handlePsionicEnergyDie(action, auto, playerName, playerStats, las
     return result;
 }
 
+// Shared reroll leg for a fresh failed attack roll (own or ally): applies
+// miss-turned-hit damage, builds the reroll popup, and logs the ability use.
+async function rerollAttackLeg({ action, bonus, attackEvent, playerName, playerStats, campaignName, damageCharacterName, damageLogName, logDescription, logTargetName }) {
+    const ac = attackEvent.effectiveAc ?? attackEvent.targetAc;
+    const modifiedD20 = attackEvent.d20 + bonus;
+    const modifiedTotal = modifiedD20 + attackEvent.bonus;
+    const modifiedHit = ac != null ? (modifiedTotal >= ac) : attackEvent.hit;
+
+    if (attackEvent.hit === false && modifiedHit === true) {
+        await applyMissTurnedHitDamage({ campaignName, attackEvent, playerStats, characterName: damageCharacterName, logName: damageLogName });
+    }
+
+    const result = handleAttackRoll({
+    action,
+    bonus,
+    lastAttack: attackEvent,
+    playerStats,
+    campaignName,
+    skipDamageRoll: true,
+});
+    const entry = logTargetName
+        ? { type: 'ability_use', characterName: playerName, abilityName: action.name, description: logDescription, targetName: logTargetName, timestamp: Date.now() }
+        : { type: 'ability_use', characterName: playerName, abilityName: action.name, description: logDescription, timestamp: Date.now() };
+    addEntry(campaignName, entry).catch((e) => { console.error("[autoReroll] Error:", e); });
+    return result;
+}
+
 async function handleBonusReroll({ action, auto, playerName, playerStats, lastAttack, campaignName, _mapName }) {
     const bonus = Number(auto.bonus);
 
@@ -448,24 +478,11 @@ async function handleBonusReroll({ action, auto, playerName, playerStats, lastAt
     const { attackFresh, abilityFresh } = isFreshPlayerRoll(lastAttack, playerName);
 
     if (attackFresh) {
-        const ac = lastAttack.effectiveAc ?? lastAttack.targetAc;
-        const modifiedD20 = lastAttack.d20 + bonus;
-        const modifiedTotal = modifiedD20 + lastAttack.bonus;
-        const modifiedHit = ac != null ? (modifiedTotal >= ac) : lastAttack.hit;
-
-        if (lastAttack.hit === false && modifiedHit === true) {
-            await applyMissTurnedHitDamage({ campaignName, attackEvent: lastAttack, playerStats, characterName: playerName, logName: action.name });
-        }
-
-        const result = handleAttackRoll(action, bonus, lastAttack, playerStats, campaignName, true);
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${playerName} used ${action.name}: +${bonus} to own failed attack roll.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[autoReroll] Error:", e); });
-        return result;
+        return rerollAttackLeg({
+            action, bonus, attackEvent: lastAttack, playerName, playerStats, campaignName,
+            damageCharacterName: playerName, damageLogName: action.name,
+            logDescription: `${playerName} used ${action.name}: +${bonus} to own failed attack roll.`,
+        });
     }
     if (abilityFresh) {
         const result = handleAbilityCheck(action, bonus, lastAttack);
@@ -484,25 +501,13 @@ async function handleBonusReroll({ action, auto, playerName, playerStats, lastAt
         const ally = await findAllyMissedAttack(playerStats, campaignName, _mapName, rangeFt);
         if (ally) {
             const attackEvent = ally.attackEvent;
-            const ac = attackEvent.effectiveAc ?? attackEvent.targetAc;
-            const modifiedD20 = attackEvent.d20 + bonus;
-            const modifiedTotal = modifiedD20 + attackEvent.bonus;
-            const modifiedHit = ac != null ? (modifiedTotal >= ac) : attackEvent.hit;
-
-            if (attackEvent.hit === false && modifiedHit === true) {
-                await applyMissTurnedHitDamage({ campaignName, attackEvent, playerStats, characterName: ally.name, logName: attackEvent.attackName || attackEvent.name || 'Attack' });
-            }
-
-            const result = handleAttackRoll(action, bonus, attackEvent, playerStats, campaignName, true);
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerName,
-                abilityName: action.name,
-                description: `${playerName} used ${action.name}: +${bonus} to ${ally.name}'s failed attack roll.`,
-                targetName: ally.name,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[autoReroll] Error:", e); });
-            return result;
+            return rerollAttackLeg({
+                action, bonus, attackEvent, playerName, playerStats, campaignName,
+                damageCharacterName: ally.name,
+                damageLogName: attackEvent.attackName || attackEvent.name || 'Attack',
+                logDescription: `${playerName} used ${action.name}: +${bonus} to ${ally.name}'s failed attack roll.`,
+                logTargetName: ally.name,
+            });
         }
     }
 
@@ -519,7 +524,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         if (auto.effect === 'override_fail_to_success' && auto.oncePer) {
             return handleGuardedMind(action, auto, playerName, lastAttack, campaignName);
         }
-        return handleSavingThrowReroll(action, auto, playerName, playerStats, lastAttack, campaignName);
+        return handleSavingThrowReroll({ action, auto, playerName, playerStats, lastAttack, campaignName });
     }
 
     const bardicDieSize = getBardicDieSize(playerStats);
@@ -529,7 +534,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (auto.bonusExpression === 'psionic_energy_die') {
-        return handlePsionicEnergyDie(action, auto, playerName, playerStats, lastAttack, campaignName);
+        return handlePsionicEnergyDie({ action, auto, playerName, playerStats, lastAttack, campaignName });
     }
 
     if (auto.bonus != null) {

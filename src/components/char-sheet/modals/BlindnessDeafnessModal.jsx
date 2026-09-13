@@ -43,9 +43,9 @@ function BlindnessDeafnessModal({ combatSummary, attackerName, attackerPos, save
         const effectKey = `blindnessDeafness_${effect.condition}`;
         setRuntimeValue(targetName, effectKey, true, campaignName);
 
-        addExpiration(attackerName, targetName, [
+        addExpiration({ attackerName, targetName, effects: [
             { type: 'condition', condition: effect.condition },
-        ], campaignName);
+        ], campaignName });
 
         setAffectedTargets(prev => [...prev, { targetName, condition: effect.condition }]);
 

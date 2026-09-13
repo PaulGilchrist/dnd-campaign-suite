@@ -79,7 +79,7 @@ describe('addExpiration', () => {
     it('adds a new expiration entry when no existing list', () => {
       getRuntimeValue.mockReturnValueOnce([]);
 
-      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'MyCampaign', 3);
+      addExpiration({ attackerName: 'Caster', targetName: 'Target', effects: [{ type: 'stunned' }], campaignName: 'MyCampaign', rounds: 3 });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Caster',
@@ -108,7 +108,7 @@ describe('addExpiration', () => {
       const originalLength = existingList.length;
       getRuntimeValue.mockReturnValueOnce(existingList);
 
-      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'MyCampaign', 2);
+      addExpiration({ attackerName: 'Caster', targetName: 'Target', effects: [{ type: 'stunned' }], campaignName: 'MyCampaign', rounds: 2 });
 
       // Original array should be unchanged (spread creates new array)
       expect(existingList.length).toBe(originalLength);
@@ -127,7 +127,7 @@ describe('addExpiration', () => {
       getCurrentCombatRound.mockReturnValue(10);
       getRuntimeValue.mockReturnValueOnce([]);
 
-      addExpiration('Caster', 'Target', [{ type: 'blinded' }], 'MyCampaign', 3);
+      addExpiration({ attackerName: 'Caster', targetName: 'Target', effects: [{ type: 'blinded' }], campaignName: 'MyCampaign', rounds: 3 });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Caster',
@@ -142,7 +142,7 @@ describe('addExpiration', () => {
     it('uses Infinity when rounds is nullish', () => {
       getRuntimeValue.mockReturnValueOnce([]);
 
-      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', null);
+      addExpiration({ attackerName: 'Caster', targetName: 'Target', effects: [{ type: 'stunned' }], campaignName: 'TestCampaign', rounds: null });
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Caster', expect.any(String), expect.arrayContaining([
         expect.objectContaining({ expiryRounds: Infinity }),

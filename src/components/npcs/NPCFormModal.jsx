@@ -5,6 +5,62 @@ import AvatarModal from '../common/AvatarModal.jsx';
 import NPCRoleplayForm from './NPCRoleplayForm.jsx';
 import NPCStatBlockForm from './NPCStatBlockForm.jsx';
 
+function NPCFormFooter({
+  editingNPC,
+  formData,
+  saving,
+  deleting,
+  disabled,
+  onClose,
+  onSave,
+  onDelete,
+  onSaveAndAddToInitiative,
+}) {
+  return (
+    <div className="ct-modal-footer no-print">
+      <div className="ct-modal-actions">
+        {editingNPC && (
+          <button
+            className="ct-btn ct-btn-danger"
+            onClick={onDelete}
+            disabled={deleting}
+          >
+            <i className="fa-solid fa-trash-can" />{' '}
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+        )}
+        {npcHasStatBlock(formData) && onSaveAndAddToInitiative && (
+          <button
+            className="ct-btn"
+            onClick={onSaveAndAddToInitiative}
+            disabled={disabled}
+            title="Save and add to initiative"
+          >
+            <i className="fa-solid fa-shield-alt" /> Save & Add to Initiative
+          </button>
+        )}
+      </div>
+      <div className="ct-modal-buttons">
+        <button
+          className="ct-btn"
+          onClick={onClose}
+          disabled={saving}
+        >
+          Cancel
+        </button>
+        <button
+          className="ct-btn ct-btn-primary"
+          onClick={onSave}
+          disabled={disabled}
+        >
+          <i className="fa-solid fa-floppy-disk" />{' '}
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function NPCFormModal({
   formData,
   setFormData,
@@ -129,47 +185,17 @@ function NPCFormModal({
             </div>
           </div>
 
-          <div className="ct-modal-footer no-print">
-            <div className="ct-modal-actions">
-              {editingNPC && (
-                <button
-                  className="ct-btn ct-btn-danger"
-                  onClick={onDelete}
-                  disabled={deleting}
-                >
-                  <i className="fa-solid fa-trash-can" />{' '}
-                  {deleting ? 'Deleting…' : 'Delete'}
-                </button>
-              )}
-              {npcHasStatBlock(formData) && onSaveAndAddToInitiative && (
-                <button
-                  className="ct-btn"
-                  onClick={onSaveAndAddToInitiative}
-                  disabled={disabled}
-                  title="Save and add to initiative"
-                >
-                  <i className="fa-solid fa-shield-alt" /> Save & Add to Initiative
-                </button>
-              )}
-            </div>
-            <div className="ct-modal-buttons">
-              <button
-                className="ct-btn"
-                onClick={onClose}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                className="ct-btn ct-btn-primary"
-                onClick={onSave}
-                disabled={disabled}
-              >
-                <i className="fa-solid fa-floppy-disk" />{' '}
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </div>
+          <NPCFormFooter
+            editingNPC={editingNPC}
+            formData={formData}
+            saving={saving}
+            deleting={deleting}
+            disabled={disabled}
+            onClose={onClose}
+            onSave={onSave}
+            onDelete={onDelete}
+            onSaveAndAddToInitiative={onSaveAndAddToInitiative}
+          />
         </div>
       </div>
       {showNpcAvatarModal && avatarPath && (

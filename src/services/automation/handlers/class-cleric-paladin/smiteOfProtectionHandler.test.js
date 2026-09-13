@@ -75,14 +75,7 @@ describe('smiteOfProtectionHandler.handle', () => {
                 true,
                 campaignName,
             );
-            expect(addExpiration).toHaveBeenCalledWith(
-                playerName,
-                playerName,
-                [{ type: 'remove_smite_of_protection' }],
-                campaignName,
-                undefined,
-                playerName,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'remove_smite_of_protection' }], campaignName, rounds: undefined, expireOnCreatureName: playerName });
             expect(addEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,

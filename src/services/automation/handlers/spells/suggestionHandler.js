@@ -98,9 +98,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         appliedDamage: 0,
     });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'condition',

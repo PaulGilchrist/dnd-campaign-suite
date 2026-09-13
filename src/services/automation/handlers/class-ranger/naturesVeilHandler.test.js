@@ -157,14 +157,7 @@ describe('naturesVeilHandler', () => {
         it('sets expiration for invisible condition (1 round + next creature)', async () => {
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'RangerGirl',
-                'RangerGirl',
-                [{ type: 'condition', condition: 'invisible' }],
-                'test-campaign',
-                undefined,
-                null
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'RangerGirl', targetName: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: null });
         });
     });
 
@@ -216,14 +209,7 @@ describe('naturesVeilHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'RangerGirl',
-                'RangerGirl',
-                [{ type: 'condition', condition: 'invisible' }],
-                'test-campaign',
-                undefined,
-                'Goblin1'
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'RangerGirl', targetName: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'Goblin1' });
         });
 
         it('wraps to start of list when player is last in combat summary', async () => {
@@ -236,14 +222,7 @@ describe('naturesVeilHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'RangerGirl',
-                'RangerGirl',
-                [{ type: 'condition', condition: 'invisible' }],
-                'test-campaign',
-                undefined,
-                'Goblin1'
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'RangerGirl', targetName: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'Goblin1' });
         });
 
         it('sets expireOnCreatureName to null when player is not in combat summary', async () => {
@@ -256,14 +235,7 @@ describe('naturesVeilHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'RangerGirl',
-                'RangerGirl',
-                [{ type: 'condition', condition: 'invisible' }],
-                'test-campaign',
-                undefined,
-                null
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'RangerGirl', targetName: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: null });
         });
 
         it('sets expireOnCreatureName to null when combat summary has no creatures', async () => {
@@ -273,14 +245,7 @@ describe('naturesVeilHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'RangerGirl',
-                'RangerGirl',
-                [{ type: 'condition', condition: 'invisible' }],
-                'test-campaign',
-                undefined,
-                null
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'RangerGirl', targetName: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: null });
         });
 
         it('sets expireOnCreatureName to null when combat summary is null', async () => {
@@ -288,14 +253,7 @@ describe('naturesVeilHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'RangerGirl',
-                'RangerGirl',
-                [{ type: 'condition', condition: 'invisible' }],
-                'test-campaign',
-                undefined,
-                null
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'RangerGirl', targetName: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: null });
         });
 
         it('sets expireOnCreatureName to null when combat summary is undefined', async () => {
@@ -303,14 +261,7 @@ describe('naturesVeilHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'RangerGirl',
-                'RangerGirl',
-                [{ type: 'condition', condition: 'invisible' }],
-                'test-campaign',
-                undefined,
-                null
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'RangerGirl', targetName: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: null });
         });
     });
 

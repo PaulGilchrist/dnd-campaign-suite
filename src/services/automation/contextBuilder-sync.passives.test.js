@@ -167,7 +167,7 @@ describe('contextBuilder-sync: hunter lore', () => {
       automation: { passives: [{ type: 'passive_rule', effect: 'hunter_lore' }] },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.hunterLoreNotice).toBe('Vulnerabilities: fire\nResistances: cold\nImmunities: poison');
   });
@@ -183,7 +183,7 @@ describe('contextBuilder-sync: hunter lore', () => {
       automation: { passives: [{ type: 'passive_rule', effect: 'hunter_lore' }] },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.hunterLoreNotice).toBe('Vulnerabilities: fire');
   });
@@ -202,7 +202,7 @@ describe('contextBuilder-sync: hunter lore', () => {
       ? { ...mockStats, automation: { passives: [{ type: 'passive_rule', effect: 'hunter_lore' }] } }
       : mockStats;
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.hunterLoreNotice).toBeNull();
   });
@@ -224,13 +224,13 @@ describe('contextBuilder-sync: critical range', () => {
       },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.criticalRange).toBe('19-20');
   });
 
   it('returns empty string when no critical range passive exists', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(result.criticalRange).toBe('');
   });
 
@@ -240,7 +240,7 @@ describe('contextBuilder-sync: critical range', () => {
       automation: { passives: [{ type: 'passive_rule', effect: 'critical_range' }] },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
     expect(result.criticalRange).toBe('');
   });
 
@@ -255,7 +255,7 @@ describe('contextBuilder-sync: critical range', () => {
       },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.criticalRange).toBe('20');
   });
@@ -276,7 +276,7 @@ describe('contextBuilder-sync: glorious defense', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.gloriousDefenseBonus).toBeUndefined();
   });
@@ -300,7 +300,7 @@ describe('contextBuilder-sync: stroke of luck and boon of fate', () => {
       automation: { passives: [{ type: 'stroke_of_luck' }] },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
     expect(result.strokeOfLuck).toBe(true);
   });
 
@@ -314,12 +314,12 @@ describe('contextBuilder-sync: stroke of luck and boon of fate', () => {
       automation: { passives: [{ type: 'stroke_of_luck' }] },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
     expect(result.strokeOfLuck).toBe(false);
   });
 
   it('sets strokeOfLuck false when passive does not exist', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(result.strokeOfLuck).toBe(false);
   });
 
@@ -333,7 +333,7 @@ describe('contextBuilder-sync: stroke of luck and boon of fate', () => {
       automation: { passives: [{ type: 'modify_d20_roll' }] },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
     expect(result.boonOfFate).toBe(true);
   });
 
@@ -347,12 +347,12 @@ describe('contextBuilder-sync: stroke of luck and boon of fate', () => {
       automation: { passives: [{ type: 'modify_d20_roll' }] },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
     expect(result.boonOfFate).toBe(false);
   });
 
   it('sets boonOfFate false when passive does not exist', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(result.boonOfFate).toBe(false);
   });
 });
@@ -369,7 +369,7 @@ describe('contextBuilder-sync: graze damage', () => {
   it('includes grazeDamage when Graze mastery is in baseMastery', async () => {
     collectWeaponMastery.mockReturnValue({ baseMastery: 'Graze', extraMasteries: [] });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.grazeDamage).toBe(true);
     expect(result.grazeAbilityName).toBe('Strength');
@@ -379,7 +379,7 @@ describe('contextBuilder-sync: graze damage', () => {
   it('includes grazeDamage when Graze mastery is in extraMasteries', async () => {
     collectWeaponMastery.mockReturnValue({ baseMastery: 'Cleave', extraMasteries: ['Graze'] });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.grazeDamage).toBe(true);
     expect(result.grazeAbilityMod).toBe(4);
@@ -389,19 +389,19 @@ describe('contextBuilder-sync: graze damage', () => {
     collectWeaponMastery.mockReturnValue({ baseMastery: 'Graze', extraMasteries: [] });
 
     const dexAttack = { ...mockAttack, abilityName: 'Dexterity' };
-    let result = await buildAttackContextSync(dexAttack, mockStats, 'camp', 'normal', {});
+    let result = await buildAttackContextSync(dexAttack, mockStats, 'camp', 'normal');
     expect(result.grazeAbilityName).toBe('Dexterity');
     expect(result.grazeAbilityMod).toBe(3);
 
     const undefAttack = { ...mockAttack, abilityName: undefined };
-    result = await buildAttackContextSync(undefAttack, mockStats, 'camp', 'normal', {});
+    result = await buildAttackContextSync(undefAttack, mockStats, 'camp', 'normal');
     expect(result.grazeAbilityName).toBe('Strength');
   });
 
   it('excludes grazeDamage when no Graze mastery', async () => {
     collectWeaponMastery.mockReturnValue({ baseMastery: 'Cleave', extraMasteries: [] });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.grazeDamage).toBe(false);
     expect(result.grazeAbilityName).toBeNull();
@@ -429,7 +429,7 @@ describe('contextBuilder-sync: boon of combat prowess', () => {
       },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
     expect(result.boonOfCombatProwess).toBe(true);
   });
 
@@ -445,7 +445,7 @@ describe('contextBuilder-sync: boon of combat prowess', () => {
       },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
     expect(result.boonOfCombatProwess).toBe(true);
   });
 
@@ -461,12 +461,12 @@ describe('contextBuilder-sync: boon of combat prowess', () => {
       },
     };
 
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
     expect(result.boonOfCombatProwess).toBe(false);
   });
 
   it('sets boonOfCombatProwess false when auto_reroll passive does not exist', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(result.boonOfCombatProwess).toBe(false);
   });
 });

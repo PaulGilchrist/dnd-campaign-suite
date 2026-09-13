@@ -499,7 +499,7 @@ describe('restoreBaseAttackAfterBash (FT-082 collateral)', () => {
     });
     getCombatContext.mockResolvedValue({ round: 4, activeCreatureName: 'EvasiveFighter' });
 
-    await applyShieldBashEffect({ automation: {} }, { name: 'EvasiveFighter' }, 'test-campaign', 'Zombie 1', 'Push', 15);
+    await applyShieldBashEffect({ action: { automation: {} }, playerStats: { name: 'EvasiveFighter' }, campaignName: 'test-campaign', targetName: 'Zombie 1', chosenOption: 'Push', saveDc: 15 });
 
     expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastAttack', baseAttack, 'test-campaign');
   });
@@ -520,7 +520,7 @@ describe('applyShieldBashEffect', () => {
 
   it('returns null and logs when chosenOption is skip', async () => {
     setupApplyEffect(null);
-    const result = await applyShieldBashEffect(baseAction, basePlayerStats, 'test-campaign', 'Goblin1', 'skip', 15);
+    const result = await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'skip', saveDc: 15 });
     expect(result).toBeNull();
     expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'ability_use', abilityName: 'Shield Bash', description: expect.stringContaining('skipped'),
@@ -531,7 +531,7 @@ describe('applyShieldBashEffect', () => {
 
   it('applies push effect and logs', async () => {
     setupApplyEffect(null);
-    const result = await applyShieldBashEffect(baseAction, basePlayerStats, 'test-campaign', 'Goblin1', 'Push', 15);
+    const result = await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign', 'targetEffects',
       expect.arrayContaining([expect.objectContaining({ target: 'Goblin1', source: 'Shield Bash', option: 'Push', effect: 'push', value: 5, duration: 'instant' })]),
@@ -547,7 +547,7 @@ describe('applyShieldBashEffect', () => {
 
   it('applies prone effect, adds condition, and logs', async () => {
     setupApplyEffect({ round: 3, activeCreatureName: 'Fighter1' });
-    const result = await applyShieldBashEffect(baseAction, basePlayerStats, 'test-campaign', 'Orc1', 'Prone', 16);
+    const result = await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Orc1', chosenOption: 'Prone', saveDc: 16 });
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign', 'targetEffects',
       expect.arrayContaining([expect.objectContaining({ target: 'Orc1', source: 'Shield Bash', option: 'Prone', effect: 'prone_and_push', value: 5, duration: 'until_start_of_next_turn', saveType: 'STR', saveDc: 16, saveAbility: 'STR' })]),
@@ -567,7 +567,7 @@ describe('applyShieldBashEffect', () => {
 
   it('marks oncePerTurn as used after push', async () => {
     setupApplyEffect({ round: 5, activeCreatureName: 'Fighter1' });
-    await applyShieldBashEffect(baseAction, basePlayerStats, 'test-campaign', 'Goblin1', 'Push', 15);
+    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Fighter1', '_Shield_Bash_usedRound', { round: 5, activeCreature: 'Fighter1' }, 'test-campaign',
     );
@@ -575,7 +575,7 @@ describe('applyShieldBashEffect', () => {
 
   it('marks oncePerTurn as used after prone', async () => {
     setupApplyEffect({ round: 2, activeCreatureName: 'Fighter1' });
-    await applyShieldBashEffect(baseAction, basePlayerStats, 'test-campaign', 'Goblin1', 'Prone', 14);
+    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Prone', saveDc: 14 });
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Fighter1', '_Shield_Bash_usedRound', { round: 2, activeCreature: 'Fighter1' }, 'test-campaign',
     );
@@ -583,7 +583,7 @@ describe('applyShieldBashEffect', () => {
 
   it('stamps the holder name (not the stale cs mirror) as latch owner (FT-074)', async () => {
     setupApplyEffect({ round: 1, activeCreatureName: 'AasimarTest' });
-    await applyShieldBashEffect(baseAction, basePlayerStats, 'test-campaign', 'Goblin1', 'Prone', 15);
+    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Prone', saveDc: 15 });
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Fighter1', '_Shield_Bash_usedRound', { round: 1, activeCreature: 'Fighter1' }, 'test-campaign',
     );
@@ -592,7 +592,7 @@ describe('applyShieldBashEffect', () => {
   it('handles existing targetEffects when applying push', async () => {
     getRuntimeValue.mockReturnValue([{ target: 'Goblin1', effect: 'slowed' }]);
     getCombatContext.mockResolvedValue(null);
-    await applyShieldBashEffect(baseAction, basePlayerStats, 'test-campaign', 'Goblin1', 'Push', 15);
+    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign', 'targetEffects',
       expect.arrayContaining([expect.objectContaining({ effect: 'slowed' }), expect.objectContaining({ effect: 'push' })]),
@@ -603,7 +603,7 @@ describe('applyShieldBashEffect', () => {
   it('handles missing combat context gracefully for round tracking', async () => {
     getRuntimeValue.mockReturnValue([]);
     getCombatContext.mockResolvedValue(null);
-    await applyShieldBashEffect(baseAction, basePlayerStats, 'test-campaign', 'Goblin1', 'Push', 15);
+    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Fighter1', '_Shield_Bash_usedRound', { round: 1, activeCreature: 'Fighter1' }, 'test-campaign',
     );
@@ -613,7 +613,7 @@ describe('applyShieldBashEffect', () => {
     getRuntimeValue.mockReturnValue([]);
     getCombatContext.mockResolvedValue(null);
     const action = { automation: { someKey: 'someValue' } };
-    const result = await applyShieldBashEffect(action, basePlayerStats, 'test-campaign', 'Goblin1', 'Push', 15);
+    const result = await applyShieldBashEffect({ action, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
     expect(result.payload.automation).toEqual({ someKey: 'someValue' });
   });
 });

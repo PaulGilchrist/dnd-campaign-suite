@@ -247,16 +247,16 @@ describe('character-creation/utils', () => {
       const validFormData = { name: 'Test', level: 1, alignment: 'Good' };
 
       it('returns no errors when all required fields are present', async () => {
-        expect(await utils.validateStep(2, validFormData, {}, [], [], '5e')).toEqual({});
+        expect(await utils.validateStep(2, validFormData, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
       });
 
       it('bubbles up invalid level values through the shared level validator', async () => {
-        expect(await utils.validateStep(2, { ...validFormData, level: 0 }, {}, [], [], '5e')).toHaveProperty('level');
-        expect(await utils.validateStep(2, { ...validFormData, level: 21 }, {}, [], [], '5e')).toHaveProperty('level');
+        expect(await utils.validateStep(2, { ...validFormData, level: 0 }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('level');
+        expect(await utils.validateStep(2, { ...validFormData, level: 21 }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('level');
       });
 
       it('rejects missing or whitespace-only name and missing alignment', async () => {
-        const errors = await utils.validateStep(2, { level: 1 }, {}, [], [], '5e');
+        const errors = await utils.validateStep(2, { level: 1 }, { racesData: [], classSubtypes: [], ruleset: '5e' });
         expect(errors).toHaveProperty('name');
         expect(errors).toHaveProperty('alignment');
       });
@@ -264,9 +264,9 @@ describe('character-creation/utils', () => {
 
     describe('Step 3: Race', () => {
       it('returns an error when race is missing or has no name, and accepts a valid race', async () => {
-        expect(await utils.validateStep(3, {}, {}, [], [], '5e')).toHaveProperty('race');
-        expect(await utils.validateStep(3, { race: {} }, {}, [], [], '5e')).toHaveProperty('race');
-        expect(await utils.validateStep(3, { race: { name: 'Human' } }, {}, [], [], '5e')).toEqual({});
+        expect(await utils.validateStep(3, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('race');
+        expect(await utils.validateStep(3, { race: {} }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('race');
+        expect(await utils.validateStep(3, { race: { name: 'Human' } }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
       });
     });
 
@@ -278,19 +278,19 @@ describe('character-creation/utils', () => {
         const formDataWithSubrace = { race: { name: 'Elf', subrace: { name: 'High Elf' } } };
         const noRaceForm = { race: {} };
 
-        let errors = await utils.validateStep(4, formData, {}, racesWithSubraces, [], '5e');
+        let errors = await utils.validateStep(4, formData, { racesData: racesWithSubraces, classSubtypes: [], ruleset: '5e' });
         expect(errors).toHaveProperty('subrace');
 
-        errors = await utils.validateStep(4, formDataWithSubrace, {}, racesWithSubraces, [], '5e');
+        errors = await utils.validateStep(4, formDataWithSubrace, { racesData: racesWithSubraces, classSubtypes: [], ruleset: '5e' });
         expect(errors).not.toHaveProperty('subrace');
 
-        errors = await utils.validateStep(4, formData, {}, racesWithoutSubraces, [], '5e');
+        errors = await utils.validateStep(4, formData, { racesData: racesWithoutSubraces, classSubtypes: [], ruleset: '5e' });
         expect(errors).not.toHaveProperty('subrace');
 
-        errors = await utils.validateStep(4, noRaceForm, {}, racesWithSubraces, [], '5e');
+        errors = await utils.validateStep(4, noRaceForm, { racesData: racesWithSubraces, classSubtypes: [], ruleset: '5e' });
         expect(errors).not.toHaveProperty('subrace');
 
-        errors = await utils.validateStep(4, { race: { name: 'Gnome' } }, {}, [], [], '5e');
+        errors = await utils.validateStep(4, { race: { name: 'Gnome' } }, { racesData: [], classSubtypes: [], ruleset: '5e' });
         expect(errors).not.toHaveProperty('subrace');
       });
     });
@@ -299,19 +299,19 @@ describe('character-creation/utils', () => {
       const validFormData = { name: 'Test', level: 1, alignment: 'Good' };
 
       it('requires a background for 2024 but not 5e, and accepts a present background for 2024', async () => {
-        expect(await utils.validateStep(5, validFormData, {}, [], [], '2024')).toHaveProperty('background');
-        expect(await utils.validateStep(5, validFormData, {}, [], [], '5e')).not.toHaveProperty('background');
-        expect(await utils.validateStep(5, { ...validFormData, background: 'Fighter' }, {}, [], [], '2024')).not.toHaveProperty('background');
+        expect(await utils.validateStep(5, validFormData, { racesData: [], classSubtypes: [], ruleset: '2024' })).toHaveProperty('background');
+        expect(await utils.validateStep(5, validFormData, { racesData: [], classSubtypes: [], ruleset: '5e' })).not.toHaveProperty('background');
+        expect(await utils.validateStep(5, { ...validFormData, background: 'Fighter' }, { racesData: [], classSubtypes: [], ruleset: '2024' })).not.toHaveProperty('background');
       });
     });
 
     describe('Step 6: Class', () => {
       it('returns an error when class is missing or has no name, and does not require a subclass', async () => {
-        expect(await utils.validateStep(6, {}, {}, [], [], '5e')).toHaveProperty('class');
-        expect(await utils.validateStep(6, { class: {} }, {}, [], [], '5e')).toHaveProperty('class');
+        expect(await utils.validateStep(6, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('class');
+        expect(await utils.validateStep(6, { class: {} }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('class');
         const classSubtypes = [{ className: 'Fighter', subtypes: [{ name: 'Champion' }] }];
         const formData = { class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(6, formData, {}, [], classSubtypes, '5e');
+        const errors = await utils.validateStep(6, formData, { racesData: [], classSubtypes, ruleset: '5e' });
         expect(errors).not.toHaveProperty('subclass');
       });
     });
@@ -324,28 +324,28 @@ describe('character-creation/utils', () => {
         const formDataWithSubclass = { class: { name: 'Fighter', subclass: { name: 'Champion' } } };
         const noClassForm = { class: {} };
 
-        let errors = await utils.validateStep(7, formData, {}, [], classSubtypesWithSubclasses, '5e');
+        let errors = await utils.validateStep(7, formData, { racesData: [], classSubtypes: classSubtypesWithSubclasses, ruleset: '5e' });
         expect(errors).toHaveProperty('subclass');
 
-        errors = await utils.validateStep(7, formDataWithSubclass, {}, [], classSubtypesWithSubclasses, '5e');
+        errors = await utils.validateStep(7, formDataWithSubclass, { racesData: [], classSubtypes: classSubtypesWithSubclasses, ruleset: '5e' });
         expect(errors).not.toHaveProperty('subclass');
 
-        errors = await utils.validateStep(7, formData, {}, [], classSubtypesEmpty, '5e');
+        errors = await utils.validateStep(7, formData, { racesData: [], classSubtypes: classSubtypesEmpty, ruleset: '5e' });
         expect(errors).not.toHaveProperty('subclass');
 
-        errors = await utils.validateStep(7, { class: { name: 'Rogue' } }, {}, [], [], '5e');
+        errors = await utils.validateStep(7, { class: { name: 'Rogue' } }, { racesData: [], classSubtypes: [], ruleset: '5e' });
         expect(errors).not.toHaveProperty('subclass');
 
-        errors = await utils.validateStep(7, noClassForm, {}, [], classSubtypesWithSubclasses, '5e');
+        errors = await utils.validateStep(7, noClassForm, { racesData: [], classSubtypes: classSubtypesWithSubclasses, ruleset: '5e' });
         expect(errors).not.toHaveProperty('subclass');
       });
     });
 
     describe('Unhandled steps', () => {
       it('returns no errors for unrecognized step numbers', async () => {
-        expect(await utils.validateStep(99, {}, {}, [], [], '5e')).toEqual({});
-        expect(await utils.validateStep(1, {}, {}, [], [], '5e')).toEqual({});
-        expect(await utils.validateStep(8, {}, {}, [], [], '5e')).toEqual({});
+        expect(await utils.validateStep(99, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
+        expect(await utils.validateStep(1, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
+        expect(await utils.validateStep(8, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
       });
     });
   });

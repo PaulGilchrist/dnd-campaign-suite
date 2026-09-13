@@ -44,7 +44,7 @@ export function isBanishmentBlocked(attackerName, targetName, _campaignName) {
     return true;
 }
 
-function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
+function dispatchSaveResult({ campaignName, promptId, targetName, saveType, saveDc, saveResult }) {
     sendSaveResult(campaignName, targetName, {
         promptId,
         success: saveResult.success,
@@ -127,11 +127,11 @@ async function banishFailingTarget({ campaignName, casterName, action, targetNam
     });
 
     // Register expirations: remove condition + remove target effect badge + break concentration
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'incapacitated' },
         { type: 'remove_target_effect', effectKey: 'banishment', target: targetName, source: casterName },
         { type: 'break_concentration', spell: action.name },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'save_result',
@@ -182,6 +182,48 @@ async function resolveBanishmentTargets(action, auto, campaignName, casterName) 
         };
     }
     return { targetNames: [targetName], popup: null };
+}
+
+function npcBanishmentSaveResult(targetCreature, dc) {
+    if (targetCreature) return rollSaveForCreature(targetCreature, 'CHA', dc, false, false);
+    const r1 = rollD20();
+    const r2 = rollD20();
+    const roll = Math.max(r1, r2);
+    const total = roll;
+    const success = total >= dc;
+    return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
+}
+
+function dispatchNpcBanishmentSave({ campaignName, promptId, targetName, dc, targetCreature }) {
+    dispatchSaveResult({
+    campaignName,
+    promptId,
+    targetName,
+    saveType: 'CHA',
+    saveDc: dc,
+    saveResult: npcBanishmentSaveResult(targetCreature, dc),
+});
+}
+
+async function banishmentSavedLeg({ campaignName, casterName, action, targetName, dc, saveResult }) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-banishment',
+        targetName,
+        saveDc: dc,
+        saveType: 'CHA',
+        success: true,
+        description: `${targetName} succeeded on CHA save against ${action.name}.`,
+    }).catch((e) => { console.error("[banishment] Error:", e); });
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -246,42 +288,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }).catch((e) => { console.error("[banishment] Error:", e); });
 
         if (isTargetNpc) {
-            const saveResult = targetCreature
-                ? rollSaveForCreature(targetCreature, 'CHA', dc, false, false)
-                : (() => {
-                    const r1 = rollD20();
-                    const r2 = rollD20();
-                    const roll = Math.max(r1, r2);
-                    const total = roll;
-                    const success = total >= dc;
-                    return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
-                })();
-
-            dispatchSaveResult(campaignName, promptId, targetName, 'CHA', dc, saveResult);
+            dispatchNpcBanishmentSave({ campaignName, promptId, targetName, dc, targetCreature });
         }
 
         const saveResult = await promise;
 
         if (saveResult.success) {
             savedCount++;
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-banishment',
-                targetName,
-                saveDc: dc,
-                saveType: 'CHA',
-                success: true,
-                description: `${targetName} succeeded on CHA save against ${action.name}.`,
-            }).catch((e) => { console.error("[banishment] Error:", e); });
+            await banishmentSavedLeg({ campaignName, casterName, action, targetName, dc, saveResult });
             savedTargets.push(targetName);
         } else {
             banishedCount++;

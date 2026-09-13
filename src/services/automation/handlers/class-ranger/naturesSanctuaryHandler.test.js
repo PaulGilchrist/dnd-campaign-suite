@@ -173,13 +173,7 @@ describe("Nature's Sanctuary Handler", () => {
         'Lightning',
         campaignName,
       );
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'Druid',
-        'Druid',
-        [{ type: 'remove_natures_sanctuary' }],
-        campaignName,
-        10,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Druid', targetName: 'Druid', effects: [{ type: 'remove_natures_sanctuary' }], campaignName, rounds: 10 });
     });
 
     it('enqueues expiry with 10 rounds for a 1_minute duration (CLA-235)', async () => {
@@ -193,10 +187,10 @@ describe("Nature's Sanctuary Handler", () => {
 
       await handle(action, playerStats, campaignName, null);
 
-      const call = expirations.addExpiration.mock.calls[0];
-      // Rounds MUST be passed (5th arg) — Infinity means the sanctuary never expires
-      expect(call.length).toBeGreaterThanOrEqual(5);
-      expect(call[4]).toBe(10);
+      const call = expirations.addExpiration.mock.calls[0][0];
+      // Rounds MUST be present — Infinity means the sanctuary never expires
+      expect(call).toHaveProperty('rounds');
+      expect(call.rounds).toBe(10);
     });
 
     it.each([

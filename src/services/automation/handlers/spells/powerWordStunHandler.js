@@ -47,7 +47,7 @@ async function applyPowerWordStun(targetName, action, campaignName, dc, targetCu
     return `${targetName} has ${targetCurrentHp} HP (150 or fewer). ${targetName} is Stunned.`;
 }
 
-async function applyPowerWordSpeedZero(targetName, casterName, action, campaignName, dc, targetCurrentHp) {
+async function applyPowerWordSpeedZero({ targetName, casterName, action, campaignName, targetCurrentHp }) {
     setRuntimeValue(targetName, 'activeConditions', [...(getRuntimeValue(targetName, 'activeConditions', campaignName) || []), 'speed_zero'], campaignName);
 
     // Update lastAttack for counterspell rollback
@@ -61,9 +61,9 @@ async function applyPowerWordSpeedZero(targetName, casterName, action, campaignN
     });
 
     // Set expiration: speed_zero ends at start of caster's next turn
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'speed_zero', condition: 'speed_zero' },
-    ], campaignName, undefined, casterName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 
     addEntry(campaignName, {
         type: 'condition',
@@ -131,7 +131,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         actionsTaken.push('stunned');
     } else {
         // Target has more than 150 HP → Speed 0 until start of next turn
-        description = await applyPowerWordSpeedZero(targetName, casterName, action, campaignName, dc, targetCurrentHp);
+        description = await applyPowerWordSpeedZero({ targetName, casterName, action, campaignName, targetCurrentHp });
         actionsTaken.push('speed_zero');
     }
 

@@ -438,22 +438,8 @@ describe('confirmMantleOfInspiration', () => {
       dieRoll: 4, bardicDieSize: 6, tempHp: 8
     })
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard1',
-      'Ally1',
-      [{ type: 'inspiring_movement_no_oa' }],
-      campaignName,
-      undefined,
-      'Bard1'
-    );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard1',
-      'Ally2',
-      [{ type: 'inspiring_movement_no_oa' }],
-      campaignName,
-      undefined,
-      'Bard1'
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'Ally1', effects: [{ type: 'inspiring_movement_no_oa' }], campaignName, rounds: undefined, expireOnCreatureName: 'Bard1' });
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'Ally2', effects: [{ type: 'inspiring_movement_no_oa' }], campaignName, rounds: undefined, expireOnCreatureName: 'Bard1' });
   });
 
   it('logs to campaign log with correct details', async () => {

@@ -82,7 +82,7 @@ describe('activateSpiritualWeaponForce', () => {
 
         expect(setRuntimeValue).toHaveBeenCalledWith('Divine_Cleric', 'activeBuffs', expect.arrayContaining([expect.objectContaining({ effect: 'spiritual_weapon_force' })]), campaignName);
         // CLA-334 rounds recipe: 1 minute = 10 rounds remove_active_buff.
-        expect(addExpiration).toHaveBeenCalledWith('Divine_Cleric', 'Divine_Cleric', [{ type: 'remove_active_buff', buffName: 'Spiritual Weapon' }], campaignName, 10);
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Divine_Cleric', targetName: 'Divine_Cleric', effects: [{ type: 'remove_active_buff', buffName: 'Spiritual Weapon' }], campaignName, rounds: 10 });
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({ type: 'summons' }));
     });
 

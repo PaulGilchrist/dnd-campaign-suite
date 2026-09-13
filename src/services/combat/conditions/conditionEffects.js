@@ -595,22 +595,13 @@ function applyProtectionFromPoisonAdvantage(effects, conditionSet, isProtectionF
   effects.saveAdvantageReasons = [...(effects.saveAdvantageReasons || []), 'Protection from Poison'];
 }
 
-function normalizeConditionEffectFlags(options = {}) {
+function normalizeConditionEffectSensesFlags(options = {}) {
   const {
-    isRaging = false,
-    shapeShiftActive = false,
-    isPeerlessAthlete = false,
-    isLargeFormActive = false,
     combatContext = null,
     seeInvisibilityActive = false,
     attackerName = null,
-    isLivingLegendActive = false,
-    isElderChampionActive = false,
-    isElderChampionAttackerActive = false,
-    isProtectionFromPoisonActive = false,
-    isTranceOfOrderActive = false,
-    hasPowerfulBuild = false,
     attackerSenses = null,
+    isRaging = false,
   } = options
 
   return {
@@ -619,6 +610,23 @@ function normalizeConditionEffectFlags(options = {}) {
     attackerName,
     attackerSenses,
     isRaging,
+  }
+}
+
+function normalizeConditionEffectFormFlags(options = {}) {
+  const {
+    shapeShiftActive = false,
+    isPeerlessAthlete = false,
+    isLargeFormActive = false,
+    isLivingLegendActive = false,
+    isElderChampionActive = false,
+    isElderChampionAttackerActive = false,
+    isProtectionFromPoisonActive = false,
+    isTranceOfOrderActive = false,
+    hasPowerfulBuild = false,
+  } = options
+
+  return {
     shapeShiftActive,
     isPeerlessAthlete,
     isLargeFormActive,
@@ -628,6 +636,13 @@ function normalizeConditionEffectFlags(options = {}) {
     isProtectionFromPoisonActive,
     isTranceOfOrderActive,
     hasPowerfulBuild,
+  }
+}
+
+function normalizeConditionEffectFlags(options = {}) {
+  return {
+    ...normalizeConditionEffectSensesFlags(options),
+    ...normalizeConditionEffectFormFlags(options),
   }
 }
 

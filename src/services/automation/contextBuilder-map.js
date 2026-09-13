@@ -14,10 +14,10 @@ import { buildAttackContextSync } from './contextBuilder-sync.js';
 
 export function buildAttackContext({ attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects, opts }) {
     if (!mapName) {
-        return buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects, opts);
+        return buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, opts);
     }
 
-    const basePromise = buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects, opts);
+    const basePromise = buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, opts);
 
     return Promise.all([
         basePromise,

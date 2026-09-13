@@ -211,17 +211,10 @@ describe('saveOnlyHandler.handle - save result success', () => {
       detail: { promptId: 'prompt-123', success: true },
     }));
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      ps.name,
-      'Goblin',
-      [
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: ps.name, targetName: 'Goblin', effects: [
         { type: 'stunned', condition: 'speed_halved' },
         { type: 'advantage_on_target' },
-      ],
-      campaignName,
-      undefined,
-      'Goblin',
-    );
+      ], campaignName, rounds: undefined, expireOnCreatureName: 'Goblin' });
   });
 
   it('adds a save_result log entry on success', async () => {
@@ -334,14 +327,7 @@ describe('saveOnlyHandler.handle - save result fail', () => {
       detail: { promptId: 'prompt-123', success: false },
     }));
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      ps.name,
-      'Goblin',
-      [{ type: 'stunned', condition: 'stunned' }],
-      campaignName,
-      undefined,
-      'Goblin',
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: ps.name, targetName: 'Goblin', effects: [{ type: 'stunned', condition: 'stunned' }], campaignName, rounds: undefined, expireOnCreatureName: 'Goblin' });
   });
 });
 

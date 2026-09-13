@@ -186,12 +186,7 @@ describe('avengingAngelHandler.handle - frightfulAura', () => {
         saveBonus: 0,
         rawRolls: [5, 5],
       }));
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestPaladin',
-        'Goblin',
-        expect.any(Array),
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestPaladin', targetName: 'Goblin', effects: expect.any(Array), campaignName });
     });
 
     it('should send save result but not apply frightened when NPC succeeds', async () => {
@@ -308,12 +303,7 @@ describe('avengingAngelHandler.handle - frightfulAura', () => {
 
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestPaladin',
-        'EnemyPlayer',
-        expect.any(Array),
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestPaladin', targetName: 'EnemyPlayer', effects: expect.any(Array), campaignName });
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'save_result',
         targetName: 'EnemyPlayer',

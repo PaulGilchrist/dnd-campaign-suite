@@ -219,7 +219,7 @@ function makeSpell(overrides = {}) {
 function renderWithSpell(spellName, spellLevel, overrides = {}) {
   const setPopupHtml = vi.fn();
   const { result } = renderHook(() =>
-    useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+    useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
   );
   act(() => {
     result.current.gateMetamagic(makeSpell({ name: spellName, level: spellLevel, ...overrides }));

@@ -28,20 +28,24 @@ function applyMonkWeaponHitBonuses(ctx, acc) {
   return acc;
 }
 
+function applyHeavyWeaponHitBonusEntry(ctx, a, acc) {
+  const r = rollExpression(a.damageExpression);
+  const evalResult = evaluateAutoExpression(a.damageExpression, ctx.playerStats);
+  const bonusValue = r ? r.total : evalResult;
+  if (!bonusValue) return;
+  const dt = (a.damageType || ctx.attack?.damageType || 'Slashing').toLowerCase();
+  const label = dt === 'same_as_weapon' ? (a.name || 'slashing') : dt;
+  const displayExpr = r ? a.damageExpression : String(bonusValue);
+  acc.formula += ` + ${displayExpr} [${label}]`;
+  acc.total += bonusValue;
+  if (r) acc.rolls = [...acc.rolls, ...r.rolls];
+}
+
 function applyHeavyWeaponHitBonuses(ctx, acc) {
   const heavy = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'melee_heavy_weapon_hit');
   if (heavy.length === 0 || !(ctx.attack?.properties || []).includes('Heavy')) return acc;
   for (const a of heavy) {
-    const r = rollExpression(a.damageExpression);
-    const evalResult = evaluateAutoExpression(a.damageExpression, ctx.playerStats);
-    const bonusValue = r ? r.total : evalResult;
-    if (!bonusValue) continue;
-    const dt = (a.damageType || ctx.attack?.damageType || 'Slashing').toLowerCase();
-    const label = dt === 'same_as_weapon' ? (a.name || 'slashing') : dt;
-    const displayExpr = r ? a.damageExpression : String(bonusValue);
-    acc.formula += ` + ${displayExpr} [${label}]`;
-    acc.total += bonusValue;
-    if (r) acc.rolls = [...acc.rolls, ...r.rolls];
+    applyHeavyWeaponHitBonusEntry(ctx, a, acc);
   }
   return acc;
 }

@@ -229,7 +229,7 @@ describe('CLA-396 saveProficiencies not feat-gated', () => {
   it('computes saveProficiencies for a zero-feat character (Iron Mind WIS)', async () => {
     const summary = { ...baseSummary, feats: [] }
 
-    const result = await rules.getPlayerStats([], [], [], [], [], summary)
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
     expect(result.saveProficiencies).toContain('Wisdom')
   })
@@ -243,7 +243,7 @@ describe('CLA-396 saveProficiencies not feat-gated', () => {
     }))
     const summary = { ...baseSummary, feats: ['Resilient'] }
 
-    const result = await rules.getPlayerStats([], [], [], [], [], summary)
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
     expect(result.saveProficiencies).toContain('Wisdom')
     expect(result.saveProficiencies).toContain('Constitution')

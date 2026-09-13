@@ -20,9 +20,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     );
 
     if (!wasActive) {
-        addExpiration(playerName, playerName, [
+        addExpiration({ attackerName: playerName, targetName: playerName, effects: [
             { type: 'remove_active_buff', buffName: action.name }
-        ], campaignName);
+        ], campaignName });
     }
 
     const combatSummary = await getCombatContext(campaignName);

@@ -104,7 +104,7 @@ export function clearGetCombatContextSyncOverride() {
  * The cost is specified as "Nd6" meaning N d6 dice to forgo.
  * We track this in runtime state so the damage computation can account for it.
  */
-export async function applyCunningStrikeCost(playerStats, campaignName, costD6, getRuntimeValue, setRuntimeValue, addEntry) {
+export async function applyCunningStrikeCost({ playerStats, campaignName, costD6, getRuntimeValue, setRuntimeValue, addEntry }) {
     // Track the Cunning Strike cost for this turn
     const key = '_cunningStrikeCostUsed';
     const currentCost = Number(getRuntimeValue(playerStats.name, key, campaignName) ?? 0);

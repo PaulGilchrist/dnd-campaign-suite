@@ -11,7 +11,7 @@ const SUPERIORITY_BONUS_SOURCES = [
     { key: 'attackRiderDieValue', resetKeys: [] },
 ];
 
-export function applySuperiorityDamageBonuses(characterName, campaignName, formula, total, rolls, context) {
+export function applySuperiorityDamageBonuses({ characterName, campaignName, formula, total, rolls, context }) {
     let newFormula = formula;
     let newTotal = total;
     let newRolls = rolls;

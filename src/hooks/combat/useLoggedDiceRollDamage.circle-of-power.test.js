@@ -216,7 +216,7 @@ describe('Circle of Power advantage on saves', () => {
         isCircleOfPowerActive.mockReturnValue(true);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, fireballContext);
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
 
         expect(rollSaveForCreature).toHaveBeenCalledWith(
             expect.any(Object),
@@ -231,7 +231,7 @@ describe('Circle of Power advantage on saves', () => {
         isCircleOfPowerActive.mockReturnValue(false);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, fireballContext);
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
 
         expect(rollSaveForCreature).toHaveBeenCalledWith(
             expect.any(Object),
@@ -247,7 +247,7 @@ describe('Circle of Power advantage on saves', () => {
         computeDamageAfterEvasion.mockReturnValue(10);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, fireballContext);
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
 
         expect(computeDamageAfterEvasion).toHaveBeenCalledWith(
             20,
@@ -262,7 +262,7 @@ describe('Circle of Power advantage on saves', () => {
         computeDamageAfterEvasion.mockReturnValue(10);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, fireballContext);
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
 
         expect(computeDamageAfterEvasion).toHaveBeenCalledWith(
             20,
@@ -276,7 +276,7 @@ describe('Circle of Power advantage on saves', () => {
         isCircleOfPowerActive.mockReturnValue(true);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, fireballContext);
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -290,7 +290,7 @@ describe('Circle of Power advantage on saves', () => {
         isCircleOfPowerActive.mockReturnValue(false);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, fireballContext);
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
             expect.objectContaining({

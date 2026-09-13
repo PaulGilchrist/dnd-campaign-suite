@@ -74,10 +74,10 @@ export async function applyAuraOfLife(action, playerStats, campaignName, mapName
         registerTargetEffect(campaignName, targetName, 'aura_of_life', casterName);
 
         // Register expirations: remove buff and HP protection on initiative roll
-        addExpiration(casterName, targetName, [
+        addExpiration({ attackerName: casterName, targetName, effects: [
             { type: 'remove_active_buff', buffName: AURA_OF_LIFE_BUFF_NAME },
             { type: 'aura_of_life_hp_protection_end' },
-        ], campaignName, undefined, casterName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 
         // Add concentration for caster
         const combatSummary = getCombatSummary(campaignName);

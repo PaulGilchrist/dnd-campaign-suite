@@ -488,12 +488,7 @@ describe('CharActions window event listeners — integration behavior', () => {
 
       await waitFor(() => {
         expect(mockRollDamage).toHaveBeenCalledWith(
-          'Blessed Strikes',
-          '1d6',
-          3,
-          [3],
-          0,
-          expect.objectContaining({ damageType: 'Radiant', targetName: 'Goblin', attackerName: 'TestCharacter' })
+          { name: 'Blessed Strikes', formula: '1d6', total: 3, rolls: [3], modifier: 0, context: expect.objectContaining({ damageType: 'Radiant', targetName: 'Goblin', attackerName: 'TestCharacter' }) }
         );
       });
 

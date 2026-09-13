@@ -63,9 +63,9 @@ export async function applyHolyAura(action, playerStats, campaignName, mapName, 
         // Register targetEffect for badge display on CreatureCard
         registerTargetEffect(campaignName, targetName, 'holy_aura', casterName);
 
-        addExpiration(casterName, targetName, [
+        addExpiration({ attackerName: casterName, targetName, effects: [
             { type: 'remove_active_buff', buffName: HOLY_AURA_BUFF_NAME }
-        ], campaignName, undefined, casterName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 
         appliedTargets.push(targetName);
 

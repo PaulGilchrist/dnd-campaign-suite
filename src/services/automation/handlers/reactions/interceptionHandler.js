@@ -35,7 +35,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const shieldOrWeaponResult = checkShieldOrWeapon(playerStats, auto, featureName);
     if (shieldOrWeaponResult) return shieldOrWeaponResult;
 
-    const rangePopup = await checkInterceptionRange(auto, playerName, attackerName, featureName, _mapName, campaignName);
+    const rangePopup = await checkInterceptionRange({ auto, playerName, attackerName, featureName, _mapName, campaignName });
     if (rangePopup) return rangePopup;
 
     const combatSummary = await getCombatContext(campaignName);
@@ -55,9 +55,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await upsertProtectionEffect(defenderName, playerName, campaignName);
 
     if (defenderName) {
-        addExpiration(playerName, defenderName, [
+        addExpiration({ attackerName: playerName, targetName: defenderName, effects: [
             { type: 'remove_target_effect', effectKey: 'protection', source: playerName, target: defenderName }
-        ], campaignName, 1);
+        ], campaignName, rounds: 1 });
     }
 
     const originalDamage = attackResult.totalDamage || 0;
@@ -68,7 +68,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         applyHealingToTarget(combatSummary, defenderName, actualHeal, campaignName);
     }
 
-    await stampInterceptionRound(playerName, currentRound, combatSummary, attackerName, attackEvent, campaignName);
+    await stampInterceptionRound({ playerName, currentRound, combatSummary, attackerName, attackEvent, campaignName });
 
     const description = baseDescription(action, attackerName, defenderName) + attackDetails({ attackEvent, originalDamage, damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal });
 
@@ -112,7 +112,7 @@ function computeInterceptionReduction(auto, playerStats, originalDamage) {
     return { damageRoll, damageBonus, reductionAmount, reducedDamage, actualHeal };
 }
 
-async function stampInterceptionRound(playerName, currentRound, combatSummary, attackerName, attackEvent, campaignName) {
+async function stampInterceptionRound({ playerName, currentRound, combatSummary, attackerName, attackEvent, campaignName }) {
     await setRuntimeValue(playerName, USED_ROUND_KEY, {
         round: currentRound,
         activeCreature: combatSummary.activeCreatureName || attackerName,
@@ -120,7 +120,7 @@ async function stampInterceptionRound(playerName, currentRound, combatSummary, a
     }, campaignName);
 }
 
-async function checkInterceptionRange(auto, playerName, attackerName, featureName, _mapName, campaignName) {
+async function checkInterceptionRange({ auto, playerName, attackerName, featureName, _mapName, campaignName }) {
     const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 5 : 5;
     if (rangeFt == null) return null;
     const positions = _mapName ? await resolveMapPositions(campaignName, playerName) : null;

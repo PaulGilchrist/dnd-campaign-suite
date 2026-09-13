@@ -223,26 +223,14 @@ describe('greaseAreaSaveHandler.handle', () => {
       setupDuration();
       const result = await handle(makeAction({ duration: '1_minute' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(10);
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        casterName,
-        casterName,
-        [{ type: 'remove_grease_area', greaseKey: '_grease_TestWizard' }],
-        campaignName,
-        10,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: [{ type: 'remove_grease_area', greaseKey: '_grease_TestWizard' }], campaignName, rounds: 10 });
     });
 
     it('sets expiration and payload durationRounds for round-based duration', async () => {
       setupDuration();
       let result = await handle(makeAction({ duration: '3_rounds' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(3);
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        casterName,
-        casterName,
-        expect.any(Array),
-        campaignName,
-        3,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: expect.any(Array), campaignName, rounds: 3 });
 
       result = await handle(makeAction({ duration: '1_rounds' }), makePlayerStats(), campaignName, mapName);
       expect(result.payload.durationRounds).toBe(1);

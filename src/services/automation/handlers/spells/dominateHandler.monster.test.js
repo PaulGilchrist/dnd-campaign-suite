@@ -176,12 +176,7 @@ describe('dominateHandler.handle (Dominate Monster)', () => {
         campaignName,
       );
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        expect.arrayContaining([{ type: 'dominated', condition: 'charmed' }]),
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'dominated', condition: 'charmed' }]), campaignName });
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'save_result',

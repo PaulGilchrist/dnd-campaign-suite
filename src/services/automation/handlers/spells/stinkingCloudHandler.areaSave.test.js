@@ -153,17 +153,11 @@ describe('stinkingCloudHandler zone registration (SP-111)', () => {
 
     await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-    expect(addExpiration).toHaveBeenCalledWith(
-      casterName,
-      casterName,
-      [
+    expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: [
         { type: 'clear_runtime_value', creatureName: casterName, key: trackingKey },
         { type: 'remove_target_effect', effectKey: 'stinking_cloud', source: casterName },
         { type: 'remove_target_effect', effectKey: 'no_action_and_bonus_action', source: casterName },
-      ],
-      campaignName,
-      10,
-    );
+      ], campaignName, rounds: 10 });
   });
 
   it('writes the no_action_and_bonus_action block te when the cast-time save fails', async () => {

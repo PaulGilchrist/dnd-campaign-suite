@@ -86,7 +86,7 @@ describe('SP-100 Revivify confirm refusal — slot rollback + spell log target',
   function renderFlow() {
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
     act(() => {
       result.current.gateMetamagic({ name: 'Revivify', level: 3, range: 'Touch', casting_time: '1 Action' });

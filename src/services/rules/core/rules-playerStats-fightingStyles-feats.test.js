@@ -213,7 +213,7 @@ describe('rules.getPlayerStats - fighting style reaction features (5e)', () => {
       const playerSummary = makePlayerSummary({
         class: { name: className, fightingStyles: [style] },
       });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
       const feature = result[array].find((a) => a.name === featureName);
       expect(feature).toBeDefined();
       expect(feature.type).toBe(type);
@@ -226,7 +226,7 @@ describe('rules.getPlayerStats - fighting style reaction features (5e)', () => {
     const playerSummary = makePlayerSummary({
       class: { name: 'Paladin', fightingStyles: ['Interception', 'Protection'] },
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.reactions.find((r) => r.name === 'Interception')).toBeDefined();
     expect(result.reactions.find((r) => r.name === 'Protection')).toBeDefined();
   });
@@ -247,7 +247,7 @@ describe('rules.getPlayerStats - fighting style reaction features (2024)', () =>
         class: { name: className, fightingStyles: [style] },
         race: { name: 'Human', languages: ['Common'], traits: [] },
       });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
       const feature = result[array].find((a) => a.name === featureName);
       expect(feature).toBeDefined();
       expect(feature.type).toBe(type);
@@ -262,7 +262,7 @@ describe('rules.getPlayerStats - fighting style reaction features (2024)', () =>
       class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting', 'Two-Weapon Fighting'] },
       race: { name: 'Human', languages: ['Common'], traits: [] },
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.specialActions.find((a) => a.name === 'Thrown Weapon Fighting')).toBeUndefined();
     expect(result.specialActions.find((a) => a.name === 'Two-Weapon Fighting')).toBeUndefined();
   });
@@ -280,7 +280,7 @@ describe('rules.getPlayerStats - action array re-sorting after fighting styles',
       bonusActions: [{ name: 'ZBonus' }, { name: 'ABonus' }],
       characterAdvancement: [{ name: 'ZAdvancement' }, { name: 'AAdvancement' }],
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.actions.map((a) => a.name)).toEqual([...result.actions.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
     expect(result.reactions.map((r) => r.name)).toEqual([...result.reactions.map((r) => r.name)].sort((a, b) => a.localeCompare(b)));
     expect(result.specialActions.map((a) => a.name)).toEqual([...result.specialActions.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
@@ -337,7 +337,7 @@ describe('rules.getPlayerStats - feat proficiency buffs', () => {
     const playerSummary = makePlayerSummary({
       proficiencies: existingProfs,
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     if (expectedProf) {
       expect(result.proficiencies).toContain(expectedProf);
     }
@@ -363,7 +363,7 @@ describe('rules.getPlayerStats - expertise handling', () => {
     const playerSummary = makePlayerSummary({
       expertSkills: ['', 123, 'Stealth', null, 'Persuasion'],
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.expertise).toContain('Stealth');
     expect(result.expertise).toContain('Persuasion');
   });

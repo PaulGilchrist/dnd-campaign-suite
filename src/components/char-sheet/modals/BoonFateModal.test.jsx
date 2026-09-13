@@ -276,14 +276,14 @@ describe('BoonFateModal', () => {
       renderModal(baseProps);
       fireEvent.click(screen.getByRole('button', { name: buttonName }));
       await waitFor(() => {
-        expect(boonOfFateHandler.applyBoonFateChoice).toHaveBeenCalledWith(
-          baseAction,
-          basePlayerStats,
-          baseProps.campaignName,
-          baseRoll2d4,
-          baseLastAttack,
-          mode,
-        );
+        expect(boonOfFateHandler.applyBoonFateChoice).toHaveBeenCalledWith({
+              action: baseAction,
+              playerStats: basePlayerStats,
+              campaignName: baseProps.campaignName,
+              roll2d4: baseRoll2d4,
+              lastAttack: baseLastAttack,
+              mode,
+          });
       });
     });
 

@@ -278,12 +278,7 @@ describe('MonsterCardModal - autoDamageRoll callback integration', () => {
           });
         });
         expect(rollDamage).toHaveBeenCalledWith(
-          name,
-          formula,
-          expectedTotal,
-          [3, 5],
-          2,
-          expect.objectContaining({ damageType, attackerName: 'Goblin', isAutoCrit })
+          { name: name, formula: formula, total: expectedTotal, rolls: [3, 5], modifier: 2, context: expect.objectContaining({ damageType, attackerName: 'Goblin', isAutoCrit }) }
         );
       }
     });
@@ -331,12 +326,7 @@ describe('MonsterCardModal - autoDamageRoll callback integration', () => {
           });
         });
         expect(rollDamage).toHaveBeenCalledWith(
-          actionName,
-          '1d6+2',
-          8,
-          [3, 5],
-          2,
-          expect.objectContaining(expectedContext)
+          { name: actionName, formula: '1d6+2', total: 8, rolls: [3, 5], modifier: 2, context: expect.objectContaining(expectedContext) }
         );
       }
     });
@@ -374,7 +364,7 @@ describe('MonsterCardModal - autoDamageRoll callback integration', () => {
         action: { name: 'Bite', description: '', attack_bonus: null, damage_dice_primary: '1d8', damage_type_primary: 'piercing' },
         linkText: '1d8',
         rollFn: rollDamage,
-        rollArgs: ['Bite', '1d8', expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)],
+        rollArgs: [{ name: 'Bite', formula: '1d8', total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) }],
         desc: 'renders and calls onDamage for trait with damage_dice_primary',
       },
       {

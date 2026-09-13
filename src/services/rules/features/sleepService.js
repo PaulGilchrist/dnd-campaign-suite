@@ -204,10 +204,10 @@ export async function applySleepTurnEnd(campaignName, targetName, options = {}) 
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName, skipSync);
     removeCondition(targetName, 'incapacitated', campaignName, skipSync);
     applyCondition(targetName, 'unconscious', campaignName, skipSync);
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'unconscious' },
         { type: 'remove_target_effect', effectKey: SLEEP_TE_EFFECT, source: casterName, target: targetName },
-    ], campaignName, 10);
+    ], campaignName, rounds: 10 });
     addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
@@ -249,7 +249,7 @@ export function wakeSleepOnDamage(campaignName, targetName, damageDealt) {
     return wakeSleepTarget(campaignName, targetName, 'target took damage');
 }
 
-export async function triggerSleep(spell, metaCtx, playerStats, campaignName, mapName, characters) {
+export async function triggerSleep({ spell, metaCtx, playerStats, campaignName, mapName, characters }) {
     let spellSaveDc;
     if (metaCtx?.spellSaveDc == null) {
         if (playerStats.spellAbilities?.saveDc == null) {

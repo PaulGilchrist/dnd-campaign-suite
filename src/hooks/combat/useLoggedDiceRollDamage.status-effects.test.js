@@ -161,7 +161,7 @@ describe('Status effects application through logDamageAndShow', () => {
     }
 
     function callHandler(contextOverride = {}) {
-        return createFn()('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        return createFn()({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'Goblin',
             damageType: 'fire',
             saveDc: 15,
@@ -169,13 +169,13 @@ describe('Status effects application through logDamageAndShow', () => {
             dcSuccess: 'half',
             attackerName: 'TestWizard',
             ...contextOverride,
-        });
+        } });
     }
 
     describe('status effects on failed saves', () => {
         it('applies status effects when save fails on an npc target', async () => {
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
                 saveDc: 15,
@@ -183,7 +183,7 @@ describe('Status effects application through logDamageAndShow', () => {
                 dcSuccess: 'half',
                 statusEffects: ['poisoned'],
                 attackerName: 'TestWizard',
-            });
+            } });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Goblin',
@@ -264,7 +264,7 @@ describe('Status effects application through logDamageAndShow', () => {
             });
             deps.charactersRef = { current: [{ name: 'Ally', computedStats: {}, saveModifiers: [] }] };
 
-            await createFn()('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            await createFn()({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'Ally',
                 damageType: 'fire',
                 saveDc: 15,
@@ -272,7 +272,7 @@ describe('Status effects application through logDamageAndShow', () => {
                 dcSuccess: 'half',
                 statusEffects: ['poisoned', 'benumbed'],
                 attackerName: 'TestWizard',
-            });
+            } });
 
             expect(sendSavePrompt).toHaveBeenCalled();
             const pendingKeys = Object.keys(deps.pendingSaves);
@@ -287,14 +287,14 @@ describe('Status effects application through logDamageAndShow', () => {
             });
             deps.charactersRef = { current: [{ name: 'Ally', computedStats: {}, saveModifiers: [] }] };
 
-            await createFn()('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            await createFn()({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'Ally',
                 damageType: 'fire',
                 saveDc: 15,
                 saveType: 'DEX',
                 dcSuccess: 'half',
                 attackerName: 'TestWizard',
-            });
+            } });
 
             const pendingKeys = Object.keys(deps.pendingSaves);
             expect(pendingKeys.length).toBeGreaterThan(0);

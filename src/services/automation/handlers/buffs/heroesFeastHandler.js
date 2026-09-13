@@ -77,9 +77,9 @@ export async function applyHeroesFeast(action, playerStats, campaignName, mapNam
             setRuntimeValue(targetName, 'currentHitPoints', Math.min(currentHp + hpIncrease, currentHp + hpIncrease), campaignName);
         }
 
-        addExpiration(playerStats.name, targetName, [
+        addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'remove_heroes_feast_buff', buffName: HEROES_FEAST_BUFF_NAME, hpKey: HEROES_FEAST_HP_KEY }
-        ], campaignName);
+        ], campaignName });
 
         const feastBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
         const buffs = Array.isArray(feastBuffs) ? feastBuffs : [];

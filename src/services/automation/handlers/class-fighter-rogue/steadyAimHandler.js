@@ -4,6 +4,23 @@ import { addEntry } from '../../../ui/logService.js';
 const MOVED_THIS_TURN_KEY = 'steadyAimMovedThisTurn';
 const SPEED_ZERO_KEY = 'steadyAimSpeedZero';
 
+// Check if the player has Roving Aim (Assassin level 9) which prevents speed reduction
+function playerHasRovingAim(playerStats) {
+    const passives = ((playerStats.automation || {}).passives || []);
+    return passives.some(p => p.name === 'Infiltration Expertise' && p.effect === 'roving_aim')
+        || passives.some(p => p.effect === 'roving_aim');
+}
+
+async function cancelSteadyAim(playerName, campaignName, hasRovingAim) {
+    await setRuntimeValue(playerName, SPEED_ZERO_KEY, false, campaignName);
+    await setRuntimeValue(playerName, MOVED_THIS_TURN_KEY, false, campaignName);
+    if (!hasRovingAim) {
+        const storedConds = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
+        const filtered = storedConds.filter(c => String(c).toLowerCase() !== 'speed_zero');
+        await setRuntimeValue(playerName, 'activeConditions', filtered, campaignName);
+    }
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -23,23 +40,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    // Check if the player has Roving Aim (Assassin level 9) which prevents speed reduction
-    const hasRovingAim = playerStats.automation?.passives?.some(
-        p => p.name === 'Infiltration Expertise' && p.effect === 'roving_aim'
-    ) || playerStats.automation?.passives?.some(
-        p => p.effect === 'roving_aim'
-    );
+    const hasRovingAim = playerHasRovingAim(playerStats);
 
     // Check if already active (toggle off)
     const isActive = getRuntimeValue(playerName, SPEED_ZERO_KEY, campaignName);
     if (isActive) {
-        await setRuntimeValue(playerName, SPEED_ZERO_KEY, false, campaignName);
-        await setRuntimeValue(playerName, MOVED_THIS_TURN_KEY, false, campaignName);
-        if (!hasRovingAim) {
-            const storedConds = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
-            const filtered = storedConds.filter(c => String(c).toLowerCase() !== 'speed_zero');
-            await setRuntimeValue(playerName, 'activeConditions', filtered, campaignName);
-        }
+        await cancelSteadyAim(playerName, campaignName, hasRovingAim);
         return {
             type: 'popup',
             payload: {

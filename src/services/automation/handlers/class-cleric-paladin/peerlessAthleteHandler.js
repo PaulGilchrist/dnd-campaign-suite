@@ -55,9 +55,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
     // Add expiration for 1 hour (6 rounds)
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'peerless_athlete_end' }
-    ], campaignName, 6);
+    ], campaignName, rounds: 6 });
 
     // Log the ability use
     await addEntry(campaignName, {

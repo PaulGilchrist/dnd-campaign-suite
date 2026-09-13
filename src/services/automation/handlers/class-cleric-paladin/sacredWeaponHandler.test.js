@@ -246,13 +246,7 @@ describe('sacredWeaponHandler', () => {
 
       await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Radiant Damage');
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestHero',
-        'TestHero',
-        [{ type: 'remove_active_buff', buffName: 'Sacred Weapon' }],
-        campaignName,
-        100,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestHero', targetName: 'TestHero', effects: [{ type: 'remove_active_buff', buffName: 'Sacred Weapon' }], campaignName, rounds: 100 });
     });
 
     it('should emit an ability_use activation log with CD spend and light prose (CLA-301)', async () => {

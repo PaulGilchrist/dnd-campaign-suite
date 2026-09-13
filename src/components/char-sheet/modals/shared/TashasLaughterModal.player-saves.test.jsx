@@ -159,16 +159,11 @@ describe('TashasLaughterModal - Player Saves', () => {
             await triggerSaveResult(false);
 
             await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith(
-                    'Wizard1',
-                    'PlayerAlly',
-                    [
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'PlayerAlly', effects: [
                         { type: 'condition', condition: 'prone' },
                         { type: 'condition', condition: 'incapacitated' },
                         { type: 'tashas_laughter_expiration' },
-                    ],
-                    campaignName,
-                );
+                    ], campaignName });
             });
         });
 

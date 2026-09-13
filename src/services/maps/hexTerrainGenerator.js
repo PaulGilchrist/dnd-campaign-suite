@@ -256,6 +256,11 @@ function fillLakes(terrain, elevationMap, hexCols, hexRows) {
   floodLowGround(terrain, elevationMap, visited, hexCols, hexRows);
 }
 
+function isValidRiverSource(elev, moist, terrainType) {
+  if (moist !== null) return elev > 0.6 && moist > 0.65;
+  return elev > 0.6 && (terrainType === 'mountains' || terrainType === 'hills' || terrainType === 'tundra');
+}
+
 function generateRivers(elevationMap, moistureMap, terrain, hexCols, hexRows) {
   const riverHexes = new Set();
   const candidates = [];
@@ -263,12 +268,8 @@ function generateRivers(elevationMap, moistureMap, terrain, hexCols, hexRows) {
   for (let r = 0; r < hexRows; r++) {
     for (let q = 0; q < hexCols; q++) {
       const key = hexKey(q, r);
-      const elev = elevationMap[key];
       const moist = moistureMap !== null ? moistureMap[key] : null;
-      const isValidSource = moist !== null
-        ? (elev > 0.6 && moist > 0.65)
-        : (elev > 0.6 && (terrain[key] === 'mountains' || terrain[key] === 'hills' || terrain[key] === 'tundra'));
-      if (isValidSource) {
+      if (isValidRiverSource(elevationMap[key], moist, terrain[key])) {
         candidates.push({ q, r, moisture: moist || 0.5 });
       }
     }
@@ -284,7 +285,7 @@ function generateRivers(elevationMap, moistureMap, terrain, hexCols, hexRows) {
     const sk = hexKey(source.q, source.r);
     if (taken.has(sk)) continue;
 
-    const path = traceRiver(source.q, source.r, elevationMap, terrain, hexCols, hexRows);
+    const path = traceRiver({ startQ: source.q, startR: source.r, elevationMap, terrain, hexCols, hexRows });
     if (path.length < 3) continue;
 
     for (const h of path) {
@@ -296,7 +297,7 @@ function generateRivers(elevationMap, moistureMap, terrain, hexCols, hexRows) {
   return Array.from(riverHexes);
 }
 
-function traceRiver(startQ, startR, elevationMap, terrain, hexCols, hexRows) {
+function traceRiver({ startQ, startR, elevationMap, terrain, hexCols, hexRows }) {
   const path = [];
   const visited = new Set();
   let q = startQ;

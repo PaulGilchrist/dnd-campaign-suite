@@ -213,7 +213,7 @@ function makeSpell(overrides = {}) {
 function renderWithSpell(spellName, spellLevel, overrides = {}) {
   const setPopupHtml = vi.fn();
   const { result } = renderHook(() =>
-    useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+    useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
   );
   act(() => {
     result.current.gateMetamagic(makeSpell({ name: spellName, level: spellLevel, ...overrides }));
@@ -249,7 +249,7 @@ describe('useSpellMetamagicFlow — Enhance Ability two-stage flow', () => {
   it('completes the two-stage flow: ability select → confirm', async () => {
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     act(() => {
@@ -291,7 +291,7 @@ describe('useSpellMetamagicFlow — Enhance Ability two-stage flow', () => {
 
   it('does nothing when skip is called without pending state', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     expect(result.current.enhanceAbilityStage).toBeNull();
@@ -383,7 +383,7 @@ describe('useSpellMetamagicFlow — Protection from Energy two-stage flow', () =
 
   it('does nothing when skip is called without pending state', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     expect(result.current.protectionFromEnergyStage).toBeNull();
@@ -475,7 +475,7 @@ describe('useSpellMetamagicFlow — Resistance two-stage flow', () => {
 
   it('does nothing when skip is called without pending state', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     expect(result.current.resistanceStage).toBeNull();

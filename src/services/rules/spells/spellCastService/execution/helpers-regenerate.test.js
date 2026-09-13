@@ -140,12 +140,7 @@ describe('helpers.js — applyRegenerateSpell', () => {
     expect(applyHealingToTarget).toHaveBeenCalled();
     expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'regenerateActive', true, 'test-campaign');
     expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'regenerateSource', 'TestWizard', 'test-campaign');
-    expect(addExpiration).toHaveBeenCalledWith(
-      'TestWizard',
-      'Goblin',
-      expect.arrayContaining([expect.objectContaining({ type: 'remove_regenerate_buff' })]),
-      'test-campaign',
-    );
+    expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'Goblin', effects: expect.arrayContaining([expect.objectContaining({ type: 'remove_regenerate_buff' })]), campaignName: 'test-campaign' });
     expect(result).toEqual(
       expect.objectContaining({
         targetName: 'Goblin',

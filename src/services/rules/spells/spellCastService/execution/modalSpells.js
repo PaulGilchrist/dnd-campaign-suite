@@ -6,7 +6,7 @@ import { getCombatContext } from '../../../combat/damageUtils.js';
 // The old if/else applied to multiTarget OR first target, silently skipping
 // the first when a second was chosen. The 10-ft second-target gate has no
 // live position seam on this chooser path (gridless lenient pass — adjudicated).
-async function handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget) {
+async function handlePowerWordHeal({ spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget }) {
     if (spell.name.toLowerCase() === 'power word heal') {
         const target = await getTargetInfo();
         const firstTargetName = target?.name || null;
@@ -22,7 +22,7 @@ async function handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, c
     return { handled: false };
 }
 
-async function handlePowerWordKill(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget) {
+async function handlePowerWordKill({ spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget }) {
     if (spell.name && spell.name.toLowerCase() === 'power word kill') {
         const target = await getTargetInfo();
         const firstTargetName = target?.name || null;
@@ -86,7 +86,7 @@ function handleCalmEmotions(fullSpell, spellSaveDc, playerStats, campaignName, m
     return { handled: false };
 }
 
-function handleHypnoticPatternEarly(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive) {
+function handleHypnoticPatternEarly({ fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive }) {
     if (fullSpell.name && fullSpell.name.toLowerCase() === 'hypnotic pattern' && fullSpell.dc) {
         const hypnoticInnateBonus = innateSorceryActive ? 1 : 0;
         const hypnoticModalPayload = {
@@ -113,7 +113,7 @@ function handleHypnoticPatternEarly(fullSpell, spellSaveDc, playerStats, campaig
     return { handled: false };
 }
 
-function handleSleep(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters) {
+function handleSleep({ fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters }) {
     if (fullSpell.name && fullSpell.name.toLowerCase() === 'sleep' && fullSpell.dc) {
         const sleepModalPayload = {
             action: { name: 'Sleep', automation: { type: 'sleep' } },
@@ -153,7 +153,7 @@ function handleConfusionEarly({ fullSpell, spell, metaCtx, spellSaveDc, playerSt
     return { handled: false };
 }
 
-function handleShapechange(fullSpell, metaCtx, playerStats, campaignName, mapName, characters) {
+function handleShapechange({ fullSpell, metaCtx, playerStats, campaignName, mapName, characters }) {
     if (fullSpell.name && fullSpell.name.toLowerCase() === 'shapechange') {
         const action = {
             name: fullSpell.name,
@@ -175,7 +175,7 @@ function handleShapechange(fullSpell, metaCtx, playerStats, campaignName, mapNam
     return { handled: false };
 }
 
-function handleFear(spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive) {
+function handleFear({ spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive }) {
     if (spell.name && spell.name.toLowerCase() === 'fear' && spell.dc) {
         const fearInnateBonus = innateSorceryActive ? 1 : 0;
         const fearModalPayload = {

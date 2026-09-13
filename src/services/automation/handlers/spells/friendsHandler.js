@@ -93,9 +93,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     });
 
     // Apply expiration (2 rounds = 12 seconds minimum; concentration handles the rest)
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'condition', condition: condKey },
-    ], campaignName, 2);
+    ], campaignName, rounds: 2 });
 
     addEntry(campaignName, {
         type: 'condition',

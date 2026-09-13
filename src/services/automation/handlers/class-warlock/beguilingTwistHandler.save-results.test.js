@@ -158,11 +158,7 @@ describe('beguilingTwistHandler', () => {
                 const handler = getSaveResultHandler(addEventListenerSpy);
                 handler({ detail: { promptId: 'test-prompt-id', success: false } });
 
-                expect(addExpiration).toHaveBeenCalledWith(
-                    playerName,
-                    playerName,
-                    [{ type: 'condition', condition: expectedCondition }]
-                );
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'condition', condition: expectedCondition }] });
                 addEventListenerSpy.mockRestore();
                 resetMocks();
             }

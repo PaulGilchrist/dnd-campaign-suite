@@ -25,12 +25,18 @@ function buildTravelInit(loadedTravel) {
     };
 }
 
+function resolveLoadedCollections(existing) {
+    return {
+        loadedTerrain: existing.terrain || {},
+        loadedRivers: existing.rivers || [],
+        loadedRoads: existing.roads || [],
+        loadedPois: existing.pois || [],
+        loadedGridSize: existing.gridSize || DEFAULT_GRID_SIZE,
+    };
+}
+
 function applyExistingMap(existing, mapName, characters, ctx) {
-    const loadedTerrain = existing.terrain || {};
-    const loadedRivers = existing.rivers || [];
-    const loadedRoads = existing.roads || [];
-    const loadedPois = existing.pois || [];
-    const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
+    const { loadedTerrain, loadedRivers, loadedRoads, loadedPois, loadedGridSize } = resolveLoadedCollections(existing);
     const { loadedZoom, loadedPanX, loadedPanY, isOldDefault } = normalizeExistingView(existing);
 
     if (!existing.type) existing.type = 'outdoor';
@@ -61,12 +67,10 @@ function applyExistingMap(existing, mapName, characters, ctx) {
         (characters.length > 0 ? characters.map(c => c.name) : []);
     ctx.setMarchingOrder(loadOrder);
 
-    if (existing.partyPosition) {
-        ctx.setPartyPosition(existing.partyPosition);
-    } else {
-        const centerCols = loadedGridSize * GRID_COLS_MULTIPLIER;
-        ctx.setPartyPosition({ q: Math.floor(centerCols / 2), r: Math.floor(loadedGridSize / 2) });
-    }
+    ctx.setPartyPosition(existing.partyPosition || {
+        q: Math.floor((loadedGridSize * GRID_COLS_MULTIPLIER) / 2),
+        r: Math.floor(loadedGridSize / 2),
+    });
 
     ctx.hasLoaded.current = true;
     ctx.setLoading(false);

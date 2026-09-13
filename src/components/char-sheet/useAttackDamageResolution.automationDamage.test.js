@@ -151,12 +151,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
                 expect.objectContaining({ damageTypeChoice: expect.anything() })
             );
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Unarmed Strike',
-                expect.stringContaining('1d6 [fire]'),
-                expect.any(Number),
-                expect.any(Array),
-                expect.any(Number),
-                expect.any(Object),
+                { name: 'Unarmed Strike', formula: expect.stringContaining('1d6 [fire]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
             );
         });
 
@@ -184,12 +179,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Unarmed Strike',
-                expect.stringContaining('1d6 [cold]'),
-                expect.any(Number),
-                expect.any(Array),
-                expect.any(Number),
-                expect.any(Object),
+                { name: 'Unarmed Strike', formula: expect.stringContaining('1d6 [cold]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
             );
         });
 
@@ -204,7 +194,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalled();
-            const formula = mockRollDamage.mock.calls[0][1];
+            const formula = mockRollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d6');
             expect(formula).not.toContain('[fire]');
         });
@@ -231,12 +221,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Greataxe',
-                expect.stringContaining('1d4 [force]'),
-                expect.any(Number),
-                expect.any(Array),
-                expect.any(Number),
-                expect.any(Object),
+                { name: 'Greataxe', formula: expect.stringContaining('1d4 [force]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
             );
         });
 
@@ -260,12 +245,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Greataxe',
-                expect.stringContaining('1d4 [slashing]'),
-                expect.any(Number),
-                expect.any(Array),
-                expect.any(Number),
-                expect.any(Object),
+                { name: 'Greataxe', formula: expect.stringContaining('1d4 [slashing]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
             );
         });
 
@@ -289,7 +269,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalled();
-            const formula = mockRollDamage.mock.calls[0][1];
+            const formula = mockRollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d8+3');
             expect(formula).not.toContain('1d4 [force]');
         });
@@ -328,12 +308,7 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Greataxe',
-                expect.stringContaining('2 [necrotic]'),
-                expect.any(Number),
-                expect.any(Array),
-                expect.any(Number),
-                expect.any(Object),
+                { name: 'Greataxe', formula: expect.stringContaining('2 [necrotic]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
             );
         });
 
@@ -361,8 +336,8 @@ describe('useAttackDamageResolution - automation damage bonuses', () => {
             await resolveAttackDamage(attack, { hit: true });
             await tick();
 
-            const rollDamageCalls = mockRollDamage.mock.calls;
-            const formula = rollDamageCalls.length > 0 ? rollDamageCalls[0][1] : '';
+            const rollDamageCalls = mockRollDamage.mock.calls.map(c => c[0]);
+            const formula = rollDamageCalls.length > 0 ? rollDamageCalls[0].formula : '';
             if (expectDamage) {
                 expect(formula).toContain('2 [necrotic]');
             } else {

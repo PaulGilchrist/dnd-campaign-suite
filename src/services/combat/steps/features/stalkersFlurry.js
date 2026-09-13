@@ -3,6 +3,24 @@ import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/d
 import { checkOncePerTurnWithSkip, clearSkipFlag } from '../../../automation/common/oncePerTurn.js';
 import { resolveMassFear } from '../../../automation/handlers/combat/massFearHandler.js';
 
+async function applyStalkersFlurryOption(ctx, opt, effectTarget, secondaryTarget) {
+  if (opt.effect === 'sudden_strike') {
+    setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', true, ctx.campaignName);
+    if (secondaryTarget) {
+      setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrikeTarget', secondaryTarget, ctx.campaignName);
+    }
+  }
+  else if (opt.effect === 'mass_fear') {
+    await resolveMassFear({
+      campaignName: ctx.campaignName,
+      casterName: ctx.playerStats.name,
+      primaryTargetName: effectTarget,
+      option: opt,
+      playerStats: ctx.playerStats,
+    });
+  }
+}
+
 export const stalkersFlurry = {
   name: 'stalkersFlurry',
   condition: (ctx) => !!ctx.playerStats.automation?.passives,
@@ -44,15 +62,7 @@ export const stalkersFlurry = {
 
     const opt = sf.options.find(o => o.name === chosen);
     if (opt) {
-      if (opt.effect === 'sudden_strike') {
-        setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrike', true, ctx.campaignName);
-        if (secondaryTarget) {
-          setRuntimeValue(ctx.playerStats.name, 'pendingSuddenStrikeTarget', secondaryTarget, ctx.campaignName);
-        }
-      }
-      else if (opt.effect === 'mass_fear') {
-        await resolveMassFear(ctx.campaignName, ctx.playerStats.name, effectTarget, opt, ctx.playerStats, null);
-      }
+      await applyStalkersFlurryOption(ctx, opt, effectTarget, secondaryTarget);
     }
 
     return {

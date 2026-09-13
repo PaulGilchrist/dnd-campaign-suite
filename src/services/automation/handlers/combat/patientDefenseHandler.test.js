@@ -145,9 +145,9 @@ describe('patientDefenseHandler — base Patient Defense', () => {
             effect: 'dodge',
             duration: 'until_start_of_next_turn',
         }, campaignName, 'TestMonk');
-        expect(expirations.addExpiration).toHaveBeenCalledWith('TestMonk', 'TestMonk', [
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestMonk', targetName: 'TestMonk', effects: [
             { type: 'remove_active_buff', buffName: 'Dodge' }
-        ], campaignName, undefined, 'TestMonk');
+        ], campaignName, rounds: undefined, expireOnCreatureName: 'TestMonk' });
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
             type: 'ability_use',
             characterName: 'TestMonk',

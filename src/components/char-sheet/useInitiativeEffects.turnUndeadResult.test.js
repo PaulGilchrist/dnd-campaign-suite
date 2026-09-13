@@ -261,26 +261,16 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
             await flushSequentialDamage();
             expect(rollDamage).toHaveBeenCalledTimes(2);
             expect(rollDamage).toHaveBeenCalledWith(
-                'Searing Undead',
-                '4d8',
-                4,
-                [4],
-                0,
-                expect.objectContaining({
+                { name: 'Searing Undead', formula: '4d8', total: 4, rolls: [4], modifier: 0, context: expect.objectContaining({
                     damageType: 'Radiant',
                     attackerName: 'Cleric',
                     targetName: 'Goblin',
-                })
+                }) }
             );
             expect(rollDamage).toHaveBeenCalledWith(
-                'Searing Undead',
-                '4d8',
-                4,
-                [4],
-                0,
-                expect.objectContaining({
+                { name: 'Searing Undead', formula: '4d8', total: 4, rolls: [4], modifier: 0, context: expect.objectContaining({
                     targetName: 'Zombie',
-                })
+                }) }
             );
         });
 
@@ -306,12 +296,7 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
                 saveType: 'WIS',
             });
             expect(rollDamage).toHaveBeenCalledWith(
-                'Searing Undead',
-                '3d8',
-                3,
-                [3],
-                0,
-                expect.any(Object)
+                { name: 'Searing Undead', formula: '3d8', total: 3, rolls: [3], modifier: 0, context: expect.any(Object) }
             );
         });
 
@@ -335,12 +320,7 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
                 failedTargets: ['Goblin'],
             });
             expect(rollDamage).toHaveBeenCalledWith(
-                'Searing Undead',
-                '1d8',
-                1,
-                [1],
-                0,
-                expect.any(Object)
+                { name: 'Searing Undead', formula: '1d8', total: 1, rolls: [1], modifier: 0, context: expect.any(Object) }
             );
         });
 
@@ -373,14 +353,9 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
                 failedTargets: ['Goblin'],
             });
             expect(rollDamage).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.any(String),
-                expect.any(Number),
-                expect.any(Array),
-                expect.any(Number),
-                expect.objectContaining({
+                { name: expect.any(String), formula: expect.any(String), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.objectContaining({
                     damageType: 'Radiant',
-                })
+                }) }
             );
         });
 
@@ -402,12 +377,12 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
                 saveType: 'CHA',
             });
             await flushSequentialDamage();
-            const contextArg = rollDamage.mock.calls[0][5];
+            const contextArg = rollDamage.mock.calls[0][0].context;
             expect(contextArg.dcSuccess).toBeUndefined();
             expect(contextArg.saveDc).toBeUndefined();
             expect(contextArg.saveType).toBeUndefined();
             // full roll total must be passed as damage for every failed target
-            expect(rollDamage.mock.calls[1][2]).toBe(4);
+            expect(rollDamage.mock.calls[1][0].total).toBe(4);
         });
 
         it('sets attackerName to player name in context', () => {
@@ -425,7 +400,7 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
                 campaignName,
                 failedTargets: ['Goblin'],
             });
-            const contextArg = rollDamage.mock.calls[0][5];
+            const contextArg = rollDamage.mock.calls[0][0].context;
             expect(contextArg.attackerName).toBe('Cleric');
         });
 
@@ -445,8 +420,8 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
                 failedTargets: ['Goblin', 'Zombie'],
             });
             await flushSequentialDamage();
-            expect(rollDamage.mock.calls[0][5].targetName).toBe('Goblin');
-            expect(rollDamage.mock.calls[1][5].targetName).toBe('Zombie');
+            expect(rollDamage.mock.calls[0][0].context.targetName).toBe('Goblin');
+            expect(rollDamage.mock.calls[1][0].context.targetName).toBe('Zombie');
         });
 
         it('handles missing Wisdom ability gracefully', () => {
@@ -469,12 +444,7 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
                 failedTargets: ['Goblin'],
             });
             expect(rollDamage).toHaveBeenCalledWith(
-                'Searing Undead',
-                '1d8',
-                1,
-                [1],
-                0,
-                expect.any(Object)
+                { name: 'Searing Undead', formula: '1d8', total: 1, rolls: [1], modifier: 0, context: expect.any(Object) }
             );
         });
 
@@ -494,12 +464,7 @@ describe('useInitiativeEffects - turn-undead-result event', () => {
                 failedTargets: ['Goblin'],
             });
             expect(rollDamage).toHaveBeenCalledWith(
-                'Searing Undead',
-                '4d8',
-                0,
-                [0],
-                0,
-                expect.any(Object)
+                { name: 'Searing Undead', formula: '4d8', total: 0, rolls: [0], modifier: 0, context: expect.any(Object) }
             );
         });
     });

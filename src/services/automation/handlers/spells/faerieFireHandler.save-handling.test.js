@@ -161,12 +161,7 @@ describe('faerieFireHandler.save-handling', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        [{ type: 'remove_faerie_fire' }],
-        campaignName,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: [{ type: 'remove_faerie_fire' }], campaignName });
     });
 
     it('should remove invisible condition when present', async () => {

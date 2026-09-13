@@ -37,7 +37,28 @@ async function consumeProtectionFromPoisonSlot(pending, playerStats, campaignNam
   }
 }
 
-export function useCustomHandlers(playerStats, campaignName, cfClearPending, getPending, setPopupHtml, characters) {
+async function consumePassWithoutTraceSlot(pending, playerStats, campaignName) {
+  // SP-085: consume the spell slot + register concentration via prepareSpellCast,
+  // mirroring createConfirmHandler (useConfirmableFlow.js) — the custom confirm
+  // previously bypassed it, so no slot was spent and no concentration tracked.
+  const isCantrip = (pending.spell?.level === 0)
+  if (isCantrip || !pending.spell) return
+  const upcastLevel = pending.spell.upcastLevel
+  const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
+  // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
+  const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
+  await prepareSpellCast(pending.spell, {}, {
+    playerName: playerStats.name,
+    playerStats,
+    campaignName,
+    isUpcast,
+    upcastLevel,
+    freeCastAuthorized,
+  })
+}
+
+export function useCustomHandlers({ playerStats, campaignName, cfClearPending, getPending, setPopupHtml, characters }) {
   const handleBarkskinConfirm = React.useCallback(async (result) => {
     const pending = getPending('barkskin')
     if (!pending) return
@@ -96,22 +117,7 @@ export function useCustomHandlers(playerStats, campaignName, cfClearPending, get
     // SP-085: consume the spell slot + register concentration via prepareSpellCast,
     // mirroring createConfirmHandler (useConfirmableFlow.js) — the custom confirm
     // previously bypassed it, so no slot was spent and no concentration tracked.
-    const isCantrip = (pending.spell?.level === 0)
-    if (!isCantrip && pending.spell) {
-      const upcastLevel = pending.spell.upcastLevel
-      const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
-      // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
-      const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
-      const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
-      await prepareSpellCast(pending.spell, {}, {
-        playerName: playerStats.name,
-        playerStats,
-        campaignName,
-        isUpcast,
-        upcastLevel,
-        freeCastAuthorized,
-      })
-    }
+    await consumePassWithoutTraceSlot(pending, playerStats, campaignName)
 
     const popup = await applyPassWithoutTraceEffect(
       pending.spell,

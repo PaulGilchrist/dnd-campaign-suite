@@ -92,7 +92,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function applyBardicInspiration(action, playerStats, campaignName, targetName, dieSize, hasCombatOptions) {
+export async function applyBardicInspiration({ action, playerStats, campaignName, targetName, dieSize, hasCombatOptions }) {
     const auto = action.automation;
     const usesMax = auto.uses_expression
         ? evaluateAutoExpression(auto.uses_expression, playerStats)
@@ -117,9 +117,9 @@ export async function applyBardicInspiration(action, playerStats, campaignName, 
         }
     }
 
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_bardic_inspiration' }
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'ability_use',

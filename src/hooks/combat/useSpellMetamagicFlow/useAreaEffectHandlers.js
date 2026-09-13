@@ -3,7 +3,7 @@ import { addEntry } from '../../../services/ui/logService.js'
 import { executeHandler } from '../../../services/automation/index.js'
 import { consumeMaterial } from '../../../services/rules/spells/materialComponents.js'
 
-export function useAreaEffectHandlers(createSkipHandler, playerStats, campaignName, cfClearPending, getPending, setPopupHtml) {
+export function useAreaEffectHandlers({ createSkipHandler, playerStats, campaignName, cfClearPending, getPending, setPopupHtml }) {
   const handleGlobeConfirm = React.useCallback(async (result) => {
     const pending = getPending('globe')
     if (!pending) return

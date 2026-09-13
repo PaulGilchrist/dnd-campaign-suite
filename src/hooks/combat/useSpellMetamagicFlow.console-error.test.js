@@ -232,7 +232,7 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
       getCombatSummary.mockReturnValueOnce({ creatures: null });
 
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
       );
 
       act(() => {
@@ -258,7 +258,7 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
     getCombatSummary.mockReturnValueOnce({ creatures: null });
 
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -280,7 +280,7 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
     getCombatSummary.mockReturnValueOnce({ creatures: null });
 
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -299,9 +299,7 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
 
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(
-        { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 },
-        'TestCampaign',
-        onExecute
+        { playerStats: { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 }, campaignName: 'TestCampaign', onExecute: onExecute }
       )
     );
 
@@ -320,7 +318,7 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
 
     const characters = [{ name: 'Ally One' }];
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, characters)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: characters })
     );
 
     act(() => {

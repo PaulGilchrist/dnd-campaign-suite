@@ -1,5 +1,23 @@
 import { useState } from 'react';
 
+function toggleSelectionKey(prev, key, maxSelections) {
+  if (prev.includes(key)) return prev.filter(k => k !== key);
+  if (prev.length >= maxSelections) return prev;
+  return [...prev, key];
+}
+
+function optionIsSelected(multiSelect, selected, key) {
+  return multiSelect ? selected.includes(key) : selected === key;
+}
+
+function optionAtMax(multiSelect, selected, maxSelections, isSel) {
+  return multiSelect && selected.length >= maxSelections && !isSel;
+}
+
+function choiceApplyBlocked(multiSelect, selected) {
+  return (multiSelect && selected.length === 0) || (!multiSelect && !selected);
+}
+
 function ChoiceResultView({ icon, title, result, onClose }) {
   return (
     <div className="sp-overlay" onClick={(e) => {
@@ -51,63 +69,27 @@ function ChoiceConfirmButton({ multiSelect, selected, confirmIcon, icon, confirm
   );
 }
 
-export function ChoiceListModal({
+function ChoiceListContent({
   icon,
   title,
   description,
   options,
-  multiSelect = false,
-  maxSelections = 1,
-  existingSelections = [],
-  confirmLabel = 'Confirm',
-  confirmIcon,
-  cancelLabel = 'Cancel',
-  resultView = false,
-  inputName = 'choiceOption',
+  multiSelect,
+  selected,
+  maxSelections,
+  inputName,
   SelectedComponent,
-  onConfirm,
+  isSelected,
+  isExisting,
+  handleToggle,
+  handleApply,
+  confirmIcon,
+  confirmLabel,
+  cancelLabel,
+  getOptionLabel,
+  getOptionDescription,
   onClose,
-  getOptionKey = (opt) => opt.name || opt.id,
-  getOptionLabel = (opt) => opt.name,
-  getOptionDescription = (opt) => opt.description,
 }) {
-  const [selected, setSelected] = useState(multiSelect ? [] : null);
-  const [applied, setApplied] = useState(false);
-  const [result, setResult] = useState(null);
-
-  const handleToggle = (option) => {
-    const key = getOptionKey(option);
-    if (multiSelect) {
-      setSelected(prev => {
-        if (prev.includes(key)) return prev.filter(k => k !== key);
-        if (prev.length >= maxSelections) return prev;
-        return [...prev, key];
-      });
-    } else {
-      setSelected(key);
-    }
-  };
-
-  const isSelected = (option) => {
-    const key = getOptionKey(option);
-    return multiSelect ? selected.includes(key) : selected === key;
-  };
-
-  const isExisting = (option) => existingSelections.includes(getOptionKey(option));
-
-  const handleApply = async () => {
-    if ((multiSelect && selected.length === 0) || (!multiSelect && !selected)) return;
-    const res = await onConfirm(selected);
-    if (resultView) {
-      setResult(res);
-      setApplied(true);
-    }
-  };
-
-  if (applied && result) {
-    return <ChoiceResultView icon={icon} title={title} result={result} onClose={onClose} />;
-  }
-
   return (
     <div className="sp-overlay" onClick={(e) => {
       if (e.target.closest('.sp-modal')) return;
@@ -128,7 +110,7 @@ export function ChoiceListModal({
             {options.map((opt, i) => {
               const isSel = isSelected(opt);
               const isEx = isExisting(opt);
-              const atMax = multiSelect && selected.length >= maxSelections && !isSel;
+              const atMax = optionAtMax(multiSelect, selected, maxSelections, isSel);
 
               if (SelectedComponent) {
                 return (
@@ -166,5 +148,80 @@ export function ChoiceListModal({
         </div>
       </div>
     </div>
+  );
+}
+
+export function ChoiceListModal({
+  icon,
+  title,
+  description,
+  options,
+  multiSelect = false,
+  maxSelections = 1,
+  existingSelections = [],
+  confirmLabel = 'Confirm',
+  confirmIcon,
+  cancelLabel = 'Cancel',
+  resultView = false,
+  inputName = 'choiceOption',
+  SelectedComponent,
+  onConfirm,
+  onClose,
+  getOptionKey = (opt) => opt.name || opt.id,
+  getOptionLabel = (opt) => opt.name,
+  getOptionDescription = (opt) => opt.description,
+}) {
+  const [selected, setSelected] = useState(multiSelect ? [] : null);
+  const [applied, setApplied] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleToggle = (option) => {
+    const key = getOptionKey(option);
+    if (multiSelect) {
+      setSelected(prev => toggleSelectionKey(prev, key, maxSelections));
+    } else {
+      setSelected(key);
+    }
+  };
+
+  const isSelected = (option) => optionIsSelected(multiSelect, selected, getOptionKey(option));
+
+  const isExisting = (option) => existingSelections.includes(getOptionKey(option));
+
+  const handleApply = async () => {
+    if (choiceApplyBlocked(multiSelect, selected)) return;
+    const res = await onConfirm(selected);
+    if (resultView) {
+      setResult(res);
+      setApplied(true);
+    }
+  };
+
+  if (applied && result) {
+    return <ChoiceResultView icon={icon} title={title} result={result} onClose={onClose} />;
+  }
+
+  return (
+    <ChoiceListContent
+      icon={icon}
+      title={title}
+      description={description}
+      options={options}
+      multiSelect={multiSelect}
+      selected={selected}
+      maxSelections={maxSelections}
+      inputName={inputName}
+      SelectedComponent={SelectedComponent}
+      isSelected={isSelected}
+      isExisting={isExisting}
+      handleToggle={handleToggle}
+      handleApply={handleApply}
+      confirmIcon={confirmIcon}
+      confirmLabel={confirmLabel}
+      cancelLabel={cancelLabel}
+      getOptionLabel={getOptionLabel}
+      getOptionDescription={getOptionDescription}
+      onClose={onClose}
+    />
   );
 }

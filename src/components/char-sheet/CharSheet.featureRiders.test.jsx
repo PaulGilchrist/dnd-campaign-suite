@@ -319,9 +319,9 @@ describe('handlePuncture', () => {
       newValue: 8,
     };
 
-    const result = await handlePuncture(stats, campaignName, [], popupHtml, setPopupHtml, punctureData);
+    const result = await handlePuncture({ playerStats: stats, campaignName, characters: [], popupHtml, setPopupHtml, punctureData });
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 3, ['Piercing'], campaignName, [], { ignoreResistance: false, attackerName: 'Test Character' });
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 3, ['Piercing'], { campaignName, characters: [], ignoreResistance: false, attackerName: 'Test Character' });
     expect(mockStore.get('Test Character:piercerPunctureUsedThisTurn')).toBe(true);
     expect(addEntry).toHaveBeenCalled();
     expect(addEntry.mock.calls[0][1].abilityName).toBe('Piercer - Puncture');
@@ -346,13 +346,13 @@ describe('handlePuncture', () => {
       newValue: 8,
     };
 
-    await handlePuncture(stats, campaignName, [], popupHtml, vi.fn(), punctureData);
+    await handlePuncture({ playerStats: stats, campaignName, characters: [], popupHtml, setPopupHtml: vi.fn(), punctureData });
     expect(mockStore.get('Test Character:piercerPunctureUsedThisTurn')).toBe(true);
 
     applyDamageToTarget.mockClear();
     addEntry.mockClear();
 
-    const second = await handlePuncture(stats, campaignName, [], popupHtml, vi.fn(), punctureData);
+    const second = await handlePuncture({ playerStats: stats, campaignName, characters: [], popupHtml, setPopupHtml: vi.fn(), punctureData });
     expect(second).toBeNull();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
@@ -374,8 +374,6 @@ describe('handleSavageAttacker', () => {
     const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
 
     const stats = createPlayerStats();
-    const setPopupHtml = vi.fn();
-    const popupHtml = { modifier: 3 };
     const savageData = {
       rawDamage: 10,
       targetName: 'Goblin',
@@ -384,7 +382,7 @@ describe('handleSavageAttacker', () => {
       newRolls: [6, 6],
     };
 
-    const result = await handleSavageAttacker(stats, campaignName, [], popupHtml, setPopupHtml, savageData);
+    const result = await handleSavageAttacker({ playerStats: stats, campaignName, savageData });
 
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(mockStore.get('Test Character:_Savage_Attacker_usedRound')).toBe(true);
@@ -399,7 +397,7 @@ describe('handleSavageAttacker', () => {
     const stats = createPlayerStats();
     const setPopupHtml = vi.fn();
 
-    await handleSavageAttackerChoice(stats, campaignName, [], { modifier: 3, damageType: 'Slashing' }, setPopupHtml, {
+    await handleSavageAttackerChoice({ playerStats: stats, campaignName, characters: [], popupHtml: { modifier: 3, damageType: 'Slashing' }, setPopupHtml, choiceData: {
       keep: 'reroll',
       originalRolls: [4, 4],
       newRolls: [6, 6],
@@ -409,7 +407,7 @@ describe('handleSavageAttacker', () => {
       modifier: 3,
       targetName: 'Goblin',
       damageTypes: ['Slashing'],
-    });
+    } });
 
     expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
     expect(applyDamageToTarget.mock.calls[0][2]).toBe(4);
@@ -423,7 +421,7 @@ describe('handleSavageAttacker', () => {
     const stats = createPlayerStats();
     const setPopupHtml = vi.fn();
 
-    const result = await handleSavageAttackerChoice(stats, campaignName, [], { modifier: 0 }, setPopupHtml, {
+    const result = await handleSavageAttackerChoice({ playerStats: stats, campaignName, characters: [], popupHtml: { modifier: 0 }, setPopupHtml, choiceData: {
       keep: 'original',
       originalRolls: [4, 4],
       newRolls: [6, 6],
@@ -433,7 +431,7 @@ describe('handleSavageAttacker', () => {
       modifier: 0,
       targetName: 'Goblin',
       damageTypes: ['Slashing'],
-    });
+    } });
 
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(setPopupHtml).not.toHaveBeenCalled();
@@ -447,7 +445,7 @@ describe('handleSavageAttacker', () => {
 
     const stats = createPlayerStats();
 
-    const result = await handleSavageAttackerChoice(stats, campaignName, [], { modifier: 0 }, vi.fn(), {
+    const result = await handleSavageAttackerChoice({ playerStats: stats, campaignName, characters: [], popupHtml: { modifier: 0 }, setPopupHtml: vi.fn(), choiceData: {
       keep: 'reroll',
       originalRolls: [5],
       newRolls: [2],
@@ -457,7 +455,7 @@ describe('handleSavageAttacker', () => {
       modifier: 0,
       targetName: 'Goblin',
       damageTypes: ['Piercing'],
-    });
+    } });
 
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(result).toEqual({ kept: 'original', damageDifference: 0 });
@@ -577,7 +575,7 @@ describe('handleSuperiorityManeuver', () => {
     const setPopupHtml = vi.fn();
     const popupHtml = { name: 'Athletics Check', rolls: [15], bonus: 3 };
 
-    await handleSuperiorityManeuver(stats, campaignName, setPopupHtml, popupHtml, 'Tripping Attack', 8);
+    await handleSuperiorityManeuver({ playerStats: stats, campaignName, setPopupHtml, popupHtml, maneuverName: 'Tripping Attack', dieValue: 8 });
 
     expect(mockStore.get('Test Character:superiorityDice')).toBe(2);
     expect(addEntry).toHaveBeenCalled();
@@ -598,7 +596,7 @@ describe('handleSuperiorityManeuver', () => {
     const setPopupHtml = vi.fn();
     const popupHtml = { name: 'Initiative', rolls: [15], bonus: 3 };
 
-    await handleSuperiorityManeuver(stats, campaignName, setPopupHtml, popupHtml, 'Tripping Attack', 8);
+    await handleSuperiorityManeuver({ playerStats: stats, campaignName, setPopupHtml, popupHtml, maneuverName: 'Tripping Attack', dieValue: 8 });
 
     expect(addEntry).toHaveBeenCalled();
     expect(setPopupHtml).toHaveBeenCalled();

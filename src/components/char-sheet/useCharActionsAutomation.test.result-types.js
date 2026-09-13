@@ -88,12 +88,7 @@ describe('useCharActionsAutomation', () => {
             await handleAutomationAction(action);
 
             expect(rollDamage).toHaveBeenCalledWith(
-                'Test Damage',
-                '2d6+3',
-                10,
-                [3, 7],
-                3,
-                {}
+                { name: 'Test Damage', formula: '2d6+3', total: 10, rolls: [3, 7], modifier: 3, context: {} }
             );
         });
 
@@ -117,12 +112,7 @@ describe('useCharActionsAutomation', () => {
             await handleAutomationAction(action);
 
             expect(rollDamage).toHaveBeenCalledWith(
-                'Test Damage',
-                '2d6+3',
-                10,
-                [3, 7],
-                3,
-                { source: 'test' }
+                { name: 'Test Damage', formula: '2d6+3', total: 10, rolls: [3, 7], modifier: 3, context: { source: 'test' } }
             );
         });
 

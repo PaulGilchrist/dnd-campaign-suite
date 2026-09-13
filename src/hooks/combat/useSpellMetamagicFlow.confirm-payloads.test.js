@@ -414,7 +414,7 @@ describe('useSpellMetamagicFlow — confirm handlers set popup html', () => {
     it(`calls setPopupHtml with ${test.expectedPayload} for ${test.name}`, async () => {
       const setPopupHtml = vi.fn();
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
       );
 
       act(() => {

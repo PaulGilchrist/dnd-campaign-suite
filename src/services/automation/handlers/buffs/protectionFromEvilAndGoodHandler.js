@@ -117,10 +117,10 @@ async function activateProtection(spell, casterName, targetName, combatSummary, 
     setRuntimeValue(targetName, PROTECTION_FROM_EVIL_AND_GOOD_KEY, WARDED_CREATURE_TYPES, campaignName);
 
     // Register expiration: expires on initiative roll (when target's turn starts), concentration loss, short rest, long rest
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_active_buff', buffName: SPELL_NAME },
         { type: 'remove_target_effect', effectKey: 'protection_from_evil_and_good', source: casterName },
-    ], campaignName, Infinity, targetName);
+    ], campaignName, rounds: Infinity, expireOnCreatureName: targetName });
 
     // Log to campaign
     await addEntry(campaignName, {

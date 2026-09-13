@@ -18,7 +18,7 @@ function useRuler() {
         }
     }, [rulerMode, resetRuler]);
 
-    const handleRulerPointerDown = useCallback((e, rulerMode, rulerStart, rulerEnd, getGridFromEvent, svgRef) => {
+    const handleRulerPointerDown = useCallback((e, { rulerMode, rulerStart, rulerEnd, getGridFromEvent, svgRef }) => {
         if (!rulerMode) return;
         const grid = getGridFromEvent(e);
         if (!grid) return;

@@ -160,16 +160,11 @@ describe('HypnoticPatternModal - Player Saves', () => {
             await triggerSaveResult(false);
 
             await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith(
-                    'Wizard1',
-                    'PlayerAlly',
-                    [
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'PlayerAlly', effects: [
                         { type: 'charmed', condition: 'charmed' },
                         { type: 'incapacitated', condition: 'incapacitated' },
                         { type: 'speed_zero', condition: 'speed_zero' },
-                    ],
-                    campaignName,
-                );
+                    ], campaignName });
             });
         });
 

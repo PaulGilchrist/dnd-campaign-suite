@@ -117,7 +117,7 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
     const { result, displayRolls, healingRerollOriginalRolls } = rollHealingWordExpression(healExpression, maximize, rerollOnes);
     if (!result) return null;
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
     const healAmount = result.total + bonusHeal;
     const { maxHp, currentHp } = resolveTargetHp(combatSummary, targetName, playerStats, campaignName);
     const actualHeal = Math.min(healAmount, maxHp - currentHp);

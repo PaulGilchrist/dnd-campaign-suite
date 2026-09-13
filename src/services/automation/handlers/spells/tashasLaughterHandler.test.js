@@ -269,16 +269,11 @@ describe('tashasLaughterHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        expect.arrayContaining([
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([
           { type: 'condition', condition: 'prone' },
           { type: 'condition', condition: 'incapacitated' },
           { type: 'tashas_laughter_expiration' },
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
     });
 
     it('should register tashas_hideous_laughter targetEffect on failed save', async () => {

@@ -433,12 +433,7 @@ describe('buffHandler.handle - advanced effects', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        ps.name,
-        ps.name,
-        expect.arrayContaining([expect.objectContaining({ type: 'remove_active_buff' })]),
-        campaignName
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: ps.name, targetName: ps.name, effects: expect.arrayContaining([expect.objectContaining({ type: 'remove_active_buff' })]), campaignName });
     });
 
     it('removes speed_zero from activeConditions when deactivating', async () => {

@@ -41,9 +41,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     );
 
     if (!wasActive) {
-        addExpiration(playerName, playerName, [
+        addExpiration({ attackerName: playerName, targetName: playerName, effects: [
             { type: 'remove_active_buff', buffName }
-        ], campaignName, undefined, playerName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
         const cs = await getCombatContext(campaignName);
         if (cs) {

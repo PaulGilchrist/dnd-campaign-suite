@@ -178,10 +178,10 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
                 await applyFrightenedToCreature(creature.name, saveDc, campaignName);
                 auraTargets.push(creature.name);
 
-                addExpiration(playerName, creature.name, [
+                addExpiration({ attackerName: playerName, targetName: creature.name, effects: [
                     { type: 'frightened', condition: 'frightened' },
                     { type: 'avenging_angel_aura' },
-                ], campaignName);
+                ], campaignName });
             }
 
             npcResults.push({ targetName: creature.name, success, roll: roll1, total, saveBonus });
@@ -197,10 +197,10 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
                 if (result.success === false) {
                     applyFrightenedToCreature(creature.name, saveDc, campaignName);
 
-                    addExpiration(playerName, creature.name, [
+                    addExpiration({ attackerName: playerName, targetName: creature.name, effects: [
                         { type: 'frightened', condition: 'frightened' },
                         { type: 'avenging_angel_aura' },
-                    ], campaignName);
+                    ], campaignName });
 
                     const currentTargets = getRuntimeValue(playerName, AVENGING_ANGEL_AURA_KEY, campaignName) || [];
                     const newTargets = currentTargets.includes(creature.name)

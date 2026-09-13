@@ -32,9 +32,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     setRuntimeValue('campaign', 'targetEffects', allTargetEffects, campaignName);
 
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
 
     addEntry(campaignName, {
         type: 'condition',

@@ -278,15 +278,10 @@ describe('resilientSphereHandler', () => {
 
         await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-          casterName,
-          targetName,
-          expect.arrayContaining([
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName, effects: expect.arrayContaining([
             { type: 'remove_active_buff', buffName: 'Resilient Sphere', effect: 'resilient_sphere' },
             { type: 'remove_target_effect', effectKey: 'resilient_sphere', target: targetName, source: casterName },
-          ]),
-          campaignName,
-        );
+          ]), campaignName });
       });
 
       it('uses custom duration from automation config', async () => {
@@ -343,14 +338,9 @@ describe('resilientSphereHandler', () => {
 
         await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-          casterName,
-          targetName,
-          expect.arrayContaining([
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName, effects: expect.arrayContaining([
             expect.objectContaining({ type: 'remove_target_effect', effectKey: 'resilient_sphere' }),
-          ]),
-          campaignName,
-        );
+          ]), campaignName });
       });
     });
 

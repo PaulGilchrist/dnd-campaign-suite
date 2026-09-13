@@ -47,7 +47,6 @@ import * as expirations from '../../../rules/effects/expirations.js';
 // ── Helpers ────────────────────────────────────────────────────
 
 const campaignName = 'test-campaign';
-const mapName = 'test-map';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -88,10 +87,13 @@ describe('massFearHandler.resolveMassFear - popup summary', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    const result = await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 14, saveType: 'WIS', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    const result = await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
@@ -123,10 +125,13 @@ describe('massFearHandler.resolveMassFear - popup summary', () => {
       };
     });
 
-    const result = await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 14, saveType: 'WIS', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    const result = await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('1 creature(s) affected');
@@ -142,10 +147,13 @@ describe('massFearHandler.resolveMassFear - popup summary', () => {
       return { promptId: 'mass-fear-prompt', promise: Promise.resolve({ success: true }) };
     });
 
-    const result = await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 14, saveType: 'WIS', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    const result = await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(result.payload.description).toContain('No creatures affected');
   });
@@ -157,10 +165,13 @@ describe('massFearHandler.resolveMassFear - popup summary', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 14, saveType: 'WIS', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     const summaryCalls = logService.addEntry.mock.calls.filter(
       call => call[1]?.type === 'ability_use' && call[1]?.description?.includes('creature(s)'),
@@ -175,10 +186,13 @@ describe('massFearHandler.resolveMassFear - popup summary', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    const result = await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 14, saveType: 'WIS', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    const result = await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
@@ -206,10 +220,13 @@ describe('massFearHandler.resolveMassFear - option defaults', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 'ability', saveAbility: 'CON', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 'ability', saveAbility: 'CON', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(savePrompt.buildSaveDc).toHaveBeenCalledWith(
       expect.objectContaining({ saveDc: 'ability', saveAbility: 'CON' }),
@@ -224,10 +241,13 @@ describe('massFearHandler.resolveMassFear - option defaults', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 'ability', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 'ability', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(savePrompt.buildSaveDc).toHaveBeenCalledWith(
       expect.objectContaining({ saveDc: 'ability', saveAbility: 'WIS' }),
@@ -242,10 +262,13 @@ describe('massFearHandler.resolveMassFear - option defaults', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 'ability' }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 'ability' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(savePrompt.buildSaveDc).toHaveBeenCalledWith(
       expect.objectContaining({ saveAbility: 'WIS' }),
@@ -260,10 +283,13 @@ describe('massFearHandler.resolveMassFear - option defaults', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveAbility: 'CON' }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveAbility: 'CON' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(savePrompt.buildSaveDc).toHaveBeenCalledWith(
       expect.objectContaining({ saveAbility: 'CON' }),
@@ -278,10 +304,13 @@ describe('massFearHandler.resolveMassFear - option defaults', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 14, saveType: 'WIS', condition: 'charmed', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 14, saveType: 'WIS', condition: 'charmed', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
       type: 'ability_use',
@@ -299,10 +328,13 @@ describe('massFearHandler.resolveMassFear - option defaults', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 14, saveType: 'WIS', range: '20_ft' }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
+          playerStats: makePlayerStats(),
+      });
 
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
       type: 'ability_use',
@@ -337,10 +369,13 @@ describe('massFearHandler.resolveMassFear - edge cases', () => {
     const mockFn = vi.fn().mockResolvedValue(true);
     rangeCheck.isWithinRange.mockImplementation(mockFn);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 13, range: '' }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 13, range: '' },
+          playerStats: makePlayerStats(),
+      });
 
     // '' || '10_ft' → '10_ft' → parseInt('10', 10) = 10
     expect(mockFn).toHaveBeenCalledWith('Goblin', 'Orc', 10);
@@ -353,10 +388,13 @@ describe('massFearHandler.resolveMassFear - edge cases', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      {}, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: {},
+          playerStats: makePlayerStats(),
+      });
 
     expect(savePrompt.buildSaveDc).toHaveBeenCalled();
   });
@@ -371,10 +409,13 @@ describe('massFearHandler.resolveMassFear - edge cases', () => {
     const mockFn = vi.fn().mockResolvedValue(true);
     rangeCheck.isWithinRange.mockImplementation(mockFn);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 13 }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 13 },
+          playerStats: makePlayerStats(),
+      });
 
     expect(mockFn).toHaveBeenCalledWith('Goblin', 'Orc', 10);
   });
@@ -385,10 +426,13 @@ describe('massFearHandler.resolveMassFear - edge cases', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    const result = await resolveMassFear(
-      campaignName, 'TestCaster', null,
-      { saveDc: 13 }, makePlayerStats(), mapName,
-    );
+    const result = await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: null,
+          option: { saveDc: 13 },
+          playerStats: makePlayerStats(),
+      });
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toBe('No targets in range.');
@@ -400,10 +444,13 @@ describe('massFearHandler.resolveMassFear - edge cases', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear(
-      campaignName, 'TestCaster', 'Goblin',
-      { saveDc: 13 }, makePlayerStats(), mapName,
-    );
+    await resolveMassFear({
+          campaignName,
+          casterName: 'TestCaster',
+          primaryTargetName: 'Goblin',
+          option: { saveDc: 13 },
+          playerStats: makePlayerStats(),
+      });
 
     expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
     expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {

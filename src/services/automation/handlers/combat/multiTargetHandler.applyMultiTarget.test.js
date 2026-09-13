@@ -285,7 +285,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
           metaCtx,
       });
 
-      expect(applyDamageToTarget).toHaveBeenCalledWith(cs, 'Orc', 20, ['cold'], campaignName, null, { ignoreResistance: false, attackerName: 'TestHero' });
+      expect(applyDamageToTarget).toHaveBeenCalledWith(cs, 'Orc', 20, ['cold'], { campaignName, characters: null, ignoreResistance: false, attackerName: 'TestHero' });
       expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestHero', campaignName);
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'hp_change',
@@ -389,7 +389,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
           metaCtx,
       });
 
-      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 15, ['fire'], campaignName, null, { ignoreResistance: false, attackerName: 'TestHero' });
+      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 15, ['fire'], { campaignName, characters: null, ignoreResistance: false, attackerName: 'TestHero' });
     });
 
     it('should not apply damage when applyDamageToTarget returns null', async () => {
@@ -461,7 +461,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
           metaCtx,
       });
 
-      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 10, [''], campaignName, null, { ignoreResistance: false, attackerName: 'TestHero' });
+      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 10, [''], { campaignName, characters: null, ignoreResistance: false, attackerName: 'TestHero' });
     });
   });
 

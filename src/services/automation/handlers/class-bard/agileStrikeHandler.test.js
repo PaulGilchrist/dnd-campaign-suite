@@ -129,7 +129,7 @@ describe('agileStrikeHandler.handle', () => {
       // DEX(3) + PROF(2) = 5 hit bonus, d20(12) + 5 = 17 >= 15 = HIT
       expect(diceRoller.rollD20).toHaveBeenCalledTimes(1);
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d8');
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 10, ['Bludgeoning'], campaignName, [], { ignoreResistance: false, attackerName: 'Bard' },);
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 10, ['Bludgeoning'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: 'Bard' });
       expect(logService.addEntry).toHaveBeenCalled();
     });
 
@@ -301,7 +301,7 @@ describe('agileStrikeHandler.handle', () => {
       await handle(action, ps, campaignName);
 
       // roll 4 + dex 3 = 7 total damage
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 7, ['Bludgeoning'], expect.any(String), expect.any(Array), { ignoreResistance: expect.any(Boolean), attackerName: 'Bard' },);
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 7, ['Bludgeoning'], { campaignName: expect.any(String), characters: expect.any(Array), ignoreResistance: expect.any(Boolean), attackerName: 'Bard' });
     });
 
     it('uses 0 when Dexterity ability is missing', async () => {
@@ -318,7 +318,7 @@ describe('agileStrikeHandler.handle', () => {
       await handle(action, ps, campaignName);
 
       // roll 4 + dex 0 = 4 total damage
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 4, ['Bludgeoning'], expect.any(String), expect.any(Array), { ignoreResistance: expect.any(Boolean), attackerName: 'Bard' },);
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 4, ['Bludgeoning'], { campaignName: expect.any(String), characters: expect.any(Array), ignoreResistance: expect.any(Boolean), attackerName: 'Bard' });
     });
 
     it('uses 0 when proficiency is missing', async () => {
@@ -352,7 +352,7 @@ describe('agileStrikeHandler.handle', () => {
       await handle(action, ps, campaignName);
 
       // rollExpression returns null, so damageTotal = 0 + 3 = 3
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 3, ['Bludgeoning'], expect.any(String), expect.any(Array), { ignoreResistance: expect.any(Boolean), attackerName: 'Bard' },);
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 3, ['Bludgeoning'], { campaignName: expect.any(String), characters: expect.any(Array), ignoreResistance: expect.any(Boolean), attackerName: 'Bard' });
     });
   });
 

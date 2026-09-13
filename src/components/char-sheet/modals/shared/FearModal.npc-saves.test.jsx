@@ -116,12 +116,7 @@ describe('FearModal NPC saves', () => {
                     expect(conditionCalls[0][2]).toContain('frightened');
                 });
 
-                expect(addExpiration).toHaveBeenCalledWith(
-                    'Wizard1',
-                    'Goblin',
-                    [{ type: 'condition', condition: 'frightened' }],
-                    campaignName,
-                );
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Goblin', effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
 
                 await waitFor(() => {
                     const targetEffectCalls = setRuntimeValue.mock.calls.filter(

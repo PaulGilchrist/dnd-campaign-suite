@@ -68,9 +68,9 @@ export async function applyStoneSkin(action, playerStats, campaignName, targetNa
     setRuntimeValue(targetName, 'activeBuffs', newBuffs, campaignName);
     setRuntimeValue(targetName, STONE_SKIN_KEY, damageTypes, campaignName);
 
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_active_buff', buffName: action.name }
-    ], campaignName);
+    ], campaignName });
 
     const spellSaveDc = playerStats.spellAbilities?.saveDc || 8 + playerStats.proficiency;
     const combatSummary = getCombatSummary(campaignName);

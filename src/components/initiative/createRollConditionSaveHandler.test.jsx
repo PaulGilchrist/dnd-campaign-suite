@@ -155,10 +155,10 @@ describe('createRollConditionSaveHandler', () => {
                 mapName: 'test-map',
                 getName: expect.any(Function),
             });
-            expect(removeCondition).toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'blinded', label: 'Blinded', dc: 10, ability: 'con' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
+            expect(removeCondition).toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'blinded', label: 'Blinded', dc: 10, ability: 'con' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
             expect(storage.set).toHaveBeenCalledWith('combatSummary', mockCombatSummary, 'test-campaign');
             expect(mockSetCombatSummary).toHaveBeenCalled();
             expect(buildConditionPopup).toHaveBeenCalled();
@@ -249,10 +249,10 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'charmed', label: 'Charmed', dc: 15, ability: 'wis' });
 
-            expect(removeCondition).toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'speed_zero' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
+            expect(removeCondition).toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'speed_zero' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign', 'targetEffects', expect.any(Array), 'test-campaign'
             );
@@ -306,14 +306,14 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'prone', label: 'Prone', dc: 10, ability: 'wis' });
 
-            expect(removeCondition).toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'prone' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
-            expect(removeCondition).toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'incapacitated' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
+            expect(removeCondition).toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'prone' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
+            expect(removeCondition).toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'incapacitated' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign', 'targetEffects', expect.any(Array), 'test-campaign'
             );
@@ -347,14 +347,14 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'incapacitated', label: 'Incapacitated', dc: 10, ability: 'wis' });
 
-            expect(removeCondition).toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'prone' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
-            expect(removeCondition).toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'incapacitated' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
+            expect(removeCondition).toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'prone' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
+            expect(removeCondition).toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'incapacitated' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign', 'targetEffects', expect.any(Array), 'test-campaign'
             );
@@ -366,10 +366,10 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'prone', label: 'Prone', dc: 10, ability: 'wis' });
 
-            expect(removeCondition).not.toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'incapacitated' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
+            expect(removeCondition).not.toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'incapacitated' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
         });
     });
 
@@ -389,14 +389,14 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'confused', label: 'Confused', dc: 15, ability: 'wis' });
 
-            expect(removeCondition).toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'charmed' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
-            expect(removeCondition).toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'speed_zero' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
+            expect(removeCondition).toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'charmed' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
+            expect(removeCondition).toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'speed_zero' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign', 'targetEffects', expect.any(Array), 'test-campaign'
             );
@@ -424,10 +424,10 @@ describe('createRollConditionSaveHandler', () => {
 
             await handler('Alice', { key: 'confused', label: 'Confused', dc: 15, ability: 'wis' });
 
-            expect(removeCondition).not.toHaveBeenCalledWith(
-                mockCombatSummary, 'Alice', { key: 'charmed' },
-                expect.any(Function), expect.any(Function), 'test-campaign'
-            );
+            expect(removeCondition).not.toHaveBeenCalledWith({
+                combatSummary: mockCombatSummary, creatureName: 'Alice', condition: { key: 'charmed' },
+                getRuntimeValue: expect.any(Function), setRuntimeValue: expect.any(Function), campaignName: 'test-campaign',
+            });
         });
     });
 

@@ -175,7 +175,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
     const slotLevel = resolveMassHealSlotLevel(metaCtx, spell);
     const totalPool = resolveTotalPool(spell, slotLevel);
     let remainingPool = totalPool;
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
     if (bonusHeal > 0) {
         remainingPool += bonusHeal * targets.length;
     }

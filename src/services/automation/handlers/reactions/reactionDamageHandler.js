@@ -225,7 +225,7 @@ async function applyFailDamage({ auto, action, playerStats, campaignName, target
 
     const cs = await getCombatContext(campaignName);
     if (cs) {
-        await applyDamageToTarget(cs, targetName, damageResult.total, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
+        await applyDamageToTarget(cs, targetName, damageResult.total, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name });
     } else {
         console.error('[reactionDamage] No combat context — damage not applied:', { actionName: action.name, targetName });
     }
@@ -471,7 +471,7 @@ async function handleThoughtShield(action, playerStats, campaignName) {
     // warlock actually took, so ignoreResistance=true ("same amount" — RAW).
     const reflectedDamage = actualWarlockDamage;
     const characters = cs.creatures.filter(c => c.type === 'player');
-    const applyResult = await applyDamageToTarget(cs, attackerCreatureName, reflectedDamage, ['Psychic'], campaignName, characters, { ignoreResistance: true, attackerName: warlockName });
+    const applyResult = await applyDamageToTarget(cs, attackerCreatureName, reflectedDamage, ['Psychic'], { campaignName, characters: characters, ignoreResistance: true, attackerName: warlockName });
 
     if (!applyResult) {
         console.error('[thoughtShield] applyDamageToTarget failed — reflected damage not applied:', { warlockName, attackerCreatureName, reflectedDamage });
@@ -615,7 +615,7 @@ async function handleEnergyRedirection(action, playerStats, campaignName) {
                 const damageOnSave = computeDamageAfterSave(redirectDamage, saveResult.success, null);
                 if (damageOnSave > 0) {
                     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-                    await applyDamageToTarget(cs, targetName, damageOnSave, [matchingTypes[0]], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+                    await applyDamageToTarget(cs, targetName, damageOnSave, [matchingTypes[0]], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
                 }
 
                 await addEntry(campaignName, {

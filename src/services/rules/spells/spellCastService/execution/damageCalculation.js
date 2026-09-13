@@ -90,7 +90,7 @@ function computeRadiantSoul(spell, playerStats, campaignName, getRuntimeValue, e
     return finalFormula;
 }
 
-function computeOverchannel(spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, baseFormula) {
+function computeOverchannel({ spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, baseFormula }) {
     let overchannelFormula = baseFormula;
     let overchannelActive = false;
     let overchannelUseCount = 0;

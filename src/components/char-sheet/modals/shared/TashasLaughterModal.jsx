@@ -113,11 +113,11 @@ function TashasLaughterModal({
             },
         }, campaignName);
 
-        addExpiration(casterName, targetName, [
+        addExpiration({ attackerName: casterName, targetName, effects: [
             { type: 'condition', condition: 'prone' },
             { type: 'condition', condition: 'incapacitated' },
             { type: 'tashas_laughter_expiration' },
-        ], campaignName);
+        ], campaignName });
 
         const allTargetEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];
         const existingIndex = allTargetEffects.findIndex(

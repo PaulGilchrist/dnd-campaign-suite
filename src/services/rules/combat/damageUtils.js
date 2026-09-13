@@ -85,6 +85,13 @@ function computeAbilityBonus(character, abilityName) {
   return Math.floor((ab.baseScore - 10) / 2);
 }
 
+function armorAcContribution(item, dexBonus) {
+  const base = item.armor_class?.base || 0;
+  if (!item.armor_class?.dex_bonus) return base;
+  const maxBonus = item.armor_class.max_bonus != null ? item.armor_class.max_bonus : 99;
+  return base + Math.min(dexBonus, maxBonus);
+}
+
 export async function computePlayerAc(character) {
   if (!character) return 10;
   const equipment = await loadEquipment();
@@ -104,13 +111,7 @@ export async function computePlayerAc(character) {
     if (!item) continue;
 
     if (item.equipment_category === 'Armor') {
-      const base = item.armor_class?.base || 0;
-      if (item.armor_class?.dex_bonus) {
-        const maxBonus = item.armor_class.max_bonus != null ? item.armor_class.max_bonus : 99;
-        ac = base + Math.min(dexBonus, maxBonus);
-      } else {
-        ac = base;
-      }
+      ac = armorAcContribution(item, dexBonus);
       hasArmor = true;
     } else if (item.equipment_category === 'Shield') {
       ac += 2;

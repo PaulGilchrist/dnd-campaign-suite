@@ -73,7 +73,7 @@ export function createMassHealHandler(config) {
         }
 
         const maximize = hasHealingMaximization(playerStats);
-        const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+        const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
 
         const combatSummary = await getCombatContext(campaignName);
         if (!combatSummary) return null;

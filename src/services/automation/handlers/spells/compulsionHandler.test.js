@@ -438,12 +438,7 @@ describe('compulsionHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]),
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]), campaignName });
     });
 
     it('posts condition log entry with full note', async () => {

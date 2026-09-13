@@ -163,7 +163,7 @@ export function resolveHealingBonuses(playerStats, prof, level, slotLevel, campa
     return totalBonus;
 }
 
-export function resolveHealingBonusesWithDetails(playerStats, prof, level, slotLevel, campaignName, targetStats) {
+export function resolveHealingBonusesWithDetails(playerStats, { prof, level, slotLevel, campaignName, targetStats }) {
     const passives = playerStats.automation?.passives || [];
     let totalBonus = 0;
     const details = [];

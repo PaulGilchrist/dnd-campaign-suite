@@ -16,7 +16,7 @@ function registerHypnoticConcentration(combatSummary, casterName, playerStats, c
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-async function applyHypnoticPatternCharm(campaignName, casterName, targetName, dc, saveResult, results) {
+async function applyHypnoticPatternCharm({ campaignName, casterName, targetName, saveResult, results }) {
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     const filtered = conditions.filter(c =>
@@ -45,11 +45,11 @@ async function applyHypnoticPatternCharm(campaignName, casterName, targetName, d
         timestamp: Date.now(),
     }).catch((e) => { console.error("[hypnoticPattern] Error:", e); });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
         { type: 'incapacitated', condition: 'incapacitated' },
         { type: 'speed_zero', condition: 'speed_zero' },
-    ], campaignName);
+    ], campaignName });
 
     results.push(`${targetName} is Charmed, Incapacitated, and has Speed 0.`);
 }
@@ -136,7 +136,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }).catch((e) => { console.error("[hypnoticPattern] Error:", e); });
         } else {
             affectedCount++;
-            await applyHypnoticPatternCharm(campaignName, casterName, targetName, dc, saveResult, results);
+            await applyHypnoticPatternCharm({ campaignName, casterName, targetName, saveResult, results });
         }
     }
 

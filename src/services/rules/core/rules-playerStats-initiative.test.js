@@ -226,7 +226,7 @@ describe('rules.getPlayerStats - initiative', () => {
 
   it('should set initiative from Dexterity bonus', async () => {
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.initiative).toBe(2);
   });
 
@@ -242,7 +242,7 @@ describe('rules.getPlayerStats - initiative', () => {
       ],
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.initiative).toBe(4);
   });
 
@@ -259,7 +259,7 @@ describe('rules.getPlayerStats - initiative', () => {
       automation: { passives: [{ type: 'passive_rule', effect: 'dread_ambush_initiative' }] },
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.initiative).toBe(5);
   });
 
@@ -269,7 +269,7 @@ describe('rules.getPlayerStats - initiative', () => {
     });
     vi.mocked(automationService.evaluateAutoExpression).mockReturnValue(2);
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.initiative).toBe(4);
   });
 
@@ -283,7 +283,7 @@ describe('rules.getPlayerStats - initiative', () => {
       automation: { passives: [{ type: passiveType, effect }] },
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result[flag]).toBe(true);
   });
 });

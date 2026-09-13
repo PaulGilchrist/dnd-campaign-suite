@@ -345,14 +345,7 @@ describe('cloakOfShadowsHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), campaignName);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'TestMonk',
-                'TestMonk',
-                [{ type: 'condition', condition: 'invisible' }],
-                campaignName,
-                undefined,
-                'TestMonk',
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestMonk', targetName: 'TestMonk', effects: [{ type: 'condition', condition: 'invisible' }], campaignName, rounds: undefined, expireOnCreatureName: 'TestMonk' });
         });
 
         it('logs activation to campaign log', async () => {

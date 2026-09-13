@@ -335,7 +335,7 @@ export function createSaves(deps) {
         finalDamage = await adjustQuickRollCantripDamage(finalDamage, pending, saveResult, campaignName, characterName);
         const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
         const allCharacters = charactersRef.current || [];
-        const applyResult = await applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, allCharacters, { ignoreResistance: ignoreResistance, attackerName: pending.attackerName || characterName });
+        const applyResult = await applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], { campaignName, characters: allCharacters, ignoreResistance: ignoreResistance, attackerName: pending.attackerName || characterName });
 
         storage.set('combatSummary', combatSummary, campaignName);
 

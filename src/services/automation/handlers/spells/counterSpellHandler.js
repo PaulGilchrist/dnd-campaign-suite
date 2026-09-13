@@ -14,7 +14,7 @@ function looksLikeSpellAttack(attackEvent) {
 
 // CLA-322: reaction-spent round latch check + slot refund. Returns a refusal
 // popup when this round's Reaction is spent, null otherwise.
-function counterspellRoundRefusal(playerName, featureName, auto, action, campaignName, currentRound) {
+function counterspellRoundRefusal({ playerName, featureName, auto, action, campaignName, currentRound }) {
     const usedRoundKey = '_Counterspell_usedRound';
     const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
     if (usedRound !== currentRound) return null;
@@ -64,7 +64,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // CLA-322: reaction-spent round latch (CLA-297 house pattern, stamped on
     // playerStats.name) — a used Counterspell must not re-trigger repeatedly
     // against the same lastAttack; re-arms when the round advances.
-    const refusal = counterspellRoundRefusal(playerName, featureName, auto, action, campaignName, cs.round || 1);
+    const refusal = counterspellRoundRefusal({ playerName, featureName, auto, action, campaignName, currentRound: cs.round || 1 });
     if (refusal) return refusal;
     setRuntimeValue(playerName, '_Counterspell_usedRound', cs.round || 1, campaignName);
 

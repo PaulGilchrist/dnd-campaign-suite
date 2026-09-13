@@ -167,7 +167,7 @@ export const shieldBash = {
   },
 };
 
-export async function applyShieldBashEffect(action, playerStats, campaignName, targetName, chosenOption, saveDc) {
+export async function applyShieldBashEffect({ action, playerStats, campaignName, targetName, chosenOption, saveDc }) {
   const auto = action.automation || {};
   const effs = getRuntimeValue('campaign', 'targetEffects') || [];
   const storedEffects = [...effs];

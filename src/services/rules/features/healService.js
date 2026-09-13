@@ -116,7 +116,7 @@ export async function triggerHeal(spell, { targetName }, playerStats, campaignNa
     const healAtSlotLevel = spell.heal_at_slot_level;
     const baseHeal = resolveHealBaseAmount(spell, slotLevel);
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
     const healAmount = baseHeal + bonusHeal;
 
     const { maxHp, currentHp } = resolveTargetHpBounds(targetName, creature, campaignName);

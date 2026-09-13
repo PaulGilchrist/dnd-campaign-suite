@@ -68,12 +68,7 @@ describe('bladeWardHandler.handle', () => {
         { type: 'buff', duration: '1 minute', effect: 'blade_ward' },
         CAMPAIGN_NAME
       );
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        ps.name,
-        ps.name,
-        [{ type: 'remove_active_buff', buffName: action.name }],
-        CAMPAIGN_NAME
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: ps.name, targetName: ps.name, effects: [{ type: 'remove_active_buff', buffName: action.name }], campaignName: CAMPAIGN_NAME });
       expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects');
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'campaign',

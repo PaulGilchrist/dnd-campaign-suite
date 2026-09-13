@@ -6,7 +6,7 @@ import { applyProtectionFromEnergyHandler } from '../../../services/automation/i
 import { applyResistanceEffect } from '../../../services/automation/index.js'
 import { isFreeCastAuthorized, prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js'
 
-export function useTwoStageHandlers(playerStats, campaignName, cfClearPending, getPending, setPopupHtml, _characters) {
+export function useTwoStageHandlers({ playerStats, campaignName, cfClearPending, getPending, setPopupHtml }) {
   const [resistanceStage, setResistanceStage] = React.useState(null)
   const [resistanceSelectedTargets, setResistanceSelectedTargets] = React.useState([])
   const [protectionFromEnergyStage, setProtectionFromEnergyStage] = React.useState(null)

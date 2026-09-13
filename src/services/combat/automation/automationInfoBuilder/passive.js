@@ -1,4 +1,4 @@
-function buildPassiveBuffBase(auto) {
+function buildPassiveBuffTargeting(auto) {
     return {
         target: auto.target || 'allies_in_range',
         range_expression: auto.range_expression || '10_ft',
@@ -6,6 +6,11 @@ function buildPassiveBuffBase(auto) {
         bonus: auto.bonus ?? undefined,
         condition: auto.condition || '',
         conditionImmunity: auto.conditionImmunity || '',
+    }
+}
+
+function buildPassiveBuffModifications(auto) {
+    return {
         resistances: auto.resistances || [],
         options: auto.options || [],
         extraMastery: auto.extraMastery || [],
@@ -16,6 +21,13 @@ function buildPassiveBuffBase(auto) {
         validTypes: auto.validTypes || [],
         amount: auto.amount || 0,
         alsoSelfHealing: auto.alsoSelfHealing || null,
+    }
+}
+
+function buildPassiveBuffBase(auto) {
+    return {
+        ...buildPassiveBuffTargeting(auto),
+        ...buildPassiveBuffModifications(auto),
     }
 }
 

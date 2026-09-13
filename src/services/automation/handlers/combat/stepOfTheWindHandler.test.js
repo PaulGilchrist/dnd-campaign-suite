@@ -122,14 +122,7 @@ describe('stepOfTheWindHandler — FP upgrade (spend 1 FP → Disengage + Dash)'
         const action = makeAction({ name: 'Heightened Step of the Wind' });
         await handle(action, makePlayerStats(), campaignName);
 
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-            'TestMonk',
-            'TestMonk',
-            [{ type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: 'Heightened Step of the Wind', target: 'TestMonk' }],
-            campaignName,
-            undefined,
-            'TestMonk',
-        );
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestMonk', targetName: 'TestMonk', effects: [{ type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: 'Heightened Step of the Wind', target: 'TestMonk' }], campaignName, rounds: undefined, expireOnCreatureName: 'TestMonk' });
     });
 
     it('dispatches focus-points-updated after spending FP', async () => {

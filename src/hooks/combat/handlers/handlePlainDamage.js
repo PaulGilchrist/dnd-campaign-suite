@@ -72,7 +72,7 @@ async function rollAndApplySecondaryDamage({ combatSummary, target, context, sec
     const secondaryTotal = computeGwfAdjustedSecondaryTotal(secondaryRollResult, context?.playerStats, secondaryDamageType);
     const secondaryRawDamage = secondaryTotal;
     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
-    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, { ignoreResistance: secondaryIgnoreResistance, attackerName: characterName, suppressHpLog: true, damageSequenceId, skipConcentration: true });
+    const secondaryApplyResultData = await applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], { campaignName, characters: characters, ignoreResistance: secondaryIgnoreResistance, attackerName: characterName, suppressHpLog: true, damageSequenceId, skipConcentration: true });
     const secondaryFinalDamage = secondaryApplyResultData?.finalDamage ?? secondaryRawDamage;
     if (secondaryApplyResultData && secondaryApplyResultData.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -92,7 +92,7 @@ async function rollAndApplySecondaryDamage({ combatSummary, target, context, sec
 
 async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name }) {
     if (!context?.autoDamageSecondaryFormula) {
-        const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true });
+        const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true });
         return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult: null, secondaryFinalDamage: 0 };
     }
     const secondaryFormula = context.autoDamageSecondaryFormula;
@@ -103,7 +103,7 @@ async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target
     if (!secondaryOutcome) return { applyResult: null, secondaryResult: null, secondaryFinalDamage: 0 };
 
     const totalConcentrationDamage = reducedTotal + secondaryOutcome.secondaryResult.total;
-    const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true, damageSequenceId, concentrationTotalDamage: totalConcentrationDamage });
+    const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true, damageSequenceId, concentrationTotalDamage: totalConcentrationDamage });
     clearReTriggeredSequence(damageSequenceId);
     return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult: secondaryOutcome.secondaryResult, secondaryFinalDamage: secondaryOutcome.secondaryFinalDamage };
 }
@@ -164,7 +164,7 @@ async function resolveDeathStrike({ applyResult, context, combatSummary, target,
                 note: 'death_strike_damage_roll_before_apply',
             });
 
-            dsApplyResult = await applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance || false, attackerName: characterName });
+            dsApplyResult = await applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance || false, attackerName: characterName });
             if (!applyResult) {
                 applyResult = dsApplyResult;
             }
@@ -250,7 +250,7 @@ function resolveWeaponTypeFlags(context) {
     return { isUnarmedStrike, isMelee };
 }
 
-function attachSavageAttackerFlag(popupData, context, characterName, campaignName, isMelee, isUnarmedStrike) {
+function attachSavageAttackerFlag(popupData, context, characterName, campaignName, { isMelee, isUnarmedStrike }) {
     // Check for Savage Attacker availability
     const hasSavageAttacker = context?.playerStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'reroll_damage_once_per_turn') || false;
     const isMeleeOrUnarmed = (isMelee || isUnarmedStrike);
@@ -263,7 +263,7 @@ function attachPopupFeatureFlags(popupData, context, characterName, campaignName
     attachPiercerFlag(popupData, context, characterName, campaignName);
     const { isUnarmedStrike, isMelee } = resolveWeaponTypeFlags(context);
     popupData.weaponType = isUnarmedStrike ? 'unarmed' : (isMelee ? 'melee' : 'ranged');
-    attachSavageAttackerFlag(popupData, context, characterName, campaignName, isMelee, isUnarmedStrike);
+    attachSavageAttackerFlag(popupData, context, characterName, campaignName, { isMelee, isUnarmedStrike });
 }
 
 async function applyDamageForTarget({ context, target, combatSummary, characters, campaignName, characterName, attackerName, damageType, adjustedTotal, name }) {
@@ -402,7 +402,7 @@ async function handleTwinPlainTarget({ combatSummary, context, target, campaignN
         gwfDisplayRolls: gwfDisplayRolls,
     });
 
-    const twinApplyResult = await applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: characterName });
+    const twinApplyResult = await applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: characterName });
 
     if (twinApplyResult && twinApplyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -440,7 +440,7 @@ async function handleMultiPlainTarget({ combatSummary, context, target, campaign
         gwfDisplayRolls: gwfDisplayRolls,
     });
 
-    const multiApplyResult = await applyDamageToTarget(combatSummary, multiTarget.name, adjustedTotal, [damageType], campaignName, null, { ignoreResistance: false, attackerName: characterName });
+    const multiApplyResult = await applyDamageToTarget(combatSummary, multiTarget.name, adjustedTotal, [damageType], { campaignName, characters: null, ignoreResistance: false, attackerName: characterName });
 
     setPopupHtml(prev => ({
         ...prev,

@@ -114,9 +114,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             })
             .catch((e) => { console.error("[postCastRider] addEntry Error:", e); });
 
-            addExpiration(playerStats.name, targetName, [
+            addExpiration({ attackerName: playerStats.name, targetName, effects: [
                 { type: 'condition', condition: appliedCondition }
-            ], campaignName);
+            ], campaignName });
 
         }
         window.removeEventListener('save-result', handleSaveResult);

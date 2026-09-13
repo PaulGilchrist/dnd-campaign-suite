@@ -135,14 +135,14 @@ async function undoHitDamage(cs, lastAttack, campaignName) {
 }
 
 // Miss→Hit reversal: roll and apply the original damage formula.
-async function applyNewHitDamage(cs, action, lastAttack, playerName, attackerName, campaignName) {
+async function applyNewHitDamage({ cs, action, lastAttack, playerName, attackerName, campaignName }) {
     let outcomeNote = ' → The attack now hits!';
     const damageFormula = lastAttack.damageFormula;
     if (damageFormula) {
         const dmgResult = rollExpression(damageFormula);
         if (dmgResult && dmgResult.total > 0) {
             const characters = [action._playerStats || { name: playerName }];
-            const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, dmgResult.total, [lastAttack.damageType || 'unknown'], campaignName, characters, { ignoreResistance: false, attackerName: attackerName });
+            const appliedDmg = applyDamageToTarget(cs, lastAttack.targetName, dmgResult.total, [lastAttack.damageType || 'unknown'], { campaignName, characters: characters, ignoreResistance: false, attackerName: attackerName });
             if (appliedDmg) {
                 outcomeNote += ` Rolled ${appliedDmg.finalDamage} damage.`;
             }
@@ -176,7 +176,7 @@ async function shiftAttackOutcome({ action, cs, lastAttack, playerName, attacker
     await setRuntimeValue('campaign', 'lastAttack', updatedLastAttack, campaignName);
 
     if (oldHit && !newHit) return await undoHitDamage(cs, lastAttack, campaignName);
-    if (!oldHit && newHit) return await applyNewHitDamage(cs, action, lastAttack, playerName, attackerName, campaignName);
+    if (!oldHit && newHit) return await applyNewHitDamage({ cs, action, lastAttack, playerName, attackerName, campaignName });
     return attackOutcomeTail(oldHit, newHit);
 }
 
@@ -346,7 +346,7 @@ export async function applyD20Modifier({ action, playerName, campaignName, diceV
     return infoPopup(featureName, description, auto);
 }
 
-export async function applyBendFateChoice(action, playerStats, campaignName, d4Roll, lastAttack, mode) {
+export async function applyBendFateChoice({ action, playerStats, campaignName, d4Roll, lastAttack, mode }) {
     const playerName = playerStats.name;
     const d4Value = typeof d4Roll === 'object' ? d4Roll.total : d4Roll;
     action._playerStats = playerStats;
@@ -430,9 +430,9 @@ async function handleAcBonus(action, playerStats, campaignName) {
     }
 
     // Set expiration — auto-removes at start of next turn
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_active_buff', buffName }
-    ], campaignName, undefined, playerName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
     // Check if hit would become miss
     const description = await resolveAcBonusMissDescription(buffName, attackResult, prof, campaignName, playerName);
@@ -481,9 +481,9 @@ async function handleUnbreakableMajesty(action, playerStats, campaignName) {
     setRuntimeValue(playerName, 'unbreakableMajestySaveDc', saveDc, campaignName);
 
     const durationRounds = parseDurationRounds(auto.duration) || 10;
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'unbreakable_majesty' }
-    ], campaignName, durationRounds);
+    ], campaignName, rounds: durationRounds });
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -717,13 +717,13 @@ function stampInspiringMovementAlly(allyName, noOAs, playerStats, campaignName) 
     setRuntimeValue(allyName, 'inspiringMovementGranted', true, campaignName);
     if (noOAs) {
         setRuntimeValue(allyName, 'inspiringMovementNoOA', true, campaignName);
-        addExpiration(playerStats.name, allyName, [
+        addExpiration({ attackerName: playerStats.name, targetName: allyName, effects: [
             { type: 'inspiring_movement_no_oa' }
-        ], campaignName, undefined, playerStats.name);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
     }
-    addExpiration(playerStats.name, allyName, [
+    addExpiration({ attackerName: playerStats.name, targetName: allyName, effects: [
         { type: 'inspiring_movement_granted' }
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
 }
 
 // Agile Strikes is an enemy-hit-triggered unarmed strike — only chain it
@@ -755,16 +755,16 @@ async function appendAgileStrikes(description, playerStats, campaignName) {
     return description;
 }
 
-export async function applyInspiringMovement(action, playerStats, campaignName, allyName, halfSpeed, noOAs) {
+export async function applyInspiringMovement({ action, playerStats, campaignName, allyName, halfSpeed, noOAs }) {
     const auto = action.automation;
     const { usesMax, usesKey } = resolveInspiringMovementUses(auto, playerStats);
 
     const expenditureNote = await consumeInspiringMovementUse(usesMax, usesKey, playerStats, campaignName);
 
     setRuntimeValue(playerStats.name, 'inspiringMovementNoOA', true, campaignName);
-    addExpiration(playerStats.name, playerStats.name, [
+    addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
         { type: 'inspiring_movement_no_oa' }
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
 
     stampInspiringMovementAlly(allyName, noOAs, playerStats, campaignName);
 

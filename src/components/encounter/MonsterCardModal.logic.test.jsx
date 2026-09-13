@@ -316,12 +316,7 @@ describe('MonsterCardModal - handleDamage: critical-hit popup', () => {
     clickDiceLink('1d6+2');
     expect(useLoggedDiceRoll._setPopupHtml).toHaveBeenCalledWith(null);
     expect(rollDamage).toHaveBeenCalledWith(
-      'Club',
-      '1d6+2',
-      10,
-      expect.any(Array),
-      0,
-      expect.anything()
+      { name: 'Club', formula: '1d6+2', total: 10, rolls: expect.any(Array), modifier: 0, context: expect.anything() }
     );
   });
 });

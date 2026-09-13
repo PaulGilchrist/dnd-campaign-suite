@@ -121,9 +121,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     );
 
     // Consumption happens on activation only; toggling OFF does not refund the use.
-    const usesAfterActivation = await consumeBuffUse(usesKey, usesRemaining, wasActive, playerStats, action, campaignName);
+    const usesAfterActivation = await consumeBuffUse({ usesKey, usesRemaining, wasActive, playerStats, action, campaignName });
 
-    await applyGenericBuffSideEffects(action, auto, playerStats, targetName, campaignName, wasActive);
+    await applyGenericBuffSideEffects({ action, auto, playerStats, targetName, campaignName, wasActive });
 
     return buildBuffTogglePopup({ action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation });
 }
@@ -132,12 +132,12 @@ async function gateTrackedBuffUses(action, auto, playerStats, campaignName) {
     if (auto?.uses == null && auto?.usesMax == null) return {};
     const usesMax = resolveBuffUsesMax(auto, playerStats);
     const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-    const gate = await gateBuffUses(action, auto, playerStats, campaignName, usesMax, usesKey);
+    const gate = await gateBuffUses({ action, auto, playerStats, campaignName, usesMax, usesKey });
     if (gate.popup) return { popup: gate.popup };
     return { usesKey, usesRemaining: gate.usesRemaining };
 }
 
-async function consumeBuffUse(usesKey, usesRemaining, wasActive, playerStats, action, campaignName) {
+async function consumeBuffUse({ usesKey, usesRemaining, wasActive, playerStats, action, campaignName }) {
     if (usesKey == null || wasActive) return null;
     const usesAfterActivation = Math.max(0, usesRemaining - 1);
     await setRuntimeValue(playerStats.name, usesKey, usesAfterActivation, campaignName);
@@ -174,7 +174,7 @@ function buildLongRestRechargePopup(action, auto, playerStats, campaignName) {
     };
 }
 
-async function applyGenericBuffSideEffects(action, auto, playerStats, targetName, campaignName, wasActive) {
+async function applyGenericBuffSideEffects({ action, auto, playerStats, targetName, campaignName, wasActive }) {
     if (auto?.effect === 'invisible') {
         applyInvisibilityToggle(targetName, playerStats, campaignName, wasActive);
     }
@@ -324,7 +324,7 @@ function resolveBuffUsesMax(auto, playerStats) {
     return 1;
 }
 
-async function gateBuffUses(action, auto, playerStats, campaignName, usesMax, usesKey) {
+async function gateBuffUses({ action, auto, playerStats, campaignName, usesMax, usesKey }) {
     const storedUses = getRuntimeValue(playerStats.name, usesKey, campaignName);
     const usesRemaining = storedUses != null ? Number(storedUses) : usesMax;
 
@@ -395,9 +395,9 @@ function logSeeInvisibilityToggle(action, playerStats, campaignName, wasActive) 
 
 async function handleHasteToggle(action, playerStats, targetName, campaignName, wasActive) {
     if (!wasActive) {
-        addExpiration(playerStats.name, targetName, [
+        addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'remove_active_buff', buffName: action.name }
-        ], campaignName);
+        ], campaignName });
         return;
     }
     const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
@@ -644,9 +644,9 @@ export async function confirmTelepathicSpeech(action, playerStats, campaignName,
     }
 
     if (!wasActive) {
-        addExpiration(playerName, playerName, [
+        addExpiration({ attackerName: playerName, targetName: playerName, effects: [
             { type: 'remove_active_buff', buffName: featureName }
-        ], campaignName);
+        ], campaignName });
     }
 
     await addEntry(campaignName, {

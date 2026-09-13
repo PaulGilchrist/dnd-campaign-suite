@@ -202,14 +202,14 @@ describe('rules.getPlayerStats - speed bonuses', () => {
   it('should add 5 ft speed for Wood Elf lineage', async () => {
     setupDefaults({ lineage: 'Wood Elf' });
     const playerSummary = makePlayerSummary({ speed: 30 });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.speed).toBe(35);
   });
 
   it('should add speed_bonus when condition allows', async () => {
     setupDefaults({ automation: { passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '15', condition: 'no_heavy_armor' }], actions: [], specialActions: [] } });
     const playerSummary = makePlayerSummary({ speed: 30 });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.speed).toBe(45);
   });
 
@@ -220,7 +220,7 @@ describe('rules.getPlayerStats - speed bonuses', () => {
       inventory: { equipped: ['Plate Armor'], magicItems: [] },
       equipment: [{ name: 'Plate Armor', armor_category: 'Heavy' }],
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.speed).toBe(30);
   });
 });
@@ -237,7 +237,7 @@ describe('rules.getPlayerStats - senses enhancements (5e)', () => {
     vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
     raceRules.getSenses.mockReturnValue(existingSenses);
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toEqual(expectedSenses);
   });
 
@@ -247,7 +247,7 @@ describe('rules.getPlayerStats - senses enhancements (5e)', () => {
       senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Truesight', value: '60 ft.' });
   });
 
@@ -257,7 +257,7 @@ describe('rules.getPlayerStats - senses enhancements (5e)', () => {
       senses: [],
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Truesight', value: '60 ft.' });
   });
 
@@ -267,7 +267,7 @@ describe('rules.getPlayerStats - senses enhancements (5e)', () => {
       senses: [{ name: 'Truesight', value: '30 ft.' }],
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     const truesightCount = result.senses.filter(s => s.name === 'Truesight').length;
     expect(truesightCount).toBe(1);
   });
@@ -278,7 +278,7 @@ describe('rules.getPlayerStats - senses enhancements (5e)', () => {
       senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Blindsight', value: '10 ft.' });
   });
 
@@ -288,7 +288,7 @@ describe('rules.getPlayerStats - senses enhancements (5e)', () => {
       senses: [],
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Blindsight', value: '10 ft.' });
   });
 
@@ -298,7 +298,7 @@ describe('rules.getPlayerStats - senses enhancements (5e)', () => {
       senses: [{ name: 'Blindsight', value: '30 ft.' }],
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     const blindsightCount = result.senses.filter(s => s.name === 'Blindsight').length;
     expect(blindsightCount).toBe(1);
   });
@@ -310,7 +310,7 @@ describe('rules.getPlayerStats - 2024 senses', () => {
   it('should set senses from raceRules.getSenses in 2024 mode', async () => {
     raceRules2024.getSenses.mockReturnValue([{ name: 'Darkvision', value: '120 ft.' }]);
     const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
   });
 
@@ -320,7 +320,7 @@ describe('rules.getPlayerStats - 2024 senses', () => {
       senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
     const playerSummary = makePlayerSummary({ rules: '2024', class: { name: 'Ranger', major: { name: 'Stalker' } } });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
   });
 
@@ -328,7 +328,7 @@ describe('rules.getPlayerStats - 2024 senses', () => {
     vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
     setup2024Defaults({ senses: [{ name: 'Darkvision', value: '60 ft.' }], class: { name: 'Fighter' } });
     const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
   });
 
@@ -338,7 +338,7 @@ describe('rules.getPlayerStats - 2024 senses', () => {
       senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
     const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Truesight', value: '120 ft.' });
   });
 
@@ -348,7 +348,7 @@ describe('rules.getPlayerStats - 2024 senses', () => {
       senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
     const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Blindsight', value: '10 ft.' });
   });
 
@@ -358,7 +358,7 @@ describe('rules.getPlayerStats - 2024 senses', () => {
       senses: [{ name: 'Darkvision', value: '60 ft.' }],
     });
     const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.senses).toContainEqual({ name: 'Blindsight', value: '10 ft.' });
   });
 
@@ -368,7 +368,7 @@ describe('rules.getPlayerStats - 2024 senses', () => {
       senses: [{ name: 'Blindsight', value: '30 ft.' }, { name: 'Darkvision', value: '60 ft.' }],
     });
     const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     const blindsightEntries = result.senses.filter(s => s.name === 'Blindsight');
     expect(blindsightEntries.length).toBe(1);
     expect(blindsightEntries[0].value).toBe('30 ft.');

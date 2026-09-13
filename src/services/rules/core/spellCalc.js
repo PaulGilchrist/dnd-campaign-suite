@@ -275,31 +275,35 @@ function applyClassPreparedRule(spellAbilities, playerStats, spellAbility) {
     }
 }
 
+// Spell Thief: remove spells blocked by other casters from runtime state.
+function removeBlockedThiefSpells(spellAbilities, playerStats) {
+    const casterBlockList = getRuntimeValue(playerStats.name, '_spellThiefCasterBlock');
+    if (!casterBlockList) return;
+    const entries = JSON.parse(casterBlockList);
+    if (!Array.isArray(entries) || entries.length === 0) return;
+    const blockedSpellNames = new Set(entries.map(e => e.spellName).filter(Boolean));
+    spellAbilities.spells = spellAbilities.spells.filter(spell => !blockedSpellNames.has(spell.name));
+}
+
+// Spell Thief: add stolen spells from runtime state.
+function addStolenThiefSpells(spellAbilities, playerStats) {
+    const stolenList = getRuntimeValue(playerStats.name, '_spellThiefStolenList');
+    if (!stolenList) return;
+    const entries = JSON.parse(stolenList);
+    if (!Array.isArray(entries)) return;
+    for (const entry of entries) {
+        const spellName = entry?.spellName;
+        if (!spellName || spellAbilities.spells.find(s => s.name === spellName)) continue;
+        if (spellAbilities.spells_known) spellAbilities.spells_known += 1;
+        spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+    }
+}
+
 // Spell Thief: remove spells stolen by other characters, then add stolen spells from
 // runtime state.
 function applySpellThiefLists(spellAbilities, playerStats) {
-    const casterBlockList = getRuntimeValue(playerStats.name, '_spellThiefCasterBlock');
-    if (casterBlockList) {
-        const entries = JSON.parse(casterBlockList);
-        if (Array.isArray(entries) && entries.length > 0) {
-            const blockedSpellNames = new Set(entries.map(e => e.spellName).filter(Boolean));
-            spellAbilities.spells = spellAbilities.spells.filter(spell => !blockedSpellNames.has(spell.name));
-        }
-    }
-
-    const stolenList = getRuntimeValue(playerStats.name, '_spellThiefStolenList');
-    if (stolenList) {
-        const entries = JSON.parse(stolenList);
-        if (Array.isArray(entries)) {
-            for (const entry of entries) {
-                const spellName = entry?.spellName;
-                if (spellName && !spellAbilities.spells.find(s => s.name === spellName)) {
-                    if (spellAbilities.spells_known) spellAbilities.spells_known += 1;
-                    spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
-                }
-            }
-        }
-    }
+    removeBlockedThiefSpells(spellAbilities, playerStats);
+    addStolenThiefSpells(spellAbilities, playerStats);
 }
 
 // Expand spell rows to full spell details and sort by level then name.

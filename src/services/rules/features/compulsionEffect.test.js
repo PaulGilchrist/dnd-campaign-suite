@@ -386,14 +386,9 @@ describe('compulsionService applyCompulsionEffect', () => {
                 ['Goblin'],
             );
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Wizard',
-                'Goblin',
-                expect.arrayContaining([
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard', targetName: 'Goblin', effects: expect.arrayContaining([
                     expect.objectContaining({ type: 'charmed', condition: 'charmed' }),
-                ]),
-                campaignName,
-            );
+                ]), campaignName });
         });
 
         it('does not call addCondition when save succeeds', async () => {

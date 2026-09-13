@@ -72,7 +72,7 @@ async function activateWrathEmanation(action, auto, playerStats, playerName, cam
     await setRuntimeValue(playerName, 'wrathOfTheSeaActive', true, campaignName);
 
     // CLA-393: register the 10-minute emanation clock (CLA-334 minutes×10).
-    addExpiration(playerName, playerName, [{ type: 'wrath_of_the_sea_end' }], campaignName, wrathRounds(auto));
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [{ type: 'wrath_of_the_sea_end' }], campaignName, rounds: wrathRounds(auto) });
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -101,7 +101,7 @@ async function resolveNpcSaveAndDamage({ action, combatSummary, target, playerNa
     const saveSuccess = saveTotal >= saveDc;
 
     const finalDamage = saveSuccess ? 0 : damageResult.total;
-    const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, ['cold'], campaignName, [playerStats], { ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
+    const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, ['cold'], { campaignName, characters: [playerStats], ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
 
     const actualDamage = applyResult?.finalDamage ?? finalDamage;
     const newHp = applyResult?.newHp ?? target.currentHp;
@@ -212,6 +212,26 @@ function checkWrathTurnGates(action, csFresh, currentRound, playerName, campaign
     return null;
 }
 
+async function resolveWrathActivation({ isAllyAttack, action, auto, playerStats, playerName, campaignName }) {
+    if (isAllyAttack) return undefined;
+    const wrathActive = getRuntimeValue(playerName, 'wrathOfTheSeaActive', campaignName);
+    if (!wrathActive) {
+        return await activateWrathEmanation(action, auto, playerStats, playerName, campaignName);
+    }
+    return undefined;
+}
+
+// CLA-393 gate 3 — emanation containment: the target must be within the
+// Emanation radius of you (gridless combat resolves lenient, CLA-317).
+async function resolveEmanationContainment(action, auto, playerName, target, campaignName) {
+    const emanationRangeFt = rangeToFeet(auto?.range) ?? DEFAULT_EMANATION_RANGE_FT;
+    const inRange = await isWithinRange(playerName, target.name, emanationRangeFt);
+    if (!inRange) {
+        return refusal(action, playerName, campaignName, `${target.name} is outside the ${emanationRangeFt}-foot Emanation.`);
+    }
+    return null;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const isAllyAttack = auto?.allyAttack === true;
@@ -222,13 +242,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const csFresh = await getCombatContext(campaignName);
     const currentRound = csFresh?.round || 1;
 
-    if (!isAllyAttack) {
-        const wrathActive = getRuntimeValue(playerName, 'wrathOfTheSeaActive', campaignName);
-
-        if (!wrathActive) {
-            return await activateWrathEmanation(action, auto, playerStats, playerName, campaignName);
-        }
-    }
+    const activationResult = await resolveWrathActivation({ isAllyAttack, action, auto, playerStats, playerName, campaignName });
+    if (activationResult) return activationResult;
 
     const gateRefusal = checkWrathTurnGates(action, csFresh, currentRound, playerName, campaignName);
     if (gateRefusal) return gateRefusal;
@@ -248,13 +263,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return refusal(action, playerName, campaignName, 'No current target selected — set the Target dropdown on your initiative card first.');
     }
 
-    // CLA-393 gate 3 — emanation containment: the target must be within the
-    // Emanation radius of you (gridless combat resolves lenient, CLA-317).
-    const emanationRangeFt = rangeToFeet(auto?.range) ?? DEFAULT_EMANATION_RANGE_FT;
-    const inRange = await isWithinRange(playerName, target.name, emanationRangeFt);
-    if (!inRange) {
-        return refusal(action, playerName, campaignName, `${target.name} is outside the ${emanationRangeFt}-foot Emanation.`);
-    }
+    const containmentRefusal = await resolveEmanationContainment(action, auto, playerName, target, campaignName);
+    if (containmentRefusal) return containmentRefusal;
 
     // CLA-371 lesson: serialize the latch — awaited stamp at the trigger, before
     // any save/damage writes, so a second same-round click reads the stamped round.

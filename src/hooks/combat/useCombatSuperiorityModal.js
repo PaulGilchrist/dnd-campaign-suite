@@ -65,10 +65,17 @@ async function rollPrecisionAttackDamage(playerStats, campaignName, rollDamage) 
     if (!la?.damageFormula) return;
     const damageResult = rollExpression(la.damageFormula);
     if (!damageResult) return;
-    rollDamage(la.damageName || la.attackName, la.damageFormula, damageResult.total, damageResult.rolls, damageResult.modifier, {
-        damageType: la.damageType || 'Slashing',
-        targetName: la.targetName,
-        attackerName: playerStats.name,
+    rollDamage({
+        name: la.damageName || la.attackName,
+        formula: la.damageFormula,
+        total: damageResult.total,
+        rolls: damageResult.rolls,
+        modifier: damageResult.modifier,
+        context: {
+            damageType: la.damageType || 'Slashing',
+            targetName: la.targetName,
+            attackerName: playerStats.name,
+        },
     });
 }
 
@@ -82,7 +89,7 @@ function buildPrecisionRolls(lastAttackRoll, dieValue) {
 
 // Precision Attack: add the superiority die to the last attack roll, re-resolve hit/miss,
 // and trigger damage when the amended roll now hits. Returns true when handled.
-async function handlePrecisionAttack(result, playerStats, campaignName, rollAttack, rollDamage, showPopup) {
+async function handlePrecisionAttack({ result, playerStats, campaignName, rollAttack, rollDamage, showPopup }) {
     if (!(result?.effect === 'attack_roll_bonus' && result?.dieValue && rollAttack)) return false;
     const lastAttackRoll = await getRuntimeValue(playerStats.name, 'lastAttackRoll', campaignName);
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
@@ -137,7 +144,7 @@ export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack,
             const result = await executeManeuver(modalAction, playerStats, campaignName, singleUseManeuverName);
             await logResultEntries(campaignName, result);
             if (dispatchChoiceModal(result, SINGLE_USE_CHOICE_MODALS)) return;
-            if (await handlePrecisionAttack(result, playerStats, campaignName, rollAttack, rollDamage, showPopup)) return;
+            if (await handlePrecisionAttack({ result, playerStats, campaignName, rollAttack, rollDamage, showPopup })) return;
             if (result?.type === 'popup') showResultPopup(result.payload, showPopup);
             dispatchAttackRollResult(result, rollAttack, { ripostePopup: result.popup });
             return;

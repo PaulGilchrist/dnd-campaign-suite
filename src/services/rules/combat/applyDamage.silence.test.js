@@ -124,9 +124,7 @@ describe('Silence zone — Thunder immunity for players', () => {
     // Provide a silence buff with sourceCharacter so the silence zone code path is triggered
     stubPlayerRuntime(20, [], [{ effect: 'silence', sourceCharacter: 'Bard' }]);
 
-    const result = await applyDamageToTarget(cs, 'Wizard', 10, ['Thunder'], 'TestCampaign', [
-      createMinimalCharacter('Wizard'),
-    ]);
+    const result = await applyDamageToTarget(cs, 'Wizard', 10, ['Thunder'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Wizard'), ] });
 
     expect(result.finalDamage).toBe(0);
     expect(silenceService.isCreatureInSilenceZone).toHaveBeenCalledWith('Wizard', 'Bard', 'TestCampaign');
@@ -139,7 +137,7 @@ describe('Silence zone — Thunder immunity for players', () => {
     const player1 = createPlayerCreature('Wizard');
     const cs1 = makeCombatSummary([player1]);
     stubPlayerRuntime(20, [], [{ effect: 'silence', sourceCharacter: 'Bard' }]);
-    let result = await applyDamageToTarget(cs1, 'Wizard', 10, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
+    let result = await applyDamageToTarget(cs1, 'Wizard', 10, ['Thunder'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wizard')] });
     expect(result.finalDamage).toBe(10);
     expect(silenceService.isCreatureInSilenceZone).toHaveBeenCalledWith('Wizard', 'Bard', 'TestCampaign');
 
@@ -150,7 +148,7 @@ describe('Silence zone — Thunder immunity for players', () => {
     const player2 = createPlayerCreature('Wizard2');
     const cs2 = makeCombatSummary([player2]);
     stubPlayerRuntime(20, [], []);
-    result = await applyDamageToTarget(cs2, 'Wizard2', 10, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Wizard2')]);
+    result = await applyDamageToTarget(cs2, 'Wizard2', 10, ['Thunder'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wizard2')] });
     expect(result.finalDamage).toBe(10);
     expect(silenceService.isCreatureInSilenceZone).not.toHaveBeenCalled();
 
@@ -161,7 +159,7 @@ describe('Silence zone — Thunder immunity for players', () => {
     const player3 = createPlayerCreature('Wizard3');
     const cs3 = makeCombatSummary([player3]);
     stubPlayerRuntime(20, [], [{ effect: 'silence' }]);
-    result = await applyDamageToTarget(cs3, 'Wizard3', 10, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Wizard3')]);
+    result = await applyDamageToTarget(cs3, 'Wizard3', 10, ['Thunder'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wizard3')] });
     expect(result.finalDamage).toBe(10);
     expect(silenceService.isCreatureInSilenceZone).not.toHaveBeenCalled();
   });
@@ -175,9 +173,7 @@ describe('Silence zone — Thunder immunity for players', () => {
 
     stubPlayerRuntime(20, [], [{ effect: 'silence', sourceCharacter: 'Bard' }]);
 
-    const result = await applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', [
-      createMinimalCharacter('Wizard'),
-    ]);
+    const result = await applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Wizard'), ] });
 
     expect(result.finalDamage).toBe(10);
   });
@@ -214,7 +210,7 @@ describe('Silence zone — NPC creatures', () => {
     const logModule = await import('../../ui/logService.js');
     logModule.addEntry.mockClear();
 
-    const result = await applyDamageToTarget(cs, 'Thug 1', 9, ['Thunder'], 'TestCampaign', []);
+    const result = await applyDamageToTarget(cs, 'Thug 1', 9, ['Thunder'], { campaignName: 'TestCampaign', characters: [] });
 
     expect(silenceService.isCreatureInSilenceZone).toHaveBeenCalledWith('Thug 1', 'Divine_Cleric', 'TestCampaign');
     expect(result.finalDamage).toBe(0);
@@ -255,7 +251,7 @@ describe('Silence zone — NPC creatures', () => {
       return undefined;
     });
 
-    const result = await applyDamageToTarget(cs, 'Thug 2', 9, ['Thunder'], 'TestCampaign', []);
+    const result = await applyDamageToTarget(cs, 'Thug 2', 9, ['Thunder'], { campaignName: 'TestCampaign', characters: [] });
 
     expect(result.finalDamage).toBe(9);
     expect(npc.currentHp).toBe(23);
@@ -295,9 +291,7 @@ describe('Silence zone — NPC creatures', () => {
       return undefined;
     });
 
-    const result = await applyDamageToTarget(cs, 'Goblin', 10, ['Thunder'], 'TestCampaign', [
-      createMinimalCharacter('Goblin'),
-    ]);
+    const result = await applyDamageToTarget(cs, 'Goblin', 10, ['Thunder'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Goblin'), ] });
 
     expect(result.finalDamage).toBe(10);
     expect(silenceService.isCreatureInSilenceZone).not.toHaveBeenCalled();

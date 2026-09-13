@@ -179,7 +179,7 @@ describe('contextBuilder-sync: target effects that grant advantage (consumed)', 
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('advantage');
     expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -200,7 +200,7 @@ describe('contextBuilder-sync: target effects that grant advantage (consumed)', 
       return undefined;
     });
 
-    await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign',
@@ -230,7 +230,7 @@ describe('contextBuilder-sync: target effects that grant advantage (not consumed
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe(setup().effect === 'protection' ? 'disadvantage' : 'advantage');
   });
@@ -244,7 +244,7 @@ describe('contextBuilder-sync: target effects that grant advantage (not consumed
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -267,7 +267,7 @@ describe('contextBuilder-sync: next_attack_bonus (Sundering Blow)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.hitBonus).toBe(7);
   });
@@ -282,7 +282,7 @@ describe('contextBuilder-sync: next_attack_bonus (Sundering Blow)', () => {
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.hitBonus).toBe(7);
   });
@@ -299,7 +299,7 @@ describe('contextBuilder-sync: Death Ward grants disadvantage on attacks', () =>
   it('sets disadvantage when target has Death Ward buff', async () => {
     isDeathWardActive.mockReturnValue(true);
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('disadvantage');
   });
@@ -307,7 +307,7 @@ describe('contextBuilder-sync: Death Ward grants disadvantage on attacks', () =>
   it('does not set disadvantage when target has no Death Ward buff', async () => {
     isDeathWardActive.mockReturnValue(false);
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -319,7 +319,7 @@ describe('contextBuilder-sync: Death Ward grants disadvantage on attacks', () =>
       return undefined;
     });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBe('disadvantage');
   });

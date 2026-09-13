@@ -326,18 +326,13 @@ describe("heroesFeastHandler", () => {
 
       await applyHeroesFeast(action, ps, campaignName, null, ['Goblin1']);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestHero',
-        'Goblin1',
-        [
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestHero', targetName: 'Goblin1', effects: [
           {
             type: 'remove_heroes_feast_buff',
             buffName: "Heroes' Feast",
             hpKey: 'heroesFeastHpMaxIncrease',
           },
-        ],
-        campaignName
-      );
+        ], campaignName });
     });
 
     it('should add activeBuffs entry when target has no existing Heroes Feast buff', async () => {

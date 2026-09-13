@@ -67,7 +67,7 @@ export function processAoeNpcs({ combatSummary, affected, rawDamage, damageType,
     const evasionEffects = creature.evasionEffects || [];
     const hasEvasion = hasEvasionForSave(evasionEffects, normalizeSaveType(saveType));
     const finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(rawDamage, saveResult.success, dcSuccess, hasEvasion);
-    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: attackerName });
+    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: attackerName });
     results.push({
       creatureName: creature.name,
       saveSuccess: isSoulstitchProtected ? true : saveResult.success,

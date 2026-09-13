@@ -9,6 +9,78 @@ import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { logSaveResultEntry } from './saveResultLogging.js';
 import { applyCalmEmotionsImmunity, applyCalmEmotionsCharmed } from '../../../../services/automation/handlers/spells/calmEmotionsHandler.js';
 
+const rollD20 = () => Math.floor(Math.random() * 20) + 1;
+
+async function resolveCalmNpcSave(ctx, targetName, target) {
+    const { campaignName, casterName, saveType, saveDc, isCarefulSpell, isCarefulAlly, heightenTarget, choice } = ctx;
+    const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
+    const saveRoll = heightenTarget === targetName ? Math.min(rollD20(), rollD20()) : rollD20();
+    const saveTotal = saveRoll + saveBonus;
+    const success = saveTotal >= saveDc;
+
+    if (carefulSpellProtected) {
+        await addEntry(campaignName, {
+            type: 'save_result',
+            characterName: casterName,
+            targetName,
+            saveDc,
+            saveType,
+            success: true,
+            roll: saveRoll,
+            total: saveTotal,
+            saveBonus,
+            description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal}) — Careful Spell protected`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[calmEmotions] Error logging save result:', e); });
+        addTargetResult(campaignName, {
+            targetName,
+            saveResult: 'success',
+            roll: saveRoll,
+            total: saveTotal,
+            conditions: [],
+            appliedDamage: 0,
+        });
+        return { targetName, success: true, roll: saveRoll, total: saveTotal, saveBonus, conditionApplied: false };
+    }
+    if (!success) {
+        await applyCalmEmotionsCharmed({ targetName, casterName, campaignName, dc: saveDc, creature: target, characters: [] });
+        await addTargetResult(campaignName, {
+            targetName,
+            saveResult: 'failure',
+            roll: saveRoll,
+            total: saveTotal,
+            conditions: [],
+            appliedDamage: 0,
+        });
+        return { targetName, success: false, roll: saveRoll, total: saveTotal, saveBonus, conditionApplied: true, choice };
+    }
+    return { targetName, success: true, roll: saveRoll, total: saveTotal, saveBonus, conditionApplied: false };
+}
+
+async function resolveCalmPlayerSave(ctx, targetName, results, prompts) {
+    const { campaignName, casterName, saveType, saveDc, isCarefulSpell, isCarefulAlly, choice } = ctx;
+    if (isCarefulSpell && isCarefulAlly(targetName)) {
+        results.push({ targetName, success: true, roll: null, total: 0, saveBonus: 0, conditionApplied: false });
+        return;
+    }
+    const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    sendSavePrompt(campaignName, {
+        promptId,
+        targetName,
+        saveType: saveType,
+        saveDc: saveDc,
+        sourceName: casterName,
+    });
+
+    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
+    existingPrompts.push(promptId);
+    setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
+
+    prompts.push({ promptId, targetName, choice });
+}
+
 function CalmEmotionsModal({
     action,
     playerStats,
@@ -65,14 +137,14 @@ function CalmEmotionsModal({
         const results = [];
         const prompts = [];
 
+        const saveCtx = { campaignName, casterName, saveType, saveDc, isCarefulSpell, isCarefulAlly, heightenTarget };
+
         for (const targetName of selectedNames) {
             const target = combatSummary.creatures.find(c => c.name === targetName);
             if (!target) continue;
 
-            const isNpc = target.type === 'npc';
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
-            const isHeightenTarget = heightenTarget === targetName;
             const choice = targetChoices[targetName] || 'immunity';
+            const ctx = { ...saveCtx, choice };
 
             // Immunity mode grants a buff directly — no save required
             if (choice === 'immunity') {
@@ -82,72 +154,11 @@ function CalmEmotionsModal({
             }
 
             // Charmed mode requires a save
-            if (isNpc) {
-                const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
-                const saveRoll = isHeightenTarget ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
-                const saveTotal = saveRoll + saveBonus;
-                const success = saveTotal >= saveDc;
-
-                if (carefulSpellProtected) {
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: casterName,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal}) — Careful Spell protected`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[calmEmotions] Error logging save result:', e); });
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'success',
-                        roll: saveRoll,
-                        total: saveTotal,
-                        conditions: [],
-                        appliedDamage: 0,
-                    });
-                    results.push({ targetName, success: true, roll: saveRoll, total: saveTotal, saveBonus, conditionApplied: false });
-                } else if (!success) {
-                    await applyCalmEmotionsCharmed({ targetName, casterName, campaignName, dc: saveDc, creature: target, characters: [] });
-                    await addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'failure',
-                        roll: saveRoll,
-                        total: saveTotal,
-                        conditions: [],
-                        appliedDamage: 0,
-                    });
-                    results.push({ targetName, success: false, roll: saveRoll, total: saveTotal, saveBonus, conditionApplied: true, choice });
-                } else {
-                    results.push({ targetName, success: true, roll: saveRoll, total: saveTotal, saveBonus, conditionApplied: false });
-                }
+            if (target.type === 'npc') {
+                results.push(await resolveCalmNpcSave(ctx, targetName, target));
             } else {
                 // Player — send save prompt
-                const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
-
-                if (carefulSpellProtected) {
-                    results.push({ targetName, success: true, roll: null, total: 0, saveBonus: 0, conditionApplied: false });
-                } else {
-                    const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-                    sendSavePrompt(campaignName, {
-                        promptId,
-                        targetName,
-                        saveType: saveType,
-                        saveDc: saveDc,
-                        sourceName: casterName,
-                    });
-
-                    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
-                    existingPrompts.push(promptId);
-                    setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
-
-                    prompts.push({ promptId, targetName, choice });
-                }
+                await resolveCalmPlayerSave(ctx, targetName, results, prompts);
             }
         }
 

@@ -147,7 +147,7 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
 
         expect(result).toBe(true);
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['Fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['Fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -231,7 +231,7 @@ describe('handlePlayerSaveDamage - endInvisibilityOnHostileAction', () => {
 
         expect(result).toBe(true);
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'TestWizard', 0, ['Psychic'], 'test-campaign', null, { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'TestWizard', 0, ['Psychic'], { campaignName: 'test-campaign', characters: null, ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({

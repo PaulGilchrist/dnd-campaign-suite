@@ -74,7 +74,7 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
     setup();
     getWolfAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'DraconicDragon' });
 
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal', {});
+    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
 
     expect(getWolfAdvantageAgainst).toHaveBeenCalledWith({
       attackerName: 'HexWarlock',
@@ -88,7 +88,7 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
     setup();
     getWolfAdvantageAgainst.mockResolvedValue({ advantage: false });
 
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal', {});
+    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -97,7 +97,7 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
     setup();
     getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'DraconicDragon' });
 
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal', {});
+    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
 
     expect(getLionDisadvantageAgainst).toHaveBeenCalledWith({
       attackerName: 'HexWarlock',

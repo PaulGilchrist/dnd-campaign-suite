@@ -90,7 +90,7 @@ function computeSunderingBlowBonus(context, rollType) {
 }
 
 // Lucky feat disadvantage/advantage on attack targets
-function applyTargetLuckyFeat(rollType, forcedMode, context, campaignName, r1, r2) {
+function applyTargetLuckyFeat({ rollType, forcedMode, context, campaignName, r1, r2 }) {
     const unchanged = { forcedMode, effectiveD20Roll: null };
     if (rollType !== 'attack' || (forcedMode && forcedMode !== 'normal')) return unchanged;
     const targetNameForLucky = context?.targetName;
@@ -161,7 +161,7 @@ function resolveAttackRoll({ rollType, forcedMode, context, campaignName, r1, r2
         effectiveD20Roll = effectiveD20;
     }
 
-    const luckyFeat = applyTargetLuckyFeat(rollType, forcedMode, context, campaignName, r1, r2);
+    const luckyFeat = applyTargetLuckyFeat({ rollType, forcedMode, context, campaignName, r1, r2 });
     const resolvedForcedMode = luckyFeat.forcedMode;
     if (luckyFeat.effectiveD20Roll !== null) {
         effectiveD20Roll = luckyFeat.effectiveD20Roll;

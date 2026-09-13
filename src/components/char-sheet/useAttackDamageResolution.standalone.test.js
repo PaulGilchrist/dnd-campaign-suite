@@ -187,8 +187,7 @@ describe('resolveAttackDamageStandalone', () => {
             });
 
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword', '1d8+3', 8, [5, 3], 3,
-                expect.objectContaining({
+                { name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: expect.objectContaining({
                     attackName: 'Longsword', damageType: 'slashing',
                     targetName: 'Goblin', attackerName: 'Player',
                     isAutoCrit: false, doubledRolls: null, playerStats: null,
@@ -196,7 +195,7 @@ describe('resolveAttackDamageStandalone', () => {
                     autoDamageSecondaryDamageType: null, saveDc: null,
                     saveType: null, dcSuccess: null, metamagicTwinTarget: null,
                     metamagicHeighten: false,
-                })
+                }) }
             );
         });
 
@@ -224,13 +223,12 @@ describe('resolveAttackDamageStandalone', () => {
             });
 
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Fire Bolt', '1d10+4', 14, [10, 4], 4,
-                expect.objectContaining({
+                { name: 'Fire Bolt', formula: '1d10+4', total: 14, rolls: [10, 4], modifier: 4, context: expect.objectContaining({
                     autoDamageSecondaryFormula: '1d6', autoDamageSecondaryName: 'Secondary',
                     autoDamageSecondaryDamageType: 'fire', saveDc: 15, saveType: 'Dexterity',
                     dcSuccess: 'half', metamagicTwinTarget: 'Goblin', metamagicHeighten: true,
                     doubledRolls: [5, 5], isAutoCrit: true,
-                })
+                }) }
             );
         });
 
@@ -253,8 +251,7 @@ describe('resolveAttackDamageStandalone', () => {
             });
 
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Rapier', '1d8+4', 9, [5, 4], 4,
-                expect.objectContaining({ attackerName: 'Rapier' })
+                { name: 'Rapier', formula: '1d8+4', total: 9, rolls: [5, 4], modifier: 4, context: expect.objectContaining({ attackerName: 'Rapier' }) }
             );
         });
     });
@@ -279,13 +276,12 @@ describe('resolveAttackDamageStandalone', () => {
             });
 
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Longsword', '1d8+3', 8, [5, 3], 3,
-                expect.objectContaining({
+                { name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: expect.objectContaining({
                     autoDamageSecondaryFormula: null, autoDamageSecondaryName: null,
                     autoDamageSecondaryDamageType: null, saveDc: null,
                     saveType: null, dcSuccess: null, metamagicHeighten: false,
                     isAutoCrit: false, doubledRolls: null,
-                })
+                }) }
             );
         });
     });

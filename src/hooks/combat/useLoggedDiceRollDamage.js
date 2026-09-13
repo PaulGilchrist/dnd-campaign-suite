@@ -103,7 +103,7 @@ export function createLogDamageAndShow(deps) {
     const playerSaveDamageHandler = createPlayerSaveDamageHandler(handlerDeps);
     const plainDamageHandler = createPlainDamageHandler(handlerDeps);
 
-    return async function logDamageAndShow(name, formula, total, rolls, modifier, context) {
+    return async function logDamageAndShow({ name, formula, total, rolls, modifier, context }) {
 
         // Sanctuary: if target is warded, attacker (characterName) must succeed on WIS save before save-based spell
         const sanctuaryResult = await handleSanctuarySave(characterName, campaignName, context, logEntry);
@@ -113,7 +113,7 @@ export function createLogDamageAndShow(deps) {
         }
 
         // Apply superiority damage bonuses
-        const { total: boostedTotal, rolls: boostedRolls } = applySuperiorityDamageBonuses(characterName, campaignName, formula, total, rolls, context);
+        const { total: boostedTotal, rolls: boostedRolls } = applySuperiorityDamageBonuses({ characterName, campaignName, formula, total, rolls, context });
 
         const { saveDc, saveType, damageType, isAutoMiss, isAutoCrit, isCrit: ctxIsCrit } = context || {};
         const isCrit = isAutoCrit || ctxIsCrit;
@@ -124,7 +124,7 @@ export function createLogDamageAndShow(deps) {
         const combatSummary = await loadCombatSummary(campaignName);
 
         if (isAutoMiss) {
-            await autoMissHandler(name, formula, total, rolls, modifier, context);
+            await autoMissHandler({ name, formula, total, rolls, modifier, context });
             return;
         }
 

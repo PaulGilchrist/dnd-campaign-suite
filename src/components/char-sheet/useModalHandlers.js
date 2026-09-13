@@ -232,7 +232,7 @@ export default function useModalHandlers({
                             },
                             onSkip: () => {
                                 setModalState({ secondaryTargetModal: null });
-                                executeFlurryWithoutHealing(action, playerStats, campaignName, mapName, numAttacks, result.distribution);
+                                executeFlurryWithoutHealing({ action, playerStats, campaignName, mapName, numAttacks, distribution: result.distribution });
                             },
                         },
                     });
@@ -304,7 +304,7 @@ export default function useModalHandlers({
         }
     };
 
-    const executeFlurryWithoutHealing = async (action, playerStats, campaignName, mapName, numAttacks, distribution) => {
+    const executeFlurryWithoutHealing = async ({ action, playerStats, campaignName, mapName, numAttacks, distribution }) => {
         const applyResult = await applyFlurryOfBlows({ action, playerStats, campaignName, _mapName: mapName, distribution, numAttacks });
         if (!applyResult) return;
 
@@ -342,9 +342,10 @@ export default function useModalHandlers({
 
         const { action, playerStats: ps, campaignName: cn } = currentTarget;
 
-        const applyRes = await applyOpenHandTechnique(
-            action, ps, cn, currentTarget.targetName, result.optionName, saveDc
-        );
+        const applyRes = await applyOpenHandTechnique({
+            action, playerStats: ps, campaignName: cn,
+            targetName: currentTarget.targetName, selectedOptionName: result.optionName, saveDc,
+        });
 
         const nextIndex = currentIndex + 1;
         if (nextIndex < targets.length) {

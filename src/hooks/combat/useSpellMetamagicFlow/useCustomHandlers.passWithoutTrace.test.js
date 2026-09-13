@@ -82,7 +82,7 @@ function renderPWT() {
   const cfClearPending = vi.fn()
   const setPopupHtml = vi.fn()
   const { result } = renderHook(() =>
-    useCustomHandlers(playerStats, CAMPAIGN, cfClearPending, () => makePending(), setPopupHtml, [])
+    useCustomHandlers({ playerStats: playerStats, campaignName: CAMPAIGN, cfClearPending: cfClearPending, getPending: () => makePending(), setPopupHtml: setPopupHtml, characters: [] })
   )
   return { result, playerStats, setPopupHtml }
 }

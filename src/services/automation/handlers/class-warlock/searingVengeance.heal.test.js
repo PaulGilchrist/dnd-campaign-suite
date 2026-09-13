@@ -127,14 +127,14 @@ describe('searingVengeance CLA-304 heal math', () => {
       selectedTargets: ['Thug 1'],
     };
 
-    const result = await confirmSearingVengeance(
-      makeAction().automation,
-      makePlayerStats(),
-      campaignName,
-      null,
-      [],
-      payload
-    );
+    const result = await confirmSearingVengeance({
+          automation: makeAction().automation,
+          playerStats: makePlayerStats(),
+          campaignName,
+          mapName: null,
+          characters: [],
+          payload,
+      });
 
     // real HP written through runtime store (modifyHitPoints inside applyHealingToTarget)
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
@@ -184,17 +184,17 @@ describe('searingVengeance CLA-304 heal math', () => {
       selectedTargets: ['Thug 1'],
     };
 
-    await confirmSearingVengeance(
-      makeAction().automation,
-      makePlayerStats(),
-      campaignName,
-      null,
-      [],
-      payload
-    );
+    await confirmSearingVengeance({
+          automation: makeAction().automation,
+          playerStats: makePlayerStats(),
+          campaignName,
+          mapName: null,
+          characters: [],
+          payload,
+      });
 
     expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8+3');
-    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 18, ['Radiant'], campaignName, [], { ignoreResistance: false, attackerName: 'HexWarlock' });
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 18, ['Radiant'], { campaignName, characters: [], ignoreResistance: false, attackerName: 'HexWarlock' });
   });
 
   it('blinded expiration is one round (until end of current turn)', async () => {
@@ -210,26 +210,22 @@ describe('searingVengeance CLA-304 heal math', () => {
     });
     diceRoller.rollExpression.mockReturnValue({ total: 18, rolls: [7, 8] });
 
-    await confirmSearingVengeance(
-      makeAction().automation,
-      makePlayerStats(),
-      campaignName,
-      null,
-      [],
-      {
+    await confirmSearingVengeance({
+          automation: makeAction().automation,
+          playerStats: makePlayerStats(),
+          campaignName,
+          mapName: null,
+          characters: [],
+          payload: {
         name: 'Searing Vengeance',
         targetName: 'LightfootHalfling',
         targetMaxHp: 12,
         healAmount: 6,
         selectedTargets: ['Thug 1'],
-      }
-    );
+      },
+      });
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'HexWarlock', 'Thug 1',
-      [{ type: 'condition', condition: 'blinded' }],
-      campaignName, 1
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'HexWarlock', targetName: 'Thug 1', effects: [{ type: 'condition', condition: 'blinded' }], campaignName, rounds: 1 });
   });
 
   it('refuses when 0 HP creatures are outside the 60 ft ally range and consumes nothing', async () => {

@@ -43,7 +43,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const level = playerStats.level || 1
     const baseExpression = auto.poolExpression || ''
     const resolvedExpression = resolveHealingPoolExpression(baseExpression, auto.scaling, playerStats)
-    const poolInfo = resolveHealingPool(auto, action, playerStats, resolvedExpression, prof, level)
+    const poolInfo = resolveHealingPool({ auto, action, playerStats, resolvedExpression, prof, level })
 
     const rangeFt = auto?.range ? rangeToFeet(auto.range) : 60
     const combatSummary = await getCombatContext(campaignName)
@@ -64,11 +64,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     return {
         type: 'modal',
         modalName: 'healingPool',
-        payload: buildHealingPoolPayload(auto, action, playerStats, resolvedExpression, poolInfo, creatureTargets),
+        payload: buildHealingPoolPayload({ auto, action, playerStats, resolvedExpression, poolInfo, creatureTargets }),
     };
 }
 
-function resolveHealingPool(auto, action, playerStats, resolvedExpression, prof, level) {
+function resolveHealingPool({ auto, action, playerStats, resolvedExpression, prof, level }) {
     const diceMatch = resolvedExpression.match(/^(\d+)d(\d+)$/i)
     const explicitDicePool = auto.isDicePool === true
     const isDicePool = explicitDicePool || !!diceMatch
@@ -82,7 +82,8 @@ function resolveHealingPool(auto, action, playerStats, resolvedExpression, prof,
     return { pool, dieType, resourceKey, isDicePool }
 }
 
-function buildHealingPoolPayload(auto, action, playerStats, resolvedExpression, { pool, dieType, resourceKey, isDicePool }, creatureTargets) {
+function buildHealingPoolPayload({ auto, action, playerStats, resolvedExpression, poolInfo, creatureTargets }) {
+    const { pool, dieType, resourceKey, isDicePool } = poolInfo;
     const restoringTouchData = playerStats.specialActions?.find(
           f => f.name === 'Restoring Touch'
           );

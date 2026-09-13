@@ -77,12 +77,10 @@ function resolveNpcDamageResult({ combatSummary, characters, target, targetName,
     const damageRoll = rollExpression(elementData.damage);
     const rawDamage = damageRoll?.total ?? 0;
     const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
-    const resResult = computeDamageAfterResistancesWithDetails(
-        damageAfterSave, [elementData.damageType], target.resistances || [], target.immunities || []
-    );
+    const resResult = computeDamageAfterResistancesWithDetails({ rawDamage: damageAfterSave, damageTypes: [elementData.damageType], resistances: target.resistances || [], immunities: target.immunities || [] });
     const finalDamage = resResult.finalDamage;
 
-    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStatsName, suppressHpLog: false });
+    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStatsName, suppressHpLog: false });
 
     logEntry.formula = elementData.damage;
     logEntry.rolls = damageRoll?.rolls ?? [];
@@ -143,6 +141,34 @@ function resolveNpcSpeedReductionResult({ targetName, saveRoll, saveTotal, saveB
     };
 }
 
+function resolveNpcPushDamage(elementData, success, target) {
+    const damageRoll = rollExpression(elementData.damage);
+    const rawDamage = damageRoll?.total ?? 0;
+    const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
+    const resResult = computeDamageAfterResistancesWithDetails({ rawDamage: damageAfterSave, damageTypes: [elementData.damageType], resistances: target.resistances || [], immunities: target.immunities || [] });
+    return { damageRoll, rawDamage, finalDamage: resResult.finalDamage };
+}
+
+function resolveNpcEffectResult(elementData, npcCtx) {
+    if (elementData?.effect === 'speed_reduction') return resolveNpcSpeedReductionResult(npcCtx);
+    if (elementData?.effect === 'push') return resolveNpcPushResult(npcCtx);
+    return null;
+}
+
+function applyNpcPush({ combatSummary, targetName, elementData, playerStatsName, actionName, campaignName }) {
+    const currentTarget = combatSummary.creatures.find(c => c.name === targetName);
+    if (!currentTarget) return;
+    const pushEffect = {
+        target: targetName,
+        direction: currentTarget.pushDirection || 'forward',
+        distance: elementData.effectValue,
+        source: playerStatsName,
+        feature: actionName,
+    };
+    const targetEffects = getRuntimeValue(targetName, 'targetEffects', campaignName) || [];
+    setRuntimeValue(targetName, 'targetEffects', [...targetEffects, pushEffect], campaignName);
+}
+
 function resolveNpcPushResult({ combatSummary, characters, target, targetName, saveRoll, saveTotal, saveBonus, success, saveType, saveDc, elementData, playerStatsName, campaignName, actionName }) {
     const logEntry = {
         type: 'roll',
@@ -159,31 +185,12 @@ function resolveNpcPushResult({ combatSummary, characters, target, targetName, s
         timestamp: Date.now(),
     };
 
-    const damageRoll = rollExpression(elementData.damage);
-    const rawDamage = damageRoll?.total ?? 0;
-    const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
-    const resResult = computeDamageAfterResistancesWithDetails(
-        damageAfterSave, [elementData.damageType], target.resistances || [], target.immunities || []
-    );
-    const finalDamage = resResult.finalDamage;
+    const { damageRoll, rawDamage, finalDamage } = resolveNpcPushDamage(elementData, success, target);
 
-    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStatsName, suppressHpLog: false });
+    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStatsName, suppressHpLog: false });
 
     if (!success) {
-        const pushDistance = elementData.effectValue;
-        const currentTarget = combatSummary.creatures.find(c => c.name === targetName);
-        if (currentTarget) {
-            const pushEffect = {
-                target: targetName,
-                direction: currentTarget.pushDirection || 'forward',
-                distance: pushDistance,
-                source: playerStatsName,
-                feature: actionName,
-            };
-            const targetEffects = getRuntimeValue(targetName, 'targetEffects', campaignName) || [];
-            const newTargetEffects = [...targetEffects, pushEffect];
-            setRuntimeValue(targetName, 'targetEffects', newTargetEffects, campaignName);
-        }
+        applyNpcPush({ combatSummary, targetName, elementData, playerStatsName, actionName, campaignName });
     }
 
     logEntry.formula = elementData.damage;
@@ -246,13 +253,11 @@ function applyAttunementSaveDamage({ detail, targetName, success, saveBonus, raw
     const damageRoll = rollExpression(elementData.damage);
     const damageAfterSave = computeDamageAfterSave(rawDamage, success, elementData.dcSuccess);
     const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
-    const resResult = computeDamageAfterResistancesWithDetails(
-        damageAfterSave, [elementData.damageType], (targetCreature?.resistances || []), (targetCreature?.immunities || [])
-    );
+    const resResult = computeDamageAfterResistancesWithDetails({ rawDamage: damageAfterSave, damageTypes: [elementData.damageType], resistances: (targetCreature?.resistances || []), immunities: (targetCreature?.immunities || []) });
     const finalDamage = resResult.finalDamage;
 
     const characters = combatSummary.creatures.filter(c => c.type === 'player') || [];
-    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
+    applyDamageToTarget(combatSummary, targetName, finalDamage, [elementData.damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
 
     logEntry.formula = elementData.damage;
     logEntry.rolls = damageRoll?.rolls ?? [];
@@ -398,10 +403,9 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
                 const npcCtx = { combatSummary, characters, target, targetName, saveRoll, saveTotal, saveBonus, success, saveType, saveDc, elementData, chosenElement, playerStatsName: playerStats.name, campaignName, actionName: action.name };
                 if (elementData?.damage) {
                     results.push(resolveNpcDamageResult(npcCtx));
-                } else if (elementData?.effect === 'speed_reduction') {
-                    results.push(resolveNpcSpeedReductionResult(npcCtx));
-                } else if (elementData?.effect === 'push') {
-                    results.push(resolveNpcPushResult(npcCtx));
+                } else {
+                    const effectResult = resolveNpcEffectResult(elementData, npcCtx);
+                    if (effectResult) results.push(effectResult);
                 }
             } else {
                 const prompt = queuePlayerSavePrompt({ campaignName, targetName, saveType, saveDc, playerStatsName: playerStats.name, elementData });
@@ -535,21 +539,14 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
         setRuntimeValue(playerStats.name, 'elementalAttunementActive', true, campaignName);
         setRuntimeValue(playerStats.name, 'elementalAttunementElement', chosenElement, campaignName);
 
-        addExpiration(
-            playerStats.name,
-            playerStats.name,
-            [
+        addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'elementalAttunementActive' },
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'elementalAttunementElement' },
                 { type: 'remove_active_buff', buffName: 'Stride of the Elements' },
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'elementalEpitomeActive' },
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'epitomeResistanceType' },
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'epitomeEmpoweredUsedRound' },
-            ],
-            campaignName,
-            Infinity,
-            playerStats.name
-        );
+            ], campaignName, rounds: Infinity, expireOnCreatureName: playerStats.name });
 
         addEntry(campaignName, {
             type: 'ability_use',

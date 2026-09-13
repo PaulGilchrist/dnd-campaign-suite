@@ -66,7 +66,7 @@ export default function useCharActionsCleave({
                 damageType: lastAttack.damageType || 'same_as_weapon',
                 attackerName: playerStats.name,
             };
-            rollDamage(`${lastAttack.attackName} (Cleave)`, cleaveDamageFormula, damageResult.total, damageResult.rolls, 0, context);
+            rollDamage({ name: `${lastAttack.attackName} (Cleave)`, formula: cleaveDamageFormula, total: damageResult.total, rolls: damageResult.rolls, modifier: 0, context: context });
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,
@@ -81,7 +81,7 @@ export default function useCharActionsCleave({
                 attackerName: playerStats.name,
                 isAutoMiss: true,
             };
-            rollDamage(`${lastAttack.attackName} (Cleave)`, cleaveDamageFormula || '0', 0, [], 0, context);
+            rollDamage({ name: `${lastAttack.attackName} (Cleave)`, formula: cleaveDamageFormula || '0', total: 0, rolls: [], modifier: 0, context: context });
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,

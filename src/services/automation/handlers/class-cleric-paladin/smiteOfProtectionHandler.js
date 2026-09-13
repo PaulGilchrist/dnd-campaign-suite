@@ -29,9 +29,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue('campaign', 'coverRefresh', refreshCount + 1, campaignName);
 
     // Set up expiration for start of next turn
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_smite_of_protection' }
-    ], campaignName, undefined, playerName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
     // Log the ability use
     await addEntry(campaignName, {

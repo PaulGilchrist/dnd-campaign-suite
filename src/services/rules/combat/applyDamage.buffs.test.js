@@ -127,7 +127,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
       .mockReturnValueOnce([]);
     const player = createPlayerCreature('Wizard');
     const cs = makeCombatSummary([player]);
-    const result = await applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
+    const result = await applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wizard')] });
     expect(result.finalDamage).toBe(5);
   });
 
@@ -144,7 +144,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
       .mockReturnValueOnce([]);
     const player = createPlayerCreature('Wizard');
     const cs = makeCombatSummary([player]);
-    const result = await applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
+    const result = await applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wizard')] });
     expect(result.finalDamage).toBe(5);
   });
 
@@ -158,7 +158,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
       .mockReturnValueOnce([]);
     const player1 = createPlayerCreature('Wizard');
     const cs1 = makeCombatSummary([player1]);
-    const result1 = await applyDamageToTarget(cs1, 'Wizard', 10, ['Fire'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
+    const result1 = await applyDamageToTarget(cs1, 'Wizard', 10, ['Fire'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wizard')] });
     expect(result1.finalDamage).toBe(10);
 
     getRuntimeValue
@@ -170,7 +170,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
       .mockReturnValueOnce([]);
     const player2 = createPlayerCreature('Wizard2');
     const cs2 = makeCombatSummary([player2]);
-    const result2 = await applyDamageToTarget(cs2, 'Wizard2', 10, ['Fire'], 'TestCampaign', [createMinimalCharacter('Wizard2')]);
+    const result2 = await applyDamageToTarget(cs2, 'Wizard2', 10, ['Fire'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wizard2')] });
     expect(result2.finalDamage).toBe(10);
 
     getRuntimeValue
@@ -185,7 +185,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
       computedExtra: { resistances: ['fire'] },
     })];
     const cs3 = makeCombatSummary([player3]);
-    const result3 = await applyDamageToTarget(cs3, 'Paladin', 10, ['Cold'], 'TestCampaign', characters);
+    const result3 = await applyDamageToTarget(cs3, 'Paladin', 10, ['Cold'], { campaignName: 'TestCampaign', characters: characters });
     expect(result3.finalDamage).toBe(5);
   });
 
@@ -213,7 +213,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
       if (subKey === 'activeConditions') return [];
       return undefined;
     });
-    await applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
+    await applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
     expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', 'TestCampaign');
   });
 });
@@ -276,7 +276,7 @@ describe('applyDamageToTarget — Projected Ward', () => {
       createPlayerCharacter(allyName),
     ];
 
-    const result = await applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+    const result = await applyDamageToTarget(cs, allyName, 10, ['Fire'], { campaignName: 'TestCampaign', characters: characters });
 
     expect(result.newHp).toBe(10);
     expect(setRuntimeValue).not.toHaveBeenCalledWith(wizardName, 'arcaneWardHp', expect.any(Number), 'TestCampaign');
@@ -291,7 +291,7 @@ describe('applyDamageToTarget — Projected Ward', () => {
       createWizardCharacter(wizardName),
     ];
 
-    const result2 = await applyDamageToTarget(cs2, wizardName, 10, ['Fire'], 'TestCampaign', characters2);
+    const result2 = await applyDamageToTarget(cs2, wizardName, 10, ['Fire'], { campaignName: 'TestCampaign', characters: characters2 });
 
     expect(result2.newHp).toBe(20);
     expect(setRuntimeValue).toHaveBeenCalledWith(wizardName, 'arcaneWardHp', 5, 'TestCampaign');

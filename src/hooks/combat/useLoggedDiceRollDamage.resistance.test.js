@@ -207,10 +207,10 @@ describe('Resistance damage reduction', () => {
             setupResistance('fire', 3);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(rollExpression).toHaveBeenCalledWith('1d4');
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -226,23 +226,22 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 8, damageReduced: true });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 5, // 8 adjusted - 3 resistance
-                ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true },);
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 5, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('includes resistanceReduction and resistanceRoll in the popup', async () => {
             setupResistance('fire', 3);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.resistanceReduction).toBe(3);
@@ -253,10 +252,10 @@ describe('Resistance damage reduction', () => {
             setupResistance('fire', 3);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(deps.logEntry).toHaveBeenCalled();
             const logData = deps.logEntry.mock.calls[0][0];
@@ -268,10 +267,10 @@ describe('Resistance damage reduction', () => {
             setupResistance('fire', 3);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             const abilityCalls = addEntry.mock.calls.filter(
                 (call) => call[1]?.type === 'ability_use',
@@ -287,15 +286,14 @@ describe('Resistance damage reduction', () => {
             setupResistance('fire', 1);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.resistanceReduction).toBe(1);
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 7, // 8 - 1
-                ['fire'], expect.any(String), expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true },);
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 7, ['fire'], { campaignName: expect.any(String), characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
     });
 
@@ -321,10 +319,10 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(rollExpression).not.toHaveBeenCalledWith('1d4');
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -354,10 +352,10 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(rollExpression).not.toHaveBeenCalledWith('1d4');
             const popup = getFirstPopupCall();
@@ -381,10 +379,10 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(rollExpression).not.toHaveBeenCalledWith('1d4');
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -401,10 +399,10 @@ describe('Resistance damage reduction', () => {
             setupNoResistance();
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(rollExpression).not.toHaveBeenCalledWith('1d4');
             const popup = getFirstPopupCall();
@@ -432,10 +430,10 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 7, damageReduced: true });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(rollExpression).toHaveBeenCalledWith('1d4');
             const popup = getFirstPopupCall();
@@ -460,10 +458,10 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 9, damageReduced: true });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'FIRE',
-            });
+            } });
 
             expect(rollExpression).toHaveBeenCalledWith('1d4');
             const popup = getFirstPopupCall();
@@ -490,13 +488,12 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 13, damageReduced: true });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 2, [2], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 2, rolls: [2], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 0, // max(0, 2 - 4) = 0
-                ['fire'], expect.any(String), expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true },);
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 0, ['fire'], { campaignName: expect.any(String), characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
     });
 
@@ -521,10 +518,10 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 7, damageReduced: true });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(rollExpression).toHaveBeenCalledWith('1d4');
             const popup = getFirstPopupCall();
@@ -549,10 +546,10 @@ describe('Resistance damage reduction', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',

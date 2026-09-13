@@ -445,12 +445,7 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // silently reverting another target's damage (pitfall 21).
             for (const targetName of failedTargets) {
                 await rollDamage(
-                    searingUndead.name,
-                    expr,
-                    result.total,
-                    result.rolls,
-                    result.modifier,
-                    { ...baseContext, targetName }
+                    { name: searingUndead.name, formula: expr, total: result.total, rolls: result.rolls, modifier: result.modifier, context: { ...baseContext, targetName } }
                 );
             }
         };

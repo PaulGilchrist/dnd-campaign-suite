@@ -172,20 +172,13 @@ describe('sanctuaryHandler.handle', () => {
 
         await handle(makeAction({}, { targetName }), makePlayerStats(), campaignName, null);
 
-        expect(addExpiration).toHaveBeenCalledWith(
-            casterName,
-            targetName,
-            expect.arrayContaining([
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName, effects: expect.arrayContaining([
                 expect.objectContaining({
                     type: 'remove_target_effect',
                     effectKey: 'sanctuary',
                     source: casterName,
                 }),
-            ]),
-            campaignName,
-            undefined,
-            targetName,
-        );
+            ]), campaignName, rounds: undefined, expireOnCreatureName: targetName });
     });
 
     it('calls addEntry with ability_use log entry', async () => {

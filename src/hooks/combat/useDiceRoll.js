@@ -38,7 +38,7 @@ export default function useDiceRoll() {
     triggerD20Roll(name, hitBonus, 'attack');
   };
 
-  const rollDamage = (name, formula, total, rolls, modifier, ctx) => {
+  const rollDamage = ({ name, formula, total, rolls, modifier, context }) => {
     setPopupHtml({
       type: 'damage',
       name,
@@ -47,7 +47,7 @@ export default function useDiceRoll() {
       total,
       bonus: 0, // Base bonus is' 0 because modifier is separate
       modifier,
-      critLabels: ctx?.critLabels || null
+      critLabels: context?.critLabels || null
     });
   };
 

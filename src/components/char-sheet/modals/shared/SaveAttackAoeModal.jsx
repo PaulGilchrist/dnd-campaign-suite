@@ -122,7 +122,7 @@ function resolveNpcTarget(ctx) {
     const normalizedSaveType = normalizeSaveType(saveType);
     const evasionActive = hasEvasionForSave(evasionEffects, normalizedSaveType);
     const damageAfterSave = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
-    const resResult = computeDamageAfterResistancesWithDetails(damageAfterSave, [damageType], resistances, immunities, false);
+    const resResult = computeDamageAfterResistancesWithDetails({ rawDamage: damageAfterSave, damageTypes: [damageType], resistances, immunities, ignoreResistance: false });
     let finalDamage = resResult.finalDamage;
 
     if (carefulSpellProtected) {
@@ -130,7 +130,7 @@ function resolveNpcTarget(ctx) {
     }
 
     if (finalDamage > 0) {
-        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, characters, { ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
+        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
         if (isRadiantSoulTarget) {
             setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
             setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
@@ -182,7 +182,7 @@ function resolvePcTarget(ctx) {
 
     if (isSoulstitchProtected) {
         // CLA-321: chosen creature auto-succeeds its save — no prompt, no damage.
-        applyDamageToTarget(combatSummary, targetName, 0, [damageType], campaignName, characters, { ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
+        applyDamageToTarget(combatSummary, targetName, 0, [damageType], { campaignName, characters: characters, ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
         addEntry(campaignName, {
             type: 'roll',
             characterName: playerStats.name,
@@ -202,7 +202,7 @@ function resolvePcTarget(ctx) {
     }
 
     if (carefulSpellProtected) {
-        applyDamageToTarget(combatSummary, targetName, 0, [damageType], campaignName, characters, { ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
+        applyDamageToTarget(combatSummary, targetName, 0, [damageType], { campaignName, characters: characters, ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
         return { result: { targetName, success: true, roll: null, total: 0, saveBonus: 0, rawDamage: 0, finalDamage: 0 } };
     }
 
@@ -441,7 +441,7 @@ function SaveAttackAoeModal({
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
 
         const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
-        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
+        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
 
         if (isRadiantSoulTarget) {
             setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);

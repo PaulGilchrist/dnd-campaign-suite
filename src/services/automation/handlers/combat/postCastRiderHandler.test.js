@@ -207,12 +207,7 @@ describe('postCastRiderHandler.handle', () => {
             campaignName,
         );
 
-        expect(addExpiration).toHaveBeenCalledWith(
-            playerStats.name,
-            'Enemy',
-            [{ type: 'condition', condition: 'frightened' }],
-            campaignName,
-        );
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerStats.name, targetName: 'Enemy', effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
 
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'save_result',

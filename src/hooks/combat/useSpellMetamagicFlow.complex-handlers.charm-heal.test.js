@@ -220,7 +220,7 @@ describe('useSpellMetamagicFlow — Charm Person confirm/skip', () => {
   it('triggers charm person and logs entry on confirm', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     const monsterUtils = await import('../../services/npcs/monsterUtils.js');
@@ -257,7 +257,7 @@ describe('useSpellMetamagicFlow — Charm Monster confirm/skip', () => {
 
   it('triggers charm monster and logs entry on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Charm Monster',
       { level: 4 },
     );
@@ -280,7 +280,7 @@ describe('useSpellMetamagicFlow — Banishment confirm/skip', () => {
 
   it('triggers banishment and logs entry on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Banishment',
       { level: 4 },
     );
@@ -301,7 +301,7 @@ describe('useSpellMetamagicFlow — Prismatic Spray confirm/skip', () => {
   it('calls onExecute with selectedTargets on confirm', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
     const spell = makeSpell({ name: 'Prismatic Spray', level: 7 });
     act(() => {
@@ -324,7 +324,7 @@ describe('useSpellMetamagicFlow — Healing Word confirm/skip', () => {
 
   it('triggers healing word and logs entry on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Healing Word',
       { level: 1 },
     );
@@ -347,7 +347,7 @@ describe('useSpellMetamagicFlow — Regenerate confirm/skip', () => {
 
   it('executes regenerate and logs entry on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Regenerate',
       { level: 7 },
     );
@@ -367,7 +367,7 @@ describe('useSpellMetamagicFlow — Protection from Evil and Good confirm/skip',
 
   it('consumes material and applies effect on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Protection from Evil and Good',
       { level: 1 },
     );
@@ -394,7 +394,7 @@ describe('useSpellMetamagicFlow — Shield of Faith confirm/skip', () => {
 
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -416,7 +416,7 @@ describe('useSpellMetamagicFlow — Heal confirm/skip', () => {
 
   it('triggers heal and logs entry on confirm', async () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Heal',
       { level: 6 },
     );

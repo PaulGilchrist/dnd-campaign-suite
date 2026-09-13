@@ -121,9 +121,7 @@ describe('CLA-289 Relentless Hunter — PC concentration exemption', () => {
     const cs = makeCombatSummary([creature]);
     stubPlayerRuntime(30);
 
-    await applyDamageToTarget(cs, 'FeyRanger', 17, ['Slashing'], 'TestCampaign', [
-      createRangerCharacter('FeyRanger', 13, true),
-    ]);
+    await applyDamageToTarget(cs, 'FeyRanger', 17, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createRangerCharacter('FeyRanger', 13, true), ] });
 
     expect(sendConcentrationPrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       targetName: 'FeyRanger',
@@ -136,9 +134,7 @@ describe('CLA-289 Relentless Hunter — PC concentration exemption', () => {
     const cs = makeCombatSummary([creature]);
     stubPlayerRuntime(30);
 
-    await applyDamageToTarget(cs, 'FeyRanger', 17, ['Slashing'], 'TestCampaign', [
-      createRangerCharacter('FeyRanger', 13, true),
-    ]);
+    await applyDamageToTarget(cs, 'FeyRanger', 17, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createRangerCharacter('FeyRanger', 13, true), ] });
 
     expect(sendConcentrationPrompt).not.toHaveBeenCalled();
     expect(creature.concentration).not.toBeNull();
@@ -156,9 +152,7 @@ describe('CLA-289 Relentless Hunter — PC concentration exemption', () => {
     const cs = makeCombatSummary([creature]);
     stubPlayerRuntime(30);
 
-    await applyDamageToTarget(cs, 'FeyRanger', 17, ['Slashing'], 'TestCampaign', [
-      createRangerCharacter('FeyRanger', 12, false),
-    ]);
+    await applyDamageToTarget(cs, 'FeyRanger', 17, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createRangerCharacter('FeyRanger', 12, false), ] });
 
     expect(sendConcentrationPrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       targetName: 'FeyRanger',
@@ -171,9 +165,7 @@ describe('CLA-289 Relentless Hunter — PC concentration exemption', () => {
     const cs = makeCombatSummary([creature]);
     stubPlayerRuntime(30);
 
-    await applyDamageToTarget(cs, 'HexWarlock', 11, ['Necrotic'], 'TestCampaign', [
-      { name: 'HexWarlock', level: 14, computedStats: { resistances: [], immunities: [], class_levels: [], class: { name: 'Warlock', class_levels: [] } } },
-    ]);
+    await applyDamageToTarget(cs, 'HexWarlock', 11, ['Necrotic'], { campaignName: 'TestCampaign', characters: [ { name: 'HexWarlock', level: 14, computedStats: { resistances: [], immunities: [], class_levels: [], class: { name: 'Warlock', class_levels: [] } } }, ] });
 
     expect(sendConcentrationPrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       targetName: 'HexWarlock',

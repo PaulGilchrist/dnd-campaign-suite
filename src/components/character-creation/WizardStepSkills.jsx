@@ -26,19 +26,25 @@ const getClassSlotBlockReason = (expertiseLimits) => {
   return 'All class expertise slots are used';
 };
 
+const isFeatRestrictedSkill = (skill, expertiseLimits) =>
+  Boolean(expertiseLimits?.featExpertiseSkillLists?.some(list =>
+    list.some(s => s.trim() === skill)
+  ));
+
+const getExpertiseSlotAvailability = (skill, expertiseData, expertiseLimits) => {
+  const inClassList = !expertiseData.classRestrictedSkills || expertiseData.classRestrictedSkills.has(skill);
+  const hasClassSlots = inClassList && expertiseLimits?.classCount > 0 && expertiseData.classSlotsAvailable > 0;
+  const hasFeatSlots = expertiseLimits?.featCount > 0 && expertiseData.featSlotsUsed < expertiseLimits.featCount;
+  return { inClassList, hasClassSlots, hasFeatSlots };
+};
+
 const getExpertiseBlockReason = (skill, expertiseData, expertiseLimits) => {
   // Check if this skill is in a feat-restricted list
-  const isFeatRestricted = expertiseLimits?.featExpertiseSkillLists?.some(list =>
-    list.some(s => s.trim() === skill)
-  );
-
-  if (isFeatRestricted) {
+  if (isFeatRestrictedSkill(skill, expertiseLimits)) {
     return getFeatSlotBlockReason(expertiseData, expertiseLimits);
   }
 
-  const inClassList = !expertiseData.classRestrictedSkills || expertiseData.classRestrictedSkills.has(skill);
-  const hasClassSlots = inClassList && expertiseLimits?.classCount && expertiseLimits.classCount > 0 && expertiseData.classSlotsAvailable > 0;
-  const hasFeatSlots = expertiseLimits?.featCount && expertiseLimits.featCount > 0 && expertiseData.featSlotsUsed < expertiseLimits.featCount;
+  const { inClassList, hasClassSlots, hasFeatSlots } = getExpertiseSlotAvailability(skill, expertiseData, expertiseLimits);
 
   if (!inClassList && !hasFeatSlots) {
     return `Class expertise is limited to: ${[...expertiseData.classRestrictedSkills].join(', ')}`;

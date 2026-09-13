@@ -140,11 +140,11 @@ function isHexInBounds(q, r, hexCols, hexRows) {
   return q >= 0 && q < hexCols && r >= 0 && r < hexRows;
 }
 
-function relaxNeighbor(current, nb, to, openSet, openKeys, tentativeG) {
+function relaxNeighbor(current, nb, to, open, tentativeG) {
   const nk = hexKey(nb.q, nb.r);
   const f = tentativeG + hexDistance(nb, to);
-  if (openKeys.has(nk)) {
-    const existing = openSet.find(n => n.q === nb.q && n.r === nb.r);
+  if (open.keys.has(nk)) {
+    const existing = open.set.find(n => n.q === nb.q && n.r === nb.r);
     if (tentativeG < existing.g) {
       existing.g = tentativeG;
       existing.f = f;
@@ -153,13 +153,13 @@ function relaxNeighbor(current, nb, to, openSet, openKeys, tentativeG) {
     return;
   }
 
-  openSet.push({
+  open.set.push({
     q: nb.q, r: nb.r,
     g: tentativeG,
     f,
     parent: current,
   });
-  openKeys.add(nk);
+  open.keys.add(nk);
 }
 
 function neighborMoveCost(nk, nb, terrain, roads) {
@@ -168,14 +168,16 @@ function neighborMoveCost(nk, nb, terrain, roads) {
   return TERRAIN_MOVE_COST[terrainType];
 }
 
-export function calculatePath(from, to, hexCols, hexRows, terrain, roads) {
+export function calculatePath(from, to, grid) {
   if (!from || !to) return [];
   if (from.q === to.q && from.r === to.r) return [];
 
+  const { hexCols, hexRows, terrain, roads } = grid;
   const openSet = [{ q: from.q, r: from.r, g: 0, f: hexDistance(from, to), parent: null }];
   const closedKeys = new Set();
   const openKeys = new Set();
   openKeys.add(hexKey(from.q, from.r));
+  const open = { set: openSet, keys: openKeys };
 
   while (openSet.length > 0) {
     const current = openSet.splice(findLowestFScoreIndex(openSet), 1)[0];
@@ -192,7 +194,7 @@ export function calculatePath(from, to, hexCols, hexRows, terrain, roads) {
       const nk = hexKey(nb.q, nb.r);
       if (closedKeys.has(nk) || !isHexInBounds(nb.q, nb.r, hexCols, hexRows)) continue;
       if (TERRAIN_MOVE_COST[terrain[nk] || DEFAULT_TERRAIN] === null) continue;
-      relaxNeighbor(current, nb, to, openSet, openKeys, current.g + neighborMoveCost(nk, nb, terrain, roads));
+      relaxNeighbor(current, nb, to, open, current.g + neighborMoveCost(nk, nb, terrain, roads));
     }
   }
 

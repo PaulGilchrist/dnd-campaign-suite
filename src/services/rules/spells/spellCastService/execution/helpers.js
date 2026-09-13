@@ -141,7 +141,7 @@ function logDispelCheck({ campaignName, playerStats, targetName, d20, totalCheck
     }));
 }
 
-function refundDispelSpellBreakerSlot(spellBreaker, spell, metaCtx, playerStats, spellLevel, campaignName) {
+function refundDispelSpellBreakerSlot({ spellBreaker, spell, metaCtx, playerStats, spellLevel, campaignName }) {
     if (!spellBreaker?.slotRetentionSpells?.includes('Dispel Magic') || !usesSpellSlot(spell, metaCtx)) return;
     refundSpellBreakerSlot(playerStats.name, spellLevel, campaignName);
     addEntry(campaignName, {
@@ -174,11 +174,11 @@ async function triggerDispelMagic(metaCtx, spell, playerStats, campaignName, _ma
     logDispelCheck({ campaignName, playerStats, targetName, d20, totalCheckBonus, total, targetDC, checkFailed });
 
     if (checkFailed) {
-        refundDispelSpellBreakerSlot(spellBreaker, spell, metaCtx, playerStats, spellLevel, campaignName);
+        refundDispelSpellBreakerSlot({ spellBreaker, spell, metaCtx, playerStats, spellLevel, campaignName });
     }
 }
 
-function powerWordHealDamage(combatSummary, targetName, playerStats, campaignName, maxHp, currentHp) {
+function powerWordHealDamage({ combatSummary, targetName, playerStats, campaignName, maxHp, currentHp }) {
     const healAmount = Math.max(0, maxHp - currentHp);
     if (healAmount <= 0) return;
 
@@ -260,7 +260,7 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName,
         ? (getRuntimeValue(targetName, 'currentHitPoints') ?? creature.currentHp ?? maxHp)
         : (creature.currentHp ?? maxHp);
 
-    powerWordHealDamage(combatSummary, targetName, playerStats, campaignName, maxHp, currentHp);
+    powerWordHealDamage({ combatSummary, targetName, playerStats, campaignName, maxHp, currentHp });
     powerWordHealConditions(targetName, campaignName);
 }
 
@@ -292,7 +292,7 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName,
             note: 'Power Word Kill',
         }).catch((e) => { console.error("[spellCast] Error:", e); });
 
-        await applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], campaignName, [], { ignoreResistance: false, attackerName: playerStats.name });
+        await applyDamageToTarget(combatSummary, targetName, currentHp, ['Psychic'], { campaignName, characters: [], ignoreResistance: false, attackerName: playerStats.name });
 
         window.dispatchEvent(new CustomEvent('damage-popup', {
             detail: {
@@ -307,7 +307,7 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName,
         const damageFormula = '12d12';
         const damageResult = rollExpression(damageFormula);
         const totalDamage = damageResult?.total ?? 0;
-        await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Psychic'], campaignName, [], { ignoreResistance: false, attackerName: playerStats.name });
+        await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Psychic'], { campaignName, characters: [], ignoreResistance: false, attackerName: playerStats.name });
 
         window.dispatchEvent(new CustomEvent('damage-popup', {
             detail: {
@@ -410,7 +410,7 @@ function logRegenerateHealEntry({ spell, targetName, caster, campaignName, expre
 }
 
 // Rolls the initial Regenerate healing, applies it, and logs the hp_change entry.
-async function applyRegenerateInitialHeal(spell, targetName, caster, campaignName, expression, bonusHeal, bonusDetails) {
+async function applyRegenerateInitialHeal({ spell, targetName, caster, campaignName, expression, bonusHeal, bonusDetails }) {
     const result = rollRegenerateHeal(expression, caster, targetName, campaignName);
     if (!result) return { initialHeal: 0, result };
 
@@ -449,13 +449,13 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
     }
     const expression = resolveRegenerateExpression(healAtSlotLevel, slotLevel);
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(caster, caster.proficiency || 0, caster.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(caster, { prof: caster.proficiency || 0, level: caster.level || 1, slotLevel, campaignName });
 
     // Apply initial healing
     let initialHeal = 0;
     let result = null;
     if (expression) {
-        const healed = await applyRegenerateInitialHeal(spell, targetName, caster, campaignName, expression, bonusHeal, bonusDetails);
+        const healed = await applyRegenerateInitialHeal({ spell, targetName, caster, campaignName, expression, bonusHeal, bonusDetails });
         initialHeal = healed.initialHeal;
         result = healed.result;
     }
@@ -465,9 +465,9 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
     await setRuntimeValue(targetName, 'regenerateSource', casterName, campaignName);
 
     // Add expiration for combat: remove regenerate buff after 1 hour (3600 seconds / 6 = 600 rounds)
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_regenerate_buff' }
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -515,7 +515,7 @@ function applyMissileDamage({ combatSummary, targetName, totalTargetDamage, dama
         return { finalDamage: 0, damageReduced: true, isShieldActive };
     }
     const ignoreResistance = resolveIgnoreResistance(playerStats);
-    const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: casterName });
+    const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: casterName });
     if (applyResult && applyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(casterName, campaignName);
     }
@@ -577,12 +577,12 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, ge
 
         const missileFormula = missileCount === 1 ? missileDamage : `${missileCount}× ${missileDamage}`;
 
-        rollDamage(`Magic Missile (${targetName})`, missileFormula, totalTargetDamage, missileRolls, 0, {
+        rollDamage({ name: `Magic Missile (${targetName})`, formula: missileFormula, total: totalTargetDamage, rolls: missileRolls, modifier: 0, context: {
             targetName,
             isAutoDamage: true,
             damageType,
             isAutoHit: true,
-        });
+        } });
 
         logEntries.push({
             type: 'roll',

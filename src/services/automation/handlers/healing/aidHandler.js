@@ -87,9 +87,9 @@ export async function applyAid(action, playerStats, campaignName, _mapName, targ
             setRuntimeValue(targetName, 'currentHitPoints', Math.min(currentHp + hpIncrease, currentHp + hpIncrease), campaignName);
         }
 
-        addExpiration(playerStats.name, targetName, [
+        addExpiration({ attackerName: playerStats.name, targetName, effects: [
             { type: 'remove_aid_buff', buffName: AID_BUFF_NAME, hpKey: 'aidHpMaxIncrease' }
-        ], campaignName);
+        ], campaignName });
 
         const aidBuff = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
         const buffs = Array.isArray(aidBuff) ? aidBuff : [];

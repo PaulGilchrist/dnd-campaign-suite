@@ -219,7 +219,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
   for (const { name, level, upcastLevel, upcastSlotKey, expectedMaxTargets } of spellCases) {
     it(`parses maxTargets from ${name} upcast_at_slot_level["${upcastSlotKey}"]`, () => {
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
       );
 
       const pendingKey = name === 'Hold Monster' ? 'pendingHoldMonster'
@@ -245,7 +245,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('returns null maxTargets when upcast_at_slot_level has no matching slot key', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -262,7 +262,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('returns null maxTargets when upcast_at_slot_level is missing', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -278,7 +278,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('returns null maxTargets when upcast_at_slot_value is not a string', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -295,7 +295,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('parses maxTargets from value with surrounding text (regex finds embedded number)', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -313,7 +313,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('falls back to spell.level when upcastLevel is not provided', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -329,7 +329,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('returns null maxTargets when upcast_at_slot_level is not an object', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -346,7 +346,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('returns null maxTargets when upcast_at_slot_level is null', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -363,7 +363,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('parses singular "target" variant', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -380,7 +380,7 @@ describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
 
   it('parses uppercase "TARGETS" variant', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {

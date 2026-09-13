@@ -96,17 +96,38 @@ describe('enhanceAbilityHandler', () => {
 
   describe('applyEnhanceAbility', () => {
     it('returns null when no targets or ability provided', async () => {
-      const result = await applyEnhanceAbility(makeAction(), makePlayerStats(), campaignName, null, [], 'STR');
+      const result = await applyEnhanceAbility({
+    action: makeAction(),
+    playerStats: makePlayerStats(),
+    campaignName,
+    mapName: null,
+    targetNames: [],
+    ability: 'STR',
+});
       expect(result).toBeNull();
 
-      const result2 = await applyEnhanceAbility(makeAction(), makePlayerStats(), campaignName, null, ['Wolf'], null);
+      const result2 = await applyEnhanceAbility({
+    action: makeAction(),
+    playerStats: makePlayerStats(),
+    campaignName,
+    mapName: null,
+    targetNames: ['Wolf'],
+    ability: null,
+});
       expect(result2).toBeNull();
     });
 
     it('adds enhance_ability targetEffect with concentration duration', async () => {
       getRuntimeValue.mockReturnValue([]);
 
-      await applyEnhanceAbility(makeAction(), makePlayerStats(), campaignName, null, ['Wolf'], 'STR');
+      await applyEnhanceAbility({
+    action: makeAction(),
+    playerStats: makePlayerStats(),
+    campaignName,
+    mapName: null,
+    targetNames: ['Wolf'],
+    ability: 'STR',
+});
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'campaign',
@@ -127,7 +148,14 @@ describe('enhanceAbilityHandler', () => {
         { target: 'Wolf', effect: 'enhance_ability', source: 'TestCaster', ability: 'DEX', duration: 'concentration' },
       ]);
 
-      await applyEnhanceAbility(makeAction(), makePlayerStats(), campaignName, null, ['Wolf'], 'WIS');
+      await applyEnhanceAbility({
+    action: makeAction(),
+    playerStats: makePlayerStats(),
+    campaignName,
+    mapName: null,
+    targetNames: ['Wolf'],
+    ability: 'WIS',
+});
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'campaign',
@@ -143,7 +171,14 @@ describe('enhanceAbilityHandler', () => {
       ];
       getRuntimeValue.mockReturnValue(existing);
 
-      await applyEnhanceAbility(makeAction(), makePlayerStats(), campaignName, null, ['Wolf'], 'INT');
+      await applyEnhanceAbility({
+    action: makeAction(),
+    playerStats: makePlayerStats(),
+    campaignName,
+    mapName: null,
+    targetNames: ['Wolf'],
+    ability: 'INT',
+});
 
       const effects = setRuntimeValue.mock.calls[0][2];
       expect(effects).toHaveLength(2);
@@ -153,7 +188,14 @@ describe('enhanceAbilityHandler', () => {
     it('logs ability_use entry with ability label', async () => {
       getRuntimeValue.mockReturnValue([]);
 
-      await applyEnhanceAbility(makeAction(), makePlayerStats(), campaignName, null, ['Wolf'], 'CHA');
+      await applyEnhanceAbility({
+    action: makeAction(),
+    playerStats: makePlayerStats(),
+    campaignName,
+    mapName: null,
+    targetNames: ['Wolf'],
+    ability: 'CHA',
+});
 
       expect(addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -170,7 +212,14 @@ describe('enhanceAbilityHandler', () => {
     it('returns automation_info popup with outcome', async () => {
       getRuntimeValue.mockReturnValue([]);
 
-      const result = await applyEnhanceAbility(makeAction(), makePlayerStats(), campaignName, null, ['Wolf'], 'STR');
+      const result = await applyEnhanceAbility({
+    action: makeAction(),
+    playerStats: makePlayerStats(),
+    campaignName,
+    mapName: null,
+    targetNames: ['Wolf'],
+    ability: 'STR',
+});
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');

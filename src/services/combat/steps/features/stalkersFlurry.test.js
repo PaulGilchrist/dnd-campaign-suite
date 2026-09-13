@@ -101,7 +101,13 @@ describe('stalkersFlurry feature step (CLA-326)', () => {
     const result = await stalkersFlurry.handler(ctx, { formula: '1d8+2', total: 5 });
 
     expect(result.modal).toBeUndefined();
-    expect(resolveMassFear).toHaveBeenCalledWith('test-campaign', 'FeyRanger', 'Thug 1', expect.objectContaining({ effect: 'mass_fear' }), playerStats, null);
+    expect(resolveMassFear).toHaveBeenCalledWith({
+    campaignName: 'test-campaign',
+    casterName: 'FeyRanger',
+    primaryTargetName: 'Thug 1',
+    option: expect.objectContaining({ effect: 'mass_fear' }),
+    playerStats,
+});
 
     await result.sideEffects();
 

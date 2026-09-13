@@ -9,7 +9,7 @@ import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 
-function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
+function dispatchSaveResult({ campaignName, promptId, targetName, saveType, saveDc, saveResult }) {
     sendSaveResult(campaignName, targetName, {
         promptId,
         success: saveResult.success,
@@ -99,9 +99,9 @@ async function applyAnimalFriendshipCharm({ campaignName, casterName, action: _a
     });
 
     // Add long rest expiration (24-hour duration)
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
-    ], campaignName);
+    ], campaignName });
 
     // Track for early end on damage
     trackAnimalFriendshipTarget(casterName, targetName, campaignName);
@@ -180,7 +180,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             const creature = csForTracking.creatures.find(c => c.name === targetName);
             if (creature && creature.type === 'npc') {
                 const saveResult = rollSaveForCreature(creature, 'WIS', dc, false, false);
-                dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, saveResult);
+                dispatchSaveResult({ campaignName, promptId, targetName, saveType: 'WIS', saveDc: dc, saveResult });
             }
         }
 

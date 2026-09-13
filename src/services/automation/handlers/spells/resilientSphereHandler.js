@@ -41,10 +41,10 @@ async function encloseInResilientSphere({ action, auto, casterName, targetName, 
     setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName, true);
 
     if (!wasActive) {
-        addExpiration(casterName, targetName, [
+        addExpiration({ attackerName: casterName, targetName, effects: [
             { type: 'remove_active_buff', buffName: action.name, effect: 'resilient_sphere' },
             { type: 'remove_target_effect', effectKey: 'resilient_sphere', target: targetName, source: casterName }
-        ], campaignName);
+        ], campaignName });
     }
 
     addEntry(campaignName, {
@@ -132,7 +132,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Ally auto-fails the save — no prompt needed
     const saveResult = isAlly
         ? { success: false, roll: 0, total: 0 }
-        : await promptResilientSphereSave(action, auto, campaignName, casterName, targetName, dc);
+        : await promptResilientSphereSave({ action, campaignName, casterName, targetName, dc });
 
     if (saveResult.success) {
         await addTargetResult(campaignName, {
@@ -168,7 +168,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     return encloseInResilientSphere({ action, auto, casterName, targetName, dc, saveResult, campaignName });
 }
 
-async function promptResilientSphereSave(action, auto, campaignName, casterName, targetName, dc) {
+async function promptResilientSphereSave({ action, campaignName, casterName, targetName, dc }) {
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,
         saveType: 'DEX',

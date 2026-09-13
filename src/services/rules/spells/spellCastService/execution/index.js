@@ -240,13 +240,13 @@ async function runStatusEffectsFallback({ spell, fullSpell, metaCtx, playerStats
         isCantrip: spell.baseLevel === 0 || spell.level === 0,
         statusEffects: spell.status_effects,
     };
-    rollDamage(spell.name, '0', 0, [], 0, context);
+    rollDamage({ name: spell.name, formula: '0', total: 0, rolls: [], modifier: 0, context: context });
 }
 
 // CLA-322: ability check resolves inside triggerDispelMagic — it logs
 // the check, dispatches `spell-result` with `checkFailed`, and refunds
 // the slot inline (keyed by cast slot level) when Spell Breaker is held.
-async function runDispelMagicFallback(spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo) {
+async function runDispelMagicFallback({ spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo }) {
     const isDispelMagic = spell.name && spell.name.toLowerCase() === 'dispel magic';
     if (!isDispelMagic) return;
     const dispelTarget = await getTargetInfo();
@@ -259,48 +259,48 @@ async function runDispelMagicFallback(spell, metaCtx, playerStats, campaignName,
 async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage }) {
     const noDamageTriggers = [
         async () => passThrough(await handleRegenerate(spell, getTargetInfo, applyRegenerateSpell, playerStats, campaignName)),
-        () => passThrough(handleFear(spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive)),
+        () => passThrough(handleFear({ spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive })),
         () => passThrough(handleConjureVolley(spell, fullSpell)),
         async () => swallow(await handleSeeInvisibility(spell, metaCtx, playerStats, campaignName, mapName)),
-        async () => swallow(await handleFleshToStone(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleHoldMonster(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleBanishment(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleConfusion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleMaze(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => passThrough(await handlePowerWordStun(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleHypnoticPattern(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleSlow(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleBane(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleBless(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleBeaconOfHope(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleMassSuggestionTrigger(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleSuggestion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleCommand(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
-        async () => swallow(await handleOttoDance(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleResilientSphere(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
+        async () => swallow(await handleFleshToStone({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleHoldMonster({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleBanishment({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleConfusion({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleMaze({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => passThrough(await handlePowerWordStun({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleHypnoticPattern({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleSlow({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleBane({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleBless({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleBeaconOfHope({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleMassSuggestionTrigger({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleSuggestion({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleCommand({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
+        async () => swallow(await handleOttoDance({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleResilientSphere({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => swallow(await handleBlur(spell, metaCtx, playerStats, campaignName, mapName)),
         async () => swallow(await handleExpeditiousRetreat(spell, metaCtx, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleFriends(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleCrownOfMadness(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleAnimalFriendship(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleDominateBeast(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleDominateMonster(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleDominatePerson(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
-        async () => swallow(await handleRayOfEnfeeblement(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleCompelledDuel(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName)),
+        async () => passThrough(await handleFriends({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleCrownOfMadness({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleAnimalFriendship({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleDominateBeast({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleDominateMonster({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleDominatePerson({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
+        async () => swallow(await handleRayOfEnfeeblement({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleCompelledDuel({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
         async () => passThrough(await handleGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName)),
         async () => passThrough(await handleForcecage(spell, metaCtx, playerStats, campaignName, mapName)),
         () => passThrough(handleSilence({ spell, metaCtx, playerStats, campaignName, getCombatSummary: (cn) => getCombatSummary(cn) })),
-        async () => swallow(await handleStinkingCloud(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => swallow(await handleSleetStorm(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleFaerieFire(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleTashasHideousLaughter(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleImprisonment(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName)),
-        async () => passThrough(await handleHeroism(spell, playerStats, campaignName, mapName, characters, executeHandler)),
+        async () => swallow(await handleStinkingCloud({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => swallow(await handleSleetStorm({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleFaerieFire({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleTashasHideousLaughter({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleImprisonment({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        async () => passThrough(await handleHeroism({ spell, playerStats, campaignName, mapName, characters, executeHandler })),
         async () => swallow(await handleHolyAuraTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
         async () => passThrough(await handleLongstrider(spell, playerStats, campaignName, mapName, executeHandler)),
-        async () => passThrough(await handleSpareTheDying(spell, playerStats, campaignName, mapName, characters, executeHandler)),
-        async () => passThrough(await handleEnhanceAbility(spell, metaCtx, playerStats, campaignName, mapName, characters, executeHandler)),
+        async () => passThrough(await handleSpareTheDying({ spell, playerStats, campaignName, mapName, characters, executeHandler })),
+        async () => passThrough(await handleEnhanceAbility({ spell, metaCtx, playerStats, campaignName, mapName, characters, executeHandler })),
     ];
     const earlyOutcome = await runTriggerChain(noDamageTriggers);
     if (earlyOutcome) return { handled: true, value: earlyOutcome.value };
@@ -333,13 +333,13 @@ async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaig
 
     const removeCurseResult = await handleRemoveCurseTrigger(spell, metaCtx, playerStats, campaignName, mapName);
     if (removeCurseResult.handled) {
-        await runDispelMagicFallback(spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo);
+        await runDispelMagicFallback({ spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo });
         return { handled: true };
     }
 
-    await runDispelMagicFallback(spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo);
+    await runDispelMagicFallback({ spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo });
 
-    const resistanceResult = await handleResistance(spell, playerStats, campaignName, mapName, characters, executeHandler, metaCtx);
+    const resistanceResult = await handleResistance({ spell, playerStats, campaignName, mapName, characters, executeHandler, metaCtx });
     if (resistanceResult.handled) return { handled: true };
 
     return { handled: false };
@@ -371,7 +371,7 @@ async function applyHealToCombat(actualHeal, targetName, campaignName) {
 }
 
 // 'max' expression branch — heals target to full.
-async function applyMaxHeal(spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails) {
+async function applyMaxHeal({ spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails }) {
     const { maxHp, currentHp } = resolveTargetHpBounds(target, playerStats, characters);
     const actualHeal = maxHp - currentHp;
     const genericHealResult = { targetName: target.name, healAmount: Math.max(0, actualHeal), formula: 'max', rolls: [], rawTotal: Math.max(0, actualHeal), bonusHeal, bonusDetails };
@@ -419,7 +419,7 @@ async function applyRolledHeal({ spell, target, playerStats, characters, campaig
     return genericHealResult;
 }
 
-async function resolveGenericHeal(spell, target, metaCtx, playerStats, campaignName, characters, spellCastingMod) {
+async function resolveGenericHeal({ spell, target, metaCtx, playerStats, campaignName, characters, spellCastingMod }) {
     if (metaCtx?.slotLevel == null && spell.level == null) {
         console.error('[spellCast] executeSpellCast: slot level is missing (metaCtx.slotLevel and spell.level) for healing spell');
         throw new Error('slot level is required for healing spell');
@@ -429,9 +429,9 @@ async function resolveGenericHeal(spell, target, metaCtx, playerStats, campaignN
     if (!expression) return null;
     const targetChar = (characters || []).find(c => c.name === target.name);
     const targetStats = targetChar?.computedStats || targetChar;
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName, targetStats);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName, targetStats });
     if (expression === 'max') {
-        return await applyMaxHeal(spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails);
+        return await applyMaxHeal({ spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails });
     }
     return await applyRolledHeal({ spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails });
 }
@@ -442,7 +442,7 @@ async function runGenericHealPath({ spell, metaCtx, playerStats, campaignName, m
     const target = explicitTarget || await getTargetInfo();
     let genericHealResult = null;
     if (target?.name) {
-        genericHealResult = await resolveGenericHeal(spell, target, metaCtx, playerStats, campaignName, characters, spellCastingMod);
+        genericHealResult = await resolveGenericHeal({ spell, target, metaCtx, playerStats, campaignName, characters, spellCastingMod });
     }
 
     triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
@@ -473,7 +473,7 @@ async function castHex(spell, metaCtx, playerStats, campaignName, getTargetInfo)
 }
 
 // --- Post-cast triggers — returns the Wild Magic Surge popup (if any).
-async function runPostCastTriggers(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo) {
+async function runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo }) {
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
     });
@@ -555,7 +555,7 @@ async function runAutoMissPath({ spell, fullSpell, metaCtx, playerStats, campaig
         metamagicHeighten: metaCtx?.metamagicHeighten,
         isCantrip: spell.baseLevel === 0 || spell.level === 0,
     };
-    rollDamage(spell.name, formula || '0', 0, [], 0, context);
+    rollDamage({ name: spell.name, formula: formula || '0', total: 0, rolls: [], modifier: 0, context: context });
     if (spell.dc || fullSpell.dc) {
         await handleSavePath({ spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
             getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
@@ -622,14 +622,14 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     // --- Power Word Heal/Kill, modal spells, generic automation (early returns) ---
     const earlyResult = await runTriggerChain([
-        async () => passThrough(await handlePowerWordHeal(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget)),
-        async () => passThrough(await handlePowerWordKill(spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget)),
+        async () => passThrough(await handlePowerWordHeal({ spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget })),
+        async () => passThrough(await handlePowerWordKill({ spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordKillToTarget })),
         () => passThrough(handleMassSuggestion(spell, spellSaveDc, playerStats, campaignName)),
         () => passThrough(handleCalmEmotions(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx)),
-        () => passThrough(handleHypnoticPatternEarly(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive)),
+        () => passThrough(handleHypnoticPatternEarly({ fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive })),
         () => { const r = handleConfusionEarly({ fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, triggerConfusion: (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp) }); return r.handled ? { value: r.result?.result } : null; },
-        () => passThrough(handleShapechange(fullSpell, metaCtx, playerStats, campaignName, mapName, characters)),
-        () => passThrough(handleSleep(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters)),
+        () => passThrough(handleShapechange({ fullSpell, metaCtx, playerStats, campaignName, mapName, characters })),
+        () => passThrough(handleSleep({ fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters })),
         async () => { const r = await handleGenericAutomation({ spell, executeHandler, playerStats, campaignName, mapName, characters, metaCtx }); return r.handled ? { value: r.result || undefined } : null; },
     ]);
     if (earlyResult) return earlyResult.value;
@@ -649,7 +649,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     let finalFormula = computeBlessedStrikes(spell, empEvocFormula, playerStats, campaignName, getRuntimeValue);
     finalFormula = computeRadiantSoul(spell, playerStats, campaignName, getRuntimeValue, finalFormula);
     metaCtx = { ...metaCtx, finalFormula };
-    const { overchannelFormula, overchannelActive, overchannelUseCount } = computeOverchannel(spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, finalFormula);
+    const { overchannelFormula, overchannelActive, overchannelUseCount } = computeOverchannel({ spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, baseFormula: finalFormula });
 
     const savePathOpts = { spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
         getTargetInfo, getRuntimeValue, innateSorceryActive, effectiveDamageType, spellSaveDc,
@@ -672,7 +672,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
 
     // --- Post-cast triggers ---
-    return await runPostCastTriggers(spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo);
+    return await runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo });
 }
 
 export { refundSpellBreakerSlot };

@@ -51,11 +51,7 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           createMockEvent(),
-          true,
-          null,
-          null,
-          getGrid,
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: getGrid, svgRef }
         );
       });
       act(() => {
@@ -89,11 +85,7 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           createMockEvent(),
-          true,
-          null,
-          null,
-          getGrid,
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: getGrid, svgRef }
         );
       });
       expect(result.current.rulerStart).toEqual({ gridX: 3, gridY: 4 });
@@ -117,21 +109,13 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           createMockEvent(),
-          true,
-          null,
-          null,
-          getGrid,
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: getGrid, svgRef }
         );
       });
       act(() => {
         result.current.handleRulerPointerDown(
           createMockEvent(),
-          true,
-          result.current.rulerStart,
-          null,
-          getGrid,
-          svgRef
+          { rulerMode: true, rulerStart: result.current.rulerStart, rulerEnd: null, getGridFromEvent: getGrid, svgRef }
         );
       });
       expect(result.current.rulerStart).toEqual({ gridX: 5, gridY: 6 });
@@ -166,11 +150,7 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           event,
-          false,
-          null,
-          null,
-          getGrid,
-          svgRef
+          { rulerMode: false, rulerStart: null, rulerEnd: null, getGridFromEvent: getGrid, svgRef }
         );
       });
 
@@ -186,11 +166,7 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           event,
-          true,
-          null,
-          null,
-          () => null,
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: () => null, svgRef }
         );
       });
 
@@ -206,11 +182,7 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           event,
-          true,
-          null,
-          null,
-          createMockGetGrid(1, 1),
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: createMockGetGrid(1, 1), svgRef }
         );
       });
 
@@ -225,11 +197,7 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           event,
-          true,
-          null,
-          null,
-          createMockGetGrid(1.9, 2.1),
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: createMockGetGrid(1.9, 2.1), svgRef }
         );
       });
 
@@ -249,21 +217,13 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           event1,
-          true,
-          null,
-          null,
-          createMockGetGrid(1.5, 2.7),
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: createMockGetGrid(1.5, 2.7), svgRef }
         );
       });
       act(() => {
         result.current.handleRulerPointerDown(
           event2,
-          true,
-          result.current.rulerStart,
-          null,
-          createMockGetGrid(5.3, 6.8),
-          svgRef
+          { rulerMode: true, rulerStart: result.current.rulerStart, rulerEnd: null, getGridFromEvent: createMockGetGrid(5.3, 6.8), svgRef }
         );
       });
 
@@ -282,31 +242,19 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           event1,
-          true,
-          null,
-          null,
-          createMockGetGrid(1.5, 2.7),
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: createMockGetGrid(1.5, 2.7), svgRef }
         );
       });
       act(() => {
         result.current.handleRulerPointerDown(
           event2,
-          true,
-          result.current.rulerStart,
-          null,
-          createMockGetGrid(5.3, 6.8),
-          svgRef
+          { rulerMode: true, rulerStart: result.current.rulerStart, rulerEnd: null, getGridFromEvent: createMockGetGrid(5.3, 6.8), svgRef }
         );
       });
       act(() => {
         result.current.handleRulerPointerDown(
           event3,
-          true,
-          result.current.rulerStart,
-          result.current.rulerEnd,
-          createMockGetGrid(10.1, 11.9),
-          svgRef
+          { rulerMode: true, rulerStart: result.current.rulerStart, rulerEnd: result.current.rulerEnd, getGridFromEvent: createMockGetGrid(10.1, 11.9), svgRef }
         );
       });
 
@@ -323,11 +271,7 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           event,
-          true,
-          null,
-          null,
-          createMockGetGrid(1, 1),
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: createMockGetGrid(1, 1), svgRef }
         );
       });
 
@@ -342,11 +286,7 @@ describe('useRuler', () => {
       act(() => {
         result.current.handleRulerPointerDown(
           event,
-          true,
-          null,
-          null,
-          createMockGetGrid(-1.2, -3.8),
-          svgRef
+          { rulerMode: true, rulerStart: null, rulerEnd: null, getGridFromEvent: createMockGetGrid(-1.2, -3.8), svgRef }
         );
       });
 

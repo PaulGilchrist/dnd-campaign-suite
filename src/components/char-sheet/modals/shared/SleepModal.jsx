@@ -40,14 +40,14 @@ function SleepModal({
             timestamp: Date.now(),
         }).catch((e) => { console.error('[SleepModal] Error logging feature use:', e); });
 
-        await triggerSleep(
-            spell || { name: action.name, level: 1 },
-            { spellSaveDc: saveDc, selectedTargets: selectedNames, heightenTarget },
+        await triggerSleep({
+            spell: spell || { name: action.name, level: 1 },
+            metaCtx: { spellSaveDc: saveDc, selectedTargets: selectedNames, heightenTarget },
             playerStats,
             campaignName,
-            null,
+            mapName: null,
             characters
-        );
+        });
 
         onClose();
     }, [campaignName, playerStats, action.name, saveDc, spell, heightenTarget, characters, onClose]);

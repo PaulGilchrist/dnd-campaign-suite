@@ -180,6 +180,14 @@ function placeRooms({ rooms, grid, gridSize, minRoom, maxRoom, targetRooms, layo
   return placedItems;
 }
 
+function pushUnvisitedNeighbors(queue, rooms, id, visited) {
+  const r = rooms.find(rr => rr.id === id);
+  if (!r) return;
+  for (const cid of r.connected) {
+    if (!visited.has(cid)) queue.push(cid);
+  }
+}
+
 function findClusters(rooms) {
   const visited = new Set();
   const clusters = [];
@@ -192,12 +200,7 @@ function findClusters(rooms) {
       if (visited.has(id)) continue;
       visited.add(id);
       cluster.push(id);
-      const r = rooms.find(rr => rr.id === id);
-      if (r) {
-        for (const cid of r.connected) {
-          if (!visited.has(cid)) queue.push(cid);
-        }
-      }
+      pushUnvisitedNeighbors(queue, rooms, id, visited);
     }
     clusters.push(cluster);
   }

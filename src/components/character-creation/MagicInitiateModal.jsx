@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { renderMarkdown } from '../../services/ui/sanitize.js';
+import SpellDetails from './SpellDetails.jsx';
 import './MagicInitiateModal.css';
 
 const FIVE_E_CLASSES = ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard'];
@@ -346,35 +346,6 @@ function MagicInitiateModal({ formData, allSpells, onArrayFieldChange, onClose }
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function SpellDetails({ spell, expanded, onToggle }) {
-  if (!spell) return null;
-  return (
-    <div className={`mi-spell-details ${expanded ? 'expanded' : ''}`}>
-      <button className="mi-spell-details-toggle" onClick={onToggle}>
-        <i className={`fa-solid ${expanded ? 'fa-caret-down' : 'fa-caret-right'}`}></i>
-        {spell.name} details
-      </button>
-      {expanded && (
-        <div className="mi-spell-details-content">
-          {spell.description && spell.description[0] && (
-            <div className="mi-spell-desc" dangerouslySetInnerHTML={{ __html: renderMarkdown(spell.description[0]) }} />
-          )}
-          <div className="mi-spell-meta">
-            {spell.school && <span>School: {spell.school}</span>}
-            {spell.casting_time && <span>Casting: {spell.casting_time}</span>}
-            {spell.ritual && <span>Ritual</span>}
-            {spell.concentration && <span>Concentration</span>}
-            {spell.duration && <span>Duration: {spell.duration}</span>}
-            {spell.components && <span>Components: {spell.components.join(', ')}</span>}
-            {spell.damage && spell.damage.damage_type && <span>Damage: {spell.damage.damage_type}</span>}
-            {spell.material && <span>Material: {spell.material}</span>}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

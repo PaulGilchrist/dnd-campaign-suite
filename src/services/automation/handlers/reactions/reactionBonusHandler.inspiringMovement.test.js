@@ -207,7 +207,14 @@ describe('applyInspiringMovement', () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ usesMax: 3 });
 
-    const result = await applyInspiringMovement(action, ps, campaignName, 'Fighter', 15, true);
+    const result = await applyInspiringMovement({
+    action,
+    playerStats: ps,
+    campaignName,
+    allyName: 'Fighter',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Bard', 'bardicInspirationUses', 2, campaignName
@@ -219,21 +226,33 @@ describe('applyInspiringMovement', () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ noOAs: true });
 
-    await applyInspiringMovement(action, ps, campaignName, 'Fighter', 15, true);
+    await applyInspiringMovement({
+    action,
+    playerStats: ps,
+    campaignName,
+    allyName: 'Fighter',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Bard', 'inspiringMovementNoOA', true, campaignName
     );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Bard', [{ type: 'inspiring_movement_no_oa' }], campaignName, undefined, 'Bard'
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard', targetName: 'Bard', effects: [{ type: 'inspiring_movement_no_oa' }], campaignName, rounds: undefined, expireOnCreatureName: 'Bard' });
   });
 
   it('grants no-OA and movement granted to ally', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ noOAs: true });
 
-    await applyInspiringMovement(action, ps, campaignName, 'Fighter', 15, true);
+    await applyInspiringMovement({
+    action,
+    playerStats: ps,
+    campaignName,
+    allyName: 'Fighter',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Fighter', 'inspiringMovementGranted', true, campaignName
@@ -241,19 +260,22 @@ describe('applyInspiringMovement', () => {
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Fighter', 'inspiringMovementNoOA', true, campaignName
     );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Fighter', [{ type: 'inspiring_movement_no_oa' }], campaignName, undefined, 'Bard'
-    );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Fighter', [{ type: 'inspiring_movement_granted' }], campaignName, undefined, 'Bard'
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard', targetName: 'Fighter', effects: [{ type: 'inspiring_movement_no_oa' }], campaignName, rounds: undefined, expireOnCreatureName: 'Bard' });
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard', targetName: 'Fighter', effects: [{ type: 'inspiring_movement_granted' }], campaignName, rounds: undefined, expireOnCreatureName: 'Bard' });
   });
 
   it('logs to campaign with ally', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ noOAs: true });
 
-    await applyInspiringMovement(action, ps, campaignName, 'Fighter', 15, true);
+    await applyInspiringMovement({
+    action,
+    playerStats: ps,
+    campaignName,
+    allyName: 'Fighter',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
@@ -270,7 +292,14 @@ describe('applyInspiringMovement', () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ noOAs: true });
 
-    const result = await applyInspiringMovement(action, ps, campaignName, 'Fighter', 15, true);
+    const result = await applyInspiringMovement({
+    action,
+    playerStats: ps,
+    campaignName,
+    allyName: 'Fighter',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
@@ -341,7 +370,14 @@ describe('CLA-199 — applyInspiringMovement expends Bardic Inspiration', () => 
   });
 
   it('decrements bardicInspirationUses 5→4 when runtime key unset (defaults to tracked max)', async () => {
-    const result = await applyInspiringMovement(make2024Action(), trackedBard(5), campaignName, 'HexWarlock', 15, true);
+    const result = await applyInspiringMovement({
+    action: make2024Action(),
+    playerStats: trackedBard(5),
+    campaignName,
+    allyName: 'HexWarlock',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Bard', 'bardicInspirationUses', 4, campaignName
@@ -360,7 +396,14 @@ describe('CLA-199 — applyInspiringMovement expends Bardic Inspiration', () => 
   it('consumes from live runtime value when set', async () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(3);
 
-    await applyInspiringMovement(make2024Action(), trackedBard(5), campaignName, 'HexWarlock', 15, true);
+    await applyInspiringMovement({
+    action: make2024Action(),
+    playerStats: trackedBard(5),
+    campaignName,
+    allyName: 'HexWarlock',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Bard', 'bardicInspirationUses', 2, campaignName
@@ -370,13 +413,27 @@ describe('CLA-199 — applyInspiringMovement expends Bardic Inspiration', () => 
   it('never decrements below zero at 0 uses', async () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
-    await applyInspiringMovement(make2024Action(), trackedBard(5), campaignName, 'HexWarlock', 15, true);
+    await applyInspiringMovement({
+    action: make2024Action(),
+    playerStats: trackedBard(5),
+    campaignName,
+    allyName: 'HexWarlock',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(biCalls()).toHaveLength(0);
   });
 
   it('does not consume when resourceCost is not bardic_inspiration', async () => {
-    await applyInspiringMovement(makeAction({ usesMax: null, uses: 0 }), trackedBard(5), campaignName, 'HexWarlock', 15, true);
+    await applyInspiringMovement({
+    action: makeAction({ usesMax: null, uses: 0 }),
+    playerStats: trackedBard(5),
+    campaignName,
+    allyName: 'HexWarlock',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(biCalls()).toHaveLength(0);
   });
@@ -397,7 +454,14 @@ describe('CLA-199 — Agile Strikes chain does not hijack the Inspiring Movement
   it('skips agile_strike entirely when no enemy target is resolved', async () => {
     damageUtils.getTargetFromAttacker.mockReturnValue(null);
 
-    const result = await applyInspiringMovement(make2024Action(), agilePlayer(), campaignName, 'HexWarlock', 15, true);
+    const result = await applyInspiringMovement({
+    action: make2024Action(),
+    playerStats: agilePlayer(),
+    campaignName,
+    allyName: 'HexWarlock',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(automationIndex.executeHandler).not.toHaveBeenCalled();
     expect(result.payload.name).toBe('Inspiring Movement');
@@ -411,7 +475,14 @@ describe('CLA-199 — Agile Strikes chain does not hijack the Inspiring Movement
       payload: { type: 'automation_info', name: 'Agile Strikes', description: 'Hit for 5 Bludgeoning damage' },
     });
 
-    const result = await applyInspiringMovement(make2024Action(), agilePlayer(), campaignName, 'HexWarlock', 15, true);
+    const result = await applyInspiringMovement({
+    action: make2024Action(),
+    playerStats: agilePlayer(),
+    campaignName,
+    allyName: 'HexWarlock',
+    halfSpeed: 15,
+    noOAs: true,
+});
 
     expect(automationIndex.executeHandler).toHaveBeenCalled();
     expect(result.payload.name).toBe('Inspiring Movement');

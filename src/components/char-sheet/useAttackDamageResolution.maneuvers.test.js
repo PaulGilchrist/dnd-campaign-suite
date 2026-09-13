@@ -248,7 +248,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result).toEqual({
@@ -275,7 +275,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result.isMissResult).toBe(true);
@@ -299,7 +299,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result.isMissResult).toBe(true);
@@ -325,7 +325,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result.formula).toContain('+ 4');
@@ -432,7 +432,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(mockSetModalState).toHaveBeenCalledWith({ sweepingAttackTargetModal: { title: 'Select Target' } });
@@ -451,7 +451,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(mockSetPopupHtml).toHaveBeenCalledWith({ hit: true, isCrit: false });
@@ -472,7 +472,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result.isMissResult).toBe(true);
@@ -496,7 +496,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result.isMissResult).toBe(true);
@@ -510,7 +510,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 undefined, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result).toEqual({
@@ -531,7 +531,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result).toEqual({
@@ -556,7 +556,7 @@ describe('useAttackDamageResolution - attack rider maneuvers', () => {
 
             const result = await handleAttackRiderManeuverUse(
                 maneuver, attack, popupHtmlData,
-                '1d8+3', 8, [5, 3],
+                { formula: '1d8+3', total: 8, rolls: [5, 3] },
             );
 
             expect(result.pendingOptions).toBe(true);

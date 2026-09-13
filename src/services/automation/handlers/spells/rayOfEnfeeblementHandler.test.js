@@ -225,18 +225,13 @@ describe('rayOfEnfeeblementHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Test Wizard',
-                'Goblin',
-                [
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Test Wizard', targetName: 'Goblin', effects: [
                     {
                         type: 'remove_target_effect',
                         effectKey: 'ray_of_enfeeble_debuff',
                         source: 'Test Wizard',
                     },
-                ],
-                'test-campaign',
-            );
+                ], campaignName: 'test-campaign' });
         });
 
         it('uses numeric saveDc from automation (no fallback DC 10) on the save prompt', async () => {
@@ -420,20 +415,13 @@ describe('rayOfEnfeeblementHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Test Wizard',
-                'Goblin',
-                [
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Test Wizard', targetName: 'Goblin', effects: [
                     {
                         type: 'remove_target_effect',
                         effectKey: 'disadvantage_next_attack',
                         source: 'Test Wizard',
                     },
-                ],
-                'test-campaign',
-                undefined,
-                'Test Wizard'
-            );
+                ], campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'Test Wizard' });
         });
 
         it('posts an automation_info log entry for the successful save', async () => {

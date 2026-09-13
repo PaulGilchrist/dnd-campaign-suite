@@ -141,9 +141,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description: `${targetName} failed WIS save. ${targetName} is now ${conditionName} for 1 minute.`,
             }).catch((e) => { console.error("[beguilingTwist] Error:", e); });
 
-            addExpiration(playerName, targetName, [
+            addExpiration({ attackerName: playerName, targetName, effects: [
                 { type: 'condition', condition: condKey }
-            ]);
+            ] });
         } else {
             addEntry(campaignName, {
                 type: 'save_result',

@@ -14,7 +14,7 @@ function applyConditionTabEffect({ combatSummary, campaignName, characters, setC
     addCondition({ combatSummary, creatureName: data.target, conditionDef, dc: data.dc, ability: data.ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats: targetStats })
     storage.set('combatSummary', combatSummary, campaignName)
     setCombatSummary(cloneDeep(combatSummary))
-    logConditionEvent(campaignName, 'applied', data.target, conditionDef.label, data.dc, data.ability)
+    logConditionEvent({ campaignName, action: 'applied', creatureName: data.target, conditionLabel: conditionDef.label, dc: data.dc, ability: data.ability })
     return true
 }
 
@@ -36,7 +36,7 @@ function applyEffectTabEntry(campaignName, data) {
     const existing = getRuntimeValue('campaign', 'targetEffects') || []
     const filtered = existing.filter(te => !(te.target === data.target && te.effect === data.effectKey))
     setRuntimeValue('campaign', 'targetEffects', [...filtered, effectEntry], campaignName)
-    logConditionEvent(campaignName, 'target-effect-applied', data.target, data.effectKey, data.dc, data.ability)
+    logConditionEvent({ campaignName, action: 'target-effect-applied', creatureName: data.target, conditionLabel: data.effectKey, dc: data.dc, ability: data.ability })
 }
 
 function isRaging(target, campaignName) {
@@ -48,7 +48,7 @@ function applyConcentrationTabEffect({ combatSummary, campaignName, setCombatSum
     addConcentration(combatSummary, data.target, data.spellName, data.dc)
     storage.set('combatSummary', combatSummary, campaignName)
     setCombatSummary(cloneDeep(combatSummary))
-    logConditionEvent(campaignName, 'concentration-started', data.target, `Concentration: ${data.spellName}`, data.dc, 'con')
+    logConditionEvent({ campaignName, action: 'concentration-started', creatureName: data.target, conditionLabel: `Concentration: ${data.spellName}`, dc: data.dc, ability: 'con' })
 }
 
 /**

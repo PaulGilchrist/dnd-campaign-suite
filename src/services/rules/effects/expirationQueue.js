@@ -7,7 +7,7 @@ import { KEY } from './turnStartEffects.js';
 /**
  * Add an expiration entry to the runtime store.
  */
-export function addExpiration(attackerName, targetName, effects, campaignName, rounds, expireOnCreatureName) {
+export function addExpiration({ attackerName, targetName, effects, campaignName, rounds, expireOnCreatureName }) {
     let list = getRuntimeValue(attackerName, KEY);
     if (!Array.isArray(list)) {
         list = [];

@@ -157,7 +157,7 @@ describe('rules.getPlayerStats - speed', () => {
 
   it('should set speed from playerStats with no bonuses', async () => {
     const playerSummary = makePlayerSummary({ speed: 30 });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.speed).toBe(30);
   });
 });
@@ -168,14 +168,14 @@ describe('rules.getPlayerStats - racial traits', () => {
   it('should set sizeMultiplier to 2 when Powerful Build trait exists', async () => {
     setupDefaults({ race: { name: 'Hill Giant', languages: ['Common'], traits: [{ name: 'Powerful Build' }] } });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.sizeMultiplier).toBe(2);
   });
 
   it('should set canMoveThroughCreatureSpace when Halfling Nimbleness trait exists', async () => {
     setupDefaults({ race: { name: 'Lightfoot Halfling', languages: ['Common'], traits: [{ name: 'Halfling Nimbleness' }] } });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.canMoveThroughCreatureSpace).toBe(true);
   });
 });
@@ -201,7 +201,7 @@ describe('rules.getPlayerStats - feat features', () => {
       ],
     });
     const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.reactions.find((f) => f.name === 'War Caster')).toBeDefined();
     expect(result.actions.find((f) => f.name === 'Inspiring Leader')).toBeDefined();
     expect(result.bonusActions.find((f) => f.name === 'Heal Word')).toBeDefined();
@@ -215,7 +215,7 @@ describe('rules.getPlayerStats - cloning', () => {
   it('should not mutate the original playerSummary', async () => {
     const playerSummary = makePlayerSummary({ actions: [{ name: 'Attack' }] });
     const originalActions = JSON.stringify(playerSummary.actions);
-    await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(JSON.stringify(playerSummary.actions)).toBe(originalActions);
   });
 });

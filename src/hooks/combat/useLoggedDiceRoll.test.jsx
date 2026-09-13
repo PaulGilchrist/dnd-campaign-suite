@@ -117,10 +117,10 @@ describe('useLoggedDiceRoll', () => {
         useLoggedDiceRoll(characterName, campaignName)
       );
       act(() => {
-        result.current.rollDamage('Longsword', '2d6+3', 10, [3, 7], 3, { targetName: 'Goblin' });
+        result.current.rollDamage({ name: 'Longsword', formula: '2d6+3', total: 10, rolls: [3, 7], modifier: 3, context: { targetName: 'Goblin' } });
       });
       expect(mockLogDamageAndShow).toHaveBeenCalledWith(
-        'Longsword', '2d6+3', 10, [3, 7], 3, { targetName: 'Goblin' }
+        { name: 'Longsword', formula: '2d6+3', total: 10, rolls: [3, 7], modifier: 3, context: { targetName: 'Goblin' } }
       );
     });
   });

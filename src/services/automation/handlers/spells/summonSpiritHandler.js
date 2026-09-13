@@ -71,6 +71,24 @@ function resolveMonsterActions(monster, { slotLevel, spellAttackMod, spellSaveDc
     });
 }
 
+function resolveSummonedHp({ baseHp, auto, slotLevel, scale, halveHp }) {
+    let hp = scale
+        ? baseHp + (auto.hpPerLevelAbove || 0) * Math.max(0, slotLevel - (auto.baseLevel || slotLevel))
+        : baseHp;
+    // CLA-252: the Phantasmal Creatures free (spectral) cast halves the summoned creature's HP.
+    if (halveHp) {
+        hp = Math.max(1, Math.floor(hp / 2));
+    }
+    return hp;
+}
+
+function spiritWarlockOptions(options, playerStats) {
+    return {
+        warlockLevel: options.warlockLevel || playerStats.level,
+        chaModifier: options.chaModifier || 0,
+    };
+}
+
 function buildSpiritCreature({ monster, displayName, casterName, initiativeValue, slotLevel, auto, playerStats, options = {} }) {
     const baseAc = typeof monster.armor_class === 'number' ? monster.armor_class : 10;
     const baseHp = monster.hit_points || 10;
@@ -79,13 +97,7 @@ function buildSpiritCreature({ monster, displayName, casterName, initiativeValue
     // SP-114: canonical summon stat blocks scale Hit Points only — AC is always
     // the base armor_class from monsters.json (never slot-scaled).
     const ac = baseAc;
-    let hp = scale
-        ? baseHp + (auto.hpPerLevelAbove || 0) * Math.max(0, slotLevel - (auto.baseLevel || slotLevel))
-        : baseHp;
-    // CLA-252: the Phantasmal Creatures free (spectral) cast halves the summoned creature's HP.
-    if (options.halveHp) {
-        hp = Math.max(1, Math.floor(hp / 2));
-    }
+    const hp = resolveSummonedHp({ baseHp, auto, slotLevel, scale, halveHp: options.halveHp });
 
     const spellSaveDc = getSpellSaveDc(playerStats);
     const spellAttackMod = getSpellAttackModifier(playerStats);
@@ -125,8 +137,7 @@ function buildSpiritCreature({ monster, displayName, casterName, initiativeValue
         summonedBy: casterName,
         summonSource: 'spell',
         createThrall: true,
-        warlockLevel: options.warlockLevel || playerStats.level,
-        chaModifier: options.chaModifier || 0,
+        ...spiritWarlockOptions(options, playerStats),
     };
 }
 
@@ -256,9 +267,9 @@ async function performSummon(action, playerStats, campaignName, variant) {
         // Fires remove_summoned_creatures at duration expiry; cleanupConcentrationEffects
         // consumes (and drains) this same entry on an earlier concentration break.
         const rounds = summonDurationRounds(action.spell?.duration || auto.duration);
-        addExpiration(casterName, casterName, [
+        addExpiration({ attackerName: casterName, targetName: casterName, effects: [
             { type: 'remove_summoned_creatures', spell: action.name },
-        ], campaignName, rounds);
+        ], campaignName, rounds });
     }
     storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
     setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);

@@ -6,11 +6,16 @@ import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 
-export async function grantCelestialResilience(playerStats, campaignName, source, _mapName) {
-    const isCelestial = playerStats.class?.major?.name === 'Celestial Patron'
-        || playerStats.class?.subclass?.name === 'Celestial Patron';
+const ALLY_GRANT_SOURCES = new Set(['magical_cunning', 'short_rest', 'long_rest']);
 
-    if (!isCelestial) return null;
+function isCelestialPatron(playerStats) {
+    const majorName = ((playerStats.class || {}).major || {}).name;
+    const subclassName = ((playerStats.class || {}).subclass || {}).name;
+    return majorName === 'Celestial Patron' || subclassName === 'Celestial Patron';
+}
+
+export async function grantCelestialResilience(playerStats, campaignName, source, _mapName) {
+    if (!isCelestialPatron(playerStats)) return null;
 
     const features = playerStats.specialActions || [];
     const feature = features.find(f => f.name === 'Celestial Resilience');
@@ -29,7 +34,7 @@ export async function grantCelestialResilience(playerStats, campaignName, source
         message: `${playerStats.name} gains ${selfTempHp} temporary hit points from Celestial Resilience.`,
     };
 
-    if (source === 'magical_cunning' || source === 'short_rest' || source === 'long_rest') {
+    if (ALLY_GRANT_SOURCES.has(source)) {
         await attachAllyGrant(result, playerStats, campaignName, auto, _mapName);
     }
 

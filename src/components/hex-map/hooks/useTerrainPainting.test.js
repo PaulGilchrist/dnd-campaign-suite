@@ -17,7 +17,7 @@ const setup = ({
     const setTerrain = vi.fn();
     const setRivers = vi.fn();
     const { result } = renderHook(() =>
-        useTerrainPainting(hexCols, hexRows, getHex, selectedTerrain, setTerrain, setRivers)
+        useTerrainPainting({ hexCols, hexRows, getHexFromEvent: getHex, selectedTerrain, setTerrain, setRivers })
     );
     return { result, setTerrain, setRivers };
 };

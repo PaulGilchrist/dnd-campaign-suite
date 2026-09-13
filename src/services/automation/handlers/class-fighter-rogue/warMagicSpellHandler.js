@@ -116,11 +116,11 @@ function resolveWeaponAttackStats(playerStats) {
     };
 }
 
-async function applyWeaponHitDamage(playerName, targetName, damageFormula, damageType, isCrit, campaignName) {
+async function applyWeaponHitDamage({ playerName, targetName, damageFormula, damageType, isCrit, campaignName }) {
     const rollResult = isCrit ? rollExpressionDoubled(damageFormula) : rollExpression(damageFormula);
     const rawDamage = rollResult?.total || 0;
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    const applyResult = await applyDamageToTarget(getCombatSummary(campaignName), targetName, rawDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+    const applyResult = await applyDamageToTarget(getCombatSummary(campaignName), targetName, rawDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
     const finalDamage = applyResult?.finalDamage || 0;
     if (finalDamage > 0) {
         endInvisibilityOnHostileAction(playerName, campaignName);
@@ -158,7 +158,7 @@ async function rollWeaponAttack(action, playerStats, campaignName, targetName, t
     let finalDamage = 0;
     let rollResult = null;
     if (hit) {
-        ({ rollResult, finalDamage } = await applyWeaponHitDamage(playerName, targetName, damageFormula, damageType, isCrit, campaignName));
+        ({ rollResult, finalDamage } = await applyWeaponHitDamage({ playerName, targetName, damageFormula, damageType, isCrit, campaignName }));
     }
 
     addEntry(campaignName, {
@@ -229,7 +229,7 @@ async function resolveWarMagicSpellDamage({ action, spell, selectedSpellName, pl
         return { spellDamage, spellFormula, spellRolls };
     }
 
-    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spell.damage?.damage_type || 'Force'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spell.damage?.damage_type || 'Force'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
     const finalDamage = applyResult?.finalDamage ?? spellDamage;
     if (finalDamage > 0) {
         endInvisibilityOnHostileAction(playerName, campaignName);

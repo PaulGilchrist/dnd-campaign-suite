@@ -72,12 +72,12 @@ async function applyConfusionFailure(campaignName, casterName, targetName, dc, s
     }).catch((e) => { console.error("[confusion] Error:", e); });
 
     // Register expirations: remove conditions + remove target effect badge + confusion turn-start behavior
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
         { type: 'speed_zero', condition: 'speed_zero' },
         { type: 'remove_target_effect', effectKey: 'confusion', target: targetName, source: casterName },
         { type: 'confusion_turn_start', name: 'Confusion' },
-    ], campaignName);
+    ], campaignName });
 
     // Track Confusion effect with DC for cleanup
     const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
@@ -101,6 +101,12 @@ async function applyConfusionFailure(campaignName, casterName, targetName, dc, s
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 }
 
+function resolveConfusionConcentrationDc(playerStats) {
+    const stored = playerStats.spellAbilities?.saveDc;
+    if (stored) return stored;
+    return 8 + (playerStats.proficiency || 2);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -122,8 +128,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Register concentration for this spell
     const combatSummary = getCombatSummary(campaignName);
     if (combatSummary) {
-        const concentrationDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-        addConcentration(combatSummary, casterName, 'Confusion', concentrationDc);
+        addConcentration(combatSummary, casterName, 'Confusion', resolveConfusionConcentrationDc(playerStats));
         storage.set('combatSummary', combatSummary, campaignName);
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
     }

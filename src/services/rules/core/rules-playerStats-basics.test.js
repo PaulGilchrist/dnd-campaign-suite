@@ -262,7 +262,7 @@ describe('rules.getPlayerStats - 5e basics', () => {
   describe('rules field', () => {
     it('should default rules to 5e when playerSummary has no rules field', async () => {
       const playerSummary = makePlayerSummary({ rules: undefined });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
       expect(result.rules).toBe('5e');
     });
   });
@@ -276,7 +276,7 @@ describe('rules.getPlayerStats - 5e basics', () => {
       ${17}  | ${6}
     `('should compute proficiency from level $level', async ({ level, expectedProficiency }) => {
       const playerSummary = makePlayerSummary({ level });
-      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
       expect(result.proficiency).toBe(expectedProficiency);
     });
   });

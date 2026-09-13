@@ -309,14 +309,9 @@ describe('buffAllyHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'Valorous Paladin',
-        'Valorous Paladin',
-        expect.arrayContaining([
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Valorous Paladin', targetName: 'Valorous Paladin', effects: expect.arrayContaining([
           expect.objectContaining({ type: 'remove_active_buff', buffName: 'Inspiring Shield' }),
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
     });
   });
 

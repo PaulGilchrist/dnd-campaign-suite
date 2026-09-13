@@ -158,10 +158,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: 150,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, maxHp: 150, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      const result = await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, maxHp: 150, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(result.intercepted).toBe(true);
       expect(result.finalDamage).toBe(0);
@@ -177,10 +174,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: 50,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'GloryPaladin', 5, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 20, maxHp: 50, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      const result = await applyDamageToTarget(cs, 'GloryPaladin', 5, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 20, maxHp: 50, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(result.intercepted).toBe(true);
       expect(result.newHp).toBe(50); // capped at maxHp, not 61
@@ -195,10 +189,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: 150,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'GloryPaladin', 3, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      const result = await applyDamageToTarget(cs, 'GloryPaladin', 3, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(result.finalDamage).toBe(3);
       expect(result.newHp).toBe(2);
@@ -215,10 +206,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         arcaneWardHp: 20,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      const result = await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(result.finalDamage).toBe(10);
       expect(result.newHp).toBe(10); // HP unchanged, ward absorbed the damage
@@ -243,10 +231,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: 120,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'Fighter', 5, ['Slashing'], campaignName,
-        [makeCharacter('Fighter', { level: 15, maxHp: 120, features: [{ name: 'Extra Attack' }], className: 'Fighter', classLevel: 15 })],
-      );
+      const result = await applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], { campaignName, characters: [makeCharacter('Fighter', { level: 15, maxHp: 120, features: [{ name: 'Extra Attack' }], className: 'Fighter', classLevel: 15 })] });
 
       expect(result.finalDamage).toBe(5);
       expect(result.newHp).toBe(0);
@@ -264,10 +249,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         undyingSentinelUsed: true,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      const result = await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(result.finalDamage).toBe(10);
       expect(result.newHp).toBe(0);
@@ -282,10 +264,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: 150,
       }));
 
-      await applyDamageToTarget(
-        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'GloryPaladin', 'undyingSentinelUsed', true, campaignName,
@@ -303,10 +282,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: 150,
       }));
 
-      await applyDamageToTarget(
-        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'GloryPaladin', 'deathSaves', [false, false, false], campaignName,
@@ -326,10 +302,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         activeConditions: ['unconscious', 'blinded'],
       }));
 
-      await applyDamageToTarget(
-        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'GloryPaladin', 'activeConditions', ['blinded'], campaignName,
@@ -345,10 +318,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: 150,
       }));
 
-      await applyDamageToTarget(
-        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'healing',
@@ -369,10 +339,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: 200,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'GloryPaladin', 5, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 20, maxHp: 200, features: [{ name: 'Undying Sentinel' }] })],
-      );
+      const result = await applyDamageToTarget(cs, 'GloryPaladin', 5, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 20, maxHp: 200, features: [{ name: 'Undying Sentinel' }] })] });
 
       expect(result.intercepted).toBe(true);
       expect(result.newHp).toBe(61); // 1 + (3 * 20)
@@ -390,10 +357,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         hitPoints: null,
       }));
 
-      await expect(applyDamageToTarget(
-        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
-        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
-      )).rejects.toThrow('Undying Sentinel: hitPoints not found for GloryPaladin');
+      await expect(applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] })).rejects.toThrow('Undying Sentinel: hitPoints not found for GloryPaladin');
     });
   });
 });

@@ -3,6 +3,20 @@ import { addEntry } from '../../../ui/logService.js';
 
 const DIVINATION_SCHOOL = 'divination';
 
+function findRegainableSlot(playerName, spellAbilities, maxRegainLevel, campaignName) {
+    for (let level = maxRegainLevel; level >= 1; level--) {
+        const slotKey = `spell_slots_level_${level}`;
+        const maxSlots = spellAbilities[slotKey] ?? 0;
+        if (maxSlots <= 0) continue;
+
+        const currentSlots = getRuntimeValue(playerName, slotKey, campaignName);
+        if (currentSlots != null && currentSlots > 0 && currentSlots < maxSlots) {
+            return { level, currentSlots };
+        }
+    }
+    return null;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -27,21 +41,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Iterate from highest eligible level downward; pick the first level
     // that has at least one expended slot (0 < current < max)
-    let bestLevel = null;
-    let bestCurrentSlots = null;
-
-    for (let level = maxRegainLevel; level >= 1; level--) {
-        const slotKey = `spell_slots_level_${level}`;
-        const maxSlots = spellAbilities[slotKey] ?? 0;
-        if (maxSlots <= 0) continue;
-
-        const currentSlots = getRuntimeValue(playerName, slotKey, campaignName);
-        if (currentSlots != null && currentSlots > 0 && currentSlots < maxSlots) {
-            bestLevel = level;
-            bestCurrentSlots = currentSlots;
-            break;
-        }
-    }
+    const best = findRegainableSlot(playerName, spellAbilities, maxRegainLevel, campaignName);
+    const bestLevel = best ? best.level : null;
+    const bestCurrentSlots = best ? best.currentSlots : null;
 
     if (bestLevel == null) {
         return {

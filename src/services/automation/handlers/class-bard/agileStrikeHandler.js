@@ -10,6 +10,11 @@ function resolveAttackText(hit, damageTotal) {
     return { hitText, damageText };
 }
 
+function resolveAbilityBonus(playerStats, abilityName) {
+    const ability = (playerStats.abilities || []).find(a => a.name === abilityName);
+    return ability ? ability.bonus : 0;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName, _characters) {
     const auto = action.automation || action;
     const bardicDie = auto.bardicDie || 6;
@@ -43,7 +48,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
         };
     }
 
-    const dexMod = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus || 0;
+    const dexMod = resolveAbilityBonus(playerStats, 'Dexterity');
     const prof = playerStats.proficiency || 0;
     const hitBonus = dexMod + prof;
 
@@ -57,7 +62,7 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
 
     if (hit) {
         const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-        applyDamageToTarget(cs, targetName, damageTotal, ['Bludgeoning'], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
+        applyDamageToTarget(cs, targetName, damageTotal, ['Bludgeoning'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name });
     }
 
     const { hitText, damageText } = resolveAttackText(hit, damageTotal);

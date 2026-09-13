@@ -151,7 +151,7 @@ describe('MN-015 handleAttackRiderManeuverUse — save DC forwarding', () => {
             { name: 'Pushing Attack', damageBonus: true, dieExpression: 'superiority_die' },
             { damageType: 'piercing' },
             { isMiss: false, targetName: 'Hill Giant 1' },
-            '1d6', 3, [3],
+            { formula: '1d6', total: 3, rolls: [3] },
         );
 
         expect(result.formula).toBe('1d6');

@@ -380,11 +380,7 @@ describe('fearHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        casterName, 'Goblin',
-        expect.arrayContaining([expect.objectContaining({ condition: 'frightened' })]),
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Goblin', effects: expect.arrayContaining([expect.objectContaining({ condition: 'frightened' })]), campaignName });
     });
 
     it('tracks a fear_end_on_los effect in targetEffects', async () => {

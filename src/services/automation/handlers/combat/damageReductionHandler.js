@@ -123,7 +123,7 @@ function triggerRefusal(auto, featureName, playerName, campaignName) {
     return infoPopup(featureName, refusalText, auto);
 }
 
-async function gateFallingReaction(auto, combatContext, playerName, usedRoundKey, featureName, campaignName) {
+async function gateFallingReaction({ auto, combatContext, playerName, usedRoundKey, featureName, campaignName }) {
     if (auto.trigger !== 'falling') return null;
     const currentRound = combatContext?.round || 1;
     const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
@@ -230,7 +230,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // navigationHandlers.js).
     const combatContext = await getCombatContext(campaignName);
     const usedRoundKey = `_${featureName.replace(/\s+/g, '_')}_usedRound`;
-    const fallingRefusal = await gateFallingReaction(auto, combatContext, playerName, usedRoundKey, featureName, campaignName);
+    const fallingRefusal = await gateFallingReaction({ auto, combatContext, playerName, usedRoundKey, featureName, campaignName });
     if (fallingRefusal) return fallingRefusal;
 
     const totalDamage = lastAttack.totalDamage || 0;
@@ -426,7 +426,7 @@ async function executeRedirect({ playerName, targetName, campaignName, redirectD
     const damageOnSave = computeDamageAfterSave(redirectDamage, saveResult.success, null);
 
     if (damageOnSave > 0 && cs) {
-        await applyDamageToTarget(cs, targetName, damageOnSave, ['Force'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+        await applyDamageToTarget(cs, targetName, damageOnSave, ['Force'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
     }
 
     await addEntry(campaignName, {

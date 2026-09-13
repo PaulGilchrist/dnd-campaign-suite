@@ -72,7 +72,7 @@ function computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armor
     return armorClass;
 }
 
-function applyMediumArmorMaster(armorClass, armorName, dexterity, mediumArmorMasterPassive, allEquipment, contributions) {
+function applyMediumArmorMaster({ armorClass, armorName, dexterity, mediumArmorMasterPassive, allEquipment, contributions }) {
     if (!mediumArmorMasterPassive || !armorName) return armorClass;
     const armor = allEquipment.find(item => item.name === parseMagicItemName(armorName).baseName);
     if (armor && armor.armor_category === 'Medium' && dexterity.totalScore >= 16) {
@@ -166,27 +166,26 @@ function applyUnarmoredDefense2024({ armorClass, playerStats, armorName, shield,
     return armorClass;
 }
 
+// 2024: Check whether an ac_bonus passive's condition is satisfied
+function acBonusConditionMet(passive, armorName, allEquipment) {
+    const condition = passive.condition || '';
+    if (!condition) return true;
+    if (condition !== 'wearing_light_medium_or_heavy_armor') return false;
+    if (!armorName) return false;
+    const armor = allEquipment.find(item => item.name === parseMagicItemName(armorName).baseName);
+    return Boolean(armor && ['Light', 'Medium', 'Heavy'].includes(armor.armor_category));
+}
+
 // 2024: Apply ac_bonus from passive_buff automation (e.g., Defense feat)
 function applyAcBonusPassives(armorClass, passives, armorName, allEquipment, contributions) {
     for (const passive of passives) {
-        if (passive.type === 'passive_buff' && passive.effect === 'ac_bonus' && passive.bonus) {
-            const bonus = typeof passive.bonus === 'number' ? passive.bonus : parseInt(passive.bonus, 10);
-            if (!isNaN(bonus) && bonus > 0) {
-                const condition = passive.condition || '';
-                if (condition === 'wearing_light_medium_or_heavy_armor') {
-                    if (armorName) {
-                        const armor = allEquipment.find(item => item.name === parseMagicItemName(armorName).baseName);
-                        if (armor && ['Light', 'Medium', 'Heavy'].includes(armor.armor_category)) {
-                            armorClass += bonus;
-                            contributions.push(`${passive.name || 'Defense'} (+${bonus})`);
-                        }
-                    }
-                } else if (!condition) {
-                    armorClass += bonus;
-                    contributions.push(`${passive.name || 'Passive Buff'} (+${bonus})`);
-                }
-            }
-        }
+        if (passive.type !== 'passive_buff' || passive.effect !== 'ac_bonus' || !passive.bonus) continue;
+        const bonus = typeof passive.bonus === 'number' ? passive.bonus : parseInt(passive.bonus, 10);
+        if (isNaN(bonus) || bonus <= 0) continue;
+        if (!acBonusConditionMet(passive, armorName, allEquipment)) continue;
+        armorClass += bonus;
+        const label = passive.name || (passive.condition ? 'Defense' : 'Passive Buff');
+        contributions.push(`${label} (+${bonus})`);
     }
     return armorClass;
 }
@@ -218,7 +217,7 @@ export function getArmorClass(allEquipment, playerStats, playerSummary) {
         const passives = playerStats.automation?.passives;
         if (Array.isArray(passives)) {
             const mediumArmorMasterPassive = passives.find(p => p.type === 'passive_buff' && p.effect === 'medium_armor_dex_bonus_increase');
-            armorClass = applyMediumArmorMaster(armorClass, armorName, dexterity, mediumArmorMasterPassive, allEquipment, contributions);
+            armorClass = applyMediumArmorMaster({ armorClass, armorName, dexterity, mediumArmorMasterPassive, allEquipment, contributions });
         }
     }
 
@@ -242,7 +241,7 @@ export function getArmorClass(allEquipment, playerStats, playerSummary) {
 
         // 2024: Medium Armor Master – increase medium armor dex bonus cap from 2 to 3 when Dex >= 16
         const mediumArmorMasterPassive = passives.find(p => p.type === 'passive_buff' && p.effect === 'medium_armor_dex_bonus_increase');
-        armorClass = applyMediumArmorMaster(armorClass, armorName, dexterity, mediumArmorMasterPassive, allEquipment, contributions);
+        armorClass = applyMediumArmorMaster({ armorClass, armorName, dexterity, mediumArmorMasterPassive, allEquipment, contributions });
     }
 
     return [armorClass, contributions.join(' + ')];

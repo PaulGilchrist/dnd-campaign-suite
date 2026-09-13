@@ -92,17 +92,8 @@ function pickClassLevelEntry(classLevels, playerStats) {
     return classLevels[(playerStats.level || 1) - 1] || {}
 }
 
-function buildDiceTokenValues(playerStats, slotLevel) {
-    const prof = playerStats?.proficiency || 0
-    const level = playerStats?.level || 1
-    const classLevels = playerStats?.class?.class_levels || []
-    const levelEntry = pickClassLevelEntry(classLevels, playerStats)
-    const currentEntry = classLevels.find(cl => cl.level === playerStats.level) || {}
-    const abilities = playerStats?.abilities || []
+function buildClassFeatureDiceTokens(playerStats, levelEntry, currentEntry) {
     return {
-        prof,
-        level,
-        slotLevel: slotLevel || 1,
         rageDamage: levelEntry.rage_damage ?? 2,
         bardicDie: levelEntry.bardic_die || 6,
         superiorityDie: getSuperiorityDieSize(playerStats),
@@ -110,12 +101,31 @@ function buildDiceTokenValues(playerStats, slotLevel) {
         martialArtsDie: currentEntry.martial_arts_die || 4,
         favoredEnemy: currentEntry.favored_enemy || 0,
         allyHitDie: getAllyHitDieSize(playerStats),
+    }
+}
+
+function buildAbilityModifierTokens(abilities) {
+    return {
         strength: getAbilityModifier(abilities, 'strength'),
         dexterity: getAbilityModifier(abilities, 'dexterity'),
         constitution: getAbilityModifier(abilities, 'constitution'),
         intelligence: getAbilityModifier(abilities, 'intelligence'),
         wisdom: getAbilityModifier(abilities, 'wisdom'),
         charisma: getAbilityModifier(abilities, 'charisma'),
+    }
+}
+
+function buildDiceTokenValues(playerStats, slotLevel) {
+    const ps = playerStats || {}
+    const classLevels = ps.class?.class_levels || []
+    const levelEntry = pickClassLevelEntry(classLevels, ps)
+    const currentEntry = classLevels.find(cl => cl.level === ps.level) || {}
+    return {
+        prof: ps.proficiency || 0,
+        level: ps.level || 1,
+        slotLevel: slotLevel || 1,
+        ...buildClassFeatureDiceTokens(playerStats, levelEntry, currentEntry),
+        ...buildAbilityModifierTokens(ps.abilities || []),
     }
 }
 

@@ -156,16 +156,11 @@ describe('useCombatSuperiorityModal - Precision Attack', () => {
 
       expect(rollDamage).toHaveBeenCalledTimes(1);
       expect(rollDamage).toHaveBeenCalledWith(
-        'Longsword',
-        '2d6+3',
-        10,
-        [4, 3],
-        3,
-        expect.objectContaining({
+        { name: 'Longsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: expect.objectContaining({
           damageType: 'Slashing',
           targetName: 'Orc',
           attackerName: 'Thorin',
-        })
+        }) }
       );
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Thorin',

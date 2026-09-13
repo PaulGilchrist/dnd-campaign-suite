@@ -45,7 +45,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function applyEnhanceAbility(action, playerStats, campaignName, mapName, targetNames, ability) {
+export async function applyEnhanceAbility({ action, playerStats, campaignName, targetNames, ability }) {
     if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0 || !ability) {
         return null;
     }

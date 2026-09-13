@@ -149,10 +149,10 @@ describe('Death Strike handling', () => {
             setupDeathStrikeRuntime(15, 'CON');
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: false, roll: 5, bonus: 3, rawRolls: [5] });
@@ -175,10 +175,10 @@ describe('Death Strike handling', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: false, roll: 5, bonus: 3, rawRolls: [5] });
@@ -186,17 +186,17 @@ describe('Death Strike handling', () => {
             await promise.catch(() => { });
 
             // adjustedTotal = 10, doubledTotal = 10 * 2 = 20
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 20, ['slashing'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter' });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 20, ['slashing'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestFighter' });
         });
 
         it('logs save-damage entry with full death strike context', async () => {
             setupDeathStrikeRuntime(15, 'CON');
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: false, roll: 5, bonus: 3, rawRolls: [5] });
@@ -229,10 +229,10 @@ describe('Death Strike handling', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: -7, damageReduced: false });
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: false, roll: 5, bonus: 3, rawRolls: [5] });
@@ -258,10 +258,10 @@ describe('Death Strike handling', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: false, roll: 5, bonus: 3, rawRolls: [5] });
@@ -290,10 +290,10 @@ describe('Death Strike handling', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: true, roll: 18, bonus: 3, rawRolls: [15] });
@@ -311,10 +311,10 @@ describe('Death Strike handling', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: true, roll: 18, bonus: 3, rawRolls: [15] });
@@ -335,10 +335,10 @@ describe('Death Strike handling', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: true, roll: 18, bonus: 3, rawRolls: [15] });
@@ -355,10 +355,10 @@ describe('Death Strike handling', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            const promise = fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: true, roll: 18, bonus: 3, rawRolls: [15] });
@@ -390,10 +390,10 @@ describe('Death Strike handling', () => {
             });
 
             const fn = createFn();
-            await fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            await fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(sendSavePrompt).not.toHaveBeenCalled();
         });
@@ -413,10 +413,10 @@ describe('Death Strike handling', () => {
             });
 
             const fn = createFn();
-            await fn('Greatsword', '2d6+3', 10, [4, 3], 3, {
+            await fn({ name: 'Greatsword', formula: '2d6+3', total: 10, rolls: [4, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(sendSavePrompt).not.toHaveBeenCalled();
         });

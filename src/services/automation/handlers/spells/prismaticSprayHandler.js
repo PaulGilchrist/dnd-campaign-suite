@@ -128,7 +128,7 @@ async function applyRayDamage({ cs, campaignName, characters, casterName, target
     if (!dmgResult) return;
     const finalDamage = computeDamageAfterSave(dmgResult.total, succeeded, 'half');
     if (finalDamage > 0) {
-        await applyDamageToTarget(cs, targetName, finalDamage, [ray.type], campaignName, characters, { ignoreResistance: false, attackerName: casterName });
+        await applyDamageToTarget(cs, targetName, finalDamage, [ray.type], { campaignName, characters: characters, ignoreResistance: false, attackerName: casterName });
     }
 }
 
@@ -247,10 +247,10 @@ async function applyIndigoEffect(targetName, dc, casterName, campaignName) {
     }, campaignName);
 
     // Add expirations: condition + targetEffect
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'restrained' },
         { type: 'remove_target_effect', effectKey: 'prismatic_spray_indigo', target: targetName, source: casterName },
-    ], campaignName);
+    ], campaignName });
 
     await addEntry(campaignName, {
         type: 'condition',
@@ -297,10 +297,10 @@ async function applyVioletEffect(targetName, dc, casterName, campaignName) {
     }, campaignName);
 
     // Add expirations: condition + targetEffect
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'blinded' },
         { type: 'remove_target_effect', effectKey: 'prismatic_spray_violet', target: targetName, source: casterName },
-    ], campaignName);
+    ], campaignName });
 
     await addEntry(campaignName, {
         type: 'condition',

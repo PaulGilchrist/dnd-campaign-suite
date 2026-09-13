@@ -175,7 +175,7 @@ describe('useAttackDamageResolution — Cunning Strike pipeline resume (CLA-188)
     await resumeAttackPipeline();
 
     expect(rollDamage).toHaveBeenCalledTimes(1);
-    const [name, formula, total] = rollDamage.mock.calls[0];
+    const [{ name, formula, total }] = rollDamage.mock.calls[0];
     expect(name).toBe('Shortsword');
     expect(formula).toContain('[Sneak Attack]');
     expect(formula).toContain('5d6');
@@ -200,7 +200,7 @@ describe('useAttackDamageResolution — Cunning Strike pipeline resume (CLA-188)
     await resumeAttackPipeline();
 
     expect(rollDamage).toHaveBeenCalledTimes(1);
-    expect(rollDamage.mock.calls[0][1]).toContain('7d6 [Sneak Attack]');
+    expect(rollDamage.mock.calls[0][0].formula).toContain('7d6 [Sneak Attack]');
   });
 
   it('resumeAttackPipeline is a no-op when the pipeline is not paused at cunningStrike', async () => {

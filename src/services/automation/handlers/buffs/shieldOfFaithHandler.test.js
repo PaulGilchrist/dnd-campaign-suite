@@ -227,17 +227,12 @@ describe('shieldOfFaithHandler.applyShieldOfFaith', () => {
             CAMPAIGN_NAME
         );
 
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-            PLAYER_NAME,
-            'Ally1',
-            expect.arrayContaining([
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: 'Ally1', effects: expect.arrayContaining([
                 expect.objectContaining({
                     type: 'remove_active_buff',
                     buffName: 'Shield of Faith',
                 }),
-            ]),
-            CAMPAIGN_NAME
-        );
+            ]), campaignName: CAMPAIGN_NAME });
 
         expect(logService.addEntry).toHaveBeenCalledWith(
             CAMPAIGN_NAME,

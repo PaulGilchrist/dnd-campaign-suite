@@ -152,13 +152,7 @@ describe('interceptionHandler reaction consumption (FS-008)', () => {
             ]),
             campaignName
         );
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-            playerName,
-            defenderName,
-            [{ type: 'remove_target_effect', effectKey: 'protection', source: playerName, target: defenderName }],
-            campaignName,
-            1
-        );
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: defenderName, effects: [{ type: 'remove_target_effect', effectKey: 'protection', source: playerName, target: defenderName }], campaignName, rounds: 1 });
     });
 
     it('blocks a re-click on the same trigger in the same round (no second heal)', async () => {

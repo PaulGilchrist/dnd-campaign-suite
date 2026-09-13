@@ -27,14 +27,17 @@ function damageClause(hit, finalDamage, damageType) {
 }
 
 function resolveMeleeWeapon(playerStats) {
-    const weapon = (playerStats.attacks || []).find(a => (a.weaponType || a.attackType) === 'melee')
-        || playerStats.attacks?.[0];
+    const attacks = playerStats.attacks || [];
+    const weapon = attacks.find(a => (a.weaponType || a.attackType) === 'melee') || attacks[0];
+    if (!weapon) {
+        return { attackBonus: 0, damageFormula: '1d4+0', damageType: 'Bludgeoning', weaponName: 'weapon', weaponType: 'melee' };
+    }
     return {
-        attackBonus: weapon?.hitBonus ?? 0,
-        damageFormula: weapon?.damage || '1d4+0',
-        damageType: weapon?.damageType || 'Bludgeoning',
-        weaponName: weapon?.name || 'weapon',
-        weaponType: weapon?.weaponType || weapon?.attackType || 'melee',
+        attackBonus: weapon.hitBonus ?? 0,
+        damageFormula: weapon.damage || '1d4+0',
+        damageType: weapon.damageType || 'Bludgeoning',
+        weaponName: weapon.name || 'weapon',
+        weaponType: weapon.weaponType || weapon.attackType || 'melee',
     };
 }
 
@@ -46,7 +49,7 @@ async function resolveConcentrationDamage({ cs, campaignName, playerName, target
     damageRolls = rollResult?.rolls || [];
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     // applyDamageToTarget writes lastAttack + logs hp_change canonically.
-    const applyResult = await applyDamageToTarget(cs, targetName, rawDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+    const applyResult = await applyDamageToTarget(cs, targetName, rawDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
     finalDamage = applyResult?.finalDamage || 0;
     if (finalDamage > 0) endInvisibilityOnHostileAction(playerName, campaignName);
 

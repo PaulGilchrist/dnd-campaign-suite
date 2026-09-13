@@ -120,14 +120,9 @@ describe('heroismService', () => {
                 }),
             ]);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Bard',
-                'Fighter',
-                expect.arrayContaining([
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard', targetName: 'Fighter', effects: expect.arrayContaining([
                     expect.objectContaining({ type: 'remove_heroism_buff' }),
-                ]),
-                CAMPAIGN_NAME,
-            );
+                ]), campaignName: CAMPAIGN_NAME });
 
             expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
                 type: 'ability_use',

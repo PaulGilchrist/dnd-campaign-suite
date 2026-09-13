@@ -43,8 +43,47 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
     };
 }
 
+async function applyFeignDeathToTarget(action, sourceName, targetName, campaignName, duration) {
+    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    const buffs = Array.isArray(activeBuffs) ? activeBuffs : [];
+    if (!buffs.some(b => b.name === action.name)) {
+        const buff = {
+            name: action.name,
+            effect: 'feign_death',
+            duration,
+            resistanceTypes: FEIGN_DEATH_RESISTANCES,
+            conditionImmunity: FEIGN_DEATH_CONDITION_IMMUNITY,
+            sourceCharacter: sourceName,
+        };
+        buffs.push(buff);
+        setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
+    }
+
+    applyFeignDeathConditions(targetName, campaignName);
+
+    const currentConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    if (Array.isArray(currentConditions)) {
+        const filtered = currentConditions.filter(c => String(c).toLowerCase() !== 'poisoned');
+        if (filtered.length !== currentConditions.length) {
+            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+        }
+    }
+
+    addExpiration({ attackerName: sourceName, targetName, effects: [
+        { type: 'remove_feign_death_buff', buffName: action.name },
+    ], campaignName, rounds: undefined, expireOnCreatureName: targetName });
+
+    const isSelf = targetName === sourceName;
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: sourceName,
+        abilityName: action.name,
+        description: `${sourceName} cast ${action.name} on ${isSelf ? 'themself' : targetName}. Target appears dead: Blinded, Incapacitated, Speed 0, Resistant to all damage except Psychic, Immune to Poisoned. Expires on initiative roll, short rest, or long rest.`,
+    }).catch((e) => { console.error('[feignDeath] Error logging:', e); });
+}
+
 export async function applyFeignDeath(action, playerStats, campaignName, _mapName, targetNames) {
-    if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
+    if (!Array.isArray(targetNames) || targetNames.length === 0) {
         return null;
     }
 
@@ -54,45 +93,7 @@ export async function applyFeignDeath(action, playerStats, campaignName, _mapNam
     const targets = [];
 
     for (const targetName of targetNames) {
-        const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
-        const buffs = Array.isArray(activeBuffs) ? activeBuffs : [];
-        const existingFeignDeath = buffs.some(b => b.name === action.name);
-
-        if (!existingFeignDeath) {
-            const buff = {
-                name: action.name,
-                effect: 'feign_death',
-                duration,
-                resistanceTypes: FEIGN_DEATH_RESISTANCES,
-                conditionImmunity: FEIGN_DEATH_CONDITION_IMMUNITY,
-                sourceCharacter: sourceName,
-            };
-            buffs.push(buff);
-            setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
-        }
-
-        applyFeignDeathConditions(targetName, campaignName);
-
-        const currentConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        if (Array.isArray(currentConditions)) {
-            const filtered = currentConditions.filter(c => String(c).toLowerCase() !== 'poisoned');
-            if (filtered.length !== currentConditions.length) {
-                setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-            }
-        }
-
-        addExpiration(sourceName, targetName, [
-            { type: 'remove_feign_death_buff', buffName: action.name },
-        ], campaignName, undefined, targetName);
-
-        const isSelf = targetName === sourceName;
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: sourceName,
-            abilityName: action.name,
-            description: `${sourceName} cast ${action.name} on ${isSelf ? 'themself' : targetName}. Target appears dead: Blinded, Incapacitated, Speed 0, Resistant to all damage except Psychic, Immune to Poisoned. Expires on initiative roll, short rest, or long rest.`,
-        }).catch((e) => { console.error('[feignDeath] Error logging:', e); });
-
+        await applyFeignDeathToTarget(action, sourceName, targetName, campaignName, duration);
         targets.push(targetName);
     }
 

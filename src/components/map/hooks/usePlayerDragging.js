@@ -2,6 +2,52 @@ import { useState, useCallback } from 'react';
 import { CELL_SIZE } from '../../../config/mapConfig';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
+function toSvgPoint(svg, clientX, clientY) {
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    return pt.matrixTransform(ctm.inverse());
+}
+
+function clampToGrid(v, gridSize) {
+    return Math.max(0, Math.min(gridSize - 1, v));
+}
+
+function findFreeSquare(startX, startY, occupiedSquares, gridSize) {
+    if (!occupiedSquares.has(`${startX},${startY}`)) {
+        return { targetX: startX, targetY: startY };
+    }
+
+    const visited = new Set([`${startX},${startY}`]);
+    const queue = [[startX, startY]];
+
+    while (queue.length > 0) {
+        const [x, y] = queue.shift();
+        if (!occupiedSquares.has(`${x},${y}`)) {
+            return { targetX: x, targetY: y };
+        }
+        const neighbors = [
+            [x + 1, y],
+            [x - 1, y],
+            [x, y + 1],
+            [x, y - 1],
+        ];
+        for (const [nx, ny] of neighbors) {
+            const clampedNx = clampToGrid(nx, gridSize);
+            const clampedNy = clampToGrid(ny, gridSize);
+            const clampedKey = `${clampedNx},${clampedNy}`;
+            if (!visited.has(clampedKey) && !occupiedSquares.has(clampedKey)) {
+                visited.add(clampedKey);
+                queue.push([clampedNx, clampedNy]);
+            }
+        }
+    }
+
+    return { targetX: startX, targetY: startY };
+}
+
 export default function usePlayerDragging({
     svgRef,
     mapData,
@@ -23,12 +69,8 @@ export default function usePlayerDragging({
         if (!svg) return;
         svg.setPointerCapture(e.pointerId);
 
-        const pt = svg.createSVGPoint();
-        pt.x = e.clientX;
-        pt.y = e.clientY;
-        const ctm = svg.getScreenCTM();
-        if (!ctm) return;
-        const svgPt = pt.matrixTransform(ctm.inverse());
+        const svgPt = toSvgPoint(svg, e.clientX, e.clientY);
+        if (!svgPt) return;
 
         const player = mapData.players.find((c) => c.id === playerId);
         if (!player) return;
@@ -51,12 +93,8 @@ export default function usePlayerDragging({
         const svg = svgRef.current;
         if (!svg) return;
 
-        const pt = svg.createSVGPoint();
-        pt.x = e.clientX;
-        pt.y = e.clientY;
-        const ctm = svg.getScreenCTM();
-        if (!ctm) return;
-        const svgPt = pt.matrixTransform(ctm.inverse());
+        const svgPt = toSvgPoint(svg, e.clientX, e.clientY);
+        if (!svgPt) return;
 
         const player = mapData.players.find((c) => c.id === dragging.playerId);
         if (!player) return;
@@ -64,11 +102,8 @@ export default function usePlayerDragging({
         const cx = svgPt.x - dragging.offsetX;
         const cy = svgPt.y - dragging.offsetY;
 
-        const gridX = Math.floor(cx / CELL_SIZE);
-        const gridY = Math.floor(cy / CELL_SIZE);
-
-        const clampedGridX = Math.max(0, Math.min(gridSize - 1, gridX));
-        const clampedGridY = Math.max(0, Math.min(gridSize - 1, gridY));
+        const clampedGridX = clampToGrid(Math.floor(cx / CELL_SIZE), gridSize);
+        const clampedGridY = clampToGrid(Math.floor(cy / CELL_SIZE), gridSize);
 
         setMapData((prev) => ({
             ...prev,
@@ -84,12 +119,8 @@ export default function usePlayerDragging({
 
         const svg = svgRef.current;
 
-        const pt = svg.createSVGPoint();
-        pt.x = e.clientX;
-        pt.y = e.clientY;
-        const ctm = svg.getScreenCTM();
-        if (!ctm) { setDragging(null); return; }
-        const svgPt = pt.matrixTransform(ctm.inverse());
+        const svgPt = toSvgPoint(svg, e.clientX, e.clientY);
+        if (!svgPt) { setDragging(null); return; }
 
         const player = mapData.players.find((c) => c.id === dragging.playerId);
         if (!player) {
@@ -100,11 +131,8 @@ export default function usePlayerDragging({
         const cx = svgPt.x - dragging.offsetX;
         const cy = svgPt.y - dragging.offsetY;
 
-        const gridX = Math.floor(cx / CELL_SIZE);
-        const gridY = Math.floor(cy / CELL_SIZE);
-
-        const clampedGridX = Math.max(0, Math.min(gridSize - 1, gridX));
-        const clampedGridY = Math.max(0, Math.min(gridSize - 1, gridY));
+        const clampedGridX = clampToGrid(Math.floor(cx / CELL_SIZE), gridSize);
+        const clampedGridY = clampToGrid(Math.floor(cy / CELL_SIZE), gridSize);
 
         // Collision detection: find the nearest unoccupied grid square
         const occupiedSquares = new Set(
@@ -113,38 +141,7 @@ export default function usePlayerDragging({
                 .map((c) => `${c.gridX},${c.gridY}`)
         );
 
-        let targetX = clampedGridX;
-        let targetY = clampedGridY;
-
-        if (occupiedSquares.has(`${targetX},${targetY}`)) {
-            const visited = new Set();
-            const queue = [[targetX, targetY]];
-            visited.add(`${targetX},${targetY}`);
-
-            while (queue.length > 0) {
-                const [x, y] = queue.shift();
-                if (!occupiedSquares.has(`${x},${y}`)) {
-                    targetX = x;
-                    targetY = y;
-                    break;
-                }
-                const neighbors = [
-                    [x + 1, y],
-                    [x - 1, y],
-                    [x, y + 1],
-                    [x, y - 1],
-                ];
-                for (const [nx, ny] of neighbors) {
-                    const clampedNx = Math.max(0, Math.min(gridSize - 1, nx));
-                    const clampedNy = Math.max(0, Math.min(gridSize - 1, ny));
-                    const clampedKey = `${clampedNx},${clampedNy}`;
-                    if (!visited.has(clampedKey) && !occupiedSquares.has(clampedKey)) {
-                        visited.add(clampedKey);
-                        queue.push([clampedNx, clampedNy]);
-                    }
-                }
-            }
-        }
+        const { targetX, targetY } = findFreeSquare(clampedGridX, clampedGridY, occupiedSquares, gridSize);
 
         setMapData((prev) => ({
             ...prev,

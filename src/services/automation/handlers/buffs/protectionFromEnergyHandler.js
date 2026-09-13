@@ -75,9 +75,9 @@ export async function applyProtectionFromEnergy(action, playerStats, campaignNam
 
     setRuntimeValue(targetName, PROTECTION_FROM_ENERGY_KEY, damageType, campaignName);
 
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_active_buff', buffName: action.name }
-    ], campaignName);
+    ], campaignName });
 
     const spellSaveDc = playerStats.spellAbilities?.saveDc || 8 + playerStats.proficiency;
     const combatSummary = getCombatSummary(campaignName);

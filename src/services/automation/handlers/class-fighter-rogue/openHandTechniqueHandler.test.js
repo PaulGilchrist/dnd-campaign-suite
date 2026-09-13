@@ -204,9 +204,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
       createSaveListener.mockReturnValue({ promise: savePromise });
 
-      const result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-      );
+      const result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
 
       expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'pendingRiderChoice', null, campaignName);
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
@@ -225,9 +225,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
-      await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-      );
+      await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
 
       const logEntry = addEntry.mock.calls.find(
         (c) => c[1]?.saveResult === 'failure',
@@ -268,9 +268,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       const savePromise = Promise.resolve({ success: true, total: 15, roll: 10, saveBonus: 5 });
       createSaveListener.mockReturnValue({ promise: savePromise });
 
-      await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-      );
+      await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
 
       const logEntry = addEntry.mock.calls.find(
         (c) => c[1]?.saveResult === 'success',
@@ -300,9 +300,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       };
       getRuntimeValue.mockReturnValue([existingEffect]);
 
-      await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-      );
+      await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'campaign',
@@ -319,9 +319,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
-      await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Push Far', 13,
-      );
+      await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Push Far', saveDc: 13,
+        });
 
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         'campaign',
@@ -337,9 +337,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       const savePromise = Promise.resolve({ success: true, total: 15, roll: 10, saveBonus: 5 });
       createSaveListener.mockReturnValue({ promise: savePromise });
 
-      let result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-      );
+      let result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
       expect(result.payload.description).toContain('Success');
       expect(result.payload.description).toContain('No effect applied');
 
@@ -348,9 +348,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 }) });
       getRuntimeValue.mockReturnValue([]);
 
-      result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Push Away', 13,
-      );
+      result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Push Away', saveDc: 13,
+        });
       expect(result.payload.description).toContain('Failure');
       expect(result.payload.description).toContain('target pushed 15 ft away');
     });
@@ -362,9 +362,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
-      const result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Unique Effect', 13,
-      );
+      const result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Unique Effect', saveDc: 13,
+        });
 
       expect(result.payload.description).toContain('Unique Effect');
     });
@@ -375,9 +375,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       const ps = makePlayerStats();
       const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone', saveType: 'DEX' }] });
 
-      let result = await applyOpenHandTechnique(
-        action, ps, campaignName, null, 'Knock Prone', 13,
-      );
+      let result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: null, selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No target selected');
@@ -386,9 +386,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'pendingRiderChoice', null, campaignName);
 
       vi.clearAllMocks();
-      result = await applyOpenHandTechnique(
-        action, ps, campaignName, undefined, 'Knock Prone', 13,
-      );
+      result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: undefined, selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
       expect(result.payload.description).toContain('No target selected');
       expect(createSaveListener).not.toHaveBeenCalled();
     });
@@ -399,23 +399,23 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       const ps = makePlayerStats();
       const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone', saveType: 'DEX' }] });
 
-      let result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Nonexistent Option', 13,
-      );
+      let result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Nonexistent Option', saveDc: 13,
+        });
       expect(result).toBeNull();
 
       vi.clearAllMocks();
       action.automation.options = null;
-      result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Any', 13,
-      );
+      result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Any', saveDc: 13,
+        });
       expect(result).toBeNull();
 
       vi.clearAllMocks();
       action.automation.options = [];
-      result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Any', 13,
-      );
+      result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Any', saveDc: 13,
+        });
       expect(result).toBeNull();
     });
   });
@@ -431,9 +431,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
-      let result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-      );
+      let result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
 
@@ -442,9 +442,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
-      result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-      );
+      result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
     });
@@ -460,9 +460,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       getRuntimeValue.mockReturnValue([]);
       addEntry.mockReturnValue(Promise.reject(new Error('log failure')));
 
-      let result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Knock Prone', 13,
-      );
+      let result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Knock Prone', saveDc: 13,
+        });
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
 
@@ -472,9 +472,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       action = makeAction({ options: [{ name: 'Disarm', effect: 'addled', saveType: 'STR' }] });
       addEntry.mockReturnValue(Promise.reject(new Error('log failure')));
 
-      result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Disarm', 13,
-      );
+      result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Disarm', saveDc: 13,
+        });
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
 
@@ -486,9 +486,9 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       getRuntimeValue.mockReturnValue([]);
       addEntry.mockReturnValue(Promise.reject(new Error('log failure')));
 
-      result = await applyOpenHandTechnique(
-        action, ps, campaignName, 'Goblin', 'Push Far', 13,
-      );
+      result = await applyOpenHandTechnique({
+          action, playerStats: ps, campaignName, targetName: 'Goblin', selectedOptionName: 'Push Far', saveDc: 13,
+        });
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
     });

@@ -114,7 +114,7 @@ async function resolveThrustChain(action, playerStats, campaignName, targetName)
     }
 
     const cs = await getCombatContext(campaignName);
-    await knockThrustTargetProne(cs, campaignName, targetName, saveDc, saveType, playerStats);
+    await knockThrustTargetProne({ cs, campaignName, targetName, saveDc, saveType, playerStats });
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -126,7 +126,7 @@ async function resolveThrustChain(action, playerStats, campaignName, targetName)
     return `${targetName} failed the ${saveType} save (DC ${saveDc}) — Prone + pushed 10ft.`;
 }
 
-async function knockThrustTargetProne(cs, campaignName, targetName, saveDc, saveType, playerStats) {
+async function knockThrustTargetProne({ cs, campaignName, targetName, saveDc, saveType, playerStats }) {
     if (!cs?.creatures) return;
     const targetCreature = cs.creatures.find(c => c.name === targetName);
     if (!targetCreature) return;
@@ -192,7 +192,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const combatSummary = await loadCombatSummary(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Force'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+    await applyDamageToTarget(combatSummary, targetName, totalDamage, ['Force'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
 
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
 

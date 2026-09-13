@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { applyOpenHandTechnique } from '../../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js';
 import '../CharSheet.css';
 
-function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName, saveDc, saveType, onClose, onConfirm }) {
+function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName, saveDc, onClose, onConfirm }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
@@ -17,7 +17,7 @@ function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName,
             return;
         }
 
-        const res = await applyOpenHandTechnique(action, playerStats, campaignName, targetName, selected, saveDc, saveType);
+        const res = await applyOpenHandTechnique({ action, playerStats, campaignName, targetName, selectedOptionName: selected, saveDc });
         setResult(res);
         setApplied(true);
     };

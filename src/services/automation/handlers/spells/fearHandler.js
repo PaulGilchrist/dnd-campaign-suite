@@ -49,9 +49,9 @@ async function applyFearSaveFail(campaignName, casterName, targetName, dc, saveR
         timestamp: Date.now(),
     }).catch((e) => { console.error("[fear] Error:", e); });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'frightened' },
-    ], campaignName);
+    ], campaignName });
 
     // Track Fear-specific effect: affected creature can re-save if it ends its turn
     // without line of sight to the caster

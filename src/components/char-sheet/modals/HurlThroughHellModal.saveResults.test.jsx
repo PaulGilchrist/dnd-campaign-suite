@@ -175,7 +175,7 @@ describe('HurlThroughHellModal', () => {
       });
 
       await waitFor(() => {
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin1', 22, ['Psychic'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'Throg' });
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin1', 22, ['Psychic'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'Throg' });
       });
 
       await waitFor(() => {
@@ -211,13 +211,7 @@ describe('HurlThroughHellModal', () => {
       });
 
       await waitFor(() => {
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-          'Throg',
-          'Goblin1',
-          [{ type: 'hurl_through_hell_return', target: 'Goblin1', source: 'Hurl Through Hell' }],
-          'test-campaign',
-          2
-        );
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Throg', targetName: 'Goblin1', effects: [{ type: 'hurl_through_hell_return', target: 'Goblin1', source: 'Hurl Through Hell' }], campaignName: 'test-campaign', rounds: 2 });
       });
 
       await waitFor(() => {

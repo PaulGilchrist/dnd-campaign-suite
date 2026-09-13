@@ -19,19 +19,28 @@ function castLabels(auto) {
 // WildCompanion chooser modal (registered in useCharActionsAutomation modalMap +
 // CharActionModals render) so payment happens BEFORE the free-cast grant stamp.
 // Refuse at both-zero with popup + wild_companion_refused log (CLA-359 shape).
-async function handleWildCompanion(action, auto, playerStats, campaignName) {
-    const playerName = playerStats.name;
-    let anySlotAvailable = false;
+function hasAnySpellSlotAvailable(playerStats, playerName, campaignName) {
     for (let lvl = 1; lvl <= 9; lvl++) {
         const slotKey = `spell_slots_level_${lvl}`;
         const max = playerStats.spellAbilities?.[slotKey] || 0;
         const stored = getRuntimeValue(playerName, slotKey, campaignName);
         const available = stored != null ? Number(stored) : max;
-        if (available > 0) { anySlotAvailable = true; break; }
+        if (available > 0) return true;
     }
-    const maxWS = playerStats._trackedResources?.wildShapeUses?.max
-        || playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape
-        || 0;
+    return false;
+}
+
+function resolveWildShapeMax(playerStats) {
+    const tracked = playerStats._trackedResources?.wildShapeUses?.max;
+    if (tracked) return tracked;
+    const levelEntry = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+    return (levelEntry ? levelEntry.wild_shape : 0) || 0;
+}
+
+async function handleWildCompanion(action, auto, playerStats, campaignName) {
+    const playerName = playerStats.name;
+    const anySlotAvailable = hasAnySpellSlotAvailable(playerStats, playerName, campaignName);
+    const maxWS = resolveWildShapeMax(playerStats);
     const storedWS = getRuntimeValue(playerName, 'wildShapeUses', campaignName);
     const currentWS = storedWS != null ? Number(storedWS) : maxWS;
 
@@ -80,9 +89,9 @@ async function handleMantleOfMajesty(action, auto, playerStats, campaignName) {
     }
     const newBuffs = [...buffsArray, { name: 'Mantle of Majesty', effect: 'mantle_of_majesty', duration: '1_minute' }];
     await setRuntimeValue(playerStats.name, 'activeBuffs', newBuffs, campaignName);
-    addExpiration(playerStats.name, playerStats.name, [
+    addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
         { type: 'remove_active_buff', buffName: 'Mantle of Majesty' }
-    ], campaignName);
+    ], campaignName });
 
     // Set concentration on combat summary so initiative tracker shows it
     const combatSummary = getCombatSummary(campaignName);
@@ -127,11 +136,15 @@ async function activateWarGodsBlessing(action, auto, playerStats, campaignName) 
     };
 }
 
+function resolveChannelDivinityMaxCharges(playerStats) {
+    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+    return classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+}
+
 // Returns a popup response to return from handle, or null to continue the cast flow.
 async function handleChannelDivinity(action, auto, playerStats, campaignName) {
     const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
-    const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
-    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    const maxCharges = resolveChannelDivinityMaxCharges(playerStats);
     const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
 
     if (currentCharges <= 0) {
@@ -235,7 +248,7 @@ async function handleUsesRechargeFreeCast(action, auto, playerStats, campaignNam
     };
 }
 
-async function handleMultiSpellFreeCast(action, auto, playerStats, campaignName, spellNames, spellLabel) {
+async function handleMultiSpellFreeCast({ action, auto, playerStats, campaignName, spellNames, spellLabel }) {
     const { noConcLabel, durLabel } = castLabels(auto);
 
     if (auto.perSpellTracking) {
@@ -337,7 +350,7 @@ function buildSpellDamageRoll(spellName, spellData, playerStats) {
     };
 }
 
-async function grantFreeCastPopup(action, auto, playerStats, campaignName, spellName, spellNames) {
+async function grantFreeCastPopup({ action, auto, playerStats, campaignName, spellName, spellNames }) {
     const { noConcLabel, durLabel } = castLabels(auto);
     const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCast`;
     const storedSpells = getRuntimeValue(playerStats.name, freeCastKey, campaignName);
@@ -353,6 +366,18 @@ async function grantFreeCastPopup(action, auto, playerStats, campaignName, spell
     };
 }
 
+function isMantleOfMajestyCast(action, auto) {
+    return action.name === 'Mantle of Majesty' && auto.type === 'free_spell' && !!auto.concentration;
+}
+
+// Counter-based free cast routes, evaluated in original order.
+const FREE_CAST_ROUTES = [
+    // uses_expression (counter-based free casts, e.g. "WIS modifier_min_1")
+    { match: (auto) => auto.uses_expression && auto.usesMax, run: handleUsesExpressionFreeCast },
+    // plain uses + recharge (fixed counter-based free casts, e.g. Paladin's Smite uses: 1, recharge: long_rest)
+    { match: (auto) => auto.uses != null && auto.recharge && !auto.uses_expression, run: handleUsesRechargeFreeCast },
+];
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
@@ -362,7 +387,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return handleWildCompanion(action, auto, playerStats, campaignName);
     }
 
-    if (action.name === 'Mantle of Majesty' && auto.type === 'free_spell' && auto.concentration) {
+    if (isMantleOfMajestyCast(action, auto)) {
         return handleMantleOfMajesty(action, auto, playerStats, campaignName);
     }
 
@@ -375,23 +400,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const spellNames = Array.isArray(auto.spell) ? auto.spell : [spellName];
     const spellLabel = spellNames.join(' or ');
 
-    // Handle uses_expression (counter-based free casts, e.g. "WIS modifier_min_1")
-    if (auto.uses_expression && auto.usesMax) {
-        return handleUsesExpressionFreeCast(action, auto, playerStats, campaignName, spellName);
-    }
-
-    // Handle plain uses + recharge (fixed counter-based free casts, e.g. Paladin's Smite uses: 1, recharge: long_rest)
-    if (auto.uses != null && auto.recharge && !auto.uses_expression) {
-        return handleUsesRechargeFreeCast(action, auto, playerStats, campaignName, spellName);
+    const freeCastRoute = FREE_CAST_ROUTES.find(route => route.match(auto));
+    if (freeCastRoute) {
+        return freeCastRoute.run(action, auto, playerStats, campaignName, spellName);
     }
 
     if (spellNames.length > 1) {
-        return handleMultiSpellFreeCast(action, auto, playerStats, campaignName, spellNames, spellLabel);
+        return handleMultiSpellFreeCast({ action, auto, playerStats, campaignName, spellNames, spellLabel });
     }
 
     const spellData = await lookupSpellData(playerStats, spellName);
     const damageRoll = buildSpellDamageRoll(spellName, spellData, playerStats);
     if (damageRoll) return damageRoll;
 
-    return grantFreeCastPopup(action, auto, playerStats, campaignName, spellName, spellNames);
+    return grantFreeCastPopup({ action, auto, playerStats, campaignName, spellName, spellNames });
 }

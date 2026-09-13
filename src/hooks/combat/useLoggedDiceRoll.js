@@ -64,7 +64,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     rollSkillCheck: (name, bonus, context) => logAndShow(name, bonus, 'skill', context),
     rollInitiative: (initBonus, context) => logAndShow('Initiative', initBonus, 'initiative', context),
     rollAttack: (name, hitBonus, context) => logAndShow(name, hitBonus, 'attack', context),
-    rollDamage: (name, formula, total, rolls, modifier, context) => logDamageAndShow(name, formula, total, rolls, modifier, context),
+    rollDamage: logDamageAndShow,
     quickRollPlayerSave,
     triggerGloriousDefenseCounterAttack,
   };

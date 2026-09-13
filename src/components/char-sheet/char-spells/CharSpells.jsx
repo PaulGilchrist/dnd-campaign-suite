@@ -82,6 +82,45 @@ function SpellPreparedCell({ spell, handleTogglePreparedSpells }) {
     return <td><input tabIndex={0} type="checkbox" checked={spell.prepared === 'Prepared'} onChange={() => handleTogglePreparedSpells(spell.name)}/></td>;
 }
 
+function spellAttackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct) {
+    return (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? ' stat--penalized' : '');
+}
+
+function SpellAttackHeaderRow({ playerStats, cannotAct, exhaustionPenalty, conditionAttackMode, innateSorceryActive, isSorcerer, rollAttack }) {
+    const toHit = playerStats.spellAbilities.toHit - exhaustionPenalty;
+    const forcedMode = conditionAttackMode !== 'normal' ? conditionAttackMode : (isSorcerer && innateSorceryActive ? 'advantage' : undefined);
+    return (
+        <div>
+            <b className={'clickable' + (cannotAct ? ' disabled-attack' : '') + spellAttackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct)} onClick={() => {
+                if (cannotAct) return;
+                rollAttack('Spell Attack', toHit, { forcedMode });
+            }}>Attack (to hit):</b> <span className={spellAttackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct).trim()}>+{toHit}</span><br/>
+            <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>
+            <b>Save DC:</b> {playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0)}
+        </div>
+    );
+}
+
+function SpellRow({ spell, is2024, isWizard, showPreparedColumn, setSelectedSpell, handleTogglePreparedSpells, playerStats }) {
+    const notes = spell.components ? [spell.components.join('/')] : [];
+    const effect = computeSpellEffectLabel(spell, playerStats);
+    const isPrepared = spell.prepared === 'Always' || spell.prepared === 'Prepared';
+    // 2024 wizards: unprepared non-ritual spells are in the spellbook but not castable;
+    // unprepared rituals remain castable via Ritual Adept. Other classes always have
+    // prepared spells, so nothing is ever grayed.
+    const isGrayedNonCastable = is2024 && isWizard && !isPrepared && !spell.ritual;
+    return <tr key={spell.name} className={isGrayedNonCastable ? 'spell-row-not-castable' : ''}>
+        <td className={`left spell-name ${isGrayedNonCastable ? 'not-castable' : 'clickable'}`} title={isGrayedNonCastable ? 'Not prepared' : undefined} onClick={() => { if (!isGrayedNonCastable) setSelectedSpell(spell); }}>{spell.name}</td>
+        <td>{spell.level === 0 ? 'Cantrip' : spell.level}</td>
+        {showPreparedColumn && <SpellPreparedCell spell={spell} handleTogglePreparedSpells={handleTogglePreparedSpells} />}
+        <td>{formatSpellCastingTime(playerStats, spell)}</td>
+        <td>{spell.range}</td>
+        <td>{effect}</td>
+        <td>{formatSpellDuration(spell)}</td>
+        <td className='left'>{notes.join(', ').replace('Concentration','Con')}</td>
+    </tr>;
+}
+
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters, setModalState }) {
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs); // subscribe to activeBuffs changes for re-render
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
@@ -116,7 +155,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 
     const { castAction } = useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta: {}, cachedPosRef: cachedCastPosRef, setModalState });
 
-    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleGreaterRestorationNoEffects, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingBane, handleBaneConfirm, handleBaneSkip, pendingBless, handleBlessConfirm, handleBlessSkip, pendingFaerieFire, handleFaerieFireConfirm, handleFaerieFireSkip, pendingHolyAura, handleHolyAuraConfirm, handleHolyAuraSkip, pendingBeaconOfHope, handleBeaconOfHopeConfirm, handleBeaconOfHopeSkip, pendingSlow, handleSlowConfirm, handleSlowSkip, pendingHaste, handleHasteConfirm, handleHasteSkip, pendingEnhanceAbility, enhanceAbilityStage, handleEnhanceAbilityAbilitySelect, handleEnhanceAbilityConfirm, handleEnhanceAbilitySkip, pendingBarkskin, handleBarkskinConfirm, handleBarkskinSkip, pendingInvisibility, handleInvisibilityConfirm, handleInvisibilitySkip, pendingGreaterInvisibility, handleGreaterInvisibilityConfirm, handleGreaterInvisibilitySkip, pendingFeignDeath, handleFeignDeathConfirm, handleFeignDeathSkip, pendingHeal, handleHealConfirm, handleHealSkip, pendingProtectionFromEvilAndGood, handleProtectionFromEvilAndGoodConfirm, handleProtectionFromEvilAndGoodSkip, pendingProtectionFromPoison, handleProtectionFromPoisonConfirm, handleProtectionFromPoisonSkip, pendingStoneSkin, handleStoneSkinConfirm, handleStoneSkinSkip, pendingProtectionFromEnergy, protectionFromEnergyStage, handleProtectionFromEnergyTargetSelect, handleProtectionFromEnergyTypeSelect, handleProtectionFromEnergySkip, pendingResistance, resistanceStage, handleResistanceTargetSelect, handleResistanceTypeSelect, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip, pendingPassWithoutTrace, handlePassWithoutTraceConfirm, handlePassWithoutTraceSkip, pendingGlobe, handleGlobeConfirm, handleGlobeSkip, pendingForcecage, handleForcecageConfirm, handleForcecageSkip, pendingAntimagicField, handleAntimagicFieldConfirm, handleAntimagicFieldSkip, pendingRegenerate, handleRegenerateConfirm, handleRegenerateSkip, pendingHealingWord, handleHealingWordConfirm, handleHealingWordSkip, pendingCureWounds, handleCureWoundsConfirm, handleCureWoundsSkip, pendingStinkingCloud, handleStinkingCloudConfirm, handleStinkingCloudSkip, pendingWeb, handleWebConfirm, handleWebSkip, pendingAnimalFriendship, handleAnimalFriendshipConfirm, handleAnimalFriendshipSkip, pendingAuraOfLife, handleAuraOfLifeConfirm, handleAuraOfLifeSkip, pendingAuraOfPurity, handleAuraOfPurityConfirm, handleAuraOfPuritySkip, pendingCircleOfPower, handleCircleOfPowerConfirm, handleCircleOfPowerSkip, pendingCompulsion, handleCompulsionConfirm, handleCompulsionSkip, pendingAuraOfVitality, handleAuraOfVitalityConfirm, handleAuraOfVitalitySkip, pendingForesight, handleForesightConfirm, handleForesightSkip, pendingLongstrider, handleLongstriderConfirm, handleLongstriderSkip, pendingSpareTheDying, handleSpareTheDyingConfirm, handleSpareTheDyingSkip,     pendingConfusion, handleConfusionConfirm, handleConfusionSkip, pendingDeathWard, handleDeathWardConfirm, handleDeathWardSkip,     pendingHeroism, handleHeroismConfirm, handleHeroismSkip, pendingHex, handleHexConfirm, handleHexSkip,   pendingHoldMonster: flowHoldMonster, pendingHoldPerson: flowHoldPerson, handleHoldMonsterConfirm, handleHoldMonsterSkip, handleHoldPersonConfirm, handleHoldPersonSkip,     pendingPolymorph: flowPolymorph, handlePolymorphConfirm, handlePolymorphSkip, pendingShapechange: pendingShapechange, pendingAnimalShapes: flowAnimalShapes, handleAnimalShapesTargetConfirm, handleAnimalShapesSkip, pendingTruePolymorph: flowTruePolymorph, handleTruePolymorphPathSelect, handleTruePolymorphTargetConfirm, handleTruePolymorphSkip, pendingCharmPerson: flowCharmPerson, handleCharmPersonConfirm, handleCharmPersonSkip, pendingCharmMonster: flowCharmMonster, handleCharmMonsterConfirm, handleCharmMonsterSkip,         pendingBanishment: flowBanishment, handleBanishmentConfirm, handleBanishmentSkip, pendingPrismaticSpray: flowPrismaticSpray, handlePrismaticSprayConfirm, handlePrismaticSpraySkip, pendingRevivify, handleRevivifyConfirm, handleRevivifySkip, pendingSanctuary, handleSanctuaryConfirm, handleSanctuarySkip, pendingSleetStorm, handleSleetStormConfirm, handleSleetStormSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction, setWordsOfCreationTarget, characters, setPopupHtml);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleGreaterRestorationNoEffects, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingBane, handleBaneConfirm, handleBaneSkip, pendingBless, handleBlessConfirm, handleBlessSkip, pendingFaerieFire, handleFaerieFireConfirm, handleFaerieFireSkip, pendingHolyAura, handleHolyAuraConfirm, handleHolyAuraSkip, pendingBeaconOfHope, handleBeaconOfHopeConfirm, handleBeaconOfHopeSkip, pendingSlow, handleSlowConfirm, handleSlowSkip, pendingHaste, handleHasteConfirm, handleHasteSkip, pendingEnhanceAbility, enhanceAbilityStage, handleEnhanceAbilityAbilitySelect, handleEnhanceAbilityConfirm, handleEnhanceAbilitySkip, pendingBarkskin, handleBarkskinConfirm, handleBarkskinSkip, pendingInvisibility, handleInvisibilityConfirm, handleInvisibilitySkip, pendingGreaterInvisibility, handleGreaterInvisibilityConfirm, handleGreaterInvisibilitySkip, pendingFeignDeath, handleFeignDeathConfirm, handleFeignDeathSkip, pendingHeal, handleHealConfirm, handleHealSkip, pendingProtectionFromEvilAndGood, handleProtectionFromEvilAndGoodConfirm, handleProtectionFromEvilAndGoodSkip, pendingProtectionFromPoison, handleProtectionFromPoisonConfirm, handleProtectionFromPoisonSkip, pendingStoneSkin, handleStoneSkinConfirm, handleStoneSkinSkip, pendingProtectionFromEnergy, protectionFromEnergyStage, handleProtectionFromEnergyTargetSelect, handleProtectionFromEnergyTypeSelect, handleProtectionFromEnergySkip, pendingResistance, resistanceStage, handleResistanceTargetSelect, handleResistanceTypeSelect, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip, pendingPassWithoutTrace, handlePassWithoutTraceConfirm, handlePassWithoutTraceSkip, pendingGlobe, handleGlobeConfirm, handleGlobeSkip, pendingForcecage, handleForcecageConfirm, handleForcecageSkip, pendingAntimagicField, handleAntimagicFieldConfirm, handleAntimagicFieldSkip, pendingRegenerate, handleRegenerateConfirm, handleRegenerateSkip, pendingHealingWord, handleHealingWordConfirm, handleHealingWordSkip, pendingCureWounds, handleCureWoundsConfirm, handleCureWoundsSkip, pendingStinkingCloud, handleStinkingCloudConfirm, handleStinkingCloudSkip, pendingWeb, handleWebConfirm, handleWebSkip, pendingAnimalFriendship, handleAnimalFriendshipConfirm, handleAnimalFriendshipSkip, pendingAuraOfLife, handleAuraOfLifeConfirm, handleAuraOfLifeSkip, pendingAuraOfPurity, handleAuraOfPurityConfirm, handleAuraOfPuritySkip, pendingCircleOfPower, handleCircleOfPowerConfirm, handleCircleOfPowerSkip, pendingCompulsion, handleCompulsionConfirm, handleCompulsionSkip, pendingAuraOfVitality, handleAuraOfVitalityConfirm, handleAuraOfVitalitySkip, pendingForesight, handleForesightConfirm, handleForesightSkip, pendingLongstrider, handleLongstriderConfirm, handleLongstriderSkip, pendingSpareTheDying, handleSpareTheDyingConfirm, handleSpareTheDyingSkip,     pendingConfusion, handleConfusionConfirm, handleConfusionSkip, pendingDeathWard, handleDeathWardConfirm, handleDeathWardSkip,     pendingHeroism, handleHeroismConfirm, handleHeroismSkip, pendingHex, handleHexConfirm, handleHexSkip,   pendingHoldMonster: flowHoldMonster, pendingHoldPerson: flowHoldPerson, handleHoldMonsterConfirm, handleHoldMonsterSkip, handleHoldPersonConfirm, handleHoldPersonSkip,     pendingPolymorph: flowPolymorph, handlePolymorphConfirm, handlePolymorphSkip, pendingShapechange: pendingShapechange, pendingAnimalShapes: flowAnimalShapes, handleAnimalShapesTargetConfirm, handleAnimalShapesSkip, pendingTruePolymorph: flowTruePolymorph, handleTruePolymorphPathSelect, handleTruePolymorphTargetConfirm, handleTruePolymorphSkip, pendingCharmPerson: flowCharmPerson, handleCharmPersonConfirm, handleCharmPersonSkip, pendingCharmMonster: flowCharmMonster, handleCharmMonsterConfirm, handleCharmMonsterSkip,         pendingBanishment: flowBanishment, handleBanishmentConfirm, handleBanishmentSkip, pendingPrismaticSpray: flowPrismaticSpray, handlePrismaticSprayConfirm, handlePrismaticSpraySkip, pendingRevivify, handleRevivifyConfirm, handleRevivifySkip, pendingSanctuary, handleSanctuaryConfirm, handleSanctuarySkip, pendingSleetStorm, handleSleetStormConfirm, handleSleetStormSkip } = useSpellMetamagicFlow({ playerStats: playerStats, campaignName: campaignName, onExecute: castAction, setSecondaryTargetModal: setWordsOfCreationTarget, characters: characters, setPopupHtml: setPopupHtml });
     const { pendingUpcast, buildUpcastLevels, handleUpcastConfirm, handleUpcastCancel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const handleSpellCast = React.useCallback(async (spell, metaCtx) => {
@@ -402,14 +441,7 @@ return (
                  * and shown via popups.
                  */}
                 <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
-                <div>
-                    <b className={'clickable' + (cannotAct ? ' disabled-attack' : '') + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? ' stat--penalized' : '')} onClick={() => {
-                      if (cannotAct) return;
-                      rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty, { forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : (isSorcerer && innateSorceryActive ? 'advantage' : undefined) });
-                    }}>Attack (to hit):</b> <span className={exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.toHit - exhaustionPenalty}</span><br/>
-                    <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>
-                      <b>Save DC:</b> {playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0)}
-                </div>
+                <SpellAttackHeaderRow playerStats={playerStats} cannotAct={cannotAct} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} innateSorceryActive={innateSorceryActive} isSorcerer={isSorcerer} rollAttack={rollAttack} />
                  <SpellAbilitySummary spellAbilities={playerStats.spellAbilities} showPreparedColumn={showPreparedColumn} />
                 <CharSpellSlots playerStats={playerStats} campaignName={campaignName}></CharSpellSlots>
             </div>
@@ -427,25 +459,9 @@ return (
                     </tr>
                 </thead>
                 <tbody>
-                    {spells.map((spell) => {
-                        const notes = spell.components ? [spell.components.join('/')] : [];
-                        const effect = computeSpellEffectLabel(spell, playerStats);
-                        const isPrepared = spell.prepared === 'Always' || spell.prepared === 'Prepared';
-                        // 2024 wizards: unprepared non-ritual spells are in the spellbook but not castable;
-                        // unprepared rituals remain castable via Ritual Adept. Other classes always have
-                        // prepared spells, so nothing is ever grayed.
-                        const isGrayedNonCastable = is2024 && isWizard && !isPrepared && !spell.ritual;
-                        return <tr key={spell.name} className={isGrayedNonCastable ? 'spell-row-not-castable' : ''}>
-                            <td className={`left spell-name ${isGrayedNonCastable ? 'not-castable' : 'clickable'}`} title={isGrayedNonCastable ? 'Not prepared' : undefined} onClick={() => { if (!isGrayedNonCastable) setSelectedSpell(spell); }}>{spell.name}</td>
-                            <td>{spell.level === 0 ? 'Cantrip' : spell.level}</td>
-                            {showPreparedColumn && <SpellPreparedCell spell={spell} handleTogglePreparedSpells={handleTogglePreparedSpells} />}
-                            <td>{formatSpellCastingTime(playerStats, spell)}</td>
-                            <td>{spell.range}</td>
-                            <td>{effect}</td>
-                            <td>{formatSpellDuration(spell)}</td>
-                            <td className='left'>{notes.join(', ').replace('Concentration','Con')}</td>
-                        </tr>;
-                    })}
+                    {spells.map((spell) => (
+                        <SpellRow key={spell.name} spell={spell} is2024={is2024} isWizard={isWizard} showPreparedColumn={showPreparedColumn} setSelectedSpell={setSelectedSpell} handleTogglePreparedSpells={handleTogglePreparedSpells} playerStats={playerStats} />
+                    ))}
                 </tbody>
             </table>}
         </div>}

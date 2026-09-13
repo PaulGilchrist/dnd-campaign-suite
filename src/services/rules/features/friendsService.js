@@ -85,15 +85,23 @@ function logFriendsNoEffect(campaignName, casterName, targetName, reason, popupD
 
 // Check 3 support: target's current/max HP (players read the runtime store,
 // monsters the combat-summary creature entry).
-function resolveTargetHealth(targetCreature, targetName, playerStats, campaignName) {
-    if (targetCreature?.type === 'player') {
-        const currentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
-        const maxHp = getRuntimeValue(targetName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
-        return { currentHp, maxHp };
-    }
+function resolvePlayerHealth(targetName, playerStats, campaignName) {
+    const currentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? playerStats.computedStats?.currentHp ?? 0;
+    const maxHp = getRuntimeValue(targetName, 'hitPoints', campaignName) ?? playerStats.computedStats?.maxHp ?? 0;
+    return { currentHp, maxHp };
+}
+
+function resolveMonsterHealth(targetCreature) {
     const currentHp = targetCreature?.currentHp ?? targetCreature?.hit_points?.current ?? 0;
     const maxHp = targetCreature?.maxHp ?? 0;
     return { currentHp, maxHp };
+}
+
+function resolveTargetHealth(targetCreature, targetName, playerStats, campaignName) {
+    if (targetCreature?.type === 'player') {
+        return resolvePlayerHealth(targetName, playerStats, campaignName);
+    }
+    return resolveMonsterHealth(targetCreature);
 }
 
 // Set concentration on the caster so the badge shows in the initiative tracker

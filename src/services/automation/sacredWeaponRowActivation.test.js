@@ -129,7 +129,7 @@ describe('Sacred Weapon row activation → dedicated handler routing (CLA-301)',
             [expect.objectContaining({ effect: 'sacred_weapon', damageTypeChoice: 'Radiant', duration: '10_minutes' })],
             campaignName,
         );
-        expect(addExpiration).toHaveBeenCalledWith(playerName, playerName, [{ type: 'remove_active_buff', buffName: 'Sacred Weapon' }], campaignName, 100);
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'remove_active_buff', buffName: 'Sacred Weapon' }], campaignName, rounds: 100 });
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({ type: 'ability_use', abilityName: 'Sacred Weapon' }));
     });
 

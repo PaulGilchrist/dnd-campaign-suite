@@ -85,7 +85,7 @@ function parseWebDurationRounds(auto, action) {
     return undefined;
 }
 
-async function restrainWebTarget(campaignName, casterName, targetName, dc, saveResult, durationRounds) {
+async function restrainWebTarget({ campaignName, casterName, targetName, dc, saveResult, durationRounds }) {
     // Apply Restrained condition
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
@@ -115,9 +115,9 @@ async function restrainWebTarget(campaignName, casterName, targetName, dc, saveR
     // Add expiration for concentration — Restrained removed when the
     // spell ends (600 rounds) — ONE merged entry (two sequential
     // addExpiration calls race server-side, playbook 42ab).
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'restrained' },
-    ], campaignName, durationRounds);
+    ], campaignName, rounds: durationRounds });
 
     addEntry(campaignName, {
         type: 'condition',
@@ -195,10 +195,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const durationRounds = parseWebDurationRounds(auto, action);
 
     if (durationRounds) {
-        addExpiration(casterName, casterName, [
+        addExpiration({ attackerName: casterName, targetName: casterName, effects: [
             { type: 'clear_runtime_value', creatureName: casterName, key: trackingKey },
             { type: 'remove_target_effect', effectKey: 'web', source: casterName },
-        ], campaignName, durationRounds);
+        ], campaignName, rounds: durationRounds });
     }
 
     registerSpellConcentration(campaignName, casterName, 'Web', playerStats);
@@ -233,7 +233,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             await saveSuccess({ campaignName, casterName, targetName, dc, saveResult, saveType: 'DEX', rollType: 'save-web', successDescription: `${targetName} succeeded on DEX save against Web.` });
         } else {
             affectedCount++;
-            await restrainWebTarget(campaignName, casterName, targetName, dc, saveResult, durationRounds);
+            await restrainWebTarget({ campaignName, casterName, targetName, dc, saveResult, durationRounds });
             results.push(`${targetName} is Restrained.`);
         }
     }

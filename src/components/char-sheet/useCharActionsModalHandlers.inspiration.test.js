@@ -188,14 +188,14 @@ describe('useCharActionsModalHandlers - inspiration', () => {
       };
       const handlers = getHandlers(modalState);
       await handlers.handleBardicInspirationConfirm('Ally1');
-      expect(applyBardicInspiration).toHaveBeenCalledWith(
-        modalState.bardicInspirationTargetModal.action,
-        modalState.bardicInspirationTargetModal.playerStats,
-        modalState.bardicInspirationTargetModal.campaignName,
-        'Ally1',
-        'd8',
-        false
-      );
+      expect(applyBardicInspiration).toHaveBeenCalledWith({
+            action: modalState.bardicInspirationTargetModal.action,
+            playerStats: modalState.bardicInspirationTargetModal.playerStats,
+            campaignName: modalState.bardicInspirationTargetModal.campaignName,
+            targetName: 'Ally1',
+            dieSize: 'd8',
+            hasCombatOptions: false,
+        });
       expect(mockSetModalState).toHaveBeenCalledWith({ bardicInspirationTargetModal: null });
     });
 
@@ -250,14 +250,14 @@ describe('useCharActionsModalHandlers - inspiration', () => {
       };
       const handlers = getHandlers(modalState);
       await handlers.handleInspiringMovementConfirm('Ally1');
-      expect(applyInspiringMovement).toHaveBeenCalledWith(
-        modalState.inspiringMovementAllyModal.action,
-        modalState.inspiringMovementAllyModal.playerStats,
-        modalState.inspiringMovementAllyModal.campaignName,
-        'Ally1',
-        true,
-        false
-      );
+      expect(applyInspiringMovement).toHaveBeenCalledWith({
+            action: modalState.inspiringMovementAllyModal.action,
+            playerStats: modalState.inspiringMovementAllyModal.playerStats,
+            campaignName: modalState.inspiringMovementAllyModal.campaignName,
+            allyName: 'Ally1',
+            halfSpeed: true,
+            noOAs: false,
+        });
       expect(mockSetModalState).toHaveBeenCalledWith({ inspiringMovementAllyModal: null });
     });
 

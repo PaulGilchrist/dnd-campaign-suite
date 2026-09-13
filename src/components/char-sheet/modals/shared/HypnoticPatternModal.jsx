@@ -115,11 +115,11 @@ function HypnoticPatternModal({
                     });
                 } else if (!success) {
                     applyHypnoticConditionsToTarget(targetName, campaignName);
-                    addExpiration(casterName, targetName, [
+                    addExpiration({ attackerName: casterName, targetName, effects: [
                         { type: 'charmed', condition: 'charmed' },
                         { type: 'incapacitated', condition: 'incapacitated' },
                         { type: 'speed_zero', condition: 'speed_zero' },
-                    ], campaignName);
+                    ], campaignName });
 
                     await addEntry(campaignName, {
                         type: 'condition',
@@ -278,11 +278,11 @@ function HypnoticPatternModal({
 
         if (!success) {
             applyHypnoticConditionsToTarget(targetName, campaignName);
-            addExpiration(casterName, targetName, [
+            addExpiration({ attackerName: casterName, targetName, effects: [
                 { type: 'charmed', condition: 'charmed' },
                 { type: 'incapacitated', condition: 'incapacitated' },
                 { type: 'speed_zero', condition: 'speed_zero' },
-            ], campaignName);
+            ], campaignName });
 
             await logConditionApplied(campaignName, {
                 targetName,

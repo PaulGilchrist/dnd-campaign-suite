@@ -93,7 +93,7 @@ function resolveTempHpExpression(auto, playerStats) {
     return auto.tempHpExpression.replace(/spellSlotLevel/g, String(slotLevel));
 }
 
-export async function confirmPowerWordFortify(action, playerStats, campaignName, distribution, totalTempHp, tempHpExpression) {
+export async function confirmPowerWordFortify({ action, playerStats, campaignName, distribution, totalTempHp, tempHpExpression }) {
     const playerName = playerStats.name;
     const targetNames = Object.keys(distribution);
     const results = [];

@@ -408,18 +408,13 @@ describe('resistanceHandler', () => {
         'fire'
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'Cleric',
-        'Goblin',
-        expect.arrayContaining([
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Cleric', targetName: 'Goblin', effects: expect.arrayContaining([
           expect.objectContaining({
             type: 'remove_target_effect',
             effectKey: 'resistance_damage_reduction',
             source: 'Cleric',
           }),
-        ]),
-        CAMPAIGN_NAME
-      );
+        ]), campaignName: CAMPAIGN_NAME });
     });
 
     it('registers concentration with combat summary data', async () => {

@@ -33,7 +33,7 @@ async function recordSlowSaveSuccess(campaignName, casterName, targetName, dc, s
     }).catch((e) => { console.error("[slow] Error:", e); });
 }
 
-async function applySlowToTarget(campaignName, action, casterName, targetName, dc, saveResult) {
+async function applySlowToTarget({ campaignName, action, casterName, targetName, dc, saveResult }) {
     // Apply slow condition
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
@@ -61,9 +61,9 @@ async function applySlowToTarget(campaignName, action, casterName, targetName, d
     });
 
     // Add expiration for concentration (up to 10 rounds = 1 minute)
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'slow' },
-    ], campaignName);
+    ], campaignName });
 
     // Store target effects for the slow debuffs with condition reference for concentration cleanup
     const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
@@ -193,7 +193,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             await recordSlowSaveSuccess(campaignName, casterName, targetName, dc, saveResult);
         } else {
             affectedCount++;
-            await applySlowToTarget(campaignName, action, casterName, targetName, dc, saveResult);
+            await applySlowToTarget({ campaignName, action, casterName, targetName, dc, saveResult });
             results.push(`${targetName} is slowed.`);
         }
     }

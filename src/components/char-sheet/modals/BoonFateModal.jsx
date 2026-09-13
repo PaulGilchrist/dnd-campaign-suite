@@ -14,7 +14,7 @@ function BoonFateModal({ action, playerStats, campaignName, roll2d4, lastAttack,
     const originalTotal = (lastAttack.d20 || 0) + bonusValue;
 
     const handleChoice = async (mode) => {
-        const res = await applyBoonFateChoice(action, playerStats, campaignName, roll2d4, lastAttack, mode);
+        const res = await applyBoonFateChoice({ action, playerStats, campaignName, roll2d4, lastAttack, mode });
         setResult(res);
     };
 

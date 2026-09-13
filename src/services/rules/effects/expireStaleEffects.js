@@ -52,7 +52,7 @@ async function processSleetStormSaves(activeName, campaignName) {
 // (swept by the concentration break) re-saves at the DC stored on the caster's
 // `_<prefix>_<caster>` zone tracking. The zone's turn-end block/condition is shed
 // by the handler at that creature's turn end.
-async function processZoneTurnStartSaves(activeName, campaignName, effectKey, trackingPrefix, processSave, logLabel) {
+async function processZoneTurnStartSaves({ activeName, campaignName, effectKey, trackingPrefix, processSave, logLabel }) {
     const zoneEffects = getCampaignTargetEffects(campaignName)
         .filter(te => te && te.effect === effectKey && te.target === activeName);
     for (const te of zoneEffects) {
@@ -103,12 +103,12 @@ export async function expireStaleEffects(campaignName, overrideActiveName) {
         // Phase 4: SP-111 Stinking Cloud recurring turn-start CON saves.
         // Poisoned on a failed save; the action/bonus-action block and Poisoned
         // are shed at that creature's turn end by applyStinkingCloudTurnEnd.
-        await processZoneTurnStartSaves(activeName, campaignName, 'stinking_cloud', 'stinkingCloud', processStinkingCloudAreaSave, 'Stinking Cloud turn-start save');
+        await processZoneTurnStartSaves({ activeName, campaignName, effectKey: 'stinking_cloud', trackingPrefix: 'stinkingCloud', processSave: processStinkingCloudAreaSave, logLabel: 'Stinking Cloud turn-start save' });
 
         // Phase 5: SP-126 Web recurring turn-start STR saves. Restrained on a
         // failed save; already-Restrained creatures skip — breaking free via a
         // STR (Athletics) action is a GM-adjudicated residual with no modal
         // consumer in this engine.
-        await processZoneTurnStartSaves(activeName, campaignName, 'web', 'web', processWebAreaSave, 'Web turn-start save');
+        await processZoneTurnStartSaves({ activeName, campaignName, effectKey: 'web', trackingPrefix: 'web', processSave: processWebAreaSave, logLabel: 'Web turn-start save' });
     } catch (_e) { console.error('[expireStaleEffects] Zone save expiration processing failed:', _e); }
 }

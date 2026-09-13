@@ -203,7 +203,14 @@ export default function useCharActionsModalHandlers({
     async function handlePowerWordFortifyConfirm(distribution) {
         if (!distribution || !mergedModalState.powerWordFortifyModal) return;
         const { action, playerStats, campaignName } = mergedModalState.powerWordFortifyModal;
-        const result = await confirmPowerWordFortify(action, playerStats, campaignName, distribution, mergedModalState.powerWordFortifyModal.totalTempHp, mergedModalState.powerWordFortifyModal.tempHpExpression);
+        const result = await confirmPowerWordFortify({
+    action,
+    playerStats,
+    campaignName,
+    distribution,
+    totalTempHp: mergedModalState.powerWordFortifyModal.totalTempHp,
+    tempHpExpression: mergedModalState.powerWordFortifyModal.tempHpExpression,
+});
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
@@ -350,14 +357,13 @@ export default function useCharActionsModalHandlers({
 
     async function handleVitalityOfTheTreeConfirm(selectedTargets) {
         if (!selectedTargets || !modalState.vitalityOfTheTreeTarget) return;
-        const result = await confirmVitalityOfTheTree(
-            modalState.vitalityOfTheTreeTarget.action,
-            modalState.vitalityOfTheTreeTarget.playerStats,
-            modalState.vitalityOfTheTreeTarget.campaignName,
-            selectedTargets,
-            modalState.vitalityOfTheTreeTarget.tempHp,
-            modalState.vitalityOfTheTreeTarget.maxTargets
-        );
+        const result = await confirmVitalityOfTheTree({
+                action: modalState.vitalityOfTheTreeTarget.action,
+                playerStats: modalState.vitalityOfTheTreeTarget.playerStats,
+                campaignName: modalState.vitalityOfTheTreeTarget.campaignName,
+                selectedTargets,
+                tempHp: modalState.vitalityOfTheTreeTarget.tempHp,
+            });
         if (result?.payload) {
             setPopupHtml(result.payload);
         }
@@ -406,7 +412,14 @@ export default function useCharActionsModalHandlers({
         const { action, playerStats: biPlayerStats, campaignName: biCampaignName, dieSize, hasCombatOptions } = modalState.bardicInspirationTargetModal;
         setModalState({ bardicInspirationTargetModal: null });
         if (!targetName) return;
-        const result = await applyBardicInspiration(action, biPlayerStats, biCampaignName, targetName, dieSize, hasCombatOptions);
+        const result = await applyBardicInspiration({
+    action,
+    playerStats: biPlayerStats,
+    campaignName: biCampaignName,
+    targetName,
+    dieSize,
+    hasCombatOptions,
+});
         if (!result) return;
         if (result.type === 'popup') {
             setPopupHtml(result.payload);
@@ -418,7 +431,14 @@ export default function useCharActionsModalHandlers({
         const { action, playerStats: imPlayerStats, campaignName: imCampaignName, halfSpeed, noOAs } = modalState.inspiringMovementAllyModal;
         setModalState({ inspiringMovementAllyModal: null });
         if (!allyName) return;
-        const result = await applyInspiringMovement(action, imPlayerStats, imCampaignName, allyName, halfSpeed, noOAs);
+        const result = await applyInspiringMovement({
+    action,
+    playerStats: imPlayerStats,
+    campaignName: imCampaignName,
+    allyName,
+    halfSpeed,
+    noOAs,
+});
         if (!result) return;
         if (result.type === 'popup') {
             setPopupHtml(result.payload);

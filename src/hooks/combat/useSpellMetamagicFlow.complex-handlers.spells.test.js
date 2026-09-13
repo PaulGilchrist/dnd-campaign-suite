@@ -177,7 +177,7 @@ function setupHook(onExecute, spellOverrides = {}) {
   const stats = makePlayerStats();
   const spell = makeSpell(spellOverrides);
   const { result } = renderHook(() =>
-    useSpellMetamagicFlow(stats, 'TestCampaign', onExecute)
+    useSpellMetamagicFlow({ playerStats: stats, campaignName: 'TestCampaign', onExecute: onExecute })
   );
   act(() => {
     result.current.gateMetamagic(spell);
@@ -249,7 +249,7 @@ describe('useSpellMetamagicFlow — Globe of Invulnerability', () => {
   it('does nothing when confirming without pending state', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -312,7 +312,7 @@ describe('useSpellMetamagicFlow — Antimagic Field', () => {
   it('does nothing when confirming without pending state', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -335,7 +335,7 @@ describe('useSpellMetamagicFlow — Stinking Cloud', () => {
     const stats = makePlayerStats();
     const spell = makeSpell({ name: 'Stinking Cloud', level: 1 });
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(stats, 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: stats, campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
     act(() => {
       result.current.gateMetamagic(spell);
@@ -386,7 +386,7 @@ describe('useSpellMetamagicFlow — Confusion', () => {
     const stats = makePlayerStats();
     const spell = makeSpell({ name: 'Confusion', level: 4 });
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(stats, 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: stats, campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
     act(() => {
       result.current.gateMetamagic(spell);
@@ -436,7 +436,7 @@ describe('useSpellMetamagicFlow — Cure Wounds', () => {
   it('calls onExecute with spell and target context on confirm', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
     const spell = makeSpell({ name: 'Cure Wounds', level: 1 });
     act(() => {
@@ -454,7 +454,7 @@ describe('useSpellMetamagicFlow — Cure Wounds', () => {
   it('does not call onExecute when targetName is missing', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
     const spell = makeSpell({ name: 'Cure Wounds', level: 1 });
     act(() => {
@@ -471,7 +471,7 @@ describe('useSpellMetamagicFlow — Cure Wounds', () => {
   it('does nothing when confirming without pending state', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -657,7 +657,7 @@ describe('useSpellMetamagicFlow — Animal Shapes', () => {
     allySel.getAllyList.mockReturnValueOnce(['Goblin A', 'Goblin B']);
 
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     act(() => {
@@ -715,7 +715,7 @@ describe('useSpellMetamagicFlow — True Polymorph', () => {
     const { applyTruePolymorph } = await import('../../services/automation/handlers/spells/truePolymorphService.js');
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     act(() => {

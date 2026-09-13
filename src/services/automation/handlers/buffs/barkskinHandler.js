@@ -43,7 +43,7 @@ function getActiveBuffList(targetName, campaignName) {
     return Array.isArray(activeBuffs) ? activeBuffs : [];
 }
 
-function processBarkskinTarget(targetName, targetCharacter, casterName, duration, campaignName, skippedTargets) {
+function processBarkskinTarget({ targetName, targetCharacter, casterName, duration, campaignName, skippedTargets }) {
     const targetAc = targetCharacter?.computedStats?.armorClass ?? targetCharacter?.armorClass ?? 10;
 
     if (targetAc >= 17) {
@@ -63,9 +63,9 @@ function processBarkskinTarget(targetName, targetCharacter, casterName, duration
         setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
     }
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_active_buff', buffName: BARKSKIN_BUFF_NAME }
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -77,7 +77,7 @@ function processBarkskinTarget(targetName, targetCharacter, casterName, duration
     return true;
 }
 
-export async function applyBarkskin(action, playerStats, campaignName, _mapName, targetNames, characters) {
+export async function applyBarkskin({ action, playerStats, campaignName, targetNames, characters }) {
     if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
         return null;
     }
@@ -95,7 +95,14 @@ export async function applyBarkskin(action, playerStats, campaignName, _mapName,
     let skippedTargets = [];
 
     for (const targetName of targetNames) {
-        if (processBarkskinTarget(targetName, targetCharacterMap[targetName], casterName, duration, campaignName, skippedTargets)) {
+        if (processBarkskinTarget({
+    targetName,
+    targetCharacter: targetCharacterMap[targetName],
+    casterName,
+    duration,
+    campaignName,
+    skippedTargets,
+})) {
             appliedTargets.push(targetName);
         }
     }

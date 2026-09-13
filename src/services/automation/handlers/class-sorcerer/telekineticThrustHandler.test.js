@@ -169,20 +169,27 @@ describe('telekineticThrustHandler', () => {
 
     describe('applyTelekineticThrust', () => {
         it('returns null when no options available', async () => {
-            const result = await applyTelekineticThrust(makeAction(), makePlayerStats(), 'test-campaign', 'Goblin', 13, 'STR');
+            const result = await applyTelekineticThrust({
+    action: makeAction(),
+    playerStats: makePlayerStats(),
+    campaignName: 'test-campaign',
+    targetName: 'Goblin',
+    saveDc: 13,
+    saveType: 'STR',
+});
 
             expect(result).toBeNull();
         });
 
         it('returns popup with no-target message when targetName is null', async () => {
-            const result = await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                null,
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: null,
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No target selected');
@@ -191,14 +198,14 @@ describe('telekineticThrustHandler', () => {
         it('creates a save listener and waits for the result', async () => {
             setupSaveMock({ success: false, total: 10, roll: 8, saveBonus: 2 });
 
-            await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', {
                 targetName: 'Goblin',
@@ -210,14 +217,14 @@ describe('telekineticThrustHandler', () => {
         it('returns a popup indicating success when save passes', async () => {
             setupSaveMock({ success: true, total: 15, roll: 12, saveBonus: 3 });
 
-            const result = await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Success');
@@ -227,14 +234,14 @@ describe('telekineticThrustHandler', () => {
         it('returns a popup indicating failure and applies effect when save fails', async () => {
             setupSaveMock({ success: false, total: 10, roll: 8, saveBonus: 2 });
 
-            const result = await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Failure');
@@ -245,14 +252,14 @@ describe('telekineticThrustHandler', () => {
             setupSaveMock({ success: false, total: 10, roll: 8, saveBonus: 2 });
             damageUtils.getCombatContext.mockResolvedValue(null);
 
-            const result = await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Failure');
@@ -268,14 +275,14 @@ describe('telekineticThrustHandler', () => {
             };
             damageUtils.getCombatContext.mockResolvedValue(combatContext);
 
-            const result = await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Failure');
@@ -309,14 +316,14 @@ describe('telekineticThrustHandler', () => {
             };
             damageUtils.getCombatContext.mockResolvedValue(combatContext);
 
-            const result = await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Failure');
@@ -343,14 +350,14 @@ describe('telekineticThrustHandler', () => {
                 },
             };
 
-            const result = await applyTelekineticThrust(
-                actionWithUnknownEffect,
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: actionWithUnknownEffect,
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Failure');
@@ -365,14 +372,14 @@ describe('telekineticThrustHandler', () => {
             };
             damageUtils.getCombatContext.mockResolvedValue(combatContext);
 
-            const result = await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Failure');
@@ -383,14 +390,14 @@ describe('telekineticThrustHandler', () => {
             setupSaveMock({ success: true, total: 15, roll: 12, saveBonus: 3 });
             logService.addEntry.mockRejectedValueOnce(new Error('log error')).mockResolvedValue(undefined);
 
-            const result = await applyTelekineticThrust(
-                makeActionWithOptions(),
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            const result = await applyTelekineticThrust({
+                    action: makeActionWithOptions(),
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Success');
@@ -415,14 +422,14 @@ describe('telekineticThrustHandler', () => {
                 },
             };
 
-            await applyTelekineticThrust(
-                actionWithoutValue,
-                makePlayerStats(),
-                'test-campaign',
-                'Goblin',
-                13,
-                'STR'
-            );
+            await applyTelekineticThrust({
+                    action: actionWithoutValue,
+                    playerStats: makePlayerStats(),
+                    campaignName: 'test-campaign',
+                    targetName: 'Goblin',
+                    saveDc: 13,
+                    saveType: 'STR',
+                });
 
             expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 description: expect.stringContaining('pushed 10 feet'),
@@ -436,14 +443,14 @@ describe('telekineticThrustHandler', () => {
             });
 
             await expect(
-                applyTelekineticThrust(
-                    makeActionWithOptions(),
-                    makePlayerStats(),
-                    'test-campaign',
-                    'Goblin',
-                    13,
-                    'STR'
-                )
+                applyTelekineticThrust({
+                        action: makeActionWithOptions(),
+                        playerStats: makePlayerStats(),
+                        campaignName: 'test-campaign',
+                        targetName: 'Goblin',
+                        saveDc: 13,
+                        saveType: 'STR',
+                    })
             ).rejects.toThrow('save failed');
         });
     });

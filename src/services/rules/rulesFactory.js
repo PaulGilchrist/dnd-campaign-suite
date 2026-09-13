@@ -93,8 +93,8 @@ const rulesFactory = {
       },
 
       // Master method - delegates to unified rules
-    getPlayerStats: async (allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary) => {
-        const playerStats = await rules.getPlayerStats(allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary);
+    getPlayerStats: async ({ allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary }) => {
+        const playerStats = await rules.getPlayerStats({ allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary });
 
         const { classRules: cr, raceRules: rr } = rulesFactory.getRules(playerSummary);
 

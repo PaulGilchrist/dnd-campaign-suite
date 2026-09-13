@@ -203,14 +203,9 @@ describe('imprisonmentHandler.handle', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), campaignName);
 
       // Verify expiration registered with remove_target_effect for imprisonment
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        expect.arrayContaining([
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([
           expect.objectContaining({ type: 'remove_target_effect', effectKey: 'imprisonment' }),
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
 
       // Verify save_result logged with save-imprisonment rollType
       const saveResultCalls = vi.mocked(addEntry).mock.calls.filter(

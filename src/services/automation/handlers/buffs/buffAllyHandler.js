@@ -32,9 +32,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     );
 
     if (!wasActive) {
-        addExpiration(playerStats.name, playerStats.name, [
+        addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
             { type: 'remove_active_buff', buffName: action.name }
-        ], campaignName);
+        ], campaignName });
     }
 
     return {

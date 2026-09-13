@@ -179,7 +179,7 @@ describe('Plain damage death strike', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            const promise = fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             // Wait for the save prompt to be sent, then dispatch failure
             await new Promise((resolve) => setTimeout(resolve, 10));
@@ -203,7 +203,7 @@ describe('Plain damage death strike', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            const promise = fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: true, roll: 15, bonus: 3, rawRolls: [12] });
@@ -222,7 +222,7 @@ describe('Plain damage death strike', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            const promise = fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: false, roll: 5, bonus: 2, rawRolls: [5] });
@@ -230,14 +230,14 @@ describe('Plain damage death strike', () => {
             await promise.catch(() => { });
 
             // On save failure, doubledTotal = adjustedTotal * 2 = 8 * 2 = 16
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 16, ['slashing'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter' });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 16, ['slashing'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestFighter' });
         });
 
         it('does not apply doubled damage when save succeeds', async () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            const promise = fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: true, roll: 18, bonus: 3, rawRolls: [15] });
@@ -269,7 +269,7 @@ describe('Plain damage death strike', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 14, newHp: -4, damageReduced: false });
 
             const fn = createFn();
-            const promise = fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            const promise = fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: false, roll: 7, bonus: 2, rawRolls: [7] });
@@ -296,7 +296,7 @@ describe('Plain damage death strike', () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
-            const promise = fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            const promise = fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             await new Promise((resolve) => setTimeout(resolve, 10));
             dispatchSaveResult('test-guid-1234', { success: false, roll: 8, bonus: 2, rawRolls: [8] });
@@ -339,7 +339,7 @@ describe('Plain damage death strike', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             expect(sendSavePrompt).not.toHaveBeenCalled();
         });
@@ -362,7 +362,7 @@ describe('Plain damage death strike', () => {
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             expect(sendSavePrompt).not.toHaveBeenCalled();
         });

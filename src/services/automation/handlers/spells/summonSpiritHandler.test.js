@@ -391,9 +391,9 @@ describe('summonSpiritHandler', () => {
 
                 await confirmSummonSpirit(makeAberrantAction(), mockPlayerStats, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
 
-                expect(addExpiration).toHaveBeenCalledWith('TestCaster', 'TestCaster', [
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'TestCaster', effects: [
                     { type: 'remove_summoned_creatures', spell: 'Summon Aberration' },
-                ], mockCampaignName, 600);
+                ], campaignName: mockCampaignName, rounds: 600 });
             });
 
             it('keeps Create Thrall verified behavior for a feature holder: no concentration, temp HP, Psychic Strike', async () => {

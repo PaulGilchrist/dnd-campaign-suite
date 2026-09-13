@@ -280,7 +280,7 @@ describe('processAoeNpcs', () => {
 
     processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 5, damageType: 'Acid', saveDc: 13, saveType: 'strength', dcSuccess: 'half', campaignName: 'MyCampaign', attackerName: 'TestHero', characters: ['char1', 'char2'] });
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Troll', 5, ['Acid'], 'MyCampaign', ['char1', 'char2'], { ignoreResistance: false, attackerName: 'TestHero' });
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Troll', 5, ['Acid'], { campaignName: 'MyCampaign', characters: ['char1', 'char2'], ignoreResistance: false, attackerName: 'TestHero' });
   });
 
   it('uses finalDamage from applyDamageToTarget when it differs from computeDamageAfterEvasion', () => {

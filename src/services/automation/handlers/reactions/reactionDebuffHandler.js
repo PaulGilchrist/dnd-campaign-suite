@@ -110,7 +110,7 @@ async function handleDamageDebuff({ action, campaignName, attackerName, bardicDi
     return infoPopup(action.name, description, auto, { defenderHp });
 }
 
-async function handleDisadvantageDebuff(action, _playerStats, campaignName, _mapName, attackerName, combatSummary) {
+async function handleDisadvantageDebuff({ action, campaignName, attackerName, combatSummary }) {
     const auto = action.automation;
 
     const attackResult = await findLastAttack(campaignName);
@@ -137,7 +137,12 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, _map
     return infoPopup(action.name, description, auto, { defenderHp, defenderName, healedAmount });
 }
 
-async function gateBranchesInRange(featureName, auto, playerName, activeCreatureName, campaignName, _mapName) {
+function areCreaturesPositioned(playerCreature, targetCreature) {
+    return playerCreature?.gridX != null && playerCreature?.gridY != null &&
+        targetCreature?.gridX != null && targetCreature?.gridY != null;
+}
+
+async function gateBranchesInRange({ featureName, auto, playerName, activeCreatureName, campaignName, _mapName }) {
     const rangeFt = rangeToFeet(auto.range || '30_ft');
     const activeMapName = getRuntimeValue('__map__', 'activeMapName');
 
@@ -148,9 +153,7 @@ async function gateBranchesInRange(featureName, auto, playerName, activeCreature
     const playerCreature = combatSummary.players?.find(p => p.name === playerName);
     const targetCreature = combatSummary.creatures?.find(c => c.name === activeCreatureName);
 
-    const positioned = playerCreature?.gridX != null && playerCreature?.gridY != null &&
-        targetCreature?.gridX != null && targetCreature?.gridY != null;
-    if (!positioned) return null;
+    if (!areCreaturesPositioned(playerCreature, targetCreature)) return null;
 
     const inRange = await isWithinRange(playerName, activeCreatureName, rangeFt);
     if (inRange) return null;
@@ -185,7 +188,7 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName
         };
     }
 
-    const outOfRange = await gateBranchesInRange(featureName, auto, playerName, activeCreatureName, campaignName, _mapName);
+    const outOfRange = await gateBranchesInRange({ featureName, auto, playerName, activeCreatureName, campaignName, _mapName });
     if (outOfRange) return outOfRange;
 
     const strMod = getAbilityModifier(playerStats.abilities, 'STR');
@@ -222,9 +225,9 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName
             });
             await setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 
-            addExpiration(playerName, activeCreatureName, [
+            addExpiration({ attackerName: playerName, targetName: activeCreatureName, effects: [
                 { type: 'remove_target_effect', effectKey: 'speed_reduction', source: featureName, target: activeCreatureName }
-            ], campaignName, 1);
+            ], campaignName, rounds: 1 });
 
             addEntry(campaignName, {
                 type: 'save_result',
@@ -340,7 +343,7 @@ async function spendUse(playerName, budget, campaignName) {
 const refused = (response) => ({ refused: true, response });
 const applied = (response, attackerName = null) => ({ refused: false, response, attackerName });
 
-async function handleAttacksVsAlly({ action, auto, playerStats, playerName, campaignName, _mapName, combatSummary }) {
+async function handleAttacksVsAlly({ action, auto, playerName, campaignName, _mapName, combatSummary }) {
     const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
     if (!attackEvent) {
@@ -384,7 +387,7 @@ async function handleAttacksVsAlly({ action, auto, playerStats, playerName, camp
     }
     await setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
 
-    const result = await handleDisadvantageDebuff(action, playerStats, campaignName, _mapName, lastAttackerName, combatSummary);
+    const result = await handleDisadvantageDebuff({ action, campaignName, attackerName: lastAttackerName, combatSummary });
     return applied(result);
 }
 
@@ -394,6 +397,16 @@ async function handleAttacksVsAlly({ action, auto, playerStats, playerName, camp
 // the verified pre-hit te producers (CLA-377 Vicious Mockery, Sap, Tumble):
 // gate the trigger, spend one use, and write te disadvantage_next_attack so
 // the attacker's next attack roll resolves with forcedMode:'disadvantage'.
+async function wardingFlareRangeGate({ auto, playerName, attackAttackerName, featureName, campaignName, _mapName }) {
+    const rangeFt = rangeToFeet(auto.range || '30_ft');
+    if (!_mapName) return null;
+    const positions = await resolveMapPositions(campaignName, playerName);
+    if (!(positions?.attackerPos && positions?.targetPos)) return null;
+    const inRange = await isWithinRange(playerName, attackAttackerName, rangeFt);
+    if (inRange) return null;
+    return `${attackAttackerName} is out of range of ${playerName} — ${featureName} requires the attacker to be within ${rangeFt} feet.`;
+}
+
 async function handleWardingFlare({ action, auto, playerName, featureName, campaignName, _mapName, combatSummary }) {
     const refusalTag = featureName.toLowerCase().replace(/\s+/g, '_') + '_refused';
     const refuse = (description) => {
@@ -422,16 +435,8 @@ async function handleWardingFlare({ action, auto, playerName, featureName, campa
     const flareDefenderName = attackEvent.targetName;
     const currentRound = combatSummary.round || 1;
 
-    const rangeFt = rangeToFeet(auto.range || '30_ft');
-    if (_mapName) {
-        const positions = await resolveMapPositions(campaignName, playerName);
-        if (positions?.attackerPos && positions?.targetPos) {
-            const inRange = await isWithinRange(playerName, attackAttackerName, rangeFt);
-            if (!inRange) {
-                return refuse(`${attackAttackerName} is out of range of ${playerName} — ${featureName} requires the attacker to be within ${rangeFt} feet.`);
-            }
-        }
-    }
+    const rangeRefusal = await wardingFlareRangeGate({ auto, playerName, attackAttackerName, featureName, campaignName, _mapName });
+    if (rangeRefusal) return refuse(rangeRefusal);
 
     const latchKey = '_' + featureName.replace(/\s+/g, '_') + '_usedRound';
     if (getRuntimeValue(playerName, latchKey) === currentRound) {
@@ -459,9 +464,9 @@ async function handleWardingFlare({ action, auto, playerName, featureName, campa
 
     await setRuntimeValue(playerName, latchKey, currentRound, campaignName);
 
-    addExpiration(playerName, attackAttackerName, [
+    addExpiration({ attackerName: playerName, targetName: attackAttackerName, effects: [
         { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerName },
-    ], campaignName, undefined, playerName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
     let flareDescription = `<b>${action.name}</b><br/>Light flares between ${flareDefenderName || 'the target'} and ${attackAttackerName}.<br/>`;
     flareDescription += `${attackAttackerName} has Disadvantage on its next attack roll (until used, or until the start of ${playerName}'s next turn).`;
@@ -469,7 +474,7 @@ async function handleWardingFlare({ action, auto, playerName, featureName, campa
     return applied(infoPopup(action.name, flareDescription, auto, { defenderName: flareDefenderName, attackerName: attackAttackerName }), attackAttackerName);
 }
 
-async function bardicRangeRefusal(auto, campaignName, playerName, attackerName, _mapName, featureName) {
+async function bardicRangeRefusal({ auto, campaignName, playerName, attackerName, _mapName, featureName }) {
     const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 60 : 60;
     if (!_mapName || rangeFt == null) return null;
     const positions = await resolveMapPositions(campaignName, playerName);
@@ -487,7 +492,7 @@ async function handleBardicRoll({ action, auto, playerStats, playerName, feature
 
     const attackerName = targetInfo.target.name;
 
-    const rangeRefusal = await bardicRangeRefusal(auto, campaignName, playerName, attackerName, _mapName, featureName);
+    const rangeRefusal = await bardicRangeRefusal({ auto, campaignName, playerName, attackerName, _mapName, featureName });
     if (rangeRefusal) return rangeRefusal;
 
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
@@ -555,6 +560,31 @@ async function logWardingFlareTail({ action: _action, playerStats, playerName, f
     return result;
 }
 
+function rechargeLabel(auto) {
+    return auto.recharge === 'short_rest' ? 'Short or Long Rest' : 'Long Rest';
+}
+
+// Effect → runner/tail-logger routes (dispatched by auto.effect).
+const EFFECT_ROUTES = {
+    disadvantage_on_attacks_vs_ally: {
+        run: (ctx) => handleAttacksVsAlly({ action: ctx.action, auto: ctx.auto, playerStats: ctx.playerStats, playerName: ctx.playerName, campaignName: ctx.campaignName, _mapName: ctx._mapName, combatSummary: ctx.combatSummary }),
+        tail: (ctx) => logAttacksVsAllyTail(ctx.playerName, ctx.featureName, ctx.campaignName, ctx.outcome.response),
+    },
+    disadvantage_on_attack_roll: {
+        run: (ctx) => handleWardingFlare({ action: ctx.action, auto: ctx.auto, playerName: ctx.playerName, featureName: ctx.featureName, campaignName: ctx.campaignName, _mapName: ctx._mapName, combatSummary: ctx.combatSummary }),
+        tail: (ctx) => logWardingFlareTail({ action: ctx.action, playerStats: ctx.playerStats, playerName: ctx.playerName, featureName: ctx.featureName, campaignName: ctx.campaignName, attackerName: ctx.outcome.attackerName, result: ctx.outcome.response }),
+    },
+    teleport_and_slow: {
+        run: async (ctx) => applied(await handleTeleportAndSlow(ctx.action, ctx.playerStats, ctx.campaignName, ctx._mapName)),
+        tail: null,
+    },
+};
+
+const DEFAULT_EFFECT_ROUTE = {
+    run: (ctx) => handleBardicRoll({ action: ctx.action, auto: ctx.auto, playerStats: ctx.playerStats, playerName: ctx.playerName, featureName: ctx.featureName, campaignName: ctx.campaignName, _mapName: ctx._mapName, combatSummary: ctx.combatSummary }),
+    tail: null,
+};
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -567,7 +597,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const budget = resolveUsesBudget(auto, playerStats, featureName);
 
     if (budget.effectiveUsesMax > 0 && currentUsesFor(playerName, budget) <= 0) {
-        return infoPopup(featureName, `${featureName} has no uses remaining. Recharges on a ${auto.recharge === 'short_rest' ? 'Short or Long Rest' : 'Long Rest'}.`, auto);
+        return infoPopup(featureName, `${featureName} has no uses remaining. Recharges on a ${rechargeLabel(auto)}.`, auto);
     }
 
     const combatSummary = await getCombatContext(campaignName);
@@ -575,18 +605,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return infoPopup(featureName, `No combat context found. Cannot apply ${featureName}.`, auto);
     }
 
-    const effect = auto.effect || '';
-    let outcome;
-
-    if (effect === 'disadvantage_on_attacks_vs_ally') {
-        outcome = await handleAttacksVsAlly({ action, auto, playerStats, playerName, campaignName, _mapName, combatSummary });
-    } else if (effect === 'disadvantage_on_attack_roll') {
-        outcome = await handleWardingFlare({ action, auto, playerName, featureName, campaignName, _mapName, combatSummary });
-    } else if (effect === 'teleport_and_slow') {
-        outcome = applied(await handleTeleportAndSlow(action, playerStats, campaignName, _mapName));
-    } else {
-        outcome = await handleBardicRoll({ action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary });
-    }
+    const route = EFFECT_ROUTES[auto.effect || ''] || DEFAULT_EFFECT_ROUTE;
+    const outcome = await route.run({ action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary });
 
     if (outcome.refused) return outcome.response;
 
@@ -594,12 +614,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         await spendUse(playerName, budget, campaignName);
     }
 
-    if (effect === 'disadvantage_on_attacks_vs_ally') {
-        return logAttacksVsAllyTail(playerName, featureName, campaignName, outcome.response);
-    }
-
-    if (effect === 'disadvantage_on_attack_roll') {
-        return logWardingFlareTail({ action, playerStats, playerName, featureName, campaignName, attackerName: outcome.attackerName, result: outcome.response });
+    if (route.tail) {
+        return route.tail({ action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary, outcome });
     }
 
     addEntry(campaignName, {

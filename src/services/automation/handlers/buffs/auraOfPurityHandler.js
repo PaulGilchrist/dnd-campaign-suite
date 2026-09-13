@@ -70,9 +70,9 @@ export async function applyAuraOfPurity(action, playerStats, campaignName, mapNa
             campaignName
         );
 
-        addExpiration(casterName, targetName, [
+        addExpiration({ attackerName: casterName, targetName, effects: [
             { type: 'remove_active_buff', buffName: AURA_OF_PURITY_BUFF_NAME },
-        ], campaignName, undefined, casterName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 
         const combatSummary = getCombatSummary(campaignName);
         addConcentration(combatSummary, casterName, 'Aura of Purity', 10 + Math.floor(playerStats.concentrationBonus || 0));

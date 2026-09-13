@@ -221,7 +221,7 @@ describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
   it('calls onExecute with magicMissileDistribution when targets selected', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -242,7 +242,7 @@ describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
   it('passes slotLevel derived from spell level in distribution', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -263,7 +263,7 @@ describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
     const { prepareSpellCast, isFreeCastAuthorized } = await import('../../services/rules/spells/spellPreparationService.js');
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -290,7 +290,7 @@ describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
     const onExecute = vi.fn();
     const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -309,7 +309,7 @@ describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
   it('does nothing when there is no pending magicMissile', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -330,7 +330,7 @@ describe('useSpellMetamagicFlow — handleEnhanceAbilityAbilitySelect', () => {
 
   it('sets enhanceAbilityStage to target and stores the selected ability', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -342,7 +342,7 @@ describe('useSpellMetamagicFlow — handleEnhanceAbilityAbilitySelect', () => {
 
   it('updates stored ability on subsequent calls', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -367,7 +367,7 @@ describe('useSpellMetamagicFlow — handleProtectionFromEnergyTargetSelect', () 
 
   it('sets protectionFromEnergyStage to type and stores the selected target', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -389,7 +389,7 @@ describe('useSpellMetamagicFlow — handleProtectionFromEnergyTypeSelect', () =>
   it('clears pending and applies effect on type select after target select', async () => {
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     act(() => {
@@ -412,7 +412,7 @@ describe('useSpellMetamagicFlow — handleProtectionFromEnergyTypeSelect', () =>
 
   it('does nothing when there is no pending protectionFromEnergy', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -433,7 +433,7 @@ describe('useSpellMetamagicFlow — handleResistanceTargetSelect', () => {
 
   it('sets resistanceStage to type and stores the selected target', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -454,7 +454,7 @@ describe('useSpellMetamagicFlow — handleResistanceTypeSelect', () => {
 
   it('clears pending and applies effect on type select after target select', async () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -477,7 +477,7 @@ describe('useSpellMetamagicFlow — handleResistanceTypeSelect', () => {
 
   it('does nothing when there is no pending resistance', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -498,7 +498,7 @@ describe('useSpellMetamagicFlow — handleGreaterRestorationNoEffects', () => {
 
   it('logs entry when no effects to remove', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -520,7 +520,7 @@ describe('useSpellMetamagicFlow — handleGreaterRestorationNoEffects', () => {
 
   it('does nothing when there is no pending greaterRestoration', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -542,7 +542,7 @@ describe('useSpellMetamagicFlow — handleTruePolymorphPathSelect object_into_cr
   it('clears pending and applies true polymorph when path is object_into_creature', async () => {
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     act(() => {
@@ -558,7 +558,7 @@ describe('useSpellMetamagicFlow — handleTruePolymorphPathSelect object_into_cr
 
   it('sets path on pending when path is not object_into_creature', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -575,7 +575,7 @@ describe('useSpellMetamagicFlow — handleTruePolymorphPathSelect object_into_cr
 
   it('does nothing when there is no pending truePolymorph', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -600,7 +600,7 @@ describe('useSpellMetamagicFlow — handleAnimalShapesBeastConfirm', () => {
 
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     act(() => {
@@ -624,7 +624,7 @@ describe('useSpellMetamagicFlow — handleAnimalShapesBeastConfirm', () => {
 
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     act(() => {
@@ -648,7 +648,7 @@ describe('useSpellMetamagicFlow — handleAnimalShapesBeastConfirm', () => {
 
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'test-campaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     await act(async () => {
@@ -673,7 +673,7 @@ describe('useSpellMetamagicFlow — handleAnimalShapesBeastConfirm concentration
 
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ ...makePlayerStats(), name: 'Goblin A', abilities: { CON: { bonus: 2 } } }, 'test-campaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: { ...makePlayerStats(), name: 'Goblin A', abilities: { CON: { bonus: 2 } } }, campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     act(() => {

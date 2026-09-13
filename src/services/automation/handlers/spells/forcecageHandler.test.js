@@ -190,12 +190,7 @@ describe('forcecageHandler.handle', () => {
         'Forcecage',
         expect.any(Number),
       );
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        [{ type: 'remove_target_effect', effectKey: 'forcecage', target: 'Goblin', source: 'TestCaster' }],
-        campaignName,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: [{ type: 'remove_target_effect', effectKey: 'forcecage', target: 'Goblin', source: 'TestCaster' }], campaignName });
     });
 
     it('allows trapping the caster when selected', async () => {

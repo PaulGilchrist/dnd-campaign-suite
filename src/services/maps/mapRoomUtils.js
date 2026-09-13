@@ -26,7 +26,7 @@ export function hasOutsideOpenNeighbor({ walls, gx, gy, minX, maxX, minY, maxY, 
     return false;
 }
 
-export function buildRoomWalls(walls, minX, maxX, minY, maxY, gridSize) {
+export function buildRoomWalls({ walls, minX, maxX, minY, maxY, gridSize }) {
     const newWalls = new Set(walls);
     const bounds = { minX, maxX, minY, maxY, gridSize };
 

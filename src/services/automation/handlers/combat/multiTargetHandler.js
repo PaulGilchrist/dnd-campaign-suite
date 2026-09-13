@@ -114,7 +114,7 @@ function applySpreadDamage({ combatSummary, secondTarget, secondTargetName, spel
     if (!spell?.damage) return;
     const rawDamage = metaCtx?.totalDamage || metaCtx?.rawDamage || 0;
     if (rawDamage <= 0) return;
-    const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], campaignName, null, { ignoreResistance: false, attackerName: playerStats.name });
+    const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], { campaignName, characters: null, ignoreResistance: false, attackerName: playerStats.name });
     if (applyResult && applyResult.finalDamage > 0) {
         endInvisibilityOnHostileAction(playerStats.name, campaignName);
     }
@@ -129,6 +129,26 @@ function applySpreadDamage({ combatSummary, secondTarget, secondTargetName, spel
             sourceName: playerStats.name,
             note: `${spellName} (multi-target spread)`,
         }).catch((e) => { console.error("[multiTarget] Error:", e); });
+    }
+}
+
+function removeSpreadStatusEffects({ spell, spellName, secondTargetName, conditions, campaignName }) {
+    if (!spell.status_effects) return;
+    const conditionsToRemove = spell.status_effects.map(e => e.toLowerCase());
+    const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
+    if (newConditions.length === conditions.length) return;
+    setRuntimeValue(secondTargetName, 'activeConditions', newConditions, campaignName);
+    for (const removed of conditionsToRemove) {
+        if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
+            addEntry(campaignName, {
+                type: 'condition',
+                action: 'removed',
+                characterName: secondTargetName,
+                condition: removed.charAt(0).toUpperCase() + removed.slice(1),
+                reason: `${spellName} (multi-target spread)`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[multiTarget] Error:", e); });
+        }
     }
 }
 
@@ -158,25 +178,7 @@ function applyPowerWordHealSpread({ combatSummary, secondTarget, secondTargetNam
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
 
-    if (spell.status_effects) {
-        const conditionsToRemove = spell.status_effects.map(e => e.toLowerCase());
-        const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
-        if (newConditions.length !== conditions.length) {
-            setRuntimeValue(secondTargetName, 'activeConditions', newConditions, campaignName);
-            for (const removed of conditionsToRemove) {
-                if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
-                    addEntry(campaignName, {
-                        type: 'condition',
-                        action: 'removed',
-                        characterName: secondTargetName,
-                        condition: removed.charAt(0).toUpperCase() + removed.slice(1),
-                        reason: `${spellName} (multi-target spread)`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error("[multiTarget] Error:", e); });
-                }
-            }
-        }
-    }
+    removeSpreadStatusEffects({ spell, spellName, secondTargetName, conditions, campaignName });
 
     if (hasProne) {
         const existingStance = getRuntimeValue(secondTargetName, 'powerWordHealStandPermission');

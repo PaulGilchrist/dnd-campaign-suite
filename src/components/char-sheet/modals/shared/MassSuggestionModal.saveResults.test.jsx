@@ -125,12 +125,7 @@ describe('MassSuggestionModal - Save Results', () => {
                 expect(onClose).toHaveBeenCalledTimes(1);
             });
             await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith(
-                    'Wizard1',
-                    'PlayerAlly',
-                    [{ type: 'charmed', condition: 'charmed' }],
-                    campaignName,
-                );
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'PlayerAlly', effects: [{ type: 'charmed', condition: 'charmed' }], campaignName });
             });
         });
 

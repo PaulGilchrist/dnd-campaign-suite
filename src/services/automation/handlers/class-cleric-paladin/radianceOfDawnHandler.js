@@ -73,7 +73,7 @@ async function processRadianceNpcTarget(combatSummary, target, targetName, ctx) 
 
     // Calculate damage
     const finalDamage = computeDamageAfterSave(totalDamage, success, dcSuccess);
-    const applyResult = applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, playerStats ? [playerStats] : null, { ignoreResistance: ignoreResistance, attackerName: playerName, suppressHpLog: true });
+    const applyResult = applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: playerStats ? [playerStats] : null, ignoreResistance: ignoreResistance, attackerName: playerName, suppressHpLog: true });
 
     const actualDamage = applyResult?.finalDamage ?? finalDamage;
     const newHp = applyResult?.newHp ?? target.currentHp;

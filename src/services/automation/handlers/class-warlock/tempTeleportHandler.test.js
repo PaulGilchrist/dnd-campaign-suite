@@ -555,14 +555,7 @@ describe('tempTeleportHandler', () => {
             const action = makeAction({ name: 'Shadow Step', automation: { effect: 'shadow_step_teleport' } });
             await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                PLAYER_NAME,
-                [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shadow Step', target: PLAYER_NAME }],
-                CAMPAIGN_NAME,
-                undefined,
-                PLAYER_NAME,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: PLAYER_NAME, effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shadow Step', target: PLAYER_NAME }], campaignName: CAMPAIGN_NAME, rounds: undefined, expireOnCreatureName: PLAYER_NAME });
         });
 
         it('enqueues expiration for caster next_attack_advantage on moonlight_step teleport', async () => {
@@ -570,14 +563,7 @@ describe('tempTeleportHandler', () => {
             const action = makeAction({ name: 'Blink', automation: { effect: 'moonlight_step_teleport' } });
             await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                PLAYER_NAME,
-                [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Blink', target: PLAYER_NAME }],
-                CAMPAIGN_NAME,
-                undefined,
-                PLAYER_NAME,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: PLAYER_NAME, effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Blink', target: PLAYER_NAME }], campaignName: CAMPAIGN_NAME, rounds: undefined, expireOnCreatureName: PLAYER_NAME });
         });
 
         it('enqueues expirations for Improved Shadow Step perception te and blinded condition', async () => {
@@ -585,17 +571,10 @@ describe('tempTeleportHandler', () => {
             const action = makeAction({ name: 'Shadow Step', automation: { effect: 'shadow_step_teleport' } });
             await confirmTeleport(action, makeShadowStepStats(), CAMPAIGN_NAME, false);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                'Goblin',
-                [
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: 'Goblin', effects: [
                     { type: 'remove_target_effect', effectKey: 'disadvantage_perception_checks', source: 'Improved Shadow Step', target: 'Goblin' },
                     { type: 'condition', condition: 'blinded' },
-                ],
-                CAMPAIGN_NAME,
-                undefined,
-                PLAYER_NAME,
-            );
+                ], campaignName: CAMPAIGN_NAME, rounds: undefined, expireOnCreatureName: PLAYER_NAME });
         });
 
         it('enqueues expiration for Shared Moonlight ally advantage te', async () => {
@@ -606,14 +585,7 @@ describe('tempTeleportHandler', () => {
             const action = makeAction({ name: 'Blink', automation: { effect: 'moonlight_step_teleport' } });
             await confirmTeleport(action, stats, CAMPAIGN_NAME, false);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                'Goblin',
-                [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shared Moonlight', target: 'Goblin' }],
-                CAMPAIGN_NAME,
-                undefined,
-                PLAYER_NAME,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: 'Goblin', effects: [{ type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: 'Shared Moonlight', target: 'Goblin' }], campaignName: CAMPAIGN_NAME, rounds: undefined, expireOnCreatureName: PLAYER_NAME });
         });
 
         it('applies Blinded on failed save with pending expiration already registered', async () => {

@@ -72,9 +72,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     })();
 
     if (durationRounds) {
-        addExpiration(playerStats.name, playerStats.name, [
+        addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
             { type: 'remove_grease_area', greaseKey: trackingKey }
-        ], campaignName, durationRounds);
+        ], campaignName, rounds: durationRounds });
     }
 
     return {

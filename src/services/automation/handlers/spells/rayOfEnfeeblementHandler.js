@@ -41,7 +41,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const saveResult = await promise;
 
     if (saveResult.success) {
-        return await handleRaySaveSuccess(action, playerStats, campaignName, targetName, dc, saveResult);
+        return await handleRaySaveSuccess({ playerStats, campaignName, targetName, dc, saveResult });
     }
 
     // ── Failed save: apply debuffs via targetEffects ──
@@ -90,9 +90,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Apply expiration (concentration handles duration; 1 minute = 10 rounds default)
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'ray_of_enfeeble_debuff', source: playerStats.name },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'condition',
@@ -125,7 +125,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-async function handleRaySaveSuccess(action, playerStats, campaignName, targetName, dc, saveResult) {
+async function handleRaySaveSuccess({ playerStats, campaignName, targetName, dc, saveResult }) {
     await addTargetResult(campaignName, {
         targetName,
         saveResult: 'success',
@@ -165,9 +165,9 @@ async function handleRaySaveSuccess(action, playerStats, campaignName, targetNam
 
     setRuntimeValue('campaign', 'targetEffects', allTargetEffects, campaignName);
 
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
 
     addEntry(campaignName, {
         type: 'automation_info',

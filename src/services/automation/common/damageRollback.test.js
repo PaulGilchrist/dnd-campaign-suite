@@ -458,8 +458,8 @@ describe('damageRollback', () => {
             await rollbackSpellEffects(attack, campaignName, 'Counterspell', cs);
 
             expect(removeCondition).toHaveBeenCalledTimes(2);
-            expect(removeCondition).toHaveBeenCalledWith(cs, 'Hero', 'burning', getRuntimeValue, setRuntimeValue, campaignName);
-            expect(removeCondition).toHaveBeenCalledWith(cs, 'Hero', 'frightened', getRuntimeValue, setRuntimeValue, campaignName);
+            expect(removeCondition).toHaveBeenCalledWith({ combatSummary: cs, creatureName: 'Hero', condition: 'burning', getRuntimeValue, setRuntimeValue, campaignName });
+            expect(removeCondition).toHaveBeenCalledWith({ combatSummary: cs, creatureName: 'Hero', condition: 'frightened', getRuntimeValue, setRuntimeValue, campaignName });
         });
 
         it('removes targetEffects for the attacker', async () => {

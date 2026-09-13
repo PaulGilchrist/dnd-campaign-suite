@@ -40,11 +40,7 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
 
   if (!race) return result;
 
-  if (ruleset === '2024' && race.damage_resistance) {
-    if (!result.resistances.includes(race.damage_resistance)) {
-      result.resistances.push(race.damage_resistance);
-    }
-  }
+  addDamageResistance(result, race, ruleset);
 
   if (ruleset === '5e') {
     const abilityBonuses = race.ability_bonuses || [];
@@ -73,16 +69,25 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
     applyTraitBuffs(trait, result, ruleset);
   });
 
-  const subraceName = playerData?.race?.subrace?.name;
-  const subrace = race.subraces
-    ? race.subraces.find(sr => sr.name === subraceName)
-    : null;
-
+  const subrace = resolveSubrace(race, playerData);
   if (subrace) {
     applySubraceBuffs(subrace, result, ruleset);
   }
 
   return result;
+}
+
+function resolveSubrace(race, playerData) {
+  const subraceName = playerData?.race?.subrace?.name;
+  if (!race.subraces) return null;
+  return race.subraces.find(sr => sr.name === subraceName) || null;
+}
+
+function addDamageResistance(result, source, ruleset) {
+  if (ruleset !== '2024' || !source.damage_resistance) return;
+  if (!result.resistances.includes(source.damage_resistance)) {
+    result.resistances.push(source.damage_resistance);
+  }
 }
 
 function applyTraitBuffs(trait, result, ruleset) {
@@ -109,11 +114,7 @@ function applyTraitBuffs(trait, result, ruleset) {
 }
 
 function applySubraceBuffs(subrace, result, ruleset) {
-  if (ruleset === '2024' && subrace.damage_resistance) {
-    if (!result.resistances.includes(subrace.damage_resistance)) {
-      result.resistances.push(subrace.damage_resistance);
-    }
-  }
+  addDamageResistance(result, subrace, ruleset);
 
   if (ruleset === '5e' && subrace.ability_bonuses) {
     subrace.ability_bonuses.forEach(ab => {

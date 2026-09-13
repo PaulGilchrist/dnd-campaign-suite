@@ -194,14 +194,7 @@ describe('feignDeathHandler', () => {
 
       await applyFeignDeath(action, ps, campaignName, null, ['AllyB']);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'AllyB',
-        [{ type: 'remove_feign_death_buff', buffName: 'Feign Death' }],
-        campaignName,
-        undefined,
-        'AllyB',
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'AllyB', effects: [{ type: 'remove_feign_death_buff', buffName: 'Feign Death' }], campaignName, rounds: undefined, expireOnCreatureName: 'AllyB' });
     });
 
     it('should log the ability use to campaign log', async () => {

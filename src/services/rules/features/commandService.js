@@ -1,6 +1,6 @@
 import { executeHandler } from '../../automation/index.js';
 
-export async function triggerCommand(spell, commandChoice, targetInfo, metaCtx, playerStats, campaignName, mapName) {
+export async function triggerCommand({ spell, commandChoice, metaCtx, playerStats, campaignName, mapName }) {
     const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
     const slotLevel = metaCtx?.slotLevel || spell.level || 1;
 

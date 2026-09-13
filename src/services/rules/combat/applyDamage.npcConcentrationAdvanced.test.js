@@ -149,9 +149,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
 
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 20 });
 
-      await applyDamageToTarget(cs, 'Druid', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('Druid', 1),
-      ]);
+      await applyDamageToTarget(cs, 'Druid', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Druid', 1), ] });
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, true, false);
     });
@@ -181,9 +179,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
 
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
 
-      await applyDamageToTarget(cs, 'Druid', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('Druid', 1),
-      ]);
+      await applyDamageToTarget(cs, 'Druid', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Druid', 1), ] });
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false, false);
     });
@@ -208,7 +204,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
 
       stubNpcRuntime(30);
 
-      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], 'TestCampaign', [rangerCharacter]);
+      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [rangerCharacter] });
 
       // Relentless Hunter suppresses the save for Hunter's Mark only
       expect(rollConcentrationSave).not.toHaveBeenCalled();
@@ -239,7 +235,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(30);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
 
-      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], 'TestCampaign', [rangerCharacter]);
+      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [rangerCharacter] });
 
       expect(rollConcentrationSave).toHaveBeenCalled();
     });
@@ -261,7 +257,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(30);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
 
-      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], 'TestCampaign', [rangerCharacter]);
+      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [rangerCharacter] });
 
       expect(rollConcentrationSave).toHaveBeenCalled();
     });
@@ -283,7 +279,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(30);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
 
-      await applyDamageToTarget(cs, 'Wizard', 10, ['Slashing'], 'TestCampaign', [wizardCharacter]);
+      await applyDamageToTarget(cs, 'Wizard', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [wizardCharacter] });
 
       expect(rollConcentrationSave).toHaveBeenCalled();
     });
@@ -313,9 +309,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
 
       stubNpcRuntime(30);
 
-      await expect(applyDamageToTarget(
-        cs, 'Ranger', 10, ['Slashing'], 'TestCampaign', [rangerCharacter],
-      )).rejects.toThrow('player level is required for relentless hunter check');
+      await expect(applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [rangerCharacter] })).rejects.toThrow('player level is required for relentless hunter check');
     });
   });
 
@@ -332,9 +326,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(30);
       rollConcentrationSave.mockReturnValue({ success: false, roll: 5, total: 4 });
 
-      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('Orc', 1),
-      ]);
+      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Orc', 1), ] });
 
       expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
         type: 'condition',
@@ -355,9 +347,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(30);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 12, total: 17 });
 
-      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('Orc', 1),
-      ]);
+      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Orc', 1), ] });
 
       expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
         type: 'roll',
@@ -383,9 +373,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(82, [], { activeBuffs: null });
       rollConcentrationSave.mockReturnValue({ success: false, roll: 3, total: 5, rawRolls: [3] });
 
-      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('EvasiveFighter', 18),
-      ])).resolves.toBeTruthy();
+      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('EvasiveFighter', 18), ] })).resolves.toBeTruthy();
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, false, false);
       expect(wight.currentHp).toBe(72);
@@ -418,9 +406,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       });
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 17, rawRolls: [15] });
 
-      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('EvasiveFighter', 18),
-      ])).resolves.toBeTruthy();
+      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('EvasiveFighter', 18), ] })).resolves.toBeTruthy();
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, false, false);
       expect(wight.currentHp).toBe(72);
@@ -438,9 +424,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(82, [], { activeBuffs: [{ name: 'Some Buff' }] });
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 17, rawRolls: [15] });
 
-      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('EvasiveFighter', 18),
-      ])).resolves.toBeTruthy();
+      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('EvasiveFighter', 18), ] })).resolves.toBeTruthy();
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, false, false);
       expect(wight.currentHp).toBe(72);
@@ -457,9 +441,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(82, [], { activeBuffs: [{ name: 'Starry Form', constellation: 'Dragon' }] });
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 17, rawRolls: [15] });
 
-      await applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('EvasiveFighter', 18),
-      ]);
+      await applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('EvasiveFighter', 18), ] });
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, true, false);
       expect(wight.currentHp).toBe(72);
@@ -477,9 +459,7 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       stubNpcRuntime(30);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 10, total: 13 });
 
-      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], 'TestCampaign', [
-        createMinimalCharacter('Orc', 1),
-      ]);
+      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Orc', 1), ] });
 
       expect(rollConcentrationSave).toHaveBeenCalledWith(3, 10, false, false);
     });

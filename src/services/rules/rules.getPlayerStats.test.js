@@ -233,7 +233,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
       expect(result.name).toBe('Test Fighter')
       expect(result.rules).toBe('5e')
@@ -269,7 +269,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       expect(result.race).toBeDefined()
     })
 
@@ -287,7 +287,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       expect(result.class.name).toBe('Wizard')
     })
 
@@ -305,7 +305,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       expect(result.immunities).toBeDefined()
       expect(result.resistances).toBeDefined()
       expect(result.senses).toBeDefined()
@@ -322,7 +322,7 @@ describe('rules getPlayerStats', () => {
         inventory: { magicItems: [], equipped: [] },
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       expect(Array.isArray(result.actions)).toBe(true)
       expect(Array.isArray(result.bonusActions)).toBe(true)
       expect(Array.isArray(result.reactions)).toBe(true)
@@ -344,7 +344,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       const actionNames = result.actions.map((a) => a.name)
       expect(actionNames).toContain('Action Surge')
     })
@@ -364,7 +364,7 @@ describe('rules getPlayerStats', () => {
         expertSkills: ['Perception'],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       expect(result.expertise).toContain('Stealth')
       expect(result.expertise).toContain('Perception')
     })
@@ -383,7 +383,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
       expect(result.name).toBe('Test Fighter 2024')
       expect(result.rules).toBe('2024')
@@ -410,7 +410,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       expect(result.senses).toBeDefined()
       expect(result.senses).toEqual([])
     })
@@ -432,7 +432,7 @@ describe('rules getPlayerStats', () => {
         craftActions: [{ name: 'Craft' }],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       const actionNames = result.actions.map((a) => a.name)
       expect(actionNames).toContain('Attack')
       expect(actionNames).toContain('Cast Spell')
@@ -463,7 +463,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
       expect(result.hasPowerfulBuild).toBe(true)
       expect(result.sizeMultiplier).toBe(2)
@@ -491,7 +491,7 @@ describe('rules getPlayerStats', () => {
         specialActions: [],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
 
       expect(result.hasPowerfulBuild).toBeUndefined()
       expect((result.saveModifiers || []).some(m => m.condition === 'powerful_build_grapple_escape')).toBe(false)
@@ -514,7 +514,7 @@ describe('rules getPlayerStats', () => {
         craftSpecialActions: [{ name: 'Craft Feature' }],
       }
 
-      const result = await rules.getPlayerStats([], [], [], [], [], summary)
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: summary })
       const specialNames = result.specialActions.map((a) => a.name)
       expect(specialNames).toContain('Feature A')
       expect(specialNames).toContain('Magic Feature')

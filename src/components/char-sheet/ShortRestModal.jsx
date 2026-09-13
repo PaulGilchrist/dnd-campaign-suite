@@ -41,6 +41,31 @@ function applyNaturalRecoverySelections(playerStats, campaignName, naturalRecove
     }
 }
 
+function applySorcerousRestorationState(playerStats, campaignName, restoreAmount) {
+    const curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');
+    const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
+    setRuntimeValue(playerStats.name, 'sorceryPoints', Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount), campaignName);
+    setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
+}
+
+function applyRequestedRestorations(ctx) {
+    const { playerStats, campaignName, restoreAmount } = ctx;
+    // UI-driven: Sorcerous Restoration
+    if (ctx.sorcRestoration && ctx.restorationAvailable && ctx.restorationRequested) {
+        applySorcerousRestorationState(playerStats, campaignName, restoreAmount);
+    }
+    // UI-driven: Arcane Recovery
+    if (ctx.arcaneRecovery && ctx.arcaneRecoveryAvailable && ctx.arcaneRecoveryRequested) {
+        recoverArcaneSlots(playerStats, campaignName);
+    }
+    // UI-driven: Natural Recovery
+    const selections = ctx.naturalRecoverySelections;
+    const hasNaturalRecoverySelections = Object.keys(selections).some(k => selections[k] > 0);
+    if (ctx.naturalRecovery && ctx.naturalRecoveryAvailable && hasNaturalRecoverySelections) {
+        applyNaturalRecoverySelections(playerStats, campaignName, selections);
+    }
+}
+
 function findClassLevel(playerStats) {
     return (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
 }
@@ -74,17 +99,21 @@ function pushTirelessLabel(playerStats, campaignName, restoredResources) {
     if (typeof currentExhaustion === 'number' && currentExhaustion > 0) restoredResources.push('Tireless (exhaustion reduced)');
 }
 
+function pushRequestedRestorationLabel({ ctx, passives, restoredResources, flag, resourceKey, label }) {
+    if (ctx[flag] && passives.some(p => p.type === 'resource_restoration' && p.resourceKey === resourceKey)) restoredResources.push(label);
+}
+
 function collectFeatureRestorationLabels(playerStats, campaignName, ctx, restoredResources) {
-    const { arcaneRecoveryRequested, restorationRequested, hasFontOfInspiration } = ctx;
+    const { hasFontOfInspiration } = ctx;
     const passives = playerStats.automation?.passives ?? [];
     if (playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare')) restoredResources.push('Warding Flare');
     if (hasFontOfInspiration) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
-    if (arcaneRecoveryRequested && passives.some(p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels')) restoredResources.push('Arcane Recovery');
+    pushRequestedRestorationLabel({ ctx, passives, restoredResources, flag: 'arcaneRecoveryRequested', resourceKey: 'arcaneRecoveryLevels', label: 'Arcane Recovery' });
     if (passives.some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats')) restoredResources.push('Bolstering Treats');
     if (playerStats.class?.name === 'Warlock') restoredResources.push('Pact Magic (Warlock spell slots)');
     if (isCelestialPatron(playerStats) && playerStats.specialActions?.some(f => f.name === 'Celestial Resilience')) restoredResources.push('Celestial Resilience (temp HP)');
     pushTirelessLabel(playerStats, campaignName, restoredResources);
-    if (restorationRequested && passives.some(p => p.type === 'resource_restoration' && p.resourceKey === 'sorcerousRestorationUses')) restoredResources.push('Sorcery Points (Sorcerous Restoration)');
+    pushRequestedRestorationLabel({ ctx, passives, restoredResources, flag: 'restorationRequested', resourceKey: 'sorcerousRestorationUses', label: 'Sorcery Points (Sorcerous Restoration)' });
 }
 
 function buildNaturalRecoveryDetail(playerStats, naturalRecoveryAvailable, naturalRecoverySelections) {
@@ -658,13 +687,6 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         onComplete && onComplete();
     };
 
-    const applySorcerousRestorationState = () => {
-        const curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');
-        const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
-        setRuntimeValue(playerStats.name, 'sorceryPoints', Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount), campaignName);
-        setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
-    };
-
     const handleComplete = async () => {
         const hpBeforeRest = Number(getRuntimeValue(playerStats.name, 'currentHitPoints') ?? playerStats.hitPoints);
 
@@ -691,21 +713,12 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setRuntimeValue(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
         setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
 
-        // UI-driven: Sorcerous Restoration
-        if (sorcRestoration && restorationAvailable && restorationRequested) {
-            applySorcerousRestorationState();
-        }
-
-        // UI-driven: Arcane Recovery
-        if (arcaneRecovery && arcaneRecoveryAvailable && arcaneRecoveryRequested) {
-            recoverArcaneSlots(playerStats, campaignName);
-        }
-
-        // UI-driven: Natural Recovery
-        const hasNaturalRecoverySelections = Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0);
-        if (naturalRecovery && naturalRecoveryAvailable && hasNaturalRecoverySelections) {
-            applyNaturalRecoverySelections(playerStats, campaignName, naturalRecoverySelections);
-        }
+        applyRequestedRestorations({
+            playerStats, campaignName, restoreAmount,
+            sorcRestoration, restorationAvailable, restorationRequested,
+            arcaneRecovery, arcaneRecoveryAvailable, arcaneRecoveryRequested,
+            naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections,
+        });
 
         const { restoredResources, naturalRecoveryDetail } = collectRestoredResources(playerStats, campaignName, {
             arcaneRecoveryRequested, restorationRequested, naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections, hasFontOfInspiration,

@@ -201,12 +201,7 @@ describe('useAttackDamageResolution - class features', () => {
             await tick();
             expect(rollExpression).toHaveBeenCalledWith('2d6');
             expect(mockRollDamage).toHaveBeenCalledWith(
-                'Rapier',
-                expect.stringContaining('2d6 [Sneak Attack]'),
-                expect.any(Number),
-                expect.any(Array),
-                expect.any(Number),
-                expect.any(Object),
+                { name: 'Rapier', formula: expect.stringContaining('2d6 [Sneak Attack]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
             );
         });
 
@@ -447,7 +442,7 @@ describe('useAttackDamageResolution - class features', () => {
             await onTargetSelected('Orc');
             expect(rollExpression).toHaveBeenCalledWith('1d6');
             expect(loadCombatSummary).toHaveBeenCalledWith('test-campaign');
-            expect(applyDamageToTarget).toHaveBeenCalledWith({ some: 'data' }, 'Orc', 5, ['Force'], 'test-campaign', [], { ignoreResistance: false, attackerName: 'TestRogue' },);
+            expect(applyDamageToTarget).toHaveBeenCalledWith({ some: 'data' }, 'Orc', 5, ['Force'], { campaignName: 'test-campaign', characters: [], ignoreResistance: false, attackerName: 'TestRogue' });
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 rollType: 'damage',
                 formula: '1d6 [Superior Hunters Prey]',

@@ -291,12 +291,7 @@ describe('buffHandler.confirmTelepathicSpeech', () => {
       'Listener',
       campaignName
     );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Channeler',
-      'Channeler',
-      expect.arrayContaining([expect.objectContaining({ type: 'remove_active_buff' })]),
-      campaignName
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Channeler', targetName: 'Channeler', effects: expect.arrayContaining([expect.objectContaining({ type: 'remove_active_buff' })]), campaignName });
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({

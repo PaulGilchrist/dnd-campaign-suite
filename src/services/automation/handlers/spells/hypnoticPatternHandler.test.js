@@ -196,15 +196,11 @@ describe('hypnoticPatternHandler.handle', () => {
           characterName: 'Goblin', condition: 'Charmed, Incapacitated, Speed 0',
         }),
       );
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster', 'Goblin',
-        expect.arrayContaining([
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([
           { type: 'charmed', condition: 'charmed' },
           { type: 'incapacitated', condition: 'incapacitated' },
           { type: 'speed_zero', condition: 'speed_zero' },
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
     });
 
     it('filters out charmed, incapacitated, and speed_zero from existing conditions before re-adding', async () => {

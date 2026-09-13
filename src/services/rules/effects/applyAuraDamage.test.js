@@ -105,7 +105,7 @@ describe('applyAuraDamage — damage application', () => {
       damageType: 'Radiant',
     });
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 5, ['Radiant'], 'Campaign', [], { ignoreResistance: false, attackerName: 'Test' },);
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 5, ['Radiant'], { campaignName: 'Campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'Test' });
   });
 
   it('skips self when creature name matches activeName', async () => {
@@ -244,6 +244,6 @@ describe('applyAuraDamage — damage application', () => {
       range: 10,
     });
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 5, ['Radiant'], 'Campaign', [], { ignoreResistance: false, attackerName: 'Test' },);
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 5, ['Radiant'], { campaignName: 'Campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'Test' });
   });
 });

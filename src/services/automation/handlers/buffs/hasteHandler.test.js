@@ -437,28 +437,18 @@ describe('hasteHandler.applyHaste', () => {
         const action = makeAction();
         await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
 
-        expect(addExpiration).toHaveBeenCalledWith(
-            'Wizard1',
-            'Ally1',
-            expect.arrayContaining([
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Ally1', effects: expect.arrayContaining([
                 expect.objectContaining({
                     type: 'remove_active_buff',
                     buffName: 'Haste',
                 }),
-            ]),
-            CAMPAIGN,
-        );
-        expect(addExpiration).toHaveBeenCalledWith(
-            'Wizard1',
-            'Ally2',
-            expect.arrayContaining([
+            ]), campaignName: CAMPAIGN });
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Ally2', effects: expect.arrayContaining([
                 expect.objectContaining({
                     type: 'remove_active_buff',
                     buffName: 'Haste',
                 }),
-            ]),
-            CAMPAIGN,
-        );
+            ]), campaignName: CAMPAIGN });
     });
 
     it('posts a log entry for each target', async () => {

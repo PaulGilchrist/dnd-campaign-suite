@@ -130,12 +130,7 @@ async function gateTriggerRequirement({ auto, action, playerStats, campaignName,
 function dispatchRollResult(payload, rollDamage) {
     if (payload.rollType !== 'damage') return;
     rollDamage(
-        payload.name,
-        payload.formula,
-        payload.total,
-        payload.rolls,
-        payload.modifier,
-        payload.contextConfig || {}
+        { name: payload.name, formula: payload.formula, total: payload.total, rolls: payload.rolls, modifier: payload.modifier, context: payload.contextConfig || {} }
     );
 }
 

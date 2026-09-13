@@ -67,7 +67,7 @@ export async function handleFiresBurnDirect(action, playerStats, campaignName) {
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats);
+    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
 
     await addEntry(campaignName, {
         type: 'roll',
@@ -106,7 +106,7 @@ export async function handleFrostsChillDirect(action, playerStats, campaignName)
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats);
+    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
 
     await applySpeedReductionEffect(targetName, optName, speedReduction, campaignName);
 
@@ -217,9 +217,9 @@ export async function handleHillsTumbleDirect(action, playerStats, campaignName)
 
     setRuntimeValue('campaign', 'targetEffects', allTargetEffects, campaignName);
 
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -338,7 +338,14 @@ export async function handleStormsThunderDirect(action, playerStats, campaignNam
     const rangeFt = rangeToFeet(action.automation.range) ?? 60;
     const inRange = await isWithinRange(attackerName, playerStats.name, rangeFt);
     if (!inRange) {
-        return stormsThunderRangeRefusal(campaignName, playerStats, optName, action.automation, attackerName, rangeFt);
+        return stormsThunderRangeRefusal({
+    campaignName,
+    playerStats,
+    optName,
+    automation: action.automation,
+    attackerName,
+    rangeFt,
+});
     }
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
@@ -348,7 +355,7 @@ export async function handleStormsThunderDirect(action, playerStats, campaignNam
     const damageType = action.automation.damageType || 'Thunder';
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage(cs, attackerName, damageResult, damageType, campaignName, playerStats);
+    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName: attackerName, damageResult, damageType, campaignName, playerStats });
 
     await addEntry(campaignName, {
         type: 'ability_use',

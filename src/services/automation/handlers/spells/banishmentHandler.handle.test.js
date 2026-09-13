@@ -184,16 +184,11 @@ describe('banishmentHandler.handle', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), campaignName);
 
       // Verify expiration registered with condition, remove_target_effect, and break_concentration
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        expect.arrayContaining([
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([
           expect.objectContaining({ type: 'condition', condition: 'incapacitated' }),
           expect.objectContaining({ type: 'remove_target_effect', effectKey: 'banishment' }),
           expect.objectContaining({ type: 'break_concentration' }),
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
 
       // Verify save_result logged with save-banishment rollType
       const saveResultCalls = vi.mocked(addEntry).mock.calls.filter(
@@ -323,28 +318,16 @@ describe('banishmentHandler.handle', () => {
 
       expect(result.payload.description).toContain('2 creature(s) banished');
       expect(addExpiration).toHaveBeenCalledTimes(2);
-      expect(addExpiration).toHaveBeenNthCalledWith(
-        1,
-        'TestCaster',
-        'Goblin',
-        expect.arrayContaining([
+      expect(addExpiration).toHaveBeenNthCalledWith(1, { attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([
           expect.objectContaining({ type: 'condition', condition: 'incapacitated' }),
           expect.objectContaining({ type: 'remove_target_effect', effectKey: 'banishment' }),
           expect.objectContaining({ type: 'break_concentration' }),
-        ]),
-        campaignName,
-      );
-      expect(addExpiration).toHaveBeenNthCalledWith(
-        2,
-        'TestCaster',
-        'Orc',
-        expect.arrayContaining([
+        ]), campaignName });
+      expect(addExpiration).toHaveBeenNthCalledWith(2, { attackerName: 'TestCaster', targetName: 'Orc', effects: expect.arrayContaining([
           expect.objectContaining({ type: 'condition', condition: 'incapacitated' }),
           expect.objectContaining({ type: 'remove_target_effect', effectKey: 'banishment' }),
           expect.objectContaining({ type: 'break_concentration' }),
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
     });
   });
 

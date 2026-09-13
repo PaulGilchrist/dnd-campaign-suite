@@ -102,14 +102,14 @@ describe('ShieldBashChoiceModal - apply effect', () => {
       fireEvent.click(screen.getByText(option));
       fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
       await waitFor(() => {
-        expect(shieldBash.applyShieldBashEffect).toHaveBeenCalledWith(
-          baseProps.action,
-          baseProps.playerStats,
-          baseProps.campaignName,
-          baseProps.targetName,
-          option,
-          baseProps.saveDc,
-        );
+        expect(shieldBash.applyShieldBashEffect).toHaveBeenCalledWith({
+          action: baseProps.action,
+          playerStats: baseProps.playerStats,
+          campaignName: baseProps.campaignName,
+          targetName: baseProps.targetName,
+          chosenOption: option,
+          saveDc: baseProps.saveDc,
+        });
       });
     },
   );
@@ -157,14 +157,14 @@ describe('ShieldBashChoiceModal - skip flow', () => {
     render(<ShieldBashChoiceModal {...makeProps()} />);
     fireEvent.click(screen.getByRole('button', { name: /Skip \(do not consume use\)/ }));
     await waitFor(() => {
-      expect(shieldBash.applyShieldBashEffect).toHaveBeenCalledWith(
-        baseProps.action,
-        baseProps.playerStats,
-        baseProps.campaignName,
-        baseProps.targetName,
-        'skip',
-        baseProps.saveDc,
-      );
+      expect(shieldBash.applyShieldBashEffect).toHaveBeenCalledWith({
+        action: baseProps.action,
+        playerStats: baseProps.playerStats,
+        campaignName: baseProps.campaignName,
+        targetName: baseProps.targetName,
+        chosenOption: 'skip',
+        saveDc: baseProps.saveDc,
+      });
     });
   });
 

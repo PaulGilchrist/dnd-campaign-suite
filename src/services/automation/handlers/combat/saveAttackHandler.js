@@ -155,13 +155,13 @@ function applyShapeDurationExpiration(action, auto, playerStats, resolvedShape, 
     if (durationRounds === undefined) return;
     const rounds = durationRounds === 0 ? undefined : durationRounds;
     if (rounds !== undefined) {
-        addExpiration(playerStats.name, playerStats.name, [
+        addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
             { type: 'remove_active_buff', buffName: action.name }
-        ], campaignName, rounds);
+        ], campaignName, rounds });
     } else {
-        addExpiration(playerStats.name, playerStats.name, [
+        addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
             { type: 'remove_active_buff', buffName: action.name }
-        ], campaignName);
+        ], campaignName });
     }
 }
 
@@ -191,13 +191,13 @@ async function consumeTrackedUses(action, auto, playerStats, campaignName) {
     return null;
 }
 
-async function resolveAttackerPosition(_mapName, campaignName, playerStats) {
+async function resolveAttackerPosition(mapName, campaignName, playerStats) {
     let attackerPos = null;
     let mapData = null;
     let attackerPlayer = null;
-    if (!_mapName) return { attackerPos, mapData, attackerPlayer };
+    if (!mapName) return { attackerPos, mapData, attackerPlayer };
     try {
-        mapData = await mapsService.loadMapData(campaignName, _mapName);
+        mapData = await mapsService.loadMapData(campaignName, mapName);
         attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
         if (attackerPlayer) {
             attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
@@ -206,10 +206,10 @@ async function resolveAttackerPosition(_mapName, campaignName, playerStats) {
     return { attackerPos, mapData, attackerPlayer };
 }
 
-async function buildHealModal(action, auto, playerStats, campaignName, _mapName, resolved) {
+async function buildHealModal({ action, auto, playerStats, campaignName, mapName, resolved }) {
     const { resolvedShape, resolvedDamageType, saveDcValue, dcSuccess } = resolved;
     const cs = await getCombatContext(campaignName);
-    const { attackerPos, mapData, attackerPlayer } = await resolveAttackerPosition(_mapName, campaignName, playerStats);
+    const { attackerPos, mapData, attackerPlayer } = await resolveAttackerPosition(mapName, campaignName, playerStats);
 
     const rangeFeet = auto.range ? rangeToFeet(auto.range) : getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);
 
@@ -242,9 +242,9 @@ async function buildHealModal(action, auto, playerStats, campaignName, _mapName,
     };
 }
 
-async function buildConditionModal({ action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue }) {
+async function buildConditionModal({ action, auto, playerStats, campaignName, mapName, resolvedShape, saveDcValue }) {
     const cs = await getCombatContext(campaignName);
-    const { attackerPos, mapData, attackerPlayer } = await resolveAttackerPosition(_mapName, campaignName, playerStats);
+    const { attackerPos, mapData, attackerPlayer } = await resolveAttackerPosition(mapName, campaignName, playerStats);
 
     const rangeFeet = getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);
 
@@ -313,16 +313,16 @@ async function buildAoeModal({ action, auto, playerStats, campaignName, resolved
     };
 }
 
-function routeSaveAttack(action, auto, playerStats, campaignName, _mapName, resolved) {
+function routeSaveAttack({ action, auto, playerStats, campaignName, mapName, resolved }) {
     const { resolvedShape, resolvedDamageType, saveDcValue, dcSuccess } = resolved;
     // Handle save_attack with healing expression — use a modal for area + healing
     if (auto.healExpression && isAreaShape(resolvedShape)) {
-        return buildHealModal(action, auto, playerStats, campaignName, _mapName, resolved);
+        return buildHealModal({ action, auto, playerStats, campaignName, mapName, resolved });
     }
 
     if (auto.conditionInflicted && !auto.damage) {
         if (isAreaShape(resolvedShape)) {
-            return buildConditionModal({ action, auto, playerStats, campaignName, _mapName, resolvedShape, saveDcValue });
+            return buildConditionModal({ action, auto, playerStats, campaignName, mapName, resolvedShape, saveDcValue });
         }
         return conditionInflictedPopup(action, auto, saveDcValue);
     }
@@ -366,7 +366,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const saveDcValue = buildSaveDc(auto, playerStats);
 
-    return routeSaveAttack(action, auto, playerStats, campaignName, _mapName, { resolvedShape, resolvedDamageType, saveDcValue, dcSuccess });
+    return routeSaveAttack({ action, auto, playerStats, campaignName, mapName: _mapName, resolved: { resolvedShape, resolvedDamageType, saveDcValue, dcSuccess } });
 }
 
 function conditionInflictedPopup(action, auto, saveDcValue) {

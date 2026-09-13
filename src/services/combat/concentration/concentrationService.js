@@ -190,7 +190,7 @@ function removeConditionIfNoSourceRemains(target, condition, remaining, casterNa
     const filtered = condList.filter(c => utils.getName(c) !== utils.getName(condition));
     if (filtered.length === condList.length) return;
     setRuntimeValue(target, 'activeConditions', filtered, campaignName);
-    logConditionEvent(campaignName, 'removed', target, condition, 'Concentration lost by ' + casterName);
+    logConditionEvent({ campaignName, action: 'removed', creatureName: target, conditionLabel: condition, dc: 'Concentration lost by ' + casterName });
 }
 
 function clearCasterConcentrationTargetEffects(casterName, campaignName) {
@@ -311,7 +311,7 @@ function clearTashasHideousLaughter(casterName, campaignName) {
         });
         if (filteredConds.length !== condList.length) {
             setRuntimeValue(te.target, 'activeConditions', filteredConds, campaignName);
-            logConditionEvent(campaignName, 'removed', te.target, 'Prone, Incapacitated', 'Concentration lost by ' + casterName);
+            logConditionEvent({ campaignName, action: 'removed', creatureName: te.target, conditionLabel: 'Prone, Incapacitated', dc: 'Concentration lost by ' + casterName });
         }
     }
     setRuntimeValue('campaign', 'targetEffects', filteredLaughterEffects, campaignName, true);

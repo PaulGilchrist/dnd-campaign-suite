@@ -21,9 +21,9 @@ export async function activateCoronaOfLight(action, playerStats, campaignName, s
     await setRuntimeValue(playerName, CORONA_ENEMIES_KEY, selectedEnemies, campaignName);
 
     // Set up expiration for 1 minute (10 rounds)
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_active_buff', buffName: action.name }
-    ], campaignName);
+    ], campaignName });
 
     // Log the ability use
     await addEntry(campaignName, {

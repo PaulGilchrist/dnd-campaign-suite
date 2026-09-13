@@ -226,7 +226,7 @@ describe('useSpellMetamagicFlow — handleAnimalShapesBeastConfirm success', () 
 
     const setPopupHtml = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn(), null, [], setPopupHtml)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
     );
 
     const allySel = await import('../../hooks/useAllySelection.js');
@@ -256,7 +256,7 @@ describe('useSpellMetamagicFlow — handleTruePolymorphSkip', () => {
 
   it('clears pending truePolymorph without calling onExecute', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'True Polymorph',
       { level: 9 },
     );
@@ -281,7 +281,7 @@ describe('useSpellMetamagicFlow — handleForesightSkip', () => {
 
   it('clears pending foresight and logs entry on skip', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Foresight',
       { level: 9 },
     );
@@ -312,7 +312,7 @@ describe('useSpellMetamagicFlow — handleProtectionFromEvilAndGoodSkip', () => 
 
   it('clears pending and logs entry on skip', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Protection from Evil and Good',
       { level: 1 },
     );
@@ -343,7 +343,7 @@ describe('useSpellMetamagicFlow — Shield of Faith Sorcerer flow', () => {
 
   it('sets pendingMetamagic for Shield of Faith (no gate)', () => {
     const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExec),
+      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
       'Shield of Faith',
       { level: 1 },
     );
@@ -355,7 +355,7 @@ describe('useSpellMetamagicFlow — Shield of Faith Sorcerer flow', () => {
   it('handleShieldOfFaithConfirm does nothing without pendingShieldOfFaith', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -368,7 +368,7 @@ describe('useSpellMetamagicFlow — Shield of Faith Sorcerer flow', () => {
   it('handleShieldOfFaithSkip does nothing without pendingShieldOfFaith', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {

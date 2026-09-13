@@ -303,7 +303,7 @@ function App() {
             const effectiveRaces = is2024 ? races2024 : races;
             const effectiveMagicItems = is2024 ? magicItems2024 : magicItems;
             const spellData = is2024 ? spells2024 : spells;
-            const playerStats = await rulesFactory.getPlayerStats(effectiveClasses, equipment, effectiveMagicItems, effectiveRaces, spellData, character);
+            const playerStats = await rulesFactory.getPlayerStats({ allClasses: effectiveClasses, allEquipment: equipment, allMagicItems: effectiveMagicItems, allRaces: effectiveRaces, allSpells: spellData, playerSummary: character });
             return { ...character, computedStats: playerStats };
           } catch {
             return character;

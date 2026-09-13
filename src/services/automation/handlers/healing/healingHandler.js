@@ -174,7 +174,7 @@ async function handleMonkHealing(action, playerStats, campaignName, isSelf, slot
     }
 
     const baseHeal = rollResult.total + wisModifier;
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
     const healAmount = baseHeal + bonusHeal;
 
     const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, healTargetName, healAmount, campaignName);
@@ -227,9 +227,9 @@ async function triggerTacticalShift(playerStats, campaignName) {
         ...storedEffects,
         { target: playerStats.name, source: 'Tactical Shift', effect: 'no_opportunity_attacks', value: null, duration: 'until_start_of_next_turn' },
     ], campaignName);
-    addExpiration(playerStats.name, playerStats.name, [
+    addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
         { type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: 'Tactical Shift', target: playerStats.name },
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -268,7 +268,7 @@ function gateTrackedUses(action, auto, playerStats, campaignName) {
     return { popup: null, usesKey, maxUses, currentUses };
 }
 
-function gateSelfHealing(action, auto, playerStats, campaignName, isHitDieRoll, hitDiceCost) {
+function gateSelfHealing({ action, auto, playerStats, campaignName, isHitDieRoll, hitDiceCost }) {
     if (isHitDieRoll && hitDiceCost > 0) {
         const popup = gateHitDiceCost(action, playerStats, campaignName, hitDiceCost);
         if (popup) return { popup };
@@ -310,7 +310,7 @@ function selfHealingHpRefusal(action, playerStats, campaignName, isHitDieRoll, c
     return null;
 }
 
-function resolveSelfHealingRoll(action, auto, playerStats, campaignName, slotLevel, isHitDieRoll) {
+function resolveSelfHealingRoll({ action, auto, playerStats, campaignName, slotLevel, isHitDieRoll }) {
     let resolvedExpression = resolveDiceExpression(auto.healExpression, playerStats, slotLevel)
         .replace(/\bfighter level\b/gi, String(playerStats.level || 1));
 
@@ -335,7 +335,7 @@ function resolveSelfHealingRoll(action, auto, playerStats, campaignName, slotLev
         const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
         healAmount = computeHitDieRecovery(rollResult.total, conBonus);
     } else {
-        const { totalBonus, details } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+        const { totalBonus, details } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
         bonusDetails = details;
         healAmount = rollResult.total + totalBonus;
     }
@@ -358,15 +358,37 @@ async function maybeTriggerTacticalShift(playerStats, campaignName, usesKey) {
     return false;
 }
 
+async function consumeHitDiceIfNeeded(isHitDieRoll, hitDiceCost, playerStats, campaignName) {
+    if (isHitDieRoll && hitDiceCost > 0) {
+        return await consumeSelfHealingHitDice(playerStats, campaignName, hitDiceCost);
+    }
+    return undefined;
+}
+
+async function consumeSelfHealingUse({ isHitDieRoll, actualHeal, playerStats, campaignName, usesKey, currentUses }) {
+    if (!isHitDieRoll && actualHeal > 0) {
+        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName, true);
+        return await maybeTriggerTacticalShift(playerStats, campaignName, usesKey);
+    }
+    return false;
+}
+
+function buildSelfHealingDescription({ action, rollInfo, actualHeal, remainingHitDice, remainingUses, tacticalShiftTriggered, isHitDieRoll }) {
+    const shiftNote = tacticalShiftTriggered ? ' Tactical Shift: you can move up to half your Speed without provoking Opportunity Attacks until the start of your next turn' : '';
+    return isHitDieRoll
+        ? `${action.name}: ${rollInfo} — ${healDesc(actualHeal)} (${remainingHitDice} hit dice remaining).`
+        : `${action.name}: ${rollInfo} — ${healDesc(actualHeal)} (${remainingUses} use${remainingUses === 1 ? '' : 's'} remaining)${actualHeal > 0 ? '' : '. No use spent'}${shiftNote}.`;
+}
+
 async function handleSelfHealing(action, auto, playerStats, campaignName, slotLevel) {
     const hitDiceCost = auto.hitDiceCost || 0;
     const isHitDieRoll = auto.healExpression === 'hit_die_roll';
 
-    const gate = gateSelfHealing(action, auto, playerStats, campaignName, isHitDieRoll, hitDiceCost);
+    const gate = gateSelfHealing({ action, auto, playerStats, campaignName, isHitDieRoll, hitDiceCost });
     if (gate.popup) return gate.popup;
     const { usesKey, maxUses, currentUses } = gate;
 
-    const roll = resolveSelfHealingRoll(action, auto, playerStats, campaignName, slotLevel, isHitDieRoll);
+    const roll = resolveSelfHealingRoll({ action, auto, playerStats, campaignName, slotLevel, isHitDieRoll });
     if (!roll) return null;
     const { resolvedExpression, maximize, rerollOnes, rollResult, healAmount, bonusDetails } = roll;
 
@@ -374,16 +396,9 @@ async function handleSelfHealing(action, auto, playerStats, campaignName, slotLe
 
     await markFortifiedIfHealed(playerStats, campaignName, actualHeal, bonusDetails);
 
-    let remainingHitDice;
-    if (isHitDieRoll && hitDiceCost > 0) {
-        remainingHitDice = await consumeSelfHealingHitDice(playerStats, campaignName, hitDiceCost);
-    }
+    const remainingHitDice = await consumeHitDiceIfNeeded(isHitDieRoll, hitDiceCost, playerStats, campaignName);
 
-    let tacticalShiftTriggered = false;
-    if (!isHitDieRoll && actualHeal > 0) {
-        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName, true);
-        tacticalShiftTriggered = await maybeTriggerTacticalShift(playerStats, campaignName, usesKey);
-    }
+    const tacticalShiftTriggered = await consumeSelfHealingUse({ isHitDieRoll, actualHeal, playerStats, campaignName, usesKey, currentUses });
 
     const rollInfo = `${resolvedExpression}=${rollResult.total} (${rollDisplay(rollResult, maximize, rerollOnes)})`;
 
@@ -403,10 +418,7 @@ async function handleSelfHealing(action, auto, playerStats, campaignName, slotLe
     });
 
     const remainingUses = actualHeal > 0 ? currentUses - 1 : currentUses;
-    const shiftNote = tacticalShiftTriggered ? ' Tactical Shift: you can move up to half your Speed without provoking Opportunity Attacks until the start of your next turn' : '';
-    const description = isHitDieRoll
-        ? `${action.name}: ${rollInfo} — ${healDesc(actualHeal)} (${remainingHitDice} hit dice remaining).`
-        : `${action.name}: ${rollInfo} — ${healDesc(actualHeal)} (${remainingUses} use${remainingUses === 1 ? '' : 's'} remaining)${actualHeal > 0 ? '' : '. No use spent'}${shiftNote}.`;
+    const description = buildSelfHealingDescription({ action, rollInfo, actualHeal, remainingHitDice, remainingUses, tacticalShiftTriggered, isHitDieRoll });
 
     return infoPopup(action, description);
 }
@@ -424,7 +436,7 @@ async function handleUsesExpressionHealing({ action, auto, playerStats, campaign
         return null;
     }
 
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
     const healAmount = rollResult.total + bonusHeal;
 
     const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, targetName, healAmount, campaignName);
@@ -464,7 +476,7 @@ async function handleUsesExpressionHealing({ action, auto, playerStats, campaign
 
 async function handleFlatHeal(action, auto, playerStats, campaignName, slotLevel) {
     const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, playerStats.proficiency || 0, playerStats.level || 1, slotLevel, campaignName);
+    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
     const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;
 
     // Determine target for this flat-heal path

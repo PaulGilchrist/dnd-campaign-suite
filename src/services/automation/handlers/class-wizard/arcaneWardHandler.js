@@ -45,7 +45,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    // Projected Ward: find the most recent damage event on a creature within range
+    return projectWardAbsorption({ action, auto, playerName, campaignName });
+}
+
+// Projected Ward: find the most recent damage event on a creature within range
+async function projectWardAbsorption({ action, auto, playerName, campaignName }) {
     const wardHp = Number(getRuntimeValue(playerName, ARCAN_WARD_KEY, campaignName) ?? 0);
     const maxHp = Number(getRuntimeValue(playerName, ARCAN_WARD_MAX_KEY, campaignName) ?? 0);
 

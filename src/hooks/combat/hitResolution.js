@@ -66,7 +66,7 @@ async function runUnbreakableMajesty({ target, attackerName, campaignName, logEn
     });
 }
 
-function applyBardicInspirationDefense(context, target, campaignName, characters, effectiveD20Roll, effectiveAc) {
+function applyBardicInspirationDefense({ context, target, campaignName, characters, effectiveD20Roll, effectiveAc }) {
     const biUsesRaw = getRuntimeValue(target.name, 'bardicInspirationUses', campaignName);
     const biUsesNum = (typeof biUsesRaw === 'object' && biUsesRaw !== null) ? biUsesRaw.current : (biUsesRaw != null ? Number(biUsesRaw) : (characters.find(c => c.name === target.name)?.computedStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
     context.bardicInspirationDefense = hasBardicInspirationDefense(target.name, campaignName) && context._biDieSize && biUsesNum > 0;
@@ -300,7 +300,7 @@ async function runOnHitDefenses(state, { target, attackerName, campaignName, log
 
     // Combat Inspiration - Defense
     if (state.hit && target) {
-        applyBardicInspirationDefense(context, target, campaignName, characters, effectiveD20Roll, effectiveAc);
+        applyBardicInspirationDefense({ context, target, campaignName, characters, effectiveD20Roll, effectiveAc });
     }
 
     // Veer — mount redirect
@@ -313,9 +313,14 @@ function computeIsCrit(state, context, effectiveD20Roll, rollsInCriticalRange) {
     return !state.isAutoMiss && (utils.DEBUG_FORCE_CRIT || effectiveD20Roll === 20 || context?.isAutoCrit || rollsInCriticalRange) && (state.hit || rollsInCriticalRange);
 }
 
+function resolveHitTargetName(context, target) {
+    if (context?.rollType !== 'attack' && context?.rollType !== 'save') return undefined;
+    return target?.name || context?.targetName;
+}
+
 export async function resolveHit({ characterName, campaignName, context, bonus: _bonus, effectiveD20Roll, target, combatSummary, characters, logEntry }) {
     const attackerName = context?.attackerName || characterName;
-    const targetName = (context?.rollType === 'attack' || context?.rollType === 'save') ? (target?.name || context?.targetName) : undefined;
+    const targetName = resolveHitTargetName(context, target);
 
     const targetAc = computeTargetAc(context, target, characters);
 
@@ -336,7 +341,7 @@ export async function resolveHit({ characterName, campaignName, context, bonus: 
     const unerringStrikeApplied = await applyUnerringStrike(state, { characterName, campaignName, context, targetName, targetAc, effectiveD20Roll });
 
     // Death Strike (Assassin level 17)
-    if (state.hit && context?.sneakAttackDice && context.sneakAttackDice > 0) {
+    if (state.hit && context?.sneakAttackDice > 0) {
         await maybeStoreDeathStrike(characterName, campaignName, context, targetName);
     }
 

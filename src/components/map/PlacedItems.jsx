@@ -13,20 +13,43 @@ function PlacedItems({
     itemDragging,
     handleItemPointerDown,
 }) {
+    const isVisible = (item) =>
+        isLocalhost || (item.visible && !fog?.has(`${item.gridX},${item.gridY}`));
+
+    const itemOpacity = (item) => (isLocalhost ? (item.visible ? 1 : 0.5) : 1);
+
+    const isDragging = (item) => itemDragging?.itemId === item.id;
+
+    const onDown = (item) => (e) => handleItemPointerDown(e, item.id);
+
+    const onContext = (item) => (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY });
+    };
+
+    const rectHitArea = (item, x, y, w, h) => (
+        <rect x={x} y={y} width={w} height={h} fill="transparent"
+            className="item-hit-area"
+            onPointerDown={onDown(item)}
+            onContextMenu={onContext(item)}
+            style={{ cursor: 'grab' }} />
+    );
+
     const renderBarrel = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#barrel" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#barrel" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
                         <circle cx={cx} cy={cy} r={RADIUS} fill="transparent" className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onPointerDown={onDown(item)}
+                            onContextMenu={onContext(item)}
                             style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {isDragging(item) && (
                             <circle cx={cx} cy={cy} r={RADIUS + 4} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -39,21 +62,17 @@ function PlacedItems({
         const isRotated = (item.rotation || 0) === 90;
         const cx = isRotated ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
         const cy = isRotated ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         const tableW = isRotated ? 36 : 72;
         const tableH = isRotated ? 72 : 36;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#table" x={cx - 36} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#table" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
                     transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - tableW / 2} y={cy - tableH / 2} width={tableW} height={tableH} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - tableW / 2, cy - tableH / 2, tableW, tableH)}
+                        {isDragging(item) && (
                             <rect x={cx - tableW / 2} y={cy - tableH / 2} width={tableW} height={tableH} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -66,21 +85,17 @@ function PlacedItems({
         const isVertical = (item.rotation || 0) % 180 === 90;
         const cx = isVertical ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
         const cy = isVertical ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         const bedW = isVertical ? 36 : 72;
         const bedH = isVertical ? 72 : 36;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#bed" x={cx - 36} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#bed" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - bedW / 2} y={cy - bedH / 2} width={bedW} height={bedH} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - bedW / 2, cy - bedH / 2, bedW, bedH)}
+                        {isDragging(item) && (
                             <rect x={cx - bedW / 2} y={cy - bedH / 2} width={bedW} height={bedH} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -92,18 +107,14 @@ function PlacedItems({
     const renderFirepit = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#firepit" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#firepit" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <circle cx={cx} cy={cy} r={18} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -115,12 +126,12 @@ function PlacedItems({
     const renderDoor = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         const isOpen = !!item.open;
         return (
             <g key={item.id} className="placed-item">
                 {!isOpen ? (
-                    <use href="#door" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                    <use href="#door" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                         transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 ) : (
                     <>
@@ -139,12 +150,8 @@ function PlacedItems({
                 )}
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -156,19 +163,15 @@ function PlacedItems({
     const renderSecretDoor = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#secretDoor" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#secretDoor" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -180,18 +183,14 @@ function PlacedItems({
     const renderTrap = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#trap" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#trap" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -203,18 +202,14 @@ function PlacedItems({
     const renderPillar = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#pillar" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#pillar" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -226,19 +221,15 @@ function PlacedItems({
     const renderStairs = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#stairs" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#stairs" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -251,21 +242,17 @@ function PlacedItems({
         const isRotated = (item.rotation || 0) === 90;
         const cx = isRotated ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
         const cy = isRotated ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         const altarW = isRotated ? 36 : 72;
         const altarH = isRotated ? 72 : 36;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#altar" x={cx - 36} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#altar" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
                     transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - altarW / 2} y={cy - altarH / 2} width={altarW} height={altarH} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - altarW / 2, cy - altarH / 2, altarW, altarH)}
+                        {isDragging(item) && (
                             <rect x={cx - altarW / 2} y={cy - altarH / 2} width={altarW} height={altarH} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -279,21 +266,17 @@ function PlacedItems({
         const isVertical = rotation % 180 === 90;
         const cx = isVertical ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
         const cy = isVertical ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         const w = isVertical ? 36 : 72;
         const h = isVertical ? 72 : 36;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#bookshelf" x={cx - 36} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#bookshelf" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
                     transform={rotation ? `rotate(${rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - w / 2, cy - h / 2, w, h)}
+                        {isDragging(item) && (
                             <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -305,19 +288,15 @@ function PlacedItems({
     const renderChair = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#chair" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#chair" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -329,18 +308,14 @@ function PlacedItems({
     const renderChest = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#chest" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#chest" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -352,18 +327,14 @@ function PlacedItems({
     const renderCrate = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#crate" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#crate" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -375,18 +346,14 @@ function PlacedItems({
     const renderFountain = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#fountain" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#fountain" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -398,18 +365,14 @@ function PlacedItems({
     const renderSkeleton = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#skeleton" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#skeleton" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -421,18 +384,14 @@ function PlacedItems({
     const renderStatue = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#statue" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#statue" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -444,19 +403,15 @@ function PlacedItems({
     const renderTorch = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#torch" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#torch" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -468,18 +423,14 @@ function PlacedItems({
     const renderWeb = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#web" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#web" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -491,8 +442,9 @@ function PlacedItems({
     const renderNpc = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
-        const npcOpacity = isLocalhost ? (item.visible ? 1 : 0.5) : 1;
+        if (!isVisible(item)) return null;
+        const npcOpacity = itemOpacity(item);
+        const npcImage = npcImages[item.name] || item.imageUrl;
 
         return (
             <g key={item.id} className="npc-group">
@@ -502,9 +454,9 @@ function PlacedItems({
                     </clipPath>
                 </defs>
                 <circle cx={cx} cy={cy} r={20} className="npc-circle" style={{ opacity: npcOpacity }} />
-                {(npcImages[item.name] || item.imageUrl) ? (
+                {npcImage ? (
                     <image
-                        xlinkHref={npcImages[item.name] || item.imageUrl}
+                        xlinkHref={npcImage}
                         x={cx - 18}
                         y={cy - 18}
                         width={36}
@@ -549,11 +501,11 @@ function PlacedItems({
                             width={RADIUS * 2}
                             height={RADIUS * 2}
                             fill="transparent"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onPointerDown={onDown(item)}
+                            onContextMenu={onContext(item)}
                             style={{ cursor: 'grab' }}
                         />
-                        {itemDragging?.itemId === item.id && (
+                        {isDragging(item) && (
                             <circle cx={cx} cy={cy} r={RADIUS + 4} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -565,19 +517,15 @@ function PlacedItems({
     const renderArrowSlitWall = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#arrowSlitWall" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                <use href="#arrowSlitWall" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -589,18 +537,14 @@ function PlacedItems({
     const renderTree = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#tree" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#tree" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -612,18 +556,14 @@ function PlacedItems({
     const renderBoulder = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#boulder" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#boulder" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>
@@ -635,18 +575,14 @@ function PlacedItems({
     const renderBush = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        if (!isVisible(item)) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#bush" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#bush" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="item-hit-area"
-                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
-                            style={{ cursor: 'grab' }} />
-                        {itemDragging?.itemId === item.id && (
+                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
+                        {isDragging(item) && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
                         )}
                     </>

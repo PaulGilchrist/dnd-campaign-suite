@@ -2,6 +2,25 @@ import { useState } from 'react';
 import { applyStanceOption } from '../../../../services/automation/handlers/combat/combatStanceHandler.js';
 import '../../CharSheet.css';
 
+const STANCE_EFFECTS = {
+    Bear: 'Resistance to all damage except Force, Necrotic, Psychic, Radiant',
+    Eagle: 'Disengage and Dash as part of the bonus action; repeatable each turn while raging',
+    Wolf: 'Allies have Advantage on attack rolls against enemies within 5 ft of you',
+    Falcon: 'Fly Speed equal to your Speed while raging (no armor)',
+    Lion: 'Enemies within 5 ft have Disadvantage on attacks against targets other than you',
+    Ram: 'Melee hits cause Large or smaller creatures to have the Prone condition',
+    Cold: 'Ice Walk: Walk across icy/water surfaces without checks; ignore ice/snow difficult terrain',
+    Fire: (opt) => `Speed Boost: +${opt.speedBonus || 10} feet to Speed`,
+    Lightning: 'Fly Speed equal to your Speed for 1 round',
+    Thunder: (opt) => `Teleport up to ${opt.teleportDistance || '30 ft'} to an unoccupied space you can see`,
+};
+
+function stanceEffects(opt) {
+    const effect = STANCE_EFFECTS[opt.name];
+    if (!effect) return [];
+    return [typeof effect === 'function' ? effect(opt) : effect];
+}
+
 function CombatStanceModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
@@ -56,17 +75,7 @@ function CombatStanceModal({ action, playerStats, campaignName, onClose }) {
                     <p>Choose {action.name === 'Rage' ? 'a primal aspect of your Rage' : 'an elemental movement type'}:</p>
                     <div style={{ textAlign: 'left', marginTop: '12px' }}>
                         {options.map((opt, i) => {
-                            const effects = [];
-                            if (opt.name === 'Bear') effects.push('Resistance to all damage except Force, Necrotic, Psychic, Radiant');
-                            if (opt.name === 'Eagle') effects.push('Disengage and Dash as part of the bonus action; repeatable each turn while raging');
-                            if (opt.name === 'Wolf') effects.push('Allies have Advantage on attack rolls against enemies within 5 ft of you');
-                            if (opt.name === 'Falcon') effects.push('Fly Speed equal to your Speed while raging (no armor)');
-                            if (opt.name === 'Lion') effects.push('Enemies within 5 ft have Disadvantage on attacks against targets other than you');
-                            if (opt.name === 'Ram') effects.push('Melee hits cause Large or smaller creatures to have the Prone condition');
-                            if (opt.name === 'Cold') effects.push('Ice Walk: Walk across icy/water surfaces without checks; ignore ice/snow difficult terrain');
-                            if (opt.name === 'Fire') effects.push(`Speed Boost: +${opt.speedBonus || 10} feet to Speed`);
-                            if (opt.name === 'Lightning') effects.push('Fly Speed equal to your Speed for 1 round');
-                            if (opt.name === 'Thunder') effects.push(`Teleport up to ${opt.teleportDistance || '30 ft'} to an unoccupied space you can see`);
+                            const effects = stanceEffects(opt);
                             const isSelected = selected === opt.name;
                             return (
                                 <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>

@@ -205,12 +205,7 @@ describe('MonsterCardModal - handleDamage', () => {
     expect(dmgLink).toBeInTheDocument();
     fireEvent.click(dmgLink);
     expect(rollDamage).toHaveBeenCalledWith(
-      'Club',
-      '1d6+2',
-      expect.any(Number),
-      expect.any(Array),
-      expect.any(Number),
-      expect.objectContaining({ damageType: 'slashing', targetName: 'Player A', attackerName: 'Goblin' })
+      { name: 'Club', formula: '1d6+2', total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.objectContaining({ damageType: 'slashing', targetName: 'Player A', attackerName: 'Goblin' }) }
     );
   });
 
@@ -230,12 +225,7 @@ describe('MonsterCardModal - handleDamage', () => {
     expect(secondaryLink).toBeInTheDocument();
     fireEvent.click(secondaryLink);
     expect(rollDamage).toHaveBeenCalledWith(
-      'Multiattack',
-      '1d4+1',
-      expect.any(Number),
-      expect.any(Array),
-      expect.any(Number),
-      expect.objectContaining({ damageType: 'slashing', targetName: 'Player A', attackerName: 'Goblin' })
+      { name: 'Multiattack', formula: '1d4+1', total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.objectContaining({ damageType: 'slashing', targetName: 'Player A', attackerName: 'Goblin' }) }
     );
   });
 });

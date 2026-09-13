@@ -59,9 +59,9 @@ async function outlineTarget(campaignName, casterName, targetName, dc, saveResul
     setRuntimeValue(targetName, 'activeBuffs', newBuffs, campaignName);
 
     // Register expiration so the effect clears on initiative roll, short rest, and long rest
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_faerie_fire' },
-    ], campaignName);
+    ], campaignName });
 
     // Remove invisible condition — Faerie Fire prevents benefiting from invisibility
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];

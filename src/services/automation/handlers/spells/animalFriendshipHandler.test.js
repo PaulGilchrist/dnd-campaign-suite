@@ -192,14 +192,9 @@ describe('animalFriendshipHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'TestCaster',
-                'Wolf',
-                expect.arrayContaining([
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Wolf', effects: expect.arrayContaining([
                     expect.objectContaining({ type: 'charmed', condition: 'charmed' }),
-                ]),
-                campaignName,
-            );
+                ]), campaignName });
         });
 
         it('handles failed save: logs condition entry', async () => {

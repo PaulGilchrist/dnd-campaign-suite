@@ -113,14 +113,7 @@ describe('useCharActionsAttackHandlers', () => {
                 characterName: 'TestFighter',
                 abilityName: 'Reckless Attack',
             }));
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                'TestFighter',
-                'TestFighter',
-                [{ type: 'remove_active_buff', buffName: 'Reckless Attack' }],
-                campaignName,
-                undefined,
-                'TestFighter'
-            );
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestFighter', targetName: 'TestFighter', effects: [{ type: 'remove_active_buff', buffName: 'Reckless Attack' }], campaignName, rounds: undefined, expireOnCreatureName: 'TestFighter' });
             expect(deps.setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({ effect: 'reckless_attack', target: 'TestFighter' }),
             ]), campaignName);

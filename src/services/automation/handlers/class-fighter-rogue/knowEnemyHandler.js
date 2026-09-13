@@ -55,7 +55,7 @@ function buildUserDescription({ action, auto, targetName, irvInfo, iravLines, us
     return description;
 }
 
-function buildLogDescription(playerName, auto, targetName, usedRelentless, dieValue, iravLines) {
+function buildLogDescription({ playerName, auto, targetName, usedRelentless, dieValue, iravLines }) {
     let logDescription = `Know Your Enemy used by ${playerName}`;
     if (targetName) {
         logDescription += ` against ${targetName}`;
@@ -68,6 +68,27 @@ function buildLogDescription(playerName, auto, targetName, usedRelentless, dieVa
     return logDescription;
 }
 
+// CLA-286: round-keyed self-re-arming latch (CLA-109 pattern).
+function resolveRelentlessState(playerStats, campaignName) {
+    const hasRelentless = (playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.effect === 'relentless');
+    const storedRound = getRuntimeValue(playerStats.name, 'relentlessUsedRound', campaignName);
+    const currentRound = getCurrentCombatRound(campaignName);
+    const relentlessUsed = hasRelentless && storedRound != null && Number(storedRound) >= Number(currentRound);
+    return { relentlessAvailable: hasRelentless && !relentlessUsed, currentRound };
+}
+
+async function spendSuperiorityOrRelentless({ auto, playerStats, campaignName, usesKey, currentUses, relentlessAvailable, currentRound }) {
+    if (relentlessAvailable && currentUses <= 0) {
+        const superiorityDieSize = evaluateAutoExpression(auto.dieExpression || 'superiority_die', playerStats);
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        const dieValue = relentlessRoll?.total || superiorityDieSize;
+        await setRuntimeValue(playerStats.name, 'relentlessUsedRound', currentRound, campaignName);
+        return { dieValue, usedRelentless: true };
+    }
+    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+    return { dieValue: 0, usedRelentless: false };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const usesKey = 'superiorityDice';
@@ -76,12 +97,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const storedUses = getRuntimeValue(playerStats.name, usesKey, campaignName);
     const currentUses = storedUses != null ? Number(storedUses) : defaultMax;
 
-    const hasRelentless = (playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.effect === 'relentless');
-    const storedRound = getRuntimeValue(playerStats.name, 'relentlessUsedRound', campaignName);
-    const currentRound = getCurrentCombatRound(campaignName);
-    // CLA-286: round-keyed self-re-arming latch (CLA-109 pattern).
-    const relentlessUsed = hasRelentless && storedRound != null && Number(storedRound) >= Number(currentRound);
-    const relentlessAvailable = hasRelentless && !relentlessUsed;
+    const { relentlessAvailable, currentRound } = resolveRelentlessState(playerStats, campaignName);
 
     if (currentUses <= 0 && !relentlessAvailable) {
         return {
@@ -95,18 +111,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    let dieValue = 0;
-    let usedRelentless = false;
-
-    if (relentlessAvailable && currentUses <= 0) {
-        const superiorityDieSize = evaluateAutoExpression(auto.dieExpression || 'superiority_die', playerStats);
-        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
-        dieValue = relentlessRoll?.total || superiorityDieSize;
-        await setRuntimeValue(playerStats.name, 'relentlessUsedRound', currentRound, campaignName);
-        usedRelentless = true;
-    } else {
-        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
-    }
+    const spend = await spendSuperiorityOrRelentless({ auto, playerStats, campaignName, usesKey, currentUses, relentlessAvailable, currentRound });
+    const dieValue = spend.dieValue;
+    const usedRelentless = spend.usedRelentless;
 
     // Get target from combat context
     const targetName = await resolveTargetName(playerStats, campaignName);
@@ -116,7 +123,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const iravLines = irvInfo ? buildIravLines(irvInfo) : '';
 
     const description = buildUserDescription({ action, auto, targetName, irvInfo, iravLines, usedRelentless, dieValue });
-    const logDescription = buildLogDescription(playerStats.name, auto, targetName, usedRelentless, dieValue, iravLines);
+    const logDescription = buildLogDescription({ playerName: playerStats.name, auto, targetName, usedRelentless, dieValue, iravLines });
 
     addEntry(campaignName, {
         type: 'ability_use',

@@ -50,9 +50,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             expireOnCreatureName = combatSummary.creatures[nextIndex].name;
         }
     }
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'condition', condition: 'invisible' }
-    ], campaignName, undefined, expireOnCreatureName);
+    ], campaignName, rounds: undefined, expireOnCreatureName });
 
     // Log the ability use
     await addEntry(campaignName, {

@@ -228,7 +228,7 @@ describe('handlePlayerSaveDamage - careful ally path', () => {
 
         expect(result).toBe(true);
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['Fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['Fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
         expect(logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: 'roll',
@@ -271,7 +271,7 @@ describe('handlePlayerSaveDamage - careful ally path', () => {
         await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
 
         expect(hasIgnoreResistance).toHaveBeenCalledWith(context.playerStats, 'Fire');
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', expect.any(Number), ['Fire'], 'test-campaign', expect.any(Array), { ignoreResistance: true, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', expect.any(Number), ['Fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: true, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
     });
 });
 

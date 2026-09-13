@@ -131,7 +131,7 @@ describe('useSpellMetamagicFlow — two-stage handler initial stages', () => {
   for (const tc of stageCases) {
     it(`sets ${tc.stageKey} to "${tc.expected}" when ${tc.spell} gates`, () => {
       const { result } = renderHook(() =>
-        useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
       );
 
       act(() => {
@@ -153,7 +153,7 @@ describe('useSpellMetamagicFlow — skip handler rollback behavior', () => {
 
   it('handlesProtectionFromPoisonSkip: clears pending and logs, but does NOT roll back an unconsumed slot (SP-095)', async () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -182,7 +182,7 @@ describe('useSpellMetamagicFlow — skip handler rollback behavior', () => {
 
   it('handleStoneSkinSkip: clears pending, logs entry, and rolls back spell slot', async () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -208,7 +208,7 @@ describe('useSpellMetamagicFlow — skip handler rollback behavior', () => {
 
   it('handleSanctuarySkip: clears pending and logs entry', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -229,7 +229,7 @@ describe('useSpellMetamagicFlow — skip handler rollback behavior', () => {
 
   it('handleSleetStormSkip: clears pending and logs entry', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -260,7 +260,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('handleEnhanceAbilityConfirm: no-op when ability not selected', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -279,7 +279,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('handleProtectionFromPoisonConfirm: does not apply spell when result has no targetName', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -301,7 +301,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('handleRevivifyConfirm: does not apply spell when result has no targetName', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -332,7 +332,7 @@ describe('useSpellMetamagicFlow — confirm handler execution', () => {
     const automation = await import('../../services/automation/index.js');
 
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -358,7 +358,7 @@ describe('useSpellMetamagicFlow — confirm handler execution', () => {
     const automation = await import('../../services/automation/index.js');
 
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {

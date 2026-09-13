@@ -295,7 +295,7 @@ async function processGrazeDamage({ context, targetName, characterName, campaign
     const combatSummary2 = await loadCombatSummary(campaignName);
     const playerStats = context?.playerStats;
     const ignoreResistance = playerStats ? hasIgnoreResistance(playerStats, grazeDamageType) : false;
-    const applyResult = await applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName });
+    const applyResult = await applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: characterName });
     const grazeTargetMaxHp = resolveGrazeTargetMaxHp(context, targetName);
     logEntry({
         type: 'roll',
@@ -416,7 +416,7 @@ async function processPotentCantripMissDamage({ potentFormula, storedDamageResul
     const halfDamage = Math.floor(adjustedTotal / 2);
     const combatSummary2 = await loadCombatSummary(campaignName);
     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
-    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: context.attackerName || characterName });
+    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: context.attackerName || characterName });
     const missTargetMaxHp = context._target?.type === 'player'
         ? (getRuntimeValue(targetName, 'hitPoints') ?? 0)
         : context._target?.maxHp ?? 0;

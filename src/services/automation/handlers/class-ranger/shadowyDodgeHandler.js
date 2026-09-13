@@ -17,7 +17,7 @@ const USED_ROUND_KEY = '_ShadowyDodge_usedRound';
 // Identity of the triggering attack instance: the campaign lastAttack is the
 // single source of truth; damage application stamps timestamp on it, misses may
 // lack one, so fall back to roll signature + attacker.
-async function appendDodgeOutcome(hit, finalHit, attackerName, playerName, campaignName, featureName) {
+async function appendDodgeOutcome({ hit, finalHit, attackerName, playerName, campaignName, featureName }) {
     if (hit === true && finalHit === false) {
         let text = `<br/><i>The attack now misses due to Disadvantage!</i>`;
         const damageRolledBack = await rollbackDamage(attackerName, playerName, campaignName, featureName);
@@ -111,7 +111,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     let description = buildDodgeDescription({ featureName, attackerName, d20, bonus, ac, hit, secondD20, finalD20, finalHit });
 
-    const outcome = await appendDodgeOutcome(hit, finalHit, attackerName, playerName, campaignName, featureName);
+    const outcome = await appendDodgeOutcome({ hit, finalHit, attackerName, playerName, campaignName, featureName });
     description += outcome.text;
     const damageRolledBack = outcome.damageRolledBack;
 

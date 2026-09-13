@@ -133,8 +133,8 @@ describe('useAttackDamageResolution — Shield Bash featureRiders pause resume (
     await resumeAttackPipeline();
 
     expect(deps.rollDamage).toHaveBeenCalledTimes(1);
-    expect(deps.rollDamage.mock.calls[0][0]).toBe('Shortsword');
-    expect(deps.rollDamage.mock.calls[0][1]).toBe('1d6+1');
+    expect(deps.rollDamage.mock.calls[0][0].name).toBe('Shortsword');
+    expect(deps.rollDamage.mock.calls[0][0].formula).toBe('1d6+1');
     expect(resumeRef.current).toBeNull();
   });
 

@@ -61,7 +61,7 @@ async function handlePotentCantripHalfDamage({ deps, name, formula, context }) {
     const halfDamage = Math.floor(adjustedPotentTotal / 2);
     const combatSummary2 = await loadCombatSummary(campaignName);
     const ignoreResistance = (playerStats && hasIgnoreResistance(playerStats, damageType)) || false;
-    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [damageType], campaignName, characters, { ignoreResistance: ignoreResistance, attackerName: characterName });
+    const applyResult = await applyDamageToTarget(combatSummary2, targetName, halfDamage, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: characterName });
     const target = combatSummary2?.creatures?.find(c => c.name === targetName) || null;
     const isCrit = isAutoCrit || false;
     const displayFormula = isCrit ? formatDamageFormula(formula, damageResult.rolls, true) : formula;
@@ -93,7 +93,10 @@ function buildAutoMissLastAttack({ characterName, name, formula, context }) {
 export function createAutoMissHandler(deps) {
     const { characterName, campaignName, setPopupHtml, logEntry } = deps;
 
-    return async function handleAutoMiss(name, formula, total, rolls, modifier, context) {
+    return async function handleAutoMiss({ name, formula, total, rolls, modifier, context }) {
+        const damageType = context?.damageType;
+        const targetName = context?.targetName;
+        const rangeReason = context?.rangeReason;
         const isCantripFlag = context?.isCantrip || false;
         const hasPotentFlag = hasPotentCantrip(context?.playerStats);
 
@@ -113,9 +116,9 @@ export function createAutoMissHandler(deps) {
             rolls,
             total,
             modifier,
-            damageType: context?.damageType,
-            targetName: context?.targetName,
-            rangeReason: context?.rangeReason,
+            damageType,
+            targetName,
+            rangeReason,
             isCrit,
         });
         setPopupHtml({
@@ -125,9 +128,9 @@ export function createAutoMissHandler(deps) {
             rolls,
             bonus: 0,
             modifier,
-            damageType: context?.damageType,
-            targetName: context?.targetName,
-            rangeReason: context?.rangeReason,
+            damageType,
+            targetName,
+            rangeReason,
         });
 
         // Write lastAttack for auto-miss — counterspell needs to know about it

@@ -218,10 +218,10 @@ describe('auraOfLifeHandler', () => {
             // Verify expirations were registered for each target
             expect(vi.mocked(expirations.addExpiration)).toHaveBeenCalledTimes(2);
             expect(vi.mocked(expirations.addExpiration))
-                .toHaveBeenCalledWith('Cleric', 'Ally1', expect.arrayContaining([
+                .toHaveBeenCalledWith({ attackerName: 'Cleric', targetName: 'Ally1', effects: expect.arrayContaining([
                     { type: 'remove_active_buff', buffName: 'Aura of Life' },
                     { type: 'aura_of_life_hp_protection_end' },
-                ]), campaignName, undefined, 'Cleric');
+                ]), campaignName, rounds: undefined, expireOnCreatureName: 'Cleric' });
 
             // Verify concentration was set with correct parameters
             // Note: handler passes getCombatSummary result directly (Promise) without await

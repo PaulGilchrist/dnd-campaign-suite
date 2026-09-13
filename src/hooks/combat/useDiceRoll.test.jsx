@@ -65,7 +65,7 @@ describe('useDiceRoll', () => {
     it('sets popupHtml with type damage and all fields', () => {
       const { result } = renderHook(() => useDiceRoll());
       act(() => {
-        result.current.rollDamage('Longsword', '1d8+3', 7, [4, 3], 3, undefined);
+        result.current.rollDamage({ name: 'Longsword', formula: '1d8+3', total: 7, rolls: [4, 3], modifier: 3, context: undefined });
       });
       expect(result.current.popupHtml).toEqual({
         type: 'damage',
@@ -82,19 +82,19 @@ describe('useDiceRoll', () => {
     it('passes critLabels from ctx, null when ctx is undefined or null', () => {
       const { result: withLabels } = renderHook(() => useDiceRoll());
       act(() => {
-        withLabels.current.rollDamage('Test', '1d8', 5, [5], 0, { critLabels: 'critical' });
+        withLabels.current.rollDamage({ name: 'Test', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: { critLabels: 'critical' } });
       });
       expect(withLabels.current.popupHtml.critLabels).toBe('critical');
 
       const { result: undef } = renderHook(() => useDiceRoll());
       act(() => {
-        undef.current.rollDamage('Test', '1d8', 5, [5], 0, undefined);
+        undef.current.rollDamage({ name: 'Test', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: undefined });
       });
       expect(undef.current.popupHtml.critLabels).toBeNull();
 
       const { result: nullCtx } = renderHook(() => useDiceRoll());
       act(() => {
-        nullCtx.current.rollDamage('Test', '1d8', 5, [5], 0, null);
+        nullCtx.current.rollDamage({ name: 'Test', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: null });
       });
       expect(nullCtx.current.popupHtml.critLabels).toBeNull();
     });
@@ -102,7 +102,7 @@ describe('useDiceRoll', () => {
     it('handles empty rolls array', () => {
       const { result } = renderHook(() => useDiceRoll());
       act(() => {
-        result.current.rollDamage('Test', '1d0', 0, [], 0, undefined);
+        result.current.rollDamage({ name: 'Test', formula: '1d0', total: 0, rolls: [], modifier: 0, context: undefined });
       });
       expect(result.current.popupHtml.rolls).toEqual([]);
     });

@@ -67,6 +67,18 @@ function stampRegenerateEffect(targetName, casterName, campaignName) {
     setRuntimeValue('campaign', 'targetEffects', filtered, campaignName);
 }
 
+function resolveRegenerateHealAmount(initialRoll) {
+    return typeof initialRoll === 'number' && initialRoll > 0 ? initialRoll : 33;
+}
+
+function resolveRegenerateHp({ combatSummary, targetName, playerStats, campaignName }) {
+    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
+    const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
+    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : (creature?.currentHp ?? maxHp);
+    return { maxHp, currentHp };
+}
+
 export async function applyRegenerateEffect(action, playerStats, campaignName, mapName, targetName) {
     if (!targetName) {
         return null;
@@ -79,16 +91,11 @@ export async function applyRegenerateEffect(action, playerStats, campaignName, m
     const initialHealExpression = resolveInitialHealExpression(spell);
 
     const initialRoll = evaluateAutoExpression(initialHealExpression, playerStats);
-    const healAmount = typeof initialRoll === 'number' && initialRoll > 0 ? initialRoll : 33;
+    const healAmount = resolveRegenerateHealAmount(initialRoll);
 
-    // Get creature max HP
+    // Get creature max HP / current HP
     const combatSummary = getCombatSummary(campaignName);
-    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
-    const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
-
-    // Get current HP
-    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-    const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : (creature?.currentHp ?? maxHp);
+    const { maxHp, currentHp } = resolveRegenerateHp({ combatSummary, targetName, playerStats, campaignName });
     const actualHeal = Math.min(healAmount, maxHp - currentHp);
 
     // Apply initial healing

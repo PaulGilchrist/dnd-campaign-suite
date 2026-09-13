@@ -19,7 +19,7 @@ function computeHealEvasionDamage(combatSummary, targetName, rawDamage, success,
 
 function applyAndLogHealNpcDamage({ combatSummary, campaignName, featureName, attackerName, saveDc, saveType, damageExpression, damageType, characters, targetName, success, saveRollTotal, saveBonus, rawDamage, finalDamage, damageRoll }) {
     if (finalDamage <= 0) return;
-    const applyResult = applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: attackerName, suppressHpLog: false });
+    const applyResult = applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: attackerName, suppressHpLog: false });
 
     addEntry(campaignName, {
         type: 'roll', characterName: attackerName, rollType: 'save-damage',
@@ -96,7 +96,7 @@ function rollAndComputeSaveDamage(damageExpression, success) {
 function logFailedSaveDamage({ campaignName, attackerName, featureName, damageExpression, damageType, targetName, saveType, saveDc, detail, damageRoll, rawDamage, finalDamage, combatSummary }) {
     if (finalDamage <= 0) return;
     const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
-    const applyResult = applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: attackerName, suppressHpLog: false });
+    const applyResult = applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: attackerName, suppressHpLog: false });
     addEntry(campaignName, {
         type: 'roll', characterName: attackerName, rollType: 'save-damage',
         name: featureName, formula: damageExpression,

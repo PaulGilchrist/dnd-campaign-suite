@@ -78,19 +78,8 @@ async function computeMapAwareContext({ mapData, npcs, attackContext, playerName
     const numericRange = rangeToFeet(attackContext.range) || 0;
     const isRanged = numericRange > 8;
 
-    if (targetPos) {
-        const distanceFt = getDistanceFeet(
-            { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-            targetPos
-         );
-        const rangeResult = computeRangeEffect(isRanged ? numericRange : attackContext.range, distanceFt, {});
-        if (rangeResult.mode === 'disadvantage') {
-            return { ...base, forcedMode: 'disadvantage', rangeReason: rangeResult.reason };
-         }
-        if (rangeResult.mode === 'miss') {
-            return { ...base, isAutoMiss: true, rangeReason: rangeResult.reason };
-         }
-     }
+    const rangeAdjusted = applyRangeDistanceCheck({ base, attackerPlayer, targetPos, attackContext, isRanged, numericRange });
+    if (rangeAdjusted) return rangeAdjusted;
 
     if (isRanged && !targetPos) {
         const meleeResult = computeMeleeProximityEffect(true, attackerPlayer, collectHostileThreats(mapData, npcs), {});
@@ -105,6 +94,22 @@ async function computeMapAwareContext({ mapData, npcs, attackContext, playerName
     }
 
     return base;
+}
+
+function applyRangeDistanceCheck({ base, attackerPlayer, targetPos, attackContext, isRanged, numericRange }) {
+    if (!targetPos) return null;
+    const distanceFt = getDistanceFeet(
+        { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+        targetPos
+    );
+    const rangeResult = computeRangeEffect(isRanged ? numericRange : attackContext.range, distanceFt, {});
+    if (rangeResult.mode === 'disadvantage') {
+        return { ...base, forcedMode: 'disadvantage', rangeReason: rangeResult.reason };
+    }
+    if (rangeResult.mode === 'miss') {
+        return { ...base, isAutoMiss: true, rangeReason: rangeResult.reason };
+    }
+    return null;
 }
 
 function computeCoverAdjustment(base, attackerPlayer, targetPos, mapData) {

@@ -20,15 +20,15 @@ function CommandModal({ spell, metaCtx, targetName, playerStats, campaignName, m
 
         try {
             const targetInfo = targetName ? { name: targetName } : null;
-            const result = await triggerCommand(
+            const result = await triggerCommand({
                 spell,
-                selectedCommand,
+                commandChoice: selectedCommand,
                 targetInfo,
                 metaCtx,
                 playerStats,
                 campaignName,
                 mapName,
-            );
+            });
 
             if (result?.type === 'popup') {
                 onClose();

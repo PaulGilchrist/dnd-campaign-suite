@@ -100,12 +100,7 @@ describe('useAttackDamageResolution', () => {
             expect(rollExpression).toHaveBeenCalledWith('1d8+3 [slashing]');
             expect(deps.buildCtxSync).toHaveBeenCalledWith(attack, { consumeAttackTe: false });
             expect(deps.rollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                expect.any(String),
-                5,
-                [5],
-                3,
-                expect.any(Object),
+                { name: 'Longsword', formula: expect.any(String), total: 5, rolls: [5], modifier: 3, context: expect.any(Object) },
             );
         });
 
@@ -119,12 +114,7 @@ describe('useAttackDamageResolution', () => {
             expect(rollExpressionDoubled).toHaveBeenCalledWith('1d8+3 [slashing]');
             expect(rollExpression).not.toHaveBeenCalled();
             expect(deps.rollDamage).toHaveBeenCalledWith(
-                'Longsword',
-                expect.any(String),
-                10,
-                [5, 5],
-                6,
-                expect.any(Object),
+                { name: 'Longsword', formula: expect.any(String), total: 10, rolls: [5, 5], modifier: 6, context: expect.any(Object) },
             );
         });
 
@@ -170,7 +160,7 @@ describe('useAttackDamageResolution', () => {
             hasTwoWeaponFighting.mockReturnValue(true);
             const { resolveAttackDamage } = useAttackDamageResolution(deps);
             await resolveAttackDamage(makeAttack(attack));
-            const formula = deps.rollDamage.mock.calls[0][1];
+            const formula = deps.rollDamage.mock.calls[0][0].formula;
             if (expected) {
                 expect(formula).toMatch(expected);
             } else {
@@ -185,7 +175,7 @@ describe('useAttackDamageResolution', () => {
             const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = makeAttack({ name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' });
             await resolveAttackDamage(attack);
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).not.toMatch(/\+ 0 \[Strength\]/);
         });
 
@@ -194,7 +184,7 @@ describe('useAttackDamageResolution', () => {
             const { resolveAttackDamage } = useAttackDamageResolution(deps);
             const attack = makeAttack({ name: 'Handaxe', damage: '1d6+3', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' });
             await resolveAttackDamage(attack);
-            const formula = deps.rollDamage.mock.calls[0][1];
+            const formula = deps.rollDamage.mock.calls[0][0].formula;
             const matches = formula.match(/\+ 3 \[Strength\]/g);
             expect(matches).toHaveLength(1);
         });
@@ -213,9 +203,9 @@ describe('useAttackDamageResolution', () => {
 
             await resolveAttackDamage(attack);
 
-            const formula = deps.rollDamage.mock.calls[0][1];
+            const formula = deps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d4');
-            expect(deps.rollDamage.mock.calls[0][2]).toBeGreaterThan(5);
+            expect(deps.rollDamage.mock.calls[0][0].total).toBeGreaterThan(5);
         });
 
         it('skips rider effects when targetEffects is absent', async () => {
@@ -224,9 +214,9 @@ describe('useAttackDamageResolution', () => {
 
             await resolveAttackDamage(attack);
 
-            const formula = deps.rollDamage.mock.calls[0][1];
+            const formula = deps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toBe('1d8 [slashing]');
-            expect(deps.rollDamage.mock.calls[0][2]).toBe(5);
+            expect(deps.rollDamage.mock.calls[0][0].total).toBe(5);
         });
     });
 

@@ -27,7 +27,7 @@ vi.mock('./rules.js', () => ({
       spell_slots_level_2: 3,
     })),
     getSpellMaxLevel: vi.fn(() => 9),
-    getPlayerStats: vi.fn(async (classes, equipment, magicItems, races, spells, summary) => ({
+    getPlayerStats: vi.fn(async ({ playerSummary: summary }) => ({
       ...summary,
       class: summary.class || { name: 'Fighter', class_levels: [] },
       race: {},
@@ -301,27 +301,14 @@ describe('rulesFactory', () => {
 
   describe('getPlayerStats', () => {
     it('returns player stats with tracked resources', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '5e' }
-      )
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: { rules: '5e' } })
       expect(result).toBeDefined()
       expect(result._trackedResources).toBeDefined()
       expect(result._trackedResources.hitPoints).toBeDefined()
     })
 
     it('adds auto resistances from resistance passives and passive_immunity', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
           rules: '5e',
           resistances: [],
           automation: {
@@ -330,79 +317,51 @@ describe('rulesFactory', () => {
               { type: 'passive_immunity', damageResistance: ['Psychic'] },
             ],
           },
-        }
-      )
+        } })
       expect(result.resistances).toContain('Fire')
       expect(result.resistances).toContain('Cold')
       expect(result.resistances).toContain('Psychic')
     })
 
     it('deduplicates auto resistances with existing ones', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
           rules: '5e',
           resistances: ['Fire'],
           automation: {
             passives: [{ type: 'resistance', damageTypes: ['Fire', 'Lightning'] }],
           },
-        }
-      )
+        } })
       const fireCount = result.resistances.filter((r) => r === 'Fire').length
       expect(fireCount).toBe(1)
       expect(result.resistances).toContain('Lightning')
     })
 
     it('adds land resistance when class type matches mapping', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
           rules: '5e',
           resistances: [],
           class: { major: { type: 'nature' } },
           automation: {
             passives: [{ type: 'land_resistance', landMappings: { nature: 'Lightning' } }],
           },
-        }
-      )
+        } })
       expect(result.resistances).toContain('Lightning')
     })
 
     it('does not add land resistance when class type does not match mapping', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
           rules: '5e',
           resistances: [],
           class: { major: { type: 'fire' } },
           automation: {
             passives: [{ type: 'land_resistance', landMappings: { nature: 'Lightning' } }],
           },
-        }
-      )
+        } })
       expect(result.resistances).not.toContain('Lightning')
     })
 
     it('prioritizes major.type over subclass.type for land resistance', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
           rules: '5e',
           resistances: [],
           class: { major: { type: 'nature' }, subclass: { type: 'fire' } },
@@ -411,27 +370,19 @@ describe('rulesFactory', () => {
               { type: 'land_resistance', landMappings: { nature: 'Lightning', fire: 'Fire' } },
             ],
           },
-        }
-      )
+        } })
       expect(result.resistances).toContain('Lightning')
     })
 
     it('trims whitespace from class type for land resistance matching', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
           rules: '5e',
           resistances: [],
           class: { major: { type: '  nature  ' } },
           automation: {
             passives: [{ type: 'land_resistance', landMappings: { nature: 'Lightning' } }],
           },
-        }
-      )
+        } })
       expect(result.resistances).toContain('Lightning')
     })
 
@@ -447,14 +398,7 @@ describe('rulesFactory', () => {
           return null
         }
       )
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '2024', resistances: [] }
-      )
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: { rules: '2024', resistances: [] } })
       expect(result.resistances).toContain('Radiant')
       expect(result.resistances).toContain('Fire')
       expect(result.resistances).toContain('Necrotic')
@@ -471,25 +415,12 @@ describe('rulesFactory', () => {
           return null
         }
       )
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '2024', resistances: [] }
-      )
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: { rules: '2024', resistances: [] } })
       expect(result.resistances).toEqual(['Cold'])
     })
 
     it('combines multiple resistance sources from passives and race rules', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        {
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
           rules: '5e',
           resistances: [],
           automation: {
@@ -498,21 +429,13 @@ describe('rulesFactory', () => {
               { type: 'passive_immunity', damageResistance: ['Psychic'] },
             ],
           },
-        }
-      )
+        } })
       expect(result.resistances).toContain('Fire')
       expect(result.resistances).toContain('Psychic')
     })
 
     it('sets class and race from appropriate ruleset modules', async () => {
-      const result = await rulesFactory.getPlayerStats(
-        [],
-        [],
-        [],
-        [],
-        {},
-        { rules: '5e', resistances: [] }
-      )
+      const result = await rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: { rules: '5e', resistances: [] } })
       expect(result.class).toBeDefined()
       expect(result.race).toBeDefined()
       expect(result.immunities).toBeDefined()
@@ -521,57 +444,36 @@ describe('rulesFactory', () => {
 
     it('throws when passives is not an array', async () => {
       await expect(
-        rulesFactory.getPlayerStats(
-          [],
-          [],
-          [],
-          [],
-          {},
-          {
+        rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
             rules: '5e',
             resistances: [],
             automation: { passives: 'not-an-array' },
-          }
-        )
+          } })
       ).rejects.toThrow('Expected passives to be an array')
     })
 
     it('throws when damageTypes is not an array in resistance passive', async () => {
       await expect(
-        rulesFactory.getPlayerStats(
-          [],
-          [],
-          [],
-          [],
-          {},
-          {
+        rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
             rules: '5e',
             resistances: [],
             automation: {
               passives: [{ type: 'resistance', damageTypes: 'not-an-array' }],
             },
-          }
-        )
+          } })
       ).rejects.toThrow('Expected damageTypes to be an array')
     })
 
     it('throws when landMappings is null in land_resistance passive', async () => {
       await expect(
-        rulesFactory.getPlayerStats(
-          [],
-          [],
-          [],
-          [],
-          {},
-          {
+        rulesFactory.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: {}, playerSummary: {
             rules: '5e',
             resistances: [],
             class: { major: { type: 'nature' } },
             automation: {
               passives: [{ type: 'land_resistance', landMappings: null }],
             },
-          }
-        )
+          } })
       ).rejects.toThrow('Expected landMappings to be an object')
     })
   })

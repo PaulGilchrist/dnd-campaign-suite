@@ -286,12 +286,7 @@ describe('celestialRevelationHandler', () => {
 
             await confirmCelestialRevelation(makePlayerStats(), 'Necrotic Shroud', campaignName);
 
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                playerName,
-                playerName,
-                [{ type: 'remove_active_buff', buffName: 'Necrotic Shroud' }],
-                campaignName
-            );
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'remove_active_buff', buffName: 'Necrotic Shroud' }], campaignName });
         });
 
         it('calls toggleBuff with correct effect for each transformation option', async () => {
@@ -422,12 +417,7 @@ describe('celestialRevelationHandler', () => {
                 'Heavenly Wings',
                 campaignName
             );
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                'CustomSorcerer',
-                'CustomSorcerer',
-                expect.any(Array),
-                campaignName
-            );
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'CustomSorcerer', targetName: 'CustomSorcerer', effects: expect.any(Array), campaignName });
             expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
                 'CustomSorcerer',
                 'Heavenly Wings',

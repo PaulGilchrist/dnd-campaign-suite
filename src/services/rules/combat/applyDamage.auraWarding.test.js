@@ -119,7 +119,7 @@ describe('applyDamageToTarget — Aura of Warding resistances (CLA-022)', () => 
   it('halves Radiant damage for a player inside a paladin\u2019s Aura of Warding', async () => {
     computeAuraComboEffects.mockResolvedValue(wardingAuraEffects());
     const cs = makeCombatSummary([createPlayerCreature('Cleric')]);
-    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Radiant'], 'TestCampaign', [createMinimalCharacter('Cleric')]);
+    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Radiant'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Cleric')] });
     expect(result.finalDamage).toBe(10);
     expect(result.damageReduced).toBe(true);
     expect(result.resistanceDetails).toEqual([{ damageType: 'Radiant', status: 'resistant' }]);
@@ -128,21 +128,21 @@ describe('applyDamageToTarget — Aura of Warding resistances (CLA-022)', () => 
   it('halves Necrotic damage while Aura of Warding is active', async () => {
     computeAuraComboEffects.mockResolvedValue(wardingAuraEffects());
     const cs = makeCombatSummary([createPlayerCreature('Cleric')]);
-    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Necrotic'], 'TestCampaign', [createMinimalCharacter('Cleric')]);
+    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Necrotic'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Cleric')] });
     expect(result.finalDamage).toBe(10);
   });
 
   it('halves Psychic damage while Aura of Warding is active', async () => {
     computeAuraComboEffects.mockResolvedValue(wardingAuraEffects());
     const cs = makeCombatSummary([createPlayerCreature('Cleric')]);
-    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Psychic'], 'TestCampaign', [createMinimalCharacter('Cleric')]);
+    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Psychic'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Cleric')] });
     expect(result.finalDamage).toBe(10);
   });
 
   it('applies full damage for unresisted types even when the aura grants other resistances', async () => {
     computeAuraComboEffects.mockResolvedValue(wardingAuraEffects());
     const cs = makeCombatSummary([createPlayerCreature('Cleric')]);
-    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Fire'], 'TestCampaign', [createMinimalCharacter('Cleric')]);
+    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Fire'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Cleric')] });
     expect(result.finalDamage).toBe(20);
     expect(result.damageReduced).toBe(false);
     expect(result.resistanceDetails).toEqual([]);
@@ -151,7 +151,7 @@ describe('applyDamageToTarget — Aura of Warding resistances (CLA-022)', () => 
   it('applies full damage when the target is outside every paladin aura', async () => {
     computeAuraComboEffects.mockResolvedValue(emptyAuraEffects());
     const cs = makeCombatSummary([createPlayerCreature('Cleric')]);
-    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Radiant'], 'TestCampaign', [createMinimalCharacter('Cleric')]);
+    const result = await applyDamageToTarget(cs, 'Cleric', 20, ['Radiant'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Cleric')] });
     expect(result.finalDamage).toBe(20);
     expect(result.damageReduced).toBe(false);
   });
@@ -163,11 +163,11 @@ describe('applyDamageToTarget — Aura of Warding resistances (CLA-022)', () => 
     });
     const cs = makeCombatSummary([createPlayerCreature('Cleric')]);
     const character = createMinimalCharacter('Cleric', { resistances: ['Fire'] });
-    const radiantResult = await applyDamageToTarget(cs, 'Cleric', 20, ['Radiant'], 'TestCampaign', [character]);
+    const radiantResult = await applyDamageToTarget(cs, 'Cleric', 20, ['Radiant'], { campaignName: 'TestCampaign', characters: [character] });
     expect(radiantResult.finalDamage).toBe(10);
 
     computeAuraComboEffects.mockResolvedValue(emptyAuraEffects());
-    const fireResult = await applyDamageToTarget(cs, 'Cleric', 20, ['Fire'], 'TestCampaign', [character]);
+    const fireResult = await applyDamageToTarget(cs, 'Cleric', 20, ['Fire'], { campaignName: 'TestCampaign', characters: [character] });
     expect(fireResult.finalDamage).toBe(10);
   });
 
@@ -183,7 +183,7 @@ describe('applyDamageToTarget — Aura of Warding resistances (CLA-022)', () => 
       concentration: null,
     };
     const cs = makeCombatSummary([npcAlly]);
-    const result = await applyDamageToTarget(cs, 'Orc Ally', 20, ['Radiant'], 'TestCampaign', [createMinimalCharacter('Paladin')]);
+    const result = await applyDamageToTarget(cs, 'Orc Ally', 20, ['Radiant'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Paladin')] });
     expect(result.finalDamage).toBe(10);
     expect(npcAlly.currentHp).toBe(10);
   });

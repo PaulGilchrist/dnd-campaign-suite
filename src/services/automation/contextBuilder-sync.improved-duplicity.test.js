@@ -143,7 +143,7 @@ describe('contextBuilder-sync: CLA-189 Improved Duplicity granted ally advantage
     // mockResolvedValue returns a real Promise: a missing await (the CLA-189 bug) makes this fail.
     getDuplicityAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'Divine_Cleric' });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'test-campaign', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'test-campaign', 'normal');
 
     expect(getDuplicityAdvantageAgainst).toHaveBeenCalledWith({
       attackerName: 'War_Cleric',
@@ -157,7 +157,7 @@ describe('contextBuilder-sync: CLA-189 Improved Duplicity granted ally advantage
   it('does not force advantage when no duplicity grant applies', async () => {
     getDuplicityAdvantageAgainst.mockResolvedValue({ advantage: false });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'test-campaign', 'normal', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'test-campaign', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
   });
@@ -165,7 +165,7 @@ describe('contextBuilder-sync: CLA-189 Improved Duplicity granted ally advantage
   it('does not override an already-forced disadvantage from conditions', async () => {
     getDuplicityAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'Divine_Cleric' });
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'test-campaign', 'disadvantage', {});
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'test-campaign', 'disadvantage');
 
     expect(result.forcedMode).toBe('disadvantage');
   });

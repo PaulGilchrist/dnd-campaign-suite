@@ -14,9 +14,9 @@ function applySpeedZero(campaignName, casterName, targetName) {
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'speed_zero');
     setRuntimeValue(targetName, 'activeConditions', [...filtered, 'speed_zero'], campaignName);
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'speed_zero' },
-    ], campaignName, undefined, casterName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 }
 
 function popup(name, description) {
@@ -44,7 +44,7 @@ function handleConstructAutoSuccess(campaignName, casterName, action, targetName
     return popup(action.name, `${targetName} is a Construct and automatically succeeds on the save. Speed is 0 until the start of your next turn.`);
 }
 
-async function handleFleshToStoneSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult) {
+async function handleFleshToStoneSaveSuccess({ campaignName, casterName, action, targetName, dc, saveResult }) {
     // On successful save: Speed 0 until the start of your next turn
     await addTargetResult(campaignName, {
         targetName,
@@ -80,7 +80,7 @@ async function handleFleshToStoneSaveSuccess(campaignName, casterName, action, t
     return popup(action.name, `${targetName} succeeded on CON save. Speed is 0 until the start of your next turn.`);
 }
 
-async function handleFleshToStoneRestrained(campaignName, casterName, action, targetName, dc, saveResult) {
+async function handleFleshToStoneRestrained({ campaignName, casterName, action, targetName, dc, saveResult }) {
     // Failed save: apply Restrained condition
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
@@ -137,9 +137,9 @@ async function handleFleshToStoneRestrained(campaignName, casterName, action, ta
         appliedDamage: 0,
     });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'restrained' },
-    ], campaignName);
+    ], campaignName });
 
     addEntry(campaignName, {
         type: 'save_result',
@@ -219,8 +219,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const saveResult = await promise;
 
     if (saveResult.success) {
-        return handleFleshToStoneSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult);
+        return handleFleshToStoneSaveSuccess({ campaignName, casterName, action, targetName, dc, saveResult });
     }
 
-    return handleFleshToStoneRestrained(campaignName, casterName, action, targetName, dc, saveResult);
+    return handleFleshToStoneRestrained({ campaignName, casterName, action, targetName, dc, saveResult });
 }

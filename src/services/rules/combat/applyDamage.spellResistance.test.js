@@ -125,30 +125,30 @@ function stubRuntime(currentHp, lastAttack = null) {
 
 describe('computeDamageAfterResistancesWithDetails — categorical Spell resistance', () => {
   it('halves spell-origin damage when resistances include Spell', () => {
-    const r = computeDamageAfterResistancesWithDetails(14, ['Cold'], ['Spell'], [], false, true);
+    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: [], ignoreResistance: false, spellOrigin: true });
     expect(r.finalDamage).toBe(7);
     expect(r.typeDetails).toEqual([{ damageType: 'Spell', status: 'resistant' }]);
   });
 
   it('does NOT halve non-spell-origin damage even when resistances include Spell', () => {
-    const r = computeDamageAfterResistancesWithDetails(14, ['Cold'], ['Spell'], [], false, false);
+    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: [], ignoreResistance: false, spellOrigin: false });
     expect(r.finalDamage).toBe(14);
     expect(r.typeDetails).toEqual([]);
   });
 
   it('does NOT double-halve when a concrete type already matched', () => {
-    const r = computeDamageAfterResistancesWithDetails(14, ['Cold'], ['Cold', 'Spell'], [], false, true);
+    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Cold', 'Spell'], immunities: [], ignoreResistance: false, spellOrigin: true });
     expect(r.finalDamage).toBe(7);
     expect(r.typeDetails).toEqual([{ damageType: 'Cold', status: 'resistant' }]);
   });
 
   it('does NOT halve spell-origin damage when resistance is ignored', () => {
-    const r = computeDamageAfterResistancesWithDetails(14, ['Cold'], ['Spell'], [], true, true);
+    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: [], ignoreResistance: true, spellOrigin: true });
     expect(r.finalDamage).toBe(14);
   });
 
   it('immunity wins over spell-origin halving', () => {
-    const r = computeDamageAfterResistancesWithDetails(14, ['Cold'], ['Spell'], ['Cold'], false, true);
+    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: ['Cold'], ignoreResistance: false, spellOrigin: true });
     expect(r.finalDamage).toBe(0);
     expect(r.typeDetails).toEqual([{ damageType: 'Cold', status: 'immune' }]);
   });
@@ -167,7 +167,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     const cs = makeCombatSummary([player]);
     stubRuntime(82);
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], 'test-campaign', [ createHolderCharacter('DivinationWizard'), ], { ignoreResistance: false, attackerName: 'Gazer 1', suppressHpLog: false, ...{ isSpellDamage: true } });
+    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], { campaignName: 'test-campaign', characters: [ createHolderCharacter('DivinationWizard'), ], ignoreResistance: false, attackerName: 'Gazer 1', suppressHpLog: false, ...{ isSpellDamage: true } });
 
     expect(result.finalDamage).toBe(7);
     expect(result.damageReduced).toBe(true);
@@ -190,7 +190,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     const cs = makeCombatSummary([player]);
     stubRuntime(82);
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], 'test-campaign', [ createHolderCharacter('DivinationWizard'), ], { ignoreResistance: false, attackerName: 'Thug 1' });
+    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], { campaignName: 'test-campaign', characters: [ createHolderCharacter('DivinationWizard'), ], ignoreResistance: false, attackerName: 'Thug 1' });
 
     expect(result.finalDamage).toBe(14);
     expect(result.resistanceDetails).toEqual([]);
@@ -204,7 +204,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     const cs = makeCombatSummary([player]);
     stubRuntime(44);
 
-    const result = await applyDamageToTarget(cs, 'AberrantSorcerer', 11, ['Cold'], 'test-campaign', [ createNonHolderCharacter('AberrantSorcerer'), ], { ignoreResistance: false, attackerName: 'Gazer 1', suppressHpLog: false, ...{ isSpellDamage: true } });
+    const result = await applyDamageToTarget(cs, 'AberrantSorcerer', 11, ['Cold'], { campaignName: 'test-campaign', characters: [ createNonHolderCharacter('AberrantSorcerer'), ], ignoreResistance: false, attackerName: 'Gazer 1', suppressHpLog: false, ...{ isSpellDamage: true } });
 
     expect(result.finalDamage).toBe(11);
     expect(result.resistanceDetails).toEqual([]);
@@ -218,7 +218,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     const cs = makeCombatSummary([player]);
     stubRuntime(82, { rollType: 'spell-save', attackerName: 'Archmage', attackName: 'Fireball' });
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 20, ['Fire'], 'test-campaign', [ createHolderCharacter('DivinationWizard'), ], { ignoreResistance: false, attackerName: 'Archmage' });
+    const result = await applyDamageToTarget(cs, 'DivinationWizard', 20, ['Fire'], { campaignName: 'test-campaign', characters: [ createHolderCharacter('DivinationWizard'), ], ignoreResistance: false, attackerName: 'Archmage' });
 
     expect(result.finalDamage).toBe(10);
     expect(result.resistanceDetails).toEqual([{ damageType: 'Spell', status: 'resistant' }]);
@@ -233,7 +233,7 @@ describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
     // Monster melee attack stamp — NOT spell-origin.
     stubRuntime(82, { rollType: 'attack', attackerName: 'Knight 1', attackName: 'Greatsword' });
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Slashing'], 'test-campaign', [ createHolderCharacter('DivinationWizard'), ], { ignoreResistance: false, attackerName: 'Knight 1' });
+    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Slashing'], { campaignName: 'test-campaign', characters: [ createHolderCharacter('DivinationWizard'), ], ignoreResistance: false, attackerName: 'Knight 1' });
 
     expect(result.finalDamage).toBe(14);
   });

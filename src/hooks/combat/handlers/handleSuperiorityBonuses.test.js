@@ -17,7 +17,7 @@ describe('applySuperiorityDamageBonuses', () => {
     it('adds attackRiderDieValue to formula, total, and rolls, then clears the key', () => {
         getRuntimeValue.mockImplementation((_name, key) => key === 'attackRiderDieValue' ? 6 : null);
 
-        const result = applySuperiorityDamageBonuses('EvasiveFighter', 'test-campaign', '1d6+4', 8, [4, 4], { damageType: 'piercing' });
+        const result = applySuperiorityDamageBonuses({ characterName: 'EvasiveFighter', campaignName: 'test-campaign', formula: '1d6+4', total: 8, rolls: [4, 4], context: { damageType: 'piercing' } });
 
         expect(result.formula).toBe('1d6+4 + 6 [piercing]');
         expect(result.total).toBe(14);
@@ -26,7 +26,7 @@ describe('applySuperiorityDamageBonuses', () => {
     });
 
     it('leaves formula untouched when attackRiderDieValue is null', () => {
-        const result = applySuperiorityDamageBonuses('EvasiveFighter', 'test-campaign', '1d6+4', 8, [4, 4], { damageType: 'piercing' });
+        const result = applySuperiorityDamageBonuses({ characterName: 'EvasiveFighter', campaignName: 'test-campaign', formula: '1d6+4', total: 8, rolls: [4, 4], context: { damageType: 'piercing' } });
 
         expect(result.formula).toBe('1d6+4');
         expect(result.total).toBe(8);

@@ -7,40 +7,55 @@ import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { resolveChannelDivinityCharges } from '../healing/healingPoolHandler.js';
 
-async function buildCreatureTargets(playerName, campaignName, mapName, rangeFt) {
+// No map: include all allies + self (assume in range)
+function collectNoMapTargets(allyList, playerName, hasAllyList) {
     const creatureTargets = [];
+    for (const allyName of allyList) {
+        if (hasAllyList && allyName !== playerName) {
+            creatureTargets.push({ name: allyName, type: 'player' });
+        }
+    }
+    return creatureTargets;
+}
+
+async function collectAlliesInRange(allyList, playerName, rangeFt) {
+    const creatureTargets = [];
+    for (const allyName of allyList) {
+        if (allyName === playerName) continue;
+        if (await isWithinRange(playerName, allyName, rangeFt)) {
+            creatureTargets.push({ name: allyName, type: 'player' });
+        }
+    }
+    return creatureTargets;
+}
+
+async function collectMapPlayersInRange(mapPlayers, playerName, rangeFt) {
+    const creatureTargets = [];
+    for (const p of mapPlayers) {
+        if (p.name === playerName) continue;
+        if (creatureTargets.length >= 10) break;
+        if (await isWithinRange(playerName, p.name, rangeFt)) {
+            creatureTargets.push({ name: p.name, type: 'player' });
+        }
+    }
+    return creatureTargets;
+}
+
+async function buildCreatureTargets(playerName, campaignName, mapName, rangeFt) {
     const allyList = getAllyList(playerName);
     const hasAllyList = allyList.length > 1;
 
     if (!mapName || rangeFt == null) {
-        // No map: include all allies + self (assume in range)
-        for (const allyName of allyList) {
-            if (hasAllyList && allyName !== playerName) {
-                creatureTargets.push({ name: allyName, type: 'player' });
-            }
-        }
+        const creatureTargets = collectNoMapTargets(allyList, playerName, hasAllyList);
         creatureTargets.push({ name: playerName, type: 'player' });
         return creatureTargets;
     }
 
-    const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
-
-    if (hasAllyList) {
-        for (const allyName of allyList) {
-            if (allyName === playerName) continue;
-            if (await isWithinRange(playerName, allyName, rangeFt)) {
-                creatureTargets.push({ name: allyName, type: 'player' });
-            }
-        }
-    } else {
-        for (const p of mapPlayers) {
-            if (p.name === playerName) continue;
-            if (creatureTargets.length >= 10) break;
-            if (await isWithinRange(playerName, p.name, rangeFt)) {
-                creatureTargets.push({ name: p.name, type: 'player' });
-            }
-        }
-    }
+    const mapData = await loadMapData(campaignName, mapName);
+    const mapPlayers = mapData?.players || [];
+    const creatureTargets = hasAllyList
+        ? await collectAlliesInRange(allyList, playerName, rangeFt)
+        : await collectMapPlayersInRange(mapPlayers, playerName, rangeFt);
 
     // Include self
     creatureTargets.push({ name: playerName, type: 'player' });

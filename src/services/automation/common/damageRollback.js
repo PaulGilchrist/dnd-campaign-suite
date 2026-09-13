@@ -267,7 +267,7 @@ export async function rollbackSpellEffects(lastAttack, campaignName, featureName
 
     const targets = lastAttack.affectedTargets || [lastAttack.targetName];
 
-    rollbackAllTargets(cs, lastAttack, targets, rolledBack, featureName, campaignName);
+    rollbackAllTargets({ cs, lastAttack, targets, rolledBack, featureName, campaignName });
 
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const filtered = storedEffects.filter(te => !(te.target && targets.includes(te.target) && te.source === attackerName));
@@ -292,7 +292,7 @@ function buildRollbackLogDescription(attackerName, spellName, targets, rolledBac
     return `${attackerName}'s spell '${spellName}' was countered — ${damageStr}, ${conditionStr}, ${effectStr} on ${affectedList}.`;
 }
 
-function rollbackAllTargets(cs, lastAttack, targets, rolledBack, featureName, campaignName) {
+function rollbackAllTargets({ cs, lastAttack, targets, rolledBack, featureName, campaignName }) {
     const targetResults = lastAttack.targetResults;
 
     if (targetResults && targetResults.length > 0) {
@@ -320,7 +320,7 @@ function rollbackTarget({ cs, targetName, damage, conditions, rolledBack, featur
     }
     for (const condition of conditions) {
         try {
-            removeCondition(cs, targetName, condition, getRuntimeValue, setRuntimeValue, campaignName);
+            removeCondition({ combatSummary: cs, creatureName: targetName, condition, getRuntimeValue, setRuntimeValue, campaignName });
             rolledBack.conditionsRemoved.push({ targetName, condition });
         } catch (e) {
             console.error(`[${featureName}] Failed to remove condition '${condition}' from ${targetName}:`, e);

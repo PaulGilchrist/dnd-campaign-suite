@@ -188,14 +188,7 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
         duration: 'until_used',
       }),
     ]);
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'War_Cleric',
-      'Thug 1',
-      [{ type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'War_Cleric' }],
-      campaignName,
-      undefined,
-      'War_Cleric'
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'War_Cleric', targetName: 'Thug 1', effects: [{ type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'War_Cleric' }], campaignName, rounds: undefined, expireOnCreatureName: 'War_Cleric' });
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('War_Cleric', '_Warding_Flare_usedRound', 1, campaignName);
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'wardingflareUses', 3, campaignName);
 

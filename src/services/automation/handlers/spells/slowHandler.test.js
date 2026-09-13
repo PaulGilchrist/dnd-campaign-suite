@@ -311,11 +311,7 @@ describe('slowHandler.handle', () => {
     it('adds expiration for slow condition', async () => {
       setupFailedSave();
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(addExpiration).toHaveBeenCalledWith(
-        casterName, targetName,
-        expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'slow' })]),
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName, effects: expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'slow' })]), campaignName });
     });
 
     it('posts condition applied and save_result log entries', async () => {

@@ -56,14 +56,7 @@ describe('removeCondition', () => {
     const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded', 'Charmed'] });
     const setRV = makeSetRuntimeValue();
 
-    removeCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'CHARMED' },
-      getRV,
-      setRV,
-      'Campaign',
-    );
+    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: { key: 'CHARMED' }, getRuntimeValue: getRV, setRuntimeValue: setRV, campaignName: 'Campaign' });
 
     expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded'], 'Campaign');
 
@@ -71,14 +64,7 @@ describe('removeCondition', () => {
     const getRV2 = makeGetRuntimeValue({ 'Hero:activeConditions': ['frightened', 'grappled'] });
     const setRV2 = makeSetRuntimeValue();
 
-    removeCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      'Frightened',
-      getRV2,
-      setRV2,
-      'Campaign',
-    );
+    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: 'Frightened', getRuntimeValue: getRV2, setRuntimeValue: setRV2, campaignName: 'Campaign' });
 
     expect(setRV2).toHaveBeenCalledWith('Hero', 'activeConditions', ['grappled'], 'Campaign');
   });
@@ -86,25 +72,11 @@ describe('removeCondition', () => {
   it('treats null/undefined activeConditions as empty array', () => {
     const setRV = makeSetRuntimeValue();
 
-    removeCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'poisoned' },
-      vi.fn(() => null),
-      setRV,
-      'Campaign',
-    );
+    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: { key: 'poisoned' }, getRuntimeValue: vi.fn(() => null), setRuntimeValue: setRV, campaignName: 'Campaign' });
     expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', [], 'Campaign');
 
     vi.clearAllMocks();
-    removeCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'poisoned' },
-      vi.fn(() => undefined),
-      setRV,
-      'Campaign',
-    );
+    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: { key: 'poisoned' }, getRuntimeValue: vi.fn(() => undefined), setRuntimeValue: setRV, campaignName: 'Campaign' });
     expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', [], 'Campaign');
   });
 
@@ -112,14 +84,7 @@ describe('removeCondition', () => {
     const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded'] });
     const setRV = makeSetRuntimeValue();
 
-    removeCondition(
-      { creatures: [{ type: 'player', name: 'Hero' }] },
-      'Hero',
-      { key: 'charmed' },
-      getRV,
-      setRV,
-      '',
-    );
+    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: { key: 'charmed' }, getRuntimeValue: getRV, setRuntimeValue: setRV, campaignName: '' });
 
     expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded'], '');
   });
@@ -128,14 +93,7 @@ describe('removeCondition', () => {
     const getRV = makeGetRuntimeValue({ 'Orc:activeConditions': ['blinded', 'charmed'] });
     const setRV = makeSetRuntimeValue();
 
-    removeCondition(
-      { creatures: [{ type: 'monster', name: 'Orc' }] },
-      'Orc',
-      { key: 'blinded' },
-      getRV,
-      setRV,
-      '',
-    );
+    removeCondition({ combatSummary: { creatures: [{ type: 'monster', name: 'Orc' }] }, creatureName: 'Orc', condition: { key: 'blinded' }, getRuntimeValue: getRV, setRuntimeValue: setRV, campaignName: '' });
 
     expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['charmed'], '');
   });
@@ -143,14 +101,7 @@ describe('removeCondition', () => {
   it('does not call setRuntimeValue when creature is not found', () => {
     const setRV = makeSetRuntimeValue();
 
-    removeCondition(
-      { creatures: [{ type: 'player', name: 'Other' }] },
-      'NonExistent',
-      { key: 'blinded' },
-      vi.fn(),
-      setRV,
-      '',
-    );
+    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Other' }] }, creatureName: 'NonExistent', condition: { key: 'blinded' }, getRuntimeValue: vi.fn(), setRuntimeValue: setRV, campaignName: '' });
 
     expect(setRV).not.toHaveBeenCalled();
   });

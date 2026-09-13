@@ -215,9 +215,7 @@ function renderWithGreaterRestoration(playerStatsOverride = {}) {
   const onExecute = vi.fn();
   const { result } = renderHook(() =>
     useSpellMetamagicFlow(
-      makePlayerStats(playerStatsOverride),
-      'TestCampaign',
-      onExecute
+      { playerStats: makePlayerStats(playerStatsOverride), campaignName: 'TestCampaign', onExecute: onExecute }
     )
   );
   // gateMetamagic is async; use act with async to await it
@@ -232,9 +230,7 @@ function renderWithTargetSpell(spellName, spellLevel, playerStatsOverride = {}) 
   const onExecute = vi.fn();
   const { result } = renderHook(() =>
     useSpellMetamagicFlow(
-      makePlayerStats(playerStatsOverride),
-      'TestCampaign',
-      onExecute
+      { playerStats: makePlayerStats(playerStatsOverride), campaignName: 'TestCampaign', onExecute: onExecute }
     )
   );
   act(() => {
@@ -248,7 +244,7 @@ function renderWithTargetSpell(spellName, spellLevel, playerStatsOverride = {}) 
 describe('useSpellMetamagicFlow — initial state', () => {
   it('has no pending metamagic on mount', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     expect(result.current.pendingMetamagic).toBeNull();
@@ -329,9 +325,7 @@ describe('useSpellMetamagicFlow — non-Sorcerer cantrip with material', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(
-        { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 },
-        'TestCampaign',
-        onExecute
+        { playerStats: { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 }, campaignName: 'TestCampaign', onExecute: onExecute }
       )
     );
 
@@ -358,9 +352,7 @@ describe('useSpellMetamagicFlow — non-Sorcerer cantrip with material', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(
-        { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 },
-        'TestCampaign',
-        onExecute
+        { playerStats: { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 }, campaignName: 'TestCampaign', onExecute: onExecute }
       )
     );
 
@@ -390,12 +382,7 @@ describe('useSpellMetamagicFlow — multi-target Power Word spells with secondar
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(
-        makePlayerStats(),
-        'TestCampaign',
-        onExecute,
-        setSecondaryTargetModal,
-        [],
-        setPopupHtml
+        { playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: setSecondaryTargetModal, characters: [], setPopupHtml: setPopupHtml }
       )
     );
 
@@ -415,12 +402,7 @@ describe('useSpellMetamagicFlow — multi-target Power Word spells with secondar
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(
-        makePlayerStats(),
-        'TestCampaign',
-        onExecute,
-        setSecondaryTargetModal,
-        [],
-        setPopupHtml
+        { playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: setSecondaryTargetModal, characters: [], setPopupHtml: setPopupHtml }
       )
     );
 
@@ -446,12 +428,7 @@ describe('useSpellMetamagicFlow — multi-target Power Word spells with secondar
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
       useSpellMetamagicFlow(
-        makePlayerStats(),
-        'TestCampaign',
-        onExecute,
-        setSecondaryTargetModal,
-        [],
-        setPopupHtml
+        { playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: setSecondaryTargetModal, characters: [], setPopupHtml: setPopupHtml }
       )
     );
 
@@ -474,7 +451,7 @@ describe('useSpellMetamagicFlow — multi-target Power Word spells with secondar
   it('falls back to pendingMultiTarget when setSecondaryTargetModal is not provided', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {

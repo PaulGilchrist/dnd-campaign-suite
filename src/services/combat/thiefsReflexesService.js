@@ -13,13 +13,17 @@ const SECOND_TURN_SUFFIX = ' (Second Turn)'
 // Matches automationInfoBuilder/diverse.js: feature.name.toLowerCase() + 'Uses'.
 const DEFAULT_RESOURCE_KEY = "thief'sreflexesUses"
 
+function isThiefsReflexesHolder(ch, characterName) {
+    return ch?.name === characterName || ch?.computedStats?.name === characterName
+}
+
 function findThiefsReflexesAutomation(characters, characterName) {
     for (const ch of (characters || [])) {
-        if (ch?.name !== characterName && ch?.computedStats?.name !== characterName) continue
+        if (!isThiefsReflexesHolder(ch, characterName)) continue
         const stats = ch.computedStats || ch
         // The extra_action info lands under automation.actions (the diverse info
         // builder omits casting_time, so the router never sees 'passive').
-        const buckets = [...(stats?.automation?.actions || []), ...(stats?.automation?.specialActions || [])]
+        const buckets = [...(stats.automation?.actions || []), ...(stats.automation?.specialActions || [])]
         return buckets.find(a => a && a.type === 'extra_action' && a.firstRoundOnly) || null
     }
     return null

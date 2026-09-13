@@ -31,9 +31,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             window.dispatchEvent(new CustomEvent('combat-summary-updated'));
         }
 
-        addExpiration(casterName, casterName, [
+        addExpiration({ attackerName: casterName, targetName: casterName, effects: [
             { type: 'remove_active_buff', buffName }
-        ], campaignName);
+        ], campaignName });
 
         await applyAntimagicField(selectedCreatures, casterName, campaignName);
 

@@ -329,7 +329,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
 
             await callHandler(createFn());
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 0, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 0, expect.any(Array), { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
             const logCall = deps.logEntry.mock.calls[0][0];
             expect(logCall.saveResult).toBe('soulstitch_auto_success');
         });
@@ -398,7 +398,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
             await callHandler(fn, { dcSuccess: 'half' });
 
             // With evasion on failed save and dcSuccess='half', damage should be halved
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 5, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 5, expect.any(Array), { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('prevents evasion when target is incapacitated', async () => {
@@ -419,7 +419,7 @@ describe('handleNpcSaveDamage - basic save damage flow', () => {
             await callHandler(fn, { dcSuccess: 'half' });
 
             // Without evasion, full damage should apply
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 10, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 10, expect.any(Array), { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
         });
 
         it('logs evasion entry when evasion is active', async () => {

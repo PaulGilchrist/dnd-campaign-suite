@@ -26,9 +26,9 @@ export async function applyManeuveringAllyGrant(allyName, casterName, targetName
     await setRuntimeValue(allyName, 'maneuveringStepGranted', true, campaignName);
     await setRuntimeValue(allyName, 'maneuveringStepNoOA', true, campaignName);
     await setRuntimeValue(allyName, 'maneuveringStepNoOASource', targetName || null, campaignName);
-    addExpiration(casterName, allyName, [
+    addExpiration({ attackerName: casterName, targetName: allyName, effects: [
         { type: 'maneuvering_step_granted' }
-    ], campaignName, undefined, casterName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: casterName });
 
     const description = `Maneuvering Attack: ${allyName} can move up to half their Speed (${halfSpeed} ft) using their Reaction without provoking Opportunity Attacks from ${targetName || 'the target'}.`;
     await addEntry(campaignName, {
@@ -61,7 +61,7 @@ async function applyBrutalStrikeRider({ maneuver, targetName, playerStats, campa
     const cs = await getCombatContext(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     if (cs && targetName) {
-        const result = applyDamageToTarget(cs, targetName, dieValue, [maneuver.damageType || 'force'], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
+        const result = applyDamageToTarget(cs, targetName, dieValue, [maneuver.damageType || 'force'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name });
         if (result.finalDamage > 0) {
             description += ` ${targetName} takes ${result.finalDamage} ${maneuver.damageType || 'force'} damage.`;
         }
@@ -187,6 +187,10 @@ function isBrutalStrikeRider(maneuver) {
     return riderOptions.length > 0 && maneuver.automation?.type === 'attack_rider';
 }
 
+function resolveRiderTargetName(targetInfo, attackInfo) {
+    return targetInfo?.target?.name || attackInfo?.targetName || null;
+}
+
 export async function executeAttackRiderManeuver(action, playerStats, campaignName, maneuverName, attackInfo) {
     const auto = action.automation || {};
     const allManeuvers = await getManeuversForRules(playerStats.rules);
@@ -203,7 +207,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     }
 
     const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    const targetName = targetInfo?.target?.name || attackInfo?.targetName || null;
+    const targetName = resolveRiderTargetName(targetInfo, attackInfo);
 
     // MN-015: size gate runs BEFORE the die roll so a refusal never expends a die
     // and never rides the maneuver die onto damage.
@@ -224,7 +228,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
         return applyBrutalStrikeRider({ maneuver, targetName, playerStats, campaignName, dieValue, dieDescription, description });
     }
 
-    description = await applyManeuverSaveOutcome(description, maneuver, auto, targetName, playerStats, campaignName);
+    description = await applyManeuverSaveOutcome({ description, maneuver, auto, targetName, playerStats, campaignName });
     description = await applyAdvantageRiderEffect(description, maneuver, targetName, playerStats, campaignName);
 
     if (maneuver.effect === 'ally_movement') {
@@ -258,7 +262,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     };
 }
 
-async function applyManeuverSaveOutcome(description, maneuver, auto, targetName, playerStats, campaignName) {
+async function applyManeuverSaveOutcome({ description, maneuver, auto, targetName, playerStats, campaignName }) {
     if (!maneuver.saveType) return description;
     const saveDc = buildSaveDc(auto, playerStats);
     if (!targetName) {
@@ -276,7 +280,7 @@ async function applyManeuverSaveOutcome(description, maneuver, auto, targetName,
 
     description += ` Target made ${maneuver.saveType} save DC ${saveDc}: ${success ? 'Success' : 'Failure'}.`;
 
-    const saveEffectDesc = await processManeuverSaveResult(maneuver, targetName, saveDc, success, playerStats, campaignName);
+    const saveEffectDesc = await processManeuverSaveResult({ maneuver, targetName, saveDc, success, playerStats, campaignName });
     return description + saveEffectDesc;
 }
 

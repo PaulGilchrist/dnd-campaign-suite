@@ -96,10 +96,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     setRuntimeValue(playerName, SILENCE_CENTER_KEY, resolveSilenceCenter(combatSummary, playerName), campaignName);
     setRuntimeValue(playerName, SILENCE_RADIUS_KEY, aoeRadius, campaignName);
 
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_active_buff', buffName },
         { type: 'clear_silence_zone', casterName: playerName },
-    ], campaignName);
+    ], campaignName });
 
     return {
         type: 'popup',
@@ -149,9 +149,9 @@ export async function handleTargetSelection(casterName, selectedTargets, campaig
         addSilencedTarget(casterName, targetName, campaignName);
         silencedTargets.push(targetName);
 
-        addExpiration(casterName, targetName, [
+        addExpiration({ attackerName: casterName, targetName, effects: [
             { type: 'condition', condition: 'deafened' },
-        ], campaignName);
+        ], campaignName });
 
         await addEntry(campaignName, {
             type: 'condition',
@@ -166,10 +166,10 @@ export async function handleTargetSelection(casterName, selectedTargets, campaig
         results.push(`${targetName} is Deafened.`);
     }
 
-    addExpiration(casterName, casterName, [
+    addExpiration({ attackerName: casterName, targetName: casterName, effects: [
         { type: 'remove_active_buff', buffName },
         { type: 'clear_silence_zone', casterName },
-    ], campaignName);
+    ], campaignName });
 
     await addEntry(campaignName, {
         type: 'ability_use',

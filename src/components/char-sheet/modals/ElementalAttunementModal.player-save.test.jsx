@@ -20,7 +20,7 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
         if (dcSuccess === 'half') return success ? Math.floor(damage / 2) : damage;
         return damage;
     }),
-    computeDamageAfterResistancesWithDetails: vi.fn((damage) => ({ finalDamage: damage })),
+    computeDamageAfterResistancesWithDetails: vi.fn(({ rawDamage }) => ({ finalDamage: rawDamage })),
     applyDamageToTarget: vi.fn(),
 }));
 
@@ -239,7 +239,7 @@ describe('ElementalAttunementModal player save handling', () => {
             const callArgs = applyDamage.applyDamageToTarget.mock.calls[0];
             expect(callArgs[1]).toBe('Player1');
             expect(callArgs[3]).toEqual(['fire']);
-            expect(callArgs[4]).toBe('test-campaign');
+            expect(callArgs[4].campaignName).toBe('test-campaign');
         });
     });
 

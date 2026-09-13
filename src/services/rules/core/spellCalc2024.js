@@ -146,17 +146,18 @@ function applyCantripAbilityOverride(spellAbilities, feature) {
     }
 }
 
+function resolveLineageName(playerSummary) {
+    const raceName = playerSummary?.race?.name;
+    const subraceName = playerSummary?.race?.subrace?.name;
+    if (!subraceName) return null;
+    if (raceName === 'Tiefling') return subraceName.replace(' Tiefling', '');
+    return subraceName;
+}
+
 // elfish_lineage / gnomish_lineage / fiendish_legacy: add the lineage's cantrip and
 // level-spell grants and track them on the known counters.
 function applyLineageFeatureSpells(spellAbilities, feature, playerSummary) {
-    const raceName = playerSummary?.race?.name;
-    const subraceName = playerSummary?.race?.subrace?.name;
-    let lineageName = null;
-    if (subraceName && raceName === 'Tiefling') {
-        lineageName = subraceName.replace(' Tiefling', '');
-    } else if (subraceName) {
-        lineageName = subraceName;
-    }
+    const lineageName = resolveLineageName(playerSummary);
     if (!lineageName) return;
     const lineageData = feature.options?.find(o => o.name === lineageName);
     if (!lineageData) return;

@@ -78,11 +78,11 @@ async function tashaSaveFailure(campaignName, casterName, targetName, dc, saveRe
     });
 
     // Add expiration for concentration - conditions removed after duration
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'prone' },
         { type: 'condition', condition: 'incapacitated' },
         { type: 'tashas_laughter_expiration' },
-    ], campaignName);
+    ], campaignName });
 
     // Register the spell badge targetEffect for concentration tracking
     const allTargetEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];

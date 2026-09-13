@@ -97,7 +97,7 @@ async function rollConditionSave({ creature, condition, characters, campaignNpcs
     return buildSaveResult({ roll, rolls: [rawRoll], saveBonus, auraBonus, aura, dc: condition.dc, starryDragonFloor: dragonConstellationActive, advantage: false })
 }
 
-function removeCondition(combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName) {
+function removeCondition({ combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName }) {
     const creature = combatSummary.creatures.find(c => c.name === creatureName)
     if (!creature) return
     const conditionKey = String(condition.key || condition).toLowerCase()

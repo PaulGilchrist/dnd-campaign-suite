@@ -475,11 +475,7 @@ describe('executeSpellCast - healing & misc edge cases', () => {
 
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateActive', true, 'testCampaign')
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateSource', 'TestWizard', 'testCampaign')
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestWizard', 'Target',
-        expect.arrayContaining([expect.objectContaining({ type: 'remove_regenerate_buff' })]),
-        'testCampaign'
-      )
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'Target', effects: expect.arrayContaining([expect.objectContaining({ type: 'remove_regenerate_buff' })]), campaignName: 'testCampaign' })
     })
   })
 
@@ -507,7 +503,7 @@ describe('executeSpellCast - healing & misc edge cases', () => {
       delete spell.dc
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 1, magicMissileDistribution: { Goblin: 0, Orc: 3 } }), services)
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Orc', 15, ['Force'], 'testCampaign', undefined, { ignoreResistance: false, attackerName: 'TestWizard' })
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Orc', 15, ['Force'], { campaignName: 'testCampaign', characters: undefined, ignoreResistance: false, attackerName: 'TestWizard' })
     })
   })
 

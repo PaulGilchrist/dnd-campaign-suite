@@ -43,6 +43,15 @@ function getClassLevel(playerStats) {
     return playerStats.class?.class_levels?.[playerStats.level - 1];
 }
 
+function barbarianBuffFlags(activeBuffs) {
+    const buffs = Array.isArray(activeBuffs) ? activeBuffs : [];
+    return {
+        rageActive: buffs.some(b => b.name === 'Rage'),
+        recklessAttackActive: buffs.some(b => b.effect === 'advantage_attacks_advantage_against'),
+        wildHeartOption: buffs.find(b => b.name === 'Rage of the Wilds')?.optionName || null,
+    };
+}
+
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = getClassLevel(playerStats);
     const is2024 = playerStats.rules === '2024';
@@ -55,10 +64,7 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
     const aspectChoice = useRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', campaignName);
 
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-    const rageActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Rage');
-    const recklessAttackActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
-    const wildHeartBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Rage of the Wilds') : null;
-    const wildHeartOption = wildHeartBuff?.optionName || null;
+    const { rageActive, recklessAttackActive, wildHeartOption } = barbarianBuffFlags(activeBuffs);
 
     const warriorOfTheGodsFeature = (playerStats.bonusActions || []).find(f => f.name === 'Warrior of the Gods');
     const maxDice = barbarianWarriorMaxDice(playerStats.level);
@@ -270,8 +276,7 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const circleOfTheLandType = useRuntimeValue(playerStats.name, '_circleOfTheLandType', campaignName);
     const isCircleOfTheMoon = hasSubclassNamed(playerStats, 'Circle of the Moon');
     const isCircleOfTheStars = hasSubclassNamed(playerStats, 'Circle of the Stars');
-    const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
-    const moonlightStepMax = isCircleOfTheMoon ? Math.max(wis?.bonus || 0, 1) : 0;
+    const moonlightStepMax = isCircleOfTheMoon ? Math.max(abilityBonus(playerStats, 'Wisdom'), 1) : 0;
     const wrathOfTheSeaActive = useRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
     const cosmicOmenEffect = useRuntimeValue(playerStats.name, 'cosmicOmenEffect', campaignName);
     if (playerStats.level < 2) return null;
@@ -282,8 +287,8 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                 {isCircleOfTheStars && playerStats.level >= 6 && (
                     <>
                         <CosmicOmenBadge cosmicOmenEffect={cosmicOmenEffect} />
-                        <TrackedResourceInput label="Cosmic Omen Uses" resourceKey="cosmicomenUses" playerName={playerStats.name} getMax={() => Math.max(wis?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                        <TrackedResourceInput label="Star Map Free Casts" resourceKey="_Star_Map_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(wis?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                        <TrackedResourceInput label="Cosmic Omen Uses" resourceKey="cosmicomenUses" playerName={playerStats.name} getMax={() => Math.max(abilityBonus(playerStats, 'Wisdom'), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                        <TrackedResourceInput label="Star Map Free Casts" resourceKey="_Star_Map_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(abilityBonus(playerStats, 'Wisdom'), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                     </>
                 )}
                 <CircleLandBadges circleOfTheLandType={circleOfTheLandType} elementalFuryChoice={elementalFuryChoice} improvedElementalFuryChoice={improvedElementalFuryChoice} />
@@ -408,22 +413,32 @@ function MonkElementalBadges({ elementalAttunementActive, elementalAttunementEle
     );
 }
 
+function monkExtraAttacks(playerStats) {
+    return playerStats.class?.class_levels?.[playerStats.level - 1]?.extra_attacks || 0;
+}
+
+function monkBuffFlags(activeBuffs) {
+    const buffs = Array.isArray(activeBuffs) ? activeBuffs : [];
+    return {
+        cloakOfShadowsActive: buffs.some(b => b.effect === 'cloak_of_shadows'),
+        strideBuff: buffs.find(b => b.name === 'Stride of the Elements') || null,
+    };
+}
+
 const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
-    const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
     const monkFeatures = getClassFeatures(playerStats);
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-    const cloakOfShadowsActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'cloak_of_shadows');
+    const { cloakOfShadowsActive, strideBuff } = monkBuffFlags(activeBuffs);
     const elementalAttunementActive = useRuntimeValue(playerStats.name, 'elementalAttunementActive', campaignName);
     const elementalAttunementElement = useRuntimeValue(playerStats.name, 'elementalAttunementElement', campaignName);
     const elementalEpitomeActive = useRuntimeValue(playerStats.name, 'elementalEpitomeActive', campaignName);
     const epitomeResistanceType = useRuntimeValue(playerStats.name, 'epitomeResistanceType', campaignName);
-    const strideBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Stride of the Elements') : null;
     const destructiveStrideActive = useRuntimeValue(playerStats.name, 'destructiveStrideActive', campaignName);
     if (playerStats.level < 2) return null;
-    const focusSaveDc = 8 + (wisdom?.bonus || 0) + playerStats.proficiency;
+    const focusSaveDc = 8 + abilityBonus(playerStats, 'Wisdom') + playerStats.proficiency;
     return (
            <div data-testid="char-class-monk">
-               <div><b>Extra Attacks: </b>{playerStats.class?.class_levels?.[playerStats.level - 1]?.extra_attacks || 0}</div>
+               <div><b>Extra Attacks: </b>{monkExtraAttacks(playerStats)}</div>
                <TrackedResourceInput label="Focus Points" resourceKey="focusPoints" playerName={playerStats.name} getMax={() => monkFeatures?.maxFocusPoints || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                <div><b>Focus Save DC: </b>{focusSaveDc}</div>
                <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
@@ -443,6 +458,23 @@ const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
 };
 
 /* ─── Paladin ─── */
+function AuraOfProtectionLine({ cha, playerStats }) {
+    if (!cha) return null;
+    return <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? `(${getAuraRangeFromStats(playerStats)} ft.)` : '(locked)'}</div>;
+}
+
+function PaladinFeatureBadges({ holyNimbusActive, livingLegendActive, peerlessAthleteActive, elderChampionActive, avengingAngelActive }) {
+    return (
+        <>
+            {holyNimbusActive && <span className="automation-badge">Holy Nimbus</span>}
+            {livingLegendActive && <span className="automation-badge">Living Legend</span>}
+            {peerlessAthleteActive === true && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-running"></i> Peerless Athlete</span>}
+            {elderChampionActive && <span className="automation-badge">Elder Champion</span>}
+            {avengingAngelActive && <span className="automation-badge">Avenging Angel</span>}
+        </>
+    );
+}
+
 const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) {
     const paladinFeatures = getClassFeatures(playerStats);
     const cha = playerStats.abilities?.find((a) => a.name === 'Charisma');
@@ -474,7 +506,7 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
     const avengingAngelActive = useRuntimeValue(playerStats.name, 'avengingAngelActive', campaignName);
     return (
          <div data-testid="char-class-paladin">
-             {cha && <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? `(${getAuraRangeFromStats(playerStats)} ft.)` : '(locked)'}</div>}
+             <AuraOfProtectionLine cha={cha} playerStats={playerStats} />
              {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
              <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => paladinFeatures?.maxChannelDivinity || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              <div><b>Extra Attacks: </b>{paladinFeatures?.extraAttacks || 0}</div>
@@ -491,12 +523,14 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
               {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
               <TrackedResourceInput label="Lay On Hands Pool" resourceKey="layOnHandsPool" playerName={playerStats.name} getMax={() => layOnHandsPoolMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               {hasGloriousDefenseActive(playerStats) && <TrackedResourceInput label="Glorious Defense Uses" resourceKey="gloriousDefenseUses" playerName={playerStats.name} getMax={() => Math.max(cha?.bonus || 0, 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
-              {holyNimbusActive && <span className="automation-badge">Holy Nimbus</span>}
-             {livingLegendActive && <span className="automation-badge">Living Legend</span>}
-              {peerlessAthleteActive === true && <span className="automation-badge automation-badge--active"><i className="fa-solid fa-person-running"></i> Peerless Athlete</span>}
-               {elderChampionActive && <span className="automation-badge">Elder Champion</span>}
-               {avengingAngelActive && <span className="automation-badge">Avenging Angel</span>}
-          </div>
+              <PaladinFeatureBadges
+                  holyNimbusActive={holyNimbusActive}
+                  livingLegendActive={livingLegendActive}
+                  peerlessAthleteActive={peerlessAthleteActive}
+                  elderChampionActive={elderChampionActive}
+                  avengingAngelActive={avengingAngelActive}
+              />
+           </div>
     );
 };
 
@@ -656,6 +690,39 @@ function WarlockPatronFeatures({ playerStats, campaignName, isCelestialPatron, h
     );
 }
 
+function warlockInvocationsLabel(warlockFeatures) {
+    return (warlockFeatures?.invocationsKnown ?? 0) > 0 ? 'Eldritch Invocations' : 'Invocations Known';
+}
+
+function warlockInvocationText(warlockFeatures) {
+    const invocations = warlockFeatures?.invocations;
+    if (!invocations || !Array.isArray(invocations)) return null;
+    return [...invocations].sort().join(', ');
+}
+
+function ArcanumSlots({ warlockFeatures, arcanumLevels, playerStats, campaignName }) {
+    if (!warlockFeatures?.hasArcanum) return null;
+    return (
+        <React.Fragment>
+            {[6, 7, 8, 9].map(level => {
+                if (!(arcanumLevels[`level${level}`] > 0)) return null;
+                return (
+                    <TrackedResourceInput
+                        key={level}
+                        label={`${level}th Level Arcanum`}
+                        resourceKey={`mysticArcanumLevel${level}`}
+                        playerName={playerStats.name}
+                        getMax={() => 1}
+                        deps={[playerStats]}
+                        campaignName={campaignName}
+                        playerStats={playerStats}
+                    />
+                );
+            })}
+        </React.Fragment>
+    );
+}
+
 const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) {
     const warlockFeatures = getClassFeatures(playerStats);
     const arcanumLevels = warlockFeatures.arcanumLevels || {};
@@ -665,29 +732,12 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
     const isGreatOldOnePatron = matchPatron(playerStats, ['Great Old One Patron']);
     const chaMod = abilityBonus(playerStats, 'Charisma');
     const awakenedMindTarget = useRuntimeValue(playerStats.name, 'awakenedMindTarget', campaignName);
+    const pactBoon = warlockFeatures?.pactBoon || null;
+    const invocationText = warlockInvocationText(warlockFeatures);
 
     return (
          <div data-testid="char-class-warlock">
-              {warlockFeatures?.hasArcanum && (
-                  <React.Fragment>
-                      {[6, 7, 8, 9].map(level => {
-                          const hasArcanum = arcanumLevels[`level${level}`] > 0;
-                          if (!hasArcanum) return null;
-                          return (
-                              <TrackedResourceInput
-                                  key={level}
-                                  label={`${level}th Level Arcanum`}
-                                  resourceKey={`mysticArcanumLevel${level}`}
-                                  playerName={playerStats.name}
-                                  getMax={() => 1}
-                                  deps={[playerStats]}
-                                  campaignName={campaignName}
-                                  playerStats={playerStats}
-                              />
-                          );
-                      })}
-                  </React.Fragment>
-              )}
+              <ArcanumSlots warlockFeatures={warlockFeatures} arcanumLevels={arcanumLevels} playerStats={playerStats} campaignName={campaignName} />
               <WarlockPatronFeatures
                   playerStats={playerStats}
                   campaignName={campaignName}
@@ -698,13 +748,13 @@ const WarlockFeatures = function WarlockFeatures({ playerStats, campaignName }) 
                   awakenedMindTarget={awakenedMindTarget}
                   chaMod={chaMod}
               />
-             <div><b>{(warlockFeatures?.invocationsKnown ?? 0) > 0 ? 'Eldritch Invocations' : 'Invocations Known'}: </b>{warlockFeatures.invocationsKnown}</div>
-             {warlockFeatures?.invocations && Array.isArray(warlockFeatures.invocations) && (
-                 <div><b>Invocations: </b>{[...warlockFeatures.invocations].sort().join(', ')}</div>
+              <div><b>{warlockInvocationsLabel(warlockFeatures)}: </b>{warlockFeatures.invocationsKnown}</div>
+             {invocationText && (
+                 <div><b>Invocations: </b>{invocationText}</div>
              )}
-             {warlockFeatures?.pactBoon && <div><b>Pact Boon: </b>{warlockFeatures.pactBoon}</div>}
+             {pactBoon && <div><b>Pact Boon: </b>{warlockFeatures.pactBoon}</div>}
              <div className="automation-actions">
-                 {warlockFeatures?.pactBoon && (
+                 {pactBoon && (
                      <button className="automation-btn" title={`Pact Boon: ${warlockFeatures.pactBoon}`}>
                          <i className="fas fa-hand-sparkles"></i> {warlockFeatures.pactBoon}
                      </button>

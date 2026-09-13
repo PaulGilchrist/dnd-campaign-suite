@@ -136,7 +136,7 @@ export async function handleBardicInspirationOffense(playerStats, campaignName, 
     const damageType = la?.damageType || 'Bludgeoning';
     const damageTypes = Array.isArray(damageType) ? damageType : [damageType];
     if (targetName) {
-        const applyResult = applyDamageToTarget(cs, targetName, dieValue, damageTypes, campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+        const applyResult = applyDamageToTarget(cs, targetName, dieValue, damageTypes, { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
         if (applyResult) {
             storageService.default.set('combatSummary', cs, campaignName);
         }
@@ -169,7 +169,7 @@ export async function handleEmpoweredSpell(playerStats, campaignName, characters
     return null;
 }
 
-export async function handlePuncture(playerStats, campaignName, characters, popupHtml, setPopupHtml, punctureData) {
+export async function handlePuncture({ playerStats, campaignName, characters, popupHtml, setPopupHtml, punctureData }) {
     if (!playerStats || !campaignName || !punctureData) return null;
     
     const playerName = playerStats.name;
@@ -185,7 +185,7 @@ export async function handlePuncture(playerStats, campaignName, characters, popu
     const damageDifference = newRolls.reduce((sum, r) => sum + r, 0) + (popupHtml?.modifier || 0) - rawDamage;
     
     if (damageDifference !== 0) {
-        applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Piercing'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+        applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Piercing'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
     }
     
     await setRuntimeValue(playerName, usedKey, true, campaignName);
@@ -218,7 +218,7 @@ export async function handlePuncture(playerStats, campaignName, characters, popu
     };
 }
 
-export async function handleSavageAttacker(playerStats, campaignName, characters, popupHtml, setPopupHtml, savageData) {
+export async function handleSavageAttacker({ playerStats, campaignName, savageData }) {
     if (!playerStats || !campaignName || !savageData) return null;
 
     const playerName = playerStats.name;
@@ -267,7 +267,7 @@ function buildSavageRerollPopup(popupHtml, popupTotal, newRolls, damageDelta) {
     return updatedPopup;
 }
 
-export async function handleSavageAttackerChoice(playerStats, campaignName, characters, popupHtml, setPopupHtml, choiceData) {
+export async function handleSavageAttackerChoice({ playerStats, campaignName, characters, popupHtml, setPopupHtml, choiceData }) {
     if (!playerStats || !campaignName || !choiceData) return null;
 
     const playerName = playerStats.name;
@@ -282,7 +282,7 @@ export async function handleSavageAttackerChoice(playerStats, campaignName, char
 
         const damageDifference = (newTotal + (modifier || 0)) - rawDamage;
         if (damageDifference > 0) {
-            applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Slashing'], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+            applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Slashing'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
         }
 
         await addEntry(campaignName, {
@@ -369,6 +369,15 @@ export async function handleTacticalMind(playerStats, campaignName, popupHtml, s
     });
 }
 
+function darkOnesLuckRollInfo(popupHtml) {
+    return {
+        rollName: popupHtml?.name || 'Ability Check',
+        d20: popupHtml?.rolls?.[0] || 0,
+        bonus: popupHtml?.bonus || 0,
+        luckValue: popupHtml?.darkOnesLuckValue || 0,
+    };
+}
+
 export async function handleDarkOnesLuck(playerStats, campaignName, popupHtml) {
     if (!playerStats) return;
     const playerName = playerStats.name;
@@ -378,11 +387,8 @@ export async function handleDarkOnesLuck(playerStats, campaignName, popupHtml) {
     const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
     if (currentUses <= 0) return;
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
-    const rollName = popupHtml?.name || 'Ability Check';
-    const d20 = popupHtml?.rolls?.[0] || 0;
-    const bonus = popupHtml?.bonus || 0;
+    const { rollName, d20, bonus, luckValue } = darkOnesLuckRollInfo(popupHtml);
     const originalTotal = d20 + bonus;
-    const luckValue = popupHtml?.darkOnesLuckValue || 0;
     const modifiedTotal = originalTotal + luckValue;
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -406,7 +412,7 @@ async function adjustInitiativeTrackerForManeuver(campaignName, playerName, newT
     storageService.default.set('combatSummary', cs, campaignName);
 }
 
-export async function handleSuperiorityManeuver(playerStats, campaignName, setPopupHtml, popupHtml, maneuverName, dieValue) {
+export async function handleSuperiorityManeuver({ playerStats, campaignName, setPopupHtml, popupHtml, maneuverName, dieValue }) {
     if (!playerStats) return;
     try {
         const allManeuvers = await getManeuversForRules(playerStats.rules || '2024');

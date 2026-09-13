@@ -158,14 +158,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: 100,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'OrcPlayer', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcPlayer', {
-          level: 1, maxHp: 100,
-          features: [{ name: 'Relentless Endurance' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-      );
+      const result = await applyDamageToTarget(cs, 'OrcPlayer', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
 
       expect(result.intercepted).toBe(true);
       expect(result.finalDamage).toBe(0);
@@ -182,14 +175,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         relentlessEnduranceUsed: true,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'OrcPlayer2', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcPlayer2', {
-          level: 1, maxHp: 100,
-          features: [{ name: 'Relentless Endurance' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-      );
+      const result = await applyDamageToTarget(cs, 'OrcPlayer2', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer2', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
 
       expect(result.finalDamage).toBe(10);
       expect(result.newHp).toBe(0);
@@ -214,14 +200,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: 80,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'ElfPlayer', 10, ['Slashing'], campaignName,
-        [makeCharacter('ElfPlayer', {
-          level: 1, maxHp: 80,
-          features: [{ name: 'Darkvision' }, { name: 'Fey Ancestry' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-      );
+      const result = await applyDamageToTarget(cs, 'ElfPlayer', 10, ['Slashing'], { campaignName, characters: [makeCharacter('ElfPlayer', { level: 1, maxHp: 80, features: [{ name: 'Darkvision' }, { name: 'Fey Ancestry' }], className: 'Rogue', classLevel: 1, })] });
 
       expect(result.finalDamage).toBe(10);
       expect(result.newHp).toBe(0);
@@ -238,14 +217,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: 100,
       }));
 
-      await applyDamageToTarget(
-        cs, 'OrcPlayer3', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcPlayer3', {
-          level: 1, maxHp: 100,
-          features: [{ name: 'Relentless Endurance' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-      );
+      await applyDamageToTarget(cs, 'OrcPlayer3', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer3', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'OrcPlayer3', 'deathSaves', [false, false, false], campaignName,
@@ -265,14 +237,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         activeConditions: ['unconscious', 'blinded'],
       }));
 
-      await applyDamageToTarget(
-        cs, 'OrcPlayer5', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcPlayer5', {
-          level: 1, maxHp: 100,
-          features: [{ name: 'Relentless Endurance' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-      );
+      await applyDamageToTarget(cs, 'OrcPlayer5', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer5', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'OrcPlayer5', 'activeConditions', ['blinded'], campaignName,
@@ -288,14 +253,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: 100,
       }));
 
-      await applyDamageToTarget(
-        cs, 'OrcPlayer4', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcPlayer4', {
-          level: 1, maxHp: 100,
-          features: [{ name: 'Relentless Endurance' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-      );
+      await applyDamageToTarget(cs, 'OrcPlayer4', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer4', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'OrcPlayer4', 'relentlessEnduranceUsed', true, campaignName,
@@ -311,14 +269,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: 100,
       }));
 
-      await applyDamageToTarget(
-        cs, 'OrcPlayer6', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcPlayer6', {
-          level: 1, maxHp: 100,
-          features: [{ name: 'Relentless Endurance' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-      );
+      await applyDamageToTarget(cs, 'OrcPlayer6', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer6', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'hp_change',
@@ -348,14 +299,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: 100,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'OrcNullFeatures', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcNullFeatures', {
-          level: 1, maxHp: 100,
-          features: null,
-          className: 'Rogue', classLevel: 1,
-        })],
-      );
+      const result = await applyDamageToTarget(cs, 'OrcNullFeatures', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcNullFeatures', { level: 1, maxHp: 100, features: null, className: 'Rogue', classLevel: 1, })] });
 
       expect(result.finalDamage).toBe(10);
       expect(result.newHp).toBe(0);
@@ -370,14 +314,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: null,
       }));
 
-      await expect(applyDamageToTarget(
-        cs, 'OrcNoHitPoints', 10, ['Slashing'], campaignName,
-        [makeCharacter('OrcNoHitPoints', {
-          level: 1, maxHp: 100,
-          features: [{ name: 'Relentless Endurance' }],
-          className: 'Rogue', classLevel: 1,
-        })],
-      )).rejects.toThrow('Relentless Endurance: hitPoints not found for OrcNoHitPoints');
+      await expect(applyDamageToTarget(cs, 'OrcNoHitPoints', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcNoHitPoints', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] })).rejects.toThrow('Relentless Endurance: hitPoints not found for OrcNoHitPoints');
     });
 
     it('adds damageSequenceId to reTriggeredSequenceIds when Relentless Endurance intercepts', async () => {
@@ -389,7 +326,7 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         hitPoints: 100,
       }));
 
-      const result = await applyDamageToTarget(cs, 'OrcSeqId', 10, ['Slashing'], campaignName, [makeCharacter('OrcSeqId', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })], { ignoreResistance: false, attackerName: null, suppressHpLog: false, ...{ damageSequenceId: 'seq-123' } },);
+      const result = await applyDamageToTarget(cs, 'OrcSeqId', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcSeqId', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })], ignoreResistance: false, attackerName: null, suppressHpLog: false, ...{ damageSequenceId: 'seq-123' } });
 
       expect(result.intercepted).toBe(true);
       expect(result.newHp).toBe(1);

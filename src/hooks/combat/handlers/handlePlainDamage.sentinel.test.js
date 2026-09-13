@@ -161,7 +161,7 @@ describe('Plain damage sentinel', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, makeOpportunityAttackContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign',
@@ -188,7 +188,7 @@ describe('Plain damage sentinel', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, makeOpportunityAttackContext({ attackerName: 'TestFighter' }));
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext({ attackerName: 'TestFighter' }) });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign',
@@ -211,7 +211,7 @@ describe('Plain damage sentinel', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, makeOpportunityAttackContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
 
             const targetEffectsCall = setRuntimeValue.mock.calls.find(
                 (call) => call[1] === 'targetEffects'
@@ -238,7 +238,7 @@ describe('Plain damage sentinel', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, makeOpportunityAttackContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
 
             const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'targetEffects'
@@ -255,7 +255,7 @@ describe('Plain damage sentinel', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, makeOpportunityAttackContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
 
             const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'targetEffects'
@@ -283,7 +283,7 @@ describe('Plain damage sentinel', () => {
                     { name: 'Goblin', computedStats: { armorClass: 12 } },
                 ],
             }));
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, makeOpportunityAttackContext());
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
 
             const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'targetEffects'
@@ -299,7 +299,7 @@ describe('Plain damage sentinel', () => {
             applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, { targetName: 'Goblin', damageType: 'slashing', });
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
 
             const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'targetEffects'

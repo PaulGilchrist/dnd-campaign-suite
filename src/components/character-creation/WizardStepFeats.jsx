@@ -4,6 +4,36 @@ import FeatItemDetails from './FeatItemDetails.jsx';
 import WarningList from '../common/WarningList.jsx';
 import { validateFeats, getFeatLimits, getRaceFeatChoices } from '../../services/character/featValidation.js';
 
+function RepeatableFeatActions({ isRepeatable, isSelected, itemCount, isPreSelected, onToggle, onRemove }) {
+  if (!isRepeatable || !isSelected) return null;
+  return (
+    <div className="repeatable-feat-actions">
+      <button
+        type="button"
+        className="add-another-btn"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+      >
+        <i className="fa-solid fa-plus" /> Add Another
+      </button>
+      {itemCount >= 1 && !isPreSelected && (
+        <button
+          type="button"
+          className="remove-feat-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          <i className="fa-solid fa-minus" /> Remove One
+        </button>
+      )}
+    </div>
+  );
+}
+
 function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) {
   const [warnings, setWarnings] = React.useState([]);
   const [raceFeatChoices, setRaceFeatChoices] = React.useState([]);
@@ -83,32 +113,14 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                             >
                                 {isSelected ? '✓' : ''}
                             </div>
-                            {isRepeatable && isSelected && (
-                                <div className="repeatable-feat-actions">
-                                    <button
-                                        type="button"
-                                        className="add-another-btn"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onToggle();
-                                        }}
-                                    >
-                                        <i className="fa-solid fa-plus" /> Add Another
-                                    </button>
-                                    {itemCount >= 1 && !isPreSelected && (
-                                        <button
-                                            type="button"
-                                            className="remove-feat-btn"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onRemove();
-                                            }}
-                                        >
-                                            <i className="fa-solid fa-minus" /> Remove One
-                                        </button>
-                                    )}
-                                </div>
-                            )}
+                            <RepeatableFeatActions
+                                isRepeatable={isRepeatable}
+                                isSelected={isSelected}
+                                itemCount={itemCount}
+                                isPreSelected={isPreSelected}
+                                onToggle={onToggle}
+                                onRemove={onRemove}
+                            />
                         </div>
                     </div>
 

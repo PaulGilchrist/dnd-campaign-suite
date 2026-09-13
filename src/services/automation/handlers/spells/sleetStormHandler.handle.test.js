@@ -352,12 +352,7 @@ describe('sleetStormHandler.handle', () => {
         mapName,
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        casterName,
-        'Goblin',
-        expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'prone' })]),
-        campaignName,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Goblin', effects: expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'prone' })]), campaignName });
     });
 
     it('calls breakConcentration for the target', async () => {
@@ -610,13 +605,7 @@ describe('sleetStormHandler.handle', () => {
         mapName,
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        casterName,
-        casterName,
-        expect.arrayContaining([expect.objectContaining({ type: 'remove_sleet_storm_area' })]),
-        campaignName,
-        10,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: expect.arrayContaining([expect.objectContaining({ type: 'remove_sleet_storm_area' })]), campaignName, rounds: 10 });
     });
 
     it('sets expiration for round-based duration', async () => {
@@ -633,13 +622,7 @@ describe('sleetStormHandler.handle', () => {
         mapName,
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        casterName,
-        casterName,
-        expect.any(Array),
-        campaignName,
-        3,
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: expect.any(Array), campaignName, rounds: 3 });
     });
 
     it('does not set expiration for unrecognized duration', async () => {

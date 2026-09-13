@@ -126,9 +126,9 @@ async function activateSacredWeapon(action, playerStats, campaignName, chosenOpt
     const newBuffs = [...activeBuffs.filter(b => b.name !== action.name), buff];
     await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_active_buff', buffName: action.name },
-    ], campaignName, SACRED_WEAPON_ROUNDS);
+    ], campaignName, rounds: SACRED_WEAPON_ROUNDS });
 
     const chaMod = Math.max(1, getAbilityModifier(playerStats.abilities, 'CHA'));
     const charges = getRemainingCharges(playerStats, campaignName);

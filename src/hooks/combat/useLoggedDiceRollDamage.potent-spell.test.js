@@ -162,10 +162,10 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const fn = createFn();
         const eventDetail = trackEvent();
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             playerStats: playerStatsWithBlessedStrikes,
-        });
+        } });
 
         const detail = await eventDetail;
         expect(detail).toBeDefined();
@@ -196,10 +196,10 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const handler = () => { dispatched = true; };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             playerStats,
-        });
+        } });
 
         window.removeEventListener('potent-spellcasting-temp-hp', handler);
         expect(dispatched).toBe(false);
@@ -213,10 +213,10 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const handler = () => { dispatched = true; };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             playerStats: playerStatsWithBlessedStrikes,
-        });
+        } });
 
         window.removeEventListener('potent-spellcasting-temp-hp', handler);
         expect(dispatched).toBe(false);
@@ -228,11 +228,11 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const handler = () => { dispatched = true; };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
 
-        await fn('Fireball', '8d6', 20, [4, 6, 2, 5, 1, 3, 4, 5], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [4, 6, 2, 5, 1, 3, 4, 5], modifier: 0, context: {
             ...BASE_CONTEXT,
             isCantrip: false,
             playerStats: playerStatsWithBlessedStrikes,
-        });
+        } });
 
         window.removeEventListener('potent-spellcasting-temp-hp', handler);
         expect(dispatched).toBe(false);
@@ -246,10 +246,10 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const handler = () => { dispatched = true; };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             playerStats: playerStatsWithBlessedStrikes,
-        });
+        } });
 
         window.removeEventListener('potent-spellcasting-temp-hp', handler);
         expect(dispatched).toBe(false);
@@ -282,10 +282,10 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const handler = (event) => { dispatchedCount++; lastDetail = event.detail; };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             playerStats,
-        });
+        } });
 
         window.removeEventListener('potent-spellcasting-temp-hp', handler);
         expect(dispatchedCount).toBe(1);
@@ -299,11 +299,11 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const handler = () => { dispatched = true; };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             dcSuccess: 'half',
             playerStats: playerStatsWithBlessedStrikes,
-        });
+        } });
 
         window.removeEventListener('potent-spellcasting-temp-hp', handler);
         expect(dispatched).toBe(false);
@@ -315,10 +315,10 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const fn = createFn();
         const detail = trackEvent();
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             playerStats: playerStatsWithBlessedStrikes,
-        });
+        } });
 
         const eventDetail = await detail;
         expect(eventDetail).toBeDefined();
@@ -334,10 +334,10 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const handler = () => { dispatched = true; };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             playerStats: playerStatsWithBlessedStrikes,
-        });
+        } });
 
         window.removeEventListener('potent-spellcasting-temp-hp', handler);
         expect(dispatched).toBe(false);
@@ -351,10 +351,10 @@ describe('Blessed Strikes — Potent Spellcasting temp HP dispatch', () => {
         const handler = () => { dispatched = true; };
         window.addEventListener('potent-spellcasting-temp-hp', handler);
 
-        await fn('Shocking Grasp', '1d8', 5, [5], 0, {
+        await fn({ name: 'Shocking Grasp', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: {
             ...BASE_CONTEXT,
             playerStats: playerStatsWithBlessedStrikes,
-        });
+        } });
 
         window.removeEventListener('potent-spellcasting-temp-hp', handler);
         expect(dispatched).toBe(false);

@@ -58,7 +58,7 @@ describe('spellLimits', () => {
         class_levels: [{ level: 1, spellcasting: null }]
       }));
 
-      const limits = await getSpellLimits('Barbarian', 1, '5e');
+      const limits = await getSpellLimits({ className: 'Barbarian', level: 1, version: '5e' });
 
       expect(limits).toEqual({
         spellType: 'prepared',
@@ -81,7 +81,7 @@ describe('spellLimits', () => {
       silenceConsole();
       setupFetch([]);
 
-      const limits = await getSpellLimits('UnknownClass', 1, '5e');
+      const limits = await getSpellLimits({ className: 'UnknownClass', level: 1, version: '5e' });
 
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
@@ -97,7 +97,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const limits = await getSpellLimits('Wizard', 1, '5e');
+      const limits = await getSpellLimits({ className: 'Wizard', level: 1, version: '5e' });
 
       expect(limits.cantrip).toBe(3);
       expect(limits.level1).toBe(2);
@@ -115,7 +115,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const limits = await getSpellLimits('wizard', 1, '5e');
+      const limits = await getSpellLimits({ className: 'wizard', level: 1, version: '5e' });
 
       expect(limits.cantrip).toBe(3);
       expect(limits.level1).toBe(2);
@@ -132,7 +132,7 @@ describe('spellLimits', () => {
         ]
       }));
 
-      const limits = await getSpellLimits('Rogue', 3, '5e');
+      const limits = await getSpellLimits({ className: 'Rogue', level: 3, version: '5e' });
 
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
@@ -153,7 +153,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const limits = await getSpellLimits('Wizard', 1, '2024', 'Conjuration');
+      const limits = await getSpellLimits({ className: 'Wizard', level: 1, version: '2024', majorName: 'Conjuration' });
 
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
@@ -173,7 +173,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const limits = await getSpellLimits('Wizard', 1, '2024', 'Abjuration');
+      const limits = await getSpellLimits({ className: 'Wizard', level: 1, version: '2024', majorName: 'Abjuration' });
 
       expect(limits.cantrip).toBe(3);
       expect(limits.level1).toBe(2);
@@ -184,12 +184,12 @@ describe('spellLimits', () => {
       resetClassDataCache();
 
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-      let limits = await getSpellLimits('Wizard', 1, '5e');
+      let limits = await getSpellLimits({ className: 'Wizard', level: 1, version: '5e' });
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
 
       global.fetch = vi.fn().mockResolvedValue({ ok: false });
-      limits = await getSpellLimits('Wizard', 1, '5e');
+      limits = await getSpellLimits({ className: 'Wizard', level: 1, version: '5e' });
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
     });
@@ -213,7 +213,7 @@ describe('spellLimits', () => {
         }
       });
 
-      const limits = await getSpellLimits('Rogue', 3, '2024', 'Arcane Trickster');
+      const limits = await getSpellLimits({ className: 'Rogue', level: 3, version: '2024', majorName: 'Arcane Trickster' });
 
       expect(limits.cantrip).toBe(3);
       expect(limits.level1).toBe(2);
@@ -240,7 +240,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const limits = await getSpellLimits('Wizard', 9, '5e');
+      const limits = await getSpellLimits({ className: 'Wizard', level: 9, version: '5e' });
 
       expect(limits.cantrip).toBe(4);
       expect(limits.level1).toBe(4);
@@ -273,7 +273,7 @@ describe('spellLimits', () => {
         }
       });
 
-      const limits = await getSpellLimits('Rogue', 3, '2024', 'Abjuration');
+      const limits = await getSpellLimits({ className: 'Rogue', level: 3, version: '2024', majorName: 'Abjuration' });
 
       expect(limits.isNonSpellcaster).toBe(true);
       expect(limits.cantrip).toBe(0);
@@ -299,13 +299,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
-        ['Fire Bolt', 'Magic Missile'],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
+      const result = await validateSpellSelection({ selectedSpells: ['Fire Bolt', 'Magic Missile'], allSpells: mockSpells, className: 'Wizard', level: 1, version: '5e' });
 
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
@@ -323,13 +317,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const atLimit = await validateSpellSelection(
-        ['Fire Bolt', 'Light'],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
+      const atLimit = await validateSpellSelection({ selectedSpells: ['Fire Bolt', 'Light'], allSpells: mockSpells, className: 'Wizard', level: 1, version: '5e' });
       expect(atLimit.valid).toBe(true);
       expect(atLimit.violations).toHaveLength(0);
 
@@ -342,13 +330,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const exceeded = await validateSpellSelection(
-        ['Fire Bolt', 'Light'],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
+      const exceeded = await validateSpellSelection({ selectedSpells: ['Fire Bolt', 'Light'], allSpells: mockSpells, className: 'Wizard', level: 1, version: '5e' });
       expect(exceeded.valid).toBe(false);
       expect(exceeded.violations).toContain('Cantrips: 2/1');
     });
@@ -363,13 +345,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
-        ['Magic Missile', 'Shield'],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
+      const result = await validateSpellSelection({ selectedSpells: ['Magic Missile', 'Shield'], allSpells: mockSpells, className: 'Wizard', level: 1, version: '5e' });
 
       expect(result.valid).toBe(false);
       expect(result.violations).toContain('1st level: 2/1');
@@ -385,13 +361,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
-        ['Fire Bolt', 'Light', 'Magic Missile', 'Shield', 'Fireball'],
-        mockSpells,
-        'Wizard',
-        1,
-        '5e'
-      );
+      const result = await validateSpellSelection({ selectedSpells: ['Fire Bolt', 'Light', 'Magic Missile', 'Shield', 'Fireball'], allSpells: mockSpells, className: 'Wizard', level: 1, version: '5e' });
 
       expect(result.valid).toBe(false);
       expect(result.violations.length).toBeGreaterThan(1);
@@ -402,16 +372,16 @@ describe('spellLimits', () => {
     it('should allow empty, null, and undefined spell selections', async () => {
       setupFetch(makeClassData());
 
-      let result = await validateSpellSelection([], mockSpells, 'Wizard', 1, '5e');
+      let result = await validateSpellSelection({ selectedSpells: [], allSpells: mockSpells, className: 'Wizard', level: 1, version: '5e' });
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
       expect(result.counts.cantrip).toBe(0);
 
-      result = await validateSpellSelection(null, mockSpells, 'Wizard', 1, '5e');
+      result = await validateSpellSelection({ selectedSpells: null, allSpells: mockSpells, className: 'Wizard', level: 1, version: '5e' });
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
 
-      result = await validateSpellSelection(undefined, mockSpells, 'Wizard', 1, '5e');
+      result = await validateSpellSelection({ selectedSpells: undefined, allSpells: mockSpells, className: 'Wizard', level: 1, version: '5e' });
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
     });
@@ -426,13 +396,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
-        ['fire-bolt'],
-        [{ index: 'fire-bolt', level: 0 }],
-        'Wizard',
-        1,
-        '5e'
-      );
+      const result = await validateSpellSelection({ selectedSpells: ['fire-bolt'], allSpells: [{ index: 'fire-bolt', level: 0 }], className: 'Wizard', level: 1, version: '5e' });
 
       expect(result.valid).toBe(true);
       expect(result.counts.cantrip).toBe(1);
@@ -446,13 +410,7 @@ describe('spellLimits', () => {
         class_levels: [{ level: 1, spellcasting: null }]
       }));
 
-      const result = await validateSpellSelection(
-        ['Fire Bolt', 'Light', 'Magic Missile', 'Fireball'],
-        mockSpells,
-        'Barbarian',
-        1,
-        '5e'
-      );
+      const result = await validateSpellSelection({ selectedSpells: ['Fire Bolt', 'Light', 'Magic Missile', 'Fireball'], allSpells: mockSpells, className: 'Barbarian', level: 1, version: '5e' });
 
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
@@ -472,13 +430,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
-        ['Magic Missile', 'Fireball', 'Light'],
-        mockSpells,
-        'Cleric',
-        1,
-        '5e'
-      );
+      const result = await validateSpellSelection({ selectedSpells: ['Magic Missile', 'Fireball', 'Light'], allSpells: mockSpells, className: 'Cleric', level: 1, version: '5e' });
 
       expect(result.valid).toBe(false);
       expect(result.violations).toContain('Prepared spells: 2/1');
@@ -499,13 +451,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
-        ['Magic Missile', 'Fireball', 'Light'],
-        mockSpells,
-        'Cleric',
-        1,
-        '5e'
-      );
+      const result = await validateSpellSelection({ selectedSpells: ['Magic Missile', 'Fireball', 'Light'], allSpells: mockSpells, className: 'Cleric', level: 1, version: '5e' });
 
       expect(result.valid).toBe(true);
       expect(result.violations).toHaveLength(0);
@@ -526,13 +472,7 @@ describe('spellLimits', () => {
         }]
       }));
 
-      const result = await validateSpellSelection(
-        ['Fire Bolt', 'Light', 'Magic Missile', 'Fireball'],
-        mockSpells,
-        'Cleric',
-        1,
-        '5e'
-      );
+      const result = await validateSpellSelection({ selectedSpells: ['Fire Bolt', 'Light', 'Magic Missile', 'Fireball'], allSpells: mockSpells, className: 'Cleric', level: 1, version: '5e' });
 
       expect(result.valid).toBe(false);
       expect(result.violations).toContain('Cantrips: 2/1');

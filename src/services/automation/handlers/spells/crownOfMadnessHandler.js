@@ -10,7 +10,7 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
 import { rollNpcSave } from './charmSpellUtils.js';
 import storage from '../../../ui/storage.js';
 
-function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc, saveResult) {
+function dispatchSaveResult({ campaignName, promptId, targetName, saveType, saveDc, saveResult }) {
     sendSaveResult(campaignName, targetName, {
         promptId,
         success: saveResult.success,
@@ -35,7 +35,7 @@ function dispatchSaveResult(campaignName, promptId, targetName, saveType, saveDc
     }));
 }
 
-async function recordCrownSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult) {
+async function recordCrownSaveSuccess({ campaignName, casterName, action, targetName, dc, saveResult }) {
     await addTargetResult(campaignName, {
         targetName,
         saveResult: 'success',
@@ -80,9 +80,9 @@ async function applyCrownCharm({ campaignName, casterName, action, playerStats, 
         appliedDamage: 0,
     });
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
-    ], campaignName);
+    ], campaignName });
 
     const combatSummary = getCombatSummary(campaignName);
     if (combatSummary) {
@@ -173,13 +173,20 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (targetInfo?.target?.type === 'npc') {
         const creature = targetInfo.cs?.creatures?.find(c => c.name === targetName);
-        dispatchSaveResult(campaignName, promptId, targetName, 'WIS', dc, rollNpcSave(creature, dc, saveAdvantage));
+        dispatchSaveResult({
+    campaignName,
+    promptId,
+    targetName,
+    saveType: 'WIS',
+    saveDc: dc,
+    saveResult: rollNpcSave(creature, dc, saveAdvantage),
+});
     }
 
     const saveResult = await promise;
 
     if (saveResult.success) {
-        return recordCrownSaveSuccess(campaignName, casterName, action, targetName, dc, saveResult);
+        return recordCrownSaveSuccess({ campaignName, casterName, action, targetName, dc, saveResult });
     }
 
     return applyCrownCharm({ campaignName, casterName, action, playerStats, targetName, dc, saveResult });

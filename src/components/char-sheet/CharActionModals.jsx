@@ -61,7 +61,7 @@ const getFlurryTarget = (flurry) => flurry?.targets[flurry.currentIndex] ?? {};
 
 const isMoonlightStepTeleport = (teleportModal) => teleportModal.action?.automation?.effect === 'moonlight_step_teleport';
 
-const handleHealingIllusionConfirm = async (targetName, payload, characters, campaignName, combatSummary, onClose) => {
+const handleHealingIllusionConfirm = async (targetName, { payload, characters, campaignName, combatSummary, onClose }) => {
     const { action, playerStats } = payload;
     const casterName = playerStats.name;
     const stored = getRuntimeValue(casterName, 'activeBuffs', campaignName);
@@ -341,7 +341,14 @@ function CharActionModals({
     const handleDestructiveStrideTargetConfirm = async (targetName) => {
         const payload = mergedModalState.destructiveStrideTargetModal;
         setModalState({ destructiveStrideTargetModal: null });
-        const result = await applyTargetChoice(payload?.action, playerStats, campaignName, targetName, payload?.chosenType, payload?.martialArtsDie);
+        const result = await applyTargetChoice({
+    action: payload?.action,
+    playerStats,
+    campaignName,
+    targetName,
+    chosenType: payload?.chosenType,
+    martialArtsDie: payload?.martialArtsDie,
+});
         if (result?.payload) {
             setPopupHtml(result.payload);
         }

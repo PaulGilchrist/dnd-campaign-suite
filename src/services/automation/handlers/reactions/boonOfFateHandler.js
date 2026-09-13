@@ -81,7 +81,7 @@ export async function handle(action, playerStats, campaignName) {
     };
 }
 
-export async function applyBoonFateChoice(action, playerStats, campaignName, roll2d4, lastAttack, mode) {
+export async function applyBoonFateChoice({ action, playerStats, campaignName, roll2d4, lastAttack, mode }) {
     const playerName = playerStats.name;
     const diceValue = typeof roll2d4 === 'object' ? roll2d4.total : roll2d4;
 

@@ -95,7 +95,7 @@ export function createConcentrationHandlers({
         stripSummonedFromCombatSummary(combatSummary, creatureName)
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
-        logConditionEvent(campaignName, 'removed', creatureName, `Concentration: ${spell}`)
+        logConditionEvent({ campaignName, action: 'removed', creatureName, conditionLabel: `Concentration: ${spell}` })
         cleanupConcentrationEffects(creatureName, spell, campaignName)
     }
 

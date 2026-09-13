@@ -72,7 +72,7 @@ async function executeCharmAction(action, playerStats, campaignName, mapName) {
 }
 
 // Multi-target path: charmPersonTargets array from CreatureSelectionModal
-async function charmMultipleTargets(spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel) {
+async function charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel }) {
     const humanoidTargets = [];
     const nonHumanoidTargets = [];
     for (const targetName of targetNames) {
@@ -139,7 +139,7 @@ export async function triggerCharmPerson(spell, metaCtx, playerStats, campaignNa
 
     const targetNames = metaCtx?.charmPersonTargets;
     if (Array.isArray(targetNames) && targetNames.length > 0) {
-        return await charmMultipleTargets(spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel);
+        return await charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel });
     }
 
     const targetName = metaCtx?.targetName || await resolveCharmTarget(playerStats, campaignName);

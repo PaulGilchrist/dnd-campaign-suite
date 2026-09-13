@@ -152,6 +152,11 @@ async function deactivateWard(playerName, campaignName) {
     }
 }
 
+function rollWardDice(dicePool, preRoll) {
+    const rollResult = preRoll || rollExpression(dicePool.join('+'));
+    return (rollResult ? rollResult.total : 0) || 0;
+}
+
 export async function handleSpendDice(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -192,9 +197,7 @@ export async function handleSpendDice(action, playerStats, campaignName, _mapNam
     const remainingDice = wardDice.slice(diceToSpend);
 
     // Roll the dice (allow pre-rolled result to avoid double-rolling)
-    const preRoll = action.preRollResult;
-    const rollResult = preRoll || rollExpression(dicePool.join('+'));
-    let totalReduction = rollResult?.total || 0;
+    const totalReduction = rollWardDice(dicePool, action.preRollResult);
 
     // Update remaining dice
     await setRuntimeValue(playerName, WARD_DICE_KEY, remainingDice, campaignName);

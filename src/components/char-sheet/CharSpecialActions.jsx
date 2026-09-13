@@ -579,7 +579,14 @@ function useWizardSpellConfirms({ signatureSpellsModal, setSignatureSpellsModal,
     }, [spellMasteryModal, playerStats, campaignName, setPopupHtml, setSpellMasteryModal]);
     const handleSavantConfirm = useCallback(async (spell1, spell2) => {
         if (!savantModal) return;
-        const result = await onSavantSelected(savantModal.action, playerStats, campaignName, spell1, spell2, savantModal.school);
+        const result = await onSavantSelected({
+    action: savantModal.action,
+    playerStats,
+    campaignName,
+    spell1,
+    spell2,
+    school: savantModal.school,
+});
         setSavantModal(null);
         if (result?.type === 'popup') {
             const payload = result.payload;

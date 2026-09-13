@@ -53,7 +53,7 @@ function applySourceGatedDisadvantage(context, characterName, target) {
     }
 }
 
-export async function resolveTarget(characterName, campaignName, context, combatSummary, characters, getKnownManeuvers) {
+export async function resolveTarget({ characterName, campaignName, context, combatSummary, getKnownManeuvers }) {
     const rollType = context?.rollType;
     const isSkillCheckContext = rollType === 'check' || rollType === 'skill' || rollType === 'initiative';
 

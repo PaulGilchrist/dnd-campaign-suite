@@ -10,7 +10,13 @@ export async function handle(action, playerStats, campaignName, _mapName, _chara
     const cs = await getCombatContext(campaignName);
     const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
     const targetName = target?.name || null;
-    return resolveMassFear(campaignName, playerStats.name, targetName, auto, playerStats, _mapName);
+    return resolveMassFear({
+    campaignName,
+    casterName: playerStats.name,
+    primaryTargetName: targetName,
+    option: auto,
+    playerStats,
+});
 }
 
 async function collectFearTargets(cs, casterName, primaryTargetName, primaryTarget, range) {
@@ -25,7 +31,7 @@ async function collectFearTargets(cs, casterName, primaryTargetName, primaryTarg
     return targets;
 }
 
-export async function resolveMassFear(campaignName, casterName, primaryTargetName, option, playerStats, _mapName) {
+function buildMassFearConfig(option, playerStats) {
     const auto = { ...option, saveDc: option.saveDc || 'ability', saveAbility: option.saveAbility || 'WIS' };
     const saveType = option.saveType || 'WIS';
     const dc = buildSaveDc(auto, playerStats);
@@ -33,6 +39,22 @@ export async function resolveMassFear(campaignName, casterName, primaryTargetNam
     const condition = option.condition || 'frightened';
     const conditionLabel = condition.charAt(0).toUpperCase() + condition.slice(1);
     const abilityName = option.name || 'Mass Fear';
+    return { saveType, dc, range, condition, conditionLabel, abilityName };
+}
+
+function applyFearCondition(campaignName, casterName, targetName, condition) {
+    const stored = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(stored) ? stored : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== condition.toLowerCase());
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, condition], campaignName);
+
+    addExpiration({ attackerName: casterName, targetName, effects: [
+        { type: 'condition', condition },
+    ], campaignName });
+}
+
+export async function resolveMassFear({ campaignName, casterName, primaryTargetName, option, playerStats }) {
+    const { saveType, dc, range, condition, conditionLabel, abilityName } = buildMassFearConfig(option, playerStats);
 
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {
@@ -92,14 +114,7 @@ export async function resolveMassFear(campaignName, casterName, primaryTargetNam
             affected++;
             affectedNames.push(targetName);
 
-            const stored = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(stored) ? stored : [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== condition.toLowerCase());
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, condition], campaignName);
-
-            addExpiration(casterName, targetName, [
-                { type: 'condition', condition },
-            ], campaignName);
+            applyFearCondition(campaignName, casterName, targetName, condition);
         }
     }
 

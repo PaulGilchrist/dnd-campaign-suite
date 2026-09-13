@@ -1,4 +1,4 @@
-export function buildResultMessage(actionName, targetName, option, saveDc, saveType, success) {
+export function buildResultMessage({ targetName, option, saveDc, saveType, success }) {
     const effectDesc = getEffectDescription(option);
     if (success) {
         return `${targetName} rolled a ${saveType} save (DC ${saveDc}): <strong>Success</strong>.<br/>No effect applied.`;

@@ -325,7 +325,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
   it('returns no_target when creature is missing from combat', async () => {
     getCombatContext.mockResolvedValue({ creatures: [{ name: casterName, type: 'player' }] });
 
-    const result = await applyObjectTransform('Missing', 'stone_block', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    const result = await applyObjectTransform({
+    targetName: 'Missing',
+    objectType: 'stone_block',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     expect(result).toEqual({ ok: false, reason: 'no_target' });
   });
@@ -334,7 +341,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
     const cs = { creatures: [{ name: targetName, type: 'monster', currentHp: 5, maxHp: 15, ac: 13, speed: '30 ft.' }] };
     getCombatContext.mockResolvedValue(cs);
 
-    const result = await applyObjectTransform(targetName, 'stone_block', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    const result = await applyObjectTransform({
+    targetName,
+    objectType: 'stone_block',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     expect(result.ok).toBe(true);
 
@@ -353,7 +367,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
       return undefined;
     });
 
-    await applyObjectTransform(targetName, 'iron_chain', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'iron_chain',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       targetName,
@@ -371,7 +392,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
       return undefined;
     });
 
-    await applyObjectTransform(targetName, 'iron_chain', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'iron_chain',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     const condCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
       call => call[1] === 'activeConditions' && call[0] === targetName,
@@ -383,7 +411,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
     const cs = { creatures: [{ name: targetName, type: 'monster', currentHp: 5, maxHp: 15, ac: 13, speed: '30 ft.' }] };
     getCombatContext.mockResolvedValue(cs);
 
-    await applyObjectTransform(targetName, 'stone_block', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'stone_block',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
     expect(setCombatSummaryCache).toHaveBeenCalled();
@@ -393,7 +428,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
     const cs = { creatures: [{ name: targetName, type: 'monster', currentHp: 5, maxHp: 15, ac: 13, speed: '30 ft.' }] };
     getCombatContext.mockResolvedValue(cs);
 
-    await applyObjectTransform(targetName, 'wooden_crate', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'wooden_crate',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign',
@@ -428,7 +470,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
       return undefined;
     });
 
-    await applyObjectTransform(targetName, 'stone_block', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'stone_block',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     const effectsCall = vi.mocked(setRuntimeValue).mock.calls.find(call => call[0] === 'campaign' && call[1] === 'targetEffects');
     const effects = effectsCall[2];
@@ -440,7 +489,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
     const cs = { creatures: [{ name: targetName, type: 'monster', currentHp: 5, maxHp: 15, ac: 13, speed: '30 ft.' }, { name: casterName, type: 'player' }] };
     getCombatContext.mockResolvedValue(cs);
 
-    await applyObjectTransform(targetName, 'stone_block', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'stone_block',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     expect(addConcentration).toHaveBeenCalledWith(
       expect.any(Object),
@@ -454,7 +510,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
     const cs = { creatures: [{ name: targetName, type: 'monster', currentHp: 5, maxHp: 15, ac: 13, speed: '30 ft.' }] };
     getCombatContext.mockResolvedValue(cs);
 
-    await applyObjectTransform(targetName, 'stone_block', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'stone_block',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     const transformCalls = vi.mocked(addEntry).mock.calls.filter(call => call[1]?.description.includes('is transformed into an stone_block'));
     expect(transformCalls.length).toBe(1);
@@ -464,7 +527,14 @@ describe('truePolymorphService.applyObjectTransform', () => {
     const cs = { creatures: [{ name: targetName, type: 'monster', currentHp: 5, maxHp: 15, ac: 13, speed: '30 ft.' }] };
     getCombatContext.mockResolvedValue(cs);
 
-    await applyObjectTransform(targetName, 'mystery_type', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'mystery_type',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
 
     const creature = cs.creatures[0];
     expect(creature.polymorphObject.icon).toBe('fa-circle');
@@ -474,16 +544,44 @@ describe('truePolymorphService.applyObjectTransform', () => {
     const cs = { creatures: [{ name: targetName, type: 'monster', currentHp: 5, maxHp: 15, ac: 13, speed: '30 ft.' }] };
     getCombatContext.mockResolvedValue(cs);
 
-    await applyObjectTransform(targetName, 'iron_bars', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'iron_bars',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
     expect(cs.creatures[0].polymorphObject.icon).toBe('fa-grip-lines');
 
-    await applyObjectTransform(targetName, 'glass_vial', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'glass_vial',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
     expect(cs.creatures[0].polymorphObject.icon).toBe('fa-flask');
 
-    await applyObjectTransform(targetName, 'leather_book', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'leather_book',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
     expect(cs.creatures[0].polymorphObject.icon).toBe('fa-book');
 
-    await applyObjectTransform(targetName, 'bronze_statue', casterName, { name: 'True Polymorph' }, campaignName, makePlayerStats());
+    await applyObjectTransform({
+    targetName,
+    objectType: 'bronze_statue',
+    casterName,
+    spell: { name: 'True Polymorph' },
+    campaignName,
+    playerStats: makePlayerStats(),
+});
     expect(cs.creatures[0].polymorphObject.icon).toBe('fa-statue');
   });
 });

@@ -906,7 +906,7 @@ describe('wrathOfTheSeaHandler', () => {
 
             await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 12, ['cold'], campaignName, expect.anything(), { ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 12, ['cold'], { campaignName, characters: expect.anything(), ignoreResistance: false, attackerName: playerName, suppressHpLog: false });
         });
 
         it('manifest leg registers the 10-minute expiration clock (rounds 100)', async () => {
@@ -919,9 +919,7 @@ describe('wrathOfTheSeaHandler', () => {
             const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
 
             expect(result.type).toBe('popup');
-            expect(addExpiration).toHaveBeenCalledWith(
-                playerName, playerName, [{ type: 'wrath_of_the_sea_end' }], campaignName, 100
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'wrath_of_the_sea_end' }], campaignName, rounds: 100 });
         });
 
         it('manifest leg honors the fixed 10_minutes data duration token', async () => {
@@ -937,9 +935,7 @@ describe('wrathOfTheSeaHandler', () => {
             };
             await handle(action, makePlayerStats(), campaignName);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                playerName, playerName, [{ type: 'wrath_of_the_sea_end' }], campaignName, 100
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'wrath_of_the_sea_end' }], campaignName, rounds: 100 });
         });
     });
 });

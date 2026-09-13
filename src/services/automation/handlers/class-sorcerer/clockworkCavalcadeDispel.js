@@ -19,37 +19,51 @@ export async function resolveSpellLevel(effect) {
     return getSpellLevelByName(effect?.spellName || effect?.name || effect?.label || effect?.condition);
 }
 
-export async function dispelSpellsOnTarget(targetName, campaignName) {
-    const removed = { target: targetName, effects: [], buffs: [], conditions: [] };
-
-    const allEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+async function dispelTargetEffects(allEffects, targetName) {
     const kept = [];
+    const removed = [];
     for (const te of allEffects) {
         if (te.target === targetName) {
             const level = await resolveSpellLevel(te);
             if (level != null && level <= 6) {
-                removed.effects.push(te);
+                removed.push(te);
                 continue;
             }
         }
         kept.push(te);
     }
-    if (kept.length !== allEffects.length) {
-        setRuntimeValue('campaign', 'targetEffects', kept, campaignName);
-    }
+    return { kept, removed };
+}
 
-    const buffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
-    const keptBuffs = [];
+async function dispelBuffs(buffs) {
+    const kept = [];
+    const removed = [];
     for (const buff of buffs) {
         const level = await getSpellLevelByName(buff?.spellName || buff?.name);
         if (level != null && level <= 6) {
-            removed.buffs.push(buff);
+            removed.push(buff);
             continue;
         }
-        keptBuffs.push(buff);
+        kept.push(buff);
     }
-    if (keptBuffs.length !== buffs.length) {
-        setRuntimeValue(targetName, 'activeBuffs', keptBuffs, campaignName);
+    return { kept, removed };
+}
+
+export async function dispelSpellsOnTarget(targetName, campaignName) {
+    const removed = { target: targetName, effects: [], buffs: [], conditions: [] };
+
+    const allEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const teSplit = await dispelTargetEffects(allEffects, targetName);
+    removed.effects = teSplit.removed;
+    if (teSplit.kept.length !== allEffects.length) {
+        setRuntimeValue('campaign', 'targetEffects', teSplit.kept, campaignName);
+    }
+
+    const buffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    const buffSplit = await dispelBuffs(buffs);
+    removed.buffs = buffSplit.removed;
+    if (buffSplit.kept.length !== buffs.length) {
+        setRuntimeValue(targetName, 'activeBuffs', buffSplit.kept, campaignName);
     }
 
     const conditionKeys = new Set(

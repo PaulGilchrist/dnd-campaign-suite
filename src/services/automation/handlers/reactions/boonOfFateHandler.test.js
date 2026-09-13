@@ -190,7 +190,14 @@ describe('boonOfFateHandler.applyBoonFateChoice', () => {
     });
 
     it('should set boonOfFateUsed runtime flag before applying modifier', async () => {
-        const result = await applyBoonFateChoice(mockAction, mockPlayerStats, mockCampaignName, { total: 6 }, mockLastAttack, 'bonus');
+        const result = await applyBoonFateChoice({
+    action: mockAction,
+    playerStats: mockPlayerStats,
+    campaignName: mockCampaignName,
+    roll2d4: { total: 6 },
+    lastAttack: mockLastAttack,
+    mode: 'bonus',
+});
 
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'TestFighter', 'boonOfFateUsed', true, mockCampaignName
@@ -200,7 +207,14 @@ describe('boonOfFateHandler.applyBoonFateChoice', () => {
     });
 
     it('should apply modifier as bonus to d20 roll', async () => {
-        const result = await applyBoonFateChoice(mockAction, mockPlayerStats, mockCampaignName, { total: 6 }, mockLastAttack, 'bonus');
+        const result = await applyBoonFateChoice({
+    action: mockAction,
+    playerStats: mockPlayerStats,
+    campaignName: mockCampaignName,
+    roll2d4: { total: 6 },
+    lastAttack: mockLastAttack,
+    mode: 'bonus',
+});
 
         expect(result.payload.description).toContain('+6');
         expect(result.payload.description).toContain('Goblin');
@@ -208,14 +222,28 @@ describe('boonOfFateHandler.applyBoonFateChoice', () => {
     });
 
     it('should apply modifier as penalty to d20 roll', async () => {
-        const result = await applyBoonFateChoice(mockAction, mockPlayerStats, mockCampaignName, { total: 4 }, mockLastAttack, 'penalty');
+        const result = await applyBoonFateChoice({
+    action: mockAction,
+    playerStats: mockPlayerStats,
+    campaignName: mockCampaignName,
+    roll2d4: { total: 4 },
+    lastAttack: mockLastAttack,
+    mode: 'penalty',
+});
 
         expect(result.payload.description).toContain('-4');
         expect(result.payload.description).toContain('Goblin');
     });
 
     it('should log the ability use to campaign log', async () => {
-        await applyBoonFateChoice(mockAction, mockPlayerStats, mockCampaignName, { total: 6 }, mockLastAttack, 'bonus');
+        await applyBoonFateChoice({
+    action: mockAction,
+    playerStats: mockPlayerStats,
+    campaignName: mockCampaignName,
+    roll2d4: { total: 6 },
+    lastAttack: mockLastAttack,
+    mode: 'bonus',
+});
 
         expect(logService.addEntry).toHaveBeenCalledWith(
             mockCampaignName,

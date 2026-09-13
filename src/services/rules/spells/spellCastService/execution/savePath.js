@@ -180,6 +180,14 @@ async function handleAoE({ spell, fullSpell, metaCtx, playerStats, campaignName,
         hasInvisible, overchannelActive, overchannelUseCount, slotLevel });
 }
 
+function hasStatusEffects(spell) {
+    return spell.status_effects && spell.status_effects.length > 0;
+}
+
+function isViciousMockery(spell) {
+    return spell.name && spell.name.toLowerCase() === 'vicious mockery';
+}
+
 function buildSingleTargetSaveContext(target, mapName, { playerStats, metaCtx, fullSpell, spell, effectiveDamageType,
     spellSaveDc, innateSorceryActive, hasInvisible, overchannelActive, overchannelUseCount, soulstitchSelection }) {
     const context = {
@@ -198,14 +206,14 @@ function buildSingleTargetSaveContext(target, mapName, { playerStats, metaCtx, f
         overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
         playerStats,
     };
-    if (spell.status_effects && spell.status_effects.length > 0) {
+    if (hasStatusEffects(spell)) {
         context.statusEffects = spell.status_effects;
     }
     // CLA-377: Vicious Mockery disadvantage must be gated on the RESOLVED save outcome.
     // Stamp the cast in context; the save consumer (handleNpcSaveDamage / save-result
     // event handler) triggers the effect on a failed save only, mirroring the
     // statusEffects-on-fail pattern.
-    if (spell.name && spell.name.toLowerCase() === 'vicious mockery') {
+    if (isViciousMockery(spell)) {
         context.viciousMockerySpell = spell;
         context.viciousMockeryMapName = mapName;
     }
@@ -228,7 +236,7 @@ async function handleSingleTargetSave({ spell, fullSpell, metaCtx, playerStats, 
         : rollExpression(damageFormula);
 
     if (overchannelResult) {
-        rollDamage(spell.name, overchannelFormula || formula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+        rollDamage({ name: spell.name, formula: overchannelFormula || formula, total: overchannelResult.total, rolls: overchannelResult.rolls, modifier: overchannelResult.modifier, context: context });
     }
 }
 

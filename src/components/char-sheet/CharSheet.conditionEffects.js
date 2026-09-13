@@ -200,23 +200,25 @@ function applyPostComputeModifiers({ conditionEffects, activeBuffs, playerSummar
     return { hasTricksterBlessing, buffAllyActive, cloakOfShadowsActive, shieldActive, shieldOfFaithActive, hasteActive, wardingBondAcBonus, wardingBondSaveBonus };
 }
 
+function isWardingBondInRange(buff, playerStats, combatContext) {
+    const casterCreature = combatContext?.creatures?.find(c => c.name === buff.sourceCharacter);
+    const targetCreature = combatContext?.creatures?.find(c => c.name === playerStats?.name);
+    const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
+    return distance === null || isDistanceInRange(distance, 60);
+}
+
 function computeWardingBondBonuses(activeBuffs, playerSummary, playerStats, combatContext) {
     let wardingBondAcBonus = 0;
     let wardingBondSaveBonus = 0;
     for (const buff of activeBuffs) {
         if (buff.effect !== 'warding_bond' || !buff.sourceCharacter) continue;
-        const casterName = buff.sourceCharacter;
-        if (casterName === playerSummary?.name) continue;
-        const casterCreature = combatContext?.creatures?.find(c => c.name === casterName);
-        const targetCreature = combatContext?.creatures?.find(c => c.name === playerStats?.name);
-        const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
-        if (distance === null || isDistanceInRange(distance, 60)) {
-            if (buff.acBonus) {
-                wardingBondAcBonus += buff.acBonus;
-            }
-            if (buff.saveBonus) {
-                wardingBondSaveBonus += buff.saveBonus;
-            }
+        if (buff.sourceCharacter === playerSummary?.name) continue;
+        if (!isWardingBondInRange(buff, playerStats, combatContext)) continue;
+        if (buff.acBonus) {
+            wardingBondAcBonus += buff.acBonus;
+        }
+        if (buff.saveBonus) {
+            wardingBondSaveBonus += buff.saveBonus;
         }
     }
     return { wardingBondAcBonus, wardingBondSaveBonus };

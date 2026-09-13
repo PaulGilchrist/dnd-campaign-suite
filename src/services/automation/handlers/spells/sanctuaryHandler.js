@@ -38,9 +38,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     setRuntimeValue('campaign', 'targetEffects', allTargetEffects, campaignName);
 
     // Expires on initiative roll (when warded target becomes active), short rest, long rest
-    addExpiration(playerName, targetName, [
+    addExpiration({ attackerName: playerName, targetName, effects: [
         { type: 'remove_target_effect', effectKey: EFFECT_KEY, source: playerName },
-    ], campaignName, undefined, targetName);
+    ], campaignName, rounds: undefined, expireOnCreatureName: targetName });
 
     addEntry(campaignName, {
         type: 'ability_use',

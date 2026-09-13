@@ -75,7 +75,7 @@ async function handleSeeInvisibility(spell, metaCtx, playerStats, campaignName, 
     return { handled: false };
 }
 
-async function handleFleshToStone(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleFleshToStone({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'flesh to stone') {
         await triggerFleshToStone(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -83,7 +83,7 @@ async function handleFleshToStone(spell, metaCtx, spellSaveDc, playerStats, camp
     return { handled: false };
 }
 
-async function handleHoldMonster(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleHoldMonster({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && (spell.name.toLowerCase() === 'hold monster' || spell.name.toLowerCase() === 'hold person')) {
         await triggerHoldMonster(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -91,7 +91,7 @@ async function handleHoldMonster(spell, metaCtx, spellSaveDc, playerStats, campa
     return { handled: false };
 }
 
-async function handleBanishment(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleBanishment({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'banishment') {
         await triggerBanishment(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -99,7 +99,7 @@ async function handleBanishment(spell, metaCtx, spellSaveDc, playerStats, campai
     return { handled: false };
 }
 
-async function handleConfusion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleConfusion({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'confusion') {
         await triggerConfusion(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -107,7 +107,7 @@ async function handleConfusion(spell, metaCtx, spellSaveDc, playerStats, campaig
     return { handled: false };
 }
 
-async function handleMaze(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleMaze({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'maze') {
         await triggerMaze(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -115,7 +115,7 @@ async function handleMaze(spell, metaCtx, spellSaveDc, playerStats, campaignName
     return { handled: false };
 }
 
-async function handlePowerWordStun(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handlePowerWordStun({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'power word stun') {
         const pwsResult = await triggerPowerWordStun(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         if (pwsResult) {
@@ -126,7 +126,7 @@ async function handlePowerWordStun(spell, metaCtx, spellSaveDc, playerStats, cam
     return { handled: false };
 }
 
-async function handleHypnoticPattern(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleHypnoticPattern({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'hypnotic pattern') {
         await triggerHypnoticPattern(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -134,7 +134,7 @@ async function handleHypnoticPattern(spell, metaCtx, spellSaveDc, playerStats, c
     return { handled: false };
 }
 
-async function handleSlow(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleSlow({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'slow') {
         await triggerSlow(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -142,7 +142,7 @@ async function handleSlow(spell, metaCtx, spellSaveDc, playerStats, campaignName
     return { handled: false };
 }
 
-async function handleBane(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleBane({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'bane') {
         await triggerBaneSpell(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -150,7 +150,7 @@ async function handleBane(spell, metaCtx, spellSaveDc, playerStats, campaignName
     return { handled: false };
 }
 
-async function handleBless(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleBless({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'bless') {
         await triggerBlessSpell(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -158,7 +158,7 @@ async function handleBless(spell, metaCtx, spellSaveDc, playerStats, campaignNam
     return { handled: false };
 }
 
-async function handleBeaconOfHope(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleBeaconOfHope({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'beacon of hope') {
         await triggerBeaconOfHope(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -166,7 +166,7 @@ async function handleBeaconOfHope(spell, metaCtx, spellSaveDc, playerStats, camp
     return { handled: false };
 }
 
-async function handleMassSuggestion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleMassSuggestion({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'mass suggestion') {
         await triggerMassSuggestion(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -174,7 +174,7 @@ async function handleMassSuggestion(spell, metaCtx, spellSaveDc, playerStats, ca
     return { handled: false };
 }
 
-async function handleSuggestion(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleSuggestion({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'suggestion') {
         await triggerSuggestion(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -182,7 +182,7 @@ async function handleSuggestion(spell, metaCtx, spellSaveDc, playerStats, campai
     return { handled: false };
 }
 
-async function handleCommand(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName) {
+async function handleCommand({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'command') {
         const commandTarget = await getTargetInfo();
         return {
@@ -206,7 +206,7 @@ async function handleCommand(spell, metaCtx, spellSaveDc, getTargetInfo, playerS
     return { handled: false };
 }
 
-async function handleOttoDance(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleOttoDance({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && (spell.name.toLowerCase() === "otto's irresistible dance" || spell.name.toLowerCase() === 'irresistible dance')) {
         await triggerOttoDance(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -214,7 +214,7 @@ async function handleOttoDance(spell, metaCtx, spellSaveDc, playerStats, campaig
     return { handled: false };
 }
 
-async function handleResilientSphere(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleResilientSphere({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && (spell.name.toLowerCase() === "otiluke's resilient sphere" || spell.name.toLowerCase() === 'resilient sphere')) {
         await triggerResilientSphere(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -238,7 +238,7 @@ async function handleExpeditiousRetreat(spell, metaCtx, playerStats, campaignNam
     return { handled: false };
 }
 
-async function handleFriends(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName) {
+async function handleFriends({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'friends') {
         const friendsTarget = await getTargetInfo();
         const friendsMetaCtx = { ...metaCtx, spellSaveDc, targetName: friendsTarget?.name };
@@ -251,7 +251,7 @@ async function handleFriends(spell, metaCtx, spellSaveDc, getTargetInfo, playerS
     return { handled: false };
 }
 
-async function handleCrownOfMadness(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName) {
+async function handleCrownOfMadness({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'crown of madness') {
         const crownTarget = await getTargetInfo();
         const crownResult = await triggerCrownOfMadness(spell, { ...metaCtx, spellSaveDc, targetName: crownTarget?.name }, playerStats, campaignName, mapName);
@@ -263,7 +263,7 @@ async function handleCrownOfMadness(spell, metaCtx, spellSaveDc, getTargetInfo, 
     return { handled: false };
 }
 
-async function handleAnimalFriendship(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleAnimalFriendship({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'animal friendship') {
         const animalFriendshipResult = await triggerAnimalFriendship(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         if (animalFriendshipResult) {
@@ -274,7 +274,7 @@ async function handleAnimalFriendship(spell, metaCtx, spellSaveDc, playerStats, 
     return { handled: false };
 }
 
-async function handleDominateBeast(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName) {
+async function handleDominateBeast({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'dominate beast') {
         const dominateBeastTarget = await getTargetInfo();
         const dominateBeastResult = await triggerDominateBeast(spell, { ...metaCtx, spellSaveDc, targetName: dominateBeastTarget?.name }, playerStats, campaignName, mapName);
@@ -286,7 +286,7 @@ async function handleDominateBeast(spell, metaCtx, spellSaveDc, getTargetInfo, p
     return { handled: false };
 }
 
-async function handleDominateMonster(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName) {
+async function handleDominateMonster({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'dominate monster') {
         const dominateMonsterTarget = await getTargetInfo();
         checkCompelledDuelAttackExpiry(playerStats.name, dominateMonsterTarget?.name, campaignName);
@@ -299,7 +299,7 @@ async function handleDominateMonster(spell, metaCtx, spellSaveDc, getTargetInfo,
     return { handled: false };
 }
 
-async function handleDominatePerson(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName) {
+async function handleDominatePerson({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'dominate person') {
         const dominatePersonTarget = await getTargetInfo();
         checkCompelledDuelAttackExpiry(playerStats.name, dominatePersonTarget?.name, campaignName);
@@ -312,7 +312,7 @@ async function handleDominatePerson(spell, metaCtx, spellSaveDc, getTargetInfo, 
     return { handled: false };
 }
 
-async function handleRayOfEnfeeblement(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName) {
+async function handleRayOfEnfeeblement({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'ray of enfeeblement') {
         const rayTarget = await getTargetInfo();
         checkCompelledDuelAttackExpiry(playerStats.name, rayTarget?.name, campaignName);
@@ -322,7 +322,7 @@ async function handleRayOfEnfeeblement(spell, metaCtx, spellSaveDc, getTargetInf
     return { handled: false };
 }
 
-async function handleCompelledDuel(spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName) {
+async function handleCompelledDuel({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'compelled duel') {
         const duelTarget = await getTargetInfo();
         const duelResult = await triggerCompelledDuel(spell, { ...metaCtx, spellSaveDc, targetName: duelTarget?.name }, playerStats, campaignName, mapName);
@@ -356,7 +356,7 @@ async function handleForcecage(spell, metaCtx, playerStats, campaignName, mapNam
     return { handled: false };
 }
 
-async function handleStinkingCloud(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleStinkingCloud({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'stinking cloud') {
         await triggerStinkingCloud(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -364,7 +364,7 @@ async function handleStinkingCloud(spell, metaCtx, spellSaveDc, playerStats, cam
     return { handled: false };
 }
 
-async function handleSleetStorm(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleSleetStorm({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'sleet storm') {
         await triggerSleetStorm(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true };
@@ -372,7 +372,7 @@ async function handleSleetStorm(spell, metaCtx, spellSaveDc, playerStats, campai
     return { handled: false };
 }
 
-async function handleFaerieFire(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleFaerieFire({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'faerie fire') {
         const ffResult = await triggerFaerieFire(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         if (ffResult) {
@@ -383,7 +383,7 @@ async function handleFaerieFire(spell, metaCtx, spellSaveDc, playerStats, campai
     return { handled: false };
 }
 
-async function handleTashasHideousLaughter(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleTashasHideousLaughter({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === "tasha's hideous laughter") {
         const result = await triggerTashasHideousLaughter(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true, result };
@@ -391,7 +391,7 @@ async function handleTashasHideousLaughter(spell, metaCtx, spellSaveDc, playerSt
     return { handled: false };
 }
 
-async function handleImprisonment(spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName) {
+async function handleImprisonment({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && spell.name.toLowerCase() === 'imprisonment') {
         const result = await triggerImprisonment(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         if (result) {
@@ -468,7 +468,7 @@ async function handleGenericAutomation({ spell, executeHandler, playerStats, cam
     return { handled: false };
 }
 
-async function handleHeroism(spell, playerStats, campaignName, mapName, characters, executeHandler) {
+async function handleHeroism({ spell, playerStats, campaignName, mapName, characters, executeHandler }) {
     if (spell.name && spell.name.toLowerCase() === 'heroism') {
         const action = {
             name: spell.name,
@@ -500,7 +500,7 @@ async function handleLongstrider(spell, playerStats, campaignName, mapName, exec
     return { handled: false };
 }
 
-async function handleSpareTheDying(spell, playerStats, campaignName, mapName, characters, executeHandler) {
+async function handleSpareTheDying({ spell, playerStats, campaignName, mapName, characters, executeHandler }) {
     if (spell.name && spell.name.toLowerCase() === 'spare the dying') {
         const action = {
             name: 'Spare the Dying',
@@ -516,7 +516,7 @@ async function handleSpareTheDying(spell, playerStats, campaignName, mapName, ch
     return { handled: false };
 }
 
-async function handleEnhanceAbility(spell, metaCtx, playerStats, campaignName, mapName, characters, executeHandler) {
+async function handleEnhanceAbility({ spell, metaCtx, playerStats, campaignName, mapName, characters, executeHandler }) {
     if (spell.name && spell.name.toLowerCase() === 'enhance ability') {
         const action = {
             name: spell.name,
@@ -559,7 +559,7 @@ async function handleProtectionFromPoison(spell, playerStats, campaignName, mapN
     return { handled: false };
 }
 
-async function handleResistance(spell, playerStats, campaignName, mapName, characters, executeHandler, metaCtx) {
+async function handleResistance({ spell, playerStats, campaignName, mapName, characters, executeHandler, metaCtx }) {
     if (spell.name && spell.name.toLowerCase() === 'resistance') {
         const action = {
             name: 'Resistance',

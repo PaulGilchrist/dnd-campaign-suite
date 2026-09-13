@@ -134,14 +134,14 @@ describe('createEffectAdderHandlers', () => {
             );
             expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, 'test-campaign');
             expect(setCombatSummary).toHaveBeenCalled();
-            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith(
-                'test-campaign',
-                'applied',
-                'Alice',
-                'Blinded',
-                15,
-                'wis',
-            );
+            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith({
+                campaignName: 'test-campaign',
+                action: 'applied',
+                creatureName: 'Alice',
+                conditionLabel: 'Blinded',
+                dc: 15,
+                ability: 'wis',
+            });
             expect(setEffectAdderTarget).toHaveBeenCalledWith(null);
         });
 
@@ -256,14 +256,14 @@ describe('createEffectAdderHandlers', () => {
                 ]),
                 'test-campaign',
             );
-            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith(
-                'test-campaign',
-                'target-effect-applied',
-                'Alice',
-                'goad',
-                15,
-                'str',
-            );
+            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith({
+                campaignName: 'test-campaign',
+                action: 'target-effect-applied',
+                creatureName: 'Alice',
+                conditionLabel: 'goad',
+                dc: 15,
+                ability: 'str',
+            });
             expect(setEffectAdderTarget).toHaveBeenCalledWith(null);
         });
 
@@ -301,14 +301,14 @@ describe('createEffectAdderHandlers', () => {
         it('should log with dc and ability when provided', () => {
             handlers.handleApplyEffect('effects', { ...effectData, dc: 18, ability: 'dex' });
 
-            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith(
-                'test-campaign',
-                'target-effect-applied',
-                'Alice',
-                'goad',
-                18,
-                'dex',
-            );
+            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith({
+                campaignName: 'test-campaign',
+                action: 'target-effect-applied',
+                creatureName: 'Alice',
+                conditionLabel: 'goad',
+                dc: 18,
+                ability: 'dex',
+            });
         });
     });
 
@@ -338,14 +338,14 @@ describe('createEffectAdderHandlers', () => {
             );
             expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, 'test-campaign');
             expect(setCombatSummary).toHaveBeenCalled();
-            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith(
-                'test-campaign',
-                'concentration-started',
-                'Alice',
-                'Concentration: Shield',
-                13,
-                'con',
-            );
+            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith({
+                campaignName: 'test-campaign',
+                action: 'concentration-started',
+                creatureName: 'Alice',
+                conditionLabel: 'Concentration: Shield',
+                dc: 13,
+                ability: 'con',
+            });
             expect(setEffectAdderTarget).toHaveBeenCalledWith(null);
         });
 

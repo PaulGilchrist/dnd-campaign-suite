@@ -55,7 +55,7 @@ function renderPfE() {
   const cfClearPending = vi.fn(() => { cleared = true })
   const getPending = (type) => (type === 'protectionFromEnergy' && !cleared ? makePending() : null)
   const { result } = renderHook(() =>
-    useTwoStageHandlers(playerStats, CAMPAIGN, cfClearPending, getPending, vi.fn(), [])
+    useTwoStageHandlers({ playerStats: playerStats, campaignName: CAMPAIGN, cfClearPending: cfClearPending, getPending: getPending, setPopupHtml: vi.fn() })
   )
   return { result, playerStats, cfClearPending }
 }

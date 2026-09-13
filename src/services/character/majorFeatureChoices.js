@@ -12,18 +12,16 @@ import { fetchClassData } from '../ui/dataLoader.js';
  *   proficiency_choice objects from major features the character has reached,
  *   with the granting feature's name attached. Empty for 5e or when no major is selected.
  */
-export async function getMajorFeatureProficiencyChoices(formData) {
-  if ((formData.rules || '5e') !== '2024') return [];
-
+async function getSelectedMajor(formData) {
   const className = formData.class?.name;
   const majorName = formData.class?.major?.name || formData.class?.subclass?.name;
-  if (!className || !majorName) return [];
+  if (!className || !majorName) return null;
 
   const classData = await fetchClassData(className, '2024');
-  const major = classData?.majors?.find(m => m.name === majorName);
-  if (!major?.features) return [];
+  return classData?.majors?.find(m => m.name === majorName) || null;
+}
 
-  const level = formData.level || 1;
+function collectFeatureChoices(major, level) {
   const choices = [];
   major.features.forEach(feature => {
     if ((feature.level || 0) <= level && Array.isArray(feature.proficiency_choices)) {
@@ -39,4 +37,13 @@ export async function getMajorFeatureProficiencyChoices(formData) {
     }
   });
   return choices;
+}
+
+export async function getMajorFeatureProficiencyChoices(formData) {
+  if ((formData.rules || '5e') !== '2024') return [];
+
+  const major = await getSelectedMajor(formData);
+  if (!major?.features) return [];
+
+  return collectFeatureChoices(major, formData.level || 1);
 }

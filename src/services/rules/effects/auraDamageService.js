@@ -53,7 +53,7 @@ export async function applyAuraDamage(activeName, playerStats, campaignName, cha
 
         const creatureName = utils.getName(creature.name);
         try {
-            applyDamageToTarget(combatSummary, creatureName, damageValue, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: activeName });
+            applyDamageToTarget(combatSummary, creatureName, damageValue, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: activeName });
         } catch (error) { console.error(`[auraDamage] Failed to apply damage to ${creatureName}:`, error); }
     }
 
@@ -97,7 +97,7 @@ export async function applyHolyNimbusDamage(activeName, characters, campaignName
         if (!inRange) continue;
 
         try {
-            applyDamageToTarget(summary, activeName, damageValue, ['Radiant'], campaignName, characters, { ignoreResistance: false, attackerName: charName });
+            applyDamageToTarget(summary, activeName, damageValue, ['Radiant'], { campaignName, characters: characters, ignoreResistance: false, attackerName: charName });
             damageApplied = true;
         } catch (error) { console.error(`[HolyNimbus] Failed to apply radiant damage to ${activeName}:`, error); }
     }

@@ -147,7 +147,7 @@ describe('useAttackDamageResolution - automations', () => {
             await tick();
 
             expect(testDeps.rollDamage).toHaveBeenCalledOnce();
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d4');
             expect(formula).toContain('radiant');
         });
@@ -214,7 +214,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('2d6');
         });
 
@@ -245,7 +245,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).not.toContain('2d6');
         });
     });
@@ -279,7 +279,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d6');
         });
 
@@ -305,7 +305,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(attack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).not.toContain('1d6');
         });
     });
@@ -336,7 +336,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d8');
         });
 
@@ -368,7 +368,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).not.toContain('1d8 [radiant]');
         });
 
@@ -400,7 +400,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d8');
         });
 
@@ -434,7 +434,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('3d8');
             // Verify the upgraded feature replaced the base feature by checking total damage dice count
             // 3d8 should produce a higher total than 1d8 would alone
@@ -463,7 +463,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d8');
         });
 
@@ -504,7 +504,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('2d6');
             expect(formula).not.toContain('1d8 [radiant]');
         });
@@ -535,7 +535,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('2d10');
         });
 
@@ -562,7 +562,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('3');
         });
     });
@@ -594,7 +594,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d6');
         });
 
@@ -622,7 +622,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = testDeps.rollDamage.mock.calls[0][1];
+            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
             expect(formula).not.toContain('1d6');
         });
     });
@@ -639,7 +639,7 @@ describe('useAttackDamageResolution - automations', () => {
             await tick();
 
             expect(deps.rollDamage).toHaveBeenCalled();
-            const formula = deps.rollDamage.mock.calls[0][1];
+            const formula = deps.rollDamage.mock.calls[0][0].formula;
             expect(formula).toContain('1d8');
         });
 
@@ -657,7 +657,7 @@ describe('useAttackDamageResolution - automations', () => {
             await resolveAttackDamage(baseAttack);
             await tick();
 
-            const formula = deps.rollDamage.mock.calls[0][1];
+            const formula = deps.rollDamage.mock.calls[0][0].formula;
             expect(formula).not.toContain('1d8 [force]');
         });
     });

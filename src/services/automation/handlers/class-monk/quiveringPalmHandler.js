@@ -8,23 +8,43 @@ import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 const QUIVERING_PALM_EFFECT = 'quivering_palm';
 
-function lastAttackRefusal(action, auto, playerName, campaignName, lastAttack, targetName) {
+function lastAttackRefusal({ action, auto, playerName, campaignName, lastAttack, targetName }) {
     if (lastAttack?.attackerName !== playerName) {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — Last attack was not made by ${playerName}.`,
-            `${action.name} — Last attack was not made by you.`);
+        return refusal({
+        action,
+        auto,
+        playerName,
+        campaignName,
+        logDescription: `${action.name} — Last attack was not made by ${playerName}.`,
+        popupDescription: `${action.name} — Last attack was not made by you.`,
+    });
     }
     if (lastAttack?.attackName !== 'Unarmed Strike') {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — Last attack was not an Unarmed Strike.`);
+        return refusal({
+        action,
+        auto,
+        playerName,
+        campaignName,
+        logDescription: `${action.name} — Last attack was not an Unarmed Strike.`,
+    });
     }
     if (!didLastAttackHit(lastAttack)) {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — Last Unarmed Strike did not hit.`);
+        return refusal({
+        action,
+        auto,
+        playerName,
+        campaignName,
+        logDescription: `${action.name} — Last Unarmed Strike did not hit.`,
+    });
     }
     if (!targetName) {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — No target selected.`);
+        return refusal({
+        action,
+        auto,
+        playerName,
+        campaignName,
+        logDescription: `${action.name} — No target selected.`,
+    });
     }
     return null;
 }
@@ -61,7 +81,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-    const refusalResult = lastAttackRefusal(action, auto, playerName, campaignName, lastAttack, targetName);
+    const refusalResult = lastAttackRefusal({ action, auto, playerName, campaignName, lastAttack, targetName });
     if (refusalResult) return refusalResult;
 
     const cost = auto.cost?.amount || 3;
@@ -71,9 +91,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const currentResource = Number(getRuntimeValue(playerName, resource, campaignName) ?? maxResource);
 
     if (currentResource < cost) {
-        return refusal(action, auto, playerName, campaignName,
-            `${action.name} — Not enough ${resourceLabel}. ${currentResource}/${cost} required.`,
-            `Not enough ${resourceLabel}. ${currentResource}/${cost} required.`);
+        return refusal({
+        action,
+        auto,
+        playerName,
+        campaignName,
+        logDescription: `${action.name} — Not enough ${resourceLabel}. ${currentResource}/${cost} required.`,
+        popupDescription: `Not enough ${resourceLabel}. ${currentResource}/${cost} required.`,
+    });
     }
 
     await setRuntimeValue(playerName, resource, currentResource - cost, campaignName);
@@ -113,7 +138,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-function refusal(action, auto, playerName, campaignName, logDescription, popupDescription = logDescription) {
+function refusal({ action, auto, playerName, campaignName, logDescription, popupDescription }) {
+    const popup = popupDescription ?? logDescription;
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
@@ -127,7 +153,7 @@ function refusal(action, auto, playerName, campaignName, logDescription, popupDe
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: popupDescription,
+            description: popup,
             automation: auto,
         },
     };
@@ -213,7 +239,7 @@ function applyShockwaveDamage(campaignName, playerName, targetName, finalDamage,
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
     const cs = getCombatSummary(campaignName);
     if (!cs) return;
-    const applyResult = applyDamageToTarget(cs, targetName, finalDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+    const applyResult = applyDamageToTarget(cs, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
     const actualDamage = applyResult?.finalDamage ?? finalDamage;
     if (actualDamage !== finalDamage) {
         console.error(`[quiveringPalm] Damage adjusted by resistances: ${finalDamage} → ${actualDamage}`);

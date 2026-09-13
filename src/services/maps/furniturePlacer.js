@@ -13,7 +13,7 @@
 import { pick } from './rng.js';
 import { rectCenter, rectContains } from './bspTree.js';
 
-export function placeFurniture(rooms, gridSize, rng, grid, corridorCells, finalDoors) {
+export function placeFurniture({ rooms, gridSize, rng, grid, corridorCells, finalDoors }) {
   const placedItems = [];
 
   for (let r = 0; r < rooms.length; r++) {
@@ -23,9 +23,9 @@ export function placeFurniture(rooms, gridSize, rng, grid, corridorCells, finalD
   for (let r = 0; r < rooms.length; r++) {
     placeTorches(rooms[r], placedItems, gridSize, rng, grid);
     const area = rooms[r].rect.w * rooms[r].rect.h;
-    if (area > 30) addLargeRoomFurniture(rooms[r], placedItems, rng, gridSize, grid, finalDoors);
-    else if (area > 15) addMediumRoomFurniture(rooms[r], placedItems, rng, gridSize, grid, finalDoors);
-    else addSmallRoomFurniture(rooms[r], placedItems, rng, gridSize, grid, finalDoors);
+    if (area > 30) addLargeRoomFurniture({ room: rooms[r], placedItems, rng, gridSize, grid, finalDoors });
+    else if (area > 15) addMediumRoomFurniture({ room: rooms[r], placedItems, rng, gridSize, grid, finalDoors });
+    else addSmallRoomFurniture({ room: rooms[r], placedItems, rng, gridSize, grid, finalDoors });
   }
 
   // Mark occupied positions
@@ -164,7 +164,7 @@ function buildDoorCellSet(finalDoors) {
   return doorCells;
 }
 
-function horizontalWallCandidates(room, wall, rot, doorCells, gridSize, grid) {
+function horizontalWallCandidates({ room, wall, rot, doorCells, gridSize, grid }) {
   const y = wall === 'n' ? room.rect.y : room.rect.y + room.rect.h - 1;
   const wy = wall === 'n' ? room.rect.y - 1 : room.rect.y + room.rect.h;
   const candidates = [];
@@ -177,7 +177,7 @@ function horizontalWallCandidates(room, wall, rot, doorCells, gridSize, grid) {
   return candidates;
 }
 
-function verticalWallCandidates(room, wall, rot, doorCells, gridSize, grid) {
+function verticalWallCandidates({ room, wall, rot, doorCells, gridSize, grid }) {
   const x = wall === 'w' ? room.rect.x : room.rect.x + room.rect.w - 1;
   const wx = wall === 'w' ? room.rect.x - 1 : room.rect.x + room.rect.w;
   const candidates = [];
@@ -190,12 +190,12 @@ function verticalWallCandidates(room, wall, rot, doorCells, gridSize, grid) {
   return candidates;
 }
 
-function placeAgainstWall(room, wall, rng, finalDoors, gridSize, grid) {
+function placeAgainstWall({ room, wall, rng, finalDoors, gridSize, grid }) {
   const rot = wallRotation(wall);
   const doorCells = buildDoorCellSet(finalDoors);
   const candidates = (wall === 'n' || wall === 's')
-    ? horizontalWallCandidates(room, wall, rot, doorCells, gridSize, grid)
-    : verticalWallCandidates(room, wall, rot, doorCells, gridSize, grid);
+    ? horizontalWallCandidates({ room, wall, rot, doorCells, gridSize, grid })
+    : verticalWallCandidates({ room, wall, rot, doorCells, gridSize, grid });
   if (candidates.length > 0) return pick(candidates, rng);
   return null;
 }
@@ -285,7 +285,7 @@ function addLargeRoomBookshelf({ room, placedItems, rng, gridSize, grid, finalDo
   for (let wi = 0; wi < walls.length && !placed; wi++) {
     const idx = Math.floor(rng() * walls.length);
     const w = walls.splice(idx, 1)[0];
-    const pos = placeAgainstWall(room, w, rng, finalDoors, gridSize, grid);
+    const pos = placeAgainstWall({ room, wall: w, rng, finalDoors, gridSize, grid });
     if (pos) {
       placedItems.push({
         id: 'bookshelf-' + room.id,
@@ -300,7 +300,7 @@ function addLargeRoomBookshelf({ room, placedItems, rng, gridSize, grid, finalDo
   }
 }
 
-function addLargeRoomFurniture(room, placedItems, rng, gridSize, grid, finalDoors) {
+function addLargeRoomFurniture({ room, placedItems, rng, gridSize, grid, finalDoors }) {
   const c = rectCenter(room.rect);
   const usedWalls = room._torchWalls || [];
 
@@ -347,7 +347,7 @@ function addLargeRoomFurniture(room, placedItems, rng, gridSize, grid, finalDoor
   placeRoomTrap(room, placedItems, rng, grid, gridSize);
 }
 
-function addMediumRoomFurniture(room, placedItems, rng, gridSize, grid, finalDoors) {
+function addMediumRoomFurniture({ room, placedItems, rng, gridSize, grid, finalDoors }) {
   const c = rectCenter(room.rect);
   const usedWalls = room._torchWalls || [];
   const roll = rng();
@@ -397,7 +397,7 @@ function addMediumRoomFurniture(room, placedItems, rng, gridSize, grid, finalDoo
     for (let wi = 0; wi < walls.length && !placed; wi++) {
       const idx = Math.floor(rng() * walls.length);
       const w = walls.splice(idx, 1)[0];
-      const pos = placeAgainstWall(room, w, rng, finalDoors, gridSize, grid);
+      const pos = placeAgainstWall({ room, wall: w, rng, finalDoors, gridSize, grid });
       if (pos) {
         placedItems.push({
           id: 'bookshelf-' + room.id,
@@ -456,7 +456,7 @@ function placeRoomTrap(room, placedItems, rng, grid, _gridSize) {
   });
 }
 
-function addSmallRoomFurniture(room, placedItems, rng, gridSize, grid, _finalDoors) {
+function addSmallRoomFurniture({ room, placedItems, rng, gridSize, grid }) {
   const c = rectCenter(room.rect);
   const usedWalls = room._torchWalls || [];
   const roll = rng();

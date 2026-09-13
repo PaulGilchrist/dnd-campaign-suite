@@ -100,10 +100,10 @@ export async function applyProtectionFromPoison(action, playerStats, campaignNam
     // (RAW 2024 Protection from Poison does not require concentration).
 
     // Register expiration: expires on initiative roll, short rest, long rest
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_active_buff', buffName: SPELL_NAME },
         { type: 'remove_target_effect', effectKey: EFFECT_KEY, source: casterName },
-    ], campaignName, Infinity, targetName);
+    ], campaignName, rounds: Infinity, expireOnCreatureName: targetName });
 
     // Log to campaign
     await addEntry(campaignName, {

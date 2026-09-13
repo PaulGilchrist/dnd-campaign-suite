@@ -97,14 +97,9 @@ describe('spellCastHandler - Mantle of Majesty', () => {
       expect.objectContaining({ name: 'Mantle of Majesty' }),
     ]), campaignName);
 
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'GlamourBard',
-      'GlamourBard',
-      expect.arrayContaining([
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'GlamourBard', targetName: 'GlamourBard', effects: expect.arrayContaining([
         expect.objectContaining({ type: 'remove_active_buff', buffName: 'Mantle of Majesty' }),
-      ]),
-      campaignName,
-    );
+      ]), campaignName });
 
     expect(combatData.getCombatSummary).toHaveBeenCalledWith(campaignName);
     expect(concentrationService.addConcentration).toHaveBeenCalledWith(

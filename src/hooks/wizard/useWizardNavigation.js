@@ -39,7 +39,7 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
   }, [formData.class, classSubtypes]);
 
   const navigateNext = useCallback(async () => {
-    const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
+    const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset });
     if (Object.keys(stepErrors).length === 0) {
       setCurrentStep(prev => prev + 1);
       return true;
@@ -57,7 +57,7 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
 
   useEffect(() => {
     const checkValidation = async () => {
-      const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
+      const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset });
       setIsNextDisabled(Object.keys(stepErrors).length > 0);
     };
     checkValidation();
@@ -65,7 +65,7 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
 
   useEffect(() => {
     const checkStep2 = async () => {
-      const step2Errors = await validateStep(2, formData, {}, racesData, classSubtypes, ruleset);
+      const step2Errors = await validateStep(2, formData, { racesData, classSubtypes, ruleset });
       setStep2Valid(Object.keys(step2Errors).length === 0);
     };
     checkStep2();

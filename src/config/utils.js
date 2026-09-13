@@ -170,13 +170,13 @@ const stepValidators = {
  * Validate step data (async version that loads rules from JSON)
  * @param {number} step - Current step number
  * @param {object} formData - Form data
- * @param {object} errors - Existing errors
- * @param {array} racesData - Races data
- * @param {array} classSubtypes - Class subtypes data
- * @param {string} ruleset - '5e' or '2024'
+ * @param {object} context - Validation context
+ * @param {array} context.racesData - Races data
+ * @param {array} context.classSubtypes - Class subtypes data
+ * @param {string} context.ruleset - '5e' or '2024'
  * @returns {Promise<object>} - New errors object
  */
-export async function validateStep(step, formData, errors, racesData = [], classSubtypes = [], ruleset) {
+export async function validateStep(step, formData, { racesData = [], classSubtypes = [], ruleset } = {}) {
   const validator = stepValidators[step];
   if (!validator) return {};
   return validator(formData, { racesData, classSubtypes, ruleset });

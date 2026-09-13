@@ -50,9 +50,9 @@ async function applyCrusherEnhancedCritical(ctx, ps) {
   if (!t?.name) return;
   const effs = getRuntimeValue('campaign', 'targetEffects') || [];
   setRuntimeValue('campaign', 'targetEffects', [...effs, { target: t.name, source: cc.name, effect: 'crusher_enhanced_critical', duration: 'until_start_of_next_turn' }], ctx.campaignName);
-  addExpiration(ps.name, t.name, [
+  addExpiration({ attackerName: ps.name, targetName: t.name, effects: [
     { type: 'remove_target_effect', effectKey: 'crusher_enhanced_critical', source: cc.name }
-  ], ctx.campaignName, undefined, ps.name);
+  ], campaignName: ctx.campaignName, rounds: undefined, expireOnCreatureName: ps.name });
   await addEntry(ctx.campaignName, {
     type: 'ability_use',
     characterName: ps.name,

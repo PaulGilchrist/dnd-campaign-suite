@@ -64,17 +64,12 @@ describe('passWithoutTraceHandler', () => {
                 }),
                 CAMPAIGN
             )
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Rogue',
-                'Rogue',
-                expect.arrayContaining([
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Rogue', targetName: 'Rogue', effects: expect.arrayContaining([
                     expect.objectContaining({
                         type: 'remove_active_buff',
                         buffName: 'Pass Without Trace',
                     }),
-                ]),
-                CAMPAIGN
-            )
+                ]), campaignName: CAMPAIGN })
             expect(result).toEqual({
                 type: 'popup',
                 payload: expect.objectContaining({
@@ -100,17 +95,12 @@ describe('passWithoutTraceHandler', () => {
                 expect.objectContaining({ auraRange: 60 }),
                 CAMPAIGN
             )
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Rogue',
-                'Rogue',
-                expect.arrayContaining([
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Rogue', targetName: 'Rogue', effects: expect.arrayContaining([
                     expect.objectContaining({
                         type: 'remove_active_buff',
                         buffName: 'Pass Without Trace',
                     }),
-                ]),
-                CAMPAIGN
-            )
+                ]), campaignName: CAMPAIGN })
             expect(result.payload.auraRange).toBe(60)
         })
 
@@ -129,17 +119,12 @@ describe('passWithoutTraceHandler', () => {
                 }),
                 CAMPAIGN
             )
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Rogue',
-                'Rogue',
-                expect.arrayContaining([
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Rogue', targetName: 'Rogue', effects: expect.arrayContaining([
                     expect.objectContaining({
                         type: 'remove_active_buff',
                         buffName: 'Pass Without Trace',
                     }),
-                ]),
-                CAMPAIGN
-            )
+                ]), campaignName: CAMPAIGN })
             expect(result).toEqual({
                 type: 'popup',
                 payload: {

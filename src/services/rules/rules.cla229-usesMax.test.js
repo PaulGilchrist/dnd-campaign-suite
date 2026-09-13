@@ -187,7 +187,7 @@ describe('rules getPlayerStats — uses_expression pools re-resolve after abilit
   }
 
   it('automation free_spell usesMax reflects the WIS modifier, not the collect-time floor of 1', async () => {
-    const result = await rules.getPlayerStats([], [], [], [], [], feyRangerSummary)
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: feyRangerSummary })
 
     expect(result.abilities.find(a => a.name === 'Wisdom').bonus).toBe(3)
     const pool = result.automation.specialActions.find(a => a.type === 'free_spell' && a.name === 'Misty Wanderer')
@@ -206,7 +206,7 @@ describe('rules getPlayerStats — uses_expression pools re-resolve after abilit
       specialActions: [{ type: 'free_spell', name: 'Fey Magic', spell: 'Misty Step', uses: 1, recharge: 'long_rest', hasAutomation: true }],
     }))
 
-    const result = await rules.getPlayerStats([], [], [], [], [], feyRangerSummary)
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary: feyRangerSummary })
 
     const pool = result.automation.specialActions.find(a => a.name === 'Fey Magic')
     expect(pool.uses).toBe(1)

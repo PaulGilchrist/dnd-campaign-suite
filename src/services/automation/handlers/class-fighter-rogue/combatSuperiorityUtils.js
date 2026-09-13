@@ -153,16 +153,16 @@ export function buildNoDiceRemainingPopup(maneuverName) {
     };
 }
 
-export async function processManeuverSaveResult(maneuver, targetName, saveDc, success, playerStats, campaignName) {
+export async function processManeuverSaveResult({ maneuver, targetName, saveDc, success, playerStats, campaignName }) {
     let description = '';
     if (!success) {
         if (maneuver.effect === 'frightened') {
             description += ` ${targetName} is Frightened until the end of your next turn.`;
             const cs = await getCombatContext(campaignName);
             applyConditionToTarget({ targetName, conditionKey: 'frightened', campaignName, combatSummary: cs, saveDc, saveType: maneuver.saveType, playerStats });
-            await addExpiration(playerStats.name, targetName, [
+            await addExpiration({ attackerName: playerStats.name, targetName, effects: [
                 { type: 'condition', condition: 'frightened' },
-            ], campaignName, 2);
+            ], campaignName, rounds: 2 });
         } else if (maneuver.effect === 'disarm') {
             description += ` ${targetName} dropped the object it was holding.`;
         } else if (maneuver.effect === 'push') {
@@ -236,9 +236,9 @@ export async function executeBaitAndSwitchChoice(action, playerStats, campaignNa
     await setRuntimeValue(chosenName, 'baitAndSwitchActive', true, campaignName);
     await setRuntimeValue(chosenName, 'baitAndSwitchBonus', dieValue, campaignName);
     await setRuntimeValue(chosenName, 'baitAndSwitchSource', maneuverName, campaignName);
-    await addExpiration(playerStats.name, chosenName, [
+    await addExpiration({ attackerName: playerStats.name, targetName: chosenName, effects: [
         { type: 'bait_and_switch_clear' }
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
 
     const description = `${maneuverName}: ${chosenName} gains +${dieValue} AC until the start of ${playerStats.name}'s next turn.`;
 
@@ -316,9 +316,9 @@ export async function executeRallyChoice({ action, playerStats, campaignName, ch
 
     setTempHp(chosenName, totalHp, campaignName);
 
-    await addExpiration(playerStats.name, chosenName, [
+    await addExpiration({ attackerName: playerStats.name, targetName: chosenName, effects: [
         { type: 'rally_clear' }
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
 
     const logEntry = {
         type: 'ability_use',
@@ -420,7 +420,7 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
 async function sweepSecondTarget({ playerStats, campaignName, secondaryTargetName, targetName, dieValue, damageType, attackTotal, secondAc }) {
     const cs = await getCombatContext(campaignName);
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    const applyResult = await applyDamageToTarget(cs, secondaryTargetName, dieValue, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerStats.name });
+    const applyResult = await applyDamageToTarget(cs, secondaryTargetName, dieValue, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name });
     const actualDamage = applyResult?.finalDamage ?? dieValue;
 
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];

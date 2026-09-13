@@ -6,6 +6,57 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 
+async function massSuggestionSavedLeg({ campaignName, casterName, targetName, dc, saveResult }) {
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-mass-suggestion',
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: true,
+        description: `${targetName} succeeded on WIS save against Mass Suggestion.`,
+    }).catch((e) => { console.error("[massSuggestion] Error:", e); });
+}
+
+async function massSuggestionAffectedLeg({ campaignName, casterName, targetName, saveResult }) {
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
+
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: ['charmed'],
+        appliedDamage: 0,
+    });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Charmed',
+        reason: 'Mass Suggestion spell',
+        note: `${targetName} is Charmed by Mass Suggestion and pursues the suggested course of activity. The spell ends if ${casterName} or allies deal damage to the target.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[massSuggestion] Error:", e); });
+
+    addExpiration({ attackerName: casterName, targetName, effects: [
+        { type: 'charmed', condition: 'charmed' },
+    ], campaignName });
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -66,55 +117,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         if (saveResult.success) {
             savedCount++;
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'success',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: casterName,
-                rollType: 'save-mass-suggestion',
-                targetName,
-                saveDc: dc,
-                saveType: 'WIS',
-                success: true,
-                description: `${targetName} succeeded on WIS save against Mass Suggestion.`,
-            }).catch((e) => { console.error("[massSuggestion] Error:", e); });
+            await massSuggestionSavedLeg({ campaignName, casterName, targetName, dc, saveResult });
         } else {
             affectedCount++;
-
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, 'charmed'], campaignName);
-
-            await addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: saveResult.roll ?? 0,
-                total: saveResult.total ?? 0,
-                conditions: ['charmed'],
-                appliedDamage: 0,
-            });
-
-            addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: 'Charmed',
-                reason: 'Mass Suggestion spell',
-                note: `${targetName} is Charmed by Mass Suggestion and pursues the suggested course of activity. The spell ends if ${casterName} or allies deal damage to the target.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[massSuggestion] Error:", e); });
-
-            addExpiration(casterName, targetName, [
-                { type: 'charmed', condition: 'charmed' },
-            ], campaignName);
-
+            await massSuggestionAffectedLeg({ campaignName, casterName, targetName, saveResult });
             results.push(`${targetName} is Charmed by Mass Suggestion.`);
         }
     }

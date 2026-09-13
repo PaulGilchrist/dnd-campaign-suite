@@ -32,7 +32,7 @@ function gateFirstRoundOnly(action, auto) {
     return null;
 }
 
-function gateUsesRemaining(action, auto, playerStats, campaignName, usesMax, resourceKey) {
+function gateUsesRemaining({ action, auto, playerStats, campaignName, usesMax, resourceKey }) {
     if (usesMax <= 0) return null;
     const usesUsed = Number(getRuntimeValue(playerStats.name, resourceKey, campaignName) ?? usesMax);
     if (usesUsed > 0) return null;
@@ -74,7 +74,7 @@ export async function handle(action, playerStats, campaignName) {
     const roundRefusal = gateFirstRoundOnly(action, auto);
     if (roundRefusal) return roundRefusal;
 
-    const usesRefusal = gateUsesRemaining(action, auto, playerStats, campaignName, usesMax, resourceKey);
+    const usesRefusal = gateUsesRemaining({ action, auto, playerStats, campaignName, usesMax, resourceKey });
     if (usesRefusal) return usesRefusal;
 
     const turnRefusal = await gateOncePerTurn(action, auto, playerStats, campaignName);

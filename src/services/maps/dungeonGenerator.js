@@ -39,7 +39,7 @@ export function generateDungeon(opts) {
   const { trimmedDoors } = placeDoors(rooms, gridSize, rng, corridorCells, grid);
 
   // ---- 5. Place furniture ----
-  const placedItems = placeFurniture(rooms, gridSize, rng, grid, corridorCells, trimmedDoors);
+  const placedItems = placeFurniture({ rooms, gridSize, rng, grid, corridorCells, finalDoors: trimmedDoors });
 
   // ---- 6-7. Place NPCs, stairs, doors, deduplicate ----
   const dedupedItems = placeItems({ rooms, placedItems, gridSize, rng, grid, trimmedDoors, corridorCells });

@@ -294,7 +294,7 @@ describe('executeSpellCast', () => {
       await executeSpellCast(makeSpell(), makeMetaCtx({ slotLevel: 3 }), services)
 
       expect(services.rollDamage).toHaveBeenCalled()
-      expect(services.rollDamage.mock.calls[0][1]).toBe('8d6')
+      expect(services.rollDamage.mock.calls[0][0].formula).toBe('8d6')
     })
 
     it('uses damage_at_character_level for cantrips', async () => {
@@ -311,7 +311,7 @@ describe('executeSpellCast', () => {
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 0 }), services)
 
       expect(services.rollDamage).toHaveBeenCalled()
-      expect(services.rollDamage.mock.calls[0][1]).toBe('1d10')
+      expect(services.rollDamage.mock.calls[0][0].formula).toBe('1d10')
     })
   })
 
@@ -326,7 +326,7 @@ describe('executeSpellCast', () => {
 
       // 8 + Int bonus(5) + proficiency(4) = 17
       expect(services.rollDamage).toHaveBeenCalled()
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.saveDc).toBe(17)
     })
 
@@ -339,7 +339,7 @@ describe('executeSpellCast', () => {
       })
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.saveDc).toBe(17)
     })
 
@@ -350,7 +350,7 @@ describe('executeSpellCast', () => {
       const services = makeServices()
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.saveDc).toBe(18)
     })
   })
@@ -364,7 +364,7 @@ describe('executeSpellCast', () => {
       const services = makeServices()
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.saveType).toBe('dex')
       expect(ctx.dcSuccess).toBe('half')
     })
@@ -377,7 +377,7 @@ describe('executeSpellCast', () => {
         services,
       )
 
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.statusEffects).toEqual(['poisoned', 'paralyzed'])
     })
   })
@@ -429,7 +429,7 @@ describe('executeSpellCast', () => {
       const services = makeServices()
       await executeSpellCast(makeSpell({ school: 'Evocation' }), makeMetaCtx(), services)
 
-      expect(services.rollDamage.mock.calls[0][1]).toContain('+ 5')
+      expect(services.rollDamage.mock.calls[0][0].formula).toContain('+ 5')
     })
   })
 
@@ -475,7 +475,7 @@ describe('executeSpellCast', () => {
       })
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.isAutoMiss).toBe(true)
       expect(ctx.rangeReason).toBe('Out of range')
     })
@@ -508,7 +508,7 @@ describe('executeSpellCast', () => {
       })
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
 
-      const ctx = services.rollDamage.mock.calls[0][5]
+      const ctx = services.rollDamage.mock.calls[0][0].context
       expect(ctx.metamagicHeighten).toBe(true)
     })
   })

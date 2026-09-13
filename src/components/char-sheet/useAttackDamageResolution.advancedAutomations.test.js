@@ -156,9 +156,9 @@ describe('useAttackDamageResolution - advanced automations', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalled();
-            const call = mockRollDamage.mock.calls[0];
-            const formula = call[1];
-            const total = call[2];
+            const call = mockRollDamage.mock.calls[0][0];
+            const formula = call.formula;
+            const total = call.total;
 
             expect(formula).toContain('4 [Cantrip]');
             expect(total).toBe(9);
@@ -178,7 +178,7 @@ describe('useAttackDamageResolution - advanced automations', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalled();
-            const formula = mockRollDamage.mock.calls[0][1];
+            const formula = mockRollDamage.mock.calls[0][0].formula;
             expect(formula).not.toContain('[Cantrip]');
         });
 
@@ -210,7 +210,7 @@ describe('useAttackDamageResolution - advanced automations', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalled();
-            const formula = mockRollDamage.mock.calls[0][1];
+            const formula = mockRollDamage.mock.calls[0][0].formula;
             expect(formula).not.toContain('[Cantrip]');
         });
 
@@ -250,7 +250,7 @@ describe('useAttackDamageResolution - advanced automations', () => {
             await tick();
 
             expect(mockRollDamage).toHaveBeenCalled();
-            const formula = mockRollDamage.mock.calls[0][1];
+            const formula = mockRollDamage.mock.calls[0][0].formula;
             expect(formula).not.toContain('[Cantrip]');
         });
     });

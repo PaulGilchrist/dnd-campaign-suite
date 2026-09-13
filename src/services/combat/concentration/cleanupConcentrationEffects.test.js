@@ -397,13 +397,13 @@ describe('cleanupConcentrationEffects', () => {
             [],
             'TestCampaign'
         )
-        expect(logConditionEvent).toHaveBeenCalledWith(
-            'TestCampaign',
-            'removed',
-            'Bob',
-            'Paralyzed',
-            'Concentration lost by Alice'
-        )
+        expect(logConditionEvent).toHaveBeenCalledWith({
+            campaignName: 'TestCampaign',
+            action: 'removed',
+            creatureName: 'Bob',
+            conditionLabel: 'Paralyzed',
+            dc: 'Concentration lost by Alice'
+        })
     })
 
     it('removes conditions from targetEffects with conditions array', () => {
@@ -426,13 +426,13 @@ describe('cleanupConcentrationEffects', () => {
             expect.arrayContaining(['Poisoned']),
             'TestCampaign'
         )
-        expect(logConditionEvent).toHaveBeenCalledWith(
-            'TestCampaign',
-            'removed',
-            'Bob',
-            expect.any(String),
-            'Concentration lost by Alice'
-        )
+        expect(logConditionEvent).toHaveBeenCalledWith({
+            campaignName: 'TestCampaign',
+            action: 'removed',
+            creatureName: 'Bob',
+            conditionLabel: expect.any(String),
+            dc: 'Concentration lost by Alice'
+        })
     })
 
     it('does not remove conditions if target still has another effect with same condition', () => {

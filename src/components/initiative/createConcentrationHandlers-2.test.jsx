@@ -88,12 +88,12 @@ describe('createConcentrationHandlers', () => {
             expect(breakConcentration).toHaveBeenCalledWith(mockCombatSummary, 'Alice');
             expect(storage.set).toHaveBeenCalledWith('combatSummary', mockCombatSummary, 'test-campaign');
             expect(mockSetCombatSummary).toHaveBeenCalled();
-            expect(logConditionEvent).toHaveBeenCalledWith(
-                'test-campaign',
-                'removed',
-                'Alice',
-                'Concentration: Fireball'
-            );
+            expect(logConditionEvent).toHaveBeenCalledWith({
+                campaignName: 'test-campaign',
+                action: 'removed',
+                creatureName: 'Alice',
+                conditionLabel: 'Concentration: Fireball'
+            });
             expect(cleanupConcentrationEffects).toHaveBeenCalledWith(
                 'Alice',
                 'Fireball',

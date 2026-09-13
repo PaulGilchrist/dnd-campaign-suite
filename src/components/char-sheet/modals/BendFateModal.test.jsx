@@ -200,14 +200,14 @@ describe('BendFateModal', () => {
       renderModal(baseProps);
       fireEvent.click(screen.getByRole('button', { name: 'Apply +3 (Bonus)' }));
       await waitFor(() => {
-        expect(reactionBonusHandler.applyBendFateChoice).toHaveBeenCalledWith(
-          baseAction,
-          basePlayerStats,
-          baseProps.campaignName,
-          baseD4Roll,
-          baseLastAttack,
-          'bonus',
-        );
+        expect(reactionBonusHandler.applyBendFateChoice).toHaveBeenCalledWith({
+              action: baseAction,
+              playerStats: basePlayerStats,
+              campaignName: baseProps.campaignName,
+              d4Roll: baseD4Roll,
+              lastAttack: baseLastAttack,
+              mode: 'bonus',
+          });
       });
     });
   });

@@ -20,7 +20,7 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
         if (dcSuccess === 'half') return success ? Math.floor(damage / 2) : damage;
         return damage;
     }),
-    computeDamageAfterResistancesWithDetails: vi.fn((damage) => ({ finalDamage: damage })),
+    computeDamageAfterResistancesWithDetails: vi.fn(({ rawDamage }) => ({ finalDamage: rawDamage })),
     applyDamageToTarget: vi.fn(),
 }));
 

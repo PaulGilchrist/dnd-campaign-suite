@@ -191,18 +191,13 @@ describe('compelledDuelHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addExpiration).toHaveBeenCalledWith(
-                'Paladin',
-                'Goblin',
-                [
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Paladin', targetName: 'Goblin', effects: [
                     {
                         type: 'remove_target_effect',
                         effectKey: 'compelled_duel',
                         source: 'Paladin',
                     },
-                ],
-                'test-campaign',
-            );
+                ], campaignName: 'test-campaign' });
         });
 
         it('posts a condition log entry for the effect', async () => {

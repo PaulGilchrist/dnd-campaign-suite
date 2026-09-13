@@ -165,12 +165,12 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
     it('writes lastAttack with full context on plain damage', async () => {
         const fn = createFn();
 
-        await fn('Fire Bolt', '1d10', 5, [5], 0, {
+        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
             attackerName: 'TestFighter',
             targetName: 'Goblin',
             damageType: 'fire',
             attackName: 'Fire Bolt',
-        });
+        } });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -204,12 +204,12 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
         });
 
         const fn = createFn();
-        await fn('Fire Bolt', '1d10', 5, [5], 0, {
+        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
             attackerName: 'TestFighter',
             targetName: 'Goblin',
             damageType: 'fire',
             attackName: 'Fire Bolt',
-        });
+        } });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -235,12 +235,12 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
     it('writes lastAttack with damageApplied=false on auto-miss', async () => {
         const fn = createFn();
 
-        await fn('Fire Bolt', '1d10', 0, [], 0, {
+        await fn({ name: 'Fire Bolt', formula: '1d10', total: 0, rolls: [], modifier: 0, context: {
             attackerName: 'TestFighter',
             targetName: 'Goblin',
             damageType: 'fire',
             isAutoMiss: true,
-        });
+        } });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -286,12 +286,12 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
         const { sendSavePrompt } = await import('../../services/combat/conditions/savePromptService.js');
 
         const fn = createFn();
-        const fnPromise = fn('Fire Bolt', '1d10', 5, [5], 0, {
+        const fnPromise = fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
             targetName: 'Goblin',
             damageType: 'fire',
             saveDc: 13,
             saveType: 'DEX',
-        });
+        } });
 
         // Wait for sendSavePrompt to be called, then dispatch failure
         await new Promise((r) => setTimeout(r, 200));
@@ -323,11 +323,11 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
             creatures: [{ name: 'Goblin', type: 'npc', currentHp: 13, maxHp: 13 }],
         });
 
-        await fn('Magic Missile', '1d4+1', 5, [4, 1], 0, {
+        await fn({ name: 'Magic Missile', formula: '1d4+1', total: 5, rolls: [4, 1], modifier: 0, context: {
             attackerName: 'TestFighter',
             targetName: 'Goblin',
             damageType: 'force',
-        });
+        } });
 
         // Immune path shows popup with 0 finalDamage but does NOT write lastAttack
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
@@ -356,12 +356,12 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
         });
 
         const fn = createFn();
-        await fn('Fire Bolt', '1d10', 5, [5], 0, {
+        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
             attackerName: 'TestFighter',
             targetName: 'NonExistent',
             damageType: 'fire',
             attackName: 'Fire Bolt',
-        });
+        } });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -381,13 +381,13 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
     it('writes lastAttack with doubled rolls on critical hit', async () => {
         const fn = createFn();
 
-        await fn('Fire Bolt', '1d10', 15, [5, 5], 0, {
+        await fn({ name: 'Fire Bolt', formula: '1d10', total: 15, rolls: [5, 5], modifier: 0, context: {
             attackerName: 'TestFighter',
             targetName: 'Goblin',
             damageType: 'fire',
             attackName: 'Fire Bolt',
             isAutoCrit: true,
-        });
+        } });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -409,10 +409,10 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
     it('does not write lastAttack when context is missing damageType', async () => {
         const fn = createFn();
 
-        await fn('Fire Bolt', '1d10', 5, [5], 0, {
+        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
             targetName: 'Goblin',
             // no damageType
-        });
+        } });
 
         // The main function only writes lastAttack when popupData.rolls &&
         // popupData.damageType are both truthy. Without damageType, it should
@@ -429,10 +429,10 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
     it('writes lastAttack with undefined targetName when context has no target', async () => {
         const fn = createFn();
 
-        await fn('Fire Bolt', '1d10', 5, [5], 0, {
+        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
             attackerName: 'TestFighter',
             damageType: 'fire',
-        });
+        } });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',

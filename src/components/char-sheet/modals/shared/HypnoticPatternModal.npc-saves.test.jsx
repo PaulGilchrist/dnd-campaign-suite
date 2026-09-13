@@ -122,16 +122,11 @@ describe('HypnoticPatternModal - NPC Saves', () => {
             await setupNpcSave();
 
             await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith(
-                    'Wizard1',
-                    'Goblin',
-                    [
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Goblin', effects: [
                         { type: 'charmed', condition: 'charmed' },
                         { type: 'incapacitated', condition: 'incapacitated' },
                         { type: 'speed_zero', condition: 'speed_zero' },
-                    ],
-                    campaignName,
-                );
+                    ], campaignName });
             });
         });
     });

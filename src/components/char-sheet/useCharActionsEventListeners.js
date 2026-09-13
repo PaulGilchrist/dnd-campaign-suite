@@ -47,7 +47,7 @@ export default function useCharActionsEventListeners({
                     targetName,
                     attackerName,
                 };
-                rollDamage(name, bonusFormula, bonusTotal, bonusRolls, 0, context);
+                rollDamage({ name: name, formula: bonusFormula, total: bonusTotal, rolls: bonusRolls, modifier: 0, context: context });
                 if (usedKey) {
                     setRuntimeValue(playerName, usedKey, currentRound, campaignName);
                 }

@@ -152,7 +152,7 @@ describe('spellCastService', () => {
         })
 
         expect(rollDamageSpy).toHaveBeenCalled()
-        const context = rollDamageSpy.mock.calls[0][5]
+        const context = rollDamageSpy.mock.calls[0][0].context
         expect(context.saveDc).toBe(13)
       })
 
@@ -174,7 +174,7 @@ describe('spellCastService', () => {
 
         // 8 + proficiency(4) = 12
         expect(rollDamageSpy).toHaveBeenCalled()
-        const context = rollDamageSpy.mock.calls[0][5]
+        const context = rollDamageSpy.mock.calls[0][0].context
         expect(context.saveDc).toBe(12)
       })
 
@@ -220,7 +220,7 @@ describe('spellCastService', () => {
         })
 
         expect(rollDamageSpy).toHaveBeenCalled()
-        const context = rollDamageSpy.mock.calls[0][5]
+        const context = rollDamageSpy.mock.calls[0][0].context
         expect(context.isAutoMiss).toBe(true)
       })
     })
@@ -250,7 +250,7 @@ describe('spellCastService', () => {
         })
 
         expect(rollDamageSpy).toHaveBeenCalled()
-        const formula = rollDamageSpy.mock.calls[0][1]
+        const formula = rollDamageSpy.mock.calls[0][0].formula
         expect(formula).toContain('Empowered Evocation')
       })
     })
@@ -279,7 +279,7 @@ describe('spellCastService', () => {
         })
 
         expect(rollDamageSpy).toHaveBeenCalled()
-        const context = rollDamageSpy.mock.calls[0][5]
+        const context = rollDamageSpy.mock.calls[0][0].context
         expect(context.overchannelActive).toBe(true)
         expect(context.overchannelSpellLevel).toBe(3)
         expect(runtimeStateMock.setRuntimeValue).toHaveBeenCalledWith(

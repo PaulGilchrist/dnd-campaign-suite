@@ -390,10 +390,7 @@ describe('prismaticSprayHandler ray effects', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
       Math.random = originalRandom;
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        casterName,
-        'Goblin',
-        expect.arrayContaining([
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Goblin', effects: expect.arrayContaining([
           expect.objectContaining({ type: 'condition', condition: 'restrained' }),
           expect.objectContaining({
             type: 'remove_target_effect',
@@ -401,9 +398,7 @@ describe('prismaticSprayHandler ray effects', () => {
             target: 'Goblin',
             source: casterName,
           }),
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
     });
 
     it('posts condition log entry for Restrained', async () => {
@@ -542,10 +537,7 @@ describe('prismaticSprayHandler ray effects', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
       Math.random = originalRandom;
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        casterName,
-        'Goblin',
-        expect.arrayContaining([
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Goblin', effects: expect.arrayContaining([
           expect.objectContaining({ type: 'condition', condition: 'blinded' }),
           expect.objectContaining({
             type: 'remove_target_effect',
@@ -553,9 +545,7 @@ describe('prismaticSprayHandler ray effects', () => {
             target: 'Goblin',
             source: casterName,
           }),
-        ]),
-        campaignName,
-      );
+        ]), campaignName });
     });
 
     it('posts condition log entry for Blinded', async () => {

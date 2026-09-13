@@ -2,6 +2,13 @@ import * as mapsService from '../../services/maps/mapsService.js';
 import SpellOverlayControls from './SpellOverlayControls.jsx';
 import { OverlayShape } from '../../models/SpellOverlay.js';
 
+const TOGGLE_TOOLS = [
+    { tool: 'paint', icon: 'fa-paint-brush', label: 'Paint' },
+    { tool: 'erase', icon: 'fa-eraser', label: 'Erase' },
+    { tool: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
+    { tool: 'room', icon: 'fa-vector-square', label: 'Room' },
+];
+
 const MapToolbar = ({
     mapName,
     isLocalhost,
@@ -30,6 +37,20 @@ const MapToolbar = ({
         clearOverlays,
     } = spellOverlayState || {};
 
+    const toggleSpellMode = () => {
+        if (spellMode) {
+            setSpellMode(null);
+        } else {
+            setTool('none');
+            setSpellMode(selectedShape || OverlayShape.SPHERE);
+        }
+    };
+
+    const onSelectShape = (shape) => {
+        setSelectedShape(shape);
+        setSpellMode(shape);
+    };
+
     return (
         <>
             <div className="toolbar-row">
@@ -53,44 +74,18 @@ const MapToolbar = ({
                     </label>
                 )}
                 <div className="toolbar no-print">
-                    {isLocalhost && (
-                        <>
-                            <button
-                                className={tool === 'paint' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'paint' ? 'none' : 'paint')}
-                            >
-                                <i className="fa-solid fa-paint-brush"></i> Paint
-                            </button>
-                            <button
-                                className={tool === 'erase' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'erase' ? 'none' : 'erase')}
-                            >
-                                <i className="fa-solid fa-eraser"></i> Erase
-                            </button>
-                            <button
-                                className={tool === 'select' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'select' ? 'none' : 'select')}
-                            >
-                                <i className="fa-solid fa-arrow-pointer"></i> Select
-                            </button>
-                            <button
-                                className={tool === 'room' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'room' ? 'none' : 'room')}
-                            >
-                                <i className="fa-solid fa-vector-square"></i> Room
-                            </button>
-                        </>
-                    )}
+                    {isLocalhost && TOGGLE_TOOLS.map(({ tool: t, icon, label }) => (
+                        <button
+                            key={t}
+                            className={tool === t ? 'active' : ''}
+                            onClick={() => setTool(tool === t ? 'none' : t)}
+                        >
+                            <i className={`fa-solid ${icon}`}></i> {label}
+                        </button>
+                    ))}
                     <button
                         className={spellMode ? 'active' : ''}
-                        onClick={() => {
-                            if (spellMode) {
-                                setSpellMode(null);
-                            } else {
-                                setTool('none');
-                                setSpellMode(selectedShape || OverlayShape.SPHERE);
-                            }
-                        }}
+                        onClick={toggleSpellMode}
                     >
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Spell
                     </button>
@@ -119,10 +114,7 @@ const MapToolbar = ({
             {spellMode !== null && spellMode !== undefined && (
                 <SpellOverlayControls
                     selectedShape={selectedShape}
-                    setSelectedShape={(shape) => {
-                        setSelectedShape(shape);
-                        setSpellMode(shape);
-                    }}
+                    setSelectedShape={onSelectShape}
                     shapeParams={shapeParams}
                     setShapeParams={setShapeParams}
                     overlays={overlays}

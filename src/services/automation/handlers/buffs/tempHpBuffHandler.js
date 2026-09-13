@@ -241,9 +241,9 @@ export async function confirmMantleOfInspiration({ action, playerStats, campaign
     for (const targetName of finalTargets) {
         setTempHp(targetName, tempHp, campaignName);
         setRuntimeValue(targetName, 'inspiringMovementNoOA', true, campaignName);
-        addExpiration(playerName, targetName, [
+        addExpiration({ attackerName: playerName, targetName, effects: [
             { type: 'inspiring_movement_no_oa' }
-        ], campaignName, undefined, playerName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
     }
 
     const targetList = finalTargets.length > 0 ? finalTargets.join(', ') : 'no targets selected';
@@ -394,7 +394,7 @@ export async function handleVitalityOfTheTree(action, playerStats, campaignName,
     };
 }
 
-export async function confirmVitalityOfTheTree(action, playerStats, campaignName, selectedTargets, tempHp, _maxTargets) {
+export async function confirmVitalityOfTheTree({ action, playerStats, campaignName, selectedTargets, tempHp }) {
     const auto = action.automation;
     const playerName = playerStats.name;
 

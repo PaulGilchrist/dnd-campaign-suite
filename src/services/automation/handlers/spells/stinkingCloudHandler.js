@@ -292,11 +292,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const durationRounds = resolveStinkingCloudDurationRounds(auto, action);
 
     if (durationRounds) {
-        addExpiration(casterName, casterName, [
+        addExpiration({ attackerName: casterName, targetName: casterName, effects: [
             { type: 'clear_runtime_value', creatureName: casterName, key: trackingKey },
             { type: 'remove_target_effect', effectKey: 'stinking_cloud', source: casterName },
             { type: 'remove_target_effect', effectKey: BLOCK_TE_EFFECT, source: casterName },
-        ], campaignName, durationRounds);
+        ], campaignName, rounds: durationRounds });
     }
 
     registerSpellConcentration(campaignName, casterName, 'Stinking Cloud', playerStats);
@@ -425,9 +425,9 @@ async function applyCloudPoisonedTarget(campaignName, casterName, targetName, dc
     });
 
     // Add expiration for concentration — Poisoned removed when concentration breaks
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'poisoned' },
-    ], campaignName);
+    ], campaignName });
 
     // Note: initiative-rolled event has nothing to do with turn/round expiration.
     // It fires once at the start of a new combat to reset once-per-combat trackers.

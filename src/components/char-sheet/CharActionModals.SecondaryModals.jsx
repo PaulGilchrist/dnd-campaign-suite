@@ -691,7 +691,7 @@ function SecondaryModals({
                     title="Healing Illusion"
                     targets={buildHealingIllusionTargets()}
                     description={`The illusion has ended. Choose a creature within 5 feet to regain ${playerStats.level || 1} HP:`}
-                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, mergedModalState.healingIllusionModal, characters, campaignName, combatSummary, () => { setModalState({ healingIllusionModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
+                    onTargetSelected={(targetName) => handleHealingIllusionConfirm(targetName, { payload: mergedModalState.healingIllusionModal, characters, campaignName, combatSummary, onClose: () => { setModalState({ healingIllusionModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); } })}
                     onSkip={() => { setModalState({ healingIllusionModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     confirmLabel="Heal"
                     confirmIcon="fa-heart"

@@ -133,7 +133,7 @@ describe('useSpellMetamagicFlow — Beacon of Hope creatureTargets fallback', ()
       { name: 'Character B' },
     ];
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', vi.fn(), null, characters)
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: characters })
     );
 
     act(() => {
@@ -146,7 +146,7 @@ describe('useSpellMetamagicFlow — Beacon of Hope creatureTargets fallback', ()
 
   it('uses combat summary creatures as creatureTargets when available', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -177,7 +177,7 @@ describe('useSpellMetamagicFlow — Aura of Vitality freeCastUsed metadata', () 
 
   it('passes freeCastUsed from metaCtx into pendingAuraOfVitality', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -190,7 +190,7 @@ describe('useSpellMetamagicFlow — Aura of Vitality freeCastUsed metadata', () 
 
   it('omits isFreeCast when metaCtx.freeCastUsed is falsy', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeSorcererStats(), 'TestCampaign', vi.fn())
+      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
 
     act(() => {
@@ -213,7 +213,7 @@ describe('useSpellMetamagicFlow — non-Sorcerer cantrip auto-leveling', () => {
   it('auto-levels cantrip with damage_at_character_level and calls onExecute', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeNonSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeNonSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -236,7 +236,7 @@ describe('useSpellMetamagicFlow — non-Sorcerer cantrip auto-leveling', () => {
   it('auto-levels cantrip with damage_at_slot_level and calls onExecute', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeNonSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeNonSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -258,7 +258,7 @@ describe('useSpellMetamagicFlow — non-Sorcerer cantrip auto-leveling', () => {
     const highLevelStats = makeNonSorcererStats({ level: 17 });
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(highLevelStats, 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: highLevelStats, campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -277,7 +277,7 @@ describe('useSpellMetamagicFlow — non-Sorcerer cantrip auto-leveling', () => {
   it('falls through to prepareSpellCast for cantrip without any damage property', async () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeNonSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeNonSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     await act(async () => {
@@ -292,7 +292,7 @@ describe('useSpellMetamagicFlow — non-Sorcerer cantrip auto-leveling', () => {
   it('uses oldConcentrationSpell path for non-cantrip with oldConcentrationSpell', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makeNonSorcererStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makeNonSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -307,7 +307,7 @@ describe('useSpellMetamagicFlow — non-Sorcerer cantrip auto-leveling', () => {
     const lowLevelStats = makeNonSorcererStats({ level: 4 });
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(lowLevelStats, 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: lowLevelStats, campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     await act(async () => {

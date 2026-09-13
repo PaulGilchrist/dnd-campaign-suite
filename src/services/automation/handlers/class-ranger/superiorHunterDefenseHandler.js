@@ -71,7 +71,7 @@ async function logHunterDefenseHeal({ campaignName, playerName, playerStats, fea
     }).catch((e) => { console.error("[superiorHunterDefense] Error logging heal:", e); });
 }
 
-function refusalPopup(featureName, refusalText, refusalType, playerName, campaignName, auto) {
+function refusalPopup({ featureName, refusalText, refusalType, playerName, campaignName, auto }) {
     addEntry(campaignName, {
         type: 'automation',
         characterName: playerName,
@@ -91,12 +91,7 @@ function refusalPopup(featureName, refusalText, refusalType, playerName, campaig
     };
 }
 
-export async function handle(action, playerStats, campaignName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const featureName = action.name || 'Super Hunter\'s Defense';
-
-    const lastAttack = await findLastAttack(campaignName);
+function checkHunterDefenseTrigger(lastAttack, playerName, featureName, auto) {
     if (!lastAttack.attackEvent) {
         return {
             type: 'popup',
@@ -108,7 +103,6 @@ export async function handle(action, playerStats, campaignName) {
             },
         };
     }
-
     if (lastAttack.targetName !== playerName) {
         return {
             type: 'popup',
@@ -120,6 +114,36 @@ export async function handle(action, playerStats, campaignName) {
             },
         };
     }
+    return null;
+}
+
+async function applyHunterDefenseHeal(cs, playerName, healAmount, campaignName) {
+    if (!cs) return 0;
+    const healResult = await applyHealingToTarget(cs, playerName, healAmount, campaignName);
+    return healResult?.actualHeal ?? 0;
+}
+
+function buildHunterDefensePopup(featureName, auto, rawDamage, damageType, actualHeal) {
+    const healText = actualHeal > 0 ? `<br/>Retroactively healed for ${actualHeal} HP.` : '';
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description: `You gained Resistance to ${damageType} damage until end of current turn. (Last damage taken: ${rawDamage} ${damageType})${healText}`,
+            automation: auto,
+        },
+    };
+}
+
+export async function handle(action, playerStats, campaignName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Super Hunter\'s Defense';
+
+    const lastAttack = await findLastAttack(campaignName);
+    const triggerRefusal = checkHunterDefenseTrigger(lastAttack, playerName, featureName, auto);
+    if (triggerRefusal) return triggerRefusal;
 
     // CLA-371: RAW trigger requires a HIT ("When an attacker ... hits you with
     // an attack roll"). A missed attack stores hit:false / primaryDamage:null —
@@ -143,7 +167,14 @@ export async function handle(action, playerStats, campaignName) {
     const usedRoundKey = '_Superior_Hunters_Defense_usedRound';
     const usedRound = Number(getRuntimeValue(playerName, usedRoundKey, campaignName) ?? 0);
     if (usedRound === currentRound) {
-        return refusalPopup(featureName, `You have already used ${featureName} this round — your Reaction is spent until your next turn.`, 'superior_hunters_defense_refused', playerName, campaignName, auto);
+        return refusalPopup({
+    featureName,
+    refusalText: `You have already used ${featureName} this round — your Reaction is spent until your next turn.`,
+    refusalType: 'superior_hunters_defense_refused',
+    playerName,
+    campaignName,
+    auto,
+});
     }
 
     // CLA-371: Serialize the latch — stamp at the TRIGGER, before any spend
@@ -158,11 +189,7 @@ export async function handle(action, playerStats, campaignName) {
 
     const healAmount = Math.floor(resistedAmount / 2);
 
-    let actualHeal = 0;
-    if (cs) {
-        const healResult = await applyHealingToTarget(cs, playerName, healAmount, campaignName);
-        actualHeal = healResult?.actualHeal ?? 0;
-    }
+    const actualHeal = await applyHunterDefenseHeal(cs, playerName, healAmount, campaignName);
 
     // Add resistance buff for the damage type until end of current turn
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
@@ -186,9 +213,9 @@ export async function handle(action, playerStats, campaignName) {
     // drains via expireStaleEffects at the FIRST turn-start of the next
     // round (same round-boundary drain family as weapon masteries /
     // CLA-334 rounds recipe), never persisting indefinitely.
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_active_buff', buffName: featureName },
-    ], campaignName, 1);
+    ], campaignName, rounds: 1 });
 
     const healText = actualHeal > 0 ? ` Retroactively healed for ${actualHeal} HP (${Math.floor(resistedAmount / 2)} from ${resistedAmount} ${damageType} damage halved by resistance).` : '';
 
@@ -202,13 +229,5 @@ export async function handle(action, playerStats, campaignName) {
         timestamp: Date.now(),
     }).catch((e) => { console.error("[superiorHunterDefense] Error:", e); });
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: featureName,
-            description: `You gained Resistance to ${damageType} damage until end of current turn. (Last damage taken: ${rawDamage} ${damageType})${actualHeal > 0 ? `<br/>Retroactively healed for ${actualHeal} HP.` : ''}`,
-            automation: auto,
-        },
-    };
+    return buildHunterDefensePopup(featureName, auto, rawDamage, damageType, actualHeal);
 }

@@ -366,16 +366,11 @@ describe('EyebiteEffectModal - NPC save', () => {
                 fireEvent.click(screen.getByTestId('stm-confirm'));
             });
             await waitFor(() => {
-                expect(expirations.addExpiration).toHaveBeenCalledWith(
-                    'Witch1',
-                    'Goblin1',
-                    expect.arrayContaining([
+                expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Witch1', targetName: 'Goblin1', effects: expect.arrayContaining([
                         expect.objectContaining({
                             condition: 'unconscious',
                         }),
-                    ]),
-                    'test-campaign'
-                );
+                    ]), campaignName: 'test-campaign' });
             });
         });
 

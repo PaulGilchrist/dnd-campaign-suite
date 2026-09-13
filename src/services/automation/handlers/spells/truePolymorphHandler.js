@@ -153,7 +153,7 @@ async function runTransformationSave(action, campaignName, casterName, targetNam
     return null;
 }
 
-function buildModePopup(mode, action, targetName, casterName, campaignName, maxCR) {
+function buildModePopup({ mode, action, targetName, casterName, campaignName, maxCR }) {
     if (mode === 'object_into_creature') {
         return {
             type: 'popup',
@@ -214,7 +214,7 @@ async function resolveCreatureTargetMode({ action, campaignName, casterName, dc,
     const characters = action.metaCtx?.characters || [];
     const maxCR = await resolveTruePolymorphMaxCR(targetName, campaignName, characters);
 
-    return buildModePopup(mode, action, targetName, casterName, campaignName, maxCR);
+    return buildModePopup({ mode, action, targetName, casterName, campaignName, maxCR });
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {

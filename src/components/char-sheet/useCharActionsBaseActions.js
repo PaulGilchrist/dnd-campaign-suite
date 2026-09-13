@@ -131,20 +131,21 @@ function buildHideFailureMessages({ d20Val, stealthBonus, rollTotal, dc, skulker
 }
 
 // Pure: resolve the grapple check ability + bonus (Monk uses DEX; JoAT adds half PB).
+function abilityModOf(playerStats, abilityName) {
+    return playerStats?.abilities?.find(a => a.name === abilityName)?.bonus || 0;
+}
+
+function jackOfAllTradesHalfBonus(playerStats) {
+    const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
+    if (!isJackOfAllTrades) return 0;
+    const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+    return Math.floor(proficiency / 2);
+}
+
 function computeGrappleCheckBonus(playerStats, exhaustionPenalty) {
     const isMonk = playerStats.class?.name === 'Monk';
-    const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-    const strMod = strAbility?.bonus || 0;
-    const dexAbility = playerStats?.abilities?.find(a => a.name === 'Dexterity');
-    const dexMod = dexAbility?.bonus || 0;
     const useAbility = isMonk ? 'Dexterity' : 'Strength';
-    const abilityMod = isMonk ? dexMod : strMod;
-    let checkBonus = abilityMod - exhaustionPenalty;
-    const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
-    if (isJackOfAllTrades) {
-        const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-        checkBonus += Math.floor(proficiency / 2);
-    }
+    const checkBonus = abilityModOf(playerStats, useAbility) - exhaustionPenalty + jackOfAllTradesHalfBonus(playerStats);
     return { isMonk, useAbility, checkBonus };
 }
 
@@ -243,9 +244,9 @@ export default function useCharActionsBaseActions({
             playerStats.name
         );
         if (!result.wasActive) {
-            addExpiration(playerStats.name, playerStats.name, [
+            addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
                 { type: 'remove_active_buff', buffName: 'Dodge' }
-            ], campaignName, undefined, playerStats.name);
+            ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
             await addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,
@@ -290,25 +291,18 @@ export default function useCharActionsBaseActions({
         return targetStr?.bonus || 0;
     }
 
+    function findStrBonus(entries) {
+        const str = entries.find(a => a.name === 'Strength');
+        return str?.bonus || 0;
+    }
+
     async function resolveTargetStrBonus(target, cs) {
-        let targetStrBonus = 0;
-        if (target.computedStats?.abilities) {
-            const targetStr = target.computedStats.abilities.find(a => a.name === 'Strength');
-            targetStrBonus = targetStr?.bonus || 0;
-        } else if (target.abilities) {
-            const targetStr = target.abilities.find(a => a.name === 'Strength');
-            targetStrBonus = targetStr?.bonus || 0;
-        } else if (target.ability_score_modifiers?.str != null) {
-            targetStrBonus = target.ability_score_modifiers.str;
-        } else if (target.type === 'player') {
-            targetStrBonus = resolvePlayerTargetStrBonus(target, cs);
-        } else {
-            const monsterData = await getMonsterData(target.name, cs?.creatures || []);
-            if (monsterData?.ability_score_modifiers?.str != null) {
-                targetStrBonus = monsterData.ability_score_modifiers.str;
-            }
-        }
-        return targetStrBonus;
+        if (target.computedStats?.abilities) return findStrBonus(target.computedStats.abilities);
+        if (target.abilities) return findStrBonus(target.abilities);
+        if (target.ability_score_modifiers?.str != null) return target.ability_score_modifiers.str;
+        if (target.type === 'player') return resolvePlayerTargetStrBonus(target, cs);
+        const monsterData = await getMonsterData(target.name, cs?.creatures || []);
+        return monsterData?.ability_score_modifiers?.str ?? 0;
     }
 
     async function applyGrappleSuccess({ target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus }) {

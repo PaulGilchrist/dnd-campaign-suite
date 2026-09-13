@@ -153,7 +153,7 @@ async function resolveSpellAttackOutcome({ campaignName, playerStats, playerName
 
 async function applyCantripDamage({ cs, campaignName, playerName, targetName, spellDamage, spellRolls, spellDamageType, formula, characters, selectedSpellName }) {
     if (spellDamage <= 0) return spellDamage;
-    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spellDamageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+    const applyResult = await applyDamageToTarget(cs, targetName, spellDamage, [spellDamageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
     const finalDamage = applyResult?.finalDamage ?? spellDamage;
     if (finalDamage > 0) {
         endInvisibilityOnHostileAction(playerName, campaignName);

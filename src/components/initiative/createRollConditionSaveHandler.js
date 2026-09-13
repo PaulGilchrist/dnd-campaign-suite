@@ -44,7 +44,7 @@ async function handleSlowSuccess({ creatureName, campaignName }) {
 async function handleOttoSuccess({ combatSummary, creatureName, condition, campaignName }) {
     const danceEffect = findTargetEffect(creatureName, 'ottos_irresistible_dance')
     if (!danceEffect) return
-    removeCondition(combatSummary, creatureName, { key: 'speed_zero' }, getRuntimeValue, setRuntimeValue, campaignName)
+    removeCondition({ combatSummary, creatureName, condition: { key: 'speed_zero' }, getRuntimeValue, setRuntimeValue, campaignName })
     removeTargetEffect(creatureName, 'ottos_irresistible_dance', campaignName)
     await logEntry(campaignName, {
         type: 'save_result',
@@ -70,8 +70,8 @@ async function handleOttoSuccess({ combatSummary, creatureName, condition, campa
 async function handleTashasLaughterSuccess({ combatSummary, creatureName, condition, campaignName }) {
     const laughterEffect = findTargetEffect(creatureName, 'tashas_hideous_laughter')
     if (!laughterEffect) return
-    removeCondition(combatSummary, creatureName, { key: 'prone' }, getRuntimeValue, setRuntimeValue, campaignName)
-    removeCondition(combatSummary, creatureName, { key: 'incapacitated' }, getRuntimeValue, setRuntimeValue, campaignName)
+    removeCondition({ combatSummary, creatureName, condition: { key: 'prone' }, getRuntimeValue, setRuntimeValue, campaignName })
+    removeCondition({ combatSummary, creatureName, condition: { key: 'incapacitated' }, getRuntimeValue, setRuntimeValue, campaignName })
     removeTargetEffect(creatureName, 'tashas_hideous_laughter', campaignName)
     await logEntry(campaignName, {
         type: 'save_result',
@@ -97,8 +97,8 @@ async function handleTashasLaughterSuccess({ combatSummary, creatureName, condit
 async function handleConfusionSuccess({ combatSummary, creatureName, condition, campaignName }) {
     const confusionEffect = findTargetEffect(creatureName, 'confusion')
     if (!confusionEffect) return
-    removeCondition(combatSummary, creatureName, { key: 'charmed' }, getRuntimeValue, setRuntimeValue, campaignName)
-    removeCondition(combatSummary, creatureName, { key: 'speed_zero' }, getRuntimeValue, setRuntimeValue, campaignName)
+    removeCondition({ combatSummary, creatureName, condition: { key: 'charmed' }, getRuntimeValue, setRuntimeValue, campaignName })
+    removeCondition({ combatSummary, creatureName, condition: { key: 'speed_zero' }, getRuntimeValue, setRuntimeValue, campaignName })
     removeTargetEffect(creatureName, 'confusion', campaignName)
     await logEntry(campaignName, {
         type: 'save_result',
@@ -254,7 +254,7 @@ export function createRollConditionSaveHandler({
         const ctx = { combatSummary, creatureName, condition, campaignName, r1, bonus }
 
         if (success) {
-            removeCondition(combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName)
+            removeCondition({ combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName })
             for (const cleanup of SUCCESS_CLEANUPS) {
                 if (cleanup.matches(conditionKey)) await cleanup.run(ctx)
             }

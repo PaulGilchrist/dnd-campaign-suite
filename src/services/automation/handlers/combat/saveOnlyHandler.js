@@ -64,10 +64,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description: `${targetName} succeeded on ${auto.saveType || 'CON'} save. Speed halved until start of next turn.`,
             }).catch((e) => { console.error("[saveOnly] Error:", e); });
 
-            addExpiration(playerStats.name, targetName, [
+            addExpiration({ attackerName: playerStats.name, targetName, effects: [
                 { type: 'stunned', condition: 'speed_halved' },
                 { type: 'advantage_on_target' }
-            ], campaignName, undefined, targetName);
+            ], campaignName, rounds: undefined, expireOnCreatureName: targetName });
         } else {
             const conditionKey = effects.fail?.[0]?.condition || 'stunned';
             const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionKey.toLowerCase());
@@ -86,9 +86,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description: `${targetName} failed ${auto.saveType || 'CON'} save. Stunned until start of next turn.`,
             }).catch((e) => { console.error("[saveOnly] Error:", e); });
 
-            addExpiration(playerStats.name, targetName, [
+            addExpiration({ attackerName: playerStats.name, targetName, effects: [
                 { type: 'stunned', condition: 'stunned' }
-            ], campaignName, undefined, targetName);
+            ], campaignName, rounds: undefined, expireOnCreatureName: targetName });
         }
 
         window.removeEventListener('save-result', handleSaveResult);

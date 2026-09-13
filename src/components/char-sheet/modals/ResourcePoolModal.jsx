@@ -7,6 +7,15 @@ import './ResourcePoolModal.css'
 const FWD_USED_KEY = 'wildResurgenceFwdUsedRound'
 const REV_USED_KEY = 'wildResurgenceReversedThisRest'
 
+function maxTrackedWildShapeUses(playerStats) {
+  return playerStats._trackedResources?.wildShapeUses?.max || 0
+}
+
+function computeCurrentWildShape(name, maxWS) {
+  const stored = getRuntimeValue(name, 'wildShapeUses')
+  return stored != null ? Number(stored) : maxWS
+}
+
 function ForwardConversionSection({ fwdHasConversion, fwdPrereqsMet, currentWS, currentSlots, maxSlots, selectedLevel, setSelectedLevel, canForward, handleForward }) {
   if (!fwdHasConversion) return null
   return (
@@ -145,11 +154,8 @@ function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
     return slots
   })()
 
-  const maxWS = playerStats._trackedResources?.wildShapeUses?.max || 0
-  const currentWS = (() => {
-    const stored = getRuntimeValue(name, 'wildShapeUses')
-    return stored != null ? Number(stored) : maxWS
-  })()
+  const maxWS = maxTrackedWildShapeUses(playerStats)
+  const currentWS = computeCurrentWildShape(name, maxWS)
 
   const fwdHasConversion = conversion === 'spell_slot_to_wild_shape'
   const revHasConversion = reverseConversion === 'wild_shape_to_spell_slot'

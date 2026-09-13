@@ -183,12 +183,7 @@ describe('massSuggestionHandler.handle', () => {
         ['charmed'],
         campaignName,
       );
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        [{ type: 'charmed', condition: 'charmed' }],
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: [{ type: 'charmed', condition: 'charmed' }], campaignName });
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'condition',
         action: 'applied',

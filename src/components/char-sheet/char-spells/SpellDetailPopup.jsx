@@ -89,23 +89,24 @@ function SpellMeta({ isCantrip, spell, isPhantasmalFreeCast, isDispelMagicAsBonu
   );
 }
 
+function hasPassive(playerStats, type) {
+  return !!playerStats?.automation?.passives?.some(p => p.type === type);
+}
+
+function spellSchoolIs(spell, schools) {
+  const school = (spell.school || '').toLowerCase();
+  return schools.includes(school);
+}
+
 function computeSpellDetailPassiveFlags(playerStats, spell, isWarlock) {
-  const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
-  const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
-  const hasOverchannelPassive = playerStats?.automation?.passives?.some(p => p.type === 'overchannel');
+  const hasPsychicSpells = hasPassive(playerStats, 'psychic_spells');
+  const hasImprovedIllusions = hasPassive(playerStats, 'improved_illusions');
+  const hasOverchannelPassive = hasPassive(playerStats, 'overchannel');
   const hasDamage = !!spell.damage;
-  const isEnchantmentOrIllusion = () => {
-    const school = (spell.school || '').toLowerCase();
-    return school === 'enchantment' || school === 'illusion';
-  };
-  const isIllusionSpell = () => {
-    const school = (spell.school || '').toLowerCase();
-    return school === 'illusion';
-  };
   return {
     canChangeDamageType: isWarlock && hasPsychicSpells && hasDamage,
-    noVSComponents: isWarlock && hasPsychicSpells && isEnchantmentOrIllusion(),
-    noVComponents: hasImprovedIllusions && isIllusionSpell(),
+    noVSComponents: isWarlock && hasPsychicSpells && spellSchoolIs(spell, ['enchantment', 'illusion']),
+    noVComponents: hasImprovedIllusions && spellSchoolIs(spell, ['illusion']),
     isOverchannelApplicable: hasOverchannelPassive && hasDamage && spell.level >= 1 && spell.level <= 5,
   };
 }

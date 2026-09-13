@@ -76,9 +76,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Set up expiration for 1 minute (10 rounds) — rounds MUST be passed or
     // the queue treats it as Infinity and the sanctuary never expires (CLA-235).
     const durationRounds = parseDurationRounds(auto.duration) || DEFAULT_DURATION_ROUNDS;
-    addExpiration(playerName, playerName, [
+    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_natures_sanctuary' }
-    ], campaignName, durationRounds);
+    ], campaignName, rounds: durationRounds });
 
     return {
         type: 'modal',

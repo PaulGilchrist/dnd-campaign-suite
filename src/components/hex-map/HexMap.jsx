@@ -109,7 +109,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const [partyContextMenu, setPartyContextMenu] = useState(null);
 
     // ── Terrain painting ──
-    const terrainPainting = useTerrainPainting(hexCols, hexRows, getHexFromEvent, selectedTerrain, setTerrain, setRivers);
+    const terrainPainting = useTerrainPainting({ hexCols, hexRows, getHexFromEvent, selectedTerrain, setTerrain, setRivers });
     const { handleTerrainPointerDown, handleTerrainPointerMove, handleTerrainPointerUp } = terrainPainting;
 
     // ── Travel management ──

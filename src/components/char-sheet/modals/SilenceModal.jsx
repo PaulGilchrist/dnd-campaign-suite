@@ -113,10 +113,10 @@ export default function SilenceModal({
 
             grantSilenceBuff(targetName);
             addSilencedTarget(casterName, targetName, campaignName);
-            addExpiration(casterName, targetName, [
+            addExpiration({ attackerName: casterName, targetName, effects: [
                 { type: 'condition', condition: 'deafened' },
                 { type: 'remove_active_buff', buffName: SILENCE_BUFF_NAME },
-            ], campaignName);
+            ], campaignName });
 
             await addEntry(campaignName, {
                 type: 'condition',
@@ -131,13 +131,13 @@ export default function SilenceModal({
             results.push(`${targetName} is Deafened.`);
         }
 
-        addExpiration(casterName, casterName, [
+        addExpiration({ attackerName: casterName, targetName: casterName, effects: [
             { type: 'remove_active_buff', buffName: SILENCE_BUFF_NAME },
             { type: 'clear_silence_zone', casterName },
             { type: 'clear_runtime_value', creatureName: casterName, key: SILENCE_KEY },
             { type: 'clear_runtime_value', creatureName: casterName, key: SILENCE_CENTER_KEY },
             { type: 'clear_runtime_value', creatureName: casterName, key: SILENCE_RADIUS_KEY },
-        ], campaignName);
+        ], campaignName });
 
         await addEntry(campaignName, {
             type: 'ability_use',

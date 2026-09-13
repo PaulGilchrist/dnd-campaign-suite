@@ -213,7 +213,7 @@ describe('Contact Other Plane auto-save', () => {
 
     it('applies auto-save for Contact Other Plane when caster is the target', async () => {
         const fn = createFn();
-        await fn('Contact Other Plane', '4d6', 14, [3, 4, 5, 2], 0, autoSaveContext);
+        await fn({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 4, 5, 2], modifier: 0, context: autoSaveContext });
 
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -229,7 +229,7 @@ describe('Contact Other Plane auto-save', () => {
             })
         );
 
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Warlock1', 7, ['psychic'], 'test-campaign', null, { ignoreResistance: false, attackerName: 'Warlock1', suppressHpLog: false, ...{ isSpellDamage: true } });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Warlock1', 7, ['psychic'], { campaignName: 'test-campaign', characters: null, ignoreResistance: false, attackerName: 'Warlock1', suppressHpLog: false, ...{ isSpellDamage: true } });
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -253,7 +253,7 @@ describe('Contact Other Plane auto-save', () => {
 
     it('does not auto-save for other spells and falls through to save prompt', async () => {
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, nonAutoSaveContext);
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: nonAutoSaveContext });
 
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
@@ -287,7 +287,7 @@ describe('Contact Other Plane auto-save', () => {
         });
 
         const fn = createFn();
-        await fn('Contact Other Plane', '4d6', 14, [3, 4, 5, 2], 0, allyContext);
+        await fn({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 4, 5, 2], modifier: 0, context: allyContext });
 
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
@@ -311,7 +311,7 @@ describe('Contact Other Plane auto-save', () => {
         };
 
         const fn = createFn();
-        await fn('Contact Other Plane', '4d6', 14, [3, 4, 5, 2], 0, context);
+        await fn({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 4, 5, 2], modifier: 0, context: context });
 
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(sendSavePrompt).toHaveBeenCalledTimes(1);

@@ -440,14 +440,13 @@ describe('useCharActionsModalHandlers - buffs', () => {
       };
       const handlers = getHandlers(modalState);
       await handlers.handleVitalityOfTheTreeConfirm(['Ally1', 'Ally2']);
-      expect(confirmVitalityOfTheTree).toHaveBeenCalledWith(
-        modalState.vitalityOfTheTreeTarget.action,
-        modalState.vitalityOfTheTreeTarget.playerStats,
-        modalState.vitalityOfTheTreeTarget.campaignName,
-        ['Ally1', 'Ally2'],
-        10,
-        3
-      );
+      expect(confirmVitalityOfTheTree).toHaveBeenCalledWith({
+            action: modalState.vitalityOfTheTreeTarget.action,
+            playerStats: modalState.vitalityOfTheTreeTarget.playerStats,
+            campaignName: modalState.vitalityOfTheTreeTarget.campaignName,
+            selectedTargets: ['Ally1', 'Ally2'],
+            tempHp: 10,
+        });
       expect(mockSetModalState).toHaveBeenCalledWith({ vitalityOfTheTreeTarget: null });
     });
 

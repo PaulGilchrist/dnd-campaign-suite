@@ -40,20 +40,25 @@ function normalizeConditionKey(c) {
   return String(c).toLowerCase();
 }
 
-function grappledTargetActive(ctx) {
-  const { combatContext } = ctx;
-  if (!combatContext || !combatContext.creatures) return false;
+// Shared lookup: active attacker creature and its current target. Returns
+// null when either cannot be resolved (mirrors the original early returns).
+function findCombatTargetPair(ctx) {
+  const combatContext = ctx.combatContext;
+  if (!combatContext || !combatContext.creatures) return null;
   const attackerName = combatContext.activeCreatureName || combatContext.attackerName;
-  if (!attackerName) return false;
+  if (!attackerName) return null;
   const attackerCreature = combatContext.creatures.find(c => c.name === attackerName);
   const targetName = attackerCreature?.targetName;
-  if (!targetName) return false;
+  if (!targetName) return null;
   const targetCreature = combatContext.creatures.find(c => c.name === targetName);
-  if (targetCreature && targetCreature.conditions) {
-    const targetConditions = targetCreature.conditions.map(normalizeConditionKey);
-    return targetConditions.includes('grappled');
-  }
-  return false;
+  return { attackerCreature, targetCreature };
+}
+
+function grappledTargetActive(ctx) {
+  const pair = findCombatTargetPair(ctx);
+  if (!pair || !pair.targetCreature?.conditions) return false;
+  const targetConditions = pair.targetCreature.conditions.map(normalizeConditionKey);
+  return targetConditions.includes('grappled');
 }
 
 function incapacitatedCreature(creature) {
@@ -61,16 +66,10 @@ function incapacitatedCreature(creature) {
 }
 
 function mountedAndTargetSmaller(ctx) {
-  const combatContext = ctx.combatContext;
-  if (!combatContext || !combatContext.creatures) return false;
-  const attackerName = combatContext.activeCreatureName || combatContext.attackerName;
-  if (!attackerName) return false;
-  const attackerCreature = combatContext.creatures.find(c => c.name === attackerName);
-  if (!attackerCreature?.isMounted) return false;
-  if (incapacitatedCreature(attackerCreature)) return false;
-  const targetName = attackerCreature.targetName;
-  if (!targetName) return false;
-  const targetCreature = combatContext.creatures.find(c => c.name === targetName);
+  const pair = findCombatTargetPair(ctx);
+  if (!pair) return false;
+  const { attackerCreature, targetCreature } = pair;
+  if (!attackerCreature.isMounted || incapacitatedCreature(attackerCreature)) return false;
   if (!targetCreature) return false;
   const mountSizeIdx = SIZE_ORDER.indexOf(attackerCreature.mountSize || 'Medium');
   const targetSizeIdx = SIZE_ORDER.indexOf(targetCreature.size || 'Medium');

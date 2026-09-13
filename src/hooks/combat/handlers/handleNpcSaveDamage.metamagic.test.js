@@ -170,7 +170,7 @@ describe('handleNpcSaveDamage - metamagic twin and multi-target', () => {
             }, combatSummary);
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-            expect(applyDamageToTarget).toHaveBeenLastCalledWith(expect.anything(), 'Orc', 10, expect.any(Array), 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard' });
+            expect(applyDamageToTarget).toHaveBeenLastCalledWith(expect.anything(), 'Orc', 10, expect.any(Array), { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard' });
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 name: expect.stringContaining('(Twinned)'),
                 targetName: 'Orc',
@@ -528,7 +528,7 @@ describe('handleNpcSaveDamage - metamagic twin and multi-target', () => {
             }, combatSummary);
 
             // Second call should pass ignoreResistance=true with total damage
-            expect(applyDamageToTarget).toHaveBeenNthCalledWith(2, expect.anything(), 'Orc', 10, expect.any(Array), 'test-campaign', null, { ignoreResistance: true, attackerName: 'TestWizard' });
+            expect(applyDamageToTarget).toHaveBeenNthCalledWith(2, expect.anything(), 'Orc', 10, expect.any(Array), { campaignName: 'test-campaign', characters: null, ignoreResistance: true, attackerName: 'TestWizard' });
         });
 
         it('does not roll saves for multi target when saveDC/saveType are missing', async () => {
@@ -652,7 +652,7 @@ describe('handleNpcSaveDamage - metamagic twin and multi-target', () => {
             expect(applyDamageToTarget).toHaveBeenCalledTimes(3);
             // Secondary should have skipConcentration option
             const secondaryCall = applyDamageToTarget.mock.calls[0];
-            expect(secondaryCall[6]).toEqual(expect.objectContaining({ skipConcentration: true }));
+            expect(secondaryCall[4]).toEqual(expect.objectContaining({ skipConcentration: true }));
         });
 
         it('multi target with autoDamageSecondaryFormula applies secondary then primary', async () => {

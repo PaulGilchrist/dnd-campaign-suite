@@ -116,6 +116,59 @@ async function polymorphEnemySaveFlow(action, casterName, targetName, dc, campai
     return null;
 }
 
+function isTargetAlreadyPolymorphed(targetName) {
+    const existingEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    return existingEffects.some(te => {
+        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
+        return teTarget === targetName && te.effect === POLYMORPH_EFFECT;
+    });
+}
+
+function polymorphRefusal(action, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description,
+        },
+    };
+}
+
+async function gatePolymorphPreconditions({ action, casterName, targetName, targetCreature, campaignName }) {
+    if (isTargetAlreadyPolymorphed(targetName)) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: action.name,
+            description: `${casterName} casts ${action.name} on ${targetName}, but ${targetName} is already transformed.`,
+        }).catch((e) => { console.error("[polymorph] Error:", e); });
+        return polymorphRefusal(action, `${targetName} is already polymorphed.`);
+    }
+
+    if (getTargetCurrentHp(targetName, targetCreature, campaignName) <= 0) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: action.name,
+            description: `${casterName} casts ${action.name} on ${targetName}, but a creature with 0 hit points can't be polymorphed.`,
+        }).catch((e) => { console.error("[polymorph] Error:", e); });
+        return polymorphRefusal(action, `${action.name} has no effect on a creature with 0 hit points.`);
+    }
+
+    if (isShapechanger(targetName, targetCreature)) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: action.name,
+            description: `${casterName} casts ${action.name} on ${targetName}, but shapechangers are unaffected.`,
+        }).catch((e) => { console.error("[polymorph] Error:", e); });
+        return polymorphRefusal(action, `${action.name} has no effect on a shapechanger.`);
+    }
+
+    return null;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
@@ -157,62 +210,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const existingEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const alreadyPolymorphed = existingEffects.some(te => {
-        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-        return teTarget === targetName && te.effect === POLYMORPH_EFFECT;
-    });
-    if (alreadyPolymorphed) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: action.name,
-            description: `${casterName} casts ${action.name} on ${targetName}, but ${targetName} is already transformed.`,
-        }).catch((e) => { console.error("[polymorph] Error:", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${targetName} is already polymorphed.`,
-            },
-        };
-    }
-
-    if (getTargetCurrentHp(targetName, targetCreature, campaignName) <= 0) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: action.name,
-            description: `${casterName} casts ${action.name} on ${targetName}, but a creature with 0 hit points can't be polymorphed.`,
-        }).catch((e) => { console.error("[polymorph] Error:", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} has no effect on a creature with 0 hit points.`,
-            },
-        };
-    }
-
-    const targetIsShapechanger = isShapechanger(targetName, targetCreature);
-    if (targetIsShapechanger) {
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: casterName,
-            abilityName: action.name,
-            description: `${casterName} casts ${action.name} on ${targetName}, but shapechangers are unaffected.`,
-        }).catch((e) => { console.error("[polymorph] Error:", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} has no effect on a shapechanger.`,
-            },
-        };
-    }
+    const preconditionRefusal = await gatePolymorphPreconditions({ action, casterName, targetName, targetCreature, campaignName });
+    if (preconditionRefusal) return preconditionRefusal;
 
     const allies = getAllyList(casterName);
     const isAlly = allies.some(n => utils.getName(n) === utils.getName(targetName));

@@ -359,7 +359,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
      }, [navigateNext, resetErrors]);
 
   const handleSubmit = useCallback(async () => {
-    const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
+    const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset });
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
       return;

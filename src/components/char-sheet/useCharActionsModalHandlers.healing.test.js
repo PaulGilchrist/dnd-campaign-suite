@@ -434,14 +434,14 @@ describe('useCharActionsModalHandlers - healing', () => {
       const handlers = getHandlers({}, mergedModalState);
       await handlers.handlePowerWordFortifyConfirm({ Ally1: 10, Ally2: 10 });
 
-      expect(confirmPowerWordFortify).toHaveBeenCalledWith(
-        mergedModalState.powerWordFortifyModal.action,
-        mergedModalState.powerWordFortifyModal.playerStats,
-        mergedModalState.powerWordFortifyModal.campaignName,
-        { Ally1: 10, Ally2: 10 },
-        20,
-        '1d10'
-      );
+      expect(confirmPowerWordFortify).toHaveBeenCalledWith({
+            action: mergedModalState.powerWordFortifyModal.action,
+            playerStats: mergedModalState.powerWordFortifyModal.playerStats,
+            campaignName: mergedModalState.powerWordFortifyModal.campaignName,
+            distribution: { Ally1: 10, Ally2: 10 },
+            totalTempHp: 20,
+            tempHpExpression: '1d10',
+        });
       expect(mockSetModalState).toHaveBeenCalledWith({ powerWordFortifyModal: null });
     });
 

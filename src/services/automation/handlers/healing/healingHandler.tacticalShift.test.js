@@ -129,14 +129,7 @@ describe('CLA-353 Tactical Shift fires on Second Wind activation', () => {
       })],
       campaignName,
     );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'EvasiveFighter',
-      'EvasiveFighter',
-      [{ type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: 'Tactical Shift', target: 'EvasiveFighter' }],
-      campaignName,
-      undefined,
-      'EvasiveFighter',
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'EvasiveFighter', targetName: 'EvasiveFighter', effects: [{ type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: 'Tactical Shift', target: 'EvasiveFighter' }], campaignName, rounds: undefined, expireOnCreatureName: 'EvasiveFighter' });
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       type: 'ability_use',
       characterName: 'EvasiveFighter',

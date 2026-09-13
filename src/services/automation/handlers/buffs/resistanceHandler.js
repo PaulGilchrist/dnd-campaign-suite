@@ -57,9 +57,9 @@ export async function applyResistance(action, playerStats, campaignName, targetN
     const combatSummary = getCombatSummary(campaignName);
     addConcentration(combatSummary, playerStats.name, 'Resistance', 10);
 
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'resistance_damage_reduction', source: playerStats.name }
-    ], campaignName);
+    ], campaignName });
 
     await addEntry(campaignName, {
         type: 'spell_effect',

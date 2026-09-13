@@ -217,7 +217,7 @@ describe('rules.getPlayerStats - feat buffs proficiency handling', () => {
     const playerSummary = makePlayerSummary({
       skillProficiencies: [],
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.skillProficiencies).toContain('Athletics');
     expect(result.skillProficiencies).toContain('Stealth');
     expect(result.skillProficiencies).toContain('Perception');
@@ -236,7 +236,7 @@ describe('rules.getPlayerStats - feat buffs proficiency handling', () => {
     const playerSummary = makePlayerSummary({
       proficiencies: ['Light Armor'],
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     if (expectedProficiency) {
       expect(result.proficiencies).toContain(expectedProficiency);
     }
@@ -250,7 +250,7 @@ describe('rules.getPlayerStats - feat buffs proficiency handling', () => {
       expertise: ['Insight'],
       expertSkills: ['History'],
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.expertise).toContain('Insight');
     expect(result.expertise).toContain('History');
   });
@@ -278,7 +278,7 @@ describe('rules.getPlayerStats - feat buffs proficiency handling', () => {
       expertise: ['Insight'],
       expertSkills: ['History'],
     });
-    const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
     expect(result.expertise).toContain('Insight');
     expect(result.expertise).toContain('History');
   });

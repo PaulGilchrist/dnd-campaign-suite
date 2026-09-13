@@ -220,17 +220,12 @@ describe('longstriderHandler', () => {
         CAMPAIGN_NAME
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        PLAYER_NAME,
-        'Ally1',
-        expect.arrayContaining([
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: 'Ally1', effects: expect.arrayContaining([
           expect.objectContaining({
             type: 'remove_active_buff',
             buffName: 'Longstrider',
           }),
-        ]),
-        CAMPAIGN_NAME
-      );
+        ]), campaignName: CAMPAIGN_NAME });
     });
 
     it('skips buff when Longstrider already active but still adds expiration', async () => {
@@ -356,12 +351,7 @@ describe('longstriderHandler', () => {
         expect.objectContaining({ duration: '10 minutes' })
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        PLAYER_NAME,
-        'Ally1',
-        expect.any(Array),
-        CAMPAIGN_NAME
-      );
+      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: 'Ally1', effects: expect.any(Array), campaignName: CAMPAIGN_NAME });
     });
 
     it('records sourceCharacter as the caster name', async () => {

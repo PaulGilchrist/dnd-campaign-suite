@@ -160,7 +160,7 @@ function sacredWeaponBonusFor(attack, playerStats, campaignName) {
     return Math.max(1, cha?.bonus || 0);
 }
 
-function renderWeaponMasteryCell(attack, playerStats, is2024Rules, hasWeaponMastery, getWeaponMastery, setPopupHtml) {
+function renderWeaponMasteryCell({ attack, playerStats, is2024Rules, hasWeaponMastery, getWeaponMastery, setPopupHtml }) {
     if (!is2024Rules || !hasWeaponMastery) return null;
     const mastery = getWeaponMastery(attack.name, attack, playerStats);
     return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>;
@@ -218,7 +218,7 @@ function BonusAttackRow({ attack, playerStats, campaignName, exhaustionPenalty, 
             handleSimpleDamageRoll(attackItem);
         }}>{attack.damage}</div>
         <div className='left'>{attack.damageType}</div>
-        {renderWeaponMasteryCell(attack, playerStats, is2024Rules, hasWeaponMastery, getWeaponMastery, setPopupHtml)}
+        {renderWeaponMasteryCell({ attack, playerStats, is2024Rules, hasWeaponMastery, getWeaponMastery, setPopupHtml })}
     </React.Fragment>;
 }
 
@@ -240,6 +240,19 @@ function BonusSpellHitCell({ isUtilityConc, autoHit, isSpellAtk, hasAttackType, 
     return <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>;
 }
 
+function buildBonusSpellAttackItem(spell, playerStats, resolvedDamage, damageType) {
+    return {
+        ...spell,
+        type: 'Bonus Action',
+        hitBonus: playerStats.spellAbilities?.toHit,
+        saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null,
+        saveType: spell.dc?.dc_type,
+        saveSuccess: spell.dc?.dc_success,
+        damage: resolvedDamage,
+        damageType,
+    };
+}
+
 function BonusSpellRow({ spell, playerStats, exhaustionPenalty, conditionAttackMode, cannotAct, is2024Rules, hasWeaponMastery, displaySaveDcBonus, onAttackClick, onResolveSpellDamage, gateMetamagic, getBonusSpellDamageDisplay, onSpellNameClick }) {
     const damageType = bonusSpellDamageType(spell);
     const resolvedDamage = spell.heal_at_slot_level
@@ -249,7 +262,7 @@ function BonusSpellRow({ spell, playerStats, exhaustionPenalty, conditionAttackM
     const isSpellAtk = !spell.dc;
     const hasAttackType = spell.attack_type != null && spell.attack_type !== '';
     const isUtilityConc = spell.concentration && !spell.dc;
-    const attackItem = { ...spell, type: 'Bonus Action', hitBonus: playerStats.spellAbilities?.toHit, saveDc: spell.dc ? playerStats.spellAbilities.saveDc : null, saveType: spell.dc?.dc_type, saveSuccess: spell.dc?.dc_success, damage: resolvedDamage, damageType };
+    const attackItem = buildBonusSpellAttackItem(spell, playerStats, resolvedDamage, damageType);
     const handleDamageClick = () => {
         if (cannotAct || isUtilityConc) return;
         // SINGLE ENTRY POINT for bonus action spell casting:
@@ -394,7 +407,7 @@ function showApplyPoisonRow(playerStats, poisonDoses, cannotAct) {
     return hasApplyPoison && Number(poisonDoses ?? 0) > 0 && !cannotAct;
 }
 
-function computeShowHordeBreakerRow(playerStats, huntersPreyChoice, hordeBreakerReady, hordeBreakerUsedRound, cannotAct, hordeBreakerWeapon) {
+function computeShowHordeBreakerRow({ playerStats, huntersPreyChoice, hordeBreakerReady, hordeBreakerUsedRound, cannotAct, hordeBreakerWeapon }) {
     const hordeBreakerMarker = (playerStats.attacks || []).find(a => a.isHordeBreaker);
     const showHordeBreakerRow = !!hordeBreakerMarker
         && huntersPreyChoice === 'Horde Breaker'
@@ -465,6 +478,117 @@ function BonusFeatureList({ playerStats, onAutomationAction, setPopupHtml }) {
             </div>;
         })}
     </div>;
+}
+
+function WrathOfTheSeaRow({ playerStats, campaignName, onAutomationAction }) {
+    const wrathActive = getRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
+    if (!wrathActive) return null;
+    const hasWotSInBonusActions = (playerStats.bonusActions || []).some(a => a.name === 'Wrath of the Sea');
+    if (hasWotSInBonusActions) return null;
+    return (
+        <div>
+            <b className="clickable" onClick={() => onAutomationAction({
+                name: 'Wrath of the Sea',
+                description: 'Force a creature to make a CON save or take WIS modifier d6 Cold damage.',
+                automation: {
+                    type: 'wrath_of_the_sea',
+                    action: 'bonus_action',
+                    allyAttack: true,
+                },
+            })}>Wrath of the Sea:</b> <span>Force a creature to make a CON save or take WIS modifier d6 Cold damage.</span>
+        </div>
+    );
+}
+
+function StarryFormArcherRow({ playerStats, activeBuffs, onAutomationAction }) {
+    const starryFormBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Starry Form' && b.constellation === 'Archer') : null;
+    if (!starryFormBuff) return null;
+    const level = playerStats.level || 1;
+    const isTwinkled = level >= 10;
+    const damageDice = isTwinkled ? '2d8' : '1d8';
+    const wis = playerStats.abilities.find(a => a.name === 'Wisdom');
+    const wisMod = wis?.bonus || 0;
+    const spellAttackMod = playerStats.spellAbilities?.toHit || 0;
+    return (
+        <div>
+            <b className="clickable" onClick={() => onAutomationAction({
+                name: 'Starry Form: Luminous Arrow',
+                description: `Ranged spell attack, 60 ft. On a hit: ${damageDice} + ${wisMod} Radiant damage.`,
+                automation: {
+                    type: 'starry_form_arrow',
+                    action: 'bonus_action',
+                    damageDice,
+                    damageType: 'Radiant',
+                    damageBonus: wisMod,
+                    spellAttackMod,
+                    range: '60_ft',
+                },
+            })}>Starry Form: Luminous Arrow:</b> <span>{`Ranged spell attack, 60 ft. On a hit: ${damageDice} + ${wisMod} Radiant damage.`}</span>
+        </div>
+    );
+}
+
+function SpiritualWeaponMoveRow({ playerStats, activeBuffs, campaignName, cannotAct, exhaustionPenalty, rollAttack, setPopupHtml }) {
+    // SP-112: Spiritual Weapon — once the spectral
+    // force is active, surface a "Move up to 20 ft & repeat the attack" Bonus Action row
+    // on the caster's LATER turns (activatedRound gate), mirroring the
+    // Starry Form conditional-row pattern.
+    const forceBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'spiritual_weapon_force') : null;
+    if (!forceBuff) return null;
+    const currentRound = getCurrentCombatRound(campaignName);
+    if (currentRound <= (forceBuff.activatedRound ?? 0)) return null;
+    const spellAttackMod = playerStats.spellAbilities?.toHit || 0;
+    return (
+        <div>
+            <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={async () => {
+                if (cannotAct) return;
+                const res = await resolveSpiritualWeaponMoveAndAttack(playerStats, campaignName);
+                if (res.refused) { setPopupHtml({ type: 'automation_info', name: 'Spiritual Weapon', description: res.message }); return; }
+                rollAttack(res.attack.name, res.attack.hitBonus - (exhaustionPenalty || 0), {
+                    targetName: res.targetName,
+                    damageType: res.attack.damageType,
+                    autoDamageFormula: res.attack.autoDamageFormula,
+                    autoDamageName: res.attack.autoDamageName,
+                    autoDamageSchool: res.attack.autoDamageSchool,
+                    spellName: 'Spiritual Weapon',
+                });
+            }}>Spiritual Weapon: Move 20 ft &amp; Attack:</b> <span>Move the spectral force up to 20 feet and repeat the melee spell attack (+{spellAttackMod}) against a creature within 5 feet of it. {forceBuff.damageFormula || '1d8 + 3'} Force.</span>
+        </div>
+    );
+}
+
+function InvokeDuplicityMoveRow({ activeBuffs, cannotAct, onAutomationAction }) {
+    // CLA-366: Invoke Duplicity "Move" bonus action — while the
+    // illusion is active, surface the move row (GM adjudicates the
+    // illusion position; no illusion token exists). Trickster's
+    // Transposition lets the caster swap places as part of the
+    // same Bonus Action, so the row routes to the swap confirm.
+    const illusionBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'create_illusion') : null;
+    if (!illusionBuff) return null;
+    return (
+        <div>
+            <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
+                if (cannotAct) return;
+                onAutomationAction({
+                    name: 'Trickster\'s Transposition',
+                    description: 'Move the Invoke Duplicity illusion up to 30 feet, swapping places with it.',
+                    automation: {
+                        type: 'temp_buff',
+                        effect: 'teleport_swap_with_illusion',
+                        action: 'bonus_action',
+                        duration: 'while_illusion_active',
+                        distance: '30 ft',
+                        casting_time: '1 bonus action',
+                        moveIllusion: true,
+                    },
+                });
+            }}>Move Invoke Duplicity (Transposition):</b> <span>Move the illusion up to 30 feet (GM adjudicates its position) and swap places with it.</span>
+        </div>
+    );
+}
+
+function computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem) {
+    return bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions || !!visibleHordeBreakerItem;
 }
 
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState, modalState }) {
@@ -589,7 +713,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const { castAction: bonusCastAction } = useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta: { innateSorceryActive: !!displaySaveDcBonus }, cachedPosRef: cachedBonusCastPosRef, setModalState });
 
-    const { pendingMetamagic, pendingBarkskin, pendingHealingWord, pendingSanctuary, gateMetamagic, handleConfirm, handleSkip, handleBarkskinConfirm, handleBarkskinSkip, handleHealingWordConfirm, handleHealingWordSkip, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction, null, characters, setPopupHtml);
+    const { pendingMetamagic, pendingBarkskin, pendingHealingWord, pendingSanctuary, gateMetamagic, handleConfirm, handleSkip, handleBarkskinConfirm, handleBarkskinSkip, handleHealingWordConfirm, handleHealingWordSkip, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip } = useSpellMetamagicFlow({ playerStats: playerStats, campaignName: campaignName, onExecute: bonusCastAction, setSecondaryTargetModal: null, characters: characters, setPopupHtml: setPopupHtml });
     const [pendingLesserRestorationTarget, setPendingLesserRestorationTarget] = useState(null);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
@@ -639,7 +763,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         if (!hordeBreakerReady || !hordeBreakerReady.attackName) return null;
         return (playerStats.attacks || []).find(a => !a.isHordeBreaker && a.name === hordeBreakerReady.attackName) || null;
     }, [hordeBreakerReady, playerStats.attacks]);
-    const showHordeBreakerRow = computeShowHordeBreakerRow(playerStats, huntersPreyChoice, hordeBreakerReady, hordeBreakerUsedRound, cannotAct, hordeBreakerWeapon);
+    const showHordeBreakerRow = computeShowHordeBreakerRow({ playerStats, huntersPreyChoice, hordeBreakerReady, hordeBreakerUsedRound, cannotAct, hordeBreakerWeapon });
     const hordeBreakerAttackItem = React.useMemo(() => buildHordeBreakerAttackItem(hordeBreakerMarker, hordeBreakerWeapon), [hordeBreakerMarker, hordeBreakerWeapon]);
     const visibleHordeBreakerItem = showHordeBreakerRow ? hordeBreakerAttackItem : null;
     const displayedBonusAttacks = visibleHordeBreakerItem ? [...bonusActionAttacks, visibleHordeBreakerItem] : bonusActionAttacks;
@@ -684,7 +808,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         }).catch((e) => { console.error("[charBonusActions:log-error]", e); });
     }, [hordeBreakerAttackItem, hordeBreakerReady, campaignName, exhaustionPenalty, playerStats.name, rollAttack]);
 
-    const hasBonusContent = bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions || !!visibleHordeBreakerItem;
+    const hasBonusContent = computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem);
 
     if (!hasBonusContent) return null;
 
@@ -740,112 +864,13 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                 {(popupHtml && hasBonusActions) && <br />}
                 {hasBonusActions && <BonusFeatureList playerStats={playerStats} onAutomationAction={onAutomationAction} setPopupHtml={setPopupHtml} />}
 
-                {(() => {
-                    const wrathActive = getRuntimeValue(playerStats.name, 'wrathOfTheSeaActive', campaignName);
-                    if (!wrathActive) return null;
-                    const hasWotSInBonusActions = (playerStats.bonusActions || []).some(a => a.name === 'Wrath of the Sea');
-                    if (hasWotSInBonusActions) return null;
-                    return (
-                        <div>
-                            <b className="clickable" onClick={() => onAutomationAction({
-                                name: 'Wrath of the Sea',
-                                description: 'Force a creature to make a CON save or take WIS modifier d6 Cold damage.',
-                                automation: {
-                                    type: 'wrath_of_the_sea',
-                                    action: 'bonus_action',
-                                    allyAttack: true,
-                                },
-                            })}>Wrath of the Sea:</b> <span>Force a creature to make a CON save or take WIS modifier d6 Cold damage.</span>
-                        </div>
-                    );
-                })()}
+                <WrathOfTheSeaRow playerStats={playerStats} campaignName={campaignName} onAutomationAction={onAutomationAction} />
 
-                {(() => {
-                    const starryFormBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Starry Form' && b.constellation === 'Archer') : null;
-                    if (!starryFormBuff) return null;
-                    const level = playerStats.level || 1;
-                    const isTwinkled = level >= 10;
-                    const damageDice = isTwinkled ? '2d8' : '1d8';
-                    const wis = playerStats.abilities.find(a => a.name === 'Wisdom');
-                    const wisMod = wis?.bonus || 0;
-                    const spellAttackMod = playerStats.spellAbilities?.toHit || 0;
-                    return (
-                        <div>
-                            <b className="clickable" onClick={() => onAutomationAction({
-                                name: 'Starry Form: Luminous Arrow',
-                                description: `Ranged spell attack, 60 ft. On a hit: ${damageDice} + ${wisMod} Radiant damage.`,
-                                automation: {
-                                    type: 'starry_form_arrow',
-                                    action: 'bonus_action',
-                                    damageDice,
-                                    damageType: 'Radiant',
-                                    damageBonus: wisMod,
-                                    spellAttackMod,
-                                    range: '60_ft',
-                                },
-                            })}>Starry Form: Luminous Arrow:</b> <span>{`Ranged spell attack, 60 ft. On a hit: ${damageDice} + ${wisMod} Radiant damage.`}</span>
-                        </div>
-                    );
-                })()}
+                <StarryFormArcherRow playerStats={playerStats} activeBuffs={activeBuffs} onAutomationAction={onAutomationAction} />
 
-                {(() => {
-                    // SP-112: Spiritual Weapon — once the spectral force is active,
-                    // surface a "Move up to 20 ft & repeat the attack" Bonus Action row
-                    // on the caster's LATER turns (activatedRound gate), mirroring the
-                    // Starry Form conditional-row pattern.
-                    const forceBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'spiritual_weapon_force') : null;
-                    if (!forceBuff) return null;
-                    const currentRound = getCurrentCombatRound(campaignName);
-                    if (currentRound <= (forceBuff.activatedRound ?? 0)) return null;
-                    const spellAttackMod = playerStats.spellAbilities?.toHit || 0;
-                    return (
-                        <div>
-                            <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={async () => {
-                                if (cannotAct) return;
-                                const res = await resolveSpiritualWeaponMoveAndAttack(playerStats, campaignName);
-                                if (res.refused) { setPopupHtml({ type: 'automation_info', name: 'Spiritual Weapon', description: res.message }); return; }
-                                rollAttack(res.attack.name, res.attack.hitBonus - (exhaustionPenalty || 0), {
-                                    targetName: res.targetName,
-                                    damageType: res.attack.damageType,
-                                    autoDamageFormula: res.attack.autoDamageFormula,
-                                    autoDamageName: res.attack.autoDamageName,
-                                    autoDamageSchool: res.attack.school,
-                                    spellName: 'Spiritual Weapon',
-                                });
-                            }}>Spiritual Weapon: Move 20 ft &amp; Attack:</b> <span>Move the spectral force up to 20 feet and repeat the melee spell attack (+{spellAttackMod}) against a creature within 5 feet of it. {forceBuff.damageFormula || '1d8 + 3'} Force.</span>
-                        </div>
-                    );
-                })()}
+                <SpiritualWeaponMoveRow playerStats={playerStats} activeBuffs={activeBuffs} campaignName={campaignName} cannotAct={cannotAct} exhaustionPenalty={exhaustionPenalty} rollAttack={rollAttack} setPopupHtml={setPopupHtml} />
 
-                {(() => {
-                    // CLA-366: Invoke Duplicity "Move" bonus action — while the
-                    // illusion is active, surface the move row (GM adjudicates the
-                    // illusion position; no illusion token exists). Trickster's
-                    // Transposition lets the caster swap places as part of the
-                    // same Bonus Action, so the row routes to the swap confirm.
-                    const illusionBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'create_illusion') : null;
-                    if (!illusionBuff) return null;
-                    return (
-                        <div>
-                            <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
-                                if (cannotAct) return;
-                                onAutomationAction({
-                                    name: 'Trickster\'s Transposition',
-                                    description: 'Move the Invoke Duplicity illusion up to 30 feet, swapping places with it.',
-                                    automation: {
-                                        type: 'temp_buff',
-                                        effect: 'teleport_swap_with_illusion',
-                                        action: 'bonus_action',
-                                        duration: 'while_illusion_active',
-                                        distance: '30 ft',
-                                        casting_time: '1 bonus action',
-                                        moveIllusion: true,
-                                    },
-                                });
-                            }}>Move Invoke Duplicity (Transposition):</b> <span>Move the illusion up to 30 feet (GM adjudicates its position) and swap places with it.</span>
-                        </div>
-                    );
-                })()}
+                <InvokeDuplicityMoveRow activeBuffs={activeBuffs} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />
 
                 {showEatTreat && <EatTreatRow handleEatBolsteringTreat={handleEatBolsteringTreat} />}
 

@@ -424,7 +424,7 @@ const rules = {
     getMagicItems,
 
     // === SHARED: getPlayerStats ===
-    getPlayerStats: async (allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary) => {
+    getPlayerStats: async ({ allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary }) => {
         const playerStats = cloneDeep(playerSummary);
 
         // Read Fey Touched and Shadow Touched spells from runtime store

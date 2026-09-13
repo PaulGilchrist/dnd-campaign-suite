@@ -267,7 +267,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             testPendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'ShieldedAlly', name: 'Magic Missile', damageType: 'force' }) };
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'ShieldedAlly', success: true, roll: 18, total: 21, saveBonus: 3 } }));
             await flushPromises();
-            expect(applyDamageToTarget).toHaveBeenCalledWith(null, 'ShieldedAlly', 0, ['force'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true, ...{ isSpellDamage: false } });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(null, 'ShieldedAlly', 0, ['force'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true, ...{ isSpellDamage: false } });
         });
 
         it('does not apply shield immunity for non-magic missile spells', async () => {
@@ -408,7 +408,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             testPendingSaves = { [pid]: createSavePrompt(pid, { statusEffects: ['poisoned', 'frightened'], saveDc: 15, saveType: 'CON' }) };
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 5, total: 8, saveBonus: 3 } }));
             await flushPromises();
-            expect(addExpiration).toHaveBeenCalledWith('TestWizard', 'Goblin', expect.any(Array), 'test-campaign', 2);
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'Goblin', effects: expect.any(Array), campaignName: 'test-campaign', rounds: 2 });
         });
 
         it('skips status effects when target is immune', async () => {

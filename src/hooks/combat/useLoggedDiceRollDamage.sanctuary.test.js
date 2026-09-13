@@ -198,7 +198,7 @@ describe('Sanctuary check on save-based spells', () => {
             getRuntimeValue.mockReturnValue([]);
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
                 expect.objectContaining({ name: 'Sanctuary' })
@@ -225,7 +225,7 @@ describe('Sanctuary check on save-based spells', () => {
             });
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
                 expect.objectContaining({ name: 'Sanctuary' })
@@ -248,7 +248,7 @@ describe('Sanctuary check on save-based spells', () => {
             });
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
                 expect.objectContaining({ name: 'Sanctuary' })
@@ -281,7 +281,7 @@ describe('Sanctuary check on save-based spells', () => {
                 }));
             });
 
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'automation_info',
@@ -325,7 +325,7 @@ describe('Sanctuary check on save-based spells', () => {
                 }));
             });
 
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             // No sanctuary popup should be shown
             expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
@@ -365,7 +365,7 @@ describe('Sanctuary check on save-based spells', () => {
                 }));
             });
 
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 promptId: 'test-guid-1234',
@@ -400,7 +400,7 @@ describe('Sanctuary check on save-based spells', () => {
                 }));
             });
 
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign',
@@ -433,7 +433,7 @@ describe('Sanctuary check on save-based spells', () => {
                 }));
             });
 
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             // The handler deletes the promptId it created from pendingSavePrompts
             // Verify setRuntimeValue was called to update pendingSavePrompts
@@ -479,7 +479,7 @@ describe('Sanctuary check on save-based spells', () => {
                 }));
             });
 
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             expect(consoleSpy).toHaveBeenCalledWith(
                 '[sanctuary] Missing saveDc on targetEffect for target',
@@ -523,7 +523,7 @@ describe('Sanctuary check on save-based spells', () => {
                 }));
             });
 
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             // The spell should proceed since the correct save succeeded
             expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
@@ -556,7 +556,7 @@ describe('Sanctuary check on save-based spells', () => {
                 }));
             });
 
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, defaultContext);
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: defaultContext });
 
             const popupCall = deps.setPopupHtml.mock.calls[0][0];
             expect(popupCall.description).toContain('Wizard1');

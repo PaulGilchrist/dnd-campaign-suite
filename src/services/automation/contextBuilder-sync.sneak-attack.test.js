@@ -152,47 +152,47 @@ describe('CLA-317: sneak attack ally-5ft gate', () => {
   });
 
   it('refuses sneak when no trigger: no advantage and no ally within 5 ft', async () => {
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(0);
     expect(isWithinRange).toHaveBeenCalledWith('Thug 1', 'ElderPaladin', 5);
   });
 
   it('grants sneak when a healthy ally is within 5 ft of the target', async () => {
     isWithinRange.mockResolvedValue(true);
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(9);
   });
 
   it('refuses sneak when the only ally in range has the Incapacitated condition (runtime)', async () => {
     isWithinRange.mockResolvedValue(true);
     setupRuntime({ activeConditions: ['incapacitated'] });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(0);
   });
 
   it('refuses sneak when the only ally in range is Stunned (grants Incapacitated)', async () => {
     isWithinRange.mockResolvedValue(true);
     setupRuntime({ activeConditions: ['stunned'] });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(0);
   });
 
   it('refuses sneak when ally conditions on combatSummary include Incapacitated', async () => {
     isWithinRange.mockResolvedValue(true);
     getCombatContext.mockResolvedValue(combatSummary([{ key: 'Incapacitated' }]));
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(0);
   });
 
   it('grants sneak via advantage without consulting the ally range loop', async () => {
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'advantage', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'advantage');
     expect(result.sneakAttackDice).toBe(9);
     expect(isWithinRange).not.toHaveBeenCalled();
   });
 
   it('refuses sneak with disadvantage even with adjacent ally and advantage trigger available', async () => {
     isWithinRange.mockResolvedValue(true);
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'disadvantage', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'disadvantage');
     expect(result.sneakAttackDice).toBe(0);
     expect(isWithinRange).not.toHaveBeenCalled();
   });
@@ -200,7 +200,7 @@ describe('CLA-317: sneak attack ally-5ft gate', () => {
   it('round latch blocks sneak on a second attack in the same round', async () => {
     isWithinRange.mockResolvedValue(true);
     setupRuntime({ latch: 1 });
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(0);
     expect(isWithinRange).not.toHaveBeenCalled();
   });
@@ -209,7 +209,7 @@ describe('CLA-317: sneak attack ally-5ft gate', () => {
     isWithinRange.mockResolvedValue(true);
     setupRuntime({ latch: 1 });
     getCurrentCombatRound.mockReturnValue(2);
-    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal', {});
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(9);
   });
 
@@ -217,7 +217,7 @@ describe('CLA-317: sneak attack ally-5ft gate', () => {
     isWithinRange.mockResolvedValue(true);
     const result = await buildAttackContextSync(
       { ...finesseAttack, name: 'Mace', properties: [], damageType: 'Bludgeoning' },
-      rogueStats, 'camp', 'normal', {}
+      rogueStats, 'camp', 'normal'
     );
     expect(result.sneakAttackDice).toBe(0);
   });

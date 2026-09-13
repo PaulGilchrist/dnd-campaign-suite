@@ -30,11 +30,7 @@ describe('useCharActionsBaseActions - handleDodgeAction', () => {
                 { effect: 'dodge', duration: 'until_start_of_next_turn' },
                 campaignName, 'TestFighter'
             );
-            expect(mockAddExpiration).toHaveBeenCalledWith(
-                'TestFighter', 'TestFighter',
-                [{ type: 'remove_active_buff', buffName: 'Dodge' }],
-                campaignName, undefined, 'TestFighter'
-            );
+            expect(mockAddExpiration).toHaveBeenCalledWith({ attackerName: 'TestFighter', targetName: 'TestFighter', effects: [{ type: 'remove_active_buff', buffName: 'Dodge' }], campaignName, rounds: undefined, expireOnCreatureName: 'TestFighter' });
             expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestFighter',
@@ -76,11 +72,7 @@ describe('useCharActionsBaseActions - handleDodgeAction', () => {
                 { effect: 'dodge', duration: 'until_start_of_next_turn' },
                 campaignName, 'RogueOne'
             );
-            expect(mockAddExpiration).toHaveBeenCalledWith(
-                'RogueOne', 'RogueOne',
-                [{ type: 'remove_active_buff', buffName: 'Dodge' }],
-                campaignName, undefined, 'RogueOne'
-            );
+            expect(mockAddExpiration).toHaveBeenCalledWith({ attackerName: 'RogueOne', targetName: 'RogueOne', effects: [{ type: 'remove_active_buff', buffName: 'Dodge' }], campaignName, rounds: undefined, expireOnCreatureName: 'RogueOne' });
             expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 characterName: 'RogueOne',
             }));

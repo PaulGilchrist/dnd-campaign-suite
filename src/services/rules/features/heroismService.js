@@ -81,9 +81,9 @@ async function applyHeroismToTarget({ targetName, playerStats, campaignName, cas
     addHeroismTurnStartEffect(targetName, playerStats, tempHpAmount, campaignName);
     syncHeroismTargetEffects(targetName, campaignName);
 
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_heroism_buff', buffName: HEROISM_BUFF_NAME },
-    ], campaignName);
+    ], campaignName });
 
     if (combatSummary) {
         addConcentration(combatSummary, casterName, 'Heroism', dc, targetName);

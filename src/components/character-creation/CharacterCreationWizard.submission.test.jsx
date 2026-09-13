@@ -334,7 +334,7 @@ describe('CharacterCreationWizard - Submission', () => {
     });
 
     await waitFor(() => {
-      expect(validateStep).toHaveBeenCalledWith(12, mockFormData, {}, [], [], '5e');
+      expect(validateStep).toHaveBeenCalledWith(12, mockFormData, { racesData: [], classSubtypes: [], ruleset: '5e' });
     });
   });
 

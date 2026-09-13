@@ -21,14 +21,7 @@ describe('CLA-392 Words of Creation spread — first target never skipped', () =
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(async () => ({ name: 'Thug 1' }));
 
-    const result = await handlePowerWordKill(
-      { name: 'Power Word Kill' },
-      { multiTarget: 'Thug 2' },
-      getTargetInfo,
-      makePlayerStats(),
-      CAMPAIGN,
-      apply
-    );
+    const result = await handlePowerWordKill({ spell: { name: 'Power Word Kill' }, metaCtx: { multiTarget: 'Thug 2' }, getTargetInfo, playerStats: makePlayerStats(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
 
     expect(result).toEqual({ handled: true });
     expect(getTargetInfo).toHaveBeenCalledTimes(1);
@@ -42,14 +35,7 @@ describe('CLA-392 Words of Creation spread — first target never skipped', () =
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(async () => ({ name: 'Thug 1' }));
 
-    const result = await handlePowerWordKill(
-      { name: 'Power Word Kill' },
-      { multiTarget: 'Thug 1' },
-      getTargetInfo,
-      makePlayerStats(),
-      CAMPAIGN,
-      apply
-    );
+    const result = await handlePowerWordKill({ spell: { name: 'Power Word Kill' }, metaCtx: { multiTarget: 'Thug 1' }, getTargetInfo, playerStats: makePlayerStats(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
 
     expect(result).toEqual({ handled: true });
     expect(apply).toHaveBeenCalledTimes(1);
@@ -60,14 +46,7 @@ describe('CLA-392 Words of Creation spread — first target never skipped', () =
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(async () => ({ name: 'Thug 1' }));
 
-    const result = await handlePowerWordKill(
-      { name: 'Power Word Kill' },
-      {},
-      getTargetInfo,
-      makePlayerStats(),
-      CAMPAIGN,
-      apply
-    );
+    const result = await handlePowerWordKill({ spell: { name: 'Power Word Kill' }, metaCtx: {}, getTargetInfo, playerStats: makePlayerStats(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
 
     expect(result).toEqual({ handled: true });
     expect(getTargetInfo).toHaveBeenCalledTimes(1);
@@ -79,14 +58,7 @@ describe('CLA-392 Words of Creation spread — first target never skipped', () =
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(async () => ({ name: 'Thug 1' }));
 
-    const result = await handlePowerWordHeal(
-      { name: 'Power Word Heal' },
-      { multiTarget: 'Thug 2' },
-      getTargetInfo,
-      makePlayerStats(),
-      CAMPAIGN,
-      apply
-    );
+    const result = await handlePowerWordHeal({ spell: { name: 'Power Word Heal' }, metaCtx: { multiTarget: 'Thug 2' }, getTargetInfo, playerStats: makePlayerStats(), campaignName: CAMPAIGN, applyPowerWordHealToTarget: apply });
 
     expect(result).toEqual({ handled: true });
     expect(getTargetInfo).toHaveBeenCalledTimes(1);
@@ -100,14 +72,7 @@ describe('CLA-392 Words of Creation spread — first target never skipped', () =
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(async () => ({ name: 'Thug 1' }));
 
-    const result = await handlePowerWordHeal(
-      { name: 'Power Word Heal' },
-      {},
-      getTargetInfo,
-      makePlayerStats(),
-      CAMPAIGN,
-      apply
-    );
+    const result = await handlePowerWordHeal({ spell: { name: 'Power Word Heal' }, metaCtx: {}, getTargetInfo, playerStats: makePlayerStats(), campaignName: CAMPAIGN, applyPowerWordHealToTarget: apply });
 
     expect(result).toEqual({ handled: true });
     expect(apply).toHaveBeenCalledTimes(1);

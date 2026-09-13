@@ -18,7 +18,7 @@ function logInitiativeRoll(campaignName, creatureName, roll, bonus) {
     }).catch((e) => { console.error("[combatLogging] Error:", e); })
 }
 
-function logConditionEvent(campaignName, action, creatureName, conditionLabel, dc, ability) {
+function logConditionEvent({ campaignName, action, creatureName, conditionLabel, dc, ability }) {
     return addEntry(campaignName, {
         type: 'condition',
         action,

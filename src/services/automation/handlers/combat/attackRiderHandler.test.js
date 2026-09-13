@@ -405,14 +405,7 @@ describe('attackRiderHandler', () => {
 
             // FT-082: expiration must be registered so the te expires at the
             // holder's next turn start (drained by expireStaleEffects phase 1).
-            expect(addExpiration).toHaveBeenCalledWith(
-                'TestHero',
-                'Goblin',
-                [{ type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'TestHero', option: 'Hamstring', target: 'Goblin' }],
-                'campaign',
-                undefined,
-                'TestHero'
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestHero', targetName: 'Goblin', effects: [{ type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'TestHero', option: 'Hamstring', target: 'Goblin' }], campaignName: 'campaign', rounds: undefined, expireOnCreatureName: 'TestHero' });
         });
 
         it('should NOT register expiration for save-based speed_reduction options', async () => {

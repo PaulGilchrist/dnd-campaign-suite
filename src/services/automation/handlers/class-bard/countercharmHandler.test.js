@@ -222,20 +222,20 @@ describe('countercharmHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(removeCondition).toHaveBeenCalledWith(
-        expect.any(Object),
-        'TestHero',
-        'charmed',
-        expect.any(Function),
-        expect.any(Function),
-      );
-      expect(removeCondition).toHaveBeenCalledWith(
-        expect.any(Object),
-        'TestHero',
-        'frightened',
-        expect.any(Function),
-        expect.any(Function),
-      );
+      expect(removeCondition).toHaveBeenCalledWith({
+        combatSummary: expect.any(Object),
+        creatureName: 'TestHero',
+        condition: 'charmed',
+        getRuntimeValue: expect.any(Function),
+        setRuntimeValue: expect.any(Function),
+      });
+      expect(removeCondition).toHaveBeenCalledWith({
+        combatSummary: expect.any(Object),
+        creatureName: 'TestHero',
+        condition: 'frightened',
+        getRuntimeValue: expect.any(Function),
+        setRuntimeValue: expect.any(Function),
+      });
     });
 
     it('should not remove conditions when save already succeeded', async () => {

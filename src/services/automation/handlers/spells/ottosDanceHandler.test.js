@@ -156,14 +156,7 @@ describe('ottosDanceHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        expect.arrayContaining([{ type: 'speed_zero', condition: 'speed_zero' }]),
-        campaignName,
-        undefined,
-        'TestCaster',
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'speed_zero', condition: 'speed_zero' }]), campaignName, rounds: undefined, expireOnCreatureName: 'TestCaster' });
     });
 
     it('should call addEntry with ability_use on initial cast', async () => {
@@ -288,12 +281,7 @@ describe('ottosDanceHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith(
-        'TestCaster',
-        'Goblin',
-        expect.any(Array),
-        campaignName,
-      );
+      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.any(Array), campaignName });
     });
 
     it('should call addEntry on failed save', async () => {
@@ -699,14 +687,7 @@ describe('ottosDanceHandler.processOttoDanceSuccessSave', () => {
       campaignName,
     );
 
-    expect(addExpiration).toHaveBeenCalledWith(
-      'TestCaster',
-      'Goblin',
-      expect.arrayContaining([{ type: 'speed_zero', condition: 'speed_zero' }]),
-      campaignName,
-      undefined,
-      'TestCaster',
-    );
+    expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'speed_zero', condition: 'speed_zero' }]), campaignName, rounds: undefined, expireOnCreatureName: 'TestCaster' });
   });
 
   it('should call addEntry', async () => {

@@ -23,7 +23,7 @@ function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, 
 
     const handleChoice = async (mode) => {
         try {
-            const res = await applyBendFateChoice(action, playerStats, campaignName, d4Roll, lastAttack, mode);
+            const res = await applyBendFateChoice({ action, playerStats, campaignName, d4Roll, lastAttack, mode });
             setResult(res);
         } catch (e) {
             console.error('Bend Luck failed', e);

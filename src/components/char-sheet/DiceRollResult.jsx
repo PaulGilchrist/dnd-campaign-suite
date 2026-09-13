@@ -336,11 +336,22 @@ function SaveResultLine({ success, total, dc, roll, bonus, mode }) {
     );
 }
 
+function saveRollNoticesVisibility(props, state) {
+    const { waitingForPlayerSave, saveResult, rollType, saveDc, dc, success } = props;
+    return {
+        showSaveResult: saveResult !== undefined && saveResult !== null,
+        showDcUnknown: rollType === 'save' && saveDc == null,
+        showSaveInfo: dc !== undefined && success === undefined && !waitingForPlayerSave && !state.isSaveDamageType,
+        showConditionSaveResult: rollType === 'condition-save' && success !== undefined,
+    };
+}
+
 function SaveRollNotices({ props, state }) {
-    const { waitingForPlayerSave, saveType, saveDc, onQuickRoll, saveResult, rollType,
-        dc, success, dcType, dcSuccess } = props;
+    const { waitingForPlayerSave, saveType, saveDc, onQuickRoll, saveResult,
+        dc, dcType, dcSuccess } = props;
     const { finalTotal, safeRolls, mode } = state;
     const saveAbilityLabel = saveType ? saveType.toUpperCase() : '';
+    const visible = saveRollNoticesVisibility(props, state);
     return (
         <>
             {waitingForPlayerSave && (
@@ -353,21 +364,21 @@ function SaveRollNotices({ props, state }) {
                 )}
               </div>
             )}
-            {saveResult !== undefined && saveResult !== null && (
+            {visible.showSaveResult && (
               <SaveResultLine success={saveResult.success} total={saveResult.total} dc={saveDc} roll={saveResult.roll} bonus={saveResult.bonus} mode={mode} />
             )}
-            {rollType === 'save' && saveDc == null && (
+            {visible.showDcUnknown && (
               <div className="dice-roll-save-info">
                 <i className="fa-solid fa-triangle-exclamation"></i> DC Unknown — no success or failure
               </div>
             )}
-            {dc !== undefined && success === undefined && !waitingForPlayerSave && !state.isSaveDamageType && (
+            {visible.showSaveInfo && (
               <div className="dice-roll-save-info">
                 Save DC {dc} {dcType}: {dcSuccess === 'half' ? 'half damage on save' : 'no damage on save'}
               </div>
             )}
-            {rollType === 'condition-save' && success !== undefined && (
-              <SaveResultLine success={success} total={finalTotal} dc={dc} roll={safeRolls[0] || 0} bonus={props.bonus} mode={mode} />
+            {visible.showConditionSaveResult && (
+              <SaveResultLine success={props.success} total={finalTotal} dc={dc} roll={safeRolls[0] || 0} bonus={props.bonus} mode={mode} />
             )}
         </>
     );
@@ -521,43 +532,66 @@ function FeatureTriggerButtons({ props, state, handlers }) {
 function DamageFeatureTriggers({ props, state, handlers }) {
     const { bardicInspirationDefense, bardicInspirationDefenseDieSize, bardicInspirationOffense,
         bardicInspirationOffenseDieSize, empoweredSpell, piercerPuncture, savageAttacker } = props;
-    return (
-        <>
-            {bardicInspirationDefense && !state.bardicInspirationDefenseUsed && state.computedHit && (
+    const triggers = [
+        {
+            key: 'bardicDefense',
+            when: () => bardicInspirationDefense && !state.bardicInspirationDefenseUsed && state.computedHit,
+            render: () => (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={handlers.handleBardicInspirationDefense} type="button">
                   <i className="fa-solid fa-music"></i> Bardic Inspiration - Defense (d{bardicInspirationDefenseDieSize})
                 </button>
               </div>
-            )}
-            {bardicInspirationOffense && !state.bardicInspirationOffenseUsed && state.isDamageType && (
+            ),
+        },
+        {
+            key: 'bardicOffense',
+            when: () => bardicInspirationOffense && !state.bardicInspirationOffenseUsed && state.isDamageType,
+            render: () => (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={() => handlers.handleBardicInspirationOffense()} type="button">
                   <i className="fa-solid fa-music"></i> Bardic Inspiration - Offense (d{bardicInspirationOffenseDieSize})
                 </button>
               </div>
-            )}
-            {empoweredSpell && !state.empoweredSpellUsed && state.isDamageType && (
+            ),
+        },
+        {
+            key: 'empowered',
+            when: () => empoweredSpell && !state.empoweredSpellUsed && state.isDamageType,
+            render: () => (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={handlers.handleEmpoweredSpell} type="button">
                   <i className="fa-solid fa-wand-magic-sparkles"></i> Empowered Spell (1 SP)
                 </button>
               </div>
-            )}
-            {piercerPuncture && !state.punctureUsed && state.isDamageType && (
+            ),
+        },
+        {
+            key: 'puncture',
+            when: () => piercerPuncture && !state.punctureUsed && state.isDamageType,
+            render: () => (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={handlers.handlePuncture} type="button">
                   <i className="fa-solid fa-bolt"></i> Piercer - Puncture
                 </button>
               </div>
-            )}
-            {savageAttacker && !state.savageAttackerUsed && state.isDamageType && (
+            ),
+        },
+        {
+            key: 'savage',
+            when: () => savageAttacker && !state.savageAttackerUsed && state.isDamageType,
+            render: () => (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={handlers.handleSavageAttacker} type="button">
                   <i className="fa-solid fa-arrows-spin"></i> Savage Attacker
                 </button>
               </div>
-            )}
+            ),
+        },
+    ];
+    return (
+        <>
+            {triggers.map(trigger => trigger.when() ? <Fragment key={trigger.key}>{trigger.render()}</Fragment> : null)}
         </>
     );
 }
@@ -686,32 +720,45 @@ function FeatureResultSummary({ props, state, handlers }) {
     );
 }
 
+function SecondarySaveResultRow({ secondarySaveResult, saveDc }) {
+    return (
+        <div className={`dice-roll-secondary-save-result ${secondarySaveResult.success ? 'save-success' : 'save-failure'}`}>
+            {secondarySaveResult.success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({secondarySaveResult.total} vs DC {saveDc})
+        </div>
+    );
+}
+
+function SecondaryDamageTotalRow({ finalDamage, damageType, secondaryFinalDamage, secondaryDamageType }) {
+    return (
+        <div className="dice-roll-secondary-total">
+            {finalDamage} {damageType || ''} damage + {secondaryFinalDamage} {secondaryDamageType || ''} damage = <strong>{finalDamage + secondaryFinalDamage} total damage</strong>
+        </div>
+    );
+}
+
+function SecondaryDamageAppliedRow({ finalDamage, secondaryFinalDamage, targetName, targetCurrentHp }) {
+    return (
+        <div className="dice-roll-damage-applied">
+            <span><strong>{finalDamage + secondaryFinalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage + secondaryFinalDamage} → ${targetCurrentHp}` : ''}</span>
+        </div>
+    );
+}
+
 function SecondaryDamageSection({ props }) {
     const { secondaryFormula, secondaryRolls, secondaryModifier, secondaryTotal, secondarySaveResult,
         saveDc, secondaryFinalDamage, finalDamage, damageType, secondaryDamageType,
         damageApplied, targetName, targetCurrentHp } = props;
     if (!secondaryFormula) return null;
+    const hasTotals = secondaryFinalDamage !== undefined && finalDamage !== undefined;
     return (
         <div className="dice-roll-secondary-damage">
             <div className="dice-roll-secondary-label">Secondary Damage:</div>
             <div className="dice-roll-secondary-formula">
               {secondaryFormula}: {secondaryRolls ? secondaryRolls.join(', ') : ''}{secondaryModifier !== undefined && secondaryModifier !== 0 ? ` +${secondaryModifier}` : ''} = {secondaryTotal}
             </div>
-            {secondarySaveResult && (
-              <div className={`dice-roll-secondary-save-result ${secondarySaveResult.success ? 'save-success' : 'save-failure'}`}>
-                {secondarySaveResult.success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({secondarySaveResult.total} vs DC {saveDc})
-              </div>
-            )}
-            {secondaryFinalDamage !== undefined && finalDamage !== undefined && (
-              <div className="dice-roll-secondary-total">
-                {finalDamage} {damageType || ''} damage + {secondaryFinalDamage} {secondaryDamageType || ''} damage = <strong>{finalDamage + secondaryFinalDamage} total damage</strong>
-              </div>
-            )}
-            {finalDamage !== undefined && damageApplied && secondaryFinalDamage !== undefined && (
-              <div className="dice-roll-damage-applied">
-                <span><strong>{finalDamage + secondaryFinalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage + secondaryFinalDamage} → ${targetCurrentHp}` : ''}</span>
-              </div>
-            )}
+            {secondarySaveResult && <SecondarySaveResultRow secondarySaveResult={secondarySaveResult} saveDc={saveDc} />}
+            {hasTotals && <SecondaryDamageTotalRow finalDamage={finalDamage} damageType={damageType} secondaryFinalDamage={secondaryFinalDamage} secondaryDamageType={secondaryDamageType} />}
+            {hasTotals && damageApplied && <SecondaryDamageAppliedRow finalDamage={finalDamage} secondaryFinalDamage={secondaryFinalDamage} targetName={targetName} targetCurrentHp={targetCurrentHp} />}
         </div>
     );
 }

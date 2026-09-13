@@ -155,15 +155,14 @@ describe('OpenHandTechniqueModal', () => {
       });
 
       await waitFor(() => {
-        expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledWith(
-          defaultAction,
-          mockPlayerStats,
-          mockCampaignName,
-          'Goblin',
-          optionName,
-          13,
-          'DEX'
-        );
+        expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledWith({
+          action: defaultAction,
+          playerStats: mockPlayerStats,
+          campaignName: mockCampaignName,
+          targetName: 'Goblin',
+          selectedOptionName: optionName,
+          saveDc: 13,
+        });
       });
     });
 

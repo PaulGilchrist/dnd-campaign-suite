@@ -228,10 +228,13 @@ function applyBuffEffect(buff, acc) {
     if (isGenericFlyBuff(buff)) acc.hasFlySpeedBuff = true
 }
 
+function findAutomationPassive(playerStats, effect) {
+    return (playerStats.automation?.passives || []).find(p => p.effect === effect)
+}
+
 function applyMovementPassives(playerStats, acc, hasArmorOrShield, wrathOfTheSeaActive) {
     let acrobaticMovementActive = false
-    const acrobaticMovementPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'acrobatic_movement')
-    if (acrobaticMovementPassive && !hasArmorOrShield) acrobaticMovementActive = true
+    if (findAutomationPassive(playerStats, 'acrobatic_movement') && !hasArmorOrShield) acrobaticMovementActive = true
 
     const elementalMovementPassive = (playerStats.passives || []).find(p => p.effect === 'elemental_attunement_movement')
     if (elementalMovementPassive) {
@@ -239,11 +242,9 @@ function applyMovementPassives(playerStats, acc, hasArmorOrShield, wrathOfTheSea
         acc.swimSpeed = acc.speed
     }
 
-    const aquaticAffinityPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'aquatic_affinity')
-    if (aquaticAffinityPassive && acc.swimSpeed === null) acc.swimSpeed = acc.speed
+    if (findAutomationPassive(playerStats, 'aquatic_affinity') && acc.swimSpeed === null) acc.swimSpeed = acc.speed
 
-    const stormbornPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'fly_speed_equals_walk_speed')
-    if (stormbornPassive && acc.flySpeed === null && wrathOfTheSeaActive) acc.hasFlySpeedBuff = true
+    if (findAutomationPassive(playerStats, 'fly_speed_equals_walk_speed') && acc.flySpeed === null && wrathOfTheSeaActive) acc.hasFlySpeedBuff = true
 
     return acrobaticMovementActive
 }
@@ -355,7 +356,7 @@ function computeCoverBadges(playerStats, characters, campaignName) {
     return cover
 }
 
-export function computeCharSummaryContext(playerStats, campaignName, characters, conditionEffects, auraComboEffects, exhaustionLevel) {
+export function computeCharSummaryContext({ playerStats, campaignName, characters, conditionEffects, auraComboEffects, exhaustionLevel }) {
     const storedBuffs = getActiveBuffs(playerStats.name, campaignName);
     const runtimeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(runtimeBuffs) ? runtimeBuffs : storedBuffs;

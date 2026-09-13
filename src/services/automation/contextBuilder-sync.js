@@ -226,7 +226,8 @@ function isAntimagicBlockedAttack(attack) {
     return attack.type !== 'weapon_attack' && !attack.weaponType && attack.isWeaponAttack === false;
 }
 
-function buildBlockedAttackContext(attack, playerName, targetName, playerStats, rangeReason, notice) {
+function buildBlockedAttackContext(attack, playerName, targetName, playerStats, block) {
+    const { rangeReason, notice } = block;
     return {
         isAutoMiss: true,
         rangeReason,
@@ -569,7 +570,33 @@ function buildAutoDamageFormula(attack, stanceDamageBonus, frenzyDamageFormula, 
     return [primaryDamage, stanceDamageBonus > 0 ? stanceDamageBonus : null, frenzyDamageFormula, brutalStrikeFormulaPart].filter(v => v !== null).join(' plus ');
 }
 
-export async function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects, opts = {}) {
+async function resolveBuffScanMode({ adv, dis, forcedMode, playerName, playerStats, targetName, activeBuffs, campaignName }) {
+    const buffScan = scanBuffsForAdvantage(activeBuffs);
+    if (forcedMode === undefined) {
+        ({ adv, dis } = await accumulateTargetAdvDis({ adv, dis, playerName, playerStats, targetName, buffScanAdv: buffScan.adv, campaignName }));
+        // Resolve accumulated adv/dis to forcedMode (they cancel per rules)
+        forcedMode = resolveAdvantageMode(adv, dis);
+    }
+    return { forcedMode, adv, dis, ramActive: buffScan.ramActive };
+}
+
+async function resolveDeferredAttackMode({ forcedMode, playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName }) {
+    let advantageReason = undefined;
+    let dis = 0;
+    if (forcedMode === undefined) {
+        const outcome = await resolveAttackModeResolvers({ playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName });
+        if (outcome) {
+            forcedMode = outcome.mode;
+            advantageReason = outcome.reason;
+        }
+    }
+    if (forcedMode === undefined && targetName && hasBlurOrForesightWithoutCounter(playerStats, targetName)) {
+        dis++;
+    }
+    return { forcedMode, advantageReason, dis };
+}
+
+export async function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, opts = {}) {
     // WM-008: one-shot attack te (vex/distracting) is consumed by the NEXT attack ROLL
     // only. Damage-phase ctx rebuilds (proceedWithDamage / buildContext / cunningStrike)
     // run after the roll and must not consume the te the same attack's tacticalMaster
@@ -604,13 +631,10 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
         const stanceDamageBonus = computeStanceDamageBonus(activeBuffs, playerStats);
         const frenzyDamageFormula = computeFrenzyDamageFormula(playerStats, attack, activeBuffs, campaignName);
 
-        const buffScan = scanBuffsForAdvantage(activeBuffs);
-        const ramActive = buffScan.ramActive;
-        if (forcedMode === undefined) {
-            ({ adv, dis } = await accumulateTargetAdvDis({ adv, dis, playerName, playerStats, targetName, buffScanAdv: buffScan.adv, campaignName }));
-            // Resolve accumulated adv/dis to forcedMode (they cancel per rules)
-            forcedMode = resolveAdvantageMode(adv, dis);
-        }
+        const scanned = await resolveBuffScanMode({ adv, dis, forcedMode, playerName, playerStats, targetName, activeBuffs, campaignName });
+        forcedMode = scanned.forcedMode;
+        dis = scanned.dis;
+        const ramActive = scanned.ramActive;
 
         const blockedContext = resolveBlockedAttackContext(attack, playerName, targetName, playerStats, campaignName);
         if (blockedContext) return blockedContext;
@@ -628,18 +652,10 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
 
         const avengingAngelActive = isAvengingAngelActive(playerName, campaignName);
 
-        let advantageReason = undefined;
-        if (forcedMode === undefined) {
-            const outcome = await resolveAttackModeResolvers({ playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName });
-            if (outcome) {
-                forcedMode = outcome.mode;
-                advantageReason = outcome.reason;
-            }
-        }
-
-        if (forcedMode === undefined && targetName && hasBlurOrForesightWithoutCounter(playerStats, targetName)) {
-            dis++;
-        }
+        const deferred = await resolveDeferredAttackMode({ forcedMode, playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName });
+        forcedMode = deferred.forcedMode;
+        dis += deferred.dis;
+        const advantageReason = deferred.advantageReason;
 
         const autoDamageFormula = buildAutoDamageFormula(attack, stanceDamageBonus, frenzyDamageFormula, brutalStrikeFormulaPart);
 
@@ -702,21 +718,24 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
 function resolveBlockedAttackContext(attack, playerName, targetName, playerStats, campaignName) {
     // Antimagic Field — allow only weapon attacks when either attacker or target is affected
     if (targetName && campaignTargetEffects().some(te => (te.effect === 'antimagic_field') && (te.target === playerName || te.target === targetName)) && isAntimagicBlockedAttack(attack)) {
-        return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
-            'Antimagic Field blocks non-weapon attacks',
-            'Attack blocked by Antimagic Field — only weapon attacks are allowed.');
+        return buildBlockedAttackContext(attack, playerName, targetName, playerStats, {
+            rangeReason: 'Antimagic Field blocks non-weapon attacks',
+            notice: 'Attack blocked by Antimagic Field — only weapon attacks are allowed.',
+        });
     }
 
     // Resilient Sphere — block all attacks when attacker or target is enclosed
     if (targetName && isResilientSphereActive(playerName, campaignName)) {
-        return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
-            'Resilient Sphere blocks attacks — nothing passes through the barrier',
-            'Attack blocked by Resilient Sphere — nothing can pass through the barrier.');
+        return buildBlockedAttackContext(attack, playerName, targetName, playerStats, {
+            rangeReason: 'Resilient Sphere blocks attacks — nothing passes through the barrier',
+            notice: 'Attack blocked by Resilient Sphere — nothing can pass through the barrier.',
+        });
     }
     if (targetName && isResilientSphereActive(targetName, campaignName)) {
-        return buildBlockedAttackContext(attack, playerName, targetName, playerStats,
-            'Resilient Sphere blocks attacks — nothing passes through the barrier',
-            'Attack blocked by Resilient Sphere — nothing can pass through the barrier.');
+        return buildBlockedAttackContext(attack, playerName, targetName, playerStats, {
+            rangeReason: 'Resilient Sphere blocks attacks — nothing passes through the barrier',
+            notice: 'Attack blocked by Resilient Sphere — nothing can pass through the barrier.',
+        });
     }
     return undefined;
 }

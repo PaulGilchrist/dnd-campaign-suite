@@ -100,7 +100,7 @@ describe('sleepService', () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const spell = { name: 'Sleep', level: 1, school: 'Enchantment' };
 
-            await triggerSleep(spell, {}, playerStats, campaignName, mapName);
+            await triggerSleep({ spell: spell, metaCtx: {}, playerStats: playerStats, campaignName, mapName });
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({ spell }),
@@ -114,13 +114,7 @@ describe('sleepService', () => {
         it('resolves saveDc from metaCtx, playerStats, or proficiency', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
-            await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                { spellSaveDc: 18, slotLevel: 3 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
+            await triggerSleep({ spell: { name: 'Sleep', level: 1 }, metaCtx: { spellSaveDc: 18, slotLevel: 3 }, playerStats, campaignName, mapName });
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({ automation: expect.objectContaining({ saveDc: 18 }), spellSlotLevel: 3 }),
                 playerStats,
@@ -129,13 +123,7 @@ describe('sleepService', () => {
                 undefined,
             );
 
-            await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+            await triggerSleep({ spell: { name: 'Sleep', level: 1 }, metaCtx: {}, playerStats, campaignName, mapName });
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({ automation: expect.objectContaining({ saveDc: 15 }) }),
                 playerStats,
@@ -149,7 +137,7 @@ describe('sleepService', () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const characters = [{ name: 'Elf', computedStats: { name: 'Elf' } }];
 
-            await triggerSleep({ name: 'Sleep', level: 1 }, { slotLevel: 1 }, playerStats, campaignName, mapName, characters);
+            await triggerSleep({ spell: { name: 'Sleep', level: 1 }, metaCtx: { slotLevel: 1 }, playerStats: playerStats, campaignName, mapName, characters });
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.anything(),
@@ -162,20 +150,14 @@ describe('sleepService', () => {
 
         it('throws when proficiency is missing and no saveDc fallback', async () => {
             await expect(
-                triggerSleep({ name: 'Sleep', level: 1 }, {}, { name: 'Wizard' }, campaignName, mapName)
+                triggerSleep({ spell: { name: 'Sleep', level: 1 }, metaCtx: {}, playerStats: { name: 'Wizard' }, campaignName, mapName })
             ).rejects.toThrow('playerStats.proficiency is required for sleep spell');
         });
 
         it('uses metaCtx slotLevel over spell.level for spellSlotLevel', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
-            await triggerSleep(
-                { name: 'Sleep', level: 1 },
-                { slotLevel: 4, spellSaveDc: 17 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
+            await triggerSleep({ spell: { name: 'Sleep', level: 1 }, metaCtx: { slotLevel: 4, spellSaveDc: 17 }, playerStats, campaignName, mapName });
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({ spellSlotLevel: 4 }),
                 playerStats,
@@ -187,7 +169,7 @@ describe('sleepService', () => {
 
         it('returns null when the handler throws', async () => {
             executeHandler.mockRejectedValue(new Error('boom'));
-            const result = await triggerSleep({ name: 'Sleep', level: 1 }, { slotLevel: 1 }, playerStats, campaignName, mapName);
+            const result = await triggerSleep({ spell: { name: 'Sleep', level: 1 }, metaCtx: { slotLevel: 1 }, playerStats: playerStats, campaignName, mapName });
             expect(result).toBeNull();
         });
     });
@@ -323,10 +305,10 @@ describe('sleepService', () => {
             const applyUnconsciousCall = setRuntimeValue.mock.calls.filter(c => c[0] === 'Thug 1' && c[1] === 'activeConditions').pop();
             expect(applyUnconsciousCall[2]).toContain('unconscious');
 
-            expect(addExpiration).toHaveBeenCalledWith('Wizard', 'Thug 1', [
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard', targetName: 'Thug 1', effects: [
                 { type: 'condition', condition: 'unconscious' },
                 { type: 'remove_target_effect', effectKey: SLEEP_TE_EFFECT, source: 'Wizard', target: 'Thug 1' },
-            ], campaignName, 10);
+            ], campaignName, rounds: 10 });
 
             vi.restoreAllMocks();
         });

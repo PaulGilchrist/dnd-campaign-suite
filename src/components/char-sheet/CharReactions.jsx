@@ -355,6 +355,53 @@ function applyAutomationModalResult(result, reaction, { campaignName, characters
     }
 }
 
+function buildProtectedRefusal(target, campaignName) {
+    const targetNoOA = getRuntimeValue(target.name, 'inspiringMovementNoOA');
+    // CLA-353: cs combatants carry no automation/passives (initiativeService.js:15-23),
+    // so gate Tactical Shift (and any other no-OA source, e.g. Step of the Wind) on the
+    // live campaign-level no_opportunity_attacks te instead of a dead passive lookup.
+    const campaignTargetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const targetNoOATe = campaignTargetEffects.find(te => te.effect === 'no_opportunity_attacks'
+        && (Array.isArray(te.target) ? te.target.includes(target.name) : te.target === target.name));
+    if (!targetNoOA && !targetNoOATe) return null;
+    const protector = targetNoOATe ? (targetNoOATe.source || 'Tactical Shift') : 'Inspiring Movement';
+    return {
+        html: `<b>Opportunity Attack</b><br/>${target.name} is protected by ${protector} and cannot be targeted by Opportunity Attacks right now.`,
+        log: `Opportunity Attack refused — ${target.name} is protected by ${protector} and cannot be targeted by Opportunity Attacks.`,
+    };
+}
+
+function buildOpportunityAttackRefusal(target, campaignName, playerName) {
+    const protectedRefusal = buildProtectedRefusal(target, campaignName);
+    if (protectedRefusal) return protectedRefusal;
+    const targetManeuveringNoOA = getRuntimeValue(target.name, 'maneuveringStepNoOA');
+    if (targetManeuveringNoOA) {
+        const grantSource = getRuntimeValue(target.name, 'maneuveringStepNoOASource');
+        if (!grantSource || grantSource === playerName) {
+            return { html: `<b>Opportunity Attack</b><br/>${target.name} was granted Maneuvering Attack movement and cannot be targeted by Opportunity Attacks from ${grantSource || playerName} right now.` };
+        }
+    }
+    if (hasSpeedyOpportunityDisadvantage(target)) {
+        return { html: `<b>Opportunity Attack</b><br/>${target.name} has Agile Movement — opportunity attacks against them have Disadvantage.` };
+    }
+    return null;
+}
+
+async function resolveOpportunityAttackRefusal(campaignName, playerName) {
+    try {
+        const cs = await getCombatContext(campaignName);
+        if (!cs) return null;
+        const target = getTargetFromAttacker(cs, playerName);
+        if (!target) return null;
+        return buildOpportunityAttackRefusal(target, campaignName, playerName);
+    } catch (_e) { return null; }
+}
+
+function pickOpportunityAttackRoll(playerStats) {
+    const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === MELEE_REACH_FEET);
+    return meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
+}
+
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters, autoDamageSource: 'char-reactions', autoDamageRoll: async (autoDamage, isCrit) => {
@@ -432,51 +479,21 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     };
 
     const handleOpportunityAttack = async () => {
-        try {
-            const cs = await getCombatContext(campaignName);
-            if (cs) {
-                const target = getTargetFromAttacker(cs, playerStats.name);
-                if (target) {
-                    const targetNoOA = getRuntimeValue(target.name, 'inspiringMovementNoOA');
-                    // CLA-353: cs combatants carry no automation/passives (initiativeService.js:15-23),
-                    // so gate Tactical Shift (and any other no-OA source, e.g. Step of the Wind) on the
-                    // live campaign-level no_opportunity_attacks te instead of a dead passive lookup.
-                    const campaignTargetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-                    const targetNoOATe = campaignTargetEffects.find(te => te.effect === 'no_opportunity_attacks'
-                        && (Array.isArray(te.target) ? te.target.includes(target.name) : te.target === target.name));
-                    const targetHasSpeedy = hasSpeedyOpportunityDisadvantage(target);
-                    if (targetNoOA || targetNoOATe) {
-                        const protector = targetNoOATe ? (targetNoOATe.source || 'Tactical Shift') : 'Inspiring Movement';
-                        const html = `<b>Opportunity Attack</b><br/>${target.name} is protected by ${protector} and cannot be targeted by Opportunity Attacks right now.`;
-                        setPopupHtml(html);
-                        addEntry(campaignName, {
-                            type: 'automation',
-                            creatureName: playerStats.name,
-                            name: 'Opportunity Attack',
-                            description: `Opportunity Attack refused — ${target.name} is protected by ${protector} and cannot be targeted by Opportunity Attacks.`,
-                            timestamp: Date.now(),
-                        }).catch((e) => { console.error('[CharReactions:OA-refusal-log-error]', e); });
-                        return;
-                    }
-                    const targetManeuveringNoOA = getRuntimeValue(target.name, 'maneuveringStepNoOA');
-                    if (targetManeuveringNoOA) {
-                        const grantSource = getRuntimeValue(target.name, 'maneuveringStepNoOASource');
-                        if (!grantSource || grantSource === playerStats.name) {
-                            const html = `<b>Opportunity Attack</b><br/>${target.name} was granted Maneuvering Attack movement and cannot be targeted by Opportunity Attacks from ${grantSource || playerStats.name} right now.`;
-                            setPopupHtml(html);
-                            return;
-                        }
-                    }
-                    if (targetHasSpeedy) {
-                        const html = `<b>Opportunity Attack</b><br/>${target.name} has Agile Movement — opportunity attacks against them have Disadvantage.`;
-                        setPopupHtml(html);
-                        return;
-                    }
-                }
+        const refusal = await resolveOpportunityAttackRefusal(campaignName, playerStats.name);
+        if (refusal) {
+            setPopupHtml(refusal.html);
+            if (refusal.log) {
+                addEntry(campaignName, {
+                    type: 'automation',
+                    creatureName: playerStats.name,
+                    name: 'Opportunity Attack',
+                    description: refusal.log,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error('[CharReactions:OA-refusal-log-error]', e); });
             }
-        } catch (_e) { /* fall through to normal OA */ }
-        const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === MELEE_REACH_FEET);
-        const attackRoll = meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
+            return;
+        }
+        const attackRoll = pickOpportunityAttackRoll(playerStats);
         if (attackRoll) {
             rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined, isOpportunityAttack: true });
         }
@@ -566,13 +583,19 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         setModalState({ searingVengeanceModal: null });
         const { campaignName: modalCampaign, characters: modalCharacters, automation } = modalState.searingVengeanceModal;
         if (!selectedTargets || selectedTargets.length === 0) return;
-        const result = await confirmSearingVengeance(automation, playerStats, modalCampaign, mapName, modalCharacters, { ...modalState.searingVengeanceModal, selectedTargets });
+        const result = await confirmSearingVengeance({
+    automation,
+    playerStats,
+    campaignName: modalCampaign,
+    characters: modalCharacters,
+    payload: { ...modalState.searingVengeanceModal, selectedTargets },
+});
         if (result) {
             if (result.type === 'popup') {
                 setPopupHtml(result.payload);
             }
         }
-    }, [modalState.searingVengeanceModal, setModalState, playerStats, mapName, setPopupHtml]);
+    }, [modalState.searingVengeanceModal, setModalState, playerStats, setPopupHtml]);
 
     const handleSearingVengeanceSkip = React.useCallback(async () => {
         if (!modalState.searingVengeanceModal) return;
@@ -618,7 +641,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const { castAction: reactionCastAction } = useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta: {}, cachedPosRef: cachedReactionCastPosRef, setModalState });
 
-    const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction, null, characters, setPopupHtml);
+    const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow({ playerStats: playerStats, campaignName: campaignName, onExecute: reactionCastAction, setSecondaryTargetModal: null, characters: characters, setPopupHtml: setPopupHtml });
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
     const handleReactionSpellCast = React.useCallback(async (spell, metaCtx) => {
@@ -672,7 +695,14 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         const { action, playerStats: imPlayerStats, campaignName: imCampaignName, halfSpeed, noOAs } = modalState.inspiringMovementAllyModal;
         setModalState({ inspiringMovementAllyModal: null });
         if (!allyName) return;
-        const result = await applyInspiringMovement(action, imPlayerStats, imCampaignName, allyName, halfSpeed, noOAs);
+        const result = await applyInspiringMovement({
+    action,
+    playerStats: imPlayerStats,
+    campaignName: imCampaignName,
+    allyName,
+    halfSpeed,
+    noOAs,
+});
         if (!result) return;
         if (result.type === 'popup') {
             setPopupHtml(result.payload);
@@ -707,9 +737,9 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 const filtered = (Array.isArray(conditions) ? conditions : []).filter(c => String(c).toLowerCase() !== conditionKey);
                 setRuntimeValue(targetName, 'activeConditions', [...filtered, conditionKey], btCampaignName);
 
-                addExpiration(btPlayerStats.name, targetName, [
+                addExpiration({ attackerName: btPlayerStats.name, targetName, effects: [
                     { type: 'condition', condition: conditionKey }
-                ], btCampaignName);
+                ], campaignName: btCampaignName });
 
                 addEntry(btCampaignName, {
                     type: 'save_result',

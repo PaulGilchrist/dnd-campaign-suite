@@ -53,7 +53,7 @@ export async function handle(action, playerStats, campaignName, _mapName, school
     };
 }
 
-export async function onSavantSelected(action, playerStats, campaignName, spell1, spell2, school) {
+export async function onSavantSelected({ action, playerStats, campaignName, spell1, spell2, school }) {
     const playerName = playerStats.name;
     const selectionKey = `_${school}_Savant_selection`;
 

@@ -334,14 +334,14 @@ describe('confirmSearingVengeance', () => {
       selectedTargets: ['Goblin'],
     };
 
-    const result = await confirmSearingVengeance(
-      automation,
-      playerStats,
-      campaignName,
-      null,
-      [],
-      payload
-    );
+    const result = await confirmSearingVengeance({
+          automation,
+          playerStats,
+          campaignName,
+          mapName: null,
+          characters: [],
+          payload,
+      });
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('12 radiant damage');
@@ -354,13 +354,7 @@ describe('confirmSearingVengeance', () => {
       campaignName
     );
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalled();
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'TestWarlock',
-      'Goblin',
-      [{ type: 'condition', condition: 'blinded' }],
-      campaignName,
-      1
-    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWarlock', targetName: 'Goblin', effects: [{ type: 'condition', condition: 'blinded' }], campaignName, rounds: 1 });
   });
 
   it('logs ability_use entry with heal and burst amounts', async () => {
@@ -386,14 +380,14 @@ describe('confirmSearingVengeance', () => {
       selectedTargets: ['Goblin'],
     };
 
-    await confirmSearingVengeance(
-      automation,
-      makePlayerStats(),
-      campaignName,
-      null,
-      [],
-      payload
-    );
+    await confirmSearingVengeance({
+          automation,
+          playerStats: makePlayerStats(),
+          campaignName,
+          mapName: null,
+          characters: [],
+          payload,
+      });
 
     expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       type: 'ability_use',

@@ -243,17 +243,12 @@ describe('greaterInvisibilityHandler.applyGreaterInvisibility', () => {
         );
 
         // Check expiration was added
-        expect(expirations.addExpiration).toHaveBeenCalledWith(
-            'TestWizard',
-            'Ally1',
-            expect.arrayContaining([
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'Ally1', effects: expect.arrayContaining([
                 expect.objectContaining({
                     type: 'remove_active_buff',
                     buffName: 'GreaterInvisibility',
                 }),
-            ]),
-            campaignName,
-        );
+            ]), campaignName });
 
         // Check log entry
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({

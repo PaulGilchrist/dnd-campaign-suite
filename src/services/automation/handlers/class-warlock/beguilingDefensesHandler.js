@@ -101,7 +101,7 @@ function buildBeguilingSaveHandler({ promptId, cs, halfDamage, campaignName, pla
             // Apply psychic damage to attacker equal to halved damage
             let psychicDamage = 0;
             if (cs && halfDamage > 0) {
-                await applyDamageToTarget(cs, targetName, halfDamage, ['Psychic'], campaignName, characters || [], { ignoreResistance: false, attackerName: playerName });
+                await applyDamageToTarget(cs, targetName, halfDamage, ['Psychic'], { campaignName, characters: characters || [], ignoreResistance: false, attackerName: playerName });
                 psychicDamage = halfDamage;
             }
             addEntry(campaignName, {

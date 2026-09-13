@@ -66,6 +66,7 @@ const ORDER_CANTRIP_BONUSES = [
 ];
 
 function applyOrderCantripBonus(limits, extraOptions, className) {
+  if (!extraOptions) return;
   for (const bonus of ORDER_CANTRIP_BONUSES) {
     if (extraOptions[bonus.optionKey] === bonus.optionValue && className === bonus.className) {
       limits.cantrip = (limits.cantrip || 0) + 1;
@@ -73,16 +74,22 @@ function applyOrderCantripBonus(limits, extraOptions, className) {
   }
 }
 
-export async function getSpellLimits(className, level, version = '5e', majorName = null, extraOptions = null, abilityScores = null) {
+// 2024 spellcasting blocks can require a specific major; other rulesets never gate.
+function requiresOtherMajor(spellcasting, version, majorName) {
+  return version === '2024' && spellcasting.required_major && spellcasting.required_major !== majorName;
+}
+
+export async function getSpellLimits({ className, level, version = '5e', majorName = null, extraOptions = null, abilityScores = null }) {
   try {
     const classData = await fetchClassData(className, version);
+    const classLevels = classData?.class_levels;
 
-    if (!classData || !classData.class_levels) {
+    if (!classLevels) {
       return getDefaultSpellLimits(className);
     }
 
     // Find the class level entry
-    const levelEntry = classData.class_levels.find(entry => entry.level === level);
+    const levelEntry = classLevels.find(entry => entry.level === level);
 
     if (!levelEntry || !levelEntry.spellcasting) {
       // Check if class has spellcasting at higher levels (subclass feature)
@@ -94,14 +101,14 @@ export async function getSpellLimits(className, level, version = '5e', majorName
     }
 
      // For 2024 classes, check if spellcasting requires a specific major
-    if (version === '2024' && levelEntry.spellcasting.required_major && levelEntry.spellcasting.required_major !== majorName) {
+    if (requiresOtherMajor(levelEntry.spellcasting, version, majorName)) {
       return getDefaultSpellLimits(className);
     }
 
     const limits = convertSpellcastingToLimits(levelEntry.spellcasting, className, abilityScores, level);
 
     // Apply 2024 Divine Order / Primal Order bonus cantrips
-    if (version === '2024' && extraOptions) {
+    if (version === '2024') {
       applyOrderCantripBonus(limits, extraOptions, className);
     }
 
@@ -121,7 +128,7 @@ function findClassLevelSpellcasting(classData, level, version, majorName) {
     const levelEntry = classData.class_levels[i];
     if (!levelEntry || !levelEntry.spellcasting) continue;
     // For 2024 classes, check if spellcasting requires a specific major
-    if (version === '2024' && levelEntry.spellcasting.required_major && levelEntry.spellcasting.required_major !== majorName) {
+    if (requiresOtherMajor(levelEntry.spellcasting, version, majorName)) {
       continue; // Skip this level's spellcasting if major doesn't match
     }
     return levelEntry.spellcasting;
@@ -302,8 +309,8 @@ function collectKnownSpellLevelViolations(counts, limits) {
 /**
  * Validates if spell selection is within limits for a given class and level
  */
-export async function validateSpellSelection(selectedSpells, allSpells, className, level, version = '5e', majorName = null, abilityScores = null) {
-  const limits = await getSpellLimits(className, level, version, majorName, null, abilityScores);
+export async function validateSpellSelection({ selectedSpells, allSpells, className, level, version = '5e', majorName = null, abilityScores = null }) {
+  const limits = await getSpellLimits({ className, level, version, majorName, abilityScores });
   const counts = countSpellsByLevel(selectedSpells, allSpells);
 
     // Non-spellcasting classes have no inherent restrictions — allow any selection for homebrew/feat/race feats
@@ -383,7 +390,7 @@ export async function getAllSpellLimits(className, version = '5e', majorName = n
   const limits = {};
   
   for (let level = 1; level <= 20; level++) {
-    limits[level] = await getSpellLimits(className, level, version, majorName);
+    limits[level] = await getSpellLimits({ className, level, version, majorName });
     }
 
   return limits;

@@ -133,9 +133,9 @@ function FearModal({
                     });
                 } else if (!success) {
                     applyFrightenedToTarget(targetName, campaignName);
-                    addExpiration(casterName, targetName, [
+                    addExpiration({ attackerName: casterName, targetName, effects: [
                         { type: 'condition', condition: 'frightened' },
-                    ], campaignName);
+                    ], campaignName });
                     trackFearEffect(casterName, targetName, saveDc, campaignName);
 
                     await addEntry(campaignName, {
@@ -273,9 +273,9 @@ function FearModal({
 
         if (!success) {
             applyFrightenedToTarget(targetName, campaignName);
-            addExpiration(casterName, targetName, [
+            addExpiration({ attackerName: casterName, targetName, effects: [
                 { type: 'condition', condition: 'frightened' },
-            ], campaignName);
+            ], campaignName });
             trackFearEffect(casterName, targetName, saveDc, campaignName);
 
             await logConditionApplied(campaignName, {

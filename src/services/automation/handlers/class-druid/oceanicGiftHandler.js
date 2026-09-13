@@ -5,13 +5,31 @@ import { buildSaveDc } from '../../common/savePrompt.js';
 
 const OCEANIC_GIFT_ALLIES_KEY = 'oceanicGiftAllies';
 
+function resolveMaxWildShapeUses(playerStats) {
+    const levels = ((playerStats.class || {}).class_levels || []);
+    const levelEntry = levels.find(cl => cl.level === playerStats.level);
+    return (levelEntry ? levelEntry.wild_shape : 0) || 0;
+}
+
+function resolveAbilityBonus(playerStats, abilityName, fallback) {
+    const ability = (playerStats.abilities || []).find(a => a.name === abilityName);
+    return (ability ? ability.bonus : fallback) || fallback;
+}
+
+function selectAllyCreatures(combatSummary, playerName) {
+    const creatures = (combatSummary || {}).creatures;
+    if (!creatures) return [];
+    return creatures.filter(c => c.name !== playerName && c.type === 'player');
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
-    const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+    const maxWS = resolveMaxWildShapeUses(playerStats);
     const currentWS = Number(getRuntimeValue(playerName, 'wildShapeUses', campaignName) ?? maxWS);
-    const cost = auto?.doubleEmanation ? 2 : 1;
+    const doubleEmanation = !!auto?.doubleEmanation;
+    const cost = doubleEmanation ? 2 : 1;
 
     if (currentWS < cost) {
         return {
@@ -26,9 +44,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const combatSummary = await loadCombatSummary(campaignName);
-    const allyTargets = combatSummary?.creatures
-        ? combatSummary.creatures.filter(c => c.name !== playerName && c.type === 'player')
-        : [];
+    const allyTargets = selectAllyCreatures(combatSummary, playerName);
 
     const spellSaveDc = buildSaveDc(auto, playerStats);
 
@@ -41,8 +57,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             campaignName,
             creatureTargets: allyTargets,
             spellSaveDc,
-            wisMod: playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 1,
-            doubleEmanation: !!auto?.doubleEmanation,
+            wisMod: resolveAbilityBonus(playerStats, 'Wisdom', 1),
+            doubleEmanation,
             cost,
             availableUses: currentWS,
         },

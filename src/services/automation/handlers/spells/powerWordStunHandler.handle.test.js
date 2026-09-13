@@ -229,16 +229,9 @@ describe('powerWordStunHandler.handle - target with more than 150 HP', () => {
     setupMocks('Dragon', 300);
     await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-    expect(addExpiration).toHaveBeenCalledWith(
-      casterName,
-      'Dragon',
-      expect.arrayContaining([
+    expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Dragon', effects: expect.arrayContaining([
         expect.objectContaining({ type: 'speed_zero', condition: 'speed_zero' }),
-      ]),
-      campaignName,
-      undefined,
-      casterName,
-    );
+      ]), campaignName, rounds: undefined, expireOnCreatureName: casterName });
   });
 
   it('should log the Speed 0 condition application', async () => {

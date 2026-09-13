@@ -296,7 +296,7 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
   }
 
   function getRollDamageCalls() {
-    return capturedRollDamageFn?.mock?.calls || [];
+    return (capturedRollDamageFn?.mock?.calls || []).map(c => c[0]);
   }
 
   describe('formula parsing and damage roll', () => {
@@ -336,13 +336,13 @@ describe('CharSpecialActions - autoDamageRoll callback', () => {
 
       const calls = getRollDamageCalls();
       expect(calls).toHaveLength(1);
-      expect(calls[0][0]).toBe(attackName);
-      expect(calls[0][2]).toBe(expectedTotal);
-      expect(calls[0][3]).toEqual(expectedRolls);
-      expect(calls[0][5].isAutoCrit).toBe(isCrit);
-      expect(calls[0][5].damageType).toBe('Slashing');
-      expect(calls[0][5].targetName).toBe('Goblin');
-      expect(calls[0][5].attackerName).toBe('TestCharacter');
+      expect(calls[0].name).toBe(attackName);
+      expect(calls[0].total).toBe(expectedTotal);
+      expect(calls[0].rolls).toEqual(expectedRolls);
+      expect(calls[0].context.isAutoCrit).toBe(isCrit);
+      expect(calls[0].context.damageType).toBe('Slashing');
+      expect(calls[0].context.targetName).toBe('Goblin');
+      expect(calls[0].context.attackerName).toBe('TestCharacter');
     });
   });
 

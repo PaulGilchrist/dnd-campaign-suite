@@ -76,21 +76,21 @@ describe('contextBuilder-sync - Protection from Evil and Good attacker-type look
 
   it('resolves monsterType (not npc) so a warded Undead attacker forces Disadvantage', async () => {
     setup({ name: 'Wight 1', type: 'npc', monsterType: 'Undead' });
-    const result = await buildAttackContextSync(attack, makeStats('Wight 1'), 'camp', 'normal', {});
+    const result = await buildAttackContextSync(attack, makeStats('Wight 1'), 'camp', 'normal');
     expect(pfeg.isCreatureWarded.mock.calls[0][0]).toBe('Undead');
     expect(result.forcedMode).toBe('disadvantage');
   });
 
   it('leaves a non-warded attacker (Giant) at normal mode', async () => {
     setup({ name: 'Ogre 1', type: 'npc', monsterType: 'Giant' });
-    const result = await buildAttackContextSync(attack, makeStats('Ogre 1'), 'camp', 'normal', {});
+    const result = await buildAttackContextSync(attack, makeStats('Ogre 1'), 'camp', 'normal');
     expect(pfeg.isCreatureWarded.mock.calls[0][0]).toBe('Giant');
     expect(result.forcedMode).not.toBe('disadvantage');
   });
 
   it('leaves a PC attacker (type pc, no monsterType) at normal mode', async () => {
     setup({ name: 'Wight 1', type: 'pc' });
-    const result = await buildAttackContextSync(attack, makeStats('Wight 1'), 'camp', 'normal', {});
+    const result = await buildAttackContextSync(attack, makeStats('Wight 1'), 'camp', 'normal');
     expect(pfeg.isCreatureWarded.mock.calls[0][0]).toBe('pc');
     expect(result.forcedMode).not.toBe('disadvantage');
   });

@@ -161,16 +161,11 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       expect(rollExpressionMaximized).toHaveBeenCalledWith('3d6');
       expect(rollDamageMock).toHaveBeenCalledWith(
-        'Fireball',
-        '3d6',
-        8,
-        [8],
-        undefined,
-        expect.objectContaining({
+        { name: 'Fireball', formula: '3d6', total: 8, rolls: [8], modifier: undefined, context: expect.objectContaining({
           overchannelActive: true,
           overchannelUseCount: 0,
           overchannelSpellLevel: 3,
-        }),
+        }) },
       );
     });
 
@@ -232,7 +227,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       await handleSavePath(args);
 
-      const context = rollDamageMock.mock.calls[0][5];
+      const context = rollDamageMock.mock.calls[0][0].context;
       expect(context.viciousMockerySpell).toBe(args.spell);
       expect(context.viciousMockeryMapName).toBe('test-map');
     });
@@ -244,7 +239,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       await handleSavePath(args);
 
-      const context = rollDamageMock.mock.calls[0][5];
+      const context = rollDamageMock.mock.calls[0][0].context;
       expect(context.viciousMockerySpell).toBeUndefined();
       expect(context.viciousMockeryMapName).toBeUndefined();
       expect(triggerViciousMockeryForGeneric).not.toHaveBeenCalled();
@@ -290,19 +285,14 @@ describe('savePath.js — handleSingleTargetSave', () => {
       await handleSavePath(args);
 
       expect(rollDamageMock).toHaveBeenCalledWith(
-        'Fireball',
-        '2d6',
-        8,
-        [8],
-        undefined,
-        expect.objectContaining({
+        { name: 'Fireball', formula: '2d6', total: 8, rolls: [8], modifier: undefined, context: expect.objectContaining({
           overchannelActive: true,
           overchannelUseCount: 2,
           overchannelSpellLevel: 3,
           isCantrip: false,
           saveType: 'dex',
           damageType: 'Fire',
-        }),
+        }) },
       );
     });
 
@@ -316,7 +306,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       await handleSavePath(args);
 
-      const context = rollDamageMock.mock.calls[0][5];
+      const context = rollDamageMock.mock.calls[0][0].context;
       expect(context.isCantrip).toBe(true);
     });
 
@@ -330,7 +320,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       await handleSavePath(args);
 
-      const context = rollDamageMock.mock.calls[0][5];
+      const context = rollDamageMock.mock.calls[0][0].context;
       expect(context.isCantrip).toBe(true);
     });
 
@@ -343,7 +333,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       await handleSavePath(args);
 
-      const context = rollDamageMock.mock.calls[0][5];
+      const context = rollDamageMock.mock.calls[0][0].context;
       expect(context.saveType).toBe('con');
     });
 
@@ -356,7 +346,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       await handleSavePath(args);
 
-      const context = rollDamageMock.mock.calls[0][5];
+      const context = rollDamageMock.mock.calls[0][0].context;
       expect(context.saveType).toBe('wis');
     });
 
@@ -371,7 +361,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       await handleSavePath(args);
 
-      const context = rollDamageMock.mock.calls[0][5];
+      const context = rollDamageMock.mock.calls[0][0].context;
       expect(context.overchannelSpellLevel).toBe(5);
     });
 
@@ -386,7 +376,7 @@ describe('savePath.js — handleSingleTargetSave', () => {
 
       await handleSavePath(args);
 
-      const context = rollDamageMock.mock.calls[0][5];
+      const context = rollDamageMock.mock.calls[0][0].context;
       expect(context.overchannelSpellLevel).toBe(3);
     });
   });

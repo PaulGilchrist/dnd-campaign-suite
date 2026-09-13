@@ -420,7 +420,7 @@ describe('initiativeService', () => {
         { name: 'New Name', armorClass: 15, hitPoints: 30 },
       ];
       const setNpcImages = vi.fn();
-      await renameNpc(combatSummary, 'Old Name', 'New Name', campaignNpcs, setNpcImages, 'campaign-1');
+      await renameNpc({ combatSummary, oldName: 'Old Name', newName: 'New Name', campaignNpcs, setNpcImages, campaignName: 'campaign-1' });
       expect(combatSummary.creatures[0].name).toBe('New Name');
       expect(combatSummary.creatures[0].ac).toBe(15);
       expect(combatSummary.creatures[0].maxHp).toBe(30);
@@ -432,7 +432,7 @@ describe('initiativeService', () => {
         { name: 'NPC 1', type: 'npc' },
       ]);
       const setNpcImages = vi.fn();
-      await renameNpc(combatSummary, 'NPC 1', 'Goblin', [], setNpcImages, 'campaign-1');
+      await renameNpc({ combatSummary, oldName: 'NPC 1', newName: 'Goblin', campaignNpcs: [], setNpcImages, campaignName: 'campaign-1' });
       expect(setNpcImages).toHaveBeenCalledWith(expect.any(Function));
       const updater = setNpcImages.mock.calls[0][0];
       const next = updater({ 'NPC 1': 'https://example.com/old.jpg' });
@@ -442,7 +442,7 @@ describe('initiativeService', () => {
 
     it('does nothing for a non-existent creature', async () => {
       const combatSummary = makeCombatSummary([{ name: 'NPC 1', type: 'npc' }]);
-      await renameNpc(combatSummary, 'Nope', 'New Name', [], undefined, 'campaign-1');
+      await renameNpc({ combatSummary, oldName: 'Nope', newName: 'New Name', campaignNpcs: [], campaignName: 'campaign-1' });
       expect(combatSummary.creatures[0].name).toBe('NPC 1');
     });
   });

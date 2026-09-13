@@ -202,10 +202,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
     describe('core popup data structure', () => {
         it('returns correct popup fields for a plain melee attack', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.type).toBe('damage');
@@ -226,52 +226,52 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
 
         it('sets isCrit to false by default', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(getFirstPopupCall().isCrit).toBe(false);
         });
 
         it('sets isCrit to true when isAutoCrit is in context', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isAutoCrit: true,
-            });
+            } });
 
             expect(getFirstPopupCall().isCrit).toBe(true);
         });
 
         it('sets isCrit to true when isAutoCrit is in context', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isAutoCrit: true,
-            });
+            } });
 
             expect(getFirstPopupCall().isCrit).toBe(true);
         });
 
         it('sets elementalAdeptBonus to 0 when no adjustment', async () => {
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(getFirstPopupCall().elementalAdeptBonus).toBe(0);
         });
 
         it('sets gwfApplied to false when GWF does not change rolls', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.gwfApplied).toBe(false);
@@ -281,13 +281,13 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
 
         it('includes dc, dcType, dcSuccess from context', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 dc: 15,
                 dcType: 'strength',
                 dcSuccess: false,
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.dc).toBe(15);
@@ -297,10 +297,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
 
         it('sets dc fields to undefined when absent from context', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.dc).toBeUndefined();
@@ -310,21 +310,21 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
 
         it('includes tavernBrawlerRerolls from context', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 tavernBrawlerRerolls: [1, 2],
-            });
+            } });
 
             expect(getFirstPopupCall().tavernBrawlerRerolls).toEqual([1, 2]);
         });
 
         it('sets tavernBrawlerRerolls to null when not in context', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(getFirstPopupCall().tavernBrawlerRerolls).toBeNull();
         });
@@ -337,12 +337,12 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             getBardicInspirationDieSizeFromClass.mockReturnValue(6);
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 bardicInspirationOffense: true,
                 bardicInspirationOffenseDieSize: 6,
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.bardicInspirationOffense).toBe(true);
@@ -353,10 +353,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             hasBardicInspirationOffense.mockReturnValue(false);
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(getFirstPopupCall().bardicInspirationOffense).toBe(false);
         });
@@ -368,12 +368,12 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             getChaModifier.mockReturnValue(3);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
                 empoweredSpell: true,
                 empoweredSpellChaMod: 3,
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.empoweredSpell).toBe(true);
@@ -384,10 +384,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             hasEmpoweredSpell.mockReturnValue(false);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
             expect(getFirstPopupCall().empoweredSpell).toBe(false);
         });
@@ -396,21 +396,21 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
     describe('spellName passthrough', () => {
         it('includes spellName from context', async () => {
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
                 spellName: 'Fire Bolt',
-            });
+            } });
 
             expect(getFirstPopupCall().spellName).toBe('Fire Bolt');
         });
 
         it('sets spellName to empty string when not in context', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(getFirstPopupCall().spellName).toBe('');
         });
@@ -425,22 +425,22 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
 
         it('sets piercerPuncture true when piercing damage, feat present, and not used', async () => {
             const fn = createFn();
-            await fn('Rapier', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Rapier', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'piercing',
                 playerStats: makePiercerStats(),
-            });
+            } });
 
             expect(getFirstPopupCall().piercerPuncture).toBe(true);
         });
 
         it('sets piercerPuncture false when damage type is not piercing', async () => {
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
                 playerStats: makePiercerStats(),
-            });
+            } });
 
             expect(getFirstPopupCall().piercerPuncture).toBe(false);
         });
@@ -453,32 +453,32 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             });
 
             const fn = createFn();
-            await fn('Rapier', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Rapier', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'piercing',
                 playerStats: makePiercerStats(),
-            });
+            } });
 
             expect(getFirstPopupCall().piercerPuncture).toBe(false);
         });
 
         it('sets piercerPuncture false when feat is not present', async () => {
             const fn = createFn();
-            await fn('Rapier', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Rapier', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'piercing',
                 playerStats: {},
-            });
+            } });
 
             expect(getFirstPopupCall().piercerPuncture).toBe(false);
         });
 
         it('sets piercerPuncture false when playerStats is missing', async () => {
             const fn = createFn();
-            await fn('Rapier', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Rapier', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'piercing',
-            });
+            } });
 
             expect(getFirstPopupCall().piercerPuncture).toBe(false);
         });
@@ -495,36 +495,36 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
 
         it('sets savageAttacker true for melee attacks when feat present and not used', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isMelee: true,
                 playerStats: makeSavageStats(),
-            });
+            } });
 
             expect(getFirstPopupCall().savageAttacker).toBe(true);
         });
 
         it('sets savageAttacker true for unarmed strikes when feat present', async () => {
             const fn = createFn();
-            await fn('Unarmed Strike', '1d4', 4, [4], 0, {
+            await fn({ name: 'Unarmed Strike', formula: '1d4', total: 4, rolls: [4], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'bludgeoning',
                 isUnarmedStrike: true,
                 playerStats: makeSavageStats(),
-            });
+            } });
 
             expect(getFirstPopupCall().savageAttacker).toBe(true);
         });
 
         it('sets savageAttacker false for ranged attacks even with feat', async () => {
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
                 isMelee: false,
                 playerStats: makeSavageStats(),
-            });
+            } });
 
             expect(getFirstPopupCall().savageAttacker).toBe(false);
         });
@@ -537,35 +537,35 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isMelee: true,
                 playerStats: makeSavageStats(),
-            });
+            } });
 
             expect(getFirstPopupCall().savageAttacker).toBe(false);
         });
 
         it('sets savageAttacker false when feat is not present', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isMelee: true,
                 playerStats: {},
-            });
+            } });
 
             expect(getFirstPopupCall().savageAttacker).toBe(false);
         });
 
         it('sets savageAttacker false when playerStats is missing', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isMelee: true,
-            });
+            } });
 
             expect(getFirstPopupCall().savageAttacker).toBe(false);
         });
@@ -574,53 +574,53 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
     describe('weapon type classification', () => {
         it('sets weaponType to unarmed for unarmed strikes', async () => {
             const fn = createFn();
-            await fn('Unarmed Strike', '1d4', 4, [4], 0, {
+            await fn({ name: 'Unarmed Strike', formula: '1d4', total: 4, rolls: [4], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'bludgeoning',
                 isUnarmedStrike: true,
-            });
+            } });
 
             expect(getFirstPopupCall().weaponType).toBe('unarmed');
         });
 
         it('sets weaponType to melee for melee attacks', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isMelee: true,
-            });
+            } });
 
             expect(getFirstPopupCall().weaponType).toBe('melee');
         });
 
         it('sets weaponType to ranged for ranged attacks', async () => {
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
                 isMelee: false,
-            });
+            } });
 
             expect(getFirstPopupCall().weaponType).toBe('ranged');
         });
 
         it('defaults weaponType to melee when isMelee is undefined', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(getFirstPopupCall().weaponType).toBe('melee');
         });
 
         it('defaults weaponType to ranged when damageType is ranged', async () => {
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'ranged',
-            });
+            } });
 
             expect(getFirstPopupCall().weaponType).toBe('ranged');
         });
@@ -639,10 +639,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.interceptedFeature).toBe('Shield Boy');
@@ -657,10 +657,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(getFirstPopupCall().interceptedFeature).toBeUndefined();
         });
@@ -676,10 +676,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(getFirstPopupCall().holyAuraSaveResult).toEqual({ success: true, saveType: 'wisdom' });
         });
@@ -692,10 +692,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(getFirstPopupCall().holyAuraSaveResult).toBeUndefined();
         });
@@ -704,18 +704,18 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
     describe('applyDamageToTarget call verification', () => {
         it('calls applyDamageToTarget with correct arguments for plain damage', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            const [, target, damage, damageTypes, campaign, , options] =
+            const [, target, damage, damageTypes, options] =
                 applyDamageToTarget.mock.calls[0];
             expect(target).toBe('Goblin');
             expect(damage).toBe(8);
             expect(damageTypes).toEqual(['slashing']);
-            expect(campaign).toBe('test-campaign');
+            expect(options.campaignName).toBe('test-campaign');
             expect(options.attackerName).toBe('TestFighter');
         });
 
@@ -723,12 +723,12 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             applyMinDamageAdjustment.mockImplementation((d) => d + 2);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 10, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 10, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
         });
     });
 
@@ -740,10 +740,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             });
 
             const fn = createFn();
-            await fn('Magic Missile', '1d4+1', 5, [4, 1], 1, {
+            await fn({ name: 'Magic Missile', formula: '1d4+1', total: 5, rolls: [4, 1], modifier: 1, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.type).toBe('damage');
@@ -757,10 +757,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             isMagicMissileImmune.mockReturnValue(true);
 
             const fn = createFn();
-            await fn('Magic Missile', '1d4+1', 5, [4, 1], 1, {
+            await fn({ name: 'Magic Missile', formula: '1d4+1', total: 5, rolls: [4, 1], modifier: 1, context: {
                 targetName: 'Goblin',
                 damageType: 'force',
-            });
+            } });
 
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
@@ -769,12 +769,12 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
     describe('auto-miss routing', () => {
         it('routes to auto-miss handler when isAutoMiss is true', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isAutoMiss: true,
                 rangeReason: 'Out of range',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.type).toBe('auto-miss');
@@ -785,11 +785,11 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
 
         it('does not call applyDamageToTarget for auto-miss', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
                 isAutoMiss: true,
-            });
+            } });
 
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
@@ -809,13 +809,13 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             processAoeNpcs.mockReturnValue([]);
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'overlay-1',
                 damageType: 'fire',
                 saveDc: 15,
                 saveType: 'dex',
                 dcSuccess: 'none',
-            });
+            } });
 
             expect(deps.setPopupHtml).toHaveBeenCalled();
             const popup = deps.setPopupHtml.mock.calls[0][0];
@@ -836,13 +836,13 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             processAoeNpcs.mockReturnValue([]);
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'overlay-1',
                 damageType: 'fire',
                 saveDc: 15,
                 saveType: 'dex',
                 dcSuccess: 'none',
-            });
+            } });
 
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
@@ -860,13 +860,13 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             rollSaveForCreature.mockReturnValue({ success: false, roll: 8, bonus: 2, total: 10, rawRolls: [8] });
 
             const fn = createFn();
-            await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+            await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
                 saveDc: 15,
                 saveType: 'dex',
                 dcSuccess: 'half',
-            });
+            } });
 
             expect(deps.setPopupHtml).toHaveBeenCalled();
             const popup = getFirstPopupCall();
@@ -880,10 +880,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
     describe('behavioral verification', () => {
         it('calls logEntry with roll data', async () => {
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'Goblin',
                 damageType: 'slashing',
-            });
+            } });
 
             expect(deps.logEntry).toHaveBeenCalled();
             const logData = deps.logEntry.mock.calls[0][0];
@@ -898,12 +898,12 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             applyMinDamageAdjustment.mockReturnValue(10);
 
             const fn = createFn();
-            await fn('Fire Bolt', '1d10', 8, [8], 0, {
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: {
                 targetName: 'Goblin',
                 damageType: 'fire',
-            });
+            } });
 
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 10, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 10, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
 
             const popup = getFirstPopupCall();
             expect(popup.total).toBe(10);
@@ -914,10 +914,10 @@ describe('Popup data with bardic inspiration, empowered spell, piercer, savage a
             loadCombatSummary.mockResolvedValue({ creatures: [] });
 
             const fn = createFn();
-            await fn('Longsword', '1d8+3', 8, [5, 3], 3, {
+            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: {
                 targetName: 'NonExistent',
                 damageType: 'slashing',
-            });
+            } });
 
             const popup = getFirstPopupCall();
             expect(popup.targetName).toBeUndefined();

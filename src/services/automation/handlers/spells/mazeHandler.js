@@ -137,10 +137,10 @@ function applyMazeBanishment({ campaignName, casterName, action, targetName, dc,
     }, campaignName);
 
     // Track for expiration cleanup
-    addExpiration(casterName, targetName, [
+    addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'incapacitated' },
         { type: 'remove_target_effect', effectKey: 'maze', target: targetName, source: casterName },
-    ], campaignName);
+    ], campaignName });
 
     // Track concentration
     if (casterCreature) {

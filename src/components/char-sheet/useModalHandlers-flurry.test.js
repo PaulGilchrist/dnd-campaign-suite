@@ -233,14 +233,14 @@ describe('useModalHandlers - open hand from flurry', () => {
             const { handleOpenHandFromFlurryConfirm } = useModalHandlers(deps);
             await handleOpenHandFromFlurryConfirm({ optionName: 'Push' });
 
-            expect(applyOpenHandTechnique).toHaveBeenCalledWith(
-                { name: 'Open Hand Technique' },
-                undefined,
-                undefined,
-                'Goblin',
-                'Push',
-                15
-            );
+            expect(applyOpenHandTechnique).toHaveBeenCalledWith({
+                action: { name: 'Open Hand Technique' },
+                playerStats: undefined,
+                campaignName: undefined,
+                targetName: 'Goblin',
+                selectedOptionName: 'Push',
+                saveDc: 15,
+            });
             expect(deps.setModalState).toHaveBeenCalledWith({
                 openHandFromFlurry: {
                     targets: [

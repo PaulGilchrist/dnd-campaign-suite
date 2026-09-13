@@ -314,7 +314,7 @@ describe('prismaticSprayHandler.handle - save results', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
       Math.random = originalRandom;
 
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 15, ['fire'], campaignName, expect.any(Array), { ignoreResistance: false, attackerName: casterName },);
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 15, ['fire'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: casterName });
     });
 
     it('does not apply half damage when rollExpression returns null', async () => {
@@ -411,7 +411,7 @@ describe('prismaticSprayHandler.handle - save results', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
       Math.random = originalRandom;
 
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 30, ['fire'], campaignName, expect.any(Array), { ignoreResistance: false, attackerName: casterName },);
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 30, ['fire'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: casterName });
     });
 
     it('does not apply damage when full damage is 0', async () => {

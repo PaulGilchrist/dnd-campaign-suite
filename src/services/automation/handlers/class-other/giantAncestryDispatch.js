@@ -68,7 +68,7 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats);
+    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
 
     await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula: opt.damage, damageResult });
 
@@ -96,7 +96,7 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage(cs, targetName, damageResult, damageType, campaignName, playerStats);
+    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
 
     await applySpeedReductionEffect(targetName, optName, speedReduction, campaignName);
 
@@ -195,9 +195,9 @@ export async function handleHillsTumble(action, playerStats, campaignName, optio
 
     setRuntimeValue('campaign', 'targetEffects', allTargetEffects, campaignName);
 
-    addExpiration(playerStats.name, targetName, [
+    addExpiration({ attackerName: playerStats.name, targetName, effects: [
         { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
-    ], campaignName, undefined, playerStats.name);
+    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -322,7 +322,14 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
     const rangeFt = rangeToFeet(opt.range) ?? 60;
     const inRange = await isWithinRange(attackerName, playerStats.name, rangeFt);
     if (!inRange) {
-        return stormsThunderRangeRefusal(campaignName, playerStats, optName, action.automation, attackerName, rangeFt);
+        return stormsThunderRangeRefusal({
+    campaignName,
+    playerStats,
+    optName,
+    automation: action.automation,
+    attackerName,
+    rangeFt,
+});
     }
 
     // Consume the use
@@ -333,7 +340,7 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
     const damageType = opt.damageType || 'Thunder';
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage(cs, attackerName, damageResult, damageType, campaignName, playerStats);
+    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName: attackerName, damageResult, damageType, campaignName, playerStats });
 
     await addEntry(campaignName, {
         type: 'ability_use',

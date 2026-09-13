@@ -82,7 +82,7 @@ describe('buildRoomWalls', () => {
       '2,1', '3,1', '4,1', '2,5', '3,5', '4,5',
       '0,0', // distant wall to preserve
     ]);
-    const result = buildRoomWalls(walls, 2, 4, 2, 4, 10);
+    const result = buildRoomWalls({ walls, minX: 2, maxX: 4, minY: 2, maxY: 4, gridSize: 10 });
     // Interior cleared
     expect(result.has('3,3')).toBe(false);
     // Boundary cells walled (all passages blocked)
@@ -103,7 +103,7 @@ describe('buildRoomWalls', () => {
       '1,2', '5,2', '1,3', '5,3', '1,4', '5,4',
       '2,1', '4,1', '2,5', '3,5', '4,5',
     ]);
-    const result = buildRoomWalls(walls, 2, 4, 2, 4, 10);
+    const result = buildRoomWalls({ walls, minX: 2, maxX: 4, minY: 2, maxY: 4, gridSize: 10 });
     // (3,2) has open passage at (3,1) → no wall
     expect(result.has('3,2')).toBe(false);
     // (2,2) and (4,2) have no open passage → walls
@@ -114,7 +114,7 @@ describe('buildRoomWalls', () => {
   it('returns a new set without mutating the input', () => {
     const walls = new Set(['0,0', '2,3', '5,5']);
     const originalSize = walls.size;
-    const result = buildRoomWalls(walls, 2, 4, 2, 4, 10);
+    const result = buildRoomWalls({ walls, minX: 2, maxX: 4, minY: 2, maxY: 4, gridSize: 10 });
     expect(walls.size).toBe(originalSize);
     expect(walls.has('2,3')).toBe(true);
     expect(result).not.toBe(walls);
@@ -122,13 +122,13 @@ describe('buildRoomWalls', () => {
 
   it('walls a single-cell room when all passages are blocked', () => {
     const walls = new Set(['4,5', '6,5', '5,4', '5,6']);
-    const result = buildRoomWalls(walls, 5, 5, 5, 5, 10);
+    const result = buildRoomWalls({ walls, minX: 5, maxX: 5, minY: 5, maxY: 5, gridSize: 10 });
     expect(result.has('5,5')).toBe(true);
   });
 
   it('handles a room at the grid edge with no outside cells on two sides', () => {
     const walls = new Set();
-    const result = buildRoomWalls(walls, 0, 2, 0, 2, 5);
+    const result = buildRoomWalls({ walls, minX: 0, maxX: 2, minY: 0, maxY: 2, gridSize: 5 });
     // Top and left edges have no valid outside cells in grid
     expect(result.has('1,0')).toBe(true);
     // Bottom-right corner has open outside neighbors in grid

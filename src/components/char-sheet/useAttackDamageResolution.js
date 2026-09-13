@@ -53,7 +53,7 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
             metamagicTwinTarget: o.metamagicTwinTarget || null,
             metamagicHeighten: o.metamagicHeighten || false,
         };
-        rollDamage(attack.name, formula, total, rolls, modifier, minimalCtx);
+        rollDamage({ name: attack.name, formula: formula, total: total, rolls: rolls, modifier: modifier, context: minimalCtx });
     };
 
     const ctx = {
@@ -343,7 +343,7 @@ export default function useAttackDamageResolution({
             (mapName ? buildCtx(attack, { consumeAttackTe: false }) : buildCtxSync(attack, { consumeAttackTe: false })).then(ctx => {
                 const merged = mergeDamagePipelineCtx(ctx, pendingCtxOverrides, pipelineCtx);
                 console.log('[sw-debug] rollDamage ctx.damageType=', merged.damageType);
-                rollDamage(attack.name, formula, total, rolls, modifier, { ...merged, ...critLabels });
+                rollDamage({ name: attack.name, formula: formula, total: total, rolls: rolls, modifier: modifier, context: { ...merged, ...critLabels } });
             }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
         } else {
             const o = pendingCtxOverrides;
@@ -360,7 +360,7 @@ export default function useAttackDamageResolution({
                 dcSuccess: o.dcSuccess || null,
                 tavernBrawlerRerolls: pipelineCtx?.tavernBrawlerRerolls || null,
             };
-            rollDamage(attack.name, formula, total, rolls, modifier, minimalCtx);
+            rollDamage({ name: attack.name, formula: formula, total: total, rolls: rolls, modifier: modifier, context: minimalCtx });
         }
     };
 
@@ -494,7 +494,10 @@ export default function useAttackDamageResolution({
         applyPauseState(resumeRef.current);
     };
 
-    const handleAttackRiderManeuverUse = async (maneuver, attack, popupHtmlData, currentFormula = null, currentTotal = 0, currentRolls = []) => {
+    const handleAttackRiderManeuverUse = async (maneuver, attack, popupHtmlData, current = {}) => {
+        const currentFormula = current.formula ?? null;
+        const currentTotal = current.total ?? 0;
+        const currentRolls = current.rolls ?? [];
         const maneuverName = maneuver?.name || maneuver;
         const attackInfo = buildRiderAttackInfo(attack, popupHtmlData);
         // MN-015: forward the Combat Superiority feature's save DC spec

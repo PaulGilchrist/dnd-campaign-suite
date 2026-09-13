@@ -198,7 +198,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('does not call onExecute when confirm handler is invoked without pending state (aid)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -212,7 +212,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('does not call onExecute when confirm handler is invoked without pending state (bane)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -226,7 +226,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('does not call onExecute when confirm handler is invoked without pending state (heal)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -240,7 +240,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('does not call onExecute when confirm handler is invoked without pending state (cureWounds)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -254,7 +254,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('does not call onExecute when confirm handler is invoked without pending state (prismaticSpray)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -270,7 +270,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('does not call onExecute when two-stage handler is invoked without pending state (resistanceStage)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -283,7 +283,7 @@ describe('useSpellMetamagicFlow — confirm handler guards', () => {
   it('does not call onExecute when two-stage handler is invoked without pending state (enhanceAbilityStage)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -304,7 +304,7 @@ describe('useSpellMetamagicFlow — skip handler guards', () => {
   it('does not call onExecute when skip handler is invoked without pending state (aid)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -318,7 +318,7 @@ describe('useSpellMetamagicFlow — skip handler guards', () => {
   it('does not call onExecute when skip handler is invoked without pending state (haste)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -332,7 +332,7 @@ describe('useSpellMetamagicFlow — skip handler guards', () => {
   it('does not call onExecute when skip handler is invoked without pending state (invisibility)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -346,7 +346,7 @@ describe('useSpellMetamagicFlow — skip handler guards', () => {
   it('does not call onExecute when skip handler is invoked without pending state (resistanceSkip)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {
@@ -359,7 +359,7 @@ describe('useSpellMetamagicFlow — skip handler guards', () => {
   it('does not call onExecute when skip handler is invoked without pending state (enhanceAbilitySkip)', () => {
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(makePlayerStats(), 'TestCampaign', onExecute)
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
     );
 
     act(() => {

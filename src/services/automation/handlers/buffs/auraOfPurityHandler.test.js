@@ -402,14 +402,7 @@ describe('auraOfPurityHandler', () => {
                 ['Ally1']
             );
 
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                casterName,
-                'Ally1',
-                [{ type: 'remove_active_buff', buffName: 'Aura of Purity' }],
-                campaignName,
-                undefined,
-                casterName
-            );
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Ally1', effects: [{ type: 'remove_active_buff', buffName: 'Aura of Purity' }], campaignName, rounds: undefined, expireOnCreatureName: casterName });
         });
 
         it('adds concentration for each target', async () => {

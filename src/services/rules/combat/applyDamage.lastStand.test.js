@@ -157,14 +157,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         hitPoints: 180,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'BoonChar', 10, ['Slashing'], campaignName,
-        [makeCharacter('BoonChar', {
-          level: 20, maxHp: 180,
-          features: [{ name: 'Last Stand' }],
-          className: 'Paladin', classLevel: 20,
-        })],
-      );
+      const result = await applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] });
 
       expect(result.intercepted).toBe(true);
       expect(result.finalDamage).toBe(0);
@@ -181,14 +174,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         boonOfRecoveryLastStandUsed: true,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'BoonChar', 10, ['Slashing'], campaignName,
-        [makeCharacter('BoonChar', {
-          level: 20, maxHp: 180,
-          features: [{ name: 'Last Stand' }],
-          className: 'Paladin', classLevel: 20,
-        })],
-      );
+      const result = await applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] });
 
       expect(result.finalDamage).toBe(10);
       expect(result.newHp).toBe(0);
@@ -213,14 +199,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         hitPoints: 200,
       }));
 
-      const result = await applyDamageToTarget(
-        cs, 'Fighter', 10, ['Slashing'], campaignName,
-        [makeCharacter('Fighter', {
-          level: 20, maxHp: 200,
-          features: [{ name: 'Extra Attack' }],
-          className: 'Fighter', classLevel: 20,
-        })],
-      );
+      const result = await applyDamageToTarget(cs, 'Fighter', 10, ['Slashing'], { campaignName, characters: [makeCharacter('Fighter', { level: 20, maxHp: 200, features: [{ name: 'Extra Attack' }], className: 'Fighter', classLevel: 20, })] });
 
       expect(result.finalDamage).toBe(10);
       expect(result.newHp).toBe(0);
@@ -238,14 +217,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         activeConditions: ['unconscious'],
       }));
 
-      await applyDamageToTarget(
-        cs, 'BoonChar', 10, ['Slashing'], campaignName,
-        [makeCharacter('BoonChar', {
-          level: 20, maxHp: 180,
-          features: [{ name: 'Last Stand' }],
-          className: 'Paladin', classLevel: 20,
-        })],
-      );
+      await applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'BoonChar', 'deathSaves', [false, false, false], campaignName,
@@ -267,14 +239,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         hitPoints: 180,
       }));
 
-      await applyDamageToTarget(
-        cs, 'BoonChar', 10, ['Slashing'], campaignName,
-        [makeCharacter('BoonChar', {
-          level: 20, maxHp: 180,
-          features: [{ name: 'Last Stand' }],
-          className: 'Paladin', classLevel: 20,
-        })],
-      );
+      await applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'BoonChar', 'boonOfRecoveryLastStandUsed', true, campaignName,
@@ -292,14 +257,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
         hitPoints: null,
       }));
 
-      await expect(applyDamageToTarget(
-        cs, 'BoonChar', 10, ['Slashing'], campaignName,
-        [makeCharacter('BoonChar', {
-          level: 20, maxHp: 180,
-          features: [{ name: 'Last Stand' }],
-          className: 'Paladin', classLevel: 20,
-        })],
-      )).rejects.toThrow('Last Stand: hitPoints not found for BoonChar');
+      await expect(applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] })).rejects.toThrow('Last Stand: hitPoints not found for BoonChar');
     });
   });
 });

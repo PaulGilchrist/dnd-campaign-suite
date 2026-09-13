@@ -94,14 +94,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: null,
       };
 
-      const result = await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      const result = await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('no creatures selected');
@@ -125,14 +125,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: [],
       };
 
-      const result = await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      const result = await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('no creatures selected');
@@ -158,14 +158,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      const result = await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      const result = await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('No combat active.');
@@ -195,14 +195,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       // Should NOT call setRuntimeValue for Goblin's conditions since blinded already exists
       const goblinConditionCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
@@ -237,14 +237,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin',
@@ -274,14 +274,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -316,14 +316,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      const result = await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      const result = await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('0 radiant damage');
@@ -350,14 +350,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -394,14 +394,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      await confirmSearingVengeance(
-        automation,
-        playerStats,
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      await confirmSearingVengeance({
+            automation,
+            playerStats,
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8+5');
     });
@@ -433,14 +433,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      await confirmSearingVengeance(
-        automation,
-        playerStats,
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      await confirmSearingVengeance({
+            automation,
+            playerStats,
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8-2');
     });
@@ -467,14 +467,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8+0');
     });
@@ -502,14 +502,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin', 'Orc'],
       };
 
-      await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(2);
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
@@ -566,14 +566,14 @@ describe('confirmSearingVengeance - edge cases', () => {
         selectedTargets: ['Goblin'],
       };
 
-      const result = await confirmSearingVengeance(
-        automation,
-        makePlayerStats(),
-        campaignName,
-        null,
-        [],
-        payload
-      );
+      const result = await confirmSearingVengeance({
+            automation,
+            playerStats: makePlayerStats(),
+            campaignName,
+            mapName: null,
+            characters: [],
+            payload,
+        });
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Searing Vengeance');

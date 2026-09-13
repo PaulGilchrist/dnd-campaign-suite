@@ -207,13 +207,13 @@ describe('AoE overlay path', () => {
 
     it('routes to aoE handler when targetName starts with overlay-', async () => {
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
-        });
+        } });
 
         expect(readAoeContext).toHaveBeenCalledWith('test-campaign', '1');
         expect(getAffectedCreatures).toHaveBeenCalled();
@@ -228,10 +228,10 @@ describe('AoE overlay path', () => {
         readAoeContext.mockResolvedValue(null);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
-        });
+        } });
 
         expect(readAoeContext).toHaveBeenCalledWith('test-campaign', '1');
         expect(getAffectedCreatures).not.toHaveBeenCalled();
@@ -244,10 +244,10 @@ describe('AoE overlay path', () => {
         loadCombatSummary.mockResolvedValue(null);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
-        });
+        } });
 
         expect(getAffectedCreatures).not.toHaveBeenCalled();
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ rollType: 'aoe-damage' }));
@@ -260,13 +260,13 @@ describe('AoE overlay path', () => {
         ]);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
-        });
+        } });
 
         expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 20, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard' });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 20, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard' });
         expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             rollType: 'aoe-damage',
@@ -276,13 +276,13 @@ describe('AoE overlay path', () => {
 
     it('writes lastAttack via setRuntimeValue for AoE', async () => {
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
-        });
+        } });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -299,13 +299,13 @@ describe('AoE overlay path', () => {
 
     it('uses attackerName from context when provided', async () => {
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             attackerName: 'Ally2',
-        });
+        } });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -323,13 +323,13 @@ describe('AoE overlay path', () => {
         sendAoePlayerSaves.mockReturnValue([{ promptId: 'save-1', targetName: 'Ally1' }]);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
-        });
+        } });
 
         expect(sendAoePlayerSaves).toHaveBeenCalled();
         expect(deps.pendingSaves['save-1']).toEqual(expect.objectContaining({
@@ -348,18 +348,18 @@ describe('AoE overlay path', () => {
         hasSoulstitchProtection.mockReturnValue(true);
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
-        });
+        } });
 
         expect(hasSoulstitchProtection).toHaveBeenCalledWith('Ally1', 'TestWizard', 'test-campaign');
         expect(sendAoePlayerSaves).not.toHaveBeenCalled();
         expect(deps.pendingSaves).toEqual({});
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['fire'], 'test-campaign', expect.any(Array), { ignoreResistance: false, attackerName: 'TestWizard' });
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard' });
     });
 
     it('applies correct overlay label from overlay context', async () => {
@@ -370,10 +370,10 @@ describe('AoE overlay path', () => {
         });
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
-        });
+        } });
 
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             targetName: 'Custom Zone',
@@ -388,10 +388,10 @@ describe('AoE overlay path', () => {
         });
 
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
-        });
+        } });
 
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             targetName: 'cone',
@@ -400,13 +400,13 @@ describe('AoE overlay path', () => {
 
     it('passes displayRolls and adjustedTotal to logEntry', async () => {
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-1',
             damageType: 'fire',
             saveDc: 15,
             saveType: 'DEX',
             dcSuccess: 'half',
-        });
+        } });
 
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             rolls: [3, 4, 5, 2, 3, 3],
@@ -416,10 +416,10 @@ describe('AoE overlay path', () => {
 
     it('handles overlay id extraction from various targetName formats', async () => {
         const fn = createFn();
-        await fn('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0, {
+        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
             targetName: 'overlay-42',
             damageType: 'fire',
-        });
+        } });
 
         expect(readAoeContext).toHaveBeenCalledWith('test-campaign', '42');
     });

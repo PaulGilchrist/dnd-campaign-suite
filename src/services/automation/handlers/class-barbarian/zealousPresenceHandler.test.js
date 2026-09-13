@@ -441,15 +441,15 @@ describe('zealousPresenceHandler.confirmZealousPresence', () => {
             expect(expCalls).toHaveLength(2);
 
             for (const call of expCalls) {
-                expect(call[0]).toBe(playerName);
-                expect(call[1]).toMatch(/^Enemy\d$/);
-                expect(call[2]).toEqual([
+                expect(call[0].attackerName).toBe(playerName);
+                expect(call[0].targetName).toMatch(/^Enemy\d$/);
+                expect(call[0].effects).toEqual([
                     { type: 'remove_active_buff', buffName: 'Zealous Presence' },
                     { type: 'clear_runtime_value', creatureName: playerName, key: 'zealousPresenceActive' },
                 ]);
-                expect(call[3]).toBe(campaignName);
-                expect(call[4]).toBeUndefined();
-                expect(call[5]).toBe(playerName);
+                expect(call[0].campaignName).toBe(campaignName);
+                expect(call[0].rounds).toBeUndefined();
+                expect(call[0].expireOnCreatureName).toBe(playerName);
             }
         });
 

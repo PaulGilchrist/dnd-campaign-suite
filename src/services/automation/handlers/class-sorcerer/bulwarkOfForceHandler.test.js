@@ -178,14 +178,7 @@ describe('bulwarkOfForceHandler', () => {
                 ['Ally Joe']
             );
 
-            expect(expirations.addExpiration).toHaveBeenCalledWith(
-                'Test Fighter',
-                'Test Fighter',
-                [{ type: 'remove_bulwark_of_force' }],
-                campaignName,
-                undefined,
-                'Test Fighter'
-            );
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Test Fighter', targetName: 'Test Fighter', effects: [{ type: 'remove_bulwark_of_force' }], campaignName, rounds: undefined, expireOnCreatureName: 'Test Fighter' });
         });
 
         it('logs the ability use when activating bulwark', async () => {

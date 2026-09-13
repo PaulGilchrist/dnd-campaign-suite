@@ -154,7 +154,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
 
     const isWildHeart = action.name === 'Rage of the Wilds';
 
-    const gate = await consumeStanceResource(action, auto, playerStats, campaignName, isWildHeart, maxUses);
+    const gate = await consumeStanceResource({ action, auto, playerStats, campaignName, isWildHeart, maxUses });
     if (gate.popup) return gate.popup;
     const currentUses = gate.currentUses;
 
@@ -164,7 +164,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
 
     const isImprovedDuplicity = auto.effect === 'create_illusion' && hasEnhancedDistraction(playerStats);
 
-    const buff = buildStanceBuff(action, auto, chosenOption, playerStats, resistanceTypes, isImprovedDuplicity);
+    const buff = buildStanceBuff({ action, auto, chosenOption, playerStats, resistanceTypes, isImprovedDuplicity });
 
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];
@@ -226,7 +226,7 @@ function stanceRefusal(action, auto, description) {
 
 // Resource gates for stance activation: Wild Heart prerequisite, tracked uses,
 // Channel Divinity, or rage-point pool. Returns { popup } to refuse activation.
-async function consumeStanceResource(action, auto, playerStats, campaignName, isWildHeart, maxUses) {
+async function consumeStanceResource({ action, auto, playerStats, campaignName, isWildHeart, maxUses }) {
     const playerName = playerStats.name;
 
     if (isWildHeart) {
@@ -313,7 +313,7 @@ const STANCE_OPTION_EFFECTS = {
     teleport: opt => ({ effect: 'teleport_ready', teleportDistance: opt.teleportDistance || '30 ft' }),
 };
 
-function buildStanceBuff(action, auto, chosenOption, playerStats, resistanceTypes, isImprovedDuplicity) {
+function buildStanceBuff({ action, auto, chosenOption, playerStats, resistanceTypes, isImprovedDuplicity }) {
     const buff = buildBaseStanceBuff(action, auto, chosenOption, isImprovedDuplicity, resistanceTypes);
 
     if (chosenOption && chosenOption.flySpeed) {

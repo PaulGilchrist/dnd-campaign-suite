@@ -260,8 +260,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         if (saveResult.success) {
             savedCount++;
             await recordCalmTargetResult(campaignName, targetName, saveResult, 'success');
-            await logCalmEmotionsSave(campaignName, casterName, targetName, dc, true,
-                `${targetName} succeeded on CHA save against Calm Emotions.`);
+            await logCalmEmotionsSave({
+                    campaignName,
+                    casterName,
+                    targetName,
+                    dc,
+                    success: true,
+                    description: `${targetName} succeeded on CHA save against Calm Emotions.`,
+                });
         } else {
             affectedCount++;
             // Default to immunity path for non-interactive route
@@ -269,8 +275,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
             await recordCalmTargetResult(campaignName, targetName, saveResult, 'failure');
 
-            await logCalmEmotionsSave(campaignName, casterName, targetName, dc, false,
-                `${targetName} failed CHA save against Calm Emotions. Granted immunity to Charmed/Frightened.`);
+            await logCalmEmotionsSave({
+                    campaignName,
+                    casterName,
+                    targetName,
+                    dc,
+                    success: false,
+                    description: `${targetName} failed CHA save against Calm Emotions. Granted immunity to Charmed/Frightened.`,
+                });
 
             results.push(`${targetName} is immune to Charmed and Frightened.`);
         }
@@ -301,7 +313,7 @@ async function recordCalmTargetResult(campaignName, targetName, saveResult, save
     });
 }
 
-async function logCalmEmotionsSave(campaignName, casterName, targetName, dc, success, description) {
+async function logCalmEmotionsSave({ campaignName, casterName, targetName, dc, success, description }) {
     await addEntry(campaignName, {
         type: 'save_result',
         characterName: casterName,

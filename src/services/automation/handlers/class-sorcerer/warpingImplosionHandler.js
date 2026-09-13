@@ -107,6 +107,66 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+function implosionRefusal(featureName, description, auto, logDescription, playerName) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description,
+            automation: auto,
+        },
+        logEntries: [{
+            type: 'automation',
+            automationType: 'warping_implosion_refused',
+            characterName: playerName,
+            name: featureName,
+            description: logDescription,
+            timestamp: Date.now(),
+        }],
+    };
+}
+
+// Refusal legs spend nothing and log (CLA-359 refusal logging).
+async function gateImplosionUse({ restoreWithSP, auto, featureName, playerName, campaignName, currentSP, restoreCost }) {
+    if (restoreWithSP) {
+        if (currentSP < restoreCost) {
+            return implosionRefusal(featureName,
+                `Not enough Sorcery Points to restore ${featureName}. Need ${restoreCost} SP, you have ${currentSP}. Nothing spent.`,
+                auto,
+                `${featureName} refused — ${currentSP} Sorcery Points is not enough to restore (needs ${restoreCost}). Nothing spent.`,
+                playerName);
+        }
+        return null;
+    }
+    const usesKey = resolveUsesKey(auto, featureName);
+    const usesMax = auto.uses ?? 1;
+    const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
+    if (currentUses <= 0) {
+        return implosionRefusal(featureName,
+            `${featureName}: No remaining uses. Restore with ${restoreCost} Sorcery Points or finish a Long Rest. Nothing spent.`,
+            auto,
+            `${featureName} refused — no remaining uses. Nothing spent.`,
+            playerName);
+    }
+    await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+    return null;
+}
+
+function buildImplosionDescriptionParts({ playerName, featureName, auto, rangeFeet, saveDcValue, restoreWithSP, restoreCost }) {
+    const descriptionParts = [
+        `${playerName} used ${featureName}: teleported to an unoccupied space within ${TELEPORT_RANGE_FEET} feet.`,
+        `Creatures within ${rangeFeet} feet of the space left make a ${auto.saveType || 'STR'} save (DC ${saveDcValue}) or take ${auto.damage || '3d10'} ${auto.damageType || 'Force'} damage, pulled toward that space.`,
+    ];
+    if (restoreWithSP) {
+        descriptionParts.push(`Restored with ${restoreCost} Sorcery Points.`);
+    }
+    if (isAreaShape(auto.shape)) {
+        descriptionParts.push('Magical Darkness in the area is dispelled.');
+    }
+    return descriptionParts;
+}
+
 export async function applyWarpingImplosion(action, playerStats, campaignName, restoreWithSP) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -117,51 +177,8 @@ export async function applyWarpingImplosion(action, playerStats, campaignName, r
     const restoreCost = auto.restoreCost || 5;
 
     // Refusal legs spend nothing and log (CLA-359 refusal logging).
-    if (restoreWithSP) {
-        if (currentSP < restoreCost) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `Not enough Sorcery Points to restore ${featureName}. Need ${restoreCost} SP, you have ${currentSP}. Nothing spent.`,
-                    automation: auto,
-                },
-                logEntries: [{
-                    type: 'automation',
-                    automationType: 'warping_implosion_refused',
-                    characterName: playerName,
-                    name: featureName,
-                    description: `${featureName} refused — ${currentSP} Sorcery Points is not enough to restore (needs ${restoreCost}). Nothing spent.`,
-                    timestamp: Date.now(),
-                }],
-            };
-        }
-    } else {
-        const usesKey = resolveUsesKey(auto, featureName);
-        const usesMax = auto.uses ?? 1;
-        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
-        if (currentUses <= 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `${featureName}: No remaining uses. Restore with ${restoreCost} Sorcery Points or finish a Long Rest. Nothing spent.`,
-                    automation: auto,
-                },
-                logEntries: [{
-                    type: 'automation',
-                    automationType: 'warping_implosion_refused',
-                    characterName: playerName,
-                    name: featureName,
-                    description: `${featureName} refused — no remaining uses. Nothing spent.`,
-                    timestamp: Date.now(),
-                }],
-            };
-        }
-        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
-    }
+    const refusal = await gateImplosionUse({ restoreWithSP, auto, featureName, playerName, campaignName, currentSP, restoreCost });
+    if (refusal) return refusal;
 
     if (restoreWithSP) {
         spendSorceryPoints(playerName, restoreCost, campaignName, maxSP);
@@ -177,16 +194,7 @@ export async function applyWarpingImplosion(action, playerStats, campaignName, r
     const saveDcValue = buildSaveDc(auto, playerStats);
     const rangeFeet = getEmanationRange(auto, playerStats, playerName, campaignName);
 
-    const descriptionParts = [
-        `${playerName} used ${featureName}: teleported to an unoccupied space within ${TELEPORT_RANGE_FEET} feet.`,
-        `Creatures within ${rangeFeet} feet of the space left make a ${auto.saveType || 'STR'} save (DC ${saveDcValue}) or take ${auto.damage || '3d10'} ${auto.damageType || 'Force'} damage, pulled toward that space.`,
-    ];
-    if (restoreWithSP) {
-        descriptionParts.push(`Restored with ${restoreCost} Sorcery Points.`);
-    }
-    if (isAreaShape(auto.shape)) {
-        descriptionParts.push('Magical Darkness in the area is dispelled.');
-    }
+    const descriptionParts = buildImplosionDescriptionParts({ playerName, featureName, auto, rangeFeet, saveDcValue, restoreWithSP, restoreCost });
 
     await addEntry(campaignName, {
         type: 'ability_use',

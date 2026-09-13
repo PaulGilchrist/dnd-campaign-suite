@@ -62,9 +62,9 @@ function MassSuggestionModal({
 
                 if (!success) {
                     applyCharmedToTarget(targetName, campaignName);
-                    addExpiration(casterName, targetName, [
+                    addExpiration({ attackerName: casterName, targetName, effects: [
                         { type: 'charmed', condition: 'charmed' },
-                    ], campaignName);
+                    ], campaignName });
 
                     await addEntry(campaignName, {
                         type: 'condition',
@@ -188,9 +188,9 @@ function MassSuggestionModal({
 
         if (!success) {
             applyCharmedToTarget(targetName, campaignName);
-            addExpiration(casterName, targetName, [
+            addExpiration({ attackerName: casterName, targetName, effects: [
                 { type: 'charmed', condition: 'charmed' },
-            ], campaignName);
+            ], campaignName });
 
             await logConditionApplied(campaignName, {
                 targetName,

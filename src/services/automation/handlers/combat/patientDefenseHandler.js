@@ -17,9 +17,9 @@ async function applyPatientDefense({ action, auto, playerStats, playerName, camp
             effect: 'dodge',
             duration: 'until_start_of_next_turn',
         }, campaignName, playerName);
-        addExpiration(playerName, playerName, [
+        addExpiration({ attackerName: playerName, targetName: playerName, effects: [
             { type: 'remove_active_buff', buffName: 'Dodge' }
-        ], campaignName, undefined, playerName);
+        ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
     }
 
     // Add temp HP for heightened version

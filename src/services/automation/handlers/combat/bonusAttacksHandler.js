@@ -168,7 +168,7 @@ async function applyFlurryAttackDamage({ cs, targetName, damageFormula, damageTy
     const rawDamage = rollResult?.total || 0;
 
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    const applyResult = applyDamageToTarget(cs, targetName, rawDamage, [damageType], campaignName, characters, { ignoreResistance: false, attackerName: playerName });
+    const applyResult = applyDamageToTarget(cs, targetName, rawDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
 
     const finalDamage = applyResult?.finalDamage || 0;
     const damageResult = {
@@ -233,7 +233,7 @@ async function applyHandOfHarmDamage({ cs, targetName, damageExpression, handOfH
 
     const harmDamageType = handOfHarmAuto.damageType || 'Necrotic';
     const harmCharacters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    const harmApplyResult = applyDamageToTarget(cs, targetName, necroticDamage, [harmDamageType], campaignName, harmCharacters, { ignoreResistance: false, attackerName: playerName });
+    const harmApplyResult = applyDamageToTarget(cs, targetName, necroticDamage, [harmDamageType], { campaignName, characters: harmCharacters, ignoreResistance: false, attackerName: playerName });
 
     const finalHarmDamage = harmApplyResult?.finalDamage || 0;
     totalDamageRef.value += finalHarmDamage;

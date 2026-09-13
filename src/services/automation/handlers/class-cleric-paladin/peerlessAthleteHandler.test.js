@@ -149,13 +149,7 @@ describe('peerlessAthleteHandler', () => {
                 ]),
                 campaignName,
             );
-            expect(addExpiration).toHaveBeenCalledWith(
-                'TestCleric',
-                'TestCleric',
-                [{ type: 'peerless_athlete_end' }],
-                campaignName,
-                6,
-            );
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCleric', targetName: 'TestCleric', effects: [{ type: 'peerless_athlete_end' }], campaignName, rounds: 6 });
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestCleric',
