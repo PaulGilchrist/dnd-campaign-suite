@@ -127,9 +127,7 @@ async function processPlayerSave({ target, characterName, campaignName, context,
     logEntry(buildPlayerSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, saveResult, saveSuccess, saveType, saveDc, attackerName, context }));
 
     // Apply save-triggered damage and conditions
-    if (context?.autoDamageFormula && saveDc != null) {
-        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal: saveResult.total, logEntry, setPopupHtml, characters: context._characters });
-    }
+    await applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal: saveResult.total, logEntry, setPopupHtml });
 
     return { saveSuccess, effectiveD20ForSave, saveTotal, saveResult };
 }
@@ -280,9 +278,7 @@ async function processNpcSave({ target, characterName, campaignName, context, bo
     logEntry(buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, context, saveTotal, bonus, baneSaveRoll, baneSaveDisplayLabel, baneAttackerRoll, baneAttackerDisplayLabel, blessSaveRoll, wardingBondSaveBonus, saveType, saveDc, saveSuccess, attackerName }));
 
     // Apply save-triggered damage and conditions
-    if (context?.autoDamageFormula && saveDc != null) {
-        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
-    }
+    await applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml });
 
     return { saveSuccess, effectiveD20ForSave, saveTotal };
 }
@@ -299,6 +295,23 @@ function resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveTy
         });
     const hasEvasion = hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(applyTarget, campaignName);
     return { targetChar, hasOwnEvasion, hasEvasion };
+}
+
+async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
+    if (context?.autoDamageFormula && saveDc != null) {
+        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
+    } else {
+        applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget: targetName || characterName, attackerName, campaignName });
+    }
+}
+
+// MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.
+function applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget, attackerName, campaignName }) {
+    if (saveDc == null || saveSuccess !== false) return;
+    const saveConditions = context?.saveConditions || [];
+    if (saveConditions.length <= 0) return;
+    const targetChar = (context._characters || []).find(c => c.name === applyTarget);
+    applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
 }
 
 function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName }) {

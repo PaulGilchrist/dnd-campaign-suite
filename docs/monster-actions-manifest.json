@@ -290,7 +290,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The aboleth makes two Tentacle attacks and uses either Consume Memories or Dominate Mind if available.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0017-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0018",
