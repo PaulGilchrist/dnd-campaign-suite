@@ -35,11 +35,40 @@ import './MonsterCardModal.css';
 function breathAoeShape(action, spellInfo) {
   if (spellInfo) return null;
   if (!action || action.save_dc == null) return null;
+  // MA-0042: an authored zone (e.g. Adult Black Dragon Insect Cloud) is a
+  // persisting radius area — picker centered on a GM-chosen point, so the
+  // attacker-origin coverage gate does NOT apply (selection advisory).
+  if (action.zone?.radius_ft != null) {
+    return { shape: 'Radius', feet: Number(action.zone.radius_ft), rangeGateFt: null };
+  }
   const description = String(action.description || '');
   const shape = /\bcone\b/i.test(description) ? 'Cone' : (/\bline\b/i.test(description) ? 'Line' : null);
   if (!shape) return null;
   const m = description.match(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/i);
-  return { shape, feet: m ? Number(m[1]) : (shape === 'Cone' ? 30 : 60) };
+  const feet = m ? Number(m[1]) : (shape === 'Cone' ? 30 : 60);
+  return { shape, feet, rangeGateFt: feet };
+}
+
+// MA-0042: persisting-zone marker payload for authored `zone` rows (currently
+// only Adult Black Dragon's Insect Cloud). Written at picker confirm by the
+// area picker: zone te per covered creature + caster tracking key
+// `_lair_insect_cloud_<caster>` (radius/saveDc, SP-111 zone shape). No
+// turn-END zone-damage consumer exists in this engine (expireStaleEffects
+// zone phases are turn-START save/restraint passes; the turn-end seams are
+// condition_removal/sleep/stink-cleanup only), so the RAW "repeat 3d6 at
+// turn end" clause is recorded + logged as GM-enforced (CLA-325 precedent)
+// — wiring a turn-end zone-damage pass would be new state design.
+function zoneTeForAction(action) {
+  if (!action?.zone?.radius_ft || !action.name) return null;
+  const slug = String(action.name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return {
+    effectKey: `lair_${slug}`,
+    trackingPrefix: `lair_${slug}`,
+    radiusFt: Number(action.zone.radius_ft),
+    repeatTurnEnd: action.zone.repeat_turn_end === true,
+    damage: action.damage_dice_primary || null,
+    duration: action.duration || null,
+  };
 }
 
 // MA-0031: recharge gate at row click — a spent breath weapon refuses with a
@@ -92,7 +121,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action) });
       return;
     }
     fire();
@@ -1216,7 +1245,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           dcSuccess={conePicker.dcSuccess}
           titleOverride={conePicker.title}
           excludeNames={[monsterName]}
-          rangeGateFt={conePicker.coneFt}
+          rangeGateFt={conePicker.rangeGateFt}
+          zoneTe={conePicker.zoneTe}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}
         />

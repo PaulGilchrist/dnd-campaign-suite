@@ -306,6 +306,45 @@ function maybeStoreLastAttack(enabled, campaignName, cfg) {
     if (enabled) storeSpellLastAttack(campaignName, cfg);
 }
 
+// MA-0042: persisting-zone arm seam (byte-inert when zoneTe is null) — on
+// area confirm, writes a zone te per covered creature (SP-111 zone te shape)
+// plus caster tracking `_<trackingPrefix>_<caster>` {radius/saveDc} for any
+// future zone consumer. repeatTurnEnd rows log "repeat <dice> at turn end —
+// GM-enforced": no turn-END zone-damage consumer exists in this engine
+// (expireStaleEffects zone phases are turn-START passes only), so the
+// repeat damage + "until dismissed" duration stay advisory (CLA-325).
+function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc, saveType, campaignName }) {
+    if (!zoneTe || !zoneTe.effectKey) return;
+    for (const targetName of selectedNames) {
+        registerTargetEffect(campaignName, targetName, zoneTe.effectKey, casterName, {
+            dc: saveDc,
+            radiusFt: zoneTe.radiusFt,
+            repeatTurnEnd: zoneTe.repeatTurnEnd === true,
+            duration: 'until_end_of_zone',
+        });
+    }
+    const trackingKey = `_${zoneTe.trackingPrefix}_${String(casterName).replace(/\s+/g, '_')}`;
+    setRuntimeValue(casterName, trackingKey, {
+        saveDc,
+        saveType,
+        radiusFt: zoneTe.radiusFt,
+        repeatTurnEnd: zoneTe.repeatTurnEnd === true,
+        damage: zoneTe.damage || null,
+        duration: zoneTe.duration || null,
+        affectedNames: [...selectedNames],
+    }, campaignName);
+    const repeatNote = zoneTe.repeatTurnEnd
+        ? ` Repeat ${zoneTe.damage || 'damage'} at turn end — GM-enforced (no turn-end zone-damage consumer).`
+        : '';
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: actionName,
+        description: `${casterName} ${actionName}: ${zoneTe.effectKey} zone armed (radius ${zoneTe.radiusFt} ft, ${saveType} save DC ${saveDc}) over ${selectedNames.join(', ') || 'no targets'}.${repeatNote} Duration ${zoneTe.duration || 'GM-adjudicated'} — GM-enforced.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging zone arm:', e); });
+}
+
 // MA-0031: advisory cone/area coverage gate — isWithinRange from the attacker
 // (gridless lenient §7); null rangeGateFt = no gate (PC-spell default).
 function useRangeAllowedSet(eligibleTargets, rangeGateFt, attackerName) {
@@ -375,6 +414,9 @@ function SaveAttackAoeModal({
     excludeNames,
     rangeGateFt,
     storeLastAttack,
+    // MA-0042 optional persisting-zone seam (byte-inert null default):
+    // { effectKey, trackingPrefix, radiusFt, repeatTurnEnd, damage, duration }
+    zoneTe = null,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -463,8 +505,11 @@ function SaveAttackAoeModal({
         // CLA-321: Soulstitch protection lasts only for the cast that wrote the stamp.
         clearSoulstitchStamp(playerStats.name, campaignName);
 
+        // MA-0042: persisting-zone arm (byte-inert unless zoneTe authored).
+        armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
+
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {

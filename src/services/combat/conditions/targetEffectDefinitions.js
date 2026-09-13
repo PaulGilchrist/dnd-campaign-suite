@@ -753,6 +753,17 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'dc'],
   },
 
+  // ── Lair ─────────────────────────────────────────────────
+  {
+    effect: 'lair_insect_cloud',
+    label: 'Insect Cloud (Lair)',
+    description: 'Inside a swarming-insect cloud (20-foot radius, lair action): Lightly Obscured. CON save (DC indicated) when the cloud appears, taking Piercing damage on a failed save, half on a success. A creature that ends its turn in the cloud takes the same damage again — GM-enforced (no turn-end zone-damage consumer exists). Lasts until the dragon dismisses it, uses this lair action again, or dies.',
+    icon: 'fa-bug',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source', 'dc'],
+  },
+
   // ── Movement ────────────────────────────────────────────
   {
     effect: 'ac_penalty',

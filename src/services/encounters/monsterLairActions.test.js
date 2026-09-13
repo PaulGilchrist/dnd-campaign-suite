@@ -144,3 +144,39 @@ describe('MA-0041 adult-black-dragon water surge data lock', () => {
     expect(surge.description).not.toMatch(/damage/i);
   });
 });
+
+// MA-0042: Adult Black Dragon lair_actions[1] "Insect Cloud" was a plain
+// string (inert, zero zone consumers). Now structured + clickable, machine-
+// readable: CON DC 15, 3d6 Piercing half-on-success, and a persisting 20-ft
+// zone with repeat_turn_end (the turn-END repeat remains GM-advisory — no
+// turn-end zone-damage consumer exists; see SaveAttackAoeModal.lair-zone).
+describe('MA-0042 adult-black-dragon insect cloud data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-black-dragon');
+  const cloud = dragon.lair_actions[1];
+
+  it('row is now a structured clickable SAVE row named Insect Cloud', () => {
+    expect(typeof cloud).toBe('object');
+    expect(cloud.name).toBe('Insect Cloud');
+    expect(lairRowAffordance(cloud)).toBe('save');
+  });
+
+  it('authored save/damage fields: DC 15 Constitution, 3d6 Piercing, half on success', () => {
+    expect(cloud.save_dc).toBe(15);
+    expect(cloud.save_type).toBe('Constitution');
+    expect(cloud.damage_dice_primary).toBe('3d6');
+    expect(cloud.damage_type_primary).toBe('Piercing');
+    expect(cloud.dc_success).toBe('half');
+  });
+
+  it('machine-readable persisting zone: 20-ft radius, repeat at turn end, advisory duration', () => {
+    expect(cloud.zone).toEqual({ radius_ft: 20, repeat_turn_end: true });
+    expect(cloud.duration).toBe('until dismissed or used again (advisory)');
+  });
+
+  it('description carries the verbatim mechanics (cloud, DC 15 CON, turn-end repeat)', () => {
+    expect(cloud.description).toMatch(/20-foot-radius sphere/i);
+    expect(cloud.description).toMatch(/DC 15 Constitution saving throw/i);
+    expect(cloud.description).toMatch(/10 \(3d6\) piercing damage/i);
+    expect(cloud.description).toMatch(/ends its turn in the cloud takes 10 \(3d6\) piercing damage/i);
+  });
+});

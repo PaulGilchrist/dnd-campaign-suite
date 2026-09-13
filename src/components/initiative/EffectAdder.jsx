@@ -73,7 +73,7 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
   // Group effects, filtering out empty groups when searching
   const groupedEffects = React.useMemo(() => {
     const groups = {}
-    const groupOrder = ['Attack', 'Defensive', 'Saves & Checks', 'Spells', 'Movement']
+    const groupOrder = ['Attack', 'Defensive', 'Saves & Checks', 'Spells', 'Movement', 'Lair']
     for (const def of filteredDefinitions) {
       if (!groups[def.group]) groups[def.group] = []
       groups[def.group].push(def)
