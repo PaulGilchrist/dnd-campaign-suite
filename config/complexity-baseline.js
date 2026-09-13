@@ -5,10 +5,4 @@
 // worst metric (non-test code). New code must not exceed its directory baseline,
 // since npm run lint runs with --max-warnings 0.
 export default [
-  {
-    files: ['src/services/ui/**'],
-    rules: {
-      'max-depth': ['warn', 5],
-    },
-  },
 ];

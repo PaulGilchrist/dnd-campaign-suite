@@ -73,23 +73,27 @@ export function removeConditionsFromTarget(campaignName, targetName, conditionsT
   return updateStoreWithCondition(targetName, 'activeConditions', updated)
 }
 
+async function fetchSeededValue(key, campaignName) {
+  if (!campaignName) return null
+  const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`)
+  if (!response.ok) return null
+  const json = await response.json()
+  return json.value || null
+}
+
+async function seedStoreFromServer(key, campaignName) {
+  let data = null
+  try {
+    data = await fetchSeededValue(key, campaignName)
+  } catch {
+    data = null
+  }
+  if (!data) setStore(key, new Map())
+}
+
 async function fetchAndSeedStores(campaignName) {
   for (const key of storeValue.keys()) {
-    try {
-      let data = null
-      if (campaignName) {
-        const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`)
-        if (response.ok) {
-          const json = await response.json()
-          if (json.value) data = json.value
-        }
-      }
-      if (!data) {
-        setStore(key, new Map())
-      }
-    } catch {
-      setStore(key, new Map())
-    }
+    await seedStoreFromServer(key, campaignName)
   }
   triggerSubscribers()
 }
