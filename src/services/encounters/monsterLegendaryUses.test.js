@@ -16,6 +16,9 @@ import {
   regainLegendaryUses,
   legendaryDelegateAction,
   legendaryDelegateAttackName,
+  legendaryCheckRow,
+  legendaryCheckBonus,
+  legendaryCheckLabel,
   parseLegendaryAllyPrerequisite,
   legendaryAllyPrerequisiteSatisfied,
   buildLegendaryPrerequisiteRefusalPopup,
@@ -421,5 +424,47 @@ describe('MA-0050 Adult Blue Dracolich "General" header authors uses:3', () => {
     const regain = await regainLegendaryUses({ monsterName: 'Adult Blue Dracolich 1', campaignName: 'test-campaign', deps });
     expect(regain).toEqual({ regained: true, max: 3 });
     expect(store['Adult Blue Dracolich 1.monsterLegendaryUses'].used).toBe(0);
+  });
+});
+
+// MA-0051: Adult Blue Dracolich "Detect" — authored ability_check row.
+describe('MA-0051 legendary ability-check rows', () => {
+  const dracolich = monstersData.find(m => m.name === 'Adult Blue Dracolich');
+
+  it('data: Detect row authors ability_check wisdom/perception; skills.Perception is +14', () => {
+    const detect = dracolich.legendary_actions.find(a => a.name === 'Detect');
+    expect(detect.ability_check).toEqual({ ability: 'wisdom', skill: 'perception' });
+    expect(dracolich.skills.Perception.modifier).toBe(14);
+    expect(dracolich.skills.Preception).toBeUndefined();
+  });
+
+  it('legendaryCheckRow: only rows with ability_check qualify', () => {
+    expect(legendaryCheckRow({ name: 'Detect', ability_check: { ability: 'wisdom', skill: 'perception' } })).toEqual({ ability: 'wisdom', skill: 'perception' });
+    expect(legendaryCheckRow({ name: 'Tail Attack' })).toBeNull();
+    expect(legendaryCheckRow({ name: 'Bad', ability_check: {} })).toBeNull();
+    expect(legendaryCheckRow(null)).toBeNull();
+  });
+
+  it('legendaryCheckBonus: skill mod wins (case-insensitive), ability mod fallback, null when unresolvable', () => {
+    const check = { ability: 'wisdom', skill: 'perception' };
+    expect(legendaryCheckBonus(dracolich, { name: 'Detect', ability_check: check })).toBe(14);
+    expect(legendaryCheckBonus({ skills: { PeRcEPTION: { modifier: 9 } } }, { ability_check: check })).toBe(9);
+    expect(legendaryCheckBonus({ ability_score_modifiers: { wis: 3 } }, { ability_check: check })).toBe(3);
+    expect(legendaryCheckBonus({ ability_score_modifiers: { wis: -2 } }, { ability_check: check })).toBe(-2);
+    expect(legendaryCheckBonus({}, { ability_check: check })).toBeNull();
+    expect(legendaryCheckBonus(dracolich, { name: 'Tail Attack' })).toBeNull();
+  });
+
+  it('legendaryCheckLabel: Wisdom (Perception) / ability-only fallback', () => {
+    expect(legendaryCheckLabel({ ability_check: { ability: 'wisdom', skill: 'perception' } })).toBe('Wisdom (Perception)');
+    expect(legendaryCheckLabel({ ability_check: { ability: 'strength' } })).toBe('Strength check');
+    expect(legendaryCheckLabel({ name: 'Lash' })).toBeNull();
+  });
+
+  it('no-check-bonus refusal popup names the stat block gap', () => {
+    const html = buildLegendaryRefusalPopup({ monsterName: 'Adult Blue Dracolich 1', actionName: 'Detect', reason: 'no-check-bonus' });
+    expect(html).toContain('ability check');
+    expect(html).toContain('Nothing spent, no roll');
+    expect(buildLegendaryRefusalPopup({ monsterName: 'X', actionName: 'Y', reason: 'no-uses' })).toContain('no legendary uses');
   });
 });

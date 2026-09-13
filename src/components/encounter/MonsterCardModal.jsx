@@ -21,7 +21,7 @@ import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
 import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
-import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal } from '../../services/encounters/monsterLegendaryUses.js';
+import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
 import SaveAttackAoeModal from '../char-sheet/modals/shared/SaveAttackAoeModal.jsx';
@@ -180,7 +180,7 @@ function resolveLegendaryRowMechanic(action, { monsterName, handledActionName, h
 // save resolves via the existing MA-0019-armed-target seam untouched, then
 // self_heal 1d10 rolls through the canonical applyHealingToTarget helper
 // (MA-0016 choke point — 'no_healing' te refused there with healing_blocked).
-async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage }) {
+async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage, handleCheck }) {
   const allyPrerequisite = parseLegendaryAllyPrerequisite(action);
   if (allyPrerequisite) {
     const gateCs = await getCombatContext(campaignName);
@@ -205,12 +205,26 @@ async function resolveLegendaryRow({ action, monsterName, monster, campaignName,
     mechanicAction = delegate;
     actionName = legendaryDelegateAttackName(action, delegate);
   }
+  // MA-0051: authored ability-check rows (Dracolich "Detect" → Wisdom
+  // (Perception)) resolve the stat-block bonus BEFORE the spend — an
+  // unresolvable modifier refuses with zero spend. A met gate spends 1
+  // (MA-0021 latch intact) then rolls d20+mod through the existing
+  // rollSkillCheck seam (same producer as the card's Skills defense chips),
+  // which logs the check roll + result and shows the popup.
+  const checkBonus = legendaryCheckRow(action) ? legendaryCheckBonus(monster, action) : null;
+  if (legendaryCheckRow(action) && checkBonus == null) {
+    setPopupHtml(buildLegendaryRefusalPopup({ monsterName, actionName: action.name, reason: 'no-check-bonus' }));
+    addEntry(campaignName, buildLegendaryRefusalLog({ monsterName, actionName: action.name, reason: 'no-check-bonus' }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging check-bonus refusal:', e); });
+    return;
+  }
   const result = await expendLegendaryUse({ monsterName, monster, actionName, campaignName });
   if (!result.spent) {
     setPopupHtml(result.popupHtml);
     return;
   }
-  resolveLegendaryRowMechanic(mechanicAction, { monsterName, handledActionName: actionName, handleAttack, handleSaveRoll, handleDamage });
+  if (checkBonus != null) handleCheck(legendaryCheckLabel(action), checkBonus);
+  else resolveLegendaryRowMechanic(mechanicAction, { monsterName, handledActionName: actionName, handleAttack, handleSaveRoll, handleDamage });
   if (action.self_heal) {
     applyLegendarySelfHeal({ monsterName, actionName: action.name, formula: action.self_heal, campaignName })
       .catch((e) => { console.error('[MonsterCardModal] Error applying legendary self-heal:', e); });
@@ -1078,6 +1092,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   // handlers, MA-0014 chip gate intact; non-numeric rows log the advisory).
   const handleLegendaryRow = (action) => resolveLegendaryRow({
     action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage,
+    handleCheck: handleSkillCheck,
   });
 
   // MA-0024: lair-row gated click — mirrors the legendary gated-row model.

@@ -153,6 +153,39 @@ export function legendaryExpendGate({ header, storedUses, round, activeCreatureN
   return { allowed: true, remaining: legendaryUsesRemaining(header, storedUses), max };
 }
 
+// MA-0051: authored skill-check legendary rows (Adult Blue Dracolich
+// "Detect" → ability_check {ability:"wisdom", skill:"perception"}). The
+// bonus resolves from the stat block truth: monster.skills (case-insensitive
+// skill lookup — the authored +14 beats the divergent ability_score_modifiers
+// wis entry, and passive 24 = 10 + 14 confirms the skill mod) with the
+// ability_score_modifiers entry as the skill-less fallback. Null bonus =
+// unresolvable → the caller refuses BEFORE the legendary spend.
+export function legendaryCheckRow(action) {
+  const ac = action?.ability_check;
+  return ac && ac.ability ? ac : null;
+}
+
+export function legendaryCheckBonus(monster, action) {
+  const ac = legendaryCheckRow(action);
+  if (!ac) return null;
+  const skills = monster?.skills || {};
+  const skillKey = ac.skill
+    ? Object.keys(skills).find(k => k.toLowerCase() === String(ac.skill).toLowerCase())
+    : null;
+  if (skillKey != null) return Number(skills[skillKey]?.modifier) || 0;
+  // ability_score_modifiers are keyed by 3-letter abbr (wis/dex/…).
+  const abbr = String(ac.ability).toLowerCase().slice(0, 3);
+  const mod = Number(monster?.ability_score_modifiers?.[abbr]);
+  return Number.isFinite(mod) ? mod : null;
+}
+
+export function legendaryCheckLabel(action) {
+  const ac = legendaryCheckRow(action);
+  if (!ac) return null;
+  const titleCase = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1).toLowerCase();
+  return ac.skill ? `${titleCase(ac.ability)} (${titleCase(ac.skill)})` : `${titleCase(ac.ability)} check`;
+}
+
 export function buildLegendaryRefusalPopup({ monsterName, actionName, reason }) {
   const why = reason === 'exhausted'
     ? `${monsterName} has no legendary uses left — they regain at the start of ${monsterName}'s turn.`
@@ -162,7 +195,9 @@ export function buildLegendaryRefusalPopup({ monsterName, actionName, reason }) 
         ? `${monsterName} expends legendary uses after ANOTHER creature's turn, not its own.`
         : reason === 'no-delegate'
           ? `${actionName} delegates to an attack that could not be found on ${monsterName}. Check the stat block.`
-          : `${monsterName} has no legendary uses to expend.`;
+          : reason === 'no-check-bonus'
+            ? `${actionName} declares an ability check but no skill or ability modifier could be resolved on ${monsterName}. Check the stat block.`
+            : `${monsterName} has no legendary uses to expend.`;
   return `<div class="mc-prerequisite-refusal"><h3>Legendary Action Refused</h3><p>${actionName}: ${why} Nothing spent, no roll.</p></div>`;
 }
 

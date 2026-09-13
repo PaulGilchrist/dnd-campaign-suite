@@ -1256,7 +1256,7 @@
       }
     },
     "skills": {
-      "Preception": {
+      "Perception": {
         "modifier": 14
       },
       "Stealth": {
@@ -1381,6 +1381,10 @@
       },
       {
         "name": "Detect",
+        "ability_check": {
+          "ability": "wisdom",
+          "skill": "perception"
+        },
         "description": "The dracolich makes a Wisdom (Perception) check."
       },
       {

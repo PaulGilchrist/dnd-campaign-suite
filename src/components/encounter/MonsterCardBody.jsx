@@ -5,7 +5,7 @@ import { computeConditionEffects } from '../../services/combat/conditions/condit
 import { resolveMonsterIRV } from '../../services/npcs/monsterIrvUtils.js';
 import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js';
 import { MonsterAction } from './MonsterAction.jsx';
-import { legendaryHeaderAction, legendaryUsesRemaining } from '../../services/encounters/monsterLegendaryUses.js';
+import { legendaryHeaderAction, legendaryUsesRemaining, legendaryCheckRow, legendaryCheckBonus } from '../../services/encounters/monsterLegendaryUses.js';
 import { isLairRowClickable, lairRowAffordance } from '../../services/encounters/monsterLairActions.js';
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses } from './MonsterCardHelpers.js';
 
@@ -52,7 +52,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
           {actionSections.map(s => (
             s.key === 'legendary_actions' && legendaryHeader ? (
-              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1)} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1).map(a => legendaryCheckRow(a) ? { ...a, checkBonus: legendaryCheckBonus(monster, a) } : a)} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
             ) : (
               <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} rechargeState={monsterRecharge} />
             )

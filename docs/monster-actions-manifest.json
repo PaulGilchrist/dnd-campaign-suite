@@ -807,7 +807,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dracolich makes a Wisdom (Perception) check.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0051-detect.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0052",

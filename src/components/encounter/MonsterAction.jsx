@@ -4,6 +4,7 @@ import { canRollExpression } from '../../services/dice/diceRoller.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
 import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage } from './MonsterCardHelpers.js';
 import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
+import { legendaryCheckRow, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
 import { monsterRechargeGate, rechargeDisplayText } from '../../services/encounters/monsterRecharge.js';
 
 function formatDamageTypeList(types) {
@@ -129,11 +130,27 @@ function GatedReactionSlot({ action, attackerCannotAct, reactionUsesUsed, onGate
 
 // MA-0021: legendary rows carry no numeric affordance (Lash/Psychic Drain) —
 // the gated spend click lives on the row name so the economy can't be bypassed.
+// MA-0051: an authored ability_check row ("Detect") gets a labelled skill-check
+// chip instead of the generic expend — same gated click (spend first, MA-0021),
+// and the click rolls d20+stat-block-mod via the modal's rollSkillCheck seam.
+function LegendaryCheckLink({ action, attackerCannotAct, legendaryGate }) {
+  const label = legendaryCheckLabel(action);
+  const bonus = action.checkBonus;
+  const sign = bonus != null && bonus < 0 ? '−' : '+';
+  const modText = bonus != null ? `${sign}${Math.abs(bonus)}` : 'Roll';
+  return (
+    <span className={`mc-dice-link mc-dice-link-legendary mc-dice-link-check${attackerCannotAct ? ' mc-dice-link-spell-spent' : ''}`} onClick={attackerCannotAct ? undefined : () => legendaryGate(action)} role="button" tabIndex={0} title={`Expend 1 legendary use — ${label} check d20 ${modText}`}>
+      <i className="fa-solid fa-eye" /> {label} {modText}
+    </span>
+  );
+}
+
 function LegendarySpendLink({ action, attackerCannotAct, legendaryGate }) {
   if (!legendaryGate) return null;
   const formula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
   const numericAffordance = action.attack_bonus != null || action.save_dc != null || canRollExpression(formula);
   if (numericAffordance) return null;
+  if (legendaryCheckRow(action)) return <LegendaryCheckLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />;
   return (
     <span className={`mc-dice-link mc-dice-link-legendary${attackerCannotAct ? ' mc-dice-link-spell-spent' : ''}`} onClick={attackerCannotAct ? undefined : () => legendaryGate(action)} role="button" tabIndex={0} title={`Expend 1 legendary use — ${action.name}`}>
       <i className="fa-solid fa-bolt" /> Expend Legendary
