@@ -716,7 +716,7 @@
       "damageTypePrimary": "piercing",
       "reach": "10 ft.",
       "description": "Melee Weapon Attack: +13 to hit, reach 10 ft., one target. Hit: 18 (2d10 + 7) piercing damage plus 5 (1dlO) lightning damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0045-bite.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0046",
