@@ -7,6 +7,7 @@ import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { resolveUses, resolveScaling } from '../../../combat/automation/automationExpressions.js';
 import { parseDurationRounds } from '../../../rules/effects/durationParser.js';
+import { fetchSpellOverlays, overlayTargetId } from '../../../maps/spellOverlayService.js';
 
 const AREA_SHAPES = new Set(['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area']);
 
@@ -278,14 +279,9 @@ async function buildAoeModal({ action, auto, playerStats, campaignName, resolved
 
     let activeOverlay = null;
     if (isOverlayTargeted) {
-        const overlayId = attackerTargetName.slice('overlay-'.length);
-        try {
-            const response = await fetch(`/api/campaigns/${campaignName}/spell-overlays`);
-            const overlays = await response.json();
-            activeOverlay = overlays.find(o => o.id === overlayId) || null;
-        } catch (error) {
-            console.error('Error fetching overlay:', error);
-        }
+        const overlayId = overlayTargetId(attackerTargetName);
+        const overlays = await fetchSpellOverlays(campaignName);
+        activeOverlay = overlays.find(o => o.id === overlayId) || null;
     }
 
     const rangeFeet = auto.range ? rangeToFeet(auto.range) : getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);

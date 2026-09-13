@@ -68,3 +68,26 @@
     font-size: 0.85em;
     margin-top: 8px;
 }
+
+.secondary-target-dist {
+    margin-left: 8px;
+    font-size: 0.8em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.secondary-target-dist-in {
+    color: #4ade80;
+}
+
+.secondary-target-dist-out {
+    color: #f87171;
+}
+
+.secondary-target-dist-off-map {
+    opacity: 0.6;
+}
+
+.secondary-target-dist-blocked {
+    color: #facc15;
+}

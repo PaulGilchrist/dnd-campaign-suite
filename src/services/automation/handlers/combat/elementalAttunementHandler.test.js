@@ -45,7 +45,8 @@ function makeAction(overrides = {}) {
 
 function setupFetchMock(overlays) {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        json: () => Promise.resolve(overlays),
+        ok: true,
+        json: () => Promise.resolve({ overlays }),
     }));
 }
 
@@ -361,7 +362,7 @@ describe('elementalAttunementHandler - overlay fetching', () => {
         const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
         expect(global.fetch).toHaveBeenCalledWith(
-            `/api/campaigns/${campaignName}/spell-overlays`,
+            `/spell-overlay?campaign=${campaignName}`,
         );
         expect(result.payload.activeOverlay).toEqual({
             id: 'abc123',

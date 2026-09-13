@@ -1,4 +1,5 @@
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { fetchSpellOverlays, overlayTargetId } from '../../../maps/spellOverlayService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const elementalAttunementActive = getRuntimeValue(playerStats.name, 'elementalAttunementActive', campaignName);
@@ -34,15 +35,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const targetName = action.targetName;
     let activeOverlay = null;
 
-    if (targetName?.startsWith('overlay-')) {
-        const overlayId = targetName.slice('overlay-'.length);
-        try {
-            const response = await fetch(`/api/campaigns/${campaignName}/spell-overlays`);
-            const overlays = await response.json();
-            activeOverlay = overlays.find(o => o.id === overlayId) || null;
-        } catch (error) {
-            console.error('[elementalAttunementHandler] Error fetching overlay:', error);
-        }
+    const overlayId = overlayTargetId(targetName);
+    if (overlayId) {
+        const overlays = await fetchSpellOverlays(campaignName);
+        activeOverlay = overlays.find(o => o.id === overlayId) || null;
     }
 
     return {

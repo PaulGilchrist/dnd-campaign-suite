@@ -2,6 +2,21 @@
 // @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mockGetCurrentOverlayTarget = vi.fn();
+const mockGetCreaturesInsideOverlay = vi.fn();
+const mockGetTargetMapStatuses = vi.fn();
+
+vi.mock('../../../../services/maps/spellOverlayService.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        getCurrentOverlayTarget: (...args) => mockGetCurrentOverlayTarget(...args),
+        getCreaturesInsideOverlay: (...args) => mockGetCreaturesInsideOverlay(...args),
+        getTargetMapStatuses: (...args) => mockGetTargetMapStatuses(...args),
+    };
+});
+
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 
 // ── Test fixtures ──
@@ -525,6 +540,97 @@ describe('CreatureSelectionModal', () => {
     it('shows "No targets available." when targets is empty', () => {
       render(<CreatureSelectionModal {...makeProps({ targets: [] })} />);
       expect(screen.getByText('No targets available.')).toBeInTheDocument();
+    });
+  });
+
+  // ── Overlay pre-selection and map distance badges ──
+
+  describe('overlay pre-selection and map distance badges', () => {
+    beforeEach(() => {
+      mockGetCurrentOverlayTarget.mockReset().mockResolvedValue(null);
+      mockGetCreaturesInsideOverlay.mockReset().mockResolvedValue([]);
+      mockGetTargetMapStatuses.mockReset().mockResolvedValue(null);
+    });
+
+    const mapProps = { campaignName: 'test-campaign', attackerName: 'Wizard' };
+
+    it('pre-selects creatures inside the current overlay target', async () => {
+      const overlay = { id: 'o1', shape: 'sphere', radiusFt: 20, startGridX: 5, startGridY: 5, angle: 0 };
+      mockGetCurrentOverlayTarget.mockResolvedValue(overlay);
+      mockGetCreaturesInsideOverlay.mockResolvedValue(['Goblin A', 'Goblin B']);
+
+      render(<CreatureSelectionModal {...makeProps(mapProps)} />);
+
+      await waitFor(() => {
+        const checkboxes = document.querySelectorAll('.secondary-target-list input[type="checkbox"]');
+        expect(checkboxes[0]).toBeChecked();
+        expect(checkboxes[1]).toBeChecked();
+        expect(checkboxes[2]).not.toBeChecked();
+      });
+      expect(mockGetCreaturesInsideOverlay).toHaveBeenCalledWith('test-campaign', overlay, ['Goblin A', 'Goblin B', 'Player Character']);
+      expect(screen.getByRole('button', { name: /Confirm \(2\)/ })).not.toBeDisabled();
+    });
+
+    it('keeps explicit defaultSelected when no overlay is targeted', async () => {
+      render(<CreatureSelectionModal {...makeProps({ ...mapProps, defaultSelected: ['Player Character'] })} />);
+
+      await waitFor(() => {
+        const checkboxes = document.querySelectorAll('.secondary-target-list input[type="checkbox"]');
+        expect(checkboxes[2]).toBeChecked();
+        expect(checkboxes[0]).not.toBeChecked();
+      });
+      expect(mockGetCurrentOverlayTarget).toHaveBeenCalledWith('test-campaign', 'Wizard');
+    });
+
+    it('merges overlay pre-selection into explicit defaultSelected', async () => {
+      mockGetCurrentOverlayTarget.mockResolvedValue({ id: 'o1', shape: 'sphere', radiusFt: 20, startGridX: 5, startGridY: 5, angle: 0 });
+      mockGetCreaturesInsideOverlay.mockResolvedValue(['Goblin A']);
+
+      render(<CreatureSelectionModal {...makeProps({ ...mapProps, defaultSelected: ['Player Character'] })} />);
+
+      await waitFor(() => {
+        const checkboxes = document.querySelectorAll('.secondary-target-list input[type="checkbox"]');
+        expect(checkboxes[0]).toBeChecked();
+        expect(checkboxes[2]).toBeChecked();
+      });
+    });
+
+    it('renders distance badges for each target', async () => {
+      mockGetTargetMapStatuses.mockResolvedValue({
+        'Goblin A': { status: 'in', distFt: 10 },
+        'Goblin B': { status: 'out', distFt: 90 },
+        'Player Character': { status: 'off-map', distFt: null },
+      });
+
+      render(<CreatureSelectionModal {...makeProps(mapProps)} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('In range · 10 ft')).toBeInTheDocument();
+        expect(screen.getByText('Out of range · 90 ft')).toBeInTheDocument();
+        expect(screen.getByText('Off map')).toBeInTheDocument();
+      });
+    });
+
+    it('renders no badges when no map is active', async () => {
+      mockGetTargetMapStatuses.mockResolvedValue(null);
+
+      render(<CreatureSelectionModal {...makeProps(mapProps)} />);
+
+      await waitFor(() => {
+        expect(mockGetTargetMapStatuses).toHaveBeenCalled();
+      });
+      expect(screen.queryByText(/In range|Out of range|Off map/)).not.toBeInTheDocument();
+    });
+
+    it('skips overlay and distance lookups without campaignName/attackerName', async () => {
+      render(<CreatureSelectionModal {...makeProps()} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Goblin A')).toBeInTheDocument();
+      });
+      expect(mockGetCurrentOverlayTarget).not.toHaveBeenCalled();
+      expect(mockGetTargetMapStatuses).not.toHaveBeenCalled();
+      expect(screen.queryByText(/In range|Out of range|Off map/)).not.toBeInTheDocument();
     });
   });
 

@@ -553,6 +553,8 @@ function EnemySelectionModals({
     handlePsychicWhispersConfirm,
     handleCoronaEnemySelectionConfirm,
     handleRadianceOfDawnConfirm,
+    playerStats,
+    campaignName,
 }) {
     return (
         <>
@@ -583,6 +585,9 @@ function EnemySelectionModals({
                     confirmIcon="fa-brain"
                     onConfirm={handlePsychicWhispersConfirm}
                     onSkip={() => setModalState({ psychicWhispersModal: null })}
+                    campaignName={campaignName}
+                    attackerName={playerStats.name}
+                    rangeFt={35}
                 />
             )}
             {mergedModalState.coronaEnemySelectionModal && (
@@ -697,6 +702,9 @@ function SecondaryModals({
                     confirmIcon="fa-heart"
                     showHp={true}
                     showSize={false}
+                    campaignName={campaignName}
+                    attackerName={playerStats.name}
+                    rangeFt={5}
                 />
             )}
             {mergedModalState.invokeDuplicityModal && (
@@ -710,6 +718,9 @@ function SecondaryModals({
                     confirmIcon="fa-shield-halved"
                     onConfirm={(selected) => handleInvokeDuplicityConfirm(selected, mergedModalState.invokeDuplicityModal, campaignName, () => { setModalState({ invokeDuplicityModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); })}
                     onSkip={() => { setModalState({ invokeDuplicityModal: null }); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    campaignName={campaignName}
+                    attackerName={playerStats.name}
+                    rangeFt={5}
                 />
             )}
             <SpellEffectModals mergedModalState={mergedModalState} setModalState={setModalState} setPopupHtml={setPopupHtml} />
@@ -747,6 +758,9 @@ function SecondaryModals({
                         if (result?.type === 'popup') setPopupHtml(result.payload);
                     }}
                     onSkip={() => setModalState({ telekineticMovementModal: null })}
+                    campaignName={campaignName}
+                    attackerName={playerStats.name}
+                    rangeFt={mergedModalState.telekineticMovementModal.rangeFt}
                 />
             )}
             {mergedModalState.bonusActionChoiceModal && (
@@ -798,6 +812,8 @@ function SecondaryModals({
                 handlePsychicWhispersConfirm={handlePsychicWhispersConfirm}
                 handleCoronaEnemySelectionConfirm={handleCoronaEnemySelectionConfirm}
                 handleRadianceOfDawnConfirm={handleRadianceOfDawnConfirm}
+                playerStats={playerStats}
+                campaignName={campaignName}
             />
             <AllySelectionModals
                 mergedModalState={mergedModalState}

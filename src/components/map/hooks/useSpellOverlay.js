@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import useSSEEqualityGuard from '../../../hooks/runtime/useSSEEqualityGuard.js';
+import { fetchSpellOverlays } from '../../../services/maps/spellOverlayService.js';
 
 /**
  * WARNING: SSE re-render loop risk
@@ -22,19 +23,13 @@ function useSpellOverlay(campaignName, _mapName) {
         if (!campaignName) return;
         let cancelled = false;
         (async () => {
-            try {
-                const res = await fetch(`/spell-overlay?campaign=${encodeURIComponent(campaignName)}`);
-                if (!res.ok || cancelled) return;
-                const { overlays: loaded } = await res.json();
-                if (loaded?.length && !cancelled) {
-                    setOverlays(prev => {
-                        const existingIds = new Set(prev.map(o => o.id));
-                        const unique = loaded.filter(n => !existingIds.has(n.id));
-                        return unique.length ? [...prev, ...unique] : prev;
-                    });
-                }
-            } catch {
-                // server may not support overlay persistence yet
+            const loaded = await fetchSpellOverlays(campaignName);
+            if (loaded.length && !cancelled) {
+                setOverlays(prev => {
+                    const existingIds = new Set(prev.map(o => o.id));
+                    const unique = loaded.filter(n => !existingIds.has(n.id));
+                    return unique.length ? [...prev, ...unique] : prev;
+                });
             }
         })();
         return () => { cancelled = true; };

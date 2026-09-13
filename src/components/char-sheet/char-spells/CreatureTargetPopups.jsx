@@ -4,9 +4,11 @@ import PolymorphSelectionModal from '../modals/PolymorphSelectionModal.jsx';
 import TruePolymorphPathModal from '../modals/TruePolymorphPathModal.jsx';
 import { confirmShapechangeTransform } from '../../../services/automation/handlers/spells/shapechangeService.js';
 import { prepareSpellCast, isFreeCastAuthorized } from '../../../services/rules/spells/spellPreparationService.js';
+import { rangeToFeet } from '../../../services/rules/combat/rangeValidation.js';
 
-function renderCreaturePopup(spec) {
+function renderCreaturePopup(spec, props) {
     if (!spec.guard) return null;
+    const rangeSource = spec.guard.range || spec.guard.spell?.range;
     return (
         <CreatureSelectionModal
             key={spec.key || spec.title}
@@ -19,6 +21,9 @@ function renderCreaturePopup(spec) {
             confirmIcon={spec.confirmIcon}
             onConfirm={spec.onConfirm}
             onSkip={spec.onSkip}
+            campaignName={props.campaignName}
+            attackerName={props.playerStats?.name}
+            rangeFt={rangeSource ? rangeToFeet(rangeSource) : null}
         />
     );
 }
@@ -105,7 +110,7 @@ const CreatureTargetPopups = function CreatureTargetPopups(props) {
 
     return (
         <>
-            {CREATURE_POPUP_RENDERERS.map((build) => renderCreaturePopup(build(props)))}
+            {CREATURE_POPUP_RENDERERS.map((build) => renderCreaturePopup(build(props), props))}
             {pendingShapechange && (
                 <PolymorphSelectionModal
                     playerStats={playerStats}
@@ -120,14 +125,14 @@ const CreatureTargetPopups = function CreatureTargetPopups(props) {
                     onCancel={() => {}}
                 />
             )}
-            {ANIMAL_SHAPES_RENDERERS.map((build) => renderCreaturePopup(build(props)))}
+            {ANIMAL_SHAPES_RENDERERS.map((build) => renderCreaturePopup(build(props), props))}
             {flowTruePolymorph && !flowTruePolymorph.path && (
                 <TruePolymorphPathModal
                     onConfirm={handleTruePolymorphPathSelect}
                     onCancel={handleTruePolymorphSkip}
                 />
             )}
-            {LATE_CREATURE_POPUP_RENDERERS.map((build) => renderCreaturePopup(build(props)))}
+            {LATE_CREATURE_POPUP_RENDERERS.map((build) => renderCreaturePopup(build(props), props))}
         </>
     );
 };

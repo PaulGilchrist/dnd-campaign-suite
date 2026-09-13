@@ -6,6 +6,7 @@ import MultiTargetPopup from '../popups/MultiTargetPopup.jsx';
 import SecondaryTargetModal from '../modals/shared/SecondaryTargetModal.jsx';
 import MagicMissileTargetPopup from '../popups/MagicMissileTargetPopup.jsx';
 import { getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
+import { rangeToFeet } from '../../../services/rules/combat/rangeValidation.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import UpcastPopup from './UpcastPopup.jsx';
 
@@ -106,6 +107,9 @@ const SpellTargetPopups = function SpellTargetPopups({
                     description={wordsOfCreationTarget.description}
                     confirmLabel={wordsOfCreationTarget.confirmLabel}
                     confirmIcon={wordsOfCreationTarget.confirmIcon}
+                    campaignName={campaignName}
+                    attackerName={playerStats.name}
+                    rangeFt={wordsOfCreationTarget.range ? rangeToFeet(wordsOfCreationTarget.range) : null}
                 />
             )}
         </>

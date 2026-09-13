@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './SecondaryTargetModal.css';
+import { getCurrentOverlayTarget, getCreaturesInsideOverlay, getTargetMapStatuses, distanceBadgeText } from '../../../../services/maps/spellOverlayService.js';
 
 export default function CreatureSelectionModal({
     title,
@@ -16,8 +17,30 @@ export default function CreatureSelectionModal({
     metamagicHeighten,
     heightenTarget,
     setHeightenTarget,
+    campaignName,
+    attackerName,
+    rangeFt,
 }) {
     const [selected, setSelected] = useState(defaultSelected || []);
+    const [mapStatuses, setMapStatuses] = useState(null);
+
+    useEffect(() => {
+        if (!campaignName || !attackerName || targets.length === 0) return undefined;
+        let cancelled = false;
+        const names = targets.map(t => t.name || t);
+        (async () => {
+            const overlay = await getCurrentOverlayTarget(campaignName, attackerName);
+            if (overlay && !cancelled) {
+                const inside = await getCreaturesInsideOverlay(campaignName, overlay, names);
+                if (inside.length && !cancelled) {
+                    setSelected(prev => [...new Set([...prev, ...inside])]);
+                }
+            }
+            const statuses = await getTargetMapStatuses(campaignName, attackerName, names, rangeFt);
+            if (statuses && !cancelled) setMapStatuses(statuses);
+        })();
+        return () => { cancelled = true; };
+    }, [campaignName, attackerName, rangeFt]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const toggleTarget = (name) => {
         setSelected(prev =>
@@ -84,6 +107,11 @@ export default function CreatureSelectionModal({
                                             </span>
                                         )}
                                     </span>
+                                    {mapStatuses && mapStatuses[name] && (
+                                        <span className={`secondary-target-dist secondary-target-dist-${mapStatuses[name].status}`}>
+                                            {distanceBadgeText(mapStatuses[name])}
+                                        </span>
+                                    )}
                                     {target.carefulSpellProtected && (
                                         <span className="sp-note" style={{ fontSize: '0.85em', color: '#4ade80', marginLeft: '4px' }}>✓ Careful Spell protected</span>
                                     )}

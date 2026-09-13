@@ -39,6 +39,7 @@ import { createAutoBreakConditionHandler } from './createAutoBreakConditionHandl
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 import { buildDisplayCreature } from './displayCreatureUtils.js'
 import InitiativeLoot from './InitiativeLoot.jsx'
+import { fetchSpellOverlays } from '../../services/maps/spellOverlayService.js'
 
 function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, 'activeBuffs', [], campaignName)
@@ -180,6 +181,20 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const [campaignNpcs, setCampaignNpcs] = React.useState([])
 
     const [overlays, setOverlays] = React.useState([])
+
+    React.useEffect(() => {
+        if (!campaignName) return
+        let cancelled = false
+        fetchSpellOverlays(campaignName).then(loaded => {
+            if (!loaded.length || cancelled) return
+            setOverlays(prev => {
+                const existingIds = new Set(prev.map(o => o.id))
+                const unique = loaded.filter(n => !existingIds.has(n.id))
+                return unique.length ? [...prev, ...unique] : prev
+            })
+        })
+        return () => { cancelled = true }
+    }, [campaignName])
 
     const [runtimeStateTick, setRuntimeStateTick] = React.useState(0)
 

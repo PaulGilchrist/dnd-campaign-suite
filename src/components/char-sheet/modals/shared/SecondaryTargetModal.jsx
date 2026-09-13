@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './SecondaryTargetModal.css';
+import { getTargetMapStatuses, distanceBadgeText } from '../../../../services/maps/spellOverlayService.js';
 
 function isOptionTarget(target) {
     return 'value' in target;
@@ -40,9 +41,10 @@ function TargetNameContent({ target, shouldShowSize, shouldShowHp }) {
     );
 }
 
-function SecondaryTargetRow({ target, selected, showHp, showSize, handleSelect }) {
+function SecondaryTargetRow({ target, selected, showHp, showSize, handleSelect, mapStatuses }) {
     const isSelected = selected === targetKeyOf(target);
     const { shouldShowHp, shouldShowSize } = rowVisibilityFlags(target, showHp, showSize);
+    const status = !isOptionTarget(target) && mapStatuses ? mapStatuses[target.name] : null;
     return (
         <label
             className={`secondary-target-row ${isSelected ? 'secondary-target-selected' : ''}`}
@@ -61,12 +63,29 @@ function SecondaryTargetRow({ target, selected, showHp, showSize, handleSelect }
                     <TargetNameContent target={target} shouldShowSize={shouldShowSize} shouldShowHp={shouldShowHp} />
                 )}
             </span>
+            {status && (
+                <span className={`secondary-target-dist secondary-target-dist-${status.status}`}>
+                    {distanceBadgeText(status)}
+                </span>
+            )}
         </label>
     );
 }
 
-function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled }) {
+function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt }) {
     const [selected, setSelected] = useState(null);
+    const [mapStatuses, setMapStatuses] = useState(null);
+
+    useEffect(() => {
+        if (!campaignName || !attackerName || targets.length === 0) return undefined;
+        let cancelled = false;
+        const names = targets.filter(t => !isOptionTarget(t)).map(t => t.name);
+        if (names.length === 0) return undefined;
+        getTargetMapStatuses(campaignName, attackerName, names, rangeFt).then(statuses => {
+            if (statuses && !cancelled) setMapStatuses(statuses);
+        });
+        return () => { cancelled = true; };
+    }, [campaignName, attackerName, rangeFt]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const iconClass = confirmIcon || 'fa-crosshairs';
     const label = confirmLabel || 'Attack';
@@ -101,6 +120,7 @@ function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featur
                                 showHp={showHp}
                                 showSize={showSize}
                                 handleSelect={handleSelect}
+                                mapStatuses={mapStatuses}
                             />
                         ))}
                     </div>

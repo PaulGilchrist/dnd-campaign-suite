@@ -7,6 +7,7 @@ import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import utils from '../../services/ui/utils.js'
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
+import { rangeToFeet } from '../../services/rules/combat/rangeValidation.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 
@@ -113,7 +114,7 @@ function MagicMissileTargetHost({ pending, playerStats, campaignName, filterTarg
     );
 }
 
-function GreaterRestorationHost({ pending, selectedTarget, filterTargets, onTargetSelected, onEffectSelected, onEffectSkip, onNoEffectsDismiss, onCancel }) {
+function GreaterRestorationHost({ pending, selectedTarget, filterTargets, onTargetSelected, onEffectSelected, onEffectSkip, onNoEffectsDismiss, onCancel, campaignName, attackerName }) {
     if (pending && !selectedTarget) {
         return (
             <SecondaryTargetModal
@@ -124,6 +125,9 @@ function GreaterRestorationHost({ pending, selectedTarget, filterTargets, onTarg
                 description={`Choose a creature within <strong>${pending.range}</strong>. You'll select which debilitating effect to remove.`}
                 confirmLabel="Cast Greater Restoration"
                 confirmIcon="fa-hand-holding-medical"
+                campaignName={campaignName}
+                attackerName={attackerName}
+                rangeFt={pending.range ? rangeToFeet(pending.range) : null}
             />
         );
     }
@@ -264,6 +268,11 @@ export default function CharActionSpellPopups(props) {
         actionHandleGreaterRestorationNoEffects();
         setGreaterRestorationSelectedTarget(null);
     }, [actionHandleGreaterRestorationNoEffects]);
+    const spellRangeFt = (state) => {
+        const rangeSource = state?.range || state?.spell?.range;
+        return rangeSource ? rangeToFeet(rangeSource) : null;
+    };
+
     const renderAllySelectionModals = () => ALLY_SELECTION_MODAL_SPECS.map(({ pending, onConfirm, onSkip, ...modalProps }) => {
         const state = props[pending];
         if (!state) return null;
@@ -275,6 +284,9 @@ export default function CharActionSpellPopups(props) {
                 maxTargets={state.maxTargets}
                 onConfirm={props[onConfirm]}
                 onSkip={props[onSkip]}
+                campaignName={campaignName}
+                attackerName={playerStatsName}
+                rangeFt={spellRangeFt(state)}
             />
         );
     });
@@ -294,6 +306,9 @@ export default function CharActionSpellPopups(props) {
                 targets={filterForcecageBlockedTargets(state.creatureTargets).map(name => ({ name, type: 'creature' }))}
                 onTargetSelected={selectTarget}
                 onSkip={props[onSkip]}
+                campaignName={campaignName}
+                attackerName={playerStatsName}
+                rangeFt={spellRangeFt(state)}
             />
         );
     });
@@ -326,6 +341,8 @@ export default function CharActionSpellPopups(props) {
                 pending={props.actionPendingGreaterRestoration}
                 selectedTarget={greaterRestorationSelectedTarget}
                 filterTargets={filterForcecageBlockedTargets}
+                campaignName={campaignName}
+                attackerName={playerStatsName}
                 onTargetSelected={handleGreaterRestorationTargetSelected}
                 onEffectSelected={handleGreaterRestorationEffectSelected}
                 onEffectSkip={handleGreaterRestorationEffectSkip}

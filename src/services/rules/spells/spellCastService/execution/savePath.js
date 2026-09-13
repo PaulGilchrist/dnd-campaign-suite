@@ -3,6 +3,7 @@ import { triggerSoulstitchSpells } from '../../postCastRiderService.js';
 import { rangeToFeet } from '../../../combat/rangeValidation.js';
 import { getCombatContext } from '../../../combat/damageUtils.js';
 import { computeEmpoweredEvocation } from './damageCalculation.js';
+import { fetchSpellOverlays, overlayTargetId } from '../../../../maps/spellOverlayService.js';
 
 async function handleSavePath(opts) {
     const { fullSpell, metaCtx, playerStats, campaignName, mapName } = opts;
@@ -33,16 +34,10 @@ async function handleSavePath(opts) {
 
 // Resolve the active spell overlay when the attacker is currently overlay-targeted.
 async function resolveActiveOverlay(attackerTargetName, campaignName) {
-    if (!attackerTargetName?.startsWith('overlay-')) return null;
-    const overlayId = attackerTargetName.slice('overlay-'.length);
-    try {
-        const response = await fetch(`/api/campaigns/${campaignName}/spell-overlays`);
-        const overlays = await response.json();
-        return overlays.find(o => o.id === overlayId) || null;
-    } catch (error) {
-        console.error('[spellCast] Error fetching overlay:', error);
-        return null;
-    }
+    const overlayId = overlayTargetId(attackerTargetName);
+    if (!overlayId) return null;
+    const overlays = await fetchSpellOverlays(campaignName);
+    return overlays.find(o => o.id === overlayId) || null;
 }
 
 // Slot-level damage expression with fallback to the highest level at or below the

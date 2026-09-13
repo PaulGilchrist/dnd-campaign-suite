@@ -157,7 +157,8 @@ describe('savePath.js — handleAoE damage/save path', () => {
 
       const fetchMock = vi.fn(() =>
         Promise.resolve({
-          json: () => Promise.resolve([{ id: 'abc123', name: 'Test Overlay' }]),
+          ok: true,
+          json: () => Promise.resolve({ overlays: [{ id: 'abc123', name: 'Test Overlay' }] }),
         }),
       );
       const originalFetch = globalThis.fetch;
@@ -165,7 +166,7 @@ describe('savePath.js — handleAoE damage/save path', () => {
 
       const result = await handleSavePath(args);
 
-      expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/test-campaign/spell-overlays');
+      expect(fetchMock).toHaveBeenCalledWith('/spell-overlay?campaign=test-campaign');
       expect(result.automationPopup.payload.activeOverlay).toEqual({ id: 'abc123', name: 'Test Overlay' });
 
       globalThis.fetch = originalFetch;
@@ -182,7 +183,8 @@ describe('savePath.js — handleAoE damage/save path', () => {
 
       const fetchMock = vi.fn(() =>
         Promise.resolve({
-          json: () => Promise.resolve([{ id: 'abc123', name: 'Other Overlay' }]),
+          ok: true,
+          json: () => Promise.resolve({ overlays: [{ id: 'abc123', name: 'Other Overlay' }] }),
         }),
       );
       const originalFetch = globalThis.fetch;
@@ -370,7 +372,8 @@ describe('savePath.js — handleAoE damage/save path', () => {
 
       const fetchMock = vi.fn(() =>
         Promise.resolve({
-          json: () => Promise.resolve([{ id: 'test123', name: 'Overlay' }]),
+          ok: true,
+          json: () => Promise.resolve({ overlays: [{ id: 'test123', name: 'Overlay' }] }),
         }),
       );
       const originalFetch = globalThis.fetch;
