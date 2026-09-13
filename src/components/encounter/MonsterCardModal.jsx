@@ -21,7 +21,7 @@ import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
 import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
-import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog } from '../../services/encounters/monsterLegendaryUses.js';
+import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal } from '../../services/encounters/monsterLegendaryUses.js';
 import './MonsterCardModal.css';
 
 function getDamageTypeChoices(action) {
@@ -53,7 +53,24 @@ function resolveLegendaryRowMechanic(action, { monsterName, handledActionName, h
 // popup + legendary_use_refused zero-spend log), then resolve the row's own
 // mechanic (numeric chips roll as today, MA-0014 gate intact). MA-0022: rows
 // with no own numbers delegate to the named row before spending.
+// MA-0023: Psychic Drain — any-ally prerequisite gate BEFORE the spend
+// (≥1 creature Charmed/Grappled by the aboleth, provenance per MA-0019,
+// tentacle grapples per MA-0018); met → spend, delegated Consume Memories
+// save resolves via the existing MA-0019-armed-target seam untouched, then
+// self_heal 1d10 rolls through the canonical applyHealingToTarget helper
+// (MA-0016 choke point — 'no_healing' te refused there with healing_blocked).
 async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage }) {
+  const allyPrerequisite = parseLegendaryAllyPrerequisite(action);
+  if (allyPrerequisite) {
+    const gateCs = await getCombatContext(campaignName);
+    const sat = legendaryAllyPrerequisiteSatisfied({ prerequisite: allyPrerequisite, creatures: gateCs?.creatures || [], monsterName, getRuntimeValue });
+    if (!sat.satisfied) {
+      setPopupHtml(buildLegendaryPrerequisiteRefusalPopup({ monsterName, actionName: action.name, prerequisite: allyPrerequisite }));
+      addEntry(campaignName, buildLegendaryPrerequisiteRefusalLog({ monsterName, actionName: action.name, prerequisite: allyPrerequisite }))
+        .catch((e) => { console.error('[MonsterCardModal] Error logging ally-prerequisite refusal:', e); });
+      return;
+    }
+  }
   let mechanicAction = action;
   let actionName = action.name;
   if (!legendaryRowHasNumericMechanic(action) && action.delegates_to) {
@@ -73,6 +90,10 @@ async function resolveLegendaryRow({ action, monsterName, monster, campaignName,
     return;
   }
   resolveLegendaryRowMechanic(mechanicAction, { monsterName, handledActionName: actionName, handleAttack, handleSaveRoll, handleDamage });
+  if (action.self_heal) {
+    applyLegendarySelfHeal({ monsterName, actionName: action.name, formula: action.self_heal, campaignName })
+      .catch((e) => { console.error('[MonsterCardModal] Error applying legendary self-heal:', e); });
+  }
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

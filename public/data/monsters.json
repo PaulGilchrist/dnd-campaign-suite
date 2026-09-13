@@ -783,6 +783,15 @@
       },
       {
         "name": "Psychic Drain",
+        "delegates_to": "Consume Memories",
+        "self_heal": "1d10",
+        "target_prerequisite": {
+          "conditions": [
+            "charmed",
+            "grappled"
+          ],
+          "any_ally_of_attacker": true
+        },
         "description": "If the aboleth has at least one creature <strong>Charmed</strong> or <strong>Grappled</strong>, it uses Consume Memories and regains 5 (1d10) Hit Points."
       }
     ],

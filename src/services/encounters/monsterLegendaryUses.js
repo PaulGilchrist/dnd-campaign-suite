@@ -10,7 +10,94 @@ export function legendaryDelegateAction(monster, action) {
 }
 
 export function legendaryDelegateAttackName(action, delegate) {
-  return `${action.name} (${delegate.name} attack)`;
+  const kind = delegate?.save_dc != null ? 'save' : 'attack';
+  return `${action.name} (${delegate.name} ${kind})`;
+}
+
+// MA-0023: Psychic Drain — "If the aboleth has at least one creature
+// Charmed or Grappled, it uses Consume Memories and regains 5 (1d10) HP."
+// The any-ally prerequisite is NOT the MA-0019 per-armed-target gate: it
+// scans the whole roster for ANY creature bearing one of the conditions
+// with provenance `activeConditionMeta[cond].source === monsterName`
+// (MA-0019 provenance; MA-0018 tentacle-grapple hit-clause stamps the
+// same source). Unmet → refusal popup + `<action>_refused` log, zero
+// legendary spend. Met → spend + delegated save + self-heal roll.
+export function parseLegendaryAllyPrerequisite(action) {
+  const tp = action?.target_prerequisite;
+  if (!tp || tp.any_ally_of_attacker !== true || !Array.isArray(tp.conditions) || tp.conditions.length === 0) return null;
+  return { conditions: tp.conditions.map(c => String(c).toLowerCase()) };
+}
+
+export function legendaryAllyPrerequisiteSatisfied({ prerequisite, creatures, monsterName, getRuntimeValue }) {
+  if (!prerequisite) return { satisfied: true };
+  for (const c of creatures || []) {
+    if (!c || c.name === monsterName) continue;
+    const conditions = getRuntimeValue(c.name, 'activeConditions') || [];
+    const conditionMeta = getRuntimeValue(c.name, 'activeConditionMeta') || {};
+    for (const cond of prerequisite.conditions) {
+      if (!conditions.some(x => String(x).toLowerCase() === cond)) continue;
+      if ((conditionMeta?.[cond]?.source || null) === monsterName) {
+        return { satisfied: true, targetName: c.name, condition: cond };
+      }
+    }
+  }
+  return { satisfied: false };
+}
+
+function allyConditionLabels(prerequisite) {
+  return prerequisite.conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(' or ');
+}
+
+export function buildLegendaryPrerequisiteRefusalPopup({ monsterName, actionName, prerequisite }) {
+  return `<div class="mc-prerequisite-refusal"><h3>Prerequisite Not Met</h3><p>${monsterName} can't use ${actionName} — no creature is currently ${allyConditionLabels(prerequisite)} by ${monsterName}. No legendary use spent, no roll, no healing.</p></div>`;
+}
+
+export function buildLegendaryPrerequisiteRefusalLog({ monsterName, actionName, prerequisite }) {
+  const slug = String(actionName || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return {
+    type: 'automation',
+    automationType: `${slug}_refused`,
+    characterName: monsterName,
+    abilityName: actionName,
+    description: `${monsterName} ${actionName} refused — no creature is ${allyConditionLabels(prerequisite)} by ${monsterName}. Zero spend, no roll, no healing.`,
+    timestamp: Date.now(),
+  };
+}
+
+// MA-0023: self-heal leg — roll the authored formula (1d10) and route
+// through the canonical combatSummary heal helper (applyHealingToTarget,
+// MA-0016 choke point: 'no_healing' te refusals land there with a
+// healing_blocked log). Logs hp_change (isHealing) naming the row.
+export async function applyLegendarySelfHeal({ monsterName, actionName, formula, campaignName, deps = {} }) {
+  const roll = deps.rollExpression || rollExpression;
+  const getCC = deps.getCombatContext || getCombatContext;
+  const applyHeal = deps.applyHealingToTarget || applyHealingToTarget;
+  const log = deps.addEntry || addEntry;
+
+  const result = roll(formula);
+  if (!result) {
+    console.error(`[monsterLegendaryUses] self_heal formula "${formula}" unparseable for ${monsterName} ${actionName}`);
+    return null;
+  }
+  const cs = await getCC(campaignName);
+  const heal = applyHeal(cs, monsterName, result.total, campaignName);
+  if (!heal) {
+    console.error(`[monsterLegendaryUses] self_heal target "${monsterName}" not in combatSummary for ${actionName}`);
+    return null;
+  }
+  await log(campaignName, {
+    type: 'hp_change',
+    targetName: monsterName,
+    sourceName: monsterName,
+    delta: heal.actualHeal,
+    currentHp: heal.newHp,
+    maxHp: heal.maxHp,
+    isHealing: true,
+    isUnconscious: false,
+    rollInfo: `${formula}: ${result.total}`,
+    description: `${monsterName} ${actionName} self-heal: ${formula} rolled ${result.total} — ${heal.actualHeal} HP regained (${heal.newHp}/${heal.maxHp}).`,
+  });
+  return { rolled: result.total, applied: heal.actualHeal, newHp: heal.newHp, maxHp: heal.maxHp };
 }
 
 // MA-0021: minimal legendary-uses economy for the "Legendary Action Uses"
@@ -28,6 +115,8 @@ export function legendaryDelegateAttackName(action, delegate) {
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { rollExpression } from '../dice/diceRoller.js';
+import { applyHealingToTarget } from '../rules/combat/applyHealing.js';
 
 export const MONSTER_LEGENDARY_USES_KEY = 'monsterLegendaryUses';
 export const MONSTER_LEGENDARY_LATCH_KEY = '_legendaryUses_usedRound';

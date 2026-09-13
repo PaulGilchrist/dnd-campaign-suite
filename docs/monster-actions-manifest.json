@@ -388,7 +388,7 @@
         "grappled"
       ],
       "description": "If the aboleth has at least one creature Charmed or Grappled, it uses Consume Memories and regains 5 (1d10) Hit Points.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0023-psychic-drain.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0024",

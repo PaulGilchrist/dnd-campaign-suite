@@ -2,6 +2,8 @@
 // refusal. Mirrors MA-0005/MA-0020 finite-uses runtime-map tracking.
 // MA-0022: non-numeric legendary rows delegate their mechanic to a named
 // attack row on the same monster (`delegates_to`).
+// MA-0023: Psychic Drain any-ally prerequisite gate + self_heal 1d10 via
+// the canonical applyHealingToTarget helper.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   legendaryHeaderAction,
@@ -14,7 +16,18 @@ import {
   regainLegendaryUses,
   legendaryDelegateAction,
   legendaryDelegateAttackName,
+  parseLegendaryAllyPrerequisite,
+  legendaryAllyPrerequisiteSatisfied,
+  buildLegendaryPrerequisiteRefusalPopup,
+  buildLegendaryPrerequisiteRefusalLog,
+  applyLegendarySelfHeal,
 } from './monsterLegendaryUses.js';
+import monstersData from '../../../public/data/monsters.json';
+
+// Real applyHealingToTarget persists combatSummary via storage.set → fetch.
+vi.mock('../../services/ui/storage.js', () => ({
+  default: { set: vi.fn(() => Promise.resolve()), get: vi.fn(() => Promise.resolve(null)) },
+}));
 
 const TENTACLE = { name: 'Tentacle', attack_bonus: 9, damage_dice_primary: '2d6 + 5', damage_type_primary: 'Bludgeoning' };
 
@@ -197,5 +210,148 @@ describe('MA-0022 legendary delegation (Lash → Tentacle)', () => {
     const e = buildLegendaryRefusalLog({ monsterName: 'Aboleth 1', actionName: 'Lash', reason: 'no-delegate' });
     expect(e.automationType).toBe('legendary_use_refused');
     expect(e.description).toMatch(/refused \(no-delegate\).*zero spend, no roll/s);
+  });
+});
+
+const CONSUME_MEMORIES = { name: 'Consume Memories', save_dc: 16, save_type: 'Intelligence', damage_dice_primary: '3d6', damage_type_primary: 'Psychic' };
+const PSYCHIC_DRAIN = {
+  name: 'Psychic Drain',
+  delegates_to: 'Consume Memories',
+  self_heal: '1d10',
+  target_prerequisite: { conditions: ['charmed', 'grappled'], any_ally_of_attacker: true },
+  description: 'If the aboleth has at least one creature Charmed or Grappled, it uses Consume Memories and regains 5 (1d10) Hit Points.',
+};
+
+describe('MA-0023 monsters.json data: Psychic Drain structured fields', () => {
+  it('row carries delegates_to Consume Memories + self_heal 1d10 + any_ally target_prerequisite', () => {
+    const aboleth = monstersData.find(m => m.name === 'Aboleth');
+    const row = aboleth.legendary_actions.find(a => a.name === 'Psychic Drain');
+    expect(row.delegates_to).toBe('Consume Memories');
+    expect(row.self_heal).toBe('1d10');
+    expect(row.target_prerequisite.conditions).toEqual(['charmed', 'grappled']);
+    expect(row.target_prerequisite.any_ally_of_attacker).toBe(true);
+  });
+
+  it('delegates_to resolves to the real Consume Memories save row', () => {
+    const aboleth = monstersData.find(m => m.name === 'Aboleth');
+    const row = aboleth.legendary_actions.find(a => a.name === 'Psychic Drain');
+    const d = legendaryDelegateAction(aboleth, row);
+    expect(d.name).toBe('Consume Memories');
+    expect(d.save_dc).toBe(16);
+    expect(legendaryDelegateAttackName(row, d)).toBe('Psychic Drain (Consume Memories save)');
+  });
+});
+
+describe('MA-0023 any-ally prerequisite gate', () => {
+  it('parses only any_ally_of_attacker shaped prerequisites', () => {
+    expect(parseLegendaryAllyPrerequisite(PSYCHIC_DRAIN).conditions).toEqual(['charmed', 'grappled']);
+    expect(parseLegendaryAllyPrerequisite(CONSUME_MEMORIES)).toBeNull();
+    expect(parseLegendaryAllyPrerequisite({ name: 'X' })).toBeNull();
+  });
+
+  it('met: creature Charmed with provenance source = monster', () => {
+    const rt = (name, key) => (name === 'TestPC' && key === 'activeConditions' ? ['charmed']
+      : name === 'TestPC' && key === 'activeConditionMeta' ? { charmed: { dc: 15, source: 'Aboleth 1' } } : null);
+    const r = legendaryAllyPrerequisiteSatisfied({ prerequisite: parseLegendaryAllyPrerequisite(PSYCHIC_DRAIN), creatures: [{ name: 'Aboleth 1' }, { name: 'TestPC' }], monsterName: 'Aboleth 1', getRuntimeValue: rt });
+    expect(r.satisfied).toBe(true);
+    expect(r.targetName).toBe('TestPC');
+  });
+
+  it('met: MA-0018 tentacle-grapple provenance (grappled, source stamped by hit clause)', () => {
+    const rt = (name, key) => (name === 'Thug 1' && key === 'activeConditions' ? ['grappled']
+      : name === 'Thug 1' && key === 'activeConditionMeta' ? { grappled: { dc: 14, source: 'Aboleth 1' } } : null);
+    const r = legendaryAllyPrerequisiteSatisfied({ prerequisite: parseLegendaryAllyPrerequisite(PSYCHIC_DRAIN), creatures: [{ name: 'Aboleth 1' }, { name: 'Thug 1' }], monsterName: 'Aboleth 1', getRuntimeValue: rt });
+    expect(r.satisfied).toBe(true);
+    expect(r.condition).toBe('grappled');
+  });
+
+  it('unmet: no conditions at all', () => {
+    const r = legendaryAllyPrerequisiteSatisfied({ prerequisite: parseLegendaryAllyPrerequisite(PSYCHIC_DRAIN), creatures: [{ name: 'Aboleth 1' }, { name: 'TestPC' }], monsterName: 'Aboleth 1', getRuntimeValue: () => null });
+    expect(r.satisfied).toBe(false);
+  });
+
+  it('unmet: condition present but attributed to ANOTHER creature (provenance fails)', () => {
+    const rt = (name, key) => (name === 'TestPC' && key === 'activeConditions' ? ['charmed']
+      : name === 'TestPC' && key === 'activeConditionMeta' ? { charmed: { source: 'Rival Hag' } } : null);
+    const r = legendaryAllyPrerequisiteSatisfied({ prerequisite: parseLegendaryAllyPrerequisite(PSYCHIC_DRAIN), creatures: [{ name: 'Aboleth 1' }, { name: 'TestPC' }], monsterName: 'Aboleth 1', getRuntimeValue: rt });
+    expect(r.satisfied).toBe(false);
+  });
+
+  it('refusal popup + psychic_drain_refused log, zero-spend wording', () => {
+    const p = buildLegendaryPrerequisiteRefusalPopup({ monsterName: 'Aboleth 1', actionName: 'Psychic Drain', prerequisite: parseLegendaryAllyPrerequisite(PSYCHIC_DRAIN) });
+    expect(p).toMatch(/Prerequisite Not Met/);
+    expect(p).toMatch(/Charmed or Grappled/);
+    const e = buildLegendaryPrerequisiteRefusalLog({ monsterName: 'Aboleth 1', actionName: 'Psychic Drain', prerequisite: parseLegendaryAllyPrerequisite(PSYCHIC_DRAIN) });
+    expect(e.automationType).toBe('psychic_drain_refused');
+    expect(e.description).toMatch(/no creature is Charmed or Grappled by Aboleth 1.*[Zz]ero spend, no roll, no healing/s);
+  });
+});
+
+describe('MA-0023 self-heal leg', () => {
+  it('rolls 1d10 (1..10 range), heals via canonical applyHealingToTarget, logs hp_change naming Psychic Drain', async () => {
+    const cs = { creatures: [{ name: 'Aboleth 1', type: 'npc', currentHp: 140, maxHp: 150 }] };
+    const healCalls = [];
+    const entries = [];
+    const r = await applyLegendarySelfHeal({
+      monsterName: 'Aboleth 1',
+      actionName: 'Psychic Drain',
+      formula: '1d10',
+      campaignName: 'test-campaign',
+      deps: {
+        getCombatContext: () => Promise.resolve(cs),
+        applyHealingToTarget: (c, name, amount) => { healCalls.push({ name, amount }); return { actualHeal: amount, newHp: c.creatures[0].currentHp + amount, maxHp: 150 }; },
+        addEntry: (_c, e) => { entries.push(e); return Promise.resolve(); },
+      },
+    });
+    expect(healCalls[0]).toEqual({ name: 'Aboleth 1', amount: r.rolled });
+    expect(r.rolled).toBeGreaterThanOrEqual(1);
+    expect(r.rolled).toBeLessThanOrEqual(10);
+    expect(entries[0].type).toBe('hp_change');
+    expect(entries[0].isHealing).toBe(true);
+    expect(entries[0].delta).toBe(r.rolled);
+    expect(entries[0].description).toContain('Psychic Drain');
+  });
+
+  it('real rollExpression over many rolls stays in 1..10 and logs hp_change isHealing', async () => {
+    const entryLogs = [];
+    for (let i = 0; i < 30; i++) {
+      const cs = { creatures: [{ name: 'Aboleth 1', type: 'npc', currentHp: 100, maxHp: 150 }] };
+      const r = await applyLegendarySelfHeal({
+        monsterName: 'Aboleth 1',
+        actionName: 'Psychic Drain',
+        formula: '1d10',
+        campaignName: 'test-campaign',
+        deps: {
+          getCombatContext: () => Promise.resolve(cs),
+          applyHealingToTarget: (c, _n, amount) => ({ actualHeal: amount, newHp: c.creatures[0].currentHp + amount, maxHp: 150 }),
+          addEntry: (_c, e) => { entryLogs.push(e); return Promise.resolve(); },
+        },
+      });
+      expect(r.rolled).toBeGreaterThanOrEqual(1);
+      expect(r.rolled).toBeLessThanOrEqual(10);
+    }
+    const e = entryLogs[0];
+    expect(e.type).toBe('hp_change');
+    expect(e.isHealing).toBe(true);
+    expect(e.targetName).toBe('Aboleth 1');
+    expect(e.description).toMatch(/Psychic Drain self-heal: 1d10 rolled/);
+  });
+
+  it('healed via the REAL applyHealingToTarget: combatSummary currentHp rises, clamped at max', async () => {
+    const cs = { creatures: [{ name: 'Aboleth 1', type: 'npc', currentHp: 148, maxHp: 150 }] };
+    const r = await applyLegendarySelfHeal({
+      monsterName: 'Aboleth 1',
+      actionName: 'Psychic Drain',
+      formula: '1d10',
+      campaignName: 'test-campaign',
+      deps: {
+        getCombatContext: () => Promise.resolve(cs),
+        addEntry: vi.fn(() => Promise.resolve()),
+      },
+    });
+    expect(cs.creatures[0].currentHp).toBeGreaterThan(148);
+    expect(cs.creatures[0].currentHp).toBeLessThanOrEqual(150);
+    expect(r.applied).toBe(cs.creatures[0].currentHp - 148);
+    expect(r.applied).toBeLessThanOrEqual(10);
   });
 });
