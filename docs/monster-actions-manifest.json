@@ -263,7 +263,7 @@
       "damageTypePrimary": "Psychic",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+3+spell level Psychic damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0015-psychic-slam.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0016",

@@ -2,6 +2,7 @@
 // (Beholderkin) Eye Ray "1d8+3+spell level") must not render as clickable
 // affordances — MV-6: static text only, no dead links. Parseable numeric
 // formulas must still render and roll.
+import { readFileSync } from 'node:fs';
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';
@@ -19,12 +20,13 @@ const EYE_RAY = {
 
 function renderRow(action, overrides = {}) {
   const onDamage = vi.fn();
+  const onAttack = vi.fn();
   const utils = render(
     <MonsterAction
       action={action}
       index={0}
       attackerCannotAct={false}
-      onAttack={vi.fn()}
+      onAttack={onAttack}
       onDamage={onDamage}
       onSaveRoll={vi.fn()}
       onSpellCast={vi.fn()}
@@ -33,7 +35,7 @@ function renderRow(action, overrides = {}) {
       {...overrides}
     />
   );
-  return { ...utils, onDamage };
+  return { ...utils, onDamage, onAttack };
 }
 
 describe('MA-0014 canRollExpression', () => {
@@ -78,5 +80,27 @@ describe('MA-0014 MonsterAction damage chip gating', () => {
     expect(chip).toBeTruthy();
     fireEvent.click(chip);
     expect(onDamage).toHaveBeenCalledWith('Club', '1d6+2', 'Bludgeoning', expect.objectContaining({ name: 'Club' }));
+  });
+});
+
+describe('MA-0015 Aberrant Spirit (Mind Flayer) Psychic Slam', () => {
+  const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+  const spirit = monsters.find(m => m.index === 'aberrant-spirit-mind-flayer');
+  const psychicSlam = spirit.actions.find(a => a.name === 'Psychic Slam');
+
+  it('authored row keeps caster-dependent tokens (no fabricated numerics)', () => {
+    expect(psychicSlam.attack_bonus).toBeNull();
+    expect(psychicSlam.damage_dice_primary).toBe('1d8+3+spell level');
+    expect(canRollExpression(psychicSlam.damage_dice_primary)).toBe(false);
+  });
+
+  it('renders the row as fully static text — no to-hit link, no damage chip', () => {
+    const { container, onDamage, onAttack } = renderRow(psychicSlam);
+    expect(container.querySelectorAll('.mc-dice-link').length).toBe(0);
+    expect(container.querySelectorAll('[role="button"]').length).toBe(0);
+    expect(container.textContent).toContain('Psychic Slam');
+    expect(container.textContent).toContain('+spell attack modifier');
+    expect(onDamage).not.toHaveBeenCalled();
+    expect(onAttack).not.toHaveBeenCalled();
   });
 });
