@@ -18,7 +18,8 @@ const TALONS_OFFER = {
   attackName: 'Talons',
 };
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
+vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
+  ...(await importActual()),
   rollExpression: vi.fn((formula) => ({ total: 9, rolls: [3], modifier: 2, formula })),
   rollExpressionDoubled: vi.fn((formula) => ({ total: 15, rolls: [3, 3], modifier: 2, formula })),
   rollD20: vi.fn(() => 14),

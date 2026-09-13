@@ -65,6 +65,15 @@ function parseExpression(formula) {
   return null;
 }
 
+function canRollExpression(formula) {
+  if (!formula) return false;
+  const stripped = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
+  if (!stripped) return false;
+  if (/\s+or\s+/i.test(stripped)) return stripped.split(/\s+or\s+/i).some(canRollExpression);
+  if (/\s+plus\s+/i.test(stripped)) return stripped.split(/\s+plus\s+/i).some(part => canRollExpression(part) || parseConstant(part) !== null);
+  return parseExpression(stripped) !== null;
+}
+
 function rollExpression(formula, options = {}) {
   if (!formula) return null;
   const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
@@ -191,4 +200,4 @@ function applyHealingRerollOnes(rolls, expression) {
   return { displayRolls: rolls, originalRolls: null };
 }
 
-export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression, rollExpressionDoubled, rollExpressionMaximized, formatDamageFormula, applyHealingRerollOnes };
+export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, canRollExpression, rollExpression, rollExpressionDoubled, rollExpressionMaximized, formatDamageFormula, applyHealingRerollOnes };

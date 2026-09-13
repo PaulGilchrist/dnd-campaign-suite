@@ -1,5 +1,6 @@
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
+import { canRollExpression } from '../../services/dice/diceRoller.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
 import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining } from './MonsterCardHelpers.js';
 
@@ -7,18 +8,21 @@ function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
 }
 
+// MA-0014: unroll­able formulas (e.g. "1d8+3+spell level") must render as
+// plain description text only — never a clickable chip that dies silently.
 function ActionDamageLinks({ action, actionDamageFormula, actionDamageTypeLabel, onDamage }) {
   if (action.save_dc != null || action.attack_bonus != null) return null;
-  const hasSecondary = action.damage_dice_secondary != null;
-  if (!actionDamageFormula && !hasSecondary) return null;
+  const rollablePrimary = actionDamageFormula && canRollExpression(actionDamageFormula);
+  const rollableSecondary = action.damage_dice_secondary != null && canRollExpression(action.damage_dice_secondary);
+  if (!rollablePrimary && !rollableSecondary) return null;
   return (
     <>
-      {actionDamageFormula && (
+      {rollablePrimary && (
         <span className="mc-dice-link" onClick={() => onDamage(action.name, actionDamageFormula, actionDamageTypeLabel, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice" /> {actionDamageFormula}
         </span>
       )}
-      {hasSecondary && (
+      {rollableSecondary && (
         <span className="mc-dice-link" onClick={() => onDamage(action.name, action.damage_dice_secondary, actionDamageTypeLabel, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice" /> {action.damage_dice_secondary}
         </span>
@@ -60,7 +64,7 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll }) {
   const handleSaveRoll = () => {
     onSaveRoll(action, saveDamageFormula, saveConditions);
   };
-  if (saveDamageFormula) {
+  if (saveDamageFormula && canRollExpression(saveDamageFormula)) {
     return (
       <span className="mc-dice-link" role="button" tabIndex={0} onClick={handleSaveRoll}>
         <i className="fa-solid fa-dice" /> {saveDamageFormula}

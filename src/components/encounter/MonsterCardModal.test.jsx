@@ -8,7 +8,8 @@ vi.mock('../../services/ui/sanitize.js', () => ({
     sanitizeHtml: vi.fn((html) => html),
 }));
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
+vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
+  ...(await importActual()),
     rollExpression: vi.fn(() => ({ total: 7, rolls: [7], modifier: 0 })),
     rollExpressionDoubled: vi.fn(() => ({ total: 14, rolls: [7, 7], modifier: 0 })),
 }));

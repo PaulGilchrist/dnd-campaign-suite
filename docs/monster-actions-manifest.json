@@ -248,7 +248,7 @@
       "reach": null,
       "range": "150 ft.",
       "description": "Ranged Spell Attack: +spell attack modifier, range 150 ft. Hit: 1d8+3+spell level Psychic damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0014-eye-ray.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0015",

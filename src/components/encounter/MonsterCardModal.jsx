@@ -306,6 +306,18 @@ function blockStinkingCloudAction(campaignName, monsterName, name) {
   }).catch((e) => { console.error('[MonsterCardModal] Error:', e); });
 }
 
+// MA-0014: never die silently on an unparseable damage formula — log the refusal.
+function logBlockedDamageRoll(campaignName, monsterName, name, formula) {
+  console.error(`[MonsterCardModal] Unparseable damage formula for ${monsterName} — ${name}: "${formula}"`);
+  addEntry(campaignName, {
+    type: 'automation blocked',
+    characterName: monsterName,
+    abilityName: name,
+    description: `${monsterName} ${name}: damage formula "${formula}" could not be rolled — GM adjudicate manually.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MonsterCardModal] Error logging blocked damage roll:', e); });
+}
+
 function hasRayOfEnfeebleOn(targetEffects, monsterName) {
   return targetEffects?.some(te => te.target === monsterName && te.effect === 'ray_of_enfeeble_debuff');
 }
@@ -519,6 +531,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               context.hitClause = autoDamage.hitClause;
             }
             rollDamage({ name: autoDamage.name, formula: autoDamage.formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
+          } else {
+            logBlockedDamageRoll(campaignName, monsterName, autoDamage.name || monsterName, autoDamage.formula);
           }
           setPopupHtml(null);
         },
@@ -627,6 +641,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         context.dcSuccess = 'half';
       }
       rollDamage({ name: name, formula: formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
+    } else {
+      logBlockedDamageRoll(campaignName, monsterName, name, formula);
     }
   };
 

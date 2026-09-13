@@ -32,7 +32,8 @@ const SPELLS_2024 = [
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
+vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
+  ...(await importActual()),
   rollExpression: vi.fn(() => ({ total: 8, rolls: [3, 5], modifier: 2 })),
   rollExpressionDoubled: vi.fn(() => ({ total: 16, rolls: [3, 5], modifier: 2 })),
 }));
