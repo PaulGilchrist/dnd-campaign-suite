@@ -321,7 +321,7 @@ export function buildGazeImmunityRefusalLog({ monsterName, actionName, targetNam
     characterName: monsterName,
     abilityName: actionName,
     targetName,
-    description: `${targetName} is immune to ${monsterName}'s ${actionName} (gaze immunity) — no save rolled, no damage, nothing spent.`,
+    description: `${targetName} is immune to ${monsterName}'s ${actionName} (save-granted immunity) — no save rolled, no damage, nothing spent.`,
     timestamp: Date.now(),
   };
 }

@@ -11,6 +11,7 @@ import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbility
 import { registerTargetEffect, getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
+import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -329,6 +330,17 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
         await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
     } else {
         applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget: targetName || characterName, attackerName, campaignName });
+    }
+    // MA-0048: authored repeat-save clause (Frightful Presence) — arm the
+    // turn-end repeat-save marker on a failed save.
+    if (saveSuccess === false && context?.repeatSave) {
+        await trackFrightfulPresence({
+            campaignName,
+            attackerName,
+            targetName: targetName || characterName,
+            saveType: context.repeatSave.save_type || saveType,
+            saveDc,
+        });
     }
 }
 

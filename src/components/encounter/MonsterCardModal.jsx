@@ -648,7 +648,7 @@ function resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, 
 }
 
 function buildGazeImmunityRefusalPopup({ monsterName, actionName, targetName }) {
-  return `<div class="mc-gaze-immunity-refusal"><h3>Gaze Immunity</h3><p>${targetName} is immune to ${monsterName}'s ${actionName} (granted by a previous successful save). No save rolled, nothing spent.</p></div>`;
+  return `<div class="mc-gaze-immunity-refusal"><h3>Immunity — ${actionName}</h3><p>${targetName} is immune to ${monsterName}'s ${actionName} (granted by a previous successful save or a previous effect ending). No save rolled, nothing spent.</p></div>`;
 }
 
 function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction }) {
@@ -673,6 +673,9 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     conditionDurationNote: extractConditionDurationNote(action?.save_effect),
     // MA-0030: authored success-immunity clause (granted at save success in saveProcessing).
     successImmunity: action?.success_immunity || null,
+    // MA-0048: authored repeat-save clause (Frightful Presence) — arm the
+    // turn-end repeat-save marker at the failed-save seam in saveProcessing.
+    repeatSave: action?.repeat_save || null,
     // MA-0038: authored failed-save concentration-disadvantage clause
     // (Cloud of Insects) — te producer arm for saveProcessing on a fail.
     concentrationDisadvantage: parseConcentrationDisadvantageClause(action?.save_effect),

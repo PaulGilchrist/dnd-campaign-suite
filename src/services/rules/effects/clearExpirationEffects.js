@@ -9,6 +9,7 @@ import { revertTruePolymorph } from '../../automation/handlers/spells/truePolymo
 import { revertShapechange } from '../../automation/handlers/spells/shapechangeService.js';
 import { addEntry } from '../../ui/logService.js';
 import { removeSummonedCreatures } from '../../combat/summons/summonedCreatureService.js';
+import { registerTargetEffect } from '../../combat/conditions/targetEffectDefinitions.js';
 
 function removeNpcCondition(targetName, conditionName, campaignName) {
     try {
@@ -379,6 +380,26 @@ const EXPIRATION_HANDLERS = {
     'clear_runtime_value': (effect, _targetName, _attackerName, campaignName) => setRuntimeValue(effect.creatureName, effect.key, null, campaignName),
     'remove_smite_of_protection': handleRemoveSmiteOfProtection,
     'clear_silence_zone': handleClearSilenceZone,
+    // MA-0048: Frightful Presence effect-end (1-minute clock expiry) grants
+    // 24h immunity to this attacker's FP. Written inline (no nested
+    // addExpiration — clocks registered mid-expiry-processing race the
+    // outer list rewrite); 24h = 14400 rounds (CLA-334), unreachable
+    // in-encounter — the te stands until an admin clear (documented residual).
+    'frightful_presence_immunity_grant': (effect, targetName, attackerName, campaignName) => {
+        registerTargetEffect(campaignName, targetName, effect.immunityEffect || 'frightful_presence_immunity', attackerName, {
+            duration: '24_hours',
+            rounds: 14400,
+        });
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'frightful_presence_immunity_granted',
+            characterName: targetName,
+            sourceName: attackerName,
+            abilityName: 'Frightful Presence',
+            description: `${targetName}'s Frightful Presence effect from ${attackerName} ended — immune to it for the next 24 hours (14400 rounds — no round clock registered mid-expiry; te stands until admin clear).`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[clearExpirationEffects:frightful_presence_immunity_granted]', e); });
+    },
 };
 
 /**

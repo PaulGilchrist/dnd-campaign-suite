@@ -5,6 +5,7 @@ import { getNextCreatureName, getPreviousCreatureName } from '../../services/enc
 import { clearPerRoundMajestyTrackers } from '../../services/combat/auras/unbreakableMajesty.js'
 import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval } from '../../services/rules/effects/expirations.js'
 import { applySleepTurnEnd } from '../../services/rules/features/sleepService.js'
+import { applyFrightfulPresenceTurnEnd } from '../../services/rules/features/frightfulPresenceService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
@@ -110,6 +111,11 @@ function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters
     // until the end of the OUTGOING creature's current turn.
     applyStinkingCloudTurnEnd(campaignName, activeCreatureName)
         .catch((e) => { console.error('[navigationHandlers] SP-111 stinking cloud turn-end cleanup failed:', e) })
+    // MA-0048: Frightful Presence (Adult Blue Dracolich) — the OUTGOING creature
+    // repeats its WIS save at the end of its own frightened turn; success sheds
+    // Frightened and grants 24h immunity to this dracolich's FP.
+    applyFrightfulPresenceTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] MA-0048 frightful presence turn-end save failed:', e) })
 }
 
 /**

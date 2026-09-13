@@ -1339,6 +1339,8 @@
         "save_dc": 18,
         "save_type": "Wisdom",
         "dc_success": "none",
+        "success_immunity": { "effect": "frightful_presence_immunity", "duration": "24_hours", "duration_minutes": 1440 },
+        "repeat_save": { "condition": "frightened", "save_type": "Wisdom", "duration_minutes": 1 },
         "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage."
       },
       {
