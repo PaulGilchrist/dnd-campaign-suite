@@ -1309,11 +1309,13 @@
       },
       {
         "name": "Bite",
-        "description": "Melee Weapon Attack: +13 to hit, reach 10 ft., one target. Hit: 18 (2d10 + 7) piercing damage plus 5 (1dlO) lightning damage.",
+        "description": "Melee Weapon Attack: +13 to hit, reach 10 ft., one target. Hit: 18 (2d10 + 7) piercing damage plus 5 (1d10) lightning damage.",
         "attack_bonus": 13,
         "reach": "10 ft.",
         "damage_dice_primary": "2d10 + 7",
-        "damage_type_primary": "piercing"
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "1d10",
+        "damage_type_secondary": "Lightning"
       },
       {
         "name": "Claw",
@@ -1336,7 +1338,8 @@
         "description": "Each creature ofthe dracolich's choice that is within 120 feet ofthe dracolich and aware of it must succeed on a DC 18 Wisdom saving throw or become frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to the dracolich's Frightful Presence for the next 24 hours.",
         "save_dc": 18,
         "save_type": "Wisdom",
-        "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours."
+        "dc_success": "none",
+        "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage."
       },
       {
         "name": "Lightning Breath",

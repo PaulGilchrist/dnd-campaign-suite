@@ -700,7 +700,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dracolich can use its Frightful Presence. It then makes three attacks: one with its bite and two with its claws.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0044-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0045",
