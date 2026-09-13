@@ -1,4 +1,8 @@
 import { getAbilitySaveModifier } from '../../services/shared/abilityLookup.js';
+import { findLastAttack } from '../../services/automation/common/damageRollback.js';
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -123,4 +127,103 @@ export function getSaveModifierForSaveType(saveType, target, characters, creatur
   }
 
   return getCreatureSaveModifier(target, abilityKey);
+}
+
+// MA-0006: gated monster reactions (e.g. Aarakocra Aeromancer Feather Fall
+// 1/Day). Rows carry automation {type:'reaction', trigger:'falling',
+// effect:'feather_fall'}; the monster card gates them on the campaign
+// lastAttack CLA-315 'falling' trigger seam (no fall-damage pipeline exists —
+// negation is recorded advisory, GM-enforced for monsters, CLA-325 precedent).
+export const MONSTER_REACTION_USES_KEY = 'monsterReactionUses';
+
+const GATED_MONSTER_REACTIONS = {
+  feather_fall: { effect: 'feather_fall', trigger: 'falling', label: 'Feather Fall', icon: 'fa-feather' },
+};
+
+export function getGatedMonsterReaction(action) {
+  const effect = action?.automation?.effect;
+  return effect ? GATED_MONSTER_REACTIONS[effect] || null : null;
+}
+
+export function monsterReactionUsesRemaining(action, storedUses) {
+  const maxUses = action?.maxUses ?? action?.uses ?? null;
+  if (maxUses == null) return null;
+  const used = Number(storedUses?.[action?.automation?.effect]) || 0;
+  return Math.max(0, maxUses - used);
+}
+
+function lastAttackTrigger(lastAttack) {
+  if (!lastAttack) return null;
+  if (lastAttack.trigger) return lastAttack.trigger;
+  if (lastAttack.attackEvent && lastAttack.attackEvent.trigger) return lastAttack.attackEvent.trigger;
+  return null;
+}
+
+function reactionInvolvesMonster(lastAttack, monsterName) {
+  return Boolean(lastAttack) && (lastAttack.attackerName === monsterName || lastAttack.targetName === monsterName);
+}
+
+function reactionMaxUses(action) {
+  if (action && action.maxUses != null) return Number(action.maxUses);
+  if (action && action.uses != null) return Number(action.uses);
+  return 1;
+}
+
+export function monsterReactionGate({ def, action, monsterName, lastAttack, currentRound, storedUses, usedRound }) {
+  if (lastAttackTrigger(lastAttack) !== def.trigger) {
+    return { ok: false, reason: 'trigger', message: `${def.label}: no falling event — ${monsterName} can only react to a fall.` };
+  }
+  if (!reactionInvolvesMonster(lastAttack, monsterName)) {
+    return { ok: false, reason: 'actor', message: `${def.label}: ${monsterName} is not the falling creature — refused.` };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: `${def.label}: Reaction already used this round (1/round) — refused.` };
+  }
+  const used = Number((storedUses && storedUses[def.effect]) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: `${def.label}: 1/Day uses already spent today — refused. Uses reset at a long rest; GM-enforced for monsters.` };
+  }
+  return { ok: true, used, limit };
+}
+
+export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, deps = {} }) {
+  const def = getGatedMonsterReaction(action);
+  if (!def) return null;
+  const findLast = deps.findLastAttack || findLastAttack;
+  const getCombat = deps.getCombatContext || getCombatContext;
+  const getRV = deps.getRuntimeValue || getRuntimeValue;
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const latchKey = `_${def.effect}_usedRound`;
+  const lastAttack = await findLast(campaignName);
+  const cs = await getCombat(campaignName);
+  const currentRound = Number(cs?.round ?? 1);
+  const storedUses = getRV(monsterName, MONSTER_REACTION_USES_KEY) || {};
+  const usedRound = Number(getRV(monsterName, latchKey) ?? 0);
+  const gate = monsterReactionGate({ def, action, monsterName, lastAttack, currentRound, storedUses, usedRound });
+  if (!gate.ok) {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: `${def.effect}_refused`,
+      name: def.label,
+      description: `${def.label} refused (${gate.reason}): ${gate.message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message: gate.message };
+  }
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, [def.effect]: gate.used + 1 }, campaignName);
+  const remaining = Math.max(0, gate.limit - gate.used - 1);
+  const message = `${monsterName} uses ${def.label} — falling damage negated (GM-enforced for monsters — advisory record, no fall-damage pipeline). ${gate.limit}/Day · ${remaining} left today.`;
+  await log(campaignName, {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: def.label,
+    description: message,
+    timestamp: Date.now(),
+  });
+  return { ok: true, message, remaining };
 }

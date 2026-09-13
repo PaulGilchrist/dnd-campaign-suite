@@ -1,7 +1,7 @@
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
-import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining } from './MonsterCardHelpers.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -75,7 +75,27 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll }) {
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {} }) {
+function GatedReactionLink({ def, remaining, attackerCannotAct, onClick }) {
+  const clickable = !attackerCannotAct;
+  return (
+    <span
+      className={`mc-dice-link${remaining === 0 ? ' mc-dice-link-spell-spent' : ''}`}
+      onClick={clickable ? onClick : undefined}
+      role="button"
+      tabIndex={0}
+    >
+      <i className={`fa-solid ${def.icon}`} /> {def.label}{remaining != null && <em> ({remaining} left)</em>}
+    </span>
+  );
+}
+
+function GatedReactionSlot({ action, attackerCannotAct, reactionUsesUsed, onGatedReaction }) {
+  const def = getGatedMonsterReaction(action);
+  if (!def) return null;
+  return <GatedReactionLink def={def} remaining={monsterReactionUsesRemaining(action, reactionUsesUsed)} attackerCannotAct={attackerCannotAct} onClick={() => onGatedReaction(action)} />;
+}
+
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
   const actionDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
@@ -99,6 +119,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
         actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} />
       )}
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
+      <GatedReactionSlot action={action} attackerCannotAct={attackerCannotAct} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} />
       {action.usage && <em> ({String(action.usage)})</em>}
       {action.recharge && <em> ({String(action.recharge)})</em>}
     </div>

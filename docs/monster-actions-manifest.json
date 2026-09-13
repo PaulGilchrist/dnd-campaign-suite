@@ -117,7 +117,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The aarakocra casts Feather Fall in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0006-feather-fall.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0007",

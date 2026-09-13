@@ -18,7 +18,8 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionGate, MONSTER_REACTION_USES_KEY } from './MonsterCardHelpers.js';
+import { findLastAttack } from '../../services/automation/common/damageRollback.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import './MonsterCardModal.css';
 
@@ -411,6 +412,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const monsterActiveBuffs = getRuntimeValue(monsterName, 'activeBuffs') || [];
   const shieldOfFaithBonus = computeShieldOfFaithBonus(monsterActiveBuffs);
   const monsterSpellUses = useRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, campaignName);
+  const monsterReactionUses = useRuntimeValue(monsterName, MONSTER_REACTION_USES_KEY, campaignName);
 
   const monsterSensesArray = useMemo(() => {
     if (!monster?.senses) return null;
@@ -684,6 +686,49 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       .catch((e) => { console.error('[MonsterCardModal] Error logging monster spell cast:', e); });
   }, [campaignName, monsterName, handleSaveRoll]);
 
+  // MA-0006: gated monster reactions (Feather Fall 1/Day) — consumer of the
+  // CLA-315 campaign lastAttack `trigger:'falling'` seam on the monster-card
+  // path. Refusals log feather_fall_refused and spend nothing; a successful
+  // use spends 1/day with an ability_use log. Fall-damage negation is an
+  // advisory record (GM-enforced for monsters, CLA-325 precedent — the app
+  // has no fall-damage pipeline).
+  const handleGatedReaction = useCallback(async (action) => {
+    const def = getGatedMonsterReaction(action);
+    if (!def) return;
+    const latchKey = `_${def.effect}_usedRound`;
+    const lastAttack = await findLastAttack(campaignName);
+    const cs = await getCombatContext(campaignName);
+    const currentRound = Number(cs?.round ?? 1);
+    const storedUses = getRuntimeValue(monsterName, MONSTER_REACTION_USES_KEY) || {};
+    const usedRound = Number(getRuntimeValue(monsterName, latchKey) ?? 0);
+    const gate = monsterReactionGate({ def, action, monsterName, lastAttack, currentRound, storedUses, usedRound });
+    if (!gate.ok) {
+      await addEntry(campaignName, {
+        type: 'automation',
+        characterName: monsterName,
+        automationType: `${def.effect}_refused`,
+        name: def.label,
+        description: `${def.label} refused (${gate.reason}): ${gate.message}`,
+        timestamp: Date.now(),
+      }).catch((e) => { console.error('[MonsterCardModal] Error logging gated reaction refusal:', e); });
+      return;
+    }
+    // CLA-315: reaction economy latch — once per round per creature, keyed on
+    // the monster's own runtime store (monsters are not covered by the
+    // player-only PLAYER_ROUND_LATCH_KEYS round-wrap clear in navigationHandlers.js;
+    // the numeric round comparison self-expires when cs.round advances).
+    await setRuntimeValue(monsterName, latchKey, currentRound, campaignName);
+    await setRuntimeValue(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, [def.effect]: gate.used + 1 }, campaignName);
+    const remaining = Math.max(0, gate.limit - gate.used - 1);
+    await addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: monsterName,
+      abilityName: def.label,
+      description: `${monsterName} uses ${def.label} — falling damage negated (GM-enforced for monsters — advisory record, no fall-damage pipeline). ${gate.limit}/Day · ${remaining} left today.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[MonsterCardModal] Error logging gated reaction spend:', e); });
+  }, [campaignName, monsterName]);
+
   const attackerCannotAct = useMemo(() => {
     const creature = getAttackerCreature();
     if (!creature) return false;
@@ -766,6 +811,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         characters={characters}
         creatures={creatures}
         monsterSpellUses={monsterSpellUses}
+        monsterReactionUses={monsterReactionUses}
+        handleGatedReaction={handleGatedReaction}
       />
       {popupHtml && (
         <MonsterAttackPopup

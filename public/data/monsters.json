@@ -172,7 +172,15 @@
     "reactions": [
       {
         "name": "Feather Fall (1/Day)",
-        "description": "The aarakocra casts <strong>Feather Fall</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The aarakocra casts <strong>Feather Fall</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "1/Day",
+        "uses": 1,
+        "maxUses": 1,
+        "automation": {
+          "type": "reaction",
+          "trigger": "falling",
+          "effect": "feather_fall"
+        }
       }
     ],
     "environments": [
