@@ -1,0 +1,77 @@
+{
+  "Aarakocra Skirmisher": {
+    "monsterIndex": "aarakocra-skirmisher",
+    "placedIn": "test-campaign initiative via Encounter Builder Join Encounter",
+    "config": {
+      "name": "Aarakocra Skirmisher 1",
+      "hp": 11,
+      "ac": 12,
+      "init": 7,
+      "csIndex": 0,
+      "verifiedRow": "MA-0007",
+      "verdict": "broken (charge bonus clause)",
+      "date": "2026-09-13"
+    }
+  },
+  "Aarakocra Aeromancer": {
+    "monsterIndex": "aarakocra-aeromancer",
+    "placedIn": "test-campaign initiative via Encounter Builder Join Encounter",
+    "config": {
+      "name": "Aarakocra Aeromancer 1",
+      "hp": 66,
+      "ac": 16,
+      "csIndex": 0,
+      "verifiedRow": "MA-0003",
+      "verdict": "broken (Gust clause)",
+      "date": "2026-09-13"
+    }
+  },
+  "Aarakocra": {
+    "monsterIndex": "aarakocra",
+    "placedIn": "test-campaign initiative via Encounter Builder Join Encounter",
+    "config": {
+      "name": "Aarakocra 1",
+      "hp": 13,
+      "ac": 12,
+      "init": 13,
+      "csIndex": 0,
+      "verifiedRow": "MA-0001, MA-0002",
+      "verdict": "PASS",
+      "date": "2026-09-13"
+    }
+  },
+  "Abominable Yeti": {
+    "monsterIndex": "abominable-yeti",
+    "placedIn": "test-campaign initiative via Encounter Builder Join Encounter",
+    "config": {
+      "name": "Abominable Yeti 1",
+      "hp": 137,
+      "ac": 13,
+      "csIndex": 0,
+      "verifiedRow": "MA-0027, MA-0028, MA-0029, MA-0030, MA-0031",
+      "verdict": "mixed (claw/ice PASS, gaze+breath broken)",
+      "date": "2026-09-13"
+    }
+  },
+  "Adult Black Dragon": {
+    "monsterIndex": "adult-black-dragon",
+    "placedIn": "test-campaign initiative via Encounter Builder Join Encounter",
+    "config": {
+      "name": "Adult Black Dragon 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0033 (broken spell half), MA-0034 (PASS)",
+      "date": "2026-09-13"
+    }
+  },
+  "Adult Blue Dracolich": {
+    "monsterIndex": "adult-blue-dracolich",
+    "placedIn": "test-campaign initiative via EB Join",
+    "config": {
+      "name": "Adult Blue Dracolich 1",
+      "hp": 225,
+      "csIndex": 0,
+      "verifiedRow": "MA-0044(broken),MA-0045(broken),MA-0046(PASS),MA-0047(PASS),MA-0048(broken)",
+      "date": "2026-09-13"
+    }
+  }
+}
