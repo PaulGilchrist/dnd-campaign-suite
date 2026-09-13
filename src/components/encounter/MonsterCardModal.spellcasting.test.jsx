@@ -23,6 +23,7 @@ const SPELLS_5E = [
   { name: 'Detect Thoughts', level: 2, concentration: true, duration: 'Up to 1 minute', damage: null, dc: null },
   { name: 'Minor Illusion', level: 0, concentration: false, duration: '1 minute', damage: null, dc: null },
   { name: 'Lightning Bolt', level: 3, concentration: false, duration: 'Instantaneous', damage: { damage_type: 'Lightning', damage_at_slot_level: { 3: '8d6', 4: '9d6' } }, dc: { dc_type: 'DEX', dc_success: 'half' } },
+  { name: 'Shatter', level: 2, concentration: false, duration: 'Instantaneous', damage: { damage_type: 'Thunder', damage_at_slot_level: { 2: '3d8', 3: '4d8' } }, dc: { dc_type: 'CON', dc_success: 'half' } },
   { name: 'Mage Hand', level: 0, concentration: false, duration: '1 minute', damage: null, dc: null },
   { name: 'Message', level: 0, concentration: false, duration: '1 round', damage: null, dc: null },
 ];
@@ -234,6 +235,40 @@ describe('MonsterCardModal - Spellcasting per-spell cast links (MA-0003)', () =>
     expect(context.actionName).toBe('Lightning Bolt');
     expect(context.dcSuccess).toBe('half');
     expect(context.autoDamageFormula).toBe('8d6');
+    expect(context.autoDamageDamageType).toBe('Lightning');
+    expect(context.isSpellDamage).toBe(true);
+  });
+
+  // MA-0054: Adult Blue Dragon Spellcasting At Will Shatter — CON-save thunder
+  // damage spell; the Spellcasting row authors no damage_type, so the spell's
+  // own spells.json Thunder must reach the save-damage context.
+  it('MA-0054 casting Shatter routes CON DC 18 half-on-success with Thunder damage from spells.json', async () => {
+    const blueDragon = makeMonster({
+      name: 'Adult Blue Dragon 1',
+      actions: [{
+        name: 'Spellcasting',
+        description: 'The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Invisibility</em>, <em>Mage Hand</em>, <em>Shatter</em>',
+        save_dc: 18,
+        save_type: 'Charisma',
+      }],
+    });
+    const creatures = [
+      { name: 'Adult Blue Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 212, maxHp: 212, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 30, maxHp: 30, conditions: [], computedStats: {} },
+    ];
+    render(<MonsterCardModal {...makeProps(blueDragon, { creatureName: 'Adult Blue Dragon 1', creatures })} />);
+    const shatter = linkByText('Shatter');
+    expect(shatter).toBeTruthy();
+    await act(async () => { fireEvent.click(shatter); });
+
+    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
+    const context = rollSavingThrow.mock.calls[0][2];
+    expect(context.spellName).toBe('Shatter');
+    expect(context.saveType).toBe('CON');
+    expect(context.saveDc).toBe(18);
+    expect(context.dcSuccess).toBe('half');
+    expect(context.autoDamageFormula).toBe('3d8');
+    expect(context.autoDamageDamageType).toBe('Thunder');
     expect(context.isSpellDamage).toBe(true);
   });
 

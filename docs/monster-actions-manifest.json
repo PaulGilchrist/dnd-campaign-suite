@@ -851,7 +851,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast *Shatter*.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0054-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0055",

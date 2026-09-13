@@ -131,7 +131,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     });
     const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
     rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
-      monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction,
+      monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType,
     }));
   };
   if (aoe == null && !recharge.gate) { fire(); return; }
@@ -632,6 +632,9 @@ function executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll 
   const dcSuccess = spell?.dc?.dc_success === 'none' ? 'none' : 'half';
   handleSaveRoll(action, spellDamageFormulaAtBaseLevel(spell), extractConditionsFromSaveEffect(spell?.save_effect), {
     spellName, saveType: spell?.dc?.dc_type || action.save_type, dcSuccess,
+    // MA-0054: Spellcasting rows carry no damage_type_primary, so without the
+    // spell's own spells.json damage type the save-damage log defaults Slashing.
+    damageType: spell?.damage?.damage_type || null,
   });
 }
 
@@ -676,8 +679,14 @@ function buildGazeImmunityRefusalPopup({ monsterName, actionName, targetName }) 
   return `<div class="mc-gaze-immunity-refusal"><h3>Immunity — ${actionName}</h3><p>${targetName} is immune to ${monsterName}'s ${actionName} (granted by a previous successful save or a previous effect ending). No save rolled, nothing spent.</p></div>`;
 }
 
-function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction }) {
-  const primaryDamageType = getDamageTypesForAction(action)[0] || null;
+// MA-0054: a Spellcasting cast has no authored damage_type on the row —
+// prefer the spell's own spells.json damage type (e.g. Shatter Thunder).
+function savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction) {
+  return spellDamageType || getDamageTypesForAction(action)[0] || null;
+}
+
+function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType }) {
+  const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
   return {
     attackerName: monsterName,
     targetName: target?.name,
