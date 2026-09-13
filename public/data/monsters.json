@@ -1389,6 +1389,7 @@
       },
       {
         "name": "Tail Attack",
+        "delegates_to": "Tail",
         "description": "The dracolich makes a tail attack."
       },
       {

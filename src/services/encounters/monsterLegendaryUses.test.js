@@ -468,3 +468,61 @@ describe('MA-0051 legendary ability-check rows', () => {
     expect(buildLegendaryRefusalPopup({ monsterName: 'X', actionName: 'Y', reason: 'no-uses' })).toContain('no legendary uses');
   });
 });
+
+// MA-0052: Adult Blue Dracolich "Tail Attack" legendary row — data fix
+// mirroring MA-0040 Pounce: delegates_to the monster's own Tail action.
+describe('MA-0052 Adult Blue Dracolich Tail Attack delegates_to Tail', () => {
+  const dracolich = monstersData.find(m => m.index === 'adult-blue-dracolich');
+  const tailAttack = dracolich.legendary_actions.find(a => a.name === 'Tail Attack');
+  const tail = dracolich.actions.find(a => a.name === 'Tail');
+
+  it('row carries delegates_to Tail with no own numeric mechanic', () => {
+    expect(tailAttack.delegates_to).toBe('Tail');
+    expect(tailAttack.attack_bonus == null && tailAttack.save_dc == null && tailAttack.damage_dice_primary == null).toBe(true);
+  });
+
+  it('delegates_to resolves to the real Tail attack row (+13 / 2d8 + 7 bludgeoning / reach 15 ft.)', () => {
+    const d = legendaryDelegateAction(dracolich, tailAttack);
+    expect(d).toBe(tail);
+    expect(d.attack_bonus).toBe(13);
+    expect(d.damage_dice_primary).toBe('2d8 + 7');
+    expect(d.damage_type_primary).toBe('bludgeoning');
+    expect(d.reach).toBe('15 ft.');
+  });
+
+  it('attack log name reads "Tail Attack (Tail attack)"', () => {
+    expect(legendaryDelegateAttackName(tailAttack, tail)).toBe('Tail Attack (Tail attack)');
+  });
+
+  it('no-delegate refusal fires when the named row is absent', () => {
+    const dangling = { name: 'Tail Attack', delegates_to: 'Wing Buffet', description: '…' };
+    expect(legendaryDelegateAction(dracolich, dangling)).toBeNull();
+    const html = buildLegendaryRefusalPopup({ monsterName: 'Adult Blue Dracolich 1', actionName: 'Tail Attack', reason: 'no-delegate' });
+    expect(html).toContain('could not be found');
+    expect(html).toContain('Nothing spent, no roll');
+  });
+
+  it('spend with the delegate name spends 1 use and logs "Tail Attack (Tail attack)"', async () => {
+    cs.activeCreatureName = 'Thug 1';
+    const r = await expendLegendaryUse({ monsterName: 'Adult Blue Dracolich 1', monster: dracolich, actionName: legendaryDelegateAttackName(tailAttack, tail), campaignName: 'test-campaign', deps });
+    expect(r.spent).toBe(true);
+    expect(store['Adult Blue Dracolich 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    const spend = logs.find(e => e.type === 'ability_use');
+    expect(spend.description).toMatch(/expends a legendary use for Tail Attack \(Tail attack\)/);
+  });
+
+  it('exhausted refusal after 3 spends logs legendary_use_refused with zero roll', async () => {
+    cs.activeCreatureName = 'Thug 1';
+    await expendLegendaryUse({ monsterName: 'Drac 1', monster: dracolich, actionName: 'Tail Attack (Tail attack)', campaignName: 'test-campaign', deps });
+    cs.activeCreatureName = 'AasimarTest';
+    await expendLegendaryUse({ monsterName: 'Drac 1', monster: dracolich, actionName: 'Tail Attack (Tail attack)', campaignName: 'test-campaign', deps });
+    cs.activeCreatureName = 'HexWarlock';
+    await expendLegendaryUse({ monsterName: 'Drac 1', monster: dracolich, actionName: 'Tail Attack (Tail attack)', campaignName: 'test-campaign', deps });
+    cs.activeCreatureName = 'FeyRanger';
+    const refused = await expendLegendaryUse({ monsterName: 'Drac 1', monster: dracolich, actionName: 'Tail Attack (Tail attack)', campaignName: 'test-campaign', deps });
+    expect(refused).toMatchObject({ spent: false, reason: 'exhausted' });
+    expect(refused.popupHtml).toContain('no legendary uses left');
+    const refusal = logs.find(e => e.automationType === 'legendary_use_refused');
+    expect(refusal.description).toMatch(/refused \(exhausted\) — zero spend, no roll/);
+  });
+});

@@ -819,7 +819,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dracolich makes a tail attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0052-tail-attack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0053",
