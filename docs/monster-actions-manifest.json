@@ -309,7 +309,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +9, reach 15 ft. Hit: 12 (2d6 + 5) Bludgeoning damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from one of four tentacles.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0018-tentacle.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0019",

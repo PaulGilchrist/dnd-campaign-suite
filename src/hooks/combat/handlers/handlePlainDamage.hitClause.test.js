@@ -94,6 +94,7 @@ import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import { registerTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
+import monsters from '../../../../public/data/monsters.json';
 
 const TENTACLE_LASH_ACTION = {
     name: 'Tentacle Lash',
@@ -319,5 +320,70 @@ describe('MA-0016 Aberrant Spirit (Slaad) Claw no_healing producer', () => {
         expect(setRuntimeValue).not.toHaveBeenCalledWith(
             'FeyRanger', 'activeConditions', expect.anything(), 'test-campaign'
         );
+    });
+});
+
+const ABOLETTE = monsters.find(m => m.index === 'aboleth');
+const ABOLETH_TENTACLE_ACTION = ABOLETTE.actions.find(a => a.name === 'Tentacle');
+
+describe('MA-0018 Aboleth Tentacle grapple-on-hit clause', () => {
+    const deps = {
+        characterName: 'Aboleth 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Aboleth 1', computedStats: { armorClass: 13 } },
+            { name: 'AberrantSorcerer', computedStats: { armorClass: 9 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 16, newHp: 25, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'AberrantSorcerer', type: 'player', size: 'Medium', ac: 9, currentHp: 41, maxHp: 41 }],
+        });
+    });
+
+    it('authors hit_conditions:["grappled"] + escape_dc:14 on the Tentacle row', () => {
+        expect(ABOLETH_TENTACLE_ACTION.attack_bonus).toBe(9);
+        expect(ABOLETH_TENTACLE_ACTION.damage_dice_primary).toBe('2d6 + 5');
+        expect(ABOLETH_TENTACLE_ACTION.hit_conditions).toEqual(['grappled']);
+        expect(ABOLETH_TENTACLE_ACTION.escape_dc).toBe(14);
+    });
+
+    it('builds a grappled-only clause with escape DC 14', () => {
+        expect(buildHitConditionClause(ABOLETH_TENTACLE_ACTION)).toEqual({
+            conditions: ['grappled'],
+            escapeDc: 14,
+            attackName: 'Tentacle',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + escape-meta + condition log on a resolved Tentacle hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Tentacle', formula: '2d6 + 5', total: 16, rolls: [5, 6], modifier: 5, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Bludgeoning',
+            attackerName: 'Aboleth 1',
+            hitClause: buildHitConditionClause(ABOLETH_TENTACLE_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({ grappled: { dc: 14, ability: 'str' } });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'AberrantSorcerer',
+            condition: 'Grappled',
+            reason: 'Tentacle (escape DC 14)',
+        }));
     });
 });
