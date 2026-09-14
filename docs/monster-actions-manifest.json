@@ -1045,7 +1045,7 @@
       "damageTypePrimary": "Fire",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 18, each creature in a 60-foot-long, 5-foot-wide Line. Failure: 45 (10d8) Fire damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0067-fire-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0068",
