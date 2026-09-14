@@ -1552,7 +1552,16 @@
         },
         "duration": "blinded 1 minute (repeat save ends early; advisory)"
       },
-      "Lightning arcs, forming a 5-foot-wide line between two of the lair's solid surfaces that the dragon can see. They must be within 120 feet of the dragon and 120 feet of each other. Each creature in that line must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) lightning damage."
+      {
+        "name": "Lightning Arcs",
+        "description": "Lightning arcs, forming a 5-foot-wide line between two of the lair's solid surfaces that the dragon can see. They must be within 120 feet of the dragon and 120 feet of each other. Each creature in that line must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) lightning damage.",
+        "save_dc": 15,
+        "save_type": "Dexterity",
+        "damage_dice_primary": "3d6",
+        "damage_type_primary": "Lightning",
+        "dc_success": "half",
+        "save_effect": "Failure: 10 (3d6) Lightning damage. Success: Half damage."
+      }
     ],
     "environments": [
       "coastal"

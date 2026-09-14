@@ -362,3 +362,61 @@ describe('MA-0063 adult-blue-dragon sand cloud data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(cloud, null, ['blinded']);
   });
 });
+
+// MA-0064: Adult Blue Dragon lair_actions[2] "Lightning arcs" was a plain
+// string (inert — no name, no affordance, zero handlers, zero log). Now a
+// structured save row mirroring MA-0062 Falling Ceiling (same card) and
+// MA-0042 Insect Cloud: DC 15 Dexterity, 3d6 Lightning half-on-success.
+describe('MA-0064 adult-blue-dragon lightning arcs data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-blue-dragon');
+  const arcs = dragon.lair_actions[2];
+
+  it('row is now a structured clickable SAVE row named Lightning Arcs', () => {
+    expect(typeof arcs).toBe('object');
+    expect(arcs.name).toBe('Lightning Arcs');
+    expect(isLairRowClickable(arcs)).toBe(true);
+    expect(lairRowAffordance(arcs)).toBe('save');
+  });
+
+  it('authored save/damage fields: DC 15 Dexterity, 3d6 Lightning, half on success', () => {
+    expect(arcs.save_dc).toBe(15);
+    expect(arcs.save_type).toBe('Dexterity');
+    expect(arcs.damage_dice_primary).toBe('3d6');
+    expect(arcs.damage_type_primary).toBe('Lightning');
+    expect(arcs.dc_success).toBe('half');
+    expect(arcs.save_effect).toBe('Failure: 10 (3d6) Lightning damage. Success: Half damage.');
+  });
+
+  it('description keeps the canonical mechanics verbatim (line, 120-ft endpoints, DC 15 DEX)', () => {
+    expect(arcs.description).toMatch(/5-foot-wide line/i);
+    expect(arcs.description).toMatch(/within 120 feet of the dragon and 120 feet of each other/i);
+    expect(arcs.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(arcs.description).toMatch(/10 \(3d6\) lightning damage/i);
+  });
+
+  it('damageless save_effect extracts NO conditions (pure damage row)', () => {
+    expect(extractConditionsFromSaveEffect(arcs.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with the 3d6 formula', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: arcs,
+      monsterName: 'Adult Blue Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '3d6',
+      saveConditions: [],
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(arcs, '3d6', []);
+  });
+
+  it('siblings untouched: Falling Ceiling and Sand Cloud keep their authored rows', () => {
+    expect(dragon.lair_actions[0].name).toBe('Falling Ceiling');
+    expect(dragon.lair_actions[1].name).toBe('Sand Cloud');
+  });
+});

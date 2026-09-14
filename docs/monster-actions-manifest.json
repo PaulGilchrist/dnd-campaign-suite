@@ -997,7 +997,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Lightning arcs, forming a 5-foot-wide line between two of the lair's solid surfaces that the dragon can see. They must be within 120 feet of the dragon and 120 feet of each other. Each creature in that line must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) lightning damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0064-lair-lightning-line.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0065",

@@ -44,8 +44,14 @@ function breathAoeShape(action, spellInfo) {
   const description = String(action.description || '');
   const shape = /\bcone\b/i.test(description) ? 'Cone' : (/\bline\b/i.test(description) ? 'Line' : null);
   if (!shape) return null;
-  const m = description.match(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/i);
-  const feet = m ? Number(m[1]) : (shape === 'Cone' ? 30 : 60);
+  const tokens = [...description.matchAll(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/gi)].map(t => Number(t[1]));
+  // MA-0064: a lair line leads with its WIDTH ("5-foot-wide line … within
+  // 120 feet") — coverage extends to the greatest authored distance, so the
+  // gate takes the largest token. Verified breath lines state length first
+  // (first === max), keeping every existing row byte-identical.
+  const feet = shape === 'Line'
+    ? (tokens.length ? Math.max(...tokens) : 60)
+    : (tokens[0] ?? 30);
   return { shape, feet, rangeGateFt: feet };
 }
 
