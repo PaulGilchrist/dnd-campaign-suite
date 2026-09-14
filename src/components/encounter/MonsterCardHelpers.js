@@ -60,6 +60,19 @@ export function parseSpeedHalfClause(saveEffect) {
   return /speed is halved/i.test(saveEffect) ? { effect: 'speed_half' } : null;
 }
 
+// MA-0093: authored failed-save subtract-die debuff clause (Adult Copper
+// Dragon Giggling Magic — "the target rolls 1d6 whenever it makes an
+// ability check or attack roll and subtracts the number rolled"). Maps the
+// clause to the registered giggling_magic_debuff te; the parsed die rides
+// the te as subtractDie and drives the generalized roll-time consumer
+// (computeSubtractDiePenalty). Arms the te producer in saveProcessing on a
+// failed save (MA-0073 parse shape).
+export function parseSubtractDieClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/rolls\s+(\d+d\d+)\b[^.]*subtract(?:s)?\s+the number rolled/i);
+  return m ? { effect: 'giggling_magic_debuff', die: m[1].toLowerCase(), displayLabel: 'Giggling Magic' } : null;
+}
+
 // MA-0079: authored failed-save push clause (Adult Bronze Dragon Repulsion
 // Breath — "pushed up to 60 feet straight away from the dragon"). Not a
 // condition, so extractConditionsFromSaveEffect can never see it; this clause

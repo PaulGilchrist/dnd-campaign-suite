@@ -322,6 +322,13 @@ async function applyAuthoredClauseGrants({ context, saveSuccess, campaignName, a
     if (saveSuccess === false && context?.speedHalf) {
         await grantSpeedHalf({ context, campaignName, attackerName, applyTarget });
     }
+    // MA-0093: Giggling Magic — "the target rolls 1d6 whenever it makes an
+    // ability check or attack roll and subtracts the number rolled" until the
+    // end of its next turn. te producer mirror of the MA-0073 shape; the
+    // subtractDie value rides the te to the generalized roll-time consumer.
+    if (saveSuccess === false && context?.subtractDebuff) {
+        await grantSubtractDieDebuff({ context, campaignName, attackerName, applyTarget });
+    }
 }
 
 async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
@@ -428,6 +435,39 @@ async function grantSpeedHalf({ context, campaignName, attackerName, applyTarget
         description: `${applyTarget} failed ${attackerName}'s ${actionName} save — Speed halved until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:speed-half-granted]', e); });
+}
+
+// MA-0093: failed-save subtract-die debuff grant (Giggling Magic). Writes
+// the registry te (giggling_magic_debuff) on the target sourced from the
+// attacker with subtractDie: '1d6', duration until_end_of_next_turn
+// (rounds:2 clock, MA-0073 shape), and logs the named clause. Consumers:
+// computeSubtractDiePenalty (attack/check rolls), ConditionEffectBadges.
+async function grantSubtractDieDebuff({ context, campaignName, attackerName, applyTarget }) {
+    const debuff = context.subtractDebuff;
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, debuff.effect, attackerName, {
+        duration: 'until_end_of_next_turn',
+        subtractDie: debuff.die,
+        displayLabel: debuff.displayLabel || 'Giggling Magic',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: debuff.effect, source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, debuff.effect);
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: `${debuff.effect}_granted`,
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — rolls ${debuff.die} and subtracts it from ability checks and attack rolls until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:subtract-die-debuff-granted]', e); });
 }
 
 // MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.

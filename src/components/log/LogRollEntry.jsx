@@ -185,6 +185,9 @@ function RollModifierBadges({ entry }) {
       {entry.baneRoll != null && (
         <span className="log-bane-penalty"> -1d4 [Bane]: -{entry.baneRoll}</span>
       )}
+      {entry.subtractDieRoll != null && (
+        <span className="log-bane-penalty"> -{entry.subtractDie || '1d6'} [{entry.subtractDieDisplayLabel || 'Subtract Rider'}]: -{entry.subtractDieRoll}</span>
+      )}
       {entry.blessRoll != null && (
         <span className="log-bless-bonus"> +1d4 [Bless]: +{entry.blessRoll}</span>
       )}

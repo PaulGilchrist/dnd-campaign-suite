@@ -2045,13 +2045,13 @@
       },
       {
         "name": "Giggling Magic",
-        "description": "Charisma Saving Throw: DC 17, one creature the dragon can see within 90 feet. <strong>Failure:</strong> 24 (7d6) Psychic damage; no effect on a successful save. Until the end of its next turn, the target rolls 1d6 whenever it makes an ability check or attack roll and subtracts the number rolled from the <strong>D20 Test</strong> (subtract-1d6 rider advisory — no te consumer; GM-enforced). The dragon can't take this action again until the start of its next turn.",
+        "description": "Charisma Saving Throw: DC 17, one creature the dragon can see within 90 feet. <strong>Failure:</strong> 24 (7d6) Psychic damage; no effect on a successful save. Until the end of its next turn, the target rolls 1d6 whenever it makes an ability check or attack roll and subtracts the number rolled from the <strong>D20 Test</strong> (giggling_magic_debuff te, subtract-die rider enforced at roll time on attack rolls and ability checks). The dragon can't take this action again until the start of its next turn.",
         "save_dc": 17,
         "save_type": "Charisma",
         "dc_success": "none",
         "damage_dice_primary": "7d6",
         "damage_type_primary": "Psychic",
-        "save_effect": "24 (7d6) Psychic damage. Until the end of its next turn, the target rolls 1d6 whenever it makes an ability check or attack roll and subtracts the number rolled from the D20 Test (advisory — GM-enforced)"
+        "save_effect": "24 (7d6) Psychic damage. Until the end of its next turn, the target rolls 1d6 whenever it makes an ability check or attack roll and subtracts the number rolled from the D20 Test (giggling_magic_debuff te until the end of the target's next turn)"
       },
       {
         "name": "Mind Jolt",

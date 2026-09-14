@@ -1441,7 +1441,7 @@
       "damageDicePrimary": "7d6",
       "damageTypePrimary": "Psychic",
       "description": "Charisma Saving Throw: DC 17, one creature the dragon can see within 90 feet. Failure: 24 (7d6) Psychic damage. Until the end of its next turn, the target rolls 1d6 whenever it makes an ability check or attack roll and subtracts the number rolled from the D20 Test. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0093-giggling-magic.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0094",

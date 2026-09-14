@@ -292,6 +292,11 @@ const BADGE_SPECS = [
         guard: ctx => ctx.effects.banePenalty,
         build: buildBaneBadge,
     },
+    // MA-0093: Giggling Magic failed-save subtract-1d6 debuff te badge.
+    {
+        find: ctx => findDirect(ctx, 'giggling_magic_debuff'),
+        build: ctx => ({ label: ctx.te?.displayLabel || 'Giggling Magic', cls: 'effect-debuff', icon: 'fa-face-laugh-squint', removable: true, removeAction: 'target_effect', effectType: 'giggling_magic_debuff', tooltip: `Rolls ${ctx.te?.subtractDie || '1d6'} and subtracts it from ability checks and attack rolls (from ${ctx.te?.source || 'unknown'}, until the end of the next turn)` }),
+    },
     {
         find: ctx => findDirect(ctx, 'ray_of_enfeeble_debuff'),
         guard: ctx => ctx.effects.rayOfEnfeebleDamageReduction,

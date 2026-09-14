@@ -241,6 +241,20 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { dc: 15, displayLabel: 'Bane' },
   },
   {
+    // MA-0093: Adult Copper Dragon Giggling Magic failed-save clause — the
+    // creature rolls 1d6 and subtracts the result from ability checks and
+    // attack rolls until the end of its next turn. subtractDie drives the
+    // generalized roll-time consumer (computeSubtractDiePenalty).
+    effect: 'giggling_magic_debuff',
+    label: 'Giggling Magic (-1d6)',
+    description: 'The creature rolls 1d6 and subtracts the number rolled from ability checks and attack rolls until the end of its next turn (Giggling Magic).',
+    icon: 'fa-face-laugh-squint',
+    cls: 'effect-disadvantage',
+    group: 'Saves & Checks',
+    fields: ['source', 'displayLabel'],
+    defaults: { displayLabel: 'Giggling Magic' },
+  },
+  {
     effect: 'hex_ability_check_disadvantage',
     label: 'Check Disadv',
     description: 'Disadvantage on ability checks of the chosen ability.',
