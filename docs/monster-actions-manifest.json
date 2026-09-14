@@ -1300,7 +1300,7 @@
         "deafened"
       ],
       "description": "Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 10 (3d6) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0084-thunderclap.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0085",

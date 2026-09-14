@@ -153,7 +153,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet });
+    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, conditionDurationNote: ctx.conditionDurationNote });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -363,7 +363,15 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
 // lair_sand_cloud te mirrors the zone with dc for future consumers. NPC
 // turn-end auto-repeat and the 1-minute expiry stay GM-enforced (no NPC
 // turn-end zone-save consumer — advisory in the log).
-function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType, targetName, casterName, actionName, campaignName, pushFeet }) {
+// MA-0084: an authored duration clause (Thunderclap "until the end of its
+// next turn") replaces the MA-0063 1-minute repeat-save copy when present —
+// byte-identical for the sand-cloud rows that have no until-clause.
+function failConditionDurationText(conditionDurationNote) {
+    return conditionDurationNote
+        || '1 minute; repeats the save at the end of each of its turns (success ends it on itself). NPC turn-end auto-repeat and 1-minute expiry GM-enforced.';
+}
+
+function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType, targetName, casterName, actionName, campaignName, pushFeet, conditionDurationNote }) {
     if (saveSuccess === true) return;
     if (!saveConditions || saveConditions.length === 0) return;
     const ability = String(saveType || '').toLowerCase().slice(0, 3) || 'con';
@@ -390,6 +398,10 @@ function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType
     if (pushFeet != null) {
         registerTargetEffect(campaignName, targetName, 'push', casterName, { duration: 'instant', value: pushFeet, actionName });
     }
+    // MA-0084: an authored duration clause (Thunderclap "until the end of its
+    // next turn") replaces the MA-0063 1-minute repeat-save copy when present —
+    // byte-identical for the sand-cloud rows that have no until-clause.
+    const durationText = failConditionDurationText(conditionDurationNote);
     addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
@@ -397,7 +409,7 @@ function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType
         condition: conditionNames.join(', '),
         sourceName: casterName,
         sourceAbility: actionName,
-        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — ${conditionNames.join(', ')} 1 minute; repeats the save at the end of each of its turns (success ends it on itself). NPC turn-end auto-repeat and 1-minute expiry GM-enforced.${pushNote}`,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — ${conditionNames.join(', ')} ${durationText}${pushNote}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save-fail condition:', e); });
 }
@@ -450,12 +462,12 @@ function applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetN
 
 // Failed-save dispatch: MA-0068 staged sleep rows route through the SP-107
 // staging seams; everything else keeps the MA-0063 one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet }) {
+function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, conditionDurationNote }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
     }
-    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet });
+    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
 }
 
 // Result-row copy: damage rows keep the byte-identical damage line; damageless
@@ -508,7 +520,12 @@ function stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten) {
     };
 }
 
-function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging }) {
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, dcSuccess }) {
+    // MA-0084: dc_success 'none' rows (Thunderclap) never print the
+    // half-on-success sentence — byte-identical copy for every other row.
+    const successSentence = dcSuccess === 'none'
+        ? 'On a successful save, target takes no damage.'
+        : 'On a successful save, target takes half damage.';
     if (!zoneOnly) {
         const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
         if (sleepStaging) return stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten);
@@ -525,7 +542,7 @@ function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, da
         return {
             icon: 'fa-bomb',
             description: head,
-            note: `On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+            note: `On a failed save, target takes ${damage} ${damageType} damage. ${successSentence}${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
         };
     }
     return {
@@ -565,9 +582,11 @@ function ZoneArmedNote({ zoneOnly, zoneTe, selected }) {
 }
 
 // Damageless rows (MA-0068/MA-0090) never print the half-damage line.
-function DamageNote({ damage, damageType }) {
+// MA-0084: dc_success 'none' rows state "no damage" on a successful save.
+function DamageNote({ damage, damageType, dcSuccess }) {
     if (!damage) return null;
-    return <p className="sp-note">On a failed save, target takes {damage} {damageType} damage. On a successful save, target takes half damage.</p>;
+    const successText = dcSuccess === 'none' ? 'no damage' : 'half damage';
+    return <p className="sp-note">On a failed save, target takes {damage} {damageType} damage. On a successful save, target takes {successText}.</p>;
 }
 
 function SaveAttackAoeModal({
@@ -618,6 +637,11 @@ function SaveAttackAoeModal({
     // push te as an instant marker (CLA-384 pull-marker shape; token movement
     // GM-enforced, §7 no position consumer). Feet parsed from save_effect.
     pushFeet,
+    // MA-0084 optional authored condition duration (byte-inert undefined
+    // default): Adult Bronze Dragon Thunderclap — "until the end of its next
+    // turn" replaces the MA-0063 1-minute repeat-save log copy when authored
+    // (extractConditionDurationNote shape).
+    conditionDurationNote,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -679,7 +703,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, conditionDurationNote };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -710,7 +734,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, conditionDurationNote]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -838,7 +862,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet });
+        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, conditionDurationNote });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -867,7 +891,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, conditionDurationNote]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -959,7 +983,7 @@ function SaveAttackAoeModal({
             return (
                 <>
                     <p>Select creatures in the area of effect. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}).</p>
-                    <DamageNote damage={damage} damageType={damageType} />
+                    <DamageNote damage={damage} damageType={damageType} dcSuccess={dcSuccess} />
                     {metamagicHeighten && <p className="sp-note">Heightened Spell: select one target for disadvantage on its first save.</p>}
                     <p className="sp-note">Targets selected: {ctx.selected.size}/{ctx.eligibleTargets.length}</p>
                     {metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget, isCarefulAlly: ctx.isCarefulAlly, heightenTarget: ctx.heightenTarget, setHeightenTarget: ctx.setHeightenTarget, metamagicHeighten: metamagicHeighten })}
@@ -1068,7 +1092,7 @@ function SaveAttackAoeModal({
         );
     }
 
-    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging });
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, dcSuccess });
 
     return (
         <CreatureSelectionModal

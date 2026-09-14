@@ -32,6 +32,17 @@ import './MonsterCardModal.css';
 // single-target block save. Coverage feet parsed from the row text
 // ("30-foot Cone" / "60-foot-long, 5-foot-wide Line"); gridless coverage
 // stays advisory via isWithinRange lenient mode (§7).
+// MA-0084: coverage feet for an authored point-centered sphere/radius save
+// row (Adult Bronze Dragon Thunderclap "20-foot-radius Sphere … within 90
+// feet") — parsed from the RADIUS token ("20-foot-radius" / "10-ft-radius"),
+// never the point-placement text (90 ft). Cylinder rows (radius + height
+// clause) stay untouched (null).
+function sphereRadiusFeet(description) {
+  if (/\bcylinder\b/i.test(description)) return null;
+  const m = description.match(/(\d+(?:\.\d+)?)\s*[- ]?(?:foot|feet|ft\.?)?[- ]?radius\b/i);
+  return m ? Number(m[1]) : null;
+}
+
 function breathAoeShape(action, spellInfo) {
   if (spellInfo) return null;
   if (!action || action.save_dc == null) return null;
@@ -43,6 +54,15 @@ function breathAoeShape(action, spellInfo) {
   }
   const description = String(action.description || '');
   const shape = /\bcone\b/i.test(description) ? 'Cone' : (/\bline\b/i.test(description) ? 'Line' : null);
+  // MA-0084: a sphere/radius save row is an area too — route it through the
+  // same area picker as the MA-0031 cones / MA-0042 zones. The GM positions
+  // the center, so the attacker-origin gate does NOT apply (zone shape).
+  if (shape === null) {
+    const radiusFt = sphereRadiusFeet(description);
+    if (radiusFt != null) {
+      return { shape: 'Radius', feet: radiusFt, rangeGateFt: null };
+    }
+  }
   if (!shape) return null;
   const tokens = [...description.matchAll(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/gi)].map(t => Number(t[1]));
   // MA-0064: a lair line leads with its WIDTH ("5-foot-wide line … within
@@ -167,7 +187,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -1346,6 +1366,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           saveConditions={conePicker.saveConditions}
           sleepStaging={conePicker.sleepStaging}
           pushFeet={conePicker.pushFeet}
+          conditionDurationNote={conePicker.conditionDurationNote}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}
         />
