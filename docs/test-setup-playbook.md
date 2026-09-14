@@ -402,3 +402,8 @@ Dead-by-design (accepted models, do not chase): feats with `automation:null` ben
 
 ## MA-0070 recipe (2026-09-14, fixed): legendary uses counter is DATA-gated (reusable)
 - Engine `monsterLegendaryUses.js` + `turnStartEffects.js` regain seam is LIVE; counter `(N left)` renders only when `legendary_actions[0]` header dict authors `uses:N`. Data-only fix pattern: header `uses:3` + attack rows `attack_bonus`/`spell_attack_bonus`+dice, move-then-attack legs `delegates_to:"<attack name>"`, no-damage saves `dc_success:"none"`. Refusals: `legendary_use_refused (turn)` turn-latch, exhausted popup at 0; regain log at turn-start. Advisory residuals (no consumers): "(N in Lair)" lair-variant, speed-halved clauses, movement distance, multi-ray.
+
+## MA-0073 recipe (2026-09-14, fixed): speed_half te producer + monster legendary per-action cooldown (reusable)
+- Save-fail speed clause lands: `parseSpeedHalfClause` (MonsterCardHelpers, MA-0038 parse pattern) → armed `speedHalf` in save context → `grantSpeedHalf` in saveProcessing `applyAuthoredClauseGrants` grants te `speed_half` (Movement group) + `addExpiration rounds:2` + `speed_half_granted` log; consumers conditionEffects→`speedHalved`→CharSummary halved Speed display + ConditionEffectBadges badge.
+- Per-action re-use gate: `monsterLegendaryActionCooldowns` keyed monster+action slug in monsterLegendaryUses.js — refusal runs AFTER the MA-0021 economy gates (else FP same-turn refusal vocabulary gets hijacked — caught by failing FP test); `<action>_refused (once per turn)` popup+log zero-spend; cleared in `regainLegendaryUses` at monster turn-start.
+- PITFALL: cs `activeCreatureName` mirror lag can latch boundary refuse before the cooldown leg runs — stamp cs to isolate per-action proof.

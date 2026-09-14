@@ -176,6 +176,11 @@ const BADGE_SPECS = [
         guard: ctx => ctx.effects.speedReduction,
         build: ctx => ({ label: ctx.effects.speedReduction >= 1000 ? 'Speed 0' : `Speed -${ctx.effects.speedReduction}`, cls: 'effect-debuff', icon: 'fa-minus', removable: true, removeAction: 'target_effect', effectType: 'speed_reduction' }),
     },
+    // MA-0073: Scorching Sands failed-save speed_half te badge.
+    {
+        find: ctx => findDirect(ctx, 'speed_half'),
+        build: ctx => ({ label: 'Speed Halved', cls: 'effect-debuff', icon: 'fa-gauge-high', removable: true, removeAction: 'target_effect', effectType: 'speed_half', tooltip: `Speed halved by ${ctx.te.source || 'unknown'} until the end of the next turn` }),
+    },
     {
         guard: ctx => ctx.effects.noAdvantageAgainst,
         build: () => ({ label: 'No Adv vs', cls: 'effect-buff', icon: 'fa-arrow-down', removable: true, removeAction: 'remove_derived', effectTypes: ['blur', 'foresight', 'escape_the_horde', 'protection', 'multiattack_defense'] }),

@@ -616,3 +616,92 @@ describe('MA-0058 Adult Blue Dragon legendary header + row classification', () =
     expect(e.description).toMatch(/casts invisibility on itself.*GM-enforced/s);
   });
 });
+
+// MA-0073: per-action once-per-turn cooldown (Scorching Sands "can't take
+// this action again until the start of its next turn"). The MA-0070 latch
+// is one-expend-per-boundary; the action-keyed map keeps the SAME row
+// unusable across every later boundary until the monster's own turn-start
+// regain clears it.
+import {
+  hasLegendaryCooldownClause,
+  legendaryActionSlug,
+  MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY,
+  buildLegendaryCooldownRefusalLog,
+  buildLegendaryCooldownRefusalPopup,
+} from './monsterLegendaryUses.js';
+
+const BRASS = monstersData.find(m => m.name === 'Adult Brass Dragon');
+const SANDS = BRASS.legendary_actions.find(a => a.name === 'Scorching Sands');
+
+describe('MA-0073 per-action cooldown clause parse', () => {
+  it('matches the Scorching Sands row text, not rows without the clause', () => {
+    expect(hasLegendaryCooldownClause(SANDS)).toBe(true);
+    expect(hasLegendaryCooldownClause(BRASS.legendary_actions.find(a => a.name === 'Pounce'))).toBe(false);
+    expect(hasLegendaryCooldownClause(null)).toBe(false);
+    expect(legendaryActionSlug('Scorching Sands')).toBe('scorching_sands');
+  });
+
+  it('refusal log is <action>_refused (once per turn); popup names the gate', () => {
+    const e = buildLegendaryCooldownRefusalLog({ monsterName: 'Adult Brass Dragon 1', actionName: 'Scorching Sands' });
+    expect(e.automationType).toBe('scorching_sands_refused (once per turn)');
+    expect(e.description).toMatch(/can't take this action again until the start of its next turn/);
+    expect(buildLegendaryCooldownRefusalPopup({ monsterName: 'Adult Brass Dragon 1', actionName: 'Scorching Sands' })).toMatch(/can't take Scorching Sands again/);
+  });
+});
+
+describe('MA-0073 expendLegendaryUse per-action cooldown gate', () => {
+  function brassMonster() {
+    return { legendary_actions: BRASS.legendary_actions };
+  }
+
+  it('first spend stamps the cooldown; later boundary re-click refused zero-spend; regain re-arms', async () => {
+    cs = { round: 1, activeCreatureName: 'Thug 1' };
+    const monster = brassMonster();
+    const first = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster, actionName: 'Scorching Sands', action: SANDS, campaignName: 'test-campaign', deps });
+    expect(first.spent).toBe(true);
+    expect(store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Adult Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ scorching_sands: { round: 1 } });
+
+    // New boundary, same round — MA-0070 boundary latch would allow, the
+    // row's own gate refuses: zero spend, refused (once per turn) log.
+    cs.activeCreatureName = 'AasimarTest';
+    const second = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster, actionName: 'Scorching Sands', action: SANDS, campaignName: 'test-campaign', deps });
+    expect(second.spent).toBe(false);
+    expect(second.reason).toBe('cooldown');
+    expect(store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'scorching_sands_refused (once per turn)')).toBe(true);
+
+    // Other legendary rows are unaffected by Scorching Sands' cooldown.
+    cs.activeCreatureName = 'HexWarlock';
+    const other = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster, actionName: 'Blazing Light', action: BRASS.legendary_actions.find(a => a.name === 'Blazing Light'), campaignName: 'test-campaign', deps });
+    expect(other.spent).toBe(true);
+    expect(store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 });
+
+    // Monster's own turn-start regain clears the cooldown — row re-fires.
+    cs.activeCreatureName = 'Adult Brass Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Adult Brass Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain.regained).toBe(true);
+    expect(store['Adult Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    cs.activeCreatureName = 'AberrantSorcerer';
+    const third = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster, actionName: 'Scorching Sands', action: SANDS, campaignName: 'test-campaign', deps });
+    expect(third.spent).toBe(true);
+  });
+
+  it('rows without the clause stamp no cooldown (byte-inert legacy semantics)', async () => {
+    cs = { round: 1, activeCreatureName: 'Thug 1' };
+    const pounce = BRASS.legendary_actions.find(a => a.name === 'Pounce');
+    const first = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster: brassMonster(), actionName: 'Pounce', action: pounce, campaignName: 'test-campaign', deps });
+    expect(first.spent).toBe(true);
+    expect(store['Adult Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeUndefined();
+    cs.activeCreatureName = 'AasimarTest';
+    const second = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster: brassMonster(), actionName: 'Pounce', action: pounce, campaignName: 'test-campaign', deps });
+    expect(second.spent).toBe(true);
+  });
+
+  it('cooldown-only clear at turn-start with no uses spent: no spurious writes', async () => {
+    cs = { round: 2, activeCreatureName: 'Adult Brass Dragon 1' };
+    const r = await regainLegendaryUses({ monsterName: 'Nobody Dragon 1', campaignName: 'test-campaign', deps });
+    expect(r).toEqual({ regained: false });
+    expect(deps.setRuntimeValue.mock.calls.some(c => String(c[1]).includes(MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY))).toBe(false);
+  });
+});

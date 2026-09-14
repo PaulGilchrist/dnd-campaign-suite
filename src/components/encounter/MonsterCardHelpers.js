@@ -50,6 +50,16 @@ export function parseConcentrationDisadvantageClause(saveEffect) {
   return re.test(saveEffect) ? { effect: 'concentration_disadvantage' } : null;
 }
 
+// MA-0073: authored failed-save speed-halved clause (Adult/Ancient Brass
+// Dragon Scorching Sands — "the target's Speed is halved until the end of
+// its next turn"). Not a condition, so extractConditionsFromSaveEffect can
+// never see it; this clause parse arms the speed_half te producer in
+// saveProcessing on a failed save (MA-0038 pattern).
+export function parseSpeedHalfClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /speed is halved/i.test(saveEffect) ? { effect: 'speed_half' } : null;
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];

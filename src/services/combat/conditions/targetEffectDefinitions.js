@@ -822,6 +822,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { value: 10 },
   },
   {
+    effect: 'speed_half',
+    label: 'Speed Halved',
+    description: 'The creature\'s Speed is halved until the end of its next turn (MA-0073 Scorching Sands failed-save clause).',
+    icon: 'fa-gauge-high',
+    cls: 'effect-debuff',
+    group: 'Movement',
+    fields: ['source'],
+  },
+  {
     effect: 'speed_reduction',
     label: 'Speed Reduced',
     description: 'The creature\'s Speed is reduced by N feet.',

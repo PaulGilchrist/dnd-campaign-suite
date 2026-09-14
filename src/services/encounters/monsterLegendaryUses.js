@@ -120,6 +120,35 @@ import { applyHealingToTarget } from '../rules/combat/applyHealing.js';
 
 export const MONSTER_LEGENDARY_USES_KEY = 'monsterLegendaryUses';
 export const MONSTER_LEGENDARY_LATCH_KEY = '_legendaryUses_usedRound';
+// MA-0073: per-ACTION cooldown (Scorching Sands "can't take this action
+// again until the start of its next turn"). The MA-0070 turn-latch is
+// one-expend-per-BOUNDARY, not the row's own gate — an action-keyed map
+// on the monster store keeps each named legendary row unusable across
+// every boundary until the monster's own turn-start regain clears it.
+export const MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY = 'monsterLegendaryActionCooldowns';
+
+export function legendaryActionSlug(actionName) {
+  return String(actionName || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+export function hasLegendaryCooldownClause(action) {
+  return /(?:can'?t|cannot) take this action again until the start of its next turn/i.test(action?.description || '');
+}
+
+export function buildLegendaryCooldownRefusalPopup({ monsterName, actionName }) {
+  return `<div class="mc-prerequisite-refusal"><h3>Legendary Action Refused</h3><p>${monsterName} can't take ${actionName} again until the start of its next turn. Nothing spent, no roll.</p></div>`;
+}
+
+export function buildLegendaryCooldownRefusalLog({ monsterName, actionName }) {
+  return {
+    type: 'automation',
+    automationType: `${legendaryActionSlug(actionName)}_refused (once per turn)`,
+    characterName: monsterName,
+    abilityName: actionName,
+    description: `${monsterName} ${actionName} refused (once per turn) — can't take this action again until the start of its next turn. Zero spend, no save rolled.`,
+    timestamp: Date.now(),
+  };
+}
 
 export function legendaryHeaderAction(monster) {
   const rows = monster?.legendary_actions;
@@ -255,7 +284,24 @@ function refuseLegendary({ log, campaignName, monsterName, actionName, reason })
 // Row-click expend: gate → spend 1 (awaited, new-object spread, MA-0005
 // recipe) → round+turn latch → `ability_use` spend log. The caller then
 // resolves the row's own mechanic (numeric chips roll as today, MA-0014).
-export async function expendLegendaryUse({ monsterName, monster, actionName, campaignName, deps = {} }) {
+// MA-0073: per-action cooldown refusal leg (complexity off expendLegendaryUse).
+async function legendaryCooldownRefusal({ action, actionName, monsterName, campaignName, getRV, log }) {
+  if (!action || !hasLegendaryCooldownClause(action)) return null;
+  const slug = legendaryActionSlug(action.name || actionName);
+  const cooldowns = getRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY) || {};
+  if (!cooldowns[slug]) return null;
+  await log(campaignName, buildLegendaryCooldownRefusalLog({ monsterName, actionName: action.name || actionName }));
+  return { spent: false, remaining: null, reason: 'cooldown', popupHtml: buildLegendaryCooldownRefusalPopup({ monsterName, actionName: action.name || actionName }) };
+}
+
+async function stampLegendaryCooldown({ action, actionName, monsterName, campaignName, round, used, getRV, setRV }) {
+  if (!action || !hasLegendaryCooldownClause(action)) return;
+  const slug = legendaryActionSlug(action.name || actionName);
+  const cooldowns = getRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY) || {};
+  await setRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY, { ...cooldowns, [slug]: { round, usedBefore: used - 1 } }, campaignName);
+}
+
+export async function expendLegendaryUse({ monsterName, monster, actionName, campaignName, action = null, deps = {} }) {
   const getRV = deps.getRuntimeValue || getRuntimeValue;
   const setRV = deps.setRuntimeValue || setRuntimeValue;
   const log = deps.addEntry || addEntry;
@@ -273,10 +319,19 @@ export async function expendLegendaryUse({ monsterName, monster, actionName, cam
   });
   if (!gate.allowed) return refuseLegendary({ log, campaignName, monsterName, actionName, reason: gate.reason });
 
+  // MA-0073: per-action once-per-turn gate (after the uses/boundary economy
+  // gates so the MA-0021 refusal vocabulary stays intact) — a row whose own
+  // text says "can't take this action again until the start of its next
+  // turn" refuses on every LATER boundary until the monster's own turn-start
+  // regain clears the cooldown map.
+  const cooldownRefusal = await legendaryCooldownRefusal({ action, actionName, monsterName, campaignName, getRV, log });
+  if (cooldownRefusal) return cooldownRefusal;
+
   const stored = getRV(monsterName, MONSTER_LEGENDARY_USES_KEY) || {};
   const used = (Number(stored.used) || 0) + 1;
   await setRV(monsterName, MONSTER_LEGENDARY_USES_KEY, { max: gate.max, used }, campaignName);
   await setRV(monsterName, MONSTER_LEGENDARY_LATCH_KEY, { round, activeCreature }, campaignName);
+  await stampLegendaryCooldown({ action, actionName, monsterName, campaignName, round, used, getRV, setRV });
   const remaining = Math.max(0, gate.max - used);
   await log(campaignName, buildLegendarySpendLog({ monsterName, actionName, activeCreature, remaining, max: gate.max }));
   return { spent: true, remaining, max: gate.max };
@@ -289,6 +344,14 @@ export async function regainLegendaryUses({ monsterName, campaignName, deps = {}
   const getRV = deps.getRuntimeValue || getRuntimeValue;
   const setRV = deps.setRuntimeValue || setRuntimeValue;
   const log = deps.addEntry || addEntry;
+
+  // MA-0073: the monster's own turn-start clears per-action cooldowns even
+  // when no uses are outstanding (clear only when something is stamped —
+  // no spurious writes).
+  const cooldowns = getRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY, campaignName);
+  if (cooldowns && Object.keys(cooldowns).length > 0) {
+    await setRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY, null, campaignName);
+  }
 
   const storedUses = getRV(monsterName, MONSTER_LEGENDARY_USES_KEY, campaignName);
   const used = Number(storedUses?.used) || 0;

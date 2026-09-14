@@ -317,6 +317,11 @@ async function applyAuthoredClauseGrants({ context, saveSuccess, campaignName, a
     if (saveSuccess === false && context?.concentrationDisadvantage) {
         await grantConcentrationDisadvantage({ context, campaignName, attackerName, applyTarget });
     }
+    // MA-0073: Scorching Sands — "the target's Speed is halved until the
+    // end of its next turn". te producer mirror of the MA-0038 shape.
+    if (saveSuccess === false && context?.speedHalf) {
+        await grantSpeedHalf({ context, campaignName, attackerName, applyTarget });
+    }
 }
 
 async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
@@ -393,6 +398,36 @@ async function grantConcentrationDisadvantage({ context, campaignName, attackerN
         description: `${applyTarget} failed ${attackerName}'s ${actionName} save — Disadvantage on saving throws to maintain Concentration until the end of ${attackerName}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:concentration-disadvantage-granted]', e); });
+}
+
+// MA-0073: failed-save speed-halved grant. Writes the registry te
+// (speed_half) on the target sourced from the attacker, duration
+// until_end_of_next_turn (rounds:2 clock, MA-0038 shape), and logs the
+// named clause. Consumers: ConditionEffectBadges 'Speed Halved' badge,
+// computeConditionEffects → CharSummary halved Speed line (PC sheet).
+async function grantSpeedHalf({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, 'speed_half', attackerName, {
+        duration: 'until_end_of_next_turn',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'speed_half', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'speed_half');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'speed_half_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — Speed halved until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:speed-half-granted]', e); });
 }
 
 // MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.

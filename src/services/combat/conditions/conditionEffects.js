@@ -347,6 +347,13 @@ const EARLY_TARGET_EFFECT_HANDLERS = {
   speed_reduction: (effects, te) => {
     effects.speedReduction = (effects.speedReduction || 0) + (te.value || 10);
   },
+  // MA-0073: Scorching Sands failed-save clause — halved Speed until the
+  // end of the target's next turn. Consumed by charSummaryCalc (halved
+  // numeric Speed) + CharSummary attribution line.
+  speed_half: (effects, te) => {
+    effects.speedHalved = true;
+    if (te.source) effects.speedHalvedSource = te.source;
+  },
   push: (effects, te) => {
     effects.pushEffect = true;
     if (!effects.pushDistance) {

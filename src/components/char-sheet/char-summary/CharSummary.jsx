@@ -138,7 +138,7 @@ function SpeedSummary({ ctx, conditionEffects, exhaustionLevel }) {
     const { auraSpeedBonus, auraSpeedSource, totalSpeedWithBuff } = ctx;
     return (
         <>
-            <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{speedSuffixText(ctx)}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}{conditionEffects?.speedHalved && <span className="stat--penalized" title="Slow spell penalty"> (Speed halved from Slow)</span>}<br />
+            <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{speedSuffixText(ctx)}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}{conditionEffects?.speedHalved && <span className="stat--penalized" title={conditionEffects.speedHalvedSource ? `Speed halved by ${conditionEffects.speedHalvedSource}` : 'Slow spell penalty'}>{conditionEffects.speedHalvedSource ? ` (Speed halved by ${conditionEffects.speedHalvedSource})` : ' (Speed halved from Slow)'}</span>}<br />
         </>
     );
 }

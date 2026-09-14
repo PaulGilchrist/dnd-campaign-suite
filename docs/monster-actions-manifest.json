@@ -1131,7 +1131,7 @@
       "damageDicePrimary": "6d8",
       "damageTypePrimary": "Fire",
       "description": "Dexterity Saving Throw: DC 16, one creature the dragon can see within 120 feet. Failure: 27 (6d8) Fire damage, and the target's Speed is halved until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0073-scorching-sands.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0074",

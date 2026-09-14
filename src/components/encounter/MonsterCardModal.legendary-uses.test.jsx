@@ -283,3 +283,43 @@ describe('MA-0021 MonsterCardModal legendary economy', () => {
     expect(runtime.store['Aboleth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
   });
 });
+
+// MA-0073: Scorching Sands per-action cooldown on the live card. First
+// gated click spends 1 + stamps the action-keyed cooldown; a later boundary
+// in the same round refuses with popup + scorching_sands_refused (once per
+// turn) log, zero spend, zero second save prompt.
+describe('MA-0073 MonsterCardModal Scorching Sands once-per-turn gate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderBrass(uses) {
+    if (uses !== undefined) runtime.store['Adult Brass Dragon 1.monsterLegendaryUses'] = uses;
+    const m = makeMonster({
+      name: 'Adult Brass Dragon',
+      actions: brassActions(),
+      legendary_actions: brass().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Brass Dragon 1', creatures: CREATURES })} />);
+  }
+  function sandsRow() {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Scorching Sands'));
+  }
+
+  it('first click spends + stamps cooldown; next-boundary re-click refuses zero-spend with (once per turn) log', async () => {
+    renderBrass({ max: 3, used: 0 });
+    fireEvent.click(sandsRow().querySelector('.mc-dice-link'));
+    await waitFor(() => expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ scorching_sands: { round: 1 } });
+
+    // Later boundary, same round — row's own gate refuses even though the
+    // boundary latch would allow and 2 uses remain.
+    ctx.value = { round: 1, activeCreatureName: 'AasimarTest', creatures: CREATURES };
+    fireEvent.click(sandsRow().querySelector('.mc-dice-link'));
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'scorching_sands_refused (once per turn)')).toBe(true));
+    expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(String(setPopupHtml.mock.calls.map(c => c[0]).join('|'))).toMatch(/can't take Scorching Sands again/);
+  });
+});
