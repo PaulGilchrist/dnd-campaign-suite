@@ -9,6 +9,7 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { registerTargetEffect } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
+import { addExpiration } from '../../../../services/rules/effects/expirationQueue.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
@@ -82,7 +83,7 @@ function npcSaveBonus(target, saveType) {
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
-    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet } = ctx;
+    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -153,7 +154,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, conditionDurationNote: ctx.conditionDurationNote });
+    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, conditionDurationNote: ctx.conditionDurationNote });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -462,12 +463,50 @@ function applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetN
 
 // Failed-save dispatch: MA-0068 staged sleep rows route through the SP-107
 // staging seams; everything else keeps the MA-0063 one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, conditionDurationNote }) {
+function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, conditionDurationNote }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
     }
+    // MA-0087: "slowed" rider clauses grant te for each authored clause on a
+    // failed save ('slowed' is not a registered condition, so each clause maps
+    // to a registered te with a live consumer). Byte-inert when null.
+    if (!success && slowedClauses?.effects?.length) {
+        grantSlowedClauses({ effects: slowedClauses.effects, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
+    }
     applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
+}
+
+// MA-0087: Slowing Breath failed-save rider te grants (Adult Copper Dragon).
+// speed_half (MA-0073 consumer), no_reactions (CharReactions), and
+// no_action_and_bonus_action (Stinking Cloud / slow2024 consumer) — each is an
+// existing registered te; no new consumers. Duration until the end of the
+// target's next turn, drained by a rounds:2 clock (MA-0073 recipe).
+function grantSlowedClauses({ effects, campaignName, targetName, casterName, actionName, saveType, saveDc }) {
+    for (const effectKey of effects) {
+        registerTargetEffect(campaignName, targetName, effectKey, casterName, {
+            duration: 'until_end_of_next_turn',
+            actionName,
+        });
+        addExpiration({
+            attackerName: casterName,
+            targetName,
+            campaignName,
+            rounds: 2,
+            effects: [{ type: 'remove_target_effect', effectKey, source: casterName, target: targetName }],
+        });
+    }
+    const clauseText = 'can\'t take Reactions, Speed halved, and one action or Bonus Action (not both)';
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Slowed',
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — Slowed: ${clauseText} until the end of ${targetName}'s next turn.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging slowed clauses:', e); });
 }
 
 // Result-row copy: damage rows keep the byte-identical damage line; damageless
@@ -520,7 +559,7 @@ function stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten) {
     };
 }
 
-function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, dcSuccess }) {
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, slowedClauses, dcSuccess }) {
     // MA-0084: dc_success 'none' rows (Thunderclap) never print the
     // half-on-success sentence — byte-identical copy for every other row.
     const successSentence = dcSuccess === 'none'
@@ -529,6 +568,16 @@ function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, da
     if (!zoneOnly) {
         const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
         if (sleepStaging) return stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten);
+        // MA-0087: damageless "slowed" cone (Adult Copper Slowing Breath) —
+        // failed saves impose Reactions/Speed/action riders, never a damage
+        // line. Byte-inert unless the clause authored.
+        if (!damage && slowedClauses?.effects?.length) {
+            return {
+                icon: 'fa-hourglass-half',
+                description: head,
+                note: `On a failed save, target is Slowed: can't take Reactions, Speed halved, and one action or Bonus Action (not both) until the end of its next turn.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+            };
+        }
         // MA-0063: damageless condition row (e.g. Adult Blue Dragon Sand Cloud) —
         // no damage formula, failed saves grant conditions. Byte-inert when empty.
         if (!damage && saveConditions && saveConditions.length > 0) {
@@ -649,6 +698,10 @@ function SaveAttackAoeModal({
     // turn" replaces the MA-0063 1-minute repeat-save log copy when authored
     // (extractConditionDurationNote shape).
     conditionDurationNote,
+    // MA-0087 optional failed-save "slowed" rider clause (byte-inert undefined
+    // default): Adult Copper Dragon Slowing Breath — grants speed_half,
+    // no_reactions, no_action_and_bonus_action te on each failed save.
+    slowedClauses,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -710,7 +763,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, conditionDurationNote };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, conditionDurationNote };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -741,7 +794,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, conditionDurationNote]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, slowedClauses, conditionDurationNote]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -869,7 +922,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, conditionDurationNote });
+        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, conditionDurationNote });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -898,7 +951,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, conditionDurationNote]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, slowedClauses, conditionDurationNote]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -1099,7 +1152,7 @@ function SaveAttackAoeModal({
         );
     }
 
-    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, dcSuccess });
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, slowedClauses, dcSuccess });
 
     return (
         <CreatureSelectionModal

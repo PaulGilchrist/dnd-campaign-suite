@@ -2027,6 +2027,7 @@
         "description": "Constitution Saving Throw: DC 18, each creature in a 60-foot <strong>Cone</strong>. <strong>Failure:</strong> The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
         "save_dc": 18,
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn."
       },
       {
@@ -2052,7 +2053,13 @@
       },
       {
         "name": "Mind Jolt",
-        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 4 version). The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 4 version) at one creature it can see within 120 feet. The target makes a DC 17 Wisdom saving throw, taking 22 (5d8) Psychic damage on a failed save or half as much on a successful one. The dragon always knows the target's location until the spell ends (no Invisible benefit against the dragon) — location tracking GM-enforced for monsters. The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 17,
+        "save_type": "Wisdom",
+        "dc_success": "half",
+        "damage_dice_primary": "5d8",
+        "damage_type_primary": "Psychic",
+        "save_effect": "5d8 Psychic damage. Success: Half damage. Location known to the dragon until the spell ends (advisory — GM-enforced for monsters). Until the end of its next turn."
       },
       {
         "name": "Pounce",

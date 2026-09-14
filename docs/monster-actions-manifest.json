@@ -1347,7 +1347,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Slowing Breath or (B) Spellcasting to cast Mind Spike (level 4 version).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0087-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0088",

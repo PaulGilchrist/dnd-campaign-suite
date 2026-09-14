@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parsePushFeetClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parsePushFeetClause, parseSlowedClauses, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -152,6 +152,15 @@ function pushFeetForAction(spellInfo, action) {
   return parsePushFeetClause(action?.save_effect)?.feet ?? null;
 }
 
+// MA-0087: authored failed-save "slowed" rider clause (Adult Copper Dragon
+// Slowing Breath). Parsed once and forwarded to the cone picker as an
+// optional te-grant seam (byte-inert null for clauseless rows). 'slowed' is
+// not a registered condition, so each clause maps to an existing registered te.
+function slowedClausesForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parseSlowedClauses(action?.save_effect);
+}
+
 function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
@@ -186,11 +195,12 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   // rides the picker as an instant marker te on failed saves (MA-0073 parse
   // shape). Null for every row without the clause — byte-inert.
   const pushFeet = pushFeetForAction(spellInfo, action);
+  const slowedClauses = slowedClausesForAction(spellInfo, action);
   if (aoe == null && !recharge.gate) { fire(); return; }
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, slowedClauses, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -690,8 +700,15 @@ async function spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, camp
 // (own dc_type/dc_success); hoisted to keep handleSpellCast branch-free.
 function executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll }) {
   const dcSuccess = spell?.dc?.dc_success === 'none' ? 'none' : 'half';
-  handleSaveRoll(action, spellDamageFormulaAtBaseLevel(spell), extractConditionsFromSaveEffect(spell?.save_effect), {
+  // MA-0087: honor the row's authored "(level N version)" upcast on the SAVE
+  // leg too (Adult Copper Mind Spike lv4 = 5d8, not the base lv2 3d8) — the
+  // MA-0112 base-dice residual. spellDamageFormulaAtLevel falls back to base
+  // when the row author no level clause, so every clauseless row is unchanged.
+  const castLevel = spellCastLevelFromSpellcasting(action?.description, spellName, spell);
+  const formula = spellDamageFormulaAtLevel(spell, castLevel) || spellDamageFormulaAtBaseLevel(spell);
+  handleSaveRoll(action, formula, extractConditionsFromSaveEffect(spell?.save_effect), {
     spellName, saveType: spell?.dc?.dc_type || action.save_type, dcSuccess,
+    castLevel,
     // MA-0054: Spellcasting rows carry no damage_type_primary, so without the
     // spell's own spells.json damage type the save-damage log defaults Slashing.
     damageType: spell?.damage?.damage_type || null,
@@ -1369,6 +1386,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           saveConditions={conePicker.saveConditions}
           sleepStaging={conePicker.sleepStaging}
           pushFeet={conePicker.pushFeet}
+          slowedClauses={conePicker.slowedClauses}
           conditionDurationNote={conePicker.conditionDurationNote}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}

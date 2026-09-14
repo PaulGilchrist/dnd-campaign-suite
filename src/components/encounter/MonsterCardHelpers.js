@@ -71,6 +71,23 @@ export function parsePushFeetClause(saveEffect) {
   return m ? { feet: Number(m[1]) } : null;
 }
 
+// MA-0087: authored failed-save "slowed" rider clause (Adult Copper Dragon
+// Slowing Breath — "can't take Reactions; its Speed is halved; and it can
+// take either an action or a Bonus Action, not both"). 'slowed' is NOT a
+// registered condition (no badge consumer in conditions.json / the sheet), so
+// the canonical machinery maps each clause to an EXISTING registered te with a
+// live consumer: speed_half (MA-0073), no_reactions, no_action_and_bonus_action
+// (Stinking Cloud / slow2024 / CharReactions). Byte-inert (null) for rows
+// without any clause. Mirrors the MA-0073 parse shape.
+export function parseSlowedClauses(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const clauses = [];
+  if (/speed is halved/i.test(saveEffect)) clauses.push('speed_half');
+  if (/can[’']?t take Reactions/i.test(saveEffect)) clauses.push('no_reactions');
+  if (/either an action or a Bonus Action[^.]*not both/i.test(saveEffect)) clauses.push('no_action_and_bonus_action');
+  return clauses.length > 0 ? { effects: clauses } : null;
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];
