@@ -29,20 +29,22 @@ vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => 
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
 const ROLLERS = vi.hoisted(() => ({
-  rollAttack: null, rollDamage: null,
+  rollAttack: null, rollDamage: null, rollSavingThrow: null,
 }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const rollAttack = vi.fn();
   const rollDamage = vi.fn();
+  const rollSavingThrow = vi.fn();
   ROLLERS.rollAttack = rollAttack;
   ROLLERS.rollDamage = rollDamage;
+  ROLLERS.rollSavingThrow = rollSavingThrow;
   return { default: vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
     rollAttack, rollDamage, rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(), rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
+    rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
   })), _setPopupHtml };
 });
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
@@ -203,6 +205,114 @@ describe('MA-0070 MonsterCardModal brass dragon legendary gated rows', () => {
     await waitFor(() => expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
     await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
     expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(8);
+  });
+});
+
+const bronze = () => monstersData.find(m => m.name === 'Adult Bronze Dragon');
+const bronzeActions = () => [{ name: 'Rend', attack_bonus: 12, damage_dice_primary: '2d8 + 7', damage_type_primary: 'Slashing', damage_dice_secondary: '1d10', damage_type_secondary: 'Lightning', reach: '10 ft.' }];
+
+// MA-0081 data lock: Adult Bronze Dragon legendary rows mirror the verified
+// MA-0070 Adult Brass Dragon shape — header authors uses:3 (counter renders,
+// 4-in-lair stays advisory), Guiding Light authors the MA-0033 spell-attack
+// seam (+10 from the Spellcasting row: PB +5 + CHA +5; level 2 Guiding Bolt
+// = 5d6 Radiant per spells.json), Pounce delegates to Rend (+12), and
+// Thunderclap authors its own save numbers with dc_success none.
+describe('MA-0081 monsters.json data: adult bronze dragon legendary economy authored', () => {
+  it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
+    const la = bronze().legendary_actions;
+    expect(la[0].name).toMatch(/Legendary Action Uses: 3 \(4 in Lair\)/);
+    expect(la[0].uses).toBe(3);
+    expect(la[0].description).toMatch(/lair.*advisory/i);
+  });
+
+  it('Guiding Light authors the spell-attack seam (+10, 5d6 Radiant)', () => {
+    const row = bronze().legendary_actions.find(a => a.name === 'Guiding Light');
+    expect(row.attack_bonus).toBe(10);
+    expect(row.spell_attack_bonus).toBe(10);
+    expect(row.damage_dice_primary).toBe('5d6');
+    expect(row.damage_type_primary).toBe('Radiant');
+    expect(row.description).toMatch(/Ranged Spell Attack: \+10/);
+  });
+
+  it('Pounce delegates_to the Rend row (+12)', () => {
+    const row = bronze().legendary_actions.find(a => a.name === 'Pounce');
+    expect(row.delegates_to).toBe('Rend');
+    expect(bronze().actions.find(a => a.name === 'Rend')?.attack_bonus).toBe(12);
+  });
+
+  it('Thunderclap authors its own save numbers, no effect on success', () => {
+    const row = bronze().legendary_actions.find(a => a.name === 'Thunderclap');
+    expect(row.save_dc).toBe(17);
+    expect(row.save_type).toBe('Constitution');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary).toBe('3d6');
+    expect(row.damage_type_primary).toBe('Thunder');
+  });
+});
+
+// MA-0081: with the header authored, the bronze dragon card renders the
+// "(3 left)" counter and every legendary row click routes through the gated
+// spend (never the ungated generic handlers).
+describe('MA-0081 MonsterCardModal bronze dragon legendary gated rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderBronze(uses) {
+    if (uses !== undefined) runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses'] = uses;
+    const m = makeMonster({
+      name: 'Adult Bronze Dragon',
+      actions: bronzeActions(),
+      legendary_actions: bronze().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Bronze Dragon 1', creatures: CREATURES })} />);
+  }
+  function bronzeRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('header shows (3 left); clicking Pounce spends 1, delegates to Rend (+12), logs spend', async () => {
+    renderBronze({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    fireEvent.click(bronzeRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Pounce (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(12);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Pounce/);
+  });
+
+  it('Guiding Light spends 1 and rolls the +10 spell attack', async () => {
+    renderBronze({ max: 3, used: 0 });
+    fireEvent.click(bronzeRow('Guiding Light').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(10);
+  });
+
+  it('exhausted (3/3): Thunderclap click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderBronze({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(bronzeRow('Thunderclap').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
+    renderBronze({ max: 3, used: 0 });
+    fireEvent.click(bronzeRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(bronzeRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
   });
 });
 
