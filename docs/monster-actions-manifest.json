@@ -1078,7 +1078,7 @@
       "saveDc": 16,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):At Will: Detect Magic, Minor Illusion, Scorching Ray, Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell), Speak with Animals1/Day Each: Detect Thoughts, Control Weather",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0069-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0070",
