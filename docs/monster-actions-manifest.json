@@ -1176,7 +1176,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Repulsion Breath or (B) Spellcasting to cast Guiding Bolt (level 2 version).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0076-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0077",
