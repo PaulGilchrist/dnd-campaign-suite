@@ -154,6 +154,7 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         isAutoCrit: ctx.isCrit,
         sneakAttackDice: context?.sneakAttackDice || 0,
         d20Roll: ctx.effectiveD20Roll,
+        hitClause: context?.hitClause || null,
     };
 }
 
@@ -211,6 +212,9 @@ function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) 
         ...buildRerollAndReplacementFlags(context),
         starryDragonFloor: ctx.starryDragonFloor,
         ...buildLuckInspirationEmpoweredFlags(context, ctx, characterName, campaignName),
+        // MA-0007: GM-adjudication offer for conditional charge-damage clauses
+        // (monsters.json conditional_damage) — surfaced on HIT popups only.
+        chargeBonusOffer: context?.chargeBonusOffer || null,
     };
 }
 

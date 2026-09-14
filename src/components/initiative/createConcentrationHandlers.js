@@ -5,6 +5,8 @@ import { cleanupConcentrationEffects } from '../../services/combat/concentration
 import { stripSummonedFromCombatSummary } from '../../services/combat/summons/summonedCreatureService.js'
 import { logConcentrationSave } from '../../services/encounters/combatLoggingService.js'
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
+import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js'
+import { addEntry } from '../../services/ui/logService.js'
 
 function findCharacterByName(characters, name) {
     return characters.find(c => c.name === name || c.name.startsWith(name + ' ')) || null
@@ -61,7 +63,20 @@ export function createConcentrationHandlers({
         const lastAttack = await grv('campaign', 'lastAttack', campaignName)
         const attackerName = lastAttack?.attackerName
         const attacker = attackerName ? findCharacterByName(characters, attackerName) : null
-        const hasConcentrationBreaker = resolveConcentrationBreaker(getSaveModifiers(attacker))
+        // MA-0038: static concentration_breaker OR the live failed-save te
+        // (e.g. Adult Black Dragon Cloud of Insects concentration_disadvantage).
+        const teConcentrationDis = getActiveTargetEffect(campaignName, creatureName, 'concentration_disadvantage')
+        if (teConcentrationDis) {
+            addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'concentration_disadvantage_applied',
+                characterName: creatureName,
+                sourceName: teConcentrationDis.source,
+                abilityName: teConcentrationDis.actionName || 'Concentration Save',
+                description: `${creatureName} rolls this Concentration save with Disadvantage (${teConcentrationDis.source}${teConcentrationDis.actionName ? ` — ${teConcentrationDis.actionName}` : ''}).`,
+            }).catch((e) => { console.error('[createConcentrationHandlers:concentration-disadvantage]', e); });
+        }
+        const hasConcentrationBreaker = resolveConcentrationBreaker(getSaveModifiers(attacker)) || !!teConcentrationDis
         const advantageSources = collectAdvantageSources(getSaveModifiers(findCharacterByName(characters, creatureName)))
 
         const { roll: r1, success, bonus, bonusDetail, starryDragonFloor, displayRolls } = await rollConcentrationSave({

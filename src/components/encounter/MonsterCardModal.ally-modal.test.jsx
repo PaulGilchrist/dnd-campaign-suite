@@ -18,7 +18,8 @@ import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
+vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
+  ...(await importActual()),
   rollExpression: vi.fn(() => ({ total: 5, rolls: [1, 2], modifier: 0 })),
   rollExpressionDoubled: vi.fn(() => ({ total: 10, rolls: [1, 2], modifier: 0 })),
 }));

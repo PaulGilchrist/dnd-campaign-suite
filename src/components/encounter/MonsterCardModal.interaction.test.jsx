@@ -41,7 +41,8 @@ import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
 // ── Mocks ----
-vi.mock('../../services/dice/diceRoller.js', () => ({
+vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
+  ...(await importActual()),
   rollExpression: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 5, rolls: [1, 2], modifier: 0 })),
   rollExpressionDoubled: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 10, rolls: [1, 2], modifier: 0 })),
 }));

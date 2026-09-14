@@ -9,6 +9,7 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { registerTargetEffect } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
+import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -80,7 +81,7 @@ function npcSaveBonus(target, saveType) {
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
-    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName } = ctx;
+    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -149,6 +150,8 @@ function resolveNpcTarget(ctx) {
         // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
         registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
     }
+    // MA-0063: damageless failed-save condition grant (byte-inert when empty).
+    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -260,6 +263,15 @@ function appendPromptTargetResult(setResultsFn, setPendingPromptsFn, targetResul
     setPendingPromptsFn(prev => prev.filter(p => p.promptId !== promptId));
 }
 
+// MA-0031 optional seams (byte-inert when props are null).
+function isExcludedByName(name, excludeNames) {
+    return (excludeNames || []).includes(name);
+}
+
+function isInAllowedRange(name, rangeAllowed) {
+    return rangeAllowed == null || rangeAllowed.has(name);
+}
+
 const TRAP_BLOCKING_EFFECTS = ['forcecage', 'maze', 'banishment', 'imprisonment'];
 
 function trapEffectBlocksAttack(effects, effectName, attackerName, targetName) {
@@ -292,6 +304,165 @@ function resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignNam
     return { resolvedDamage, radiantSoulFlagKey, isRadiantSoulTarget, targetDamageFormula, damageRoll };
 }
 
+function maybeStoreLastAttack(enabled, campaignName, cfg) {
+    if (enabled) storeSpellLastAttack(campaignName, cfg);
+}
+
+// MA-0042: persisting-zone arm seam (byte-inert when zoneTe is null) — on
+// area confirm, writes a zone te per covered creature (SP-111 zone te shape)
+// plus caster tracking `_<trackingPrefix>_<caster>` {radius/saveDc} for any
+// future zone consumer. repeatTurnEnd rows log "repeat <dice> at turn end —
+// GM-enforced": no turn-END zone-damage consumer exists in this engine
+// (expireStaleEffects zone phases are turn-START passes only), so the
+// repeat damage + "until dismissed" duration stay advisory (CLA-325).
+function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc, saveType, campaignName }) {
+    if (!zoneTe || !zoneTe.effectKey) return;
+    for (const targetName of selectedNames) {
+        registerTargetEffect(campaignName, targetName, zoneTe.effectKey, casterName, {
+            dc: saveDc,
+            radiusFt: zoneTe.radiusFt,
+            repeatTurnEnd: zoneTe.repeatTurnEnd === true,
+            duration: 'until_end_of_zone',
+        });
+    }
+    const trackingKey = `_${zoneTe.trackingPrefix}_${String(casterName).replace(/\s+/g, '_')}`;
+    setRuntimeValue(casterName, trackingKey, {
+        saveDc,
+        saveType,
+        radiusFt: zoneTe.radiusFt,
+        repeatTurnEnd: zoneTe.repeatTurnEnd === true,
+        damage: zoneTe.damage || null,
+        duration: zoneTe.duration || null,
+        affectedNames: [...selectedNames],
+    }, campaignName);
+    const saveNote = saveDc != null ? `${saveType} save DC ${saveDc}` : 'no save';
+    const repeatNote = zoneTe.repeatTurnEnd
+        ? ` Repeat ${zoneTe.damage || 'damage'} at turn end — GM-enforced (no turn-end zone-damage consumer).`
+        : '';
+    const clauseNote = zoneTe.clause ? ` ${zoneTe.clause}` : '';
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: actionName,
+        description: `${casterName} ${actionName}: ${zoneTe.effectKey} zone armed (radius ${zoneTe.radiusFt} ft, ${saveNote}) over ${selectedNames.join(', ') || 'no targets'}.${repeatNote}${clauseNote} Duration ${zoneTe.duration || 'GM-adjudicated'} — GM-enforced.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging zone arm:', e); });
+}
+
+// MA-0063: damageless failed-save condition grant inside the AoE picker
+// (byte-inert when saveConditions is empty — every existing consumer is
+// damage-only or zoneOnly). On a failed save the condition lands on the
+// target's activeConditions + activeConditionMeta {dc, ability} so the PC
+// badge-click repeat-save seam (CharConditions → createRollConditionSaveHandler)
+// can strip it on a later success (MA-0017 damageless-save shape). A
+// lair_sand_cloud te mirrors the zone with dc for future consumers. NPC
+// turn-end auto-repeat and the 1-minute expiry stay GM-enforced (no NPC
+// turn-end zone-save consumer — advisory in the log).
+function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType, targetName, casterName, actionName, campaignName }) {
+    if (saveSuccess === true) return;
+    if (!saveConditions || saveConditions.length === 0) return;
+    const ability = String(saveType || '').toLowerCase().slice(0, 3) || 'con';
+    const existing = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(existing) ? existing : [];
+    const merged = [...conditions];
+    for (const cond of saveConditions) {
+        if (!merged.some(c => String(c).toLowerCase() === cond)) merged.push(cond);
+    }
+    setRuntimeValue(targetName, 'activeConditions', merged, campaignName);
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    const nextMeta = { ...existingMeta };
+    for (const cond of saveConditions) {
+        nextMeta[cond] = { ...(existingMeta[cond] || {}), dc: saveDc, ability, source: casterName };
+    }
+    setRuntimeValue(targetName, 'activeConditionMeta', nextMeta, campaignName);
+    const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: conditionNames.join(', '),
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — ${conditionNames.join(', ')} 1 minute; repeats the save at the end of each of its turns (success ends it on itself). NPC turn-end auto-repeat and 1-minute expiry GM-enforced.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save-fail condition:', e); });
+}
+
+// MA-0031: advisory cone/area coverage gate — isWithinRange from the attacker
+// (gridless lenient §7); null rangeGateFt = no gate (PC-spell default).
+function useRangeAllowedSet(eligibleTargets, rangeGateFt, attackerName) {
+    const [rangeAllowed, setRangeAllowed] = useState(null);
+    useEffect(() => {
+        if (rangeGateFt == null) return undefined;
+        let cancelled = false;
+        Promise.all(eligibleTargets.map(async c => ({ name: c.name, ok: await isWithinRange(attackerName, c.name, rangeGateFt) })))
+            .then(rows => { if (!cancelled) setRangeAllowed(new Set(rows.filter(r => r.ok).map(r => r.name))); });
+        return () => { cancelled = true; };
+    }, [rangeGateFt, eligibleTargets, attackerName]);
+    return rangeAllowed;
+}
+
+function aoePickerTitle(action, titleOverride) {
+    return titleOverride || action.name;
+}
+
+// MA-0043: zoneOnly rows (Shroud of Darkness) read as save-less darkness
+// copy; every other consumer keeps the byte-identical save picker text.
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions }) {
+    if (!zoneOnly) {
+        const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
+        // MA-0063: damageless condition row (e.g. Adult Blue Dragon Sand Cloud) —
+        // no damage formula, failed saves grant conditions. Byte-inert when empty.
+        if (!damage && saveConditions && saveConditions.length > 0) {
+            const names = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+            return {
+                icon: 'fa-smog',
+                description: head,
+                note: `On a failed save, target is ${names}.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+            };
+        }
+        return {
+            icon: 'fa-bomb',
+            description: head,
+            note: `On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+        };
+    }
+    return {
+        icon: 'fa-moon',
+        description: `Select creatures inside the <strong>${zoneTe?.radiusFt ?? range}-foot</strong> darkness. No saving throw — the GM positions the origin (selection advisory).`,
+        note: `${zoneTe?.clause || ''} Duration ${zoneTe?.duration || 'GM-adjudicated'} — GM-enforced.`,
+    };
+}
+
+function buildEligibleTargets(combatSummary, attackerName, isCarefulSpell, isCarefulAlly, excludeNames) {
+    if (!combatSummary?.creatures) return [];
+    return combatSummary.creatures
+        .filter(c => !isTargetExcludedByTraps(c, attackerName))
+        .filter(c => !isExcludedByName(c.name, excludeNames))
+        .map(c => ({
+            ...c,
+            carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),
+        }));
+}
+
+function toPickerTargets(eligibleTargets, rangeAllowed) {
+    return eligibleTargets
+        .filter(c => isInAllowedRange(c.name, rangeAllowed))
+        .map(c => ({
+            name: c.name,
+            type: c.type,
+            currentHp: c.currentHp,
+            maxHp: c.maxHp,
+            carefulSpellProtected: c.carefulSpellProtected,
+        }));
+}
+
+// MA-0043: zone-armed confirmation line on the save-less picker results view.
+function ZoneArmedNote({ zoneOnly, zoneTe, selected }) {
+    if (!zoneOnly) return null;
+    return <p>{zoneTe?.effectKey || 'Zone'} armed over {Array.from(selected).join(', ') || 'no targets'} — GM-enforced.</p>;
+}
+
 function SaveAttackAoeModal({
     action,
     playerStats,
@@ -312,6 +483,25 @@ function SaveAttackAoeModal({
     overchannelSpellLevel = 1,
     pullMarkerEffect = null,
     logSaveSuccess = false,
+    // MA-0031 optional seams (byte-inert defaults for all PC-spell consumers):
+    // monster-card cone rows pass a title label, exclude the attacker itself,
+    // an advisory isWithinRange coverage gate, and skip the spell lastAttack
+    // stamp (a breath weapon is not spell-origin — keeps counterspell gates clean).
+    titleOverride,
+    excludeNames,
+    rangeGateFt,
+    storeLastAttack,
+    // MA-0042 optional persisting-zone seam (byte-inert null default):
+    // { effectKey, trackingPrefix, radiusFt, repeatTurnEnd, damage, duration, clause? }
+    zoneTe = null,
+    // MA-0043 zoneOnly (byte-inert false default): save-less zone rows
+    // (Shroud of Darkness) — confirm arms the zone and logs, but resolves
+    // NO saves and applies NO damage (canonical darkness lair = no save).
+    zoneOnly = false,
+    // MA-0063 optional failed-save conditions (byte-inert empty default):
+    // damageless condition rows (Adult Blue Dragon Sand Cloud) grant these
+    // conditions on failed saves inside the picker (MA-0017 shape).
+    saveConditions,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -344,7 +534,7 @@ function SaveAttackAoeModal({
         const combatSummary = getCombatSummary(campaignName);
         if (!combatSummary) return;
 
-        storeSpellLastAttack(campaignName, {
+        maybeStoreLastAttack(storeLastAttack !== false, campaignName, {
             casterName: playerStats.name,
             spellName: action.name,
             saveType,
@@ -373,7 +563,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -400,8 +590,11 @@ function SaveAttackAoeModal({
         // CLA-321: Soulstitch protection lasts only for the cast that wrote the stamp.
         clearSoulstitchStamp(playerStats.name, campaignName);
 
+        // MA-0042: persisting-zone arm (byte-inert unless zoneTe authored).
+        armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
+
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -527,6 +720,8 @@ function SaveAttackAoeModal({
             // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
             registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
         }
+        // MA-0063: damageless failed-save condition grant (byte-inert when empty).
+        applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -555,7 +750,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -586,25 +781,12 @@ function SaveAttackAoeModal({
     const combatSummary = getCombatSummary(campaignName);
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');
 
-    const eligibleTargets = React.useMemo(() => {
-        if (!combatSummary?.creatures) return [];
-        return combatSummary.creatures
-            .filter(c => !isTargetExcludedByTraps(c, playerStats.name))
-            .map(c => ({
-                ...c,
-                carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),
-            }));
-    }, [combatSummary, isCarefulSpell, isCarefulAlly, playerStats.name]);
+    const eligibleTargets = React.useMemo(
+        () => buildEligibleTargets(combatSummary, playerStats.name, isCarefulSpell, isCarefulAlly, excludeNames),
+        [combatSummary, isCarefulSpell, isCarefulAlly, playerStats.name, excludeNames]);
 
-    const getCreatureTargets = () => {
-        return eligibleTargets.map(c => ({
-            name: c.name,
-            type: c.type,
-            currentHp: c.currentHp,
-            maxHp: c.maxHp,
-            carefulSpellProtected: c.carefulSpellProtected,
-        }));
-    };
+    const rangeAllowed = useRangeAllowedSet(eligibleTargets, rangeGateFt, playerStats.name);
+
 
     const toggleTarget = useCallback((name) => {
         setSelected(prev => {
@@ -620,6 +802,15 @@ function SaveAttackAoeModal({
 
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
         setSelected(new Set(selectedNames));
+
+        if (zoneOnly) {
+            // MA-0043: zone arming only — no saves, no damage, no lastAttack.
+            armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
+            setResults([]);
+            setPendingPrompts([]);
+            setSummary({ results: [], selected: new Set(selectedNames) });
+            return;
+        }
 
         addEntry(campaignName, {
             type: 'ability_use',
@@ -640,7 +831,7 @@ function SaveAttackAoeModal({
         if (prompts.length === 0 && results.length > 0) {
             setSummary({ results, selected: new Set(selectedNames) });
         }
-    }, [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSavesAndDamage]);
+    }, [campaignName, playerStats.name, action.name, saveDc, saveType, zoneOnly, zoneTe, resolveAllSavesAndDamage]);
 
     const handleCreatureSelectionSkip = useCallback(() => {
         onClose();
@@ -724,6 +915,7 @@ function SaveAttackAoeModal({
                         <i className="fa-solid fa-bomb"></i> {action.name} — Results
                     </div>
                     <div className="sp-body">
+                        <ZoneArmedNote zoneOnly={zoneOnly} zoneTe={zoneTe} selected={summary.selected} />
                         <div className="abjure-results-list">
                             {summary.results.map(r => (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
@@ -771,13 +963,15 @@ function SaveAttackAoeModal({
         );
     }
 
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions });
+
     return (
         <CreatureSelectionModal
-            title={action.name}
-            icon="fa-bomb"
-            targets={getCreatureTargets()}
-            description={`Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`}
-            note={`On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`}
+            title={aoePickerTitle(action, titleOverride)}
+            icon={pickerCopy.icon}
+            targets={toPickerTargets(eligibleTargets, rangeAllowed)}
+            description={pickerCopy.description}
+            note={pickerCopy.note}
             confirmLabel={action.name}
             confirmIcon="fa-bomb"
             onConfirm={handleCreatureSelectionConfirm}

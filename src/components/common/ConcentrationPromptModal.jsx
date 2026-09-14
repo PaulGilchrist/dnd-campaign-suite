@@ -91,7 +91,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
     if (!current) return;
 
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
-    const { saveBonus, roll, rawRolls, total, success, bonusDetail, mode, advantageSources } =
+    const { saveBonus, roll, rawRolls, total, success, bonusDetail, mode, advantageSources, disadvantageSource } =
       resolveConcentrationRoll({ current, characters, campaignName, auraBonus: aura.bonus, auraSourceName: aura.sourceName });
     const totalSaveBonus = saveBonus + aura.bonus;
 
@@ -106,6 +106,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
       mode,
       rawRolls,
       advantageSources,
+      disadvantageSource,
     });
 
     window.dispatchEvent(new CustomEvent('concentration-result', {
@@ -122,12 +123,13 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
         mode,
         rawRolls,
         advantageSources,
+        disadvantageSource,
       },
     }));
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0
-        ? { ...p, result: { success, roll, total, saveBonus: totalSaveBonus, bonusDetail, mode, rawRolls, advantageSources } }
+        ? { ...p, result: { success, roll, total, saveBonus: totalSaveBonus, bonusDetail, mode, rawRolls, advantageSources, disadvantageSource } }
         : p
     ));
 

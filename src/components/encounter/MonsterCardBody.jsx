@@ -5,9 +5,11 @@ import { computeConditionEffects } from '../../services/combat/conditions/condit
 import { resolveMonsterIRV } from '../../services/npcs/monsterIrvUtils.js';
 import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js';
 import { MonsterAction } from './MonsterAction.jsx';
+import { legendaryHeaderAction, legendaryUsesRemaining, legendaryCheckRow, legendaryCheckBonus } from '../../services/encounters/monsterLegendaryUses.js';
+import { isLairRowClickable, lairRowAffordance } from '../../services/encounters/monsterLairActions.js';
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses } from './MonsterCardHelpers.js';
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, monsterRecharge = {} }) {
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -31,6 +33,10 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
 
     const lairActions = getLairActions(monster);
     const regionalEffects = getRegionalEffects(monster);
+    // MA-0021: header row authors `uses` → the section becomes a gated
+    // legendary economy (counter + clickable gated rows).
+    const legendaryHeader = legendaryHeaderAction(monster);
+    const legendaryRemaining = legendaryUsesRemaining(legendaryHeader, monsterLegendaryUses);
 
     return (
       <div className="mc-card" onClick={(e) => e.stopPropagation()}>
@@ -45,10 +51,14 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <hr />
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
           {actionSections.map(s => (
-            <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} />
+            s.key === 'legendary_actions' && legendaryHeader ? (
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1).map(a => legendaryCheckRow(a) ? { ...a, checkBonus: legendaryCheckBonus(monster, a) } : a)} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
+            ) : (
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} rechargeState={monsterRecharge} />
+            )
           ))}
           {lairActions && (
-            <MonsterNamedEffectSection title="Lair Actions" items={lairActions} renderItem={(la, i) => <MonsterLairAction key={i} la={la} />} />
+            <MonsterNamedEffectSection title="Lair Actions" items={lairActions} renderItem={(la, i) => <MonsterLairAction key={i} la={la} attackerCannotAct={attackerActionBlocked} handleLairRow={handleLairRow} />} />
           )}
           {regionalEffects && (
             <MonsterNamedEffectSection title="Regional Effects" items={regionalEffects} renderItem={(re, i) => <MonsterRegionalEffect key={i} re={re} />} />
@@ -62,7 +72,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         </div>
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, handleGatedReaction, handleLegendaryRow, handleLairRow]);
 
   return content;
 }
@@ -195,14 +205,19 @@ function MonsterCardAbilities({ monster, handleAbilityCheck }) {
   );
 }
 
-function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll }) {
+function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, spellUsesUsed, reactionUsesUsed, onGatedReaction, legendaryGate, headerRow, rechargeState = {} }) {
+  const atk = legendaryGate ? (name, bonus, action) => legendaryGate(action) : handleAttack;
+  const dmg = legendaryGate ? (_name, _formula, _type, action) => legendaryGate(action) : handleDamage;
+  const save = legendaryGate ? (action) => legendaryGate(action) : handleSaveRoll;
+  const cast = legendaryGate ? (action) => legendaryGate(action) : handleSpellCast;
   return (
     <>
       <hr />
       {title && <h5 className="mc-section-title">{title}</h5>}
       <div className="mc-section">
+        {headerRow}
         {actions.map((a, i) => (
-          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={handleAttack} onDamage={handleDamage} onSaveRoll={handleSaveRoll} />
+          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={atk} onDamage={dmg} onSaveRoll={save} onSpellCast={cast} spellUsesUsed={spellUsesUsed} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} legendaryGate={legendaryGate} rechargeState={rechargeState} />
         ))}
       </div>
     </>
@@ -218,6 +233,19 @@ function MonsterNamedEffectSection({ title, items, renderItem }) {
         {items.map(renderItem)}
       </div>
     </>
+  );
+}
+
+// MA-0021: legendary-uses economy header row — "(N left)" counter reads the
+// monsterLegendaryUses runtime map (max from the header row's authored uses).
+function MonsterLegendaryHeaderRow({ header, remaining }) {
+  const spent = remaining === 0;
+  return (
+    <div className={`mc-action mc-legendary-header-row${spent ? ' mc-dice-link-spell-spent' : ''}`} title="Legendary action uses — regain at the start of this creature's turn">
+      <strong>{header.name}</strong>{' '}
+      <span className="mc-legendary-counter">({remaining ?? header.uses} left)</span>{' '}
+      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(header.description) }} />
+    </div>
   );
 }
 
@@ -303,17 +331,44 @@ function MonsterCardDefenses({ monster, monsterName, campaignName, handleSaveThr
   );
 }
 
-function MonsterLairAction({ la }) {
+// MA-0024: legacy plain-string rows (and nameless dicts, MV-24) keep the
+// static render untouched (~600 monsters regression-protected). Structured
+// rows with an authored mechanic route through the SAME gated affordance as
+// legendary rows — one click = one adjudicated effect (save prompt at the
+// authored DC/type, damage chip, or CLA-325 advisory record).
+function MonsterLairAction({ la, attackerCannotAct, handleLairRow }) {
+  if (typeof la === 'string' || !isLairRowClickable(la)) {
+    return (
+      <div className="mc-action">
+        {typeof la === 'string' ? (
+          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la) }} />
+        ) : (
+          <>
+            <strong>{la.name}.</strong>{' '}
+            <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
+          </>
+        )}
+      </div>
+    );
+  }
+  const affordance = lairRowAffordance(la);
+  const label = affordance === 'save'
+    ? `DC ${la.save_dc} ${la.save_type || ''}`.trim()
+    : affordance === 'damage' ? la.damage_dice_primary : la.name;
+  const clickable = !attackerCannotAct && !!handleLairRow;
   return (
-    <div className="mc-action">
-      {typeof la === 'string' ? (
-        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la) }} />
-      ) : (
-        <>
-          <strong>{la.name}.</strong>{' '}
-          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
-        </>
-      )}
+    <div className={`mc-action${attackerCannotAct ? ' mc-action-disabled' : ''}`}>
+      <strong>{la.name}.</strong>{' '}
+      <span
+        className={`mc-dice-link mc-dice-link-lair${clickable ? '' : ' mc-dice-link-spell-spent'}`}
+        onClick={clickable ? () => handleLairRow(la) : undefined}
+        role="button"
+        tabIndex={0}
+        title={`Lair action — ${label}. Chosen on initiative 20, GM-enforced.`}
+      >
+        <i className="fa-solid fa-hurricane" /> {label}
+      </span>{' '}
+      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
     </div>
   );
 }

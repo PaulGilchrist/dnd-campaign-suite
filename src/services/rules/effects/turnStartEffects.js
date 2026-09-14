@@ -6,6 +6,8 @@ import { addEntry } from '../../ui/logService.js';
 import { handleConfusionTurnStart } from '../../automation/handlers/spells/confusionTurnStartHandler.js';
 import { applyAuraDamage, applyHolyNimbusDamage } from './auraDamageService.js';
 import { cleanUpToppleConditions } from './toppleCleanup.js';
+import { regainLegendaryUses } from '../../encounters/monsterLegendaryUses.js';
+import { rollMonsterRecharges } from '../../encounters/monsterRecharge.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
 
@@ -168,6 +170,13 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
     // playerStats (Holy Nimbus precedent).
     if (activeName) {
         await clearResistanceUsedThisTurnFlags(campaignName);
+        // MA-0021: monsters regain all expended legendary action uses at the
+        // start of their own turn — same pre-playerStats seam. No-op for
+        // creatures without a monsterLegendaryUses map (no spam).
+        await regainLegendaryUses({ monsterName: activeName, campaignName });
+        // MA-0031: monster breath-weapon recharge d6 at the owner's own turn
+        // start (same seam; no-op without a monsterRecharge map entry spent).
+        await rollMonsterRecharges({ monsterName: activeName, campaignName });
     }
 
     if (!activeName || !playerStats) {

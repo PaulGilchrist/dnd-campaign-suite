@@ -4,7 +4,7 @@
 // @improved-by-ai
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect } from './targetEffectDefinitions.js';
+import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect } from './targetEffectDefinitions.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -503,6 +503,26 @@ describe('targetEffectDefinitions', () => {
 
       const callArgs = setRuntimeValue.mock.calls[0];
       expect(callArgs[4]).toBe(true);
+    });
+  });
+
+  describe('MA-0038 concentration_disadvantage registry entry', () => {
+    const campaignName = 'test-campaign';
+
+    it('registers concentration_disadvantage in Saves & Checks', () => {
+      const def = getEffectDefinition('concentration_disadvantage');
+      expect(def).toBeTruthy();
+      expect(def.group).toBe('Saves & Checks');
+      expect(def.description).toMatch(/Disadvantage on saving throws to maintain Concentration/);
+    });
+
+    it('getActiveTargetEffect returns the live te for target+key, null otherwise', () => {
+      const te = { target: 'Ally1', effect: 'concentration_disadvantage', source: 'Adult Black Dragon 1', duration: 'until_end_of_next_turn' };
+      getRuntimeValue.mockReturnValue([te]);
+      expect(getActiveTargetEffect(campaignName, 'Ally1', 'concentration_disadvantage')).toBe(te);
+      expect(getActiveTargetEffect(campaignName, 'Ally2', 'concentration_disadvantage')).toBeNull();
+      getRuntimeValue.mockReturnValue(undefined);
+      expect(getActiveTargetEffect(campaignName, 'Ally1', 'concentration_disadvantage')).toBeNull();
     });
   });
 });

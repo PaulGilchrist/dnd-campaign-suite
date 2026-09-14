@@ -7,6 +7,11 @@ import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
+import { registerTargetEffect, getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
+import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
+import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
+import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -127,9 +132,7 @@ async function processPlayerSave({ target, characterName, campaignName, context,
     logEntry(buildPlayerSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, saveResult, saveSuccess, saveType, saveDc, attackerName, context }));
 
     // Apply save-triggered damage and conditions
-    if (context?.autoDamageFormula && saveDc != null) {
-        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal: saveResult.total, logEntry, setPopupHtml, characters: context._characters });
-    }
+    await applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal: saveResult.total, logEntry, setPopupHtml });
 
     return { saveSuccess, effectiveD20ForSave, saveTotal, saveResult };
 }
@@ -280,9 +283,7 @@ async function processNpcSave({ target, characterName, campaignName, context, bo
     logEntry(buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, context, saveTotal, bonus, baneSaveRoll, baneSaveDisplayLabel, baneAttackerRoll, baneAttackerDisplayLabel, blessSaveRoll, wardingBondSaveBonus, saveType, saveDc, saveSuccess, attackerName }));
 
     // Apply save-triggered damage and conditions
-    if (context?.autoDamageFormula && saveDc != null) {
-        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
-    }
+    await applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml });
 
     return { saveSuccess, effectiveD20ForSave, saveTotal };
 }
@@ -299,6 +300,108 @@ function resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveTy
         });
     const hasEvasion = hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(applyTarget, campaignName);
     return { targetChar, hasOwnEvasion, hasEvasion };
+}
+
+// Authored outcome-keyed te clause grants (MA-0030 success-immunity,
+// MA-0038 failed-save concentration-disadvantage).
+async function applyAuthoredClauseGrants({ context, saveSuccess, campaignName, attackerName, applyTarget }) {
+    // MA-0030: "Success: immune to this yeti's Chilling Gaze for 1 hour" —
+    // 1 hour encoded as 600 rounds (CLA-334 minutes×10).
+    if (saveSuccess === true && context?.successImmunity) {
+        await grantSuccessImmunity({ context, campaignName, attackerName, applyTarget });
+    }
+    // MA-0038: Cloud of Insects — "Disadvantage on saving throws to maintain
+    // Concentration until the end of its next turn". te sourced from the
+    // dragon; duration: 'until_end_of_next_turn' with rounds:2 drained by
+    // the pendingExpirations clock (HurlThroughHell codebase convention).
+    if (saveSuccess === false && context?.concentrationDisadvantage) {
+        await grantConcentrationDisadvantage({ context, campaignName, attackerName, applyTarget });
+    }
+}
+
+async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
+    // MA-0020: ability N/Day spend lands here — prompt-confirm seam (reaches
+    // this point only once the save has resolved), regardless of the outcome.
+    if (context?.monsterAbilityUse) {
+        await spendMonsterAbilityUse({ monsterName: attackerName, use: context.monsterAbilityUse, targetName: targetName || characterName, campaignName });
+    }
+    await applyAuthoredClauseGrants({ context, saveSuccess, campaignName, attackerName, applyTarget: targetName || characterName });
+    if (context?.autoDamageFormula && saveDc != null) {
+        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
+    } else {
+        applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget: targetName || characterName, attackerName, campaignName });
+    }
+    // MA-0048: authored repeat-save clause (Frightful Presence) — arm the
+    // turn-end repeat-save marker on a failed save.
+    if (saveSuccess === false && context?.repeatSave) {
+        await trackFrightfulPresence({
+            campaignName,
+            attackerName,
+            targetName: targetName || characterName,
+            saveType: context.repeatSave.save_type || saveType,
+            saveDc,
+        });
+    }
+}
+
+// MA-0030: successful-save immunity grant. Writes a registry te (e.g.
+// gaze_immunity) on the target sourced from the attacker, with a
+// minutes×10 rounds clock (CLA-334) removing the te via remove_target_effect.
+async function grantSuccessImmunity({ context, campaignName, attackerName, applyTarget }) {
+    const immunity = parseSuccessImmunity({ success_immunity: context.successImmunity });
+    if (!immunity) return;
+    const rounds = immunity.durationMinutes * 10;
+    registerTargetEffect(campaignName, applyTarget, immunity.effect, attackerName, { duration: immunity.duration, rounds });
+    addExpiration({ attackerName, targetName: applyTarget, campaignName, rounds, effects: [{ type: 'remove_target_effect', effectKey: immunity.effect, source: attackerName, target: applyTarget }] });
+    const actionName = context?.actionName || context?.name || 'the gaze';
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: `${immunity.effect}_granted`,
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} succeeded its save against ${attackerName}'s ${actionName} — immune to it for ${immunity.durationMinutes / 60 >= 1 ? `${immunity.durationMinutes / 60} hour(s)` : `${immunity.durationMinutes} minute(s)`} (${rounds} rounds).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:gaze-immunity-granted]', e); });
+}
+
+// MA-0038: failed-save concentration-disadvantage grant. Writes the
+// registry te (concentration_disadvantage) on the target sourced from the
+// attacker, duration until_end_of_next_turn (rounds:2 clock), and logs the
+// named clause. Consumers: concentrationPromptRoll, applyDamage NPC
+// concentration leg, createConcentrationHandlers GM roll.
+async function grantConcentrationDisadvantage({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, 'concentration_disadvantage', attackerName, {
+        duration: 'until_end_of_next_turn',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'concentration_disadvantage', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'concentration_disadvantage');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'concentration_disadvantage_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — Disadvantage on saving throws to maintain Concentration until the end of ${attackerName}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:concentration-disadvantage-granted]', e); });
+}
+
+// MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.
+function applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget, attackerName, campaignName }) {
+    if (saveDc == null || saveSuccess !== false) return;
+    const saveConditions = context?.saveConditions || [];
+    if (saveConditions.length <= 0) return;
+    const targetChar = (context._characters || []).find(c => c.name === applyTarget);
+    applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
 }
 
 function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName }) {
@@ -319,6 +422,7 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
         }
     }
     setRuntimeValue(applyTarget, 'activeConditions', newConditions, campaignName);
+    stampConditionMetaAndLogClauses({ applyTarget, saveConditions, attackerName, context, campaignName });
     const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
     addEntry(campaignName, {
         type: 'condition',
@@ -329,6 +433,34 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
         sourceAbility: context?.actionName || context.name,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[saveProcessing:log-error]", e); });
+}
+
+// MA-0019 provenance: stamp the inflicting creature into condition meta so
+// "by <source>" prerequisites (target_prerequisite.by_attacker) can be
+// enforced. MA-0020: an authored "until …" clause (Dominate Mind) rides the
+// same stamp as a durationNote — advisory only, no auto-expiry subsystem
+// (CLA-325). Existing meta consumers read dc/ability only — additive.
+function stampConditionMetaAndLogClauses({ applyTarget, saveConditions, attackerName, context, campaignName }) {
+    const existingMeta = getRuntimeValue(applyTarget, 'activeConditionMeta', campaignName) || {};
+    const newMeta = { ...existingMeta };
+    for (const cond of saveConditions) {
+        newMeta[cond] = { ...(existingMeta[cond] || {}), source: attackerName };
+        if (context?.conditionDurationNote && !newMeta[cond].durationNote) {
+            newMeta[cond].durationNote = context.conditionDurationNote;
+        }
+    }
+    setRuntimeValue(applyTarget, 'activeConditionMeta', newMeta, campaignName);
+    if (!context?.conditionDurationNote) return;
+    const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'condition_clauses_advisory',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: context?.actionName || context.name,
+        description: `${applyTarget} is ${conditionNames.join(', ')} ${context.conditionDurationNote} — control/telepathy/repeat-save clauses are GM-enforced (no control subsystem).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[saveProcessing:clause-advisory-log]", e); });
 }
 
 function logSaveEvasionRoll({ applyTarget, hasOwnEvasion, saveType, saveDc, saveSuccess, context, logEntry }) {
@@ -418,4 +550,31 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
     setPopupHtml(buildSaveDamagePopupData({ context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, targetName, effectiveD20ForSave, saveTotal, saveSuccess, saveDc, saveType }));
 
     applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    maybeLogMemoryGainAtZeroHp({ context, combatSummary: combatSummaryForSave, applyTarget, attackerName, applyResult, saveSuccess, campaignName });
+}
+
+// MA-0019: "The aboleth gains the target's memories if the target is a
+// Humanoid and is reduced to 0 Hit Points by this action." Advisory log —
+// no memory subsystem (CLA-325 GM-enforced precedent).
+function isHumanoidCreature(csCreature) {
+    if (!csCreature) return false;
+    if (csCreature.type === 'player') return true;
+    return String(csCreature.monsterType || '').toLowerCase() === 'humanoid';
+}
+
+function maybeLogMemoryGainAtZeroHp({ context, combatSummary, applyTarget, attackerName, applyResult, saveSuccess, campaignName }) {
+    if (!context?.consumeMemoriesClause || saveSuccess !== false) return;
+    if (!applyResult || applyResult.newHp > 0) return;
+    const csCreature = (combatSummary?.creatures || []).find(c => c.name === applyTarget);
+    if (!isHumanoidCreature(csCreature)) return;
+    const memoryActionName = context?.actionName || context?.autoDamageName || 'the action';
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'consume_memories',
+        characterName: attackerName,
+        abilityName: memoryActionName,
+        targetName: applyTarget,
+        description: `${attackerName} gains ${applyTarget}'s memories — target reduced to 0 Hit Points by ${memoryActionName} (Humanoid, GM-enforced).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[saveProcessing:consume-memories-log]", e); });
 }

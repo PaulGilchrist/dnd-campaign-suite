@@ -37,6 +37,18 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-0038: Adult Black Dragon Cloud of Insects failed-save clause —
+    // Disadvantage on saving throws to maintain Concentration until the
+    // end of the source's next turn (duration: until_end_of_next_turn).
+    effect: 'concentration_disadvantage',
+    label: 'Concentration Disadv',
+    description: 'Disadvantage on saving throws to maintain Concentration until the end of the source\'s next turn.',
+    icon: 'fa-arrow-down',
+    cls: 'effect-disadvantage',
+    group: 'Saves & Checks',
+    fields: ['source'],
+  },
+  {
     effect: 'goad',
     label: 'Goad',
     description: 'Attacks against creatures other than the goader have Disadvantage.',
@@ -94,6 +106,15 @@ const TARGET_EFFECT_DEFINITIONS = [
 
   // ── Defensive ──────────────────────────────────────────
   {
+    effect: 'no_healing',
+    label: "Can't Regain Hit Points",
+    description: 'The target can\'t regain Hit Points while this effect lasts (e.g. Aberrant Spirit Claw — until the start of the spirit\'s next turn). Healing via the canonical heal helpers is refused and logged.',
+    icon: 'fa-heart-circle-xmark',
+    cls: 'effect-debuff',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
     effect: 'dodge',
     label: 'Disadvantage on attacks',
     description: 'Attacks against the target have Disadvantage. The target has Advantage on Dexterity saving throws.',
@@ -107,6 +128,33 @@ const TARGET_EFFECT_DEFINITIONS = [
     description: 'Attacks against the target have Disadvantage (Escape the Horde).',
     icon: 'fa-shield-halved',
     cls: 'effect-target-disadv',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
+    effect: 'frightful_presence_immunity',
+    label: 'FP Immunity',
+    description: 'Immune to the source creature\u2019s Frightful Presence for 24 hours (granted on a successful save or when the effect ends).',
+    icon: 'fa-shield-halved',
+    cls: 'effect-buff',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
+    effect: 'frightful_presence',
+    label: 'Frightful Presence',
+    description: 'Frightened by the source\u2019s Frightful Presence — repeats the save at the end of each of its turns; a success ends the effect (Adult Blue Dracolich — 1 minute).',
+    icon: 'fa-skull',
+    cls: 'effect-debuff',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
+    effect: 'gaze_immunity',
+    label: 'Gaze Immunity',
+    description: 'Immune to the source creature\u2019s gaze on a successful save (e.g. Abominable Yeti Chilling Gaze \u2014 1 hour).',
+    icon: 'fa-eye-slash',
+    cls: 'effect-buff',
     group: 'Defensive',
     fields: ['source'],
   },
@@ -723,6 +771,35 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'dc'],
   },
 
+  // ── Lair ─────────────────────────────────────────────────
+  {
+    effect: 'lair_darkness',
+    label: 'Magical Darkness (Lair)',
+    description: 'Inside magical darkness (15-foot radius, lair action): heavily obscured — darkvision can\'t see through it and nonmagical light can\'t illuminate it. Overlapping light created by a spell of 2nd level or lower is dispelled — GM-enforced (no light-level model in this engine). No saving throw. Lasts until the dragon dismisses it, uses this lair action again, or dies.',
+    icon: 'fa-moon',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source'],
+  },
+  {
+    effect: 'lair_insect_cloud',
+    label: 'Insect Cloud (Lair)',
+    description: 'Inside a swarming-insect cloud (20-foot radius, lair action): Lightly Obscured. CON save (DC indicated) when the cloud appears, taking Piercing damage on a failed save, half on a success. A creature that ends its turn in the cloud takes the same damage again — GM-enforced (no turn-end zone-damage consumer exists). Lasts until the dragon dismisses it, uses this lair action again, or dies.',
+    icon: 'fa-bug',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source', 'dc'],
+  },
+  {
+    effect: 'lair_sand_cloud',
+    label: 'Sand Cloud (Lair)',
+    description: 'Inside a swirling sand cloud (20-foot radius, lair action): blinded. CON save (DC 15) when the cloud appears; on a failed save the target is Blinded for 1 minute. A creature can repeat the CON save at the end of each of its turns, ending the effect on itself on a success — badge-click repeat save enforced for PCs (DC stamped on condition meta); NPC turn-end auto-repeat and 1-minute expiry are GM-enforced (no NPC turn-end zone-save consumer). Lasts until the dragon dismisses it, uses this lair action again, or dies.',
+    icon: 'fa-smog',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source', 'dc'],
+  },
+
   // ── Movement ────────────────────────────────────────────
   {
     effect: 'ac_penalty',
@@ -830,4 +907,15 @@ function registerTargetEffect(campaignName, targetName, effectKey, source, extra
   setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName, true)
 }
 
-export { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect }
+/**
+ * Read the live te an active creature carries for a registry effect key.
+ * MA-0038: concentration-save consumers use this to see te written by
+ * monster failed-save clauses (e.g. concentration_disadvantage).
+ */
+function getActiveTargetEffect(campaignName, targetName, effectKey) {
+  const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName)
+  if (!Array.isArray(storedEffects)) return null
+  return storedEffects.find(te => te.target === targetName && te.effect === effectKey) || null
+}
+
+export { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect }

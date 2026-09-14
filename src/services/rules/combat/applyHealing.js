@@ -2,8 +2,12 @@
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../ui/storage.js';
 import { modifyHitPoints } from '../../shared/hpModifier.js';
+import { isHealingBlocked, blockedHealResult } from './healingBlock.js';
 
 export function applyHealingToTarget(combatSummary, targetName, healAmount, campaignName) {
+    if (isHealingBlocked(targetName, campaignName, healAmount)) {
+        return blockedHealResult(combatSummary, targetName, campaignName);
+    }
     const result = modifyHitPoints(combatSummary, targetName, healAmount, campaignName);
     if (!result) return null;
 

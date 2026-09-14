@@ -9,6 +9,8 @@ import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInsp
 import { hasEmpoweredSpell } from '../../../services/rules/spells/empoweredSpellService.js';
 import { getChaModifier } from '../../../services/rules/spells/metamagicRules.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
+import { registerTargetEffect, getEffectDefinition } from '../../../services/combat/conditions/targetEffectDefinitions.js';
+import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
 
@@ -460,6 +462,96 @@ function maybeApplyRamProne({ context, target, applyResult, campaignName, logEnt
     applyRamProneCondition(target, campaignName, logEntry);
 }
 
+// MA-0010: monster attack-hit conditions (monsters.json hit_conditions +
+// escape_dc, e.g. Aberrant Cultist Tentacle Lash → Grappled/Restrained).
+// Applied on the resolved hit via the canonical activeConditions write path,
+// with activeConditionMeta {dc, ability} so the target's condition badge
+// (CharConditions) offers the escape save. Escape is a badge click —
+// GM-enforced re-save; no token/movement grapple subsystem.
+function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, attackerName }) {
+    const currentConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+    const newConditions = [...currentConditions];
+    for (const cond of hitClause.conditions) {
+        if (!newConditions.some(c => String(c).toLowerCase() === cond)) {
+            newConditions.push(cond);
+        }
+    }
+    setRuntimeValue(target.name, 'activeConditions', newConditions, campaignName);
+    // MA-0019 provenance: always stamp the inflicting creature into meta
+    // (escape dc/ability ride along when authored) so "by <source>"
+    // prerequisites can be enforced. Additive for existing dc consumers.
+    const existingMeta = getRuntimeValue(target.name, 'activeConditionMeta', campaignName) || {};
+    const newMeta = { ...existingMeta };
+    for (const cond of hitClause.conditions) {
+        newMeta[cond] = { ...(existingMeta[cond] || {}), source: attackerName };
+        if (hitClause.escapeDc != null) {
+            newMeta[cond].dc = hitClause.escapeDc;
+            newMeta[cond].ability = 'str';
+        }
+    }
+    setRuntimeValue(target.name, 'activeConditionMeta', newMeta, campaignName);
+    const conditionLabels = hitClause.conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+    logEntry({
+        type: 'condition',
+        action: 'applied',
+        characterName: target.name,
+        condition: conditionLabels,
+        reason: `${hitClause.attackName} (escape DC ${hitClause.escapeDc ?? '—'})`,
+        note: hitClause.escapeDc != null
+            ? `${target.name} is held by a tentacle — escape via the condition badge save (DC ${hitClause.escapeDc}, STR); Restrained lasts until the grapple ends.`
+            : null,
+        timestamp: Date.now(),
+    });
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
+function maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry, characterName }) {
+    const hitClause = context?.hitClause;
+    if (!hitClause || !target || !applyResult) return;
+    const hasConditions = Array.isArray(hitClause.conditions) && hitClause.conditions.length > 0;
+    if (!hasConditions && !hitClause.targetEffect) return;
+    const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
+    if (!isLargeOrSmaller) return;
+    if (hasConditions) {
+        applyHitClauseConditions({ hitClause, target, campaignName, logEntry, attackerName: characterName });
+    }
+    if (hitClause.targetEffect) {
+        applyHitClauseTargetEffect({ hitClause, target, attackerName: characterName, campaignName, logEntry });
+    }
+}
+
+// MA-0016: Aberrant Spirit (Slaad) Claw — "the target can't regain Hit
+// Points until the start of the spirit's next turn". Registers the
+// registered 'no_healing' te on the target (registry:
+// targetEffectDefinitions.js; consumed by applyHealingToTarget /
+// applyHealingDirectly via healingBlock.js) and expires it anchored on the
+// spirit (attacker) — fires at the spirit's NEXT turn start (stepOfTheWind
+// until_start_of_next_turn + CLA-345 expireOnCreatureName pattern).
+function applyHitClauseTargetEffect({ hitClause, target, attackerName, campaignName, logEntry }) {
+    const def = getEffectDefinition(hitClause.targetEffect);
+    registerTargetEffect(campaignName, target.name, hitClause.targetEffect, attackerName, {
+        duration: 'until_start_of_next_turn',
+    });
+    addExpiration({
+        attackerName,
+        targetName: target.name,
+        effects: [{ type: 'remove_target_effect', effectKey: hitClause.targetEffect, source: attackerName, target: target.name }],
+        campaignName,
+        rounds: undefined,
+        expireOnCreatureName: attackerName,
+    });
+    logEntry({
+        type: 'condition',
+        action: 'applied',
+        characterName: target.name,
+        condition: def?.label || hitClause.targetEffect,
+        reason: `${hitClause.attackName} — until the start of ${attackerName}'s next turn`,
+        note: `Healing blocked for ${target.name} (GM-enforced for direct-HP writes: turn-start ticks, rests, initiative-card HP edits).`,
+        timestamp: Date.now(),
+    });
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
 function attachPopupHpFallbacks(popupData, target, targetMaxHp) {
     popupData.targetCurrentHp = popupData.targetCurrentHp || (target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : (target?.currentHp ?? target?.maxHp));
     popupData.targetMaxHp = popupData.targetMaxHp || targetMaxHp;
@@ -564,6 +656,7 @@ export function createPlainDamageHandler(deps) {
         applyResult = await resolveDeathStrike({ applyResult, context, combatSummary, target, characters, campaignName, characterName, adjustedTotal, formula, rolls, modifier, damageType, setPopupHtml, logEntry });
 
         maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry });
+        maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry, characterName });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 

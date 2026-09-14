@@ -172,7 +172,15 @@
     "reactions": [
       {
         "name": "Feather Fall (1/Day)",
-        "description": "The aarakocra casts <strong>Feather Fall</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The aarakocra casts <strong>Feather Fall</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "1/Day",
+        "uses": 1,
+        "maxUses": 1,
+        "automation": {
+          "type": "reaction",
+          "trigger": "falling",
+          "effect": "feather_fall"
+        }
       }
     ],
     "environments": [
@@ -231,7 +239,13 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "1d4 + 2",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "conditional_damage": {
+          "dice": "3d4",
+          "modifier": 2,
+          "damage_type": "Slashing",
+          "condition": "moved 30+ feet straight toward target immediately before the hit"
+        }
       },
       {
         "name": "Wind Javelin",
@@ -313,7 +327,9 @@
         "damage_dice_primary": "1d6 + 4",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "4d6",
-        "damage_type_secondary": "Psychic"
+        "damage_type_secondary": "Psychic",
+        "hit_conditions": ["grappled", "restrained"],
+        "escape_dc": 14
       },
       {
         "name": "Mind Rot",
@@ -326,13 +342,19 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <em>Detect Thoughts</em>, <em>Minor Illusion</em>"
+        "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <em>Detect Thoughts</em>, <em>Minor Illusion</em>",
+        "save_dc": 15,
+        "save_type": "Wisdom"
       }
     ],
     "reactions": [
       {
         "name": "Counterspell (2/Day)",
-        "description": "The cultist casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The cultist casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "2/Day",
+        "uses": 2,
+        "maxUses": 2,
+        "automation": { "type": "reaction", "trigger": "enemy_spell_cast", "effect": "counterspell" }
       }
     ],
     "environments": [
@@ -622,7 +644,8 @@
         "attack_bonus": null,
         "reach": "5 ft.",
         "damage_dice_primary": "1d10+3+spell level",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_target_effect": "no_healing"
       }
     ],
     "traits": [
@@ -719,7 +742,9 @@
         "attack_bonus": 9,
         "reach": "15 ft.",
         "damage_dice_primary": "2d6 + 5",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 14
       },
       {
         "name": "Consume Memories",
@@ -728,34 +753,72 @@
         "save_type": "Intelligence",
         "damage_dice_primary": "3d6",
         "damage_type_primary": "Psychic",
-        "save_effect": "Failure: 10 (3d6) Psychic damage. Success: Half damage"
+        "save_effect": "Failure: 10 (3d6) Psychic damage. Success: Half damage",
+        "target_prerequisite": {
+          "conditions": ["charmed", "grappled"],
+          "by_attacker": true
+        }
       },
       {
         "name": "Dominate Mind (2/Day)",
         "description": "Wisdom Saving Throw: DC 16, one creature the aboleth can see within 30 feet. <strong>Failure:</strong> The target has the <strong>Charmed</strong> condition until the aboleth dies or is on a different plane of existence from the target. While Charmed, the target acts as an ally to the aboleth and is under its control while within 60 feet of it. In addition, the aboleth and the target can communicate telepathically with each other over any distance. The target repeats the save whenever it takes damage as well as after every 24 hours it spends at least 1 mile away from the aboleth, ending the effect on itself on a success.",
         "save_dc": 16,
         "save_type": "Wisdom",
-        "save_effect": "Failure: The target has the Charmed condition until the aboleth dies or is on a different plane of existence from the target"
+        "save_effect": "Failure: The target has the Charmed condition until the aboleth dies or is on a different plane of existence from the target",
+        "usage": "2/Day",
+        "uses": 2,
+        "maxUses": 2
       }
     ],
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the aboleth can expend a use to take one of the following actions. The aboleth regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the aboleth can expend a use to take one of the following actions. The aboleth regains all expended uses at the start of each of its turns. In its lair the aboleth has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Lash",
+        "delegates_to": "Tentacle",
         "description": "The aboleth makes one Tentacle attack."
       },
       {
         "name": "Psychic Drain",
+        "delegates_to": "Consume Memories",
+        "self_heal": "1d10",
+        "target_prerequisite": {
+          "conditions": [
+            "charmed",
+            "grappled"
+          ],
+          "any_ally_of_attacker": true
+        },
         "description": "If the aboleth has at least one creature <strong>Charmed</strong> or <strong>Grappled</strong>, it uses Consume Memories and regains 5 (1d10) Hit Points."
       }
     ],
     "lair_actions": [
-      "The aboleth casts phantasmal force (no components required) on any number of creatures it can see within 60 feet of it. While maintaining concentration on this effect, the aboleth can't take other lair actions. If a tar­get succeeds on the saving throw or if the effect ends for it, the target is immune to the aboleth's phantasmal force lair action for the next 24 hours, although such a creature can choose to be affected.",
-      "Pools of water within 90 feet of the aboleth surge out­ ward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 14 Strength saving throw or be pulled up to 20 feet into the water and knocked prone. The aboleth can't use this lair action again until it has used a different one.",
-      "Water in the aboleth's lair magically becomes a con­ duit for the creature's rage. The aboleth can target any number of creatures it can see in such water within 90 feet of it. A target must succeed on a DC 14 Wisdom saving throw or take 7 (2d6) psychic damage. The aboleth can't use this lair action again until it has used a different one."
+      {
+        "name": "Phantasmal Force",
+        "advisory": "phantasmal_force",
+        "save_dc": 16,
+        "save_type": "Intelligence",
+        "description": "The aboleth casts phantasmal force (no components required) on any number of creatures it can see within 60 feet of it. While maintaining concentration on this effect, the aboleth can't take other lair actions. If a tar­get succeeds on the saving throw or if the effect ends for it, the target is immune to the aboleth's phantasmal force lair action for the next 24 hours, although such a creature can choose to be affected."
+      },
+      {
+        "name": "Grasping Tide",
+        "save_dc": 14,
+        "save_type": "Strength",
+        "save_effect": "Failure: The target is pulled up to 20 feet into the water and knocked prone. Success: unaffected.",
+        "description": "Pools of water within 90 feet of the aboleth surge out­ ward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 14 Strength saving throw or be pulled up to 20 feet into the water and knocked prone. The aboleth can't use this lair action again until it has used a different one."
+      },
+      {
+        "name": "Conduit for Rage",
+        "save_dc": 14,
+        "save_type": "Wisdom",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Psychic",
+        "save_effect": "Failure: 7 (2d6) Psychic damage. Success: Half damage.",
+        "description": "Water in the aboleth's lair magically becomes a con­ duit for the creature's rage. The aboleth can target any number of creatures it can see in such water within 90 feet of it. A target must succeed on a DC 14 Wisdom saving throw or take 7 (2d6) psychic damage. The aboleth can't use this lair action again until it has used a different one."
+      }
     ],
     "environments": [
       "underdark"
@@ -857,8 +920,10 @@
         "description": "Constitution Saving Throw: DC 18, one creature the yeti can see within 30 feet. <strong>Failure:</strong> 21 (6d6) Cold damage, and the target has the <strong>Paralyzed</strong> condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. <strong>Success:</strong> The target is immune to this yeti's Chilling Gaze for 1 hour.",
         "save_dc": 18,
         "save_type": "Constitution",
+        "dc_success": "none",
         "damage_dice_primary": "6d6",
         "damage_type_primary": "Cold",
+        "success_immunity": { "effect": "gaze_immunity", "duration": "1_hour", "duration_minutes": 60 },
         "save_effect": "Failure: 21 (6d6) Cold damage, and the target has the Paralyzed condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. Success: The target is immune to this yeti's Chilling Gaze for 1 hour."
       },
       {
@@ -1060,13 +1125,15 @@
         "name": "Spellcasting",
         "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Fear</em>, <strong>Melf's Acid Arrow</strong> (level 3 version)<br><strong>1/Day Each:</strong> <em>Speak with Dead</em>, <em>Vitriolic Sphere</em>",
         "save_dc": 17,
-        "save_type": "Charisma"
+        "save_type": "Charisma",
+        "spell_attack_bonus": 9
       }
     ],
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Cloud of Insects",
@@ -1079,24 +1146,51 @@
       },
       {
         "name": "Frightful Presence",
-        "description": "The dragon uses Spellcasting to cast <em>Fear</em>. The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Fear</em>. Each creature of the dragon's choice within 60 feet of it that can see and hear the dragon must succeed on a DC 17 Wisdom saving throw or become Frightened. 60-ft selection advisory — single armed target resolves; GM picks targets. The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 17,
+        "save_type": "Wisdom",
+        "save_effect": "The target becomes Frightened. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success."
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance producer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
       {
-        "description": "Pools of water that the dragon can see within 120 feet of it surge outward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 15 Strength saving throw or be pulled up to 20 feet into the water and knocked prone.",
+        "name": "Water Surge",
+        "save_dc": 15,
+        "save_type": "Strength",
+        "save_effect": "Failure: The target is pulled up to 20 feet into the water and knocked prone. Success: unaffected.",
+        "description": "Pools of water that the dragon can see within 120 feet of it surge outward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 15 Strength saving throw or be pulled up to 20 feet into the water and knocked prone."
+      },
+      {
+        "name": "Insect Cloud",
         "save_dc": 15,
         "save_type": "Constitution",
-        "save_effect": "Failure: 10 (3d6) Piercing damage. Success: Half damage.",
         "damage_dice_primary": "3d6",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "dc_success": "half",
+        "save_effect": "Failure: 10 (3d6) piercing damage. Success: Half damage.",
+        "zone": {
+          "radius_ft": 20,
+          "repeat_turn_end": true
+        },
+        "duration": "until dismissed or used again (advisory)",
+        "description": "A cloud of swarming insects fills a 20-foot-radius sphere centered on a point the dragon chooses within 120 feet of it. The cloud spreads around corners and remains until the dragon dismisses it as an action, uses this lair action again, or dies. The cloud is lightly obscured. Any creature in the cloud when it appears must make on a DC 15 Constitution saving throw, taking 10 (3d6) piercing damage on a failed save, or half as much damage on a successful one. A creature that ends its turn in the cloud takes 10 (3d6) piercing damage."
       },
-      "A cloud of swarming insects fills a 20-foot-radius sphere centered on a point the dragon chooses within 120 feet of it. The cloud spreads around corners and remains until the dragon dismisses it as an action, uses this lair action again, or dies. The cloud is lightly obscured. Any creature in the cloudwhen it appears must make on a DC 15 Constitution saving throw, taking 10 (3d6) piercing damage on a failed save, or half as much damage on a successful one. A creature that ends its turn in the cloud takes 10 (3d6) piercing damage.",
-      "Magical darkness spreads from a point the dragon chooses within 60 feet of it, filling a 15-foot-radius sphere until the dragon dismisses it as an action, uses this lair action again, or dies. The darkness spreads around corners. A creature with darkvision can't see through this darkness, and nonmagical light can't illuminate it. If any of the effect's area overlaps with an area of light created by a spell of 2nd level or lower, the spell that created the light is dispelled."
+      {
+        "name": "Shroud of Darkness",
+        "description": "Magical darkness spreads from a point the dragon chooses within 60 feet of it, filling a 15-foot-radius sphere until the dragon dismisses it as an action, uses this lair action again, or dies. The darkness spreads around corners. A creature with darkvision can't see through this darkness, and nonmagical light can't illuminate it. If any of the effect's area overlaps with an area of light created by a spell of 2nd level or lower, the spell that created the light is dispelled.",
+        "zone": {
+          "radius_ft": 15,
+          "no_save": true,
+          "effect_key": "lair_darkness",
+          "advisory": "No saving throw (canonical darkness lair action). Darkvision blocking and light-spell overlap — dispel only by 2nd-level+ light — GM-enforced (no light model in this engine)."
+        },
+        "duration": "until dismissed or used again (advisory)"
+      }
     ],
     "environments": [
       "coastal"
@@ -1162,7 +1256,7 @@
       }
     },
     "skills": {
-      "Preception": {
+      "Perception": {
         "modifier": 14
       },
       "Stealth": {
@@ -1215,11 +1309,13 @@
       },
       {
         "name": "Bite",
-        "description": "Melee Weapon Attack: +13 to hit, reach 10 ft., one target. Hit: 18 (2d10 + 7) piercing damage plus 5 (1dlO) lightning damage.",
+        "description": "Melee Weapon Attack: +13 to hit, reach 10 ft., one target. Hit: 18 (2d10 + 7) piercing damage plus 5 (1d10) lightning damage.",
         "attack_bonus": 13,
         "reach": "10 ft.",
         "damage_dice_primary": "2d10 + 7",
-        "damage_type_primary": "piercing"
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "1d10",
+        "damage_type_secondary": "Lightning"
       },
       {
         "name": "Claw",
@@ -1242,7 +1338,10 @@
         "description": "Each creature ofthe dracolich's choice that is within 120 feet ofthe dracolich and aware of it must succeed on a DC 18 Wisdom saving throw or become frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to the dracolich's Frightful Presence for the next 24 hours.",
         "save_dc": 18,
         "save_type": "Wisdom",
-        "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours."
+        "dc_success": "none",
+        "success_immunity": { "effect": "frightful_presence_immunity", "duration": "24_hours", "duration_minutes": 1440 },
+        "repeat_save": { "condition": "frightened", "save_type": "Wisdom", "duration_minutes": 1 },
+        "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage."
       },
       {
         "name": "Lightning Breath",
@@ -1277,14 +1376,20 @@
     "legendary_actions": [
       {
         "name": "General",
+        "uses": 3,
         "description": "The dracolich can take 3 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only at the end ofanother creature's turn. The dracolich regains spent legendary actions at the start of its turn."
       },
       {
         "name": "Detect",
+        "ability_check": {
+          "ability": "wisdom",
+          "skill": "perception"
+        },
         "description": "The dracolich makes a Wisdom (Perception) check."
       },
       {
         "name": "Tail Attack",
+        "delegates_to": "Tail",
         "description": "The dracolich makes a tail attack."
       },
       {
@@ -1397,31 +1502,56 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Cloaked Flight",
-        "description": "The dragon uses Spellcasting to cast <em>Invisibility</em> on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn."
+        "advisory": "invisibility",
+        "description": "The dragon uses Spellcasting to cast <em>Invisibility</em> on itself, and it can fly up to half its Fly Speed (movement advisory — GM moves the token; no movement-distance producer; invisibility GM-enforced, CLA-325). The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Sonic Boom",
-        "description": "The dragon uses Spellcasting to cast <em>Shatter</em>. The dragon can't take this action again until the start of its next turn."
+        "save_dc": 18,
+        "save_type": "Constitution",
+        "damage_dice_primary": "3d8",
+        "damage_type_primary": "Thunder",
+        "save_effect": "3d8 Thunder damage. Success: Half damage.",
+        "description": "The dragon uses Spellcasting to cast <em>Shatter</em> (spell save DC 18, Charisma). 10-ft-radius sphere selection advisory — single armed target resolves; GM picks targets. The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Tail Swipe",
+        "delegates_to": "Rend",
         "description": "The dragon makes one Rend attack."
       }
     ],
     "lair_actions": [
       {
+        "name": "Falling Ceiling",
         "description": "Part of the ceiling collapses above one creature that the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) bludgeoning damage and be knocked prone and buried. The buried target is restrained and unable to breathe or stand up. A creature can take an action to make a DC 10 Strength check, ending the buried state on a success.",
         "save_dc": 15,
         "save_type": "Dexterity",
         "damage_dice_primary": "3d6",
-        "damage_type_primary": "Lightning",
-        "save_effect": "Failure: 10 (3d6) Lightning damage. Success: Half damage."
+        "damage_type_primary": "Bludgeoning",
+        "dc_success": "half",
+        "save_effect": "Failure: 10 (3d6) Bludgeoning damage and knocked prone and buried. The buried target is restrained and unable to breathe or stand up. Success: Half damage.",
+        "rescue_check": { "ability": "Strength", "dc": 10, "ends": "buried", "advisory": "DC 10 Strength check (action) ends the buried state on a success — GM-enforced (no rescue-engine consumer)." }
+    },
+      {
+        "name": "Sand Cloud",
+        "description": "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
+        "save_dc": 15,
+        "save_type": "Constitution",
+        "dc_success": "none",
+        "save_effect": "Failure: The target is blinded for 1 minute (repeat the Constitution save at the end of each of its turns; a success ends the effect on itself). Success: unaffected. This effect deals no damage.",
+        "zone": {
+          "radius_ft": 20,
+          "effect_key": "lair_sand_cloud",
+          "repeat_save": true,
+          "advisory": "Blinded persists 1 minute; a creature repeats the DC 15 Constitution save at the end of each of its turns, ending the effect on itself on a success — badge-click repeat save (DC stamped on condition meta) for PCs is enforced; NPC turn-end auto-repeat and 1-minute expiry are GM-enforced (no NPC turn-end zone-save consumer)."
+        },
+        "duration": "blinded 1 minute (repeat save ends early; advisory)"
       },
-      "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "Lightning arcs, forming a 5-foot-wide line between two of the lair's solid surfaces that the dragon can see. They must be within 120 feet of the dragon and 120 feet of each other. Each creature in that line must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) lightning damage."
     ],
     "environments": [
@@ -4234,7 +4364,7 @@
       },
       {
         "name": "Frightful Presence",
-        "description": "The dragon casts *Fear*, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18). The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Fear</em>. The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Pounce",

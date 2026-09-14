@@ -29,7 +29,8 @@ import { extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
+vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
+  ...(await importActual()),
   rollExpression: vi.fn(() => ({ total: 5, rolls: [1, 2], modifier: 0 })),
   rollExpressionDoubled: vi.fn(() => ({ total: 10, rolls: [1, 2], modifier: 0 })),
 }));
@@ -176,7 +177,7 @@ describe('MonsterCardModal - save_effect conditions reach the save roll', () => 
   });
 
   it('passes an empty saveConditions array when save_effect is absent', () => {
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
+    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [], targetName: 'Player A' });
 
     const m = makeMonster({
       actions: [{
@@ -186,7 +187,7 @@ describe('MonsterCardModal - save_effect conditions reach the save roll', () => 
         description: 'Dexterity Saving Throw: DC 13. Webbing fills a 20-ft square.',
       }],
     });
-    render(<MonsterCardModal {...makeProps(m)} />);
+    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
 
     fireEvent.click(screen.getByText('DC 13 Dexterity'));
     expect(rollSavingThrow).toHaveBeenCalledWith(

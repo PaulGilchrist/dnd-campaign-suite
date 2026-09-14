@@ -344,6 +344,42 @@
   border-color: var(--color-link);
 }
 
+.mc-dice-link-spell {
+  color: #9b59b6;
+}
+
+.mc-dice-link-spell:hover {
+  background: #9b59b6;
+  color: var(--color-background);
+  border-color: #9b59b6;
+}
+
+.mc-dice-link-spell-spent {
+  color: #7f8c8d;
+  text-decoration: line-through;
+}
+
+.mc-dice-link-spell-spent:hover {
+  background: #7f8c8d;
+}
+
+.mc-legendary-header-row {
+  font-style: italic;
+}
+
+.mc-legendary-counter {
+  color: #9b59b6;
+  font-weight: bold;
+}
+
+.mc-dice-link-legendary {
+  margin-left: 6px;
+}
+
+.mc-dice-link-lair {
+  margin-left: 6px;
+}
+
 .mc-ally-badge {
   display: inline-flex;
   align-items: center;
