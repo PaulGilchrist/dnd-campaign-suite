@@ -689,3 +689,73 @@ describe('MA-0085 adult-bronze-dragon fog cloud + thunderclap data lock', () => 
     expect(def.group).toBe('Lair');
   });
 });
+
+// MA-0096: Adult Copper Dragon lair_actions[0] was a NAMELESS dict (MV-24) —
+// save_dc 15 Dexterity + restrained authored behind the dead `row.name` gate
+// (isLairRowClickable :26) → inert static branch, header "." rendered, save
+// never reachable. Data-only fix (MA-0074 pattern): named "Spike Growth" +
+// dc_success "none" (damageless restrained-only row, no half-damage
+// boilerplate) arms the untouched MA-0024 seam → .mc-dice-link-lair chip →
+// handleSaveRoll → MA-0017 damageless failed-save condition landing. Duration
+// clause ("until the dragon uses this lair action again or until the dragon
+// dies") stays verbatim advisory — GM-remove convention, no initiative-20
+// cadence / zone-re-use consumer (MA-0024 design). Sibling mud row [1] is
+// MA-0097 scope — must stay a raw string here.
+describe('MA-0096 adult-copper-dragon spike growth data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-copper-dragon');
+  const spike = dragon.lair_actions[0];
+
+  it('row is now a structured clickable SAVE row named Spike Growth', () => {
+    expect(typeof spike).toBe('object');
+    expect(spike.name).toBe('Spike Growth');
+    expect(isLairRowClickable(spike)).toBe(true);
+    expect(lairRowAffordance(spike)).toBe('save');
+  });
+
+  it('authored save fields untouched: DC 15 Dexterity (canonical spike growth)', () => {
+    expect(spike.save_dc).toBe(15);
+    expect(spike.save_type).toBe('Dexterity');
+    expect(spike.description).toMatch(/spike growth spell/i);
+    expect(spike.description).toMatch(/20-foot radius/i);
+    expect(spike.description).toMatch(/within 120 feet/i);
+  });
+
+  it('no damage authored — dc_success none suppresses half-damage boilerplate', () => {
+    expect(spike.dc_success).toBe('none');
+    expect(spike.damage_dice_primary).toBeUndefined();
+    expect(spike.damage_type_primary).toBeUndefined();
+    expect(spike.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('save_effect vocabulary extracts ONLY restrained (MA-0017 damageless seam)', () => {
+    expect(spike.save_effect).toBe('The target is restrained.');
+    expect(extractConditionsFromSaveEffect(spike.save_effect)).toEqual(['restrained']);
+  });
+
+  it('duration clause kept verbatim in description (advisory — no lair cadence consumer)', () => {
+    expect(spike.description).toMatch(/until the dragon uses this lair action again or until the dragon dies/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + restrained', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: spike,
+      monsterName: 'Adult Copper Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(spike.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(spike, null, ['restrained']);
+  });
+
+  it('sibling mud row [1] untouched raw string (MA-0097 scope — not fixed here)', () => {
+    expect(typeof dragon.lair_actions[1]).toBe('string');
+    expect(dragon.lair_actions[1]).toMatch(/mud/i);
+    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(false);
+  });
+});

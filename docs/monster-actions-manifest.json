@@ -1483,7 +1483,7 @@
         "restrained"
       ],
       "description": "The dragon chooses a point on the ground that it can see within 120 feet of it. Stone spikes sprout from the ground in a 20-foot radius centered on that point. The effect is otherwise identical to the spike growth spell and lasts until the dragon uses this lair action again or until the dragon dies.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0096-lair-spike-growth.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0097",
