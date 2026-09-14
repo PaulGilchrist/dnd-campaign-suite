@@ -310,24 +310,39 @@ async function applyAuthoredClauseGrants({ context, saveSuccess, campaignName, a
     if (saveSuccess === true && context?.successImmunity) {
         await grantSuccessImmunity({ context, campaignName, attackerName, applyTarget });
     }
+    if (saveSuccess === false) {
+        await applyFailedSaveClauseGrants({ context, campaignName, attackerName, applyTarget });
+    }
+}
+
+// Failed-save te clause grants (MA-0038/0073/0093/0104) — split from the
+// dispatcher to keep both functions under the lint complexity ceiling.
+async function applyFailedSaveClauseGrants({ context, campaignName, attackerName, applyTarget }) {
     // MA-0038: Cloud of Insects — "Disadvantage on saving throws to maintain
     // Concentration until the end of its next turn". te sourced from the
     // dragon; duration: 'until_end_of_next_turn' with rounds:2 drained by
     // the pendingExpirations clock (HurlThroughHell codebase convention).
-    if (saveSuccess === false && context?.concentrationDisadvantage) {
+    if (context?.concentrationDisadvantage) {
         await grantConcentrationDisadvantage({ context, campaignName, attackerName, applyTarget });
     }
     // MA-0073: Scorching Sands — "the target's Speed is halved until the
     // end of its next turn". te producer mirror of the MA-0038 shape.
-    if (saveSuccess === false && context?.speedHalf) {
+    if (context?.speedHalf) {
         await grantSpeedHalf({ context, campaignName, attackerName, applyTarget });
     }
     // MA-0093: Giggling Magic — "the target rolls 1d6 whenever it makes an
     // ability check or attack roll and subtracts the number rolled" until the
     // end of its next turn. te producer mirror of the MA-0073 shape; the
     // subtractDie value rides the te to the generalized roll-time consumer.
-    if (saveSuccess === false && context?.subtractDebuff) {
+    if (context?.subtractDebuff) {
         await grantSubtractDieDebuff({ context, campaignName, attackerName, applyTarget });
+    }
+    // MA-0104: Adult Gold Dragon Banish — "transported to a harmless
+    // demiplane until the start of the dragon's next turn". Distinct te from
+    // the PC spell banishment (concentration/permanent semantics); badge +
+    // honest advisory display, reappearance placement GM-enforced (§7).
+    if (context?.demiplaneTransport) {
+        await grantDemiplaneTransport({ context, campaignName, attackerName, applyTarget });
     }
 }
 
@@ -468,6 +483,38 @@ async function grantSubtractDieDebuff({ context, campaignName, attackerName, app
         description: `${applyTarget} failed ${attackerName}'s ${actionName} save — rolls ${debuff.die} and subtracts it from ability checks and attack rolls until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:subtract-die-debuff-granted]', e); });
+}
+
+// MA-0104: failed-save demiplane-transport grant (Adult Gold Dragon Banish).
+// Writes the registry te (banished_demiplane) on the target sourced from the
+// dragon, duration until_start_of_attacker_next_turn with the MA-0073 rounds:2
+// clock, and logs the named clause. Consumers: ConditionEffectBadges 'Banished'
+// badge. Incapacitation lands via saveConditions — not duplicated here.
+// Reappearing in an unoccupied space of the dragon's choice within 120 feet
+// stays GM-enforced advisory (§7 — no grid transport consumer).
+async function grantDemiplaneTransport({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'Banish';
+    registerTargetEffect(campaignName, applyTarget, 'banished_demiplane', attackerName, {
+        duration: 'until_start_of_attacker_next_turn',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'banished_demiplane', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'banished_demiplane');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'banished_demiplane_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — transported to a harmless demiplane (Incapacitated) until the start of ${attackerName}'s next turn, then reappears in an unoccupied space of ${attackerName}'s choice within 120 feet (reappearance placement GM-enforced).${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:demiplane-transport-granted]', e); });
 }
 
 // MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.

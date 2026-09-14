@@ -125,6 +125,20 @@ export function parseSlowedClauses(saveEffect) {
   return clauses.length > 0 ? { effects: clauses } : null;
 }
 
+// MA-0104: authored failed-save demiplane-transport clause (Adult/Ancient
+// Gold Dragon Banish — "transported to a harmless demiplane until the start
+// of the dragon's next turn"). Not a condition, so extractConditionsFromSaveEffect
+// can never see it; this parse arms the banished_demiplane te producer at the
+// failed-save seam in saveProcessing (MA-0073 parse shape). Distinct te from
+// the PC spell `banishment` (concentration/permanent semantics would misfire
+// its badge/handler consumers). Byte-inert (null) for rows without the clause;
+// "trapped in a demiplane inside the Soul Tome" (different wording) never
+// matches. Reappearance placement stays GM-enforced §7.
+export function parseBanishTransportClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /transported to a harmless demiplane/i.test(saveEffect) ? { effect: 'banished_demiplane' } : null;
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];

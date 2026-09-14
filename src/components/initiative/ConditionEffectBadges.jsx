@@ -397,6 +397,12 @@ const BADGE_SPECS = [
         build: ctx => ({ label: 'Banished', cls: 'effect-debuff', icon: 'fa-door-open', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'banishment', tooltip: `Banished by ${ctx.te.source || 'unknown'}: Incapacitated in demiplane. ${ctx.te.permanent ? 'Permanent banishment - target will not return.' : 'Concentration, up to 1 minute.'}` }),
     },
     {
+        // MA-0104: monster legendary Banish (Adult/Ancient Gold Dragon) —
+        // distinct te from the PC spell; honest non-concentration tooltip.
+        find: ctx => findDirect(ctx, 'banished_demiplane'),
+        build: ctx => ({ label: 'Banished (Demiplane)', cls: 'effect-debuff', icon: 'fa-door-open', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'banished_demiplane', tooltip: `Banished by ${ctx.te.source || 'unknown'}: Incapacitated in a harmless demiplane until the start of the dragon's next turn; reappears within 120 ft of the dragon (GM-enforced).` }),
+    },
+    {
         find: ctx => findDirect(ctx, 'maze'),
         build: buildMazeBadge,
     },

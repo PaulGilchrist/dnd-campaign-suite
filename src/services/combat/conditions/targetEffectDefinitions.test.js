@@ -161,6 +161,7 @@ describe('targetEffectDefinitions', () => {
         expect(effectKeys).toContain('maze');
         expect(effectKeys).toContain('confusion');
         expect(effectKeys).toContain('banishment');
+        expect(effectKeys).toContain('banished_demiplane');
         expect(effectKeys).toContain('holy_aura');
         expect(effectKeys).toContain('antimagic_field');
         expect(effectKeys).toContain('aura_of_life');

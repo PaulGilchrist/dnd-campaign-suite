@@ -2225,13 +2225,13 @@
       },
       {
         "name": "Banish",
-        "description": "Charisma Saving Throw: DC 21, one creature the dragon can see within 120 feet. <strong>Failure:</strong> 10 (3d6) Force damage, and the target has the <strong>Incapacitated</strong> condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon (demiplane transport advisory — no te consumer; GM-enforced). No damage or effect on a successful save. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+        "description": "Charisma Saving Throw: DC 21, one creature the dragon can see within 120 feet. <strong>Failure:</strong> 10 (3d6) Force damage, and the target has the <strong>Incapacitated</strong> condition and is transported to a harmless demiplane until the start of the dragon's next turn (banished_demiplane te granted on a failed save), at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon (reappearance placement GM-enforced). No damage or effect on a successful save. Failure or Success: The dragon can't take this action again until the start of its next turn.",
         "save_dc": 21,
         "save_type": "Charisma",
         "dc_success": "none",
         "damage_dice_primary": "3d6",
         "damage_type_primary": "Force",
-        "save_effect": "10 (3d6) Force damage, and the target has the Incapacitated condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon (advisory — GM-enforced)"
+        "save_effect": "10 (3d6) Force damage, and the target has the Incapacitated condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon (reappearance placement GM-enforced)"
       },
       {
         "name": "Guiding Light",

@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -780,24 +780,26 @@ function savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction)
 
 function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
+  const actionName = spellName || action.name;
+  const saveEffect = action?.save_effect ?? null;
   return {
     attackerName: monsterName,
     targetName: target?.name,
-    actionName: spellName || action.name,
+    actionName,
     spellName,
     saveDc: action.save_dc,
     saveType,
     dcSuccess,
     autoDamageFormula: saveDamageFormula,
     autoDamageDamageType: saveDamageFormula && primaryDamageType ? formatDamageTypes([primaryDamageType]) : null,
-    autoDamageName: spellName || action.name,
+    autoDamageName: actionName,
     saveConditions,
     isSpellDamage: !!spellName,
     consumeMemoriesClause: !!prerequisite,
     // MA-0020: spend marker lands at prompt-confirm (saveProcessing); the
     // until-clause rides the condition meta as a GM-enforced durationNote.
-    monsterAbilityUse: usesGate ? { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName: spellName || action.name } : undefined,
-    conditionDurationNote: extractConditionDurationNote(action?.save_effect),
+    monsterAbilityUse: usesGate ? { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName } : undefined,
+    conditionDurationNote: extractConditionDurationNote(saveEffect),
     // MA-0030: authored success-immunity clause (granted at save success in saveProcessing).
     successImmunity: action?.success_immunity || null,
     // MA-0048: authored repeat-save clause (Frightful Presence) — arm the
@@ -805,13 +807,16 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     repeatSave: action?.repeat_save || null,
     // MA-0038: authored failed-save concentration-disadvantage clause
     // (Cloud of Insects) — te producer arm for saveProcessing on a fail.
-    concentrationDisadvantage: parseConcentrationDisadvantageClause(action?.save_effect),
+    concentrationDisadvantage: parseConcentrationDisadvantageClause(saveEffect),
     // MA-0073: authored failed-save speed-halved clause (Scorching Sands) —
     // speed_half te producer arm for saveProcessing on a fail.
-    speedHalf: parseSpeedHalfClause(action?.save_effect),
+    speedHalf: parseSpeedHalfClause(saveEffect),
     // MA-0093: authored failed-save subtract-die debuff clause (Giggling
     // Magic) — giggling_magic_debuff te producer arm for saveProcessing.
-    subtractDebuff: parseSubtractDieClause(action.save_effect),
+    subtractDebuff: parseSubtractDieClause(saveEffect),
+    // MA-0104: authored failed-save demiplane-transport clause (Banish) —
+    // banished_demiplane te producer arm for saveProcessing on a fail.
+    demiplaneTransport: parseBanishTransportClause(saveEffect),
   };
 }
 

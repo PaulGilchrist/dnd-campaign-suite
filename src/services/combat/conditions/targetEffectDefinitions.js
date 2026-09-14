@@ -390,6 +390,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    effect: 'banished_demiplane',
+    label: 'Banished (Demiplane)',
+    description: 'Monster legendary Banish: the target is transported to a harmless demiplane until the start of the dragon\'s next turn (Incapacitated while banished), then reappears in an unoccupied space of the dragon\'s choice within 120 feet — reappearance placement is GM-enforced.',
+    icon: 'fa-door-open',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
     effect: 'holy_aura',
     label: 'Holy Aura',
     description: 'Allies gain Advantage on saving throws. Other creatures have Disadvantage on attack rolls against them. Fiends/Undead that hit an affected creature with a melee attack must succeed on a CON save or be Blinded until the end of their next turn. Concentration, up to 1 minute.',
