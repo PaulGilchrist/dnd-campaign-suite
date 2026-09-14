@@ -1691,24 +1691,32 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Blazing Light",
-        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em>."
+        "attack_bonus": 8,
+        "spell_attack_bonus": 8,
+        "range": "120 ft.",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Fire",
+        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em>: Ranged Spell Attack: +8 to hit. Hit: 2d6 Fire damage per ray (single ray resolves per click — multi-ray advisory, GM clicks again per ray)."
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       },
       {
         "name": "Scorching Sands",
-        "description": "Dexterity Saving Throw: DC 16, one creature the dragon can see within 120 feet. <strong>Failure:</strong> 27 (6d8) Fire damage, and the target's Speed is halved until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+        "description": "Dexterity Saving Throw: DC 16, one creature the dragon can see within 120 feet. <strong>Failure:</strong> 27 (6d8) Fire damage, and the target's Speed is halved until the end of its next turn (Speed-halved advisory — no save-path speed consumer; GM-enforced). Failure or Success: The dragon can't take this action again until the start of its next turn.",
         "save_dc": 16,
         "save_type": "Dexterity",
+        "dc_success": "none",
         "damage_dice_primary": "6d8",
         "damage_type_primary": "Fire",
-        "save_effect": "27 (6d8) Fire damage, and the target's Speed is halved until the end of its next turn"
+        "save_effect": "27 (6d8) Fire damage, and the target's Speed is halved until the end of its next turn (Speed-halved advisory, GM-enforced)"
       }
     ],
     "lair_actions": [
