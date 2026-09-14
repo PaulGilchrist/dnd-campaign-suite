@@ -574,3 +574,118 @@ describe('MA-0075 adult-brass-dragon sand cloud data lock', () => {
     expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
   });
 });
+
+// MA-0085: Adult Bronze Dragon lair_actions were a MISATTRIBUTED dict [0]
+// (fog-cloud text carrying thunderclap numbers — save_dc 15 / Constitution /
+// 1d10 Thunder / deafened) plus a raw STRING [1] holding the actual
+// thunderclap mechanics (typo "1dlO"). [0] had NO name → "Unnamed lair
+// actions 1" and both rows were inert (MV-24). Now: [0] is a named save-less
+// FOG CLOUD zone row (MA-0043 no_save zone shape — chip → zone picker, NO
+// save prompt); [1] is the named THUNDERCLAP save row that legitimately owns
+// the DC 15 CON 1d10 Thunder + deafened numbers (typo fixed, dc_success none).
+describe('MA-0085 adult-bronze-dragon fog cloud + thunderclap data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-bronze-dragon');
+  const fog = dragon.lair_actions[0];
+  const clap = dragon.lair_actions[1];
+
+  it('[0] is now a NAMED clickable ZONE row (no longer nameless inert dict)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Fog Cloud');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('zone');
+  });
+
+  it('[0] fog cloud carries NO misattributed thunderclap fields (stripped)', () => {
+    expect(fog.save_dc).toBeUndefined();
+    expect(fog.save_type).toBeUndefined();
+    expect(fog.damage_dice_primary).toBeUndefined();
+    expect(fog.damage_type_primary).toBeUndefined();
+    expect(fog.save_effect).toBeUndefined();
+  });
+
+  it('[0] canonical fog cloud is save-less zone: 20-ft radius, no_save, fog noun', () => {
+    expect(fog.description).toMatch(/fog cloud spell/i);
+    expect(fog.description).toMatch(/initiative count 20 on the next round/i);
+    expect(fog.description).not.toMatch(/saving throw/i);
+    expect(fog.zone.radius_ft).toBe(20);
+    expect(fog.zone.no_save).toBe(true);
+    expect(fog.zone.noun).toBe('fog');
+    expect(fog.zone.effect_key).toBe('lair_fog_cloud');
+    expect(fog.zone.advisory).toMatch(/no saving throw/i);
+    expect(fog.zone.advisory).toMatch(/GM-enforced/i);
+    expect(fog.duration).toMatch(/initiative count 20/i);
+  });
+
+  it('[1] thunderclap is now a structured clickable SAVE row named Thunderclap', () => {
+    expect(typeof clap).toBe('object');
+    expect(clap.name).toBe('Thunderclap');
+    expect(isLairRowClickable(clap)).toBe(true);
+    expect(lairRowAffordance(clap)).toBe('save');
+  });
+
+  it('[1] thunderclap now LEGITIMATELY owns DC 15 Constitution, 1d10 Thunder', () => {
+    expect(clap.save_dc).toBe(15);
+    expect(clap.save_type).toBe('Constitution');
+    expect(clap.damage_dice_primary).toBe('1d10');
+    expect(clap.damage_type_primary).toBe('Thunder');
+    expect(clap.description).toMatch(/DC 15 Constitution saving throw/i);
+    expect(clap.description).toMatch(/20-foot radius/i);
+  });
+
+  it('[1] typo fixed — no "1dlO" letter-O token anywhere in the row', () => {
+    expect(JSON.stringify(clap)).not.toMatch(/1dlO/);
+    expect(clap.description).toMatch(/5 \(1d10\) thunder damage/i);
+    expect(clap.save_effect).toMatch(/5 \(1d10\) Thunder damage/i);
+  });
+
+  it('[1] dc_success none — canonical text states no half-on-success (full on fail)', () => {
+    expect(clap.dc_success).toBe('none');
+    expect(clap.description).not.toMatch(/half/i);
+  });
+
+  it('[1] save_effect vocabulary extracts ONLY deafened (MA-0017 failed-save seam)', () => {
+    expect(clap.save_effect).toMatch(/deafened until the end of its next turn/i);
+    expect(extractConditionsFromSaveEffect(clap.save_effect)).toEqual(['deafened']);
+  });
+
+  it('[0] fog zone routes through handleZone, zero save/attack/damage handlers', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Adult Bronze Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(fog);
+  });
+
+  it('[1] thunderclap routes through handleSaveRoll with 1d10 formula + deafened', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: clap,
+      monsterName: 'Adult Bronze Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '1d10',
+      saveConditions: extractConditionsFromSaveEffect(clap.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(clap, '1d10', ['deafened']);
+  });
+
+  it('lair_fog_cloud te is registered in the target-effect registry (Lair group)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_fog_cloud');
+    expect(def).toBeTruthy();
+    expect(def.label).toBe('Fog Cloud (Lair)');
+    expect(def.group).toBe('Lair');
+  });
+});

@@ -100,6 +100,9 @@ function zoneTeForAction(action) {
   // 2nd-level+ light — GM-enforced") rides the arm log. Absent on
   // MA-0042's insect-cloud row (payload byte-identical there).
   if (action.zone.advisory) payload.clause = action.zone.advisory;
+  // MA-0085: optional zone noun (e.g. Adult Bronze Dragon Fog Cloud "fog")
+  // for the save-less picker copy. Absent → 'darkness' (MA-0043 byte-identical).
+  if (action.zone.noun) payload.noun = action.zone.noun;
   return payload;
 }
 

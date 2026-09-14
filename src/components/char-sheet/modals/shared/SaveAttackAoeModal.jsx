@@ -545,9 +545,16 @@ function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, da
             note: `On a failed save, target takes ${damage} ${damageType} damage. ${successSentence}${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
         };
     }
+    return zoneOnlyPickerCopy(zoneTe, range);
+}
+
+// MA-0043: save-less zone picker copy (Shroud of Darkness). MA-0085: optional
+// zone noun/icon (Adult Bronze Dragon Fog Cloud "fog") — absent → darkness
+// defaults, MA-0043 byte-identical.
+function zoneOnlyPickerCopy(zoneTe, range) {
     return {
-        icon: 'fa-moon',
-        description: `Select creatures inside the <strong>${zoneTe?.radiusFt ?? range}-foot</strong> darkness. No saving throw — the GM positions the origin (selection advisory).`,
+        icon: zoneTe?.icon || 'fa-moon',
+        description: `Select creatures inside the <strong>${zoneTe?.radiusFt ?? range}-foot</strong> ${zoneTe?.noun || 'darkness'}. No saving throw — the GM positions the origin (selection advisory).`,
         note: `${zoneTe?.clause || ''} Duration ${zoneTe?.duration || 'GM-adjudicated'} — GM-enforced.`,
     };
 }

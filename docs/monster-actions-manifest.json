@@ -1320,7 +1320,7 @@
         "deafened"
       ],
       "description": "The dragon creates fog as though it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0085-lair-fog-cloud.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0086",

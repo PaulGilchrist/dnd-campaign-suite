@@ -423,3 +423,7 @@ Dead-by-design (accepted models, do not chase): feats with `automation:null` ben
 ## MA-0084 recipe (2026-09-14, fixed): Sphere/radius save rows → Radius picker (reusable ~40 rows)
 - `breathAoeShape` now detects Sphere/radius text via `sphereRadiusFeet()` → `{shape:'Radius', feet:<radius token>, rangeGateFt:null}` reusing MA-0042 zone picker plumbing ("GM positions tokens; selection advisory"; point-range text never coverage). Cylinder rows stay single-target. SaveAttackAoeModal gained honest `dcSuccess:'none'` copy + optional `conditionDurationNote` on fail log (absent = byte-identical MA-0063).
 - PITFALL: success saves on damage rows write no roll log (MA-0090 gated pattern) — `saveResult-<T>` machine keys are the evidence. Monster overlay survives picker close — dismiss its × between cards.
+
+## MA-0085 recipe (2026-09-14, fixed): save-less lair zone + drift re-attribution (reusable fog cloud lair rows)
+- No-save lair area: `{name, description, zone:{radius_ft, no_save:true, effect_key:"lair_fog_cloud", noun:"fog"}}` → `affordance:'zone'` (monsterLairActions.js:40 — requires radius_ft AND no save_dc) → zoneOnly picker "20-foot fog. No saving throw" + te arm, zero save prompt. `lair_fog_cloud` te registered (Lair group); `zone.noun` passthrough (default darkness byte-identical MA-0043).
+- Pair row in same block as structured save row (Thunderclap: dc/dice/deafened save_effect must contain the condition word for MA-0017 seam; dc_success:"none" suppresses half boilerplate). Fix authoring typos (1dlO→1d10) in data locks too.

@@ -799,6 +799,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Lair',
     fields: ['source', 'dc'],
   },
+  {
+    effect: 'lair_fog_cloud',
+    label: 'Fog Cloud (Lair)',
+    description: 'Inside a magical fog cloud (20-foot radius, lair action): lightly obscured. No saving throw (canonical fog cloud lair action). Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam in this engine).',
+    icon: 'fa-cloud-fog',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source'],
+  },
 
   // ── Movement ────────────────────────────────────────────
   {
