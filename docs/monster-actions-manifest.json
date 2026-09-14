@@ -1398,7 +1398,7 @@
       "saveType": "Constitution",
       "saveEffect": "The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
       "description": "Constitution Saving Throw: DC 18, each creature in a 60-foot Cone. Failure: The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0090-slowing-breath.md"
     },
     {
       "id": "MA-0091",
@@ -1412,7 +1412,7 @@
       "saveDc": 17,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):At Will: Detect Magic, Mind Spike (level 4 version), Minor Illusion, Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell)1/Day Each: Greater Restoration, Major Image",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0092",
@@ -1424,7 +1424,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0092-legendary-uses.md"
     },
     {
       "id": "MA-0093",
@@ -1441,7 +1441,7 @@
       "damageDicePrimary": "7d6",
       "damageTypePrimary": "Psychic",
       "description": "Charisma Saving Throw: DC 17, one creature the dragon can see within 90 feet. Failure: 24 (7d6) Psychic damage. Until the end of its next turn, the target rolls 1d6 whenever it makes an ability check or attack roll and subtracts the number rolled from the D20 Test. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0093-giggling-magic.md"
     },
     {
       "id": "MA-0094",
@@ -1453,7 +1453,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Mind Spike (level 4 version). The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0094-mind-jolt.md"
     },
     {
       "id": "MA-0095",
@@ -1465,7 +1465,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0095-pounce.md"
     },
     {
       "id": "MA-0096",
@@ -1483,7 +1483,7 @@
         "restrained"
       ],
       "description": "The dragon chooses a point on the ground that it can see within 120 feet of it. Stone spikes sprout from the ground in a 20-foot radius centered on that point. The effect is otherwise identical to the spike growth spell and lasts until the dragon uses this lair action again or until the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0096-lair-spike-growth.md"
     },
     {
       "id": "MA-0097",
@@ -1498,7 +1498,7 @@
         "restrained"
       ],
       "description": "The dragon chooses a 10-foot-square area on the ground that it can see within 120 feet of it. The ground in that area turns into 3-foot-deep mud. Each creature on the ground in that area when the mud appears must succeed on a DC 15 Dexterity saving throw or sink into the mud and become restrained. A creature can take an action to attempt a DC 15 Strength check, freeing itself or another creature within its reach and ending the restrained condition on a success. Moving 1 foot in the mud costs 2 feet of movement. On initia­tive count 20 on the next round, the mud hardens, and the Strength DC to work free increases to 20.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0097-lair-2.md"
     },
     {
       "id": "MA-0098",
@@ -1510,7 +1510,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Spellcasting to cast Guiding Bolt (level 2 version) or (B) Weakening Breath.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0099",
@@ -1528,7 +1528,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 17 (2d8 + 8) Slashing damage plus 4 (1d8) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0100",
@@ -1546,7 +1546,7 @@
       "damageTypePrimary": "Fire",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 21, each creature in a 60-foot Cone. Failure: 66 (12d10) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0101",
@@ -1560,7 +1560,7 @@
       "saveDc": 21,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21, +13 to hit with spell attacks):At Will: Detect Magic, Guiding Bolt (level 2 version), Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell)1/Day Each: Flame Strike, Zone of Truth",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0102",
@@ -1575,7 +1575,7 @@
       "saveType": "Strength",
       "saveEffect": "The target has Disadvantage on Strength-based D20 Tests and subtracts 3 (1d6) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. Target repeats the save at the end of each of its turns. After 1 minute, it succeeds automatically.",
       "description": "Strength Saving Throw: DC 21, each creature that isn't currently affected by this breath in a 60-foot Cone. Failure: The target has Disadvantage on Strength-based D20 Tests and subtracts 3 (1d6) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0102-weakening-breath.md"
     },
     {
       "id": "MA-0103",
@@ -1587,7 +1587,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0103-legendary-uses.md"
     },
     {
       "id": "MA-0104",
@@ -1607,7 +1607,7 @@
         "incapacitated"
       ],
       "description": "Charisma Saving Throw: DC 21, one creature the dragon can see within 120 feet. Failure: 10 (3d6) Force damage, and the target has the Incapacitated condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0104-banish.md"
     },
     {
       "id": "MA-0105",
@@ -1619,7 +1619,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Guiding Bolt (level 2 version).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0105-guiding-light.md"
     },
     {
       "id": "MA-0106",
@@ -1631,7 +1631,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0106-pounce.md"
     },
     {
       "id": "MA-0107",
@@ -1646,7 +1646,7 @@
       "saveType": "Charisma",
       "saveEffect": "The target is banished to a dream plane. To escape, the creature must use its action to make a Charisma check contested by the dragon's.",
       "description": "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0107-lair-future-sight.md"
     },
     {
       "id": "MA-0108",
@@ -1658,7 +1658,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane, a different plane of exis­ tence the dragon has imagined into being. To escape, the creature must use its action to make a Charisma check contested by the dragon's. If the creature wins, it escapes the dream plane. Otherwise, the effect ends on initiative count 20 on the next round. When the effect ends, the creature reappears in the space it left or in the nearest unoccupied space if that one is occupied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0108-lair-dream-plane.md"
     },
     {
       "id": "MA-0109",
@@ -1670,7 +1670,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Mind Spike (level 3 version).",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0110",
@@ -1688,7 +1688,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +11, reach 10 ft. Hit: 15 (2d8 + 6) Slashing damage plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0111",
@@ -1706,7 +1706,7 @@
       "damageTypePrimary": "Poison",
       "recharge": "5-6",
       "description": "Constitution Saving Throw: DC 18, each creature in a 60-foot Cone. Failure: 56 (16d6) Poison damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0112",
@@ -1720,7 +1720,7 @@
       "saveDc": 17,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):At Will: Detect Magic, Mind Spike (level 3 version)1/Day: Geas",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0112-spellcasting.md"
     },
     {
       "id": "MA-0113",
@@ -1732,7 +1732,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0113-legendary-uses.md"
     },
     {
       "id": "MA-0114",
@@ -1744,7 +1744,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Mind Spike (level 3 version).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0114-mind-invasion.md"
     },
     {
       "id": "MA-0115",
@@ -1761,7 +1761,7 @@
       "damageDicePrimary": "2d6",
       "damageTypePrimary": "Poison",
       "description": "Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0115-noxious-miasma.md"
     },
     {
       "id": "MA-0116",
@@ -1773,7 +1773,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0116-pounce.md"
     },
     {
       "id": "MA-0117",
@@ -1793,7 +1793,7 @@
         "restrained"
       ],
       "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif­ficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0117-lair-grasping-roots.md"
     },
     {
       "id": "MA-0118",
@@ -1805,7 +1805,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec­ tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0118-lair-wall-of-thorns.md"
     },
     {
       "id": "MA-0119",
@@ -1820,7 +1820,7 @@
         "charmed"
       ],
       "description": "Magical fog billows around one creature the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Wisdom saving throw or be charmed by the dragon until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0119-lair-fog-charm.md"
     },
     {
       "id": "MA-0120",
@@ -1832,7 +1832,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast *Scorching Ray*.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0121",
@@ -1850,7 +1850,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 13 (1d10 + 8) Slashing damage plus 5 (2d4) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0122",
@@ -1868,7 +1868,7 @@
       "damageTypePrimary": "Fire",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 21, each creature in a 60-foot Cone. Failure: 59 (17d6) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0123",
@@ -1882,7 +1882,7 @@
       "saveDc": 20,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 20, +12 to hit with spell attacks):At Will: Command (level 2 version), Detect Magic, Scorching Ray1/Day: Fireball",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0124",
@@ -1894,7 +1894,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0124-legendary-uses.md"
     },
     {
       "id": "MA-0125",
@@ -1906,7 +1906,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0125-commanding-presence.md"
     },
     {
       "id": "MA-0126",
@@ -1918,7 +1918,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Scorching Ray. The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0126-fiery-rays.md"
     },
     {
       "id": "MA-0127",
@@ -1930,7 +1930,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0127-pounce.md"
     },
     {
       "id": "MA-0128",
@@ -1950,7 +1950,7 @@
         "prone"
       ],
       "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0128-lair-magma-geyser.md"
     },
     {
       "id": "MA-0129",
@@ -1965,7 +1965,7 @@
         "prone"
       ],
       "description": "A tremor shakes the lair in a 60-foot radius around the dragon. Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0129-lair-tremor-prone.md"
     },
     {
       "id": "MA-0130",
@@ -1981,7 +1981,7 @@
         "poisoned"
       ],
       "description": "Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The sphere spreads around corners, and its area is lightly obscured. It lasts until initiative count 20 on the next round. Each creature that starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn. While poisoned in this way, a creature is incapacitated.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0130-lair-volcanic-gas.md"
     },
     {
       "id": "MA-0131",
@@ -1993,7 +1993,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Paralyzing Breath or (B) Spellcasting to cast *Ice Knife*.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0132",
@@ -2011,7 +2011,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +13, reach 10 ft. Hit: 17 (2d8 + 8) Slashing damage plus 4 (1d8) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0133",
@@ -2029,7 +2029,7 @@
       "damageTypePrimary": "Cold",
       "recharge": "5-6",
       "description": "Constitution Saving Throw: DC 20, each creature in a 60-foot Cone. Failure: 54 (12d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0134",
@@ -2048,7 +2048,7 @@
         "paralyzed"
       ],
       "description": "Constitution Saving Throw: DC 20, each creature in a 60-foot Cone. First Failure: The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0135",
@@ -2062,7 +2062,7 @@
       "saveDc": 19,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 19, +11 to hit with spell attacks):At Will: Detect Magic, Hold Monster, Ice Knife, Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell)1/Day Each: Ice Storm (level 5 version), Zone of Truth",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0135-spellcasting.md"
     },
     {
       "id": "MA-0136",
@@ -2074,7 +2074,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0136-legendary-uses.md"
     },
     {
       "id": "MA-0137",
@@ -2086,7 +2086,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0137-chill.md"
     },
     {
       "id": "MA-0138",
@@ -2103,7 +2103,7 @@
       "damageDicePrimary": "4d6",
       "damageTypePrimary": "Cold",
       "description": "Dexterity Saving Throw: DC 19, each creature in a 60-foot-long, 10-foot-wide Line. Failure: 14 (4d6) Cold damage, and the target is pushed up to 30 feet straight away from the dragon. Success: Half damage only. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0138-cold-gale.md"
     },
     {
       "id": "MA-0139",
@@ -2115,7 +2115,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0139-pounce.md"
     },
     {
       "id": "MA-0140",
@@ -2132,7 +2132,7 @@
       "damageDicePrimary": "1d10",
       "damageTypePrimary": "Cold",
       "description": "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0140-lair-1.md"
     },
     {
       "id": "MA-0141",
@@ -2144,7 +2144,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "A blisteringly cold wind blows through the lair near the dragon. Each creature within 120 feet of the dragon must succeed on a DC 15 Constitution saving throw or take 5 (1dlO) cold damage. Gases and vapors are dispersed by the wind, and unprotected flames are extinguished. Protected flames, such as lanterns, have a 50 percent chance of being extinguished.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0141-lair-2.md"
     },
     {
       "id": "MA-0142",
@@ -2156,7 +2156,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0143",
@@ -2174,7 +2174,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +11, reach 10 ft. Hit: 13 (2d6 + 6) Slashing damage plus 4 (1d8) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0144",
@@ -2192,7 +2192,7 @@
       "damageTypePrimary": "Cold",
       "recharge": "5-6",
       "description": "Constitution Saving Throw: DC 19, each creature in a 60-foot Cone. Failure: 54 (12d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0145",
@@ -2204,7 +2204,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0145-legendary-uses.md"
     },
     {
       "id": "MA-0146",
@@ -2221,7 +2221,7 @@
       "damageDicePrimary": "2d6",
       "damageTypePrimary": "Cold",
       "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot-radius Sphere centered on a point the dragon can see within 120 feet. Failure: 7 (2d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0146-freezing-burst.md"
     },
     {
       "id": "MA-0147",
@@ -2235,7 +2235,7 @@
       "saveDc": 14,
       "saveType": "Charisma",
       "description": "The dragon casts *Fear*, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14). The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0147-frightful-presence.md"
     },
     {
       "id": "MA-0148",
@@ -2247,7 +2247,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0148-pounce.md"
     },
     {
       "id": "MA-0149",
@@ -2263,7 +2263,7 @@
       "damageDicePrimary": "3d6",
       "damageTypePrimary": "Cold",
       "description": "Freezing fog fills a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The fog spreads around corners, and its area is heavily obscured. Each creature in the fog when it appears must make a DC 10 Constitution saving throw, taking 10 (3d6) cold damage on a failed save, or half as much damage on a successful one. A creature that ends its turn in the fog takes 10 (3d6) cold damage. A wind of at least 20 miles per hour disperses the fog. The fog otherwise lasts until the dragon uses this lair action again or until the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0149-lair-1.md"
     },
     {
       "id": "MA-0150",
@@ -2275,7 +2275,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Jagged ice shards fall from the ceiling, striking up to three creatures underneath that the dragon can see within 120 feet of it. The dragon makes one ranged attack roll (+7 to hit) against each target. On a hit, the target takes 10 (3d6) piercing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0150-lair-2.md"
     },
     {
       "id": "MA-0151",
@@ -2287,7 +2287,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec­ tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0151-lair-3.md"
     },
     {
       "id": "MA-0152",
@@ -2299,7 +2299,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The elemental makes two Thunderous Slam attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0153",
@@ -2315,7 +2315,7 @@
       "damageTypePrimary": "Thunder",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 14 (2d8 + 5) Thunder damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0154",
@@ -2336,7 +2336,7 @@
         "prone"
       ],
       "description": "Strength Saving Throw: DC 13, one Medium or smaller creature in the elemental's space. Failure: 24 (4d10 + 2) Thunder damage, and the target is pushed up to 20 feet straight away from the elemental and has the Prone condition. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0155",
@@ -2352,7 +2352,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 15 (2d10 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0156",
@@ -2371,7 +2371,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d8 + 4) Slashing damage. If the target is a Large or smaller creature and the allosaurus moved 30+ feet straight toward it immediately before the hit, the target has the Prone condition, and the allosaurus can make one Bite attack against it.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0157",
@@ -2383,7 +2383,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Melf's Acid Arrow (level 4 version).",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0158",
@@ -2401,7 +2401,7 @@
       "damageTypeSecondary": "Acid",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 17 (2d8 + 8) Slashing damage plus 9 (2d8) Acid damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0159",
@@ -2419,7 +2419,7 @@
       "damageTypePrimary": "Acid",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 22, each creature in a 90-foot-long, 10-foot-wide Line. Failure: 67 (15d8) Acid damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0160",
@@ -2433,7 +2433,7 @@
       "saveDc": 21,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21, +13 to hit with spell attacks):At Will: Detect Magic, Fear, Melf's Acid Arrow (level 4 version)1/Day Each: Create Undead, Speak with Dead, Vitriolic Sphere (level 5 version)",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0160-spellcasting.md"
     },
     {
       "id": "MA-0161",
@@ -2445,7 +2445,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0161-legendary-uses.md"
     },
     {
       "id": "MA-0162",
@@ -2462,7 +2462,7 @@
       "damageDicePrimary": "6d10",
       "damageTypePrimary": "Poison",
       "description": "Dexterity Saving Throw: DC 21, one creature the dragon can see within 120 feet. Failure: 33 (6d10) Poison damage, and the target has Disadvantage on saving throws to maintain Concentration until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0163",

@@ -1,4 +1,31 @@
 {
+  "Ancient Black Dragon": {
+    "monsterIndex": "ancient-black-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Black Dragon 1",
+      "hp": 367,
+      "ac": 22,
+      "init": 4,
+      "csIndex": 0,
+      "verifiedRow": "MA-0160 (FAIL spellcasting: save-leg upcast Vitriolic Sphere lv5 rolled base 10d4; list+DC21/CHA+1/Day gate all PASS)",
+      "date": "2026-09-14"
+    }
+  },
+  "Allosaurus": {
+    "monsterIndex": "allosaurus",
+    "placedIn": "test-campaign initiative via Encounter Builder Join Encounter",
+    "config": {
+      "name": "Allosaurus 1",
+      "hp": 51,
+      "ac": 13,
+      "init": 2,
+      "csIndex": 0,
+      "verifiedRow": "MA-0155",
+      "verdict": "verified",
+      "date": "2026-09-14"
+    }
+  },
   "Aarakocra Skirmisher": {
     "monsterIndex": "aarakocra-skirmisher",
     "placedIn": "test-campaign initiative via Encounter Builder Join Encounter",
@@ -63,6 +90,20 @@
       "date": "2026-09-13"
     }
   },
+  "Adult Copper Dragon": {
+    "monsterIndex": "adult-copper-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Adult Copper Dragon 1",
+      "hp": 184,
+      "ac": 18,
+      "init": 11,
+      "csIndex": 0,
+      "verifiedRow": "MA-0090(broken — cone DC 18 CON save rolls, slowdown effect never applied), MA-0091(PASS — spell list+DC17+1/Day gate live; residual: Mind Spike rolls base 3d8 not lv4 5d8), MA-0092(broken uses counter), MA-0093(broken half-dmg+debuff+gate), MA-0094(inert), MA-0095(inert), MA-0096(inert), MA-0097(inert)",
+      "note": "legendary/lair rows render inert: monsters.json dicts lack name/uses keys; lair row isLairRowClickable gates on row.name",
+      "date": "2026-09-14"
+    }
+  },
   "Adult Blue Dracolich": {
     "monsterIndex": "adult-blue-dracolich",
     "placedIn": "test-campaign initiative via EB Join",
@@ -72,6 +113,32 @@
       "csIndex": 0,
       "verifiedRow": "MA-0044(broken),MA-0045(broken),MA-0046(PASS),MA-0047(PASS),MA-0048(broken)",
       "date": "2026-09-13"
+    }
+  },
+  "Adult Gold Dragon": {
+    "monsterIndex": "adult-gold-dragon",
+    "placedIn": "test-campaign initiative via EB Join",
+    "config": {
+      "name": "Adult Gold Dragon 1",
+      "hp": 243,
+      "ac": 19,
+      "init": 19,
+      "csIndex": 0,
+      "verifiedRow": "MA-0098(PASS multiattack: 3 Rend +14 2d8+8+1d8 Fire, Guiding Bolt lv2 5d6 +13, Weakening Breath DC21 STR)",
+      "date": "2026-09-14"
+    }
+  },
+  "Adult Green Dragon": {
+    "monsterIndex": "adult-green-dragon",
+    "placedIn": "test-campaign initiative via EB Join",
+    "config": {
+      "name": "Adult Green Dragon 1",
+      "hp": 207,
+      "ac": 19,
+      "init": 7,
+      "csIndex": 0,
+      "verifiedRow": "MA-0109(PASS multiattack: 3 Rend +11 2d8+6+2d6 Poison, replace→Mind Spike lv3 DC17 base-3d8 residual)",
+      "date": "2026-09-14"
     }
   }
 }
