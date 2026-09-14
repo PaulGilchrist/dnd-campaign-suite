@@ -435,6 +435,130 @@ describe('MA-0092 MonsterCardModal copper dragon legendary gated rows', () => {
   });
 });
 
+const gold = () => monstersData.find(m => m.name === 'Adult Gold Dragon');
+const goldActions = () => [{ name: 'Rend', attack_bonus: 14, damage_dice_primary: '2d8 + 8', damage_type_primary: 'Slashing', damage_dice_secondary: '1d8', damage_type_secondary: 'Fire', reach: '10 ft.' }];
+
+// MA-0103 data lock: Adult Gold Dragon legendary rows mirror the verified
+// MA-0070/MA-0081/MA-0092 shape — header authors uses:3 (counter renders,
+// 4-in-lair stays advisory), Banish keeps its save shape (DC 21 Charisma)
+// and authors dc_success none (canonical: no damage or effect on a successful
+// save; demiplane transport advisory), Guiding Light authors the MA-0033
+// spell-attack seam (+13 from the Spellcasting row: PB +6 + CHA +7; level 2
+// Guiding Bolt = 5d6 Radiant per spells.json), Pounce delegates to Rend (+14
+// from the actions row).
+describe('MA-0103 monsters.json data: adult gold dragon legendary economy authored', () => {
+  it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
+    const la = gold().legendary_actions;
+    expect(la[0].name).toMatch(/Legendary Action Uses: 3 \(4 in Lair\)/);
+    expect(la[0].uses).toBe(3);
+    expect(la[0].description).toMatch(/lair.*advisory/i);
+  });
+
+  it('Banish keeps DC 21 Charisma and authors dc_success none (success = no damage)', () => {
+    const row = gold().legendary_actions.find(a => a.name === 'Banish');
+    expect(row.save_dc).toBe(21);
+    expect(row.save_type).toBe('Charisma');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary).toBe('3d6');
+    expect(row.damage_type_primary).toBe('Force');
+    expect(row.description).toMatch(/No damage or effect on a successful save/i);
+    expect(row.description).toMatch(/can'?t take this action again until the start of its next turn/i);
+  });
+
+  it('Guiding Light authors the spell-attack seam (+13, 5d6 Radiant)', () => {
+    const row = gold().legendary_actions.find(a => a.name === 'Guiding Light');
+    expect(row.attack_bonus).toBe(13);
+    expect(row.spell_attack_bonus).toBe(13);
+    expect(row.damage_dice_primary).toBe('5d6');
+    expect(row.damage_type_primary).toBe('Radiant');
+    expect(row.description).toMatch(/Ranged Spell Attack: \+13/);
+    expect(gold().actions.find(a => a.name === 'Spellcasting')?.description).toMatch(/\+13 to hit with spell attacks/);
+  });
+
+  it('Pounce delegates_to the Rend row (+14)', () => {
+    const row = gold().legendary_actions.find(a => a.name === 'Pounce');
+    expect(row.delegates_to).toBe('Rend');
+    expect(gold().actions.find(a => a.name === 'Rend')?.attack_bonus).toBe(14);
+  });
+});
+
+// MA-0103: with the header authored, the gold dragon card renders the
+// "(3 left)" counter and every legendary row click routes through the gated
+// spend (never the ungated generic handlers).
+describe('MA-0103 MonsterCardModal gold dragon legendary gated rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderGold(uses) {
+    if (uses !== undefined) runtime.store['Adult Gold Dragon 1.monsterLegendaryUses'] = uses;
+    const m = makeMonster({
+      name: 'Adult Gold Dragon',
+      actions: goldActions(),
+      legendary_actions: gold().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Gold Dragon 1', creatures: CREATURES })} />);
+  }
+  function goldRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('header shows (3 left); clicking Pounce spends 1, delegates to Rend (+14), logs spend', async () => {
+    renderGold({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    fireEvent.click(goldRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Pounce (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(14);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Pounce/);
+  });
+
+  it('Banish gated click spends 1, stamps once-per-turn cooldown, save at DC 21 success=none', async () => {
+    renderGold({ max: 3, used: 0 });
+    fireEvent.click(goldRow('Banish').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ banish: { round: 1 } });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Banish/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Banish/);
+  });
+
+  it('exhausted (3/3): Guiding Light click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderGold({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(goldRow('Guiding Light').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
+    renderGold({ max: 3, used: 0 });
+    fireEvent.click(goldRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(goldRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+
+  it('per-action cooldown: Banish re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
+    renderGold({ max: 3, used: 0 });
+    fireEvent.click(goldRow('Banish').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    ctx.value = { round: 1, activeCreatureName: 'TestPC', creatures: CREATURES };
+    fireEvent.click(goldRow('Banish').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'banish_refused (once per turn)')).toBe(true));
+    expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+});
+
 describe('MA-0021 MonsterCardModal legendary economy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
