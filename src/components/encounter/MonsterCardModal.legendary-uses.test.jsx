@@ -559,6 +559,138 @@ describe('MA-0103 MonsterCardModal gold dragon legendary gated rows', () => {
   });
 });
 
+const green = () => monstersData.find(m => m.name === 'Adult Green Dragon');
+const greenActions = () => [{ name: 'Rend', attack_bonus: 11, damage_dice_primary: '2d8 + 6', damage_type_primary: 'Slashing', damage_dice_secondary: '2d6', damage_type_secondary: 'Poison', reach: '10 ft.' }];
+
+// MA-0113 data lock: Adult Green Dragon legendary rows mirror the verified
+// MA-0070/MA-0081/MA-0092/MA-0103 shape — header authors uses:3 (counter
+// renders, 4-in-lair stays advisory), Noxious Miasma keeps its save shape
+// (DC 17 Constitution, 2d6 Poison) and authors dc_success none (success = no
+// damage or effect; AC-penalty te advisory), Mind Invasion authors the
+// MA-0058 advisory token (gated spend + adjudication record; its own save
+// mechanics are MA-0114 scope), Pounce delegates to Rend (+11 from the
+// actions row).
+describe('MA-0113 monsters.json data: adult green dragon legendary economy authored', () => {
+  it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
+    const la = green().legendary_actions;
+    expect(la[0].name).toMatch(/Legendary Action Uses: 3 \(4 in Lair\)/);
+    expect(la[0].uses).toBe(3);
+    expect(la[0].description).toMatch(/lair.*advisory/i);
+  });
+
+  it('Noxious Miasma keeps DC 17 Constitution and authors dc_success none (success = no damage)', () => {
+    const row = green().legendary_actions.find(a => a.name === 'Noxious Miasma');
+    expect(row.save_dc).toBe(17);
+    expect(row.save_type).toBe('Constitution');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary).toBe('2d6');
+    expect(row.damage_type_primary).toBe('Poison');
+    expect(row.description).toMatch(/No effect on a successful save/i);
+    expect(row.description).toMatch(/can'?t take this action again until the start of its next turn/i);
+  });
+
+  it('Mind Invasion authors the MA-0058 advisory token (gated spend affordance)', () => {
+    const row = green().legendary_actions.find(a => a.name === 'Mind Invasion');
+    expect(row.advisory).toBe('mind_spike');
+    expect(row.attack_bonus == null && row.save_dc == null).toBe(true);
+  });
+
+  it('Pounce delegates_to the Rend row (+11)', () => {
+    const row = green().legendary_actions.find(a => a.name === 'Pounce');
+    expect(row.delegates_to).toBe('Rend');
+    expect(green().actions.find(a => a.name === 'Rend')?.attack_bonus).toBe(11);
+  });
+});
+
+// MA-0113: with the header authored, the green dragon card renders the
+// "(3 left)" counter and every legendary row click routes through the gated
+// spend (never the ungated generic handlers).
+describe('MA-0113 MonsterCardModal green dragon legendary gated rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderGreen(uses) {
+    if (uses !== undefined) runtime.store['Adult Green Dragon 1.monsterLegendaryUses'] = uses;
+    const m = makeMonster({
+      name: 'Adult Green Dragon',
+      actions: greenActions(),
+      legendary_actions: green().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Green Dragon 1', creatures: CREATURES })} />);
+  }
+  function greenRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('header shows (3 left); clicking Pounce spends 1, delegates to Rend (+11), logs spend', async () => {
+    renderGreen({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    fireEvent.click(greenRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Pounce (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(11);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Pounce/);
+  });
+
+  it('Noxious Miasma gated click spends 1, stamps once-per-turn cooldown, never the ungated roll', async () => {
+    renderGreen({ max: 3, used: 0 });
+    fireEvent.click(greenRow('Noxious Miasma').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ noxious_miasma: { round: 1 } });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Noxious Miasma/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Noxious Miasma/);
+  });
+
+  it('Mind Invasion gated click spends 1 and lands the advisory adjudication record', async () => {
+    renderGreen({ max: 3, used: 0 });
+    fireEvent.click(greenRow('Mind Invasion').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls.map(c => c[0]).join('|'))).toMatch(/Legendary Action — Mind Invasion/);
+    const advisory = addEntry.mock.calls.map(c => c[1]).find(e => /legendary action Mind Invasion/.test(e.description || ''));
+    expect(advisory).toBeTruthy();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (3/3): Noxious Miasma click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderGreen({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(greenRow('Noxious Miasma').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
+    renderGreen({ max: 3, used: 0 });
+    fireEvent.click(greenRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(greenRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+
+  it('per-action cooldown: Noxious Miasma re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
+    renderGreen({ max: 3, used: 0 });
+    fireEvent.click(greenRow('Noxious Miasma').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    ctx.value = { round: 1, activeCreatureName: 'TestPC', creatures: CREATURES };
+    fireEvent.click(greenRow('Noxious Miasma').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'noxious_miasma_refused (once per turn)')).toBe(true));
+    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+});
+
 describe('MA-0021 MonsterCardModal legendary economy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
