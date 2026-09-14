@@ -411,3 +411,6 @@ Dead-by-design (accepted models, do not chase): feats with `automation:null` ben
 ## MA-0074 recipe (2026-09-14, fixed): nameless-drifting lair row → named STR save (data-only)
 - Fixed pattern: lair dict gets `name` + corrected `save_type`/`save_effect` + `dc_success:"none"` (damageless push/prone) → live chip via existing seam, zero code change. Push-distance + gas/flame clauses = GM-advisory prose (no consumer).
 - PITFALL: choose save-branch victims by ability modifier vs DC (STR −1 auto-fails DC 15 success branch — use high-STR target to prove no-condition-on-success). Data edits picked up by card reload (resolves by monsterIndex); stale EB tabs keep old echo only.
+
+## MA-0075 recipe (2026-09-14, fixed): lair zone-cloud rows structured shape (reusable fog/cloud/fog-cloud rows)
+- Verified sand-cloud shape (Blue MA-0063 → Brass MA-0075 byte-mirrored): {name, description, save_dc, save_type, dc_success:"none", save_effect, zone:{radius_ft, effect_key:"lair_<name>", repeat_save:true, advisory}, duration:"blinded 1 minute (repeat save ends early; advisory)"} → chip → radius picker → zone-arm te + log → per-target save → condition on fail. Repeat-save advisory (no NPC turn-end zone-save consumer). Reuse for Green/Copper fog/mist lair rows; assert structural Object.keys equality vs Blue row in monsterLairActions.test.js data-lock.

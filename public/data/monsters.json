@@ -1728,7 +1728,21 @@
         "dc_success": "none",
         "save_effect": "Failure: The target is pushed 15 feet away from the dragon and knocked prone. Success: unaffected. This effect deals no damage. Gases and vapors are dispersed by the wind, unprotected flames are extinguished, and protected flames have a 50 percent chance of being extinguished (flame/gas clauses are GM-enforced — no flame/gas consumer)."
       },
-      "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in it must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success."
+      {
+        "name": "Sand Cloud",
+        "description": "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in it must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
+        "save_dc": 15,
+        "save_type": "Constitution",
+        "dc_success": "none",
+        "save_effect": "Failure: The target is blinded for 1 minute (repeat the Constitution save at the end of each of its turns; a success ends the effect on itself). Success: unaffected. This effect deals no damage.",
+        "zone": {
+          "radius_ft": 20,
+          "effect_key": "lair_sand_cloud",
+          "repeat_save": true,
+          "advisory": "Blinded persists 1 minute; a creature repeats the DC 15 Constitution save at the end of each of its turns, ending the effect on itself on a success — badge-click repeat save (DC stamped on condition meta) for PCs is enforced; NPC turn-end auto-repeat and 1-minute expiry are GM-enforced (no NPC turn-end zone-save consumer)."
+        },
+        "duration": "blinded 1 minute (repeat save ends early; advisory)"
+      }
     ],
     "environments": [
       "coastal"
