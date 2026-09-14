@@ -1,6 +1,6 @@
 {
   "name": "Zane",
-  "level": 1,
+  "level": 2,
   "alignment": "True Neutral",
   "abilities": [
     {
@@ -21,7 +21,7 @@
       "name": "Constitution",
       "baseScore": 13,
       "featIncrease": 0,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -35,7 +35,7 @@
       "name": "Wisdom",
       "baseScore": 12,
       "featIncrease": 0,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -98,7 +98,8 @@
     "Alarm",
     "False Life",
     "Feather Fall",
-    "Invisibility"
+    "Invisibility",
+    "Chromatic Orb"
   ],
   "magicInitiateInstances": [
     {

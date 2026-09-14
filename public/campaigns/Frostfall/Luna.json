@@ -1,6 +1,6 @@
 {
   "name": "Luna",
-  "level": 1,
+  "level": 2,
   "alignment": "Neutral Good",
   "abilities": [
     {
@@ -28,14 +28,14 @@
       "name": "Intelligence",
       "baseScore": 8,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -105,7 +105,8 @@
   "resistances": [],
   "skillProficiencies": [
     "Insight",
-    "Religion"
+    "Religion",
+    "Perception"
   ],
   "toolProficiencies": [
     "Calligrapher's Supplies"
@@ -121,7 +122,8 @@
     "Shield",
     "Poison Spray",
     "Ray of Frost",
-    "Guidance"
+    "Guidance",
+    "Speak with Animals"
   ],
   "magicInitiateInstances": [
     {
@@ -137,5 +139,10 @@
   "xp": 0,
   "xpMode": "milestone",
   "background": "Acolyte",
-  "imagePath": "images/Luna.png"
+  "imagePath": "images/Luna.png",
+  "featAbilityChoices": {
+    "Boon Of Energy Resistance-0": {
+      "assignment": "Strength"
+    }
+  }
 }

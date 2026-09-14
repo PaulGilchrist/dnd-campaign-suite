@@ -1,13 +1,13 @@
 {
   "name": "Nemeria",
-  "level": 1,
+  "level": 2,
   "alignment": "Chaotic Neutral",
   "abilities": [
     {
       "name": "Strength",
       "baseScore": 14,
       "featIncrease": 0,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -28,7 +28,7 @@
       "name": "Intelligence",
       "baseScore": 10,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {

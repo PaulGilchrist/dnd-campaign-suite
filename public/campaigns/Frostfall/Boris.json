@@ -1,20 +1,20 @@
 {
   "name": "Boris",
-  "level": 1,
+  "level": 2,
   "alignment": "True Neutral",
   "abilities": [
     {
       "name": "Strength",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 13,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -96,9 +96,12 @@
     "Choose any 2 from Animal Handling",
     "Nature",
     "Perception",
-    "Survival"
+    "Survival",
+    "Animal Handling"
   ],
-  "toolProficiencies": [],
+  "toolProficiencies": [
+    "Playing Card Set"
+  ],
   "specialActions": [],
   "spells": [],
   "magicInitiateInstances": [],
@@ -106,5 +109,10 @@
   "xp": 0,
   "xpMode": "milestone",
   "background": "Soldier",
-  "imagePath": "images/Boris.png"
+  "imagePath": "images/Boris.png",
+  "featAbilityChoices": {
+    "Boon Of Energy Resistance-0": {
+      "assignment": "Strength"
+    }
+  }
 }
