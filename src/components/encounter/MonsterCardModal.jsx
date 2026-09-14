@@ -1311,6 +1311,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           rangeGateFt={conePicker.rangeGateFt}
           zoneTe={conePicker.zoneTe}
           zoneOnly={conePicker.zoneOnly === true}
+          saveConditions={conePicker.saveConditions}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}
         />

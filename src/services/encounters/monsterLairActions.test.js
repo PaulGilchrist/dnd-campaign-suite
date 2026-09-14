@@ -301,3 +301,64 @@ describe('MA-0062 adult-blue-dragon falling ceiling data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(ceiling, '3d6', ['prone', 'restrained']);
   });
 });
+
+// MA-0063: Adult Blue Dragon lair_actions[1] "Sand Cloud" was a plain string
+// (inert — no zone, no save, no blinded). Now structured save+zone mirroring
+// MA-0042 Insect Cloud: CON DC 15, dc_success none (no damage), a 20-ft
+// persisting zone `lair_sand_cloud`, blinded 1 min + end-of-turn repeat saves.
+describe('MA-0063 adult-blue-dragon sand cloud data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-blue-dragon');
+  const cloud = dragon.lair_actions[1];
+
+  it('row is now a structured clickable SAVE row named Sand Cloud', () => {
+    expect(typeof cloud).toBe('object');
+    expect(cloud.name).toBe('Sand Cloud');
+    expect(isLairRowClickable(cloud)).toBe(true);
+    expect(lairRowAffordance(cloud)).toBe('save');
+  });
+
+  it('authored save fields: DC 15 Constitution, no damage (dc_success none)', () => {
+    expect(cloud.save_dc).toBe(15);
+    expect(cloud.save_type).toBe('Constitution');
+    expect(cloud.dc_success).toBe('none');
+    expect(cloud.damage_dice_primary).toBeUndefined();
+  });
+
+  it('save_effect vocabulary → MA-0017 seam extracts blinded (no fabricated conditions)', () => {
+    expect(cloud.save_effect).toMatch(/blinded/i);
+    expect(cloud.save_effect).toMatch(/repeat the constitution save/i);
+    expect(extractConditionsFromSaveEffect(cloud.save_effect)).toEqual(['blinded']);
+  });
+
+  it('machine-readable persisting zone: 20-ft radius, lair_sand_cloud key, repeat_save', () => {
+    expect(cloud.zone.radius_ft).toBe(20);
+    expect(cloud.zone.effect_key).toBe('lair_sand_cloud');
+    expect(cloud.zone.repeat_save).toBe(true);
+    expect(cloud.zone.advisory).toMatch(/GM-enforced/);
+    expect(cloud.duration).toMatch(/blinded 1 minute/i);
+  });
+
+  it('description carries the verbatim mechanics (20-ft sphere, DC 15 CON, blinded, repeat)', () => {
+    expect(cloud.description).toMatch(/20-foot-radius sphere/i);
+    expect(cloud.description).toMatch(/DC 15 Constitution saving throw/i);
+    expect(cloud.description).toMatch(/blinded for 1 minute/i);
+    expect(cloud.description).toMatch(/repeat the saving throw at the end of each of its turns/i);
+  });
+
+  it('save row routes through handleSaveRoll with blinded conditions, zero damage formula', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: cloud,
+      monsterName: 'Adult Blue Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(cloud.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(cloud, null, ['blinded']);
+  });
+});

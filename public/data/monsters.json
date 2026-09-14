@@ -1537,7 +1537,21 @@
         "save_effect": "Failure: 10 (3d6) Bludgeoning damage and knocked prone and buried. The buried target is restrained and unable to breathe or stand up. Success: Half damage.",
         "rescue_check": { "ability": "Strength", "dc": 10, "ends": "buried", "advisory": "DC 10 Strength check (action) ends the buried state on a success — GM-enforced (no rescue-engine consumer)." }
     },
-      "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
+      {
+        "name": "Sand Cloud",
+        "description": "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
+        "save_dc": 15,
+        "save_type": "Constitution",
+        "dc_success": "none",
+        "save_effect": "Failure: The target is blinded for 1 minute (repeat the Constitution save at the end of each of its turns; a success ends the effect on itself). Success: unaffected. This effect deals no damage.",
+        "zone": {
+          "radius_ft": 20,
+          "effect_key": "lair_sand_cloud",
+          "repeat_save": true,
+          "advisory": "Blinded persists 1 minute; a creature repeats the DC 15 Constitution save at the end of each of its turns, ending the effect on itself on a success — badge-click repeat save (DC stamped on condition meta) for PCs is enforced; NPC turn-end auto-repeat and 1-minute expiry are GM-enforced (no NPC turn-end zone-save consumer)."
+        },
+        "duration": "blinded 1 minute (repeat save ends early; advisory)"
+      },
       "Lightning arcs, forming a 5-foot-wide line between two of the lair's solid surfaces that the dragon can see. They must be within 120 feet of the dragon and 120 feet of each other. Each creature in that line must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) lightning damage."
     ],
     "environments": [

@@ -81,7 +81,7 @@ function npcSaveBonus(target, saveType) {
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
-    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName } = ctx;
+    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -150,6 +150,8 @@ function resolveNpcTarget(ctx) {
         // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
         registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
     }
+    // MA-0063: damageless failed-save condition grant (byte-inert when empty).
+    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -347,6 +349,45 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging zone arm:', e); });
 }
 
+// MA-0063: damageless failed-save condition grant inside the AoE picker
+// (byte-inert when saveConditions is empty — every existing consumer is
+// damage-only or zoneOnly). On a failed save the condition lands on the
+// target's activeConditions + activeConditionMeta {dc, ability} so the PC
+// badge-click repeat-save seam (CharConditions → createRollConditionSaveHandler)
+// can strip it on a later success (MA-0017 damageless-save shape). A
+// lair_sand_cloud te mirrors the zone with dc for future consumers. NPC
+// turn-end auto-repeat and the 1-minute expiry stay GM-enforced (no NPC
+// turn-end zone-save consumer — advisory in the log).
+function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType, targetName, casterName, actionName, campaignName }) {
+    if (saveSuccess === true) return;
+    if (!saveConditions || saveConditions.length === 0) return;
+    const ability = String(saveType || '').toLowerCase().slice(0, 3) || 'con';
+    const existing = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(existing) ? existing : [];
+    const merged = [...conditions];
+    for (const cond of saveConditions) {
+        if (!merged.some(c => String(c).toLowerCase() === cond)) merged.push(cond);
+    }
+    setRuntimeValue(targetName, 'activeConditions', merged, campaignName);
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    const nextMeta = { ...existingMeta };
+    for (const cond of saveConditions) {
+        nextMeta[cond] = { ...(existingMeta[cond] || {}), dc: saveDc, ability, source: casterName };
+    }
+    setRuntimeValue(targetName, 'activeConditionMeta', nextMeta, campaignName);
+    const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: conditionNames.join(', '),
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — ${conditionNames.join(', ')} 1 minute; repeats the save at the end of each of its turns (success ends it on itself). NPC turn-end auto-repeat and 1-minute expiry GM-enforced.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save-fail condition:', e); });
+}
+
 // MA-0031: advisory cone/area coverage gate — isWithinRange from the attacker
 // (gridless lenient §7); null rangeGateFt = no gate (PC-spell default).
 function useRangeAllowedSet(eligibleTargets, rangeGateFt, attackerName) {
@@ -367,11 +408,22 @@ function aoePickerTitle(action, titleOverride) {
 
 // MA-0043: zoneOnly rows (Shroud of Darkness) read as save-less darkness
 // copy; every other consumer keeps the byte-identical save picker text.
-function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten }) {
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions }) {
     if (!zoneOnly) {
+        const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
+        // MA-0063: damageless condition row (e.g. Adult Blue Dragon Sand Cloud) —
+        // no damage formula, failed saves grant conditions. Byte-inert when empty.
+        if (!damage && saveConditions && saveConditions.length > 0) {
+            const names = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+            return {
+                icon: 'fa-smog',
+                description: head,
+                note: `On a failed save, target is ${names}.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+            };
+        }
         return {
             icon: 'fa-bomb',
-            description: `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`,
+            description: head,
             note: `On a failed save, target takes ${damage} ${damageType} damage. On a successful save, target takes half damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
         };
     }
@@ -446,6 +498,10 @@ function SaveAttackAoeModal({
     // (Shroud of Darkness) — confirm arms the zone and logs, but resolves
     // NO saves and applies NO damage (canonical darkness lair = no save).
     zoneOnly = false,
+    // MA-0063 optional failed-save conditions (byte-inert empty default):
+    // damageless condition rows (Adult Blue Dragon Sand Cloud) grant these
+    // conditions on failed saves inside the picker (MA-0017 shape).
+    saveConditions,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -507,7 +563,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -538,7 +594,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -664,6 +720,8 @@ function SaveAttackAoeModal({
             // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
             registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
         }
+        // MA-0063: damageless failed-save condition grant (byte-inert when empty).
+        applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -692,7 +750,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -905,7 +963,7 @@ function SaveAttackAoeModal({
         );
     }
 
-    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten });
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions });
 
     return (
         <CreatureSelectionModal

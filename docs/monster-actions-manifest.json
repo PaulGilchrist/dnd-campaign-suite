@@ -985,7 +985,7 @@
         "blinded"
       ],
       "description": "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0063-lair-sand-cloud.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0064",

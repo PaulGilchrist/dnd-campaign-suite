@@ -790,6 +790,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Lair',
     fields: ['source', 'dc'],
   },
+  {
+    effect: 'lair_sand_cloud',
+    label: 'Sand Cloud (Lair)',
+    description: 'Inside a swirling sand cloud (20-foot radius, lair action): blinded. CON save (DC 15) when the cloud appears; on a failed save the target is Blinded for 1 minute. A creature can repeat the CON save at the end of each of its turns, ending the effect on itself on a success — badge-click repeat save enforced for PCs (DC stamped on condition meta); NPC turn-end auto-repeat and 1-minute expiry are GM-enforced (no NPC turn-end zone-save consumer). Lasts until the dragon dismisses it, uses this lair action again, or dies.',
+    icon: 'fa-smog',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source', 'dc'],
+  },
 
   // ── Movement ────────────────────────────────────────────
   {
