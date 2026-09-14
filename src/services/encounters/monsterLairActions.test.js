@@ -11,7 +11,7 @@ import {
   buildLairAdvisoryLog,
 } from './monsterLairActions.js';
 import { addEntry } from '../ui/logService.js';
-import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect, parseDreamPlaneBanishClause, parseBanishTransportClause } from '../../components/encounter/MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 
 vi.mock('../ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
@@ -855,5 +855,137 @@ describe('MA-0097 adult-copper-dragon liquid mud data lock', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
     expect(ancient.lair_actions[0]).toEqual(expect.any(String));
     expect(ancient.lair_actions[1].name).toBeUndefined();
+  });
+});
+
+// MA-0107: Adult Gold Dragon lair_actions were (a) a NAMELESS dict [0] whose
+// description is the self-buff "glimpse the future" text while its authored
+// save_dc/save_type/save_effect were ORPHANED from the raw-string row [1]
+// (the actual dream-plane banishment prose) — name-gate (monsterLairActions
+// .js:26) killed clickability on [0], and even lifted, its affordance would
+// run the WRONG mechanic (banish save vs advantage self-buff); and (b) the
+// raw string [1] short-circuited to the static span branch. Both rows inert,
+// forced clicks zero delta, zero log (live baseline confirmed 2026-09-14).
+// Split fix: [0] → named ADVISORY row (advantage-until-init-20 self-buff =
+// CLA-325/MA-0024 advisory vocabulary, save fields stripped); [1] → named
+// structured SAVE row (DC 15 Charisma, dc_success none — no damage) whose
+// save_effect arms the registered `lair_dream_plane` te producer at the
+// MA-0038/0104 failed-save seam (escape contest + initiative-20 expiry +
+// reappearance stay GM-enforced advisory — no initiative lair seam §7).
+describe('MA-0107 adult-gold-dragon glimpse future + dream plane banishment data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-gold-dragon');
+  const glimpse = dragon.lair_actions[0];
+  const banish = dragon.lair_actions[1];
+
+  it('[0] is now a named clickable ADVISORY row (was nameless inert dict)', () => {
+    expect(typeof glimpse).toBe('object');
+    expect(glimpse.name).toBe('Glimpse the Future');
+    expect(isLairRowClickable(glimpse)).toBe(true);
+    expect(lairRowAffordance(glimpse)).toBe('advisory');
+  });
+
+  it('[0] orphaned save metadata STRIPPED (advantage self-buff is not a save)', () => {
+    expect(glimpse.save_dc).toBeUndefined();
+    expect(glimpse.save_type).toBeUndefined();
+    expect(glimpse.save_effect).toBeUndefined();
+    expect(glimpse.damage_dice_primary).toBeUndefined();
+  });
+
+  it('[0] description kept verbatim (advantage until initiative count 20)', () => {
+    expect(glimpse.description).toBe('The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.');
+  });
+
+  it('[0] advisory click logs ability_use record, zero save/attack/damage', async () => {
+    const logs = [];
+    const res = await resolveLairRow({
+      action: glimpse,
+      monsterName: 'Adult Gold Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].description).toMatch(/casts glimpse the future/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+  });
+
+  it('[1] is now a named structured SAVE row (was inert raw string)', () => {
+    expect(typeof banish).toBe('object');
+    expect(banish.name).toBe('Dream Plane Banishment');
+    expect(isLairRowClickable(banish)).toBe(true);
+    expect(lairRowAffordance(banish)).toBe('save');
+  });
+
+  it('[1] save fields: DC 15 Charisma, dc_success none (no damage authored)', () => {
+    expect(banish.save_dc).toBe(15);
+    expect(banish.save_type).toBe('Charisma');
+    expect(banish.dc_success).toBe('none');
+    expect(banish.damage_dice_primary).toBeUndefined();
+    expect(banish.damage_type_primary).toBeUndefined();
+  });
+
+  it('[1] description kept verbatim from the original string row (soft hyphen preserved)', () => {
+    expect(banish.description).toMatch(/^One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane/i);
+    expect(banish.description).toMatch(/exis\xAD? tence the dragon has imagined into being/i);
+    expect(banish.description).toMatch(/If the creature wins, it escapes the dream plane/i);
+    expect(banish.description).toMatch(/effect ends on initiative count 20 on the next round/i);
+    expect(banish.description).toMatch(/reappears in the space it left or in the nearest unoccupied space/i);
+  });
+
+  it('[1] save_effect arms the lair_dream_plane te producer (MA-0104 parse shape)', () => {
+    expect(parseDreamPlaneBanishClause(banish.save_effect)).toEqual({ effect: 'lair_dream_plane' });
+  });
+
+  it('[1] dream-plane wording NEVER matches the MA-0104 demiplane parser (distinct te)', () => {
+    expect(parseBanishTransportClause(banish.save_effect)).toBeNull();
+  });
+
+  it('[1] save_effect has no canonical condition word — te is the sole enforcement (MA-0017 stays inert)', () => {
+    expect(extractConditionsFromSaveEffect(banish.save_effect)).toEqual([]);
+  });
+
+  it('[1] advisory prose: escape contest + initiative-20 expiry + reappearance GM-enforced', () => {
+    expect(banish.save_effect).toMatch(/contested by the dragon/i);
+    expect(banish.save_effect).toMatch(/GM-enforced/i);
+    expect(banish.duration).toMatch(/initiative count 20 on the next round/i);
+    expect(banish.duration).toMatch(/contested Charisma check/i);
+  });
+
+  it('[1] save row routes through handleSaveRoll, zero damage formula', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: banish,
+      monsterName: 'Adult Gold Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(banish.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(banish, null, []);
+  });
+
+  it('lair_dream_plane te is registered in the target-effect registry (Lair group)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_dream_plane');
+    expect(def).toBeTruthy();
+    expect(def.label).toBe('Dream Plane (Lair)');
+    expect(def.group).toBe('Lair');
+    expect(def.description).toMatch(/initiative count 20/i);
+  });
+
+  it('ancient-gold-dragon scope guard: its rows are NOT touched by this fix', () => {
+    const ancient = monstersData.find(m => m.index === 'ancient-gold-dragon');
+    expect(ancient.lair_actions[0]).toEqual(expect.any(String));
+    expect(ancient.lair_actions[1].name).toBeUndefined();
+    expect(ancient.lair_actions[1].save_effect).toBeUndefined();
   });
 });

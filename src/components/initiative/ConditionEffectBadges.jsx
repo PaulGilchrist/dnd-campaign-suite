@@ -403,6 +403,13 @@ const BADGE_SPECS = [
         build: ctx => ({ label: 'Banished (Demiplane)', cls: 'effect-debuff', icon: 'fa-door-open', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'banished_demiplane', tooltip: `Banished by ${ctx.te.source || 'unknown'}: Incapacitated in a harmless demiplane until the start of the dragon's next turn; reappears within 120 ft of the dragon (GM-enforced).` }),
     },
     {
+        // MA-0107: Adult Gold Dragon lair action Dream Plane Banishment —
+        // distinct te from banished_demiplane/PC banishment; the contested
+        // Charisma escape check and initiative-20 expiry are GM-enforced.
+        find: ctx => findDirect(ctx, 'lair_dream_plane'),
+        build: ctx => ({ label: 'Dream Plane', cls: 'effect-debuff', icon: 'fa-cloud-moon', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'lair_dream_plane', tooltip: `Banished to a dream plane by ${ctx.te.source || 'unknown'}'s lair action until initiative count 20 on the next round; escape requires a contested Charisma check action (GM-enforced).` }),
+    },
+    {
         find: ctx => findDirect(ctx, 'maze'),
         build: buildMazeBadge,
     },

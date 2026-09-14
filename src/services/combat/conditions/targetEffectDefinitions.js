@@ -812,6 +812,15 @@ const TARGET_EFFECT_DEFINITIONS = [
 
   // ── Lair ─────────────────────────────────────────────────
   {
+    effect: 'lair_dream_plane',
+    label: 'Dream Plane (Lair)',
+    description: 'Banished to a dream plane by a gold dragon\'s lair action: the target is banished to an imagined plane until the effect ends on initiative count 20 on the next round (modeled as the MA-0038/0104 rounds:2 clock — nearest expiry seam; initiative-20 cadence GM-enforced, no initiative lair seam). Escaping early requires an action and a Charisma check contested by the dragon\'s — GM-enforced (no contested-check consumer). Reappearance placement is GM-enforced.',
+    icon: 'fa-cloud-moon',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source'],
+  },
+  {
     effect: 'lair_darkness',
     label: 'Magical Darkness (Lair)',
     description: 'Inside magical darkness (15-foot radius, lair action): heavily obscured — darkvision can\'t see through it and nonmagical light can\'t illuminate it. Overlapping light created by a spell of 2nd level or lower is dispelled — GM-enforced (no light-level model in this engine). No saving throw. Lasts until the dragon dismisses it, uses this lair action again, or dies.',

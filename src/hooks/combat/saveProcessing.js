@@ -344,6 +344,16 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     if (context?.demiplaneTransport) {
         await grantDemiplaneTransport({ context, campaignName, attackerName, applyTarget });
     }
+    // MA-0107: Adult Gold Dragon lair action Dream Plane Banishment —
+    // "banished to a dream plane ... the effect ends on initiative count 20
+    // on the next round". Distinct te from banished_demiplane (MA-0104 —
+    // the Banish wording never matches, and vice versa); rounds:2 clock
+    // mirrors the verified MA-0104 shape (initiative-20 cadence stays
+    // GM-enforced — no initiative lair seam §7). The escape clause
+    // (contested Charisma check action) stays advisory prose (§7).
+    if (context?.dreamPlaneBanishment) {
+        await grantDreamPlaneBanishment({ context, campaignName, attackerName, applyTarget });
+    }
 }
 
 async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
@@ -515,6 +525,37 @@ async function grantDemiplaneTransport({ context, campaignName, attackerName, ap
         description: `${applyTarget} failed ${attackerName}'s ${actionName} save — transported to a harmless demiplane (Incapacitated) until the start of ${attackerName}'s next turn, then reappears in an unoccupied space of ${attackerName}'s choice within 120 feet (reappearance placement GM-enforced).${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:demiplane-transport-granted]', e); });
+}
+
+// MA-0107: failed-save dream-plane banishment grant (Adult Gold Dragon lair
+// action). Writes the registry te (lair_dream_plane) on the target sourced
+// from the dragon with the MA-0104 rounds:2 clock — the RAW "ends on
+// initiative count 20 on the next round" cadence maps to the nearest expiry
+// seam (initiative-20 lair seam absent §7), so expiry/reappearance stays
+// GM-enforced advisory. Consumers: ConditionEffectBadges 'Dream Plane' badge.
+async function grantDreamPlaneBanishment({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'Dream Plane Banishment';
+    registerTargetEffect(campaignName, applyTarget, 'lair_dream_plane', attackerName, {
+        duration: 'until_initiative_count_20_next_round',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'lair_dream_plane', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'lair_dream_plane');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'lair_dream_plane_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — banished to a dream plane until the effect ends on initiative count 20 on the next round; escaping early requires a contested Charisma check and reappearance placement is GM-enforced (no initiative lair seam).${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:dream-plane-banishment-granted]', e); });
 }
 
 // MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.

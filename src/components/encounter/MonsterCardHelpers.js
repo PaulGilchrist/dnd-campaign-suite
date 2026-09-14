@@ -139,6 +139,20 @@ export function parseBanishTransportClause(saveEffect) {
   return /transported to a harmless demiplane/i.test(saveEffect) ? { effect: 'banished_demiplane' } : null;
 }
 
+// MA-0107: authored failed-save dream-plane banishment clause (Adult Gold
+// Dragon lair action "Dream Plane Banishment" — "banished to a dream plane,
+// a different plane of existence the dragon has imagined into being"). Not a
+// condition, so extractConditionsFromSaveEffect can never see it; this parse
+// arms the lair_dream_plane te producer at the failed-save seam in
+// saveProcessing (MA-0104 parse shape). Distinct te from the MA-0104
+// `banished_demiplane` (Banish wording never matches) and from the PC spell
+// `banishment`. Byte-inert (null) for rows without the clause; the ancient
+// gold dragon's nameless lair dict has no save_effect so it never arms.
+export function parseDreamPlaneBanishClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /banished to a dream plane/i.test(saveEffect) ? { effect: 'lair_dream_plane' } : null;
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];
