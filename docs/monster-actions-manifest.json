@@ -1244,7 +1244,7 @@
       "saveDc": 17,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17, +10 to hit with spell attacks):At Will: Detect Magic, Guiding Bolt (level 2 version), Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell), Speak with Animals, Thaumaturgy1/Day Each: Detect Thoughts, Water Breathing",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0080-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0081",
