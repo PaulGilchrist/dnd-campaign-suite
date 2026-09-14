@@ -1335,7 +1335,7 @@
         "deafened"
       ],
       "description": "A thunderclap originates at a point the dragon can see within 120 feet of it. Each creature within a 20-foot radius centered on that point must make a DC 15 Constitution saving throw or take 5 (1dlO) thunder damage and be deafened until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0086-lair-thunderclap.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0087",
