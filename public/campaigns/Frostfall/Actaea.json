@@ -1,3 +1,142 @@
 {
-  "imagePath": ""
+  "name": "Actaea",
+  "level": 2,
+  "alignment": "True Neutral",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 9,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Dexterity",
+      "baseScore": 14,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Constitution",
+      "baseScore": 13,
+      "featIncrease": 0,
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 11,
+      "featIncrease": 0,
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 15,
+      "featIncrease": 0,
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 10,
+      "featIncrease": 0,
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
+    }
+  ],
+  "class": {
+    "name": "Druid",
+    "subclass": {
+      "name": "Circle of the Land"
+    },
+    "divineOrder": "",
+    "primalOrder": "Magician"
+  },
+  "expertSkills": [],
+  "feats": [
+    "Magic Initiate"
+  ],
+  "fightingStyles": [],
+  "race": {
+    "name": "Elf",
+    "subrace": {
+      "name": "Wood Elf"
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Parchment (one sheet)",
+      "Calligrapher's Supplies",
+      "Robes",
+      "Book",
+      "Herbalism Kit",
+      "Oil (flask)",
+      "Ration",
+      "Hempen Rope",
+      "Bedroll"
+    ],
+    "equipped": [
+      "Leather",
+      "Shield",
+      "Quarterstaff",
+      "Sickle"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [
+    "Common",
+    "Elvish",
+    "Druidic"
+  ],
+  "resistances": [],
+  "skillProficiencies": [
+    "Arcana",
+    "History",
+    "Insight",
+    "Perception",
+    "Investigation",
+    "Animal Handling"
+  ],
+  "toolProficiencies": [
+    "Calligrapher's Supplies",
+    "Herbalism Kit"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Poison Spray",
+    "Ray of Frost",
+    "Ice Knife",
+    "Druidcraft",
+    "Produce Flame",
+    "Shillelagh",
+    "Entangle",
+    "Thunderwave",
+    "Purify Food and Drink",
+    "Animal Friendship",
+    "Shield"
+  ],
+  "magicInitiateInstances": [
+    {
+      "class": "Wizard",
+      "cantrips": [
+        "Poison Spray",
+        "Ray of Frost"
+      ],
+      "level1Spell": "Ice Knife"
+    }
+  ],
+  "rules": "2024",
+  "xp": 0,
+  "xpMode": "milestone",
+  "background": "Sage",
+  "imagePath": "images/Actaea.png",
+  "featAbilityChoices": {
+    "Boon Of Energy Resistance-0": {
+      "assignment": "Strength"
+    }
+  }
 }

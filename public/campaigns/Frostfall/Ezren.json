@@ -1,11 +1,11 @@
 {
   "name": "Ezren",
-  "level": 1,
+  "level": 2,
   "alignment": "True Neutral",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 9,
+      "baseScore": 10,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
