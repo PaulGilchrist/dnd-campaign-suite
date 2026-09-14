@@ -2388,8 +2388,13 @@
       },
       {
         "name": "Mind Invasion",
-        "advisory": "mind_spike",
-        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 3 version) at one creature it can see within 60 feet (advisory — targeting, WIS save, and damage adjudication are GM-enforced until the row's own save shape is authored; MA-0114 scope)."
+        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 3 version) at one creature it can see within 60 feet. The target makes a DC 17 Wisdom saving throw, taking 4d8 Psychic damage on a failed save or half as much on a successful one. 4d8 = Mind Spike upcast to level 3 per spells.json (3d8 base +1d8 per slot level above 2nd). The dragon always knows the target's location until the spell ends (no Invisible benefit against the dragon) — location tracking GM-enforced for monsters.",
+        "save_dc": 17,
+        "save_type": "Wisdom",
+        "dc_success": "half",
+        "damage_dice_primary": "4d8",
+        "damage_type_primary": "Psychic",
+        "save_effect": "4d8 Psychic damage. Success: Half damage. Location known to the dragon until the spell ends (advisory — GM-enforced for monsters)."
       },
       {
         "name": "Noxious Miasma",

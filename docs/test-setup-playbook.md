@@ -453,3 +453,4 @@ Dead-by-design (accepted models, do not chase): feats with `automation:null` ben
 
 ## MA-0113 recipe (2026-09-14, fixed): Green legendary uses (same MA-0070 data pattern)
 - PITFALL: `buildLegendaryAdvisoryPopup/Log` engine copy is Cloaked-Flight-specific prose — advisory legendaries on other monsters echo misleading text (replace with real shape when the row comes up); removing `.sp-overlay`/`.popup` via evaluate crashes React — dismiss via real buttons/self-click only; activeCreatureName top-level mirror lags mid-walk — server state is truth.
+- MA-0114 (fixed): interim advisory → numeric save shape (save_dc 17 WIS 4d8 Psychic half, lv3 via spells.json lv2+1/slot); PITFALL: test `findCreatureByName` mock hardcoded null silently no-target-refuses single-target legendary saves — mock a real lookup; exhausted stamps need reload to land; popup-overlays are click-to-dismiss and stale refusals replay — dismiss before next chip click.

@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
+import spells2024 from '../../../public/data/2024/spells.json';
 
 const TENTACLE = { name: 'Tentacle', attack_bonus: 9, damage_dice_primary: '2d6 + 5', damage_type_primary: 'Bludgeoning', reach: '15 ft.' };
 
@@ -58,7 +59,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   formatDamageTypes: vi.fn((t) => (t || []).join(', ') || ''),
   getTargetFromAttacker: vi.fn(() => null),
   getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(() => null),
+  findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
 }));
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
@@ -566,10 +567,10 @@ const greenActions = () => [{ name: 'Rend', attack_bonus: 11, damage_dice_primar
 // MA-0070/MA-0081/MA-0092/MA-0103 shape — header authors uses:3 (counter
 // renders, 4-in-lair stays advisory), Noxious Miasma keeps its save shape
 // (DC 17 Constitution, 2d6 Poison) and authors dc_success none (success = no
-// damage or effect; AC-penalty te advisory), Mind Invasion authors the
-// MA-0058 advisory token (gated spend + adjudication record; its own save
-// mechanics are MA-0114 scope), Pounce delegates to Rend (+11 from the
-// actions row).
+// damage or effect; AC-penalty te advisory), Mind Invasion keeps the gated
+// economy and — MA-0114 — its MA-0113 interim advisory placeholder is
+// replaced by the real numeric save shape, Pounce delegates to Rend (+11
+// from the actions row).
 describe('MA-0113 monsters.json data: adult green dragon legendary economy authored', () => {
   it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
     const la = green().legendary_actions;
@@ -589,10 +590,26 @@ describe('MA-0113 monsters.json data: adult green dragon legendary economy autho
     expect(row.description).toMatch(/can'?t take this action again until the start of its next turn/i);
   });
 
-  it('Mind Invasion authors the MA-0058 advisory token (gated spend affordance)', () => {
+  // MA-0114: the MA-0113 interim advisory placeholder ("advisory":
+  // "mind_spike") is REPLACED by the row's real numeric save shape, mirroring
+  // the verified MA-0087/MA-0092 Copper Mind Jolt pattern — Mind Spike lv3
+  // per 2024 spells.json (3d8 base +1d8/slot = 4d8 Psychic), Spellcasting
+  // row save_dc 17, app-data dc_success half.
+  it('MA-0114 Mind Invasion authors the numeric save shape (DC 17 WIS 4d8 Psychic half), advisory placeholder removed', () => {
     const row = green().legendary_actions.find(a => a.name === 'Mind Invasion');
-    expect(row.advisory).toBe('mind_spike');
-    expect(row.attack_bonus == null && row.save_dc == null).toBe(true);
+    expect(row.advisory == null).toBe(true);
+    expect(row.save_dc).toBe(17);
+    expect(row.save_type).toBe('Wisdom');
+    expect(row.dc_success).toBe('half');
+    expect(row.damage_dice_primary).toBe('4d8');
+    expect(row.damage_type_primary).toBe('Psychic');
+    expect(row.description).toMatch(/level 3 version/);
+    expect(row.description).toMatch(/DC 17 Wisdom saving throw/);
+    expect(green().actions.find(a => a.name === 'Spellcasting')?.save_dc).toBe(17);
+    const spike = spells2024.find(s => s.index === 'mind-spike');
+    expect(spike.damage.damage_at_slot_level['3']).toBe('4d8');
+    expect(spike.damage.damage_at_slot_level['2']).toBe('3d8');
+    expect(spike.dc.dc_success).toBe('half');
   });
 
   it('Pounce delegates_to the Rend row (+11)', () => {
@@ -646,15 +663,55 @@ describe('MA-0113 MonsterCardModal green dragon legendary gated rows', () => {
     expect(spend.description).toMatch(/expends a legendary use for Noxious Miasma/);
   });
 
-  it('Mind Invasion gated click spends 1 and lands the advisory adjudication record', async () => {
-    renderGreen({ max: 3, used: 0 });
-    fireEvent.click(greenRow('Mind Invasion').querySelector('.mc-dice-link-legendary'));
+  // MA-0114: the advisory-only chip is gone — the row now renders the
+  // numeric save affordances (plain .mc-dice-link "4d8" + "DC 17 Wisdom"
+  // save chip, MA-0092 pitfall: gated save rows render plain .mc-dice-link)
+  // and a gated click spends 1 then rolls the numeric save leg: WIS DC 17,
+  // 4d8 Psychic, half-on-success (armed target, no AoE picker).
+  function renderGreenArmed(uses) {
+    runtime.store['Adult Green Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Adult Green Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 230, maxHp: 230, ac: 19, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Adult Green Dragon', actions: greenActions(), legendary_actions: green().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Green Dragon 1', creatures })} />);
+  }
+
+  it('MA-0114 Mind Invasion renders numeric save chips (4d8 + DC 17 Wisdom), no advisory expend chip', () => {
+    renderGreenArmed({ max: 3, used: 0 });
+    const row = greenRow('Mind Invasion');
+    expect(row.querySelector('.mc-dice-link-legendary')).toBe(null);
+    expect(row.querySelector('.mc-dice-link').textContent).toContain('4d8');
+    expect(row.querySelector('.mc-dice-link-save-clickable').textContent).toMatch(/DC 17 Wisdom/);
+  });
+
+  it('MA-0114 Mind Invasion gated click spends 1 and rolls the numeric save leg (WIS DC 17, 4d8 Psychic half)', async () => {
+    renderGreenArmed({ max: 3, used: 0 });
+    fireEvent.click(greenRow('Mind Invasion').querySelector('.mc-dice-link'));
     await waitFor(() => expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls.map(c => c[0]).join('|'))).toMatch(/Legendary Action — Mind Invasion/);
-    const advisory = addEntry.mock.calls.map(c => c[1]).find(e => /legendary action Mind Invasion/.test(e.description || ''));
-    expect(advisory).toBeTruthy();
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('WIS');
+    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(context.saveDc).toBe(17);
+    expect(context.saveType).toBe('Wisdom');
+    expect(context.dcSuccess).toBe('half');
+    expect(context.autoDamageFormula).toBe('4d8');
+    expect(context.targetName).toBe('TestPC');
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Mind Invasion/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Mind Invasion/);
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (3/3): Mind Invasion click refuses with popup + legendary_use_refused, zero spend, zero save roll', async () => {
+    renderGreen({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(greenRow('Mind Invasion').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 
