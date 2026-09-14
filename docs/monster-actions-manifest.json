@@ -901,7 +901,7 @@
       "saveDc": 18,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):At Will: Detect Magic, Invisibility, Mage Hand, Shatter1/Day Each: Scrying, Sending",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0057-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0058",
