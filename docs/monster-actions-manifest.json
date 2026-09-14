@@ -1212,7 +1212,7 @@
       "damageTypePrimary": "Lightning",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 19, each creature in a 90-foot-long, 5-foot-wide Line. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0078-lightning-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0079",
