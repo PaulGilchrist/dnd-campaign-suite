@@ -1720,7 +1720,7 @@
       "saveDc": 17,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):At Will: Detect Magic, Mind Spike (level 3 version)1/Day: Geas",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0112-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0113",
