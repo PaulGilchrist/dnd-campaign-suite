@@ -11,6 +11,7 @@ import {
   buildLairAdvisoryLog,
 } from './monsterLairActions.js';
 import { addEntry } from '../ui/logService.js';
+import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 
 vi.mock('../ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
@@ -234,5 +235,69 @@ describe('MA-0043 adult-black-dragon shroud of darkness data lock', () => {
     });
     expect(res).toEqual({ resolved: true, affordance: 'zone' });
     expect(handleZone).toHaveBeenCalledWith(dark);
+  });
+});
+
+// MA-0062: Adult Blue Dragon lair_actions[0] "ceiling collapse" was an
+// unnamed inert dict (MV-24) with damage-type drift — save_effect said
+// "Lightning" (copy-paste from the lightning-arcs row [2]) while the
+// authored description says bludgeoning. Now named + Bludgeoning +
+// condition vocabulary in save_effect so the MA-0017 failed-save seam
+// applies prone+restrained; buried/rescue is CLA-325 advisory (no rescue
+// engine).
+describe('MA-0062 adult-blue-dragon falling ceiling data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-blue-dragon');
+  const ceiling = dragon.lair_actions[0];
+
+  it('structured clickable row named per MA-0024 convention', () => {
+    expect(typeof ceiling).toBe('object');
+    expect(ceiling.name).toBe('Falling Ceiling');
+    expect(isLairRowClickable(ceiling)).toBe(true);
+    expect(lairRowAffordance(ceiling)).toBe('save');
+  });
+
+  it('save_dc/save_type match the authored description verbatim', () => {
+    expect(ceiling.save_dc).toBe(15);
+    expect(ceiling.save_type).toBe('Dexterity');
+    expect(ceiling.description).toMatch(/DC 15 Dexterity saving throw/i);
+  });
+
+  it('damage type fixed to Bludgeoning — no Lightning drift on this row', () => {
+    expect(ceiling.damage_dice_primary).toBe('3d6');
+    expect(ceiling.damage_type_primary).toBe('Bludgeoning');
+    expect(ceiling.save_effect).toMatch(/bludgeoning/i);
+    expect(ceiling.save_effect).not.toMatch(/lightning/i);
+    expect(ceiling.dc_success).toBe('half');
+  });
+
+  it('save_effect carries condition vocabulary → MA-0017 seam applies prone+restrained', () => {
+    expect(ceiling.save_effect).toMatch(/knocked prone/i);
+    expect(ceiling.save_effect).toMatch(/restrained/i);
+    expect(extractConditionsFromSaveEffect(ceiling.save_effect)).toEqual(['prone', 'restrained']);
+  });
+
+  it('buried/rescue clause machine-readable but advisory (CLA-325 — no rescue engine)', () => {
+    expect(ceiling.rescue_check.ability).toBe('Strength');
+    expect(ceiling.rescue_check.dc).toBe(10);
+    expect(ceiling.rescue_check.ends).toBe('buried');
+    expect(ceiling.rescue_check.advisory).toMatch(/GM-enforced/);
+    expect(ceiling.description).toMatch(/DC 10 Strength check, ending the buried state on a success/i);
+  });
+
+  it('save row routes through handleSaveRoll with formula + prone/restrained conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: ceiling,
+      monsterName: 'Adult Blue Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '3d6',
+      saveConditions: extractConditionsFromSaveEffect(ceiling.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(ceiling, '3d6', ['prone', 'restrained']);
   });
 });

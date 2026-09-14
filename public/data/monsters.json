@@ -1527,13 +1527,16 @@
     ],
     "lair_actions": [
       {
+        "name": "Falling Ceiling",
         "description": "Part of the ceiling collapses above one creature that the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) bludgeoning damage and be knocked prone and buried. The buried target is restrained and unable to breathe or stand up. A creature can take an action to make a DC 10 Strength check, ending the buried state on a success.",
         "save_dc": 15,
         "save_type": "Dexterity",
         "damage_dice_primary": "3d6",
-        "damage_type_primary": "Lightning",
-        "save_effect": "Failure: 10 (3d6) Lightning damage. Success: Half damage."
-      },
+        "damage_type_primary": "Bludgeoning",
+        "dc_success": "half",
+        "save_effect": "Failure: 10 (3d6) Bludgeoning damage and knocked prone and buried. The buried target is restrained and unable to breathe or stand up. Success: Half damage.",
+        "rescue_check": { "ability": "Strength", "dc": 10, "ends": "buried", "advisory": "DC 10 Strength check (action) ends the buried state on a success — GM-enforced (no rescue-engine consumer)." }
+    },
       "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "Lightning arcs, forming a 5-foot-wide line between two of the lair's solid surfaces that the dragon can see. They must be within 120 feet of the dragon and 120 feet of each other. Each creature in that line must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) lightning damage."
     ],
