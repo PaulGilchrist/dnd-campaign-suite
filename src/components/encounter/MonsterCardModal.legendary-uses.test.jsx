@@ -316,6 +316,125 @@ describe('MA-0081 MonsterCardModal bronze dragon legendary gated rows', () => {
   });
 });
 
+const copper = () => monstersData.find(m => m.name === 'Adult Copper Dragon');
+const copperActions = () => [{ name: 'Rend', attack_bonus: 11, damage_dice_primary: '2d10 + 6', damage_type_primary: 'Slashing', damage_dice_secondary: '1d8', damage_type_secondary: 'Acid', reach: '10 ft.' }];
+
+// MA-0092 data lock: Adult Copper Dragon legendary rows mirror the verified
+// MA-0070/MA-0081 shape — header authors uses:3 (counter renders, 4-in-lair
+// stays advisory), Giggling Magic authors its own save numbers with
+// dc_success none (failure-only per prose; the subtract-1d6 rider is
+// advisory), Mind Jolt keeps the MA-0087 numeric save-leg shape (DC 17 WIS
+// 5d8 Psychic half), and Pounce delegates to Rend (+11 from the actions row).
+describe('MA-0092 monsters.json data: adult copper dragon legendary economy authored', () => {
+  it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
+    const la = copper().legendary_actions;
+    expect(la[0].name).toMatch(/Legendary Action Uses: 3 \(4 in Lair\)/);
+    expect(la[0].uses).toBe(3);
+    expect(la[0].description).toMatch(/lair.*advisory/i);
+  });
+
+  it('Giggling Magic authors its own save numbers, no effect on success', () => {
+    const row = copper().legendary_actions.find(a => a.name === 'Giggling Magic');
+    expect(row.save_dc).toBe(17);
+    expect(row.save_type).toBe('Charisma');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary).toBe('7d6');
+    expect(row.damage_type_primary).toBe('Psychic');
+  });
+
+  it('Mind Jolt keeps the MA-0087 numeric save-leg shape (DC 17 WIS 5d8 half)', () => {
+    const row = copper().legendary_actions.find(a => a.name === 'Mind Jolt');
+    expect(row.save_dc).toBe(17);
+    expect(row.save_type).toBe('Wisdom');
+    expect(row.dc_success).toBe('half');
+    expect(row.damage_dice_primary).toBe('5d8');
+    expect(row.damage_type_primary).toBe('Psychic');
+  });
+
+  it('Pounce delegates_to the Rend row (+11)', () => {
+    const row = copper().legendary_actions.find(a => a.name === 'Pounce');
+    expect(row.delegates_to).toBe('Rend');
+    expect(copper().actions.find(a => a.name === 'Rend')?.attack_bonus).toBe(11);
+  });
+});
+
+// MA-0092: with the header authored, the copper dragon card renders the
+// "(3 left)" counter and every legendary row click routes through the gated
+// spend (never the ungated generic handlers).
+describe('MA-0092 MonsterCardModal copper dragon legendary gated rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderCopper(uses) {
+    if (uses !== undefined) runtime.store['Adult Copper Dragon 1.monsterLegendaryUses'] = uses;
+    const m = makeMonster({
+      name: 'Adult Copper Dragon',
+      actions: copperActions(),
+      legendary_actions: copper().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Copper Dragon 1', creatures: CREATURES })} />);
+  }
+  function copperRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('header shows (3 left); clicking Pounce spends 1, delegates to Rend (+11), logs spend', async () => {
+    renderCopper({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    fireEvent.click(copperRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Pounce (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(11);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Pounce/);
+  });
+
+  it('Giggling Magic gated click spends 1 (never the ungated handleSaveRoll) and logs spend', async () => {
+    renderCopper({ max: 3, used: 0 });
+    fireEvent.click(copperRow('Giggling Magic').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Giggling Magic/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Giggling Magic/);
+  });
+
+  it('exhausted (3/3): Mind Jolt click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderCopper({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(copperRow('Mind Jolt').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
+    renderCopper({ max: 3, used: 0 });
+    fireEvent.click(copperRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(copperRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+
+  it('per-action cooldown: Giggling Magic re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
+    renderCopper({ max: 3, used: 0 });
+    fireEvent.click(copperRow('Giggling Magic').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ giggling_magic: { round: 1 } });
+    ctx.value = { round: 1, activeCreatureName: 'AasimarTest', creatures: CREATURES };
+    fireEvent.click(copperRow('Giggling Magic').querySelector('.mc-dice-link'));
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'giggling_magic_refused (once per turn)')).toBe(true));
+    expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+});
+
 describe('MA-0021 MonsterCardModal legendary economy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
