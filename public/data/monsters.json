@@ -1854,6 +1854,8 @@
         "description": "Strength Saving Throw: DC 19, each creature in a 30-foot <strong>Cone</strong>. <strong>Failure:</strong> The target is pushed up to 60 feet straight away from the dragon and has the <strong>Prone</strong> condition.",
         "save_dc": 19,
         "save_type": "Strength",
+        "recharge": "5-6",
+        "dc_success": "none",
         "save_effect": "The target is pushed up to 60 feet straight away from the dragon and has the Prone condition."
       },
       {

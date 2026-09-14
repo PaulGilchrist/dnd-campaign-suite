@@ -60,6 +60,17 @@ export function parseSpeedHalfClause(saveEffect) {
   return /speed is halved/i.test(saveEffect) ? { effect: 'speed_half' } : null;
 }
 
+// MA-0079: authored failed-save push clause (Adult Bronze Dragon Repulsion
+// Breath — "pushed up to 60 feet straight away from the dragon"). Not a
+// condition, so extractConditionsFromSaveEffect can never see it; this clause
+// parse arms the push te marker grant in the AoE picker on a failed save
+// (MA-0073 parse shape; token movement itself stays GM-enforced §7).
+export function parsePushFeetClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/push(?:ed)? up to (\d+) feet/i);
+  return m ? { feet: Number(m[1]) } : null;
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];

@@ -414,3 +414,8 @@ Dead-by-design (accepted models, do not chase): feats with `automation:null` ben
 
 ## MA-0075 recipe (2026-09-14, fixed): lair zone-cloud rows structured shape (reusable fog/cloud/fog-cloud rows)
 - Verified sand-cloud shape (Blue MA-0063 → Brass MA-0075 byte-mirrored): {name, description, save_dc, save_type, dc_success:"none", save_effect, zone:{radius_ft, effect_key:"lair_<name>", repeat_save:true, advisory}, duration:"blinded 1 minute (repeat save ends early; advisory)"} → chip → radius picker → zone-arm te + log → per-target save → condition on fail. Repeat-save advisory (no NPC turn-end zone-save consumer). Reuse for Green/Copper fog/mist lair rows; assert structural Object.keys equality vs Blue row in monsterLairActions.test.js data-lock.
+
+## MA-0079 recipe (2026-09-14, fixed): damageless AoE push/prone landing (reusable)
+- Damageless cone saves DO land conditions today (MA-0063 seam + MA-0017 damageless saveProcessing leg — root gate no longer strands them). Push clause: `parsePushFeetClause` (MA-0073 shape) → SaveAttackAoeModal `pushFeet` prop (undefined default byte-inert) → fail registers `push` te {value:60, duration:'instant'} (CLA-384 marker) + advisory in condition log; SavePromptModal quick-roll now carries saveConditions into lastAttack stamp (was []).
+- Data: canonical recharge rows author `recharge:"5-6"` + `dc_success:"none"` — suppression of "Half damage" rides existing dcSuccess:'none' mechanism; do NOT add new prompt-builder branches.
+- PITFALL: SavePromptModal Roll Save = one roll per prompt (success probes need high-STAT target or re-cast); zero stale activeConditions before judging deltas; GM-stamp `monsterRecharged.recharged:true` via merged full-store POST as control rig when d6-5+ cadence is too slow.

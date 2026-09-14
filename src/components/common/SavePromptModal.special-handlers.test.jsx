@@ -95,6 +95,7 @@ vi.mock('./Subscriber.jsx', () => {
       React.createElement('button', { 'data-testid': 'subscriber-trigger-rawdamage', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-rd', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false, rawDamage: 10, dcSuccess: 'half' } }) }),
       React.createElement('button', { 'data-testid': 'subscriber-trigger-rawdamage-none', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-rd-none', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false, rawDamage: 10, dcSuccess: 'none' } }) }),
       React.createElement('button', { 'data-testid': 'subscriber-trigger-rawdamage-reroll', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-rd-reroll', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false, rawDamage: 10, dcSuccess: 'half' } }) }),
+      React.createElement('button', { 'data-testid': 'subscriber-trigger-saveconditions', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget5`, data: { promptId: 'test-prompt-saveconditions', targetName: 'testTarget5', saveType: 'str', saveDc: 19, disadvantage: false, dcSuccess: 'none', sourceName: 'Adult Bronze Dragon 1', rawDamage: 0, saveConditions: ['prone'] } }) }),
     );
   }
   return { default: MockSubscriber };
@@ -179,6 +180,41 @@ describe('SavePromptModal — Special Handlers', () => {
       rollType: 'save',
       saveType: 'con',
       saveDc: 12,
+    }), 'test-campaign');
+  });
+
+  // MA-0079: quick-roll lastAttack keeps the saveConditions carried on the
+  // AoE-prompt payload (Repulsion Breath) — previously always [].
+  it('quick-roll lastAttack stamps saveConditions from the prompt payload', async () => {
+    rollD20.mockReturnValue(11);
+    vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger-saveconditions'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Half damage on successful save/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/No damage on successful save/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Save' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
+    });
+
+    expect(storage.set).toHaveBeenCalledWith('lastAttack', expect.objectContaining({
+      saveType: 'str',
+      saveDc: 19,
+      saveConditions: ['prone'],
     }), 'test-campaign');
   });
 });

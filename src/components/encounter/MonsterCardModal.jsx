@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parsePushFeetClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -120,6 +120,15 @@ function sleepStagingForAction(spellInfo, action) {
   return { unconsciousRounds: (Number(action.staged_sleep.unconscious_minutes) || 10) * 10 };
 }
 
+// MA-0079: authored push clause (Adult Bronze Dragon Repulsion Breath —
+// "pushed up to 60 feet straight away"). Feet parsed for the picker's failed-
+// save push marker te (MA-0073 parse shape); null for every clauseless row —
+// byte-inert. Spell rows never carry the monster push clause.
+function pushFeetForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parsePushFeetClause(action?.save_effect)?.feet ?? null;
+}
+
 function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
@@ -150,11 +159,15 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     }));
   };
   const sleepStaging = sleepStagingForAction(spellInfo, action);
+  // MA-0079: authored push clause (Repulsion Breath "pushed up to 60 feet")
+  // rides the picker as an instant marker te on failed saves (MA-0073 parse
+  // shape). Null for every row without the clause — byte-inert.
+  const pushFeet = pushFeetForAction(spellInfo, action);
   if (aoe == null && !recharge.gate) { fire(); return; }
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet });
       return;
     }
     fire();
@@ -1332,6 +1345,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           zoneOnly={conePicker.zoneOnly === true}
           saveConditions={conePicker.saveConditions}
           sleepStaging={conePicker.sleepStaging}
+          pushFeet={conePicker.pushFeet}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}
         />

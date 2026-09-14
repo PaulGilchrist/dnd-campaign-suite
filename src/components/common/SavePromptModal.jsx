@@ -234,7 +234,7 @@ function buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, aura
     saveType: current.saveType || null,
     saveDc: current.saveDc,
     saveResult: success ? 'success' : 'failure',
-    saveConditions: current.condition ? [current.condition] : [],
+    saveConditions: current.condition ? [current.condition] : (current.saveConditions || []),
     ...buildSaveDamageFields(current),
     ...buildSecondaryDamageFields(current),
     timestamp: Date.now(),

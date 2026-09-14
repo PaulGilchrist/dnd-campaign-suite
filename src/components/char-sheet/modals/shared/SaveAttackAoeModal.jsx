@@ -82,7 +82,7 @@ function npcSaveBonus(target, saveType) {
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
-    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging } = ctx;
+    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -153,7 +153,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName });
+    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -181,7 +181,7 @@ function resolveNpcTarget(ctx) {
 
 // Resolve a PC target: soulstitch/careful auto-protect (returns { result }) or a save prompt ({ prompt }).
 function resolvePcTarget(ctx) {
-    const { action, targetName, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, overchannelActive, isCarefulSpell, isCarefulAlly, heightenTarget, playerStats, campaignName } = ctx;
+    const { action, targetName, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, overchannelActive, isCarefulSpell, isCarefulAlly, heightenTarget, playerStats, campaignName, saveConditions } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -228,6 +228,9 @@ function resolvePcTarget(ctx) {
         rawDamage,
         dcSuccess,
         disadvantage: heightenTarget === targetName,
+        // MA-0079: carry the authored failed-save conditions onto the prompt
+        // so the quick-roll lastAttack stamp keeps saveConditions (was []).
+        saveConditions: saveConditions || [],
     });
 
     const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
@@ -360,7 +363,7 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
 // lair_sand_cloud te mirrors the zone with dc for future consumers. NPC
 // turn-end auto-repeat and the 1-minute expiry stay GM-enforced (no NPC
 // turn-end zone-save consumer — advisory in the log).
-function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType, targetName, casterName, actionName, campaignName }) {
+function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType, targetName, casterName, actionName, campaignName, pushFeet }) {
     if (saveSuccess === true) return;
     if (!saveConditions || saveConditions.length === 0) return;
     const ability = String(saveType || '').toLowerCase().slice(0, 3) || 'con';
@@ -378,6 +381,15 @@ function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType
     }
     setRuntimeValue(targetName, 'activeConditionMeta', nextMeta, campaignName);
     const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+    // MA-0079: authored push clause (Repulsion Breath) — instant marker te
+    // on failed saves (CLA-384 pull-marker seam shape; instant te persists
+    // as marker, GM moves the token — §7 no position consumer).
+    const pushNote = pushFeet != null
+        ? ` Pushed up to ${pushFeet} ft straight away from ${casterName} (marker te; token movement GM-enforced).`
+        : '';
+    if (pushFeet != null) {
+        registerTargetEffect(campaignName, targetName, 'push', casterName, { duration: 'instant', value: pushFeet, actionName });
+    }
     addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
@@ -385,7 +397,7 @@ function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType
         condition: conditionNames.join(', '),
         sourceName: casterName,
         sourceAbility: actionName,
-        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — ${conditionNames.join(', ')} 1 minute; repeats the save at the end of each of its turns (success ends it on itself). NPC turn-end auto-repeat and 1-minute expiry GM-enforced.`,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — ${conditionNames.join(', ')} 1 minute; repeats the save at the end of each of its turns (success ends it on itself). NPC turn-end auto-repeat and 1-minute expiry GM-enforced.${pushNote}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save-fail condition:', e); });
 }
@@ -438,12 +450,12 @@ function applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetN
 
 // Failed-save dispatch: MA-0068 staged sleep rows route through the SP-107
 // staging seams; everything else keeps the MA-0063 one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName }) {
+function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
     }
-    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
+    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet });
 }
 
 // Result-row copy: damage rows keep the byte-identical damage line; damageless
@@ -601,6 +613,11 @@ function SaveAttackAoeModal({
     // Dragon Sleep Breath — failed saves STAGE the sleep (sleepService SP-107
     // shape) instead of the one-shot grant. { unconsciousRounds }.
     sleepStaging,
+    // MA-0079 optional failed-save push clause (byte-inert undefined default):
+    // Adult Bronze Dragon Repulsion Breath — failed saves grant the registry
+    // push te as an instant marker (CLA-384 pull-marker shape; token movement
+    // GM-enforced, §7 no position consumer). Feet parsed from save_effect.
+    pushFeet,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -662,7 +679,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -693,7 +710,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -821,7 +838,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName });
+        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -850,7 +867,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

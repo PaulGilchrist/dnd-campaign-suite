@@ -1230,7 +1230,7 @@
         "prone"
       ],
       "description": "Strength Saving Throw: DC 19, each creature in a 30-foot Cone. Failure: The target is pushed up to 60 feet straight away from the dragon and has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0079-repulsion-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0080",
