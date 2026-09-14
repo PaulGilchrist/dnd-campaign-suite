@@ -1009,7 +1009,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Sleep Breath or (B) Spellcasting to cast Scorching Ray.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0065-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0066",

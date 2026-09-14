@@ -8417,6 +8417,7 @@
             "When you cast this spell using a spell slot of 3rd level or higher, you create one additional ray for each slot level above 2nd."
         ],
         "range": "120 feet",
+        "attack_type": "ranged",
         "components": [
             "V",
             "S"
@@ -8427,7 +8428,17 @@
         "casting_time": "1 action",
         "level": 2,
         "damage": {
-            "damage_type": "Fire"
+            "damage_type": "Fire",
+            "damage_at_slot_level": {
+                "2": "2d6",
+                "3": "2d6",
+                "4": "2d6",
+                "5": "2d6",
+                "6": "2d6",
+                "7": "2d6",
+                "8": "2d6",
+                "9": "2d6"
+            }
         },
         "school": "Evocation",
         "classes": [

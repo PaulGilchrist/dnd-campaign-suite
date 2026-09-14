@@ -1677,9 +1677,10 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Minor Illusion</em>, <em>Scorching Ray</em>, <em>Shapechange</em> (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell), <em>Speak with Animals</em><br><strong>1/Day Each:</strong> <em>Detect Thoughts</em>, <em>Control Weather</em>",
+        "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16, +8 to hit with spell attacks):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Minor Illusion</em>, <em>Scorching Ray</em>, <em>Shapechange</em> (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell), <em>Speak with Animals</em><br><strong>1/Day Each:</strong> <em>Detect Thoughts</em>, <em>Control Weather</em>",
         "save_dc": 16,
-        "save_type": "Charisma"
+        "save_type": "Charisma",
+        "spell_attack_bonus": 8
       }
     ],
     "legendary_actions": [
