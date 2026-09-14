@@ -407,3 +407,7 @@ Dead-by-design (accepted models, do not chase): feats with `automation:null` ben
 - Save-fail speed clause lands: `parseSpeedHalfClause` (MonsterCardHelpers, MA-0038 parse pattern) → armed `speedHalf` in save context → `grantSpeedHalf` in saveProcessing `applyAuthoredClauseGrants` grants te `speed_half` (Movement group) + `addExpiration rounds:2` + `speed_half_granted` log; consumers conditionEffects→`speedHalved`→CharSummary halved Speed display + ConditionEffectBadges badge.
 - Per-action re-use gate: `monsterLegendaryActionCooldowns` keyed monster+action slug in monsterLegendaryUses.js — refusal runs AFTER the MA-0021 economy gates (else FP same-turn refusal vocabulary gets hijacked — caught by failing FP test); `<action>_refused (once per turn)` popup+log zero-spend; cleared in `regainLegendaryUses` at monster turn-start.
 - PITFALL: cs `activeCreatureName` mirror lag can latch boundary refuse before the cooldown leg runs — stamp cs to isolate per-action proof.
+
+## MA-0074 recipe (2026-09-14, fixed): nameless-drifting lair row → named STR save (data-only)
+- Fixed pattern: lair dict gets `name` + corrected `save_type`/`save_effect` + `dc_success:"none"` (damageless push/prone) → live chip via existing seam, zero code change. Push-distance + gas/flame clauses = GM-advisory prose (no consumer).
+- PITFALL: choose save-branch victims by ability modifier vs DC (STR −1 auto-fails DC 15 success branch — use high-STR target to prove no-condition-on-success). Data edits picked up by card reload (resolves by monsterIndex); stale EB tabs keep old echo only.

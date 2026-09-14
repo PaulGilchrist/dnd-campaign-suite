@@ -1149,7 +1149,7 @@
         "prone"
       ],
       "description": "A strong wind blows around the dragon. Each creature within 60 feet of the dragon must succeed on a DC 15 Strength saving throw or be pushed 15 feet away from the dragon and knocked prone. Gases and vapors are dispersed by the wind, and unprotected flames are extinguished. Protected flames, such as lanterns, have a 50 percent chance of being extinguished.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0074-lair-wind.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0075",

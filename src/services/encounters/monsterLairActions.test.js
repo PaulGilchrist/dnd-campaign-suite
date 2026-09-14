@@ -420,3 +420,76 @@ describe('MA-0064 adult-blue-dragon lightning arcs data lock', () => {
     expect(dragon.lair_actions[1].name).toBe('Sand Cloud');
   });
 });
+
+// MA-0074: Adult Brass Dragon lair_actions[0] was an unnamed inert dict
+// (MV-24/MV-21 fingerprint) with data drift copied from the sibling sand-cloud
+// row [1]: save_type Constitution (canonical STR) and save_effect "blinded for
+// 1 minute" (canonical pushed 15 ft + knocked prone). Now named "Strong Wind"
+// + Strength + push/prone so the MA-0024 seam renders a .mc-dice-link-lair
+// chip and the MA-0017 damageless failed-save seam applies prone. Push distance
+// and the gas/flame extinguish clauses stay GM-advisory (no push/flame te
+// consumer app-wide — CLA-325 precedent).
+describe('MA-0074 adult-brass-dragon strong wind data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-brass-dragon');
+  const wind = dragon.lair_actions[0];
+
+  it('row is now a structured clickable SAVE row named Strong Wind', () => {
+    expect(typeof wind).toBe('object');
+    expect(wind.name).toBe('Strong Wind');
+    expect(isLairRowClickable(wind)).toBe(true);
+    expect(lairRowAffordance(wind)).toBe('save');
+  });
+
+  it('save_type fixed to Strength — matches the authored description (no CON drift)', () => {
+    expect(wind.save_dc).toBe(15);
+    expect(wind.save_type).toBe('Strength');
+    expect(wind.description).toMatch(/DC 15 Strength saving throw/i);
+    expect(wind.save_effect).not.toMatch(/constitution/i);
+  });
+
+  it('save_effect fixed to push+prone — no blinded drift from the sand-cloud row', () => {
+    expect(wind.save_effect).toMatch(/pushed 15 feet away from the dragon/i);
+    expect(wind.save_effect).toMatch(/knocked prone/i);
+    expect(wind.save_effect).not.toMatch(/blinded/i);
+  });
+
+  it('no damage authored (dc_success none) — pure push/prone control row', () => {
+    expect(wind.damage_dice_primary).toBeUndefined();
+    expect(wind.damage_type_primary).toBeUndefined();
+    expect(wind.dc_success).toBe('none');
+    expect(wind.save_effect).toMatch(/deals no damage/i);
+  });
+
+  it('failed-save vocabulary extracts ONLY prone (MA-0017 damageless seam)', () => {
+    expect(extractConditionsFromSaveEffect(wind.save_effect)).toEqual(['prone']);
+  });
+
+  it('gas/flame extinguish clauses kept as advisory prose (GM-enforced — no consumer)', () => {
+    expect(wind.save_effect).toMatch(/gases and vapors are dispersed/i);
+    expect(wind.save_effect).toMatch(/unprotected flames are extinguished/i);
+    expect(wind.save_effect).toMatch(/GM-enforced/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula, prone conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wind,
+      monsterName: 'Adult Brass Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(wind.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wind, null, ['prone']);
+  });
+
+  it('sibling sand-cloud row [1] untouched (canonical DC 15 CON blinded string)', () => {
+    expect(typeof dragon.lair_actions[1]).toBe('string');
+    expect(dragon.lair_actions[1]).toMatch(/DC 15 Constitution saving throw/i);
+    expect(dragon.lair_actions[1]).toMatch(/blinded for 1 minute/i);
+  });
+});
