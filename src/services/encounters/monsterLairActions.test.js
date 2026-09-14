@@ -753,9 +753,107 @@ describe('MA-0096 adult-copper-dragon spike growth data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(spike, null, ['restrained']);
   });
 
-  it('sibling mud row [1] untouched raw string (MA-0097 scope — not fixed here)', () => {
-    expect(typeof dragon.lair_actions[1]).toBe('string');
-    expect(dragon.lair_actions[1]).toMatch(/mud/i);
-    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(false);
+  it('sibling mud row [1] structured as of MA-0097 (still names the mud mechanic)', () => {
+    expect(typeof dragon.lair_actions[1]).toBe('object');
+    expect(dragon.lair_actions[1].description).toMatch(/mud/i);
+    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(true);
+  });
+});
+
+// MA-0097: Adult Copper Dragon lair_actions[1] was a raw STRING (MV-24
+// fingerprint — no name, no keys: string short-circuit to the static span
+// branch in MonsterCardBody.jsx, isLairRowClickable never reached, save
+// unreachable). Now a structured save+zone row mirroring the VERIFIED
+// MA-0063/0075 sand-cloud shape: DEX DC 15, dc_success none (damageless),
+// restrained until freed, persisting zone `lair_mud` (registered Lair-group
+// te). Unmodelable clauses stay advisory prose (MA-0090/CLA-325 precedent):
+// SQUARE area (modeled 10-ft radius), STR-check-to-free, initiative-20
+// harden→DC 20, and 2-ft-per-1-ft movement have zero consumers (§7).
+describe('MA-0097 adult-copper-dragon liquid mud data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-copper-dragon');
+  const mud = dragon.lair_actions[1];
+
+  it('row is now a structured clickable SAVE row named Liquid Mud', () => {
+    expect(typeof mud).toBe('object');
+    expect(mud.name).toBe('Liquid Mud');
+    expect(isLairRowClickable(mud)).toBe(true);
+    expect(lairRowAffordance(mud)).toBe('save');
+  });
+
+  it('authored save fields: DC 15 Dexterity, dc_success none (no damage)', () => {
+    expect(mud.save_dc).toBe(15);
+    expect(mud.save_type).toBe('Dexterity');
+    expect(mud.dc_success).toBe('none');
+    expect(mud.damage_dice_primary).toBeUndefined();
+    expect(mud.damage_type_primary).toBeUndefined();
+    expect(mud.save_effect).toMatch(/deals no damage/i);
+  });
+
+  it('save_effect vocabulary extracts ONLY restrained (MA-0017 damageless seam)', () => {
+    expect(extractConditionsFromSaveEffect(mud.save_effect)).toEqual(['restrained']);
+  });
+
+  it('machine-readable zone: 10-ft radius, lair_mud key, mud noun, no repeat save', () => {
+    expect(mud.zone.radius_ft).toBe(10);
+    expect(mud.zone.effect_key).toBe('lair_mud');
+    expect(mud.zone.noun).toBe('mud');
+    expect(mud.zone.repeat_save).toBe(false);
+    expect(mud.zone.advisory).toMatch(/square/i);
+    expect(mud.zone.advisory).toMatch(/GM-enforced/i);
+    expect(mud.duration).toMatch(/initiative count 20/i);
+  });
+
+  it('description kept verbatim from the original string row (all clauses preserved)', () => {
+    expect(mud.description).toMatch(/10-foot-square area/i);
+    expect(mud.description).toMatch(/3-foot-deep mud/i);
+    expect(mud.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(mud.description).toMatch(/DC 15 Strength check/i);
+    expect(mud.description).toMatch(/Moving 1 foot in the mud costs 2 feet of movement/i);
+    expect(mud.description).toMatch(/initia­?tive count 20 on the next round, the mud hardens/i);
+    expect(mud.description).toMatch(/Strength DC to work free increases to 20/i);
+  });
+
+  it('STR-free / harden / movement-cost residuals advisory in save_effect prose', () => {
+    expect(mud.save_effect).toMatch(/restrained until freed by a DC 15 Strength check action/i);
+    expect(mud.save_effect).toMatch(/Moving 1 foot in the mud costs 2 feet of movement — GM-enforced/i);
+    expect(mud.save_effect).toMatch(/mud hardens/i);
+    expect(mud.save_effect).toMatch(/no initiative-20 lair seam/i);
+  });
+
+  it('save row routes through handleSaveRoll with restrained conditions, zero damage formula', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: mud,
+      monsterName: 'Adult Copper Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(mud.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(mud, null, ['restrained']);
+  });
+
+  it('lair_mud te is registered in the target-effect registry (Lair group)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_mud');
+    expect(def).toBeTruthy();
+    expect(def.label).toBe('Liquid Mud (Lair)');
+    expect(def.group).toBe('Lair');
+  });
+
+  it('sibling spike growth row [0] untouched (MA-0096 structured DEX save row)', () => {
+    expect(dragon.lair_actions[0].name).toBe('Spike Growth');
+    expect(dragon.lair_actions[0].save_type).toBe('Dexterity');
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
+  });
+
+  it('ancient-copper-dragon scope guard: its rows are NOT touched by this fix', () => {
+    const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
+    expect(ancient.lair_actions[0]).toEqual(expect.any(String));
+    expect(ancient.lair_actions[1].name).toBeUndefined();
   });
 });

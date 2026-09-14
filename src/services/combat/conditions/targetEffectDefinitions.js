@@ -822,6 +822,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Lair',
     fields: ['source'],
   },
+  {
+    effect: 'lair_mud',
+    label: 'Liquid Mud (Lair)',
+    description: 'In 3-foot-deep mud (10-foot square, modeled as radius, lair action): Dexterity save (DC indicated) when the mud appears; on a failed save the target is restrained until freed by a DC 15 Strength check action — GM-enforced (no rescue-engine consumer). Moving 1 foot costs 2 feet of movement, and the mud hardens at initiative count 20 next round (Strength DC rises to 20) — GM-enforced (no movement-cost or initiative-20 lair seam in this engine).',
+    icon: 'fa-water',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source', 'dc'],
+  },
 
   // ── Movement ────────────────────────────────────────────
   {

@@ -2078,7 +2078,22 @@
         "dc_success": "none",
         "save_effect": "The target is restrained."
       },
-      "The dragon chooses a 10-foot-square area on the ground that it can see within 120 feet of it. The ground in that area turns into 3-foot-deep mud. Each creature on the ground in that area when the mud appears must succeed on a DC 15 Dexterity saving throw or sink into the mud and become restrained. A creature can take an action to attempt a DC 15 Strength check, freeing itself or another creature within its reach and ending the restrained condition on a success. Moving 1 foot in the mud costs 2 feet of movement. On initia­tive count 20 on the next round, the mud hardens, and the Strength DC to work free increases to 20."
+      {
+        "name": "Liquid Mud",
+        "description": "The dragon chooses a 10-foot-square area on the ground that it can see within 120 feet of it. The ground in that area turns into 3-foot-deep mud. Each creature on the ground in that area when the mud appears must succeed on a DC 15 Dexterity saving throw or sink into the mud and become restrained. A creature can take an action to attempt a DC 15 Strength check, freeing itself or another creature within its reach and ending the restrained condition on a success. Moving 1 foot in the mud costs 2 feet of movement. On initia­tive count 20 on the next round, the mud hardens, and the Strength DC to work free increases to 20.",
+        "save_dc": 15,
+        "save_type": "Dexterity",
+        "dc_success": "none",
+        "save_effect": "Failure: The target sinks into the mud and becomes restrained until freed by a DC 15 Strength check action. Moving 1 foot in the mud costs 2 feet of movement — GM-enforced (no movement-cost consumer). On initiative count 20 the next round, the mud hardens, and the Strength DC to work free increases to 20 — GM-enforced (no initiative-20 lair seam). Success: unaffected. This effect deals no damage.",
+        "zone": {
+          "radius_ft": 10,
+          "effect_key": "lair_mud",
+          "repeat_save": false,
+          "noun": "mud",
+          "advisory": "Canonical shape is a 10-foot-square area — modeled as a 10-ft radius picker (square→radius approximation; GM positions the area). Restrained until freed by a DC 15 Strength check action — GM-enforced (no rescue-engine consumer). Moving 1 foot costs 2 feet of movement — GM-enforced (no movement-cost consumer). Mud hardens at initiative count 20 next round (Strength DC rises to 20) — GM-enforced (no initiative-20 lair seam)."
+        },
+        "duration": "until the dragon uses this lair action again or dies; mud hardens at initiative count 20 next round (advisory)"
+      }
     ],
     "environments": [
       "coastal"
