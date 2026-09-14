@@ -1398,7 +1398,7 @@
       "saveType": "Constitution",
       "saveEffect": "The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
       "description": "Constitution Saving Throw: DC 18, each creature in a 60-foot Cone. Failure: The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0090-slowing-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0091",
