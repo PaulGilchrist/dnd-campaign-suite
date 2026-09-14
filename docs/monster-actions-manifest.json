@@ -1575,7 +1575,7 @@
       "saveType": "Strength",
       "saveEffect": "The target has Disadvantage on Strength-based D20 Tests and subtracts 3 (1d6) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. Target repeats the save at the end of each of its turns. After 1 minute, it succeeds automatically.",
       "description": "Strength Saving Throw: DC 21, each creature that isn't currently affected by this breath in a 60-foot Cone. Failure: The target has Disadvantage on Strength-based D20 Tests and subtracts 3 (1d6) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0102-weakening-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0103",

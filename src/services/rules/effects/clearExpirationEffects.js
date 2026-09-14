@@ -385,6 +385,24 @@ const EXPIRATION_HANDLERS = {
     // addExpiration — clocks registered mid-expiry-processing race the
     // outer list rewrite); 24h = 14400 rounds (CLA-334), unreachable
     // in-encounter — the te stands until an admin clear (documented residual).
+    // MA-0102: Weakening Breath 1-minute clock expiry — RAW "After 1 minute,
+    // it succeeds automatically": strip the te and log the auto-success.
+    'weakening_breath_auto_success': (effect, targetName, attackerName, campaignName) => {
+        const effects = [...(getRuntimeValue('campaign', 'targetEffects', campaignName) || [])];
+        const filtered = effects.filter(te => !(te.effect === (effect.effectKey || 'weakening_breath') && te.target === targetName));
+        if (filtered.length !== effects.length) {
+            setRuntimeValue('campaign', 'targetEffects', filtered, campaignName);
+        }
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'weakening_breath_auto_success',
+            characterName: targetName,
+            sourceName: attackerName,
+            abilityName: 'Weakening Breath',
+            description: `${targetName} has suffered ${attackerName}'s Weakening Breath for 1 minute (10 rounds) — the repeat save succeeds automatically; the effect ends.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[clearExpirationEffects:weakening_breath_auto_success]', e); });
+    },
     'frightful_presence_immunity_grant': (effect, targetName, attackerName, campaignName) => {
         registerTargetEffect(campaignName, targetName, effect.immunityEffect || 'frightful_presence_immunity', attackerName, {
             duration: '24_hours',

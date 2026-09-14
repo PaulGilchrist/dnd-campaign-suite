@@ -255,6 +255,22 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { displayLabel: 'Giggling Magic' },
   },
   {
+    // MA-0102: Adult Gold Dragon Weakening Breath failed-save clause —
+    // Disadvantage on Strength-based D20 Tests and 1d6 subtracted from its
+    // damage rolls; repeats the save at the end of each of its turns (ends
+    // on a success), auto-succeeds after 1 minute. strCheckDisadvantage is
+    // the generic te field the STR-test roll consumers read (ray chain);
+    // damageSubtractDie feeds the damage-roll consumer in handlePlainDamage.
+    effect: 'weakening_breath',
+    label: 'Weakening Breath',
+    description: 'Disadvantage on Strength-based d20 tests and 1d6 subtracted from damage rolls; repeats the save at the end of each of its turns (auto-succeeds after 1 minute).',
+    icon: 'fa-hand-fist',
+    cls: 'effect-disadvantage',
+    group: 'Saves & Checks',
+    fields: ['source', 'dc', 'saveType', 'damageSubtractDie'],
+    defaults: { damageSubtractDie: '1d6' },
+  },
+  {
     effect: 'hex_ability_check_disadvantage',
     label: 'Check Disadv',
     description: 'Disadvantage on ability checks of the chosen ability.',

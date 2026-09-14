@@ -44,6 +44,18 @@ function rollRayOfEnfeebleReduction(attacker) {
     return { rayReduction: rayRoll?.total || 0, rayOfEnfeebleRoll: rayRoll?.total ?? null };
 }
 
+// MA-0102: Weakening Breath (Adult Gold Dragon) — the afflicted attacker
+// subtracts its te's damageSubtractDie (1d6) from its damage rolls until the
+// effect ends (repeat-save success or 1-minute auto-success). Mirrors the ray
+// reduction seam; rolls once per damage roll while the te stands.
+function rollWeakeningBreathReduction(attacker) {
+    const tes = getRuntimeValue('campaign', 'targetEffects') || [];
+    const te = tes.find(t => t.target === attacker && t.effect === 'weakening_breath');
+    if (!te) return { weakeningReduction: 0, weakeningBreathRoll: null };
+    const roll = rollExpression(te.damageSubtractDie || '1d6');
+    return { weakeningReduction: roll?.total || 0, weakeningBreathRoll: roll?.total ?? null };
+}
+
 function rollResistanceReduction(target, damageType, campaignName) {
     const resTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const resEffectOnTarget = resTargetEffects.find(te => te.target === target?.name && te.effect === 'resistance_damage_reduction');
@@ -276,14 +288,15 @@ async function applyDamageForTarget({ context, target, combatSummary, characters
     }
     const attacker = attackerName || characterName;
     const { rayReduction, rayOfEnfeebleRoll } = rollRayOfEnfeebleReduction(attacker);
+    const { weakeningReduction, weakeningBreathRoll } = rollWeakeningBreathReduction(attacker);
     const { resistanceReduction, resistanceRoll } = rollResistanceReduction(target, damageType, campaignName);
-    const reducedTotal = Math.max(0, adjustedTotal - rayReduction - resistanceReduction);
+    const reducedTotal = Math.max(0, adjustedTotal - rayReduction - weakeningReduction - resistanceReduction);
     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
     const { applyResult, secondaryResult, secondaryFinalDamage } = await rollAndApplySecondaryPlainDamage({
         context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name,
     });
-    return { applyResult, secondaryResult, secondaryFinalDamage, reducedTotal, rayReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll };
+    return { applyResult, secondaryResult, secondaryFinalDamage, reducedTotal, rayReduction, rayOfEnfeebleRoll, weakeningReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll };
 }
 
 function resolveCurrentHp(target) {
@@ -291,7 +304,7 @@ function resolveCurrentHp(target) {
     return target.type === 'player' ? (getRuntimeValue(target.name, 'currentHitPoints') ?? target.currentHp) : target.currentHp;
 }
 
-function buildPlainDamageLogData({ characterName, name, modifier, formula, rolls, displayRolls, gwfBaseRolls, gwfDisplayRolls, target, damageType, adjustedTotal, appliedDamage, reducedTotal, isCrit, rayReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll }) {
+function buildPlainDamageLogData({ characterName, name, modifier, formula, rolls, displayRolls, gwfBaseRolls, gwfDisplayRolls, target, damageType, adjustedTotal, appliedDamage, reducedTotal, isCrit, rayReduction, rayOfEnfeebleRoll, weakeningReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll }) {
     return {
         type: 'roll',
         characterName,
@@ -311,12 +324,14 @@ function buildPlainDamageLogData({ characterName, name, modifier, formula, rolls
         gwfDisplayRolls: gwfDisplayRolls,
         rayOfEnfeebleReduction: rayReduction,
         rayOfEnfeebleRoll: rayOfEnfeebleRoll,
+        weakeningBreathReduction: weakeningReduction || 0,
+        weakeningBreathRoll: weakeningBreathRoll ?? null,
         resistanceReduction,
         resistanceRoll,
     };
 }
 
-function buildPlainPopupData({ name, formula, rolls, modifier, context, target, damageType, adjustedTotal, total, isCrit, gwfBaseRolls, gwfDisplayRolls, rayReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll }) {
+function buildPlainPopupData({ name, formula, rolls, modifier, context, target, damageType, adjustedTotal, total, isCrit, gwfBaseRolls, gwfDisplayRolls, rayReduction, rayOfEnfeebleRoll, weakeningReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll }) {
     return {
         type: 'damage',
         name,
@@ -339,6 +354,8 @@ function buildPlainPopupData({ name, formula, rolls, modifier, context, target, 
         tavernBrawlerRerolls: context?.tavernBrawlerRerolls || null,
         rayOfEnfeebleReduction: rayReduction,
         rayOfEnfeebleRoll: rayOfEnfeebleRoll,
+        weakeningBreathReduction: weakeningReduction || 0,
+        weakeningBreathRoll: weakeningBreathRoll ?? null,
         resistanceReduction,
         resistanceRoll,
     };
@@ -625,11 +642,13 @@ export function createPlainDamageHandler(deps) {
         let reducedTotal = 0;
         let rayReduction = 0;
         let rayOfEnfeebleRoll = null;
+        let weakeningReduction = 0;
+        let weakeningBreathRoll = null;
         let resistanceReduction = 0;
         let resistanceRoll = null;
 
         if (target) {
-            ({ applyResult, secondaryResult, secondaryFinalDamage, reducedTotal, rayReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll } = await applyDamageForTarget({
+            ({ applyResult, secondaryResult, secondaryFinalDamage, reducedTotal, rayReduction, rayOfEnfeebleRoll, weakeningReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll } = await applyDamageForTarget({
                 context, target, combatSummary, characters, campaignName, characterName, attackerName, damageType, adjustedTotal, name,
             }));
         }
@@ -645,7 +664,7 @@ export function createPlainDamageHandler(deps) {
 
         const isCrit = context?.isAutoCrit || false;
 
-        const logEntryData = buildPlainDamageLogData({ characterName, name, modifier, formula, rolls, displayRolls, gwfBaseRolls, gwfDisplayRolls, target, damageType, adjustedTotal, appliedDamage, reducedTotal, isCrit, rayReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll });
+        const logEntryData = buildPlainDamageLogData({ characterName, name, modifier, formula, rolls, displayRolls, gwfBaseRolls, gwfDisplayRolls, target, damageType, adjustedTotal, appliedDamage, reducedTotal, isCrit, rayReduction, rayOfEnfeebleRoll, weakeningReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll });
         assignSecondaryFields(logEntryData, secondaryResult, SECONDARY_LOG_SUFFIXES);
         logEntry(logEntryData);
 
@@ -660,7 +679,7 @@ export function createPlainDamageHandler(deps) {
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 
-        const popupData = buildPlainPopupData({ name, formula, rolls, modifier, context, target, damageType, adjustedTotal, total, isCrit, gwfBaseRolls, gwfDisplayRolls, rayReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll });
+        const popupData = buildPlainPopupData({ name, formula, rolls, modifier, context, target, damageType, adjustedTotal, total, isCrit, gwfBaseRolls, gwfDisplayRolls, rayReduction, rayOfEnfeebleRoll, weakeningReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll });
 
         assignSecondaryFields(popupData, secondaryResult, SECONDARY_POPUP_SUFFIXES);
 

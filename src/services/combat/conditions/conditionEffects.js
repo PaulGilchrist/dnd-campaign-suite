@@ -110,6 +110,8 @@ function buildBaseEffects() {
      strCheckAdvantage: false,
      acPenalty: 0,
     rayOfEnfeebleDamageReduction: false,
+    weakeningBreathDamageSubtract: false,
+    weakeningBreathDamageSubtractDie: null,
     resistanceDamageReduction: false,
     seeInvisibilityActive: false,
     wardingBondAcBonus: 0,
@@ -496,6 +498,17 @@ const LATE_TARGET_EFFECT_HANDLERS = {
   ray_of_enfeeble_debuff: (effects, te) => {
     if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
     if (te.rayOfEnfeebleDamageReduction) effects.rayOfEnfeebleDamageReduction = true;
+  },
+  // MA-0102: Weakening Breath (Adult Gold Dragon) — STR-test disadvantage
+  // rides the same generic strCheckDisadvantage flag the check/grapple
+  // consumers already read; damageSubtractDie names the die the damage-roll
+  // consumer (handlePlainDamage) subtracts.
+  weakening_breath: (effects, te) => {
+    if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
+    if (te.damageSubtractDie) {
+      effects.weakeningBreathDamageSubtract = true;
+      effects.weakeningBreathDamageSubtractDie = te.damageSubtractDie;
+    }
   },
   // Handle Resistance — reduce damage of chosen type by 1d4 (once per turn)
   resistance_damage_reduction: (effects) => {

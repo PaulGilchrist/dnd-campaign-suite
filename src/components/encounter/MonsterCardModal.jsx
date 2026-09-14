@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -161,6 +161,17 @@ function slowedClausesForAction(spellInfo, action) {
   return parseSlowedClauses(action?.save_effect);
 }
 
+// MA-0102: authored failed-save weakening clause (Adult Gold Dragon Weakening
+// Breath). Parsed once and forwarded to the cone picker as an optional
+// te-grant seam (byte-inert null for clauseless rows, MA-0087 shape): the
+// picker grants the registered weakening_breath te on failed saves, excludes
+// creatures already weakened by this dragon, and the turn-END seam repeats
+// the save at Disadvantage until success or the 1-minute auto-success clock.
+function weakeningBreathForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parseWeakeningBreathClause(action?.save_effect);
+}
+
 function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
@@ -196,11 +207,12 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   // shape). Null for every row without the clause — byte-inert.
   const pushFeet = pushFeetForAction(spellInfo, action);
   const slowedClauses = slowedClausesForAction(spellInfo, action);
+  const weakeningBreath = weakeningBreathForAction(spellInfo, action);
   if (aoe == null && !recharge.gate) { fire(); return; }
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, slowedClauses, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -593,8 +605,12 @@ function logBlockedDamageRoll(campaignName, monsterName, name, formula) {
   }).catch((e) => { console.error('[MonsterCardModal] Error logging blocked damage roll:', e); });
 }
 
-function hasRayOfEnfeebleOn(targetEffects, monsterName) {
-  return targetEffects?.some(te => te.target === monsterName && te.effect === 'ray_of_enfeeble_debuff');
+// MA-0102 generalization: any te on this monster carrying the generic
+// strCheckDisadvantage flag (ray_of_enfeeble_debuff, weakening_breath)
+// forces Disadvantage on its STR ability/skill checks. Ray te already
+// carries the flag, so ray behavior is byte-identical.
+function hasStrTestDisadvantageOn(targetEffects, monsterName) {
+  return targetEffects?.some(te => te.target === monsterName && (te.effect === 'ray_of_enfeeble_debuff' || te.strCheckDisadvantage));
 }
 
 function rayDisadvantageContext(applies) {
@@ -1083,14 +1099,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleAbilityCheck = (abbr, mod) => {
     const fullName = abilityNameMap[abbr] || abbr.toUpperCase();
-    const context = rayDisadvantageContext(abbr === 'str' && hasRayOfEnfeebleOn(monsterTargetEffects, monsterName));
+    const context = rayDisadvantageContext(abbr === 'str' && hasStrTestDisadvantageOn(monsterTargetEffects, monsterName));
     rollAbilityCheck(fullName, mod, context);
   };
 
   const handleSaveThrow = (ability, mod) => rollSavingThrow(saveAbilityAbbr(ability), mod);
 
   const handleSkillCheck = (name, mod) => {
-    const context = rayDisadvantageContext(name === 'Athletics' && hasRayOfEnfeebleOn(monsterTargetEffects, monsterName));
+    const context = rayDisadvantageContext(name === 'Athletics' && hasStrTestDisadvantageOn(monsterTargetEffects, monsterName));
     rollSkillCheck(name, mod, context);
   };
 
@@ -1390,6 +1406,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           sleepStaging={conePicker.sleepStaging}
           pushFeet={conePicker.pushFeet}
           slowedClauses={conePicker.slowedClauses}
+          weakeningBreath={conePicker.weakeningBreath}
           conditionDurationNote={conePicker.conditionDurationNote}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}

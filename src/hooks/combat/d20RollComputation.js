@@ -37,13 +37,17 @@ function applyPendingSkillCheckBonus(rollType, characterName, campaignName) {
     return { bonus: pendingRaw, detail: `(+${pendingRaw} [Pending Skill Check])` };
 }
 
-// Ray of Enfeeblement: STR-based d20 tests have disadvantage
-function hasRayOfEnfeeblementDisadvantage(rollType, name, characterName) {
+// STR-based d20 tests have disadvantage (MA-0102 generalization of the Ray
+// of Enfeeblement hook): any te on the roller carrying the generic
+// strCheckDisadvantage flag (ray_of_enfeeble_debuff, MA-0102
+// weakening_breath) forces Disadvantage on STR ability/skill checks. Ray te
+// already carries the flag, so ray behavior is byte-identical.
+function hasStrTestDisadvantage(rollType, name, characterName) {
     if (rollType !== 'check' && rollType !== 'skill') return false;
     const abilityAbbr = (name || '').substring(0, 3).toUpperCase();
     if (abilityAbbr !== 'STR' && name !== 'Strength' && name !== 'Athletics') return false;
     const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    return allTargetEffects.some(te => te.target === characterName && te.effect === 'ray_of_enfeeble_debuff' && te.strCheckDisadvantage);
+    return allTargetEffects.some(te => te.target === characterName && te.strCheckDisadvantage);
 }
 
 // Roll-time subtract-die riders (generalized bane_penalty hook): Bane/Blade
@@ -214,7 +218,7 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
     const pendingSkillCheckAppliedBonus = pendingSkillCheck.bonus;
     const pendingSkillCheckDetail = pendingSkillCheck.detail;
 
-    const rayStrDisadvantage = hasRayOfEnfeeblementDisadvantage(rollType, name, characterName);
+    const rayStrDisadvantage = hasStrTestDisadvantage(rollType, name, characterName);
 
     if (rayStrDisadvantage) {
         forcedMode = 'disadvantage';

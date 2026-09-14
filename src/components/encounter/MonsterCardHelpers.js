@@ -73,6 +73,30 @@ export function parseSubtractDieClause(saveEffect) {
   return m ? { effect: 'giggling_magic_debuff', die: m[1].toLowerCase(), displayLabel: 'Giggling Magic' } : null;
 }
 
+// MA-0102: authored failed-save weakening clause (Adult Gold Dragon Weakening
+// Breath — "Disadvantage on Strength-based D20 Tests and subtracts 3 (1d6)
+// from its damage rolls. It repeats the save at the end of each of its turns,
+// ending the effect on itself on a success. After 1 minute, it succeeds
+// automatically."). Maps the clause to the registered weakening_breath te;
+// strCheckDisadvantage rides the generic te field the generalized roll-time
+// consumers already read (ray_of_enfeeble_debuff chain, MA-0093 shape), and
+// damageSubtractDie carries the die for the damage-roll consumer (NOT
+// subtractDie — that key subtracts from d20 tests, wrong RAW here). Arms the
+// te producer at the monster cone picker on a failed save (MA-0087 parse
+// shape). Byte-inert (null) for rows without the clause.
+export function parseWeakeningBreathClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/disadvantage on strength-based\s*(?:<\/?strong>)?\s*d20 tests?[^.]*subtract(?:s)?[^.]*\((\d+d\d+)\)/i);
+  if (!m) return null;
+  return {
+    effect: 'weakening_breath',
+    strCheckDisadvantage: true,
+    damageSubtractDie: m[1].toLowerCase(),
+    repeatSave: true,
+    autoSuccessMinutes: /after 1 minute/i.test(saveEffect) ? 1 : null,
+  };
+}
+
 // MA-0079: authored failed-save push clause (Adult Bronze Dragon Repulsion
 // Breath — "pushed up to 60 feet straight away from the dragon"). Not a
 // condition, so extractConditionsFromSaveEffect can never see it; this clause

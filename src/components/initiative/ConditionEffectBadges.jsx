@@ -302,6 +302,12 @@ const BADGE_SPECS = [
         guard: ctx => ctx.effects.rayOfEnfeebleDamageReduction,
         build: buildEnfeebleBadge,
     },
+    // MA-0102: Adult Gold Dragon Weakening Breath failed-save te badge.
+    {
+        find: ctx => findDirect(ctx, 'weakening_breath'),
+        guard: ctx => ctx.effects.weakeningBreathDamageSubtract,
+        build: ctx => ({ label: 'Weakened', cls: 'effect-debuff', icon: 'fa-hand-fist', removable: true, removeAction: 'target_effect', effectType: 'weakening_breath', tooltip: `Weakening Breath from ${ctx.te?.source || 'unknown'}: Disadvantage on STR-based d20 tests, -${ctx.te?.damageSubtractDie || '1d6'} damage rolls; repeats the save at the end of each of its turns (auto-succeeds after 1 minute)` }),
+    },
     {
         find: ctx => findDirect(ctx, 'resistance_damage_reduction'),
         guard: ctx => ctx.effects.resistanceDamageReduction,

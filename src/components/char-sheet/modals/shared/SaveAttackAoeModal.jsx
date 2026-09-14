@@ -12,6 +12,7 @@ import { registerTargetEffect } from '../../../../services/combat/conditions/tar
 import { addExpiration } from '../../../../services/rules/effects/expirationQueue.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
+import { grantWeakeningBreath } from '../../../../services/rules/features/weakeningBreathService.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -154,7 +155,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, conditionDurationNote: ctx.conditionDurationNote });
+    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, conditionDurationNote: ctx.conditionDurationNote });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -463,7 +464,7 @@ function applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetN
 
 // Failed-save dispatch: MA-0068 staged sleep rows route through the SP-107
 // staging seams; everything else keeps the MA-0063 one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, conditionDurationNote }) {
+function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
@@ -473,6 +474,13 @@ function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetN
     // to a registered te with a live consumer). Byte-inert when null.
     if (!success && slowedClauses?.effects?.length) {
         grantSlowedClauses({ effects: slowedClauses.effects, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
+    }
+    // MA-0102: Weakening Breath failed-save grant (Adult Gold Dragon) —
+    // weakening_breath te (STR-test disadvantage + 1d6 damage subtract) with
+    // the turn-END repeat-save marker and a 10-round auto-success clock
+    // (weakeningBreathService, MA-0048/MA-0087 shapes). Byte-inert when null.
+    if (!success && weakeningBreath) {
+        grantWeakeningBreath({ campaignName, attackerName: playerStats.name, targetName, saveType, saveDc, roll: saveRoll, saveBonus }).catch((e) => { console.error('[SaveAttackAoeModal] Error granting weakening breath:', e); });
     }
     applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
 }
@@ -559,7 +567,30 @@ function stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten) {
     };
 }
 
-function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, slowedClauses, dcSuccess }) {
+// MA-0102: damageless weakening cone (Adult Gold Weakening Breath) —
+// failed saves impose STR-test disadvantage + a damage-subtract die and
+// repeat at turn end; never a damage line (kills the MA-0090 "null null
+// damage" cosmetic). Byte-inert unless the clause authored.
+function weakeningPickerCopy(head, weakeningBreath, metamagicHeighten) {
+    return {
+        icon: 'fa-hand-fist',
+        description: head,
+        note: `On a failed save, target has Disadvantage on Strength-based D20 Tests and subtracts ${weakeningBreath.damageSubtractDie || '1d6'} from its damage rolls. It repeats the save at the end of each of its turns, ending on a success — auto-succeeds after 1 minute.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+    };
+}
+
+// MA-0087: damageless "slowed" cone (Adult Copper Slowing Breath) —
+// failed saves impose Reactions/Speed/action riders, never a damage line.
+// Byte-inert unless the clause authored.
+function slowedPickerCopy(head, metamagicHeighten) {
+    return {
+        icon: 'fa-hourglass-half',
+        description: head,
+        note: `On a failed save, target is Slowed: can't take Reactions, Speed halved, and one action or Bonus Action (not both) until the end of its next turn.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+    };
+}
+
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, slowedClauses, weakeningBreath, dcSuccess }) {
     // MA-0084: dc_success 'none' rows (Thunderclap) never print the
     // half-on-success sentence — byte-identical copy for every other row.
     const successSentence = dcSuccess === 'none'
@@ -568,16 +599,8 @@ function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, da
     if (!zoneOnly) {
         const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
         if (sleepStaging) return stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten);
-        // MA-0087: damageless "slowed" cone (Adult Copper Slowing Breath) —
-        // failed saves impose Reactions/Speed/action riders, never a damage
-        // line. Byte-inert unless the clause authored.
-        if (!damage && slowedClauses?.effects?.length) {
-            return {
-                icon: 'fa-hourglass-half',
-                description: head,
-                note: `On a failed save, target is Slowed: can't take Reactions, Speed halved, and one action or Bonus Action (not both) until the end of its next turn.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
-            };
-        }
+        if (!damage && weakeningBreath) return weakeningPickerCopy(head, weakeningBreath, metamagicHeighten);
+        if (!damage && slowedClauses?.effects?.length) return slowedPickerCopy(head, metamagicHeighten);
         // MA-0063: damageless condition row (e.g. Adult Blue Dragon Sand Cloud) —
         // no damage formula, failed saves grant conditions. Byte-inert when empty.
         if (!damage && saveConditions && saveConditions.length > 0) {
@@ -606,6 +629,18 @@ function zoneOnlyPickerCopy(zoneTe, range) {
         description: `Select creatures inside the <strong>${zoneTe?.radiusFt ?? range}-foot</strong> ${zoneTe?.noun || 'darkness'}. No saving throw — the GM positions the origin (selection advisory).`,
         note: `${zoneTe?.clause || ''} Duration ${zoneTe?.duration || 'GM-adjudicated'} — GM-enforced.`,
     };
+}
+
+// MA-0102: RAW Weakening Breath targets "each creature that isn't currently
+// affected by this breath" — creatures already carrying this attacker's
+// weakening_breath te are merged into the picker's excludeNames. Byte-inert
+// (no read) unless the weakening clause is authored on the row.
+function weakenedNamesFor(catalog, attackerName, weakeningBreath) {
+    if (!weakeningBreath) return [];
+    const effects = getRuntimeValue('campaign', 'targetEffects') || [];
+    return (catalog || [])
+        .map(c => c.name)
+        .filter(name => effects.some(te => te.effect === 'weakening_breath' && te.target === name && te.source === attackerName));
 }
 
 function buildEligibleTargets(combatSummary, attackerName, isCarefulSpell, isCarefulAlly, excludeNames) {
@@ -702,6 +737,13 @@ function SaveAttackAoeModal({
     // default): Adult Copper Dragon Slowing Breath — grants speed_half,
     // no_reactions, no_action_and_bonus_action te on each failed save.
     slowedClauses,
+    // MA-0102 optional failed-save weakening clause (byte-inert undefined
+    // default): Adult Gold Dragon Weakening Breath — grants the registered
+    // weakening_breath te (STR-test disadvantage + damageSubtractDie 1d6)
+    // with a turn-END repeat save and a 1-minute (10-round) auto-success
+    // clock; targets already affected by this dragon's breath are excluded
+    // (RAW "each creature that isn't currently affected by this breath").
+    weakeningBreath,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -763,7 +805,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, conditionDurationNote };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -794,7 +836,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, slowedClauses, conditionDurationNote]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -922,7 +964,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, conditionDurationNote });
+        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -951,7 +993,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, slowedClauses, conditionDurationNote]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -983,8 +1025,8 @@ function SaveAttackAoeModal({
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');
 
     const eligibleTargets = React.useMemo(
-        () => buildEligibleTargets(combatSummary, playerStats.name, isCarefulSpell, isCarefulAlly, excludeNames),
-        [combatSummary, isCarefulSpell, isCarefulAlly, playerStats.name, excludeNames]);
+        () => buildEligibleTargets(combatSummary, playerStats.name, isCarefulSpell, isCarefulAlly, [...(excludeNames || []), ...weakenedNamesFor(combatSummary?.creatures, playerStats.name, weakeningBreath)]),
+        [combatSummary, isCarefulSpell, isCarefulAlly, playerStats.name, excludeNames, weakeningBreath]);
 
     const rangeAllowed = useRangeAllowedSet(eligibleTargets, rangeGateFt, playerStats.name);
 
@@ -1152,7 +1194,7 @@ function SaveAttackAoeModal({
         );
     }
 
-    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, slowedClauses, dcSuccess });
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, slowedClauses, weakeningBreath, dcSuccess });
 
     return (
         <CreatureSelectionModal

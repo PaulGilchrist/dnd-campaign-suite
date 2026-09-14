@@ -6,6 +6,7 @@ import { clearPerRoundMajestyTrackers } from '../../services/combat/auras/unbrea
 import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval } from '../../services/rules/effects/expirations.js'
 import { applySleepTurnEnd } from '../../services/rules/features/sleepService.js'
 import { applyFrightfulPresenceTurnEnd } from '../../services/rules/features/frightfulPresenceService.js'
+import { applyWeakeningBreathTurnEnd } from '../../services/rules/features/weakeningBreathService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
@@ -116,6 +117,11 @@ function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters
     // Frightened and grants 24h immunity to this dracolich's FP.
     applyFrightfulPresenceTurnEnd(campaignName, activeCreatureName)
         .catch((e) => { console.error('[navigationHandlers] MA-0048 frightful presence turn-end save failed:', e) })
+    // MA-0102: Weakening Breath (Adult Gold Dragon) — the OUTGOING creature
+    // repeats its STR save at Disadvantage at the end of its own weakened
+    // turn; success ends the effect (10-round clock auto-succeeds after 1 min).
+    applyWeakeningBreathTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] MA-0102 weakening breath turn-end save failed:', e) })
 }
 
 /**
