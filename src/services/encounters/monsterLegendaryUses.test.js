@@ -24,6 +24,8 @@ import {
   buildLegendaryPrerequisiteRefusalPopup,
   buildLegendaryPrerequisiteRefusalLog,
   applyLegendarySelfHeal,
+  buildLegendaryAdvisoryPopup,
+  buildLegendaryAdvisoryLog,
 } from './monsterLegendaryUses.js';
 import monstersData from '../../../public/data/monsters.json';
 
@@ -524,5 +526,93 @@ describe('MA-0052 Adult Blue Dracolich Tail Attack delegates_to Tail', () => {
     expect(refused.popupHtml).toContain('no legendary uses left');
     const refusal = logs.find(e => e.automationType === 'legendary_use_refused');
     expect(refusal.description).toMatch(/refused \(exhausted\) — zero spend, no roll/);
+  });
+});
+
+// MA-0058: Adult Blue Dragon "Legendary Action Uses: 3 (4 in Lair)" —
+// data fix mirroring MA-0037/0050: header authors uses:3 (+ lair advisory);
+// the three verbatim rows classified post-MA-0021/0051 — Tail Swipe attack
+// delegate (MA-0022), Sonic Boom save row (MA-0039 shape, spell save DC 18
+// Constitution 3d8 Thunder per MA-0054 Shatter truth), Cloaked Flight
+// advisory row (MA-0024/CLA-325 — no invisibility/movement consumer).
+describe('MA-0058 Adult Blue Dragon legendary header + row classification', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-blue-dragon');
+
+  it('header authors uses:3 with lair advisory', () => {
+    const header = legendaryHeaderAction(dragon);
+    expect(header?.name).toBe('Legendary Action Uses: 3 (4 in Lair)');
+    expect(header?.uses).toBe(3);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+    expect(header.description).toMatch(/In its lair the dragon has 4 uses \(advisory .* GM-enforced\)/);
+  });
+
+  it('Cloaked Flight: advisory row, no own numeric mechanic, movement advisory text', () => {
+    const row = dragon.legendary_actions.find(a => a.name === 'Cloaked Flight');
+    expect(row.advisory).toBe('invisibility');
+    expect(row.attack_bonus == null && row.save_dc == null).toBe(true);
+    expect(row.description).toMatch(/movement advisory/i);
+  });
+
+  it('Sonic Boom: authored Constitution save row at spell save DC 18, 3d8 Thunder', () => {
+    const row = dragon.legendary_actions.find(a => a.name === 'Sonic Boom');
+    expect(row.save_dc).toBe(18);
+    expect(row.save_type).toBe('Constitution');
+    expect(row.damage_dice_primary).toBe('3d8');
+    expect(row.damage_type_primary).toBe('Thunder');
+    expect(row.save_effect).toMatch(/Half damage/i);
+  });
+
+  it('Tail Swipe delegates_to the real Rend attack row (+12 / 2d8 + 7 Slashing + 1d10 Lightning)', () => {
+    const row = dragon.legendary_actions.find(a => a.name === 'Tail Swipe');
+    expect(row.delegates_to).toBe('Rend');
+    const d = legendaryDelegateAction(dragon, row);
+    expect(d).toBe(dragon.actions.find(a => a.name === 'Rend'));
+    expect(d.attack_bonus).toBe(12);
+    expect(d.damage_dice_primary).toBe('2d8 + 7');
+    expect(d.damage_type_primary).toBe('Slashing');
+    expect(d.damage_dice_secondary).toBe('1d10');
+    expect(d.damage_type_secondary).toBe('Lightning');
+    expect(legendaryDelegateAttackName(row, d)).toBe('Tail Swipe (Rend attack)');
+  });
+
+  it('economy is live: 3 spends across other-creature turns, exhaustion refusal, turn-start regain', async () => {
+    cs.activeCreatureName = 'Thug 1';
+    const tail = await expendLegendaryUse({ monsterName: 'Adult Blue Dragon 1', monster: dragon, actionName: 'Tail Swipe (Rend attack)', campaignName: 'test-campaign', deps });
+    expect(tail).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Adult Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Adult Blue Dragon 1', monster: dragon, actionName: 'Sonic Boom', campaignName: 'test-campaign', deps });
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const sonic = await expendLegendaryUse({ monsterName: 'Adult Blue Dragon 1', monster: dragon, actionName: 'Sonic Boom', campaignName: 'test-campaign', deps });
+    expect(sonic).toEqual({ spent: true, remaining: 1, max: 3 });
+    cs.activeCreatureName = 'HexWarlock';
+    const cloaked = await expendLegendaryUse({ monsterName: 'Adult Blue Dragon 1', monster: dragon, actionName: 'Cloaked Flight', campaignName: 'test-campaign', deps });
+    expect(cloaked).toEqual({ spent: true, remaining: 0, max: 3 });
+
+    cs.activeCreatureName = 'FeyRanger';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Adult Blue Dragon 1', monster: dragon, actionName: 'Tail Swipe (Rend attack)', campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+    expect(logs.some(e => e.automationType === 'legendary_use_refused')).toBe(true);
+
+    cs.activeCreatureName = 'Adult Blue Dragon 1';
+    const ownTurn = await expendLegendaryUse({ monsterName: 'Adult Blue Dragon 1', monster: dragon, actionName: 'Sonic Boom', campaignName: 'test-campaign', deps });
+    expect(ownTurn.reason).toBe('exhausted');
+    const regain = await regainLegendaryUses({ monsterName: 'Adult Blue Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Adult Blue Dragon 1.monsterLegendaryUses'].used).toBe(0);
+  });
+
+  it('advisory popup + ability_use log name the spell and the GM-enforced residual', () => {
+    const row = dragon.legendary_actions.find(a => a.name === 'Cloaked Flight');
+    const html = buildLegendaryAdvisoryPopup({ monsterName: 'Adult Blue Dragon 1', action: row });
+    expect(html).toMatch(/Legendary Action — Cloaked Flight/);
+    expect(html).toMatch(/casts invisibility on itself/);
+    expect(html).toMatch(/GM-enforced/);
+    const e = buildLegendaryAdvisoryLog({ monsterName: 'Adult Blue Dragon 1', action: row });
+    expect(e.type).toBe('ability_use');
+    expect(e.abilityName).toBe('Cloaked Flight');
+    expect(e.description).toMatch(/casts invisibility on itself.*GM-enforced/s);
   });
 });

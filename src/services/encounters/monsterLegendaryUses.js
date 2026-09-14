@@ -212,6 +212,28 @@ export function buildLegendaryRefusalLog({ monsterName, actionName, reason }) {
   };
 }
 
+// MA-0058: advisory legendary rows with no rollable mechanic (Adult Blue
+// Dragon "Cloaked Flight" — self Invisibility + half-Fly-Speed movement).
+// Mirrors the lair advisory model (MA-0024/CLA-325): the spend is already
+// logged by expendLegendaryUse; the click lands a spell-named adjudication
+// record (popup + ability_use log) instead of a console.error dead-end —
+// invisibility/movement-distance have no engine consumer (GM-enforced).
+export function buildLegendaryAdvisoryPopup({ monsterName, action }) {
+  const spell = String(action.advisory).replace(/_/g, ' ');
+  return `<div class="mc-prerequisite-refusal"><h3>Legendary Action — ${action.name}</h3><p>${monsterName} casts ${spell} on itself via Spellcasting. Advisory record: the invisibility and half-Fly-Speed movement are GM-enforced (no invisibility/movement-distance consumer). ${monsterName} can't take this action again until the start of its next turn.</p></div>`;
+}
+
+export function buildLegendaryAdvisoryLog({ monsterName, action }) {
+  const spell = String(action.advisory).replace(/_/g, ' ');
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: action.name,
+    description: `${monsterName} legendary action ${action.name}: casts ${spell} on itself — advisory record: invisibility and half-Fly-Speed movement are GM-enforced (no invisibility/movement-distance consumer, CLA-325).`,
+    timestamp: Date.now(),
+  };
+}
+
 function combatRound(cs) { return Number(cs?.round ?? 1) || 0; }
 function combatActive(cs) { return cs?.activeCreatureName || ''; }
 

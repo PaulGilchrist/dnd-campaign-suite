@@ -1502,18 +1502,26 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Cloaked Flight",
-        "description": "The dragon uses Spellcasting to cast <em>Invisibility</em> on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn."
+        "advisory": "invisibility",
+        "description": "The dragon uses Spellcasting to cast <em>Invisibility</em> on itself, and it can fly up to half its Fly Speed (movement advisory — GM moves the token; no movement-distance producer; invisibility GM-enforced, CLA-325). The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Sonic Boom",
-        "description": "The dragon uses Spellcasting to cast <em>Shatter</em>. The dragon can't take this action again until the start of its next turn."
+        "save_dc": 18,
+        "save_type": "Constitution",
+        "damage_dice_primary": "3d8",
+        "damage_type_primary": "Thunder",
+        "save_effect": "3d8 Thunder damage. Success: Half damage.",
+        "description": "The dragon uses Spellcasting to cast <em>Shatter</em> (spell save DC 18, Charisma). 10-ft-radius sphere selection advisory — single armed target resolves; GM picks targets. The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Tail Swipe",
+        "delegates_to": "Rend",
         "description": "The dragon makes one Rend attack."
       }
     ],

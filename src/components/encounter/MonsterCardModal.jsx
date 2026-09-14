@@ -21,7 +21,7 @@ import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
 import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
-import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
+import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
 import SaveAttackAoeModal from '../char-sheet/modals/shared/SaveAttackAoeModal.jsx';
@@ -160,9 +160,17 @@ function legendaryRowHasNumericMechanic(action) {
   return !!(formula && canRollExpression(formula));
 }
 
-function resolveLegendaryRowMechanic(action, { monsterName, handledActionName, handleAttack, handleSaveRoll, handleDamage }) {
+function resolveLegendaryRowMechanic(action, { monsterName, handledActionName, handleAttack, handleSaveRoll, handleDamage, setPopupHtml, campaignName }) {
   if (action.attack_bonus != null) handleAttack(handledActionName ?? action.name, action.attack_bonus, action);
   else if (action.save_dc != null) handleSaveRoll(action, extractDamageDiceFromDescription(action.description, action.damage_dice_primary), extractConditionsFromSaveEffect(action.save_effect));
+  else if (action.advisory) {
+    // MA-0058: advisory row (Cloaked Flight self-Invisibility + movement) —
+    // spend already logged by expendLegendaryUse; land the adjudication
+    // record instead of a console dead-end (MA-0024/CLA-325 model).
+    setPopupHtml(buildLegendaryAdvisoryPopup({ monsterName, action }));
+    addEntry(campaignName, buildLegendaryAdvisoryLog({ monsterName, action }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging legendary advisory row:', e); });
+  }
   else {
     const formula = extractDamageDiceFromDescription(action.description, action.damage_dice_primary);
     if (formula && canRollExpression(formula)) handleDamage(handledActionName ?? action.name, formula, action.damage_type_primary ? formatDamageTypes([action.damage_type_primary]) : '', action);
@@ -224,7 +232,7 @@ async function resolveLegendaryRow({ action, monsterName, monster, campaignName,
     return;
   }
   if (checkBonus != null) handleCheck(legendaryCheckLabel(action), checkBonus);
-  else resolveLegendaryRowMechanic(mechanicAction, { monsterName, handledActionName: actionName, handleAttack, handleSaveRoll, handleDamage });
+  else resolveLegendaryRowMechanic(mechanicAction, { monsterName, handledActionName: actionName, handleAttack, handleSaveRoll, handleDamage, setPopupHtml, campaignName });
   if (action.self_heal) {
     applyLegendarySelfHeal({ monsterName, actionName: action.name, formula: action.self_heal, campaignName })
       .catch((e) => { console.error('[MonsterCardModal] Error applying legendary self-heal:', e); });
