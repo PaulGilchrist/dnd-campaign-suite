@@ -10,6 +10,7 @@ import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { registerTargetEffect } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
+import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -81,7 +82,7 @@ function npcSaveBonus(target, saveType) {
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
-    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions } = ctx;
+    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -150,8 +151,9 @@ function resolveNpcTarget(ctx) {
         // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
         registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
     }
-    // MA-0063: damageless failed-save condition grant (byte-inert when empty).
-    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
+    // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
+    // when neither flag authored).
+    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -388,6 +390,80 @@ function applySaveFailConditions({ saveConditions, saveSuccess, saveDc, saveType
     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging save-fail condition:', e); });
 }
 
+// MA-0068: staged Sleep Breath fail (byte-inert unless sleepStaging authored).
+// A failed save STAGES the sleep (Incapacitated + sleep_staged te, SP-107
+// sleepService shape) instead of the MA-0063 one-shot all-conditions grant:
+// the turn-END seam (navigationHandlers applyOutgoingTurnEndPasses →
+// sleepService.applySleepTurnEnd) rolls the CON repeat save, and a second
+// fail escalates to Unconscious for unconsciousRounds (10 min = 100 rounds,
+// CLA-334 minutes×10). Wake-on-damage lands at the existing applyDamage
+// wakeSleepOnDamage seam. Shaking awake within 5 ft stays GM-enforced
+// (§7 sleep_shake residual). Zero damage — HP untouched; roll + condition
+// logs written here (no damage = no damage log — MA-0090 fingerprint).
+function applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName, actionName, roll, saveBonus, campaignName }) {
+    const failed = success !== true;
+    const unconsciousMinutes = Math.max(1, Math.round((sleepStaging.unconsciousRounds ?? 100) / 10));
+    addEntry(campaignName, {
+        type: 'roll',
+        rollType: 'save',
+        characterName: targetName,
+        name: actionName,
+        targetName,
+        saveType,
+        saveDc,
+        saveResult: failed ? 'failure' : 'success',
+        rolls: [roll ?? 0],
+        bonus: saveBonus ?? 0,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging staged sleep save:', e); });
+    if (!failed) return;
+    stageSleepTargets(campaignName, casterName, [targetName], saveDc, {
+        saveType,
+        concentrate: false,
+        label: actionName,
+        logLabel: actionName,
+        unconsciousRounds: sleepStaging.unconsciousRounds ?? 100,
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error staging sleep:', e); });
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Incapacitated',
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} failed ${casterName}'s ${actionName} (${saveType} save DC ${saveDc}) — Incapacitated until the end of its next turn, when it repeats the save; a second failure makes it Unconscious for ${unconsciousMinutes} minutes (ends early on damage; shaking awake is GM-enforced).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging staged sleep condition:', e); });
+}
+
+// Failed-save dispatch: MA-0068 staged sleep rows route through the SP-107
+// staging seams; everything else keeps the MA-0063 one-shot grant untouched.
+function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName }) {
+    if (sleepStaging) {
+        applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
+        return;
+    }
+    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
+}
+
+// Result-row copy: damage rows keep the byte-identical damage line; damageless
+// rows never print "null null damage" (MA-0090 cosmetic), and staged sleep
+// rows state the Incapacitated-until-repeat-save semantics (MA-0068).
+function resultRowText(r, damage, damageType, sleepStaging) {
+    if (r.soulstitchProtected) return 'Soulstitch — automatically succeeds, takes no damage';
+    if (r.success) {
+        return (r.finalDamage ?? 0) > 0
+            ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
+            : `Saved — takes no damage (rolled ${r.roll ?? 0})`;
+    }
+    if (!damage) {
+        return sleepStaging
+            ? `Failed — Incapacitated until the end of its next turn, then repeats the save (rolled ${r.roll ?? 0})`
+            : `Failed the save (rolled ${r.roll ?? 0})`;
+    }
+    return `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0})`;
+}
+
 // MA-0031: advisory cone/area coverage gate — isWithinRange from the attacker
 // (gridless lenient §7); null rangeGateFt = no gate (PC-spell default).
 function useRangeAllowedSet(eligibleTargets, rangeGateFt, attackerName) {
@@ -408,9 +484,22 @@ function aoePickerTitle(action, titleOverride) {
 
 // MA-0043: zoneOnly rows (Shroud of Darkness) read as save-less darkness
 // copy; every other consumer keeps the byte-identical save picker text.
-function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions }) {
+// MA-0068: staged Sleep Breath picker copy — fail stages Incapacitated
+// (repeat save at end of next turn); second fail = Unconscious for N minutes,
+// ends early on damage. No half-damage copy on this damageless row.
+function stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten) {
+    const minutes = Math.max(1, Math.round((sleepStaging.unconsciousRounds ?? 100) / 10));
+    return {
+        icon: 'fa-moon',
+        description: head,
+        note: `On a failed save, target is Incapacitated until the end of its next turn, then repeats the save. Second failure: Unconscious for ${minutes} minutes — the effect ends if the target takes damage.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+    };
+}
+
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging }) {
     if (!zoneOnly) {
         const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
+        if (sleepStaging) return stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten);
         // MA-0063: damageless condition row (e.g. Adult Blue Dragon Sand Cloud) —
         // no damage formula, failed saves grant conditions. Byte-inert when empty.
         if (!damage && saveConditions && saveConditions.length > 0) {
@@ -463,6 +552,12 @@ function ZoneArmedNote({ zoneOnly, zoneTe, selected }) {
     return <p>{zoneTe?.effectKey || 'Zone'} armed over {Array.from(selected).join(', ') || 'no targets'} — GM-enforced.</p>;
 }
 
+// Damageless rows (MA-0068/MA-0090) never print the half-damage line.
+function DamageNote({ damage, damageType }) {
+    if (!damage) return null;
+    return <p className="sp-note">On a failed save, target takes {damage} {damageType} damage. On a successful save, target takes half damage.</p>;
+}
+
 function SaveAttackAoeModal({
     action,
     playerStats,
@@ -502,6 +597,10 @@ function SaveAttackAoeModal({
     // damageless condition rows (Adult Blue Dragon Sand Cloud) grant these
     // conditions on failed saves inside the picker (MA-0017 shape).
     saveConditions,
+    // MA-0068 optional staged sleep (byte-inert when unset): Adult Brass
+    // Dragon Sleep Breath — failed saves STAGE the sleep (sleepService SP-107
+    // shape) instead of the one-shot grant. { unconsciousRounds }.
+    sleepStaging,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -563,7 +662,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -594,7 +693,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -720,8 +819,9 @@ function SaveAttackAoeModal({
             // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
             registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
         }
-        // MA-0063: damageless failed-save condition grant (byte-inert when empty).
-        applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
+        // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
+        // when neither flag authored).
+        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -750,7 +850,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -842,7 +942,7 @@ function SaveAttackAoeModal({
             return (
                 <>
                     <p>Select creatures in the area of effect. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}).</p>
-                    <p className="sp-note">On a failed save, target takes {damage} {damageType} damage. On a successful save, target takes half damage.</p>
+                    <DamageNote damage={damage} damageType={damageType} />
                     {metamagicHeighten && <p className="sp-note">Heightened Spell: select one target for disadvantage on its first save.</p>}
                     <p className="sp-note">Targets selected: {ctx.selected.size}/{ctx.eligibleTargets.length}</p>
                     {metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget, isCarefulAlly: ctx.isCarefulAlly, heightenTarget: ctx.heightenTarget, setHeightenTarget: ctx.setHeightenTarget, metamagicHeighten: metamagicHeighten })}
@@ -858,13 +958,7 @@ function SaveAttackAoeModal({
                     <div className="abjure-results-list">
                         {ctx.results.map(r => (
                             <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                <strong>{r.targetName}</strong>: {r.soulstitchProtected
-                                    ? 'Soulstitch — automatically succeeds, takes no damage'
-                                    : r.success
-                                        ? (r.finalDamage ?? 0) > 0
-                                            ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
-                                            : `Saved — takes no damage (rolled ${r.roll ?? 0})`
-                                        : `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0})`}
+                                <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, sleepStaging)}
                             </div>
                         ))}
                         {ctx.pendingPrompts.map(p => (
@@ -919,13 +1013,7 @@ function SaveAttackAoeModal({
                         <div className="abjure-results-list">
                             {summary.results.map(r => (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                    <strong>{r.targetName}</strong>: {r.soulstitchProtected
-                                        ? 'Soulstitch — automatically succeeds, takes no damage'
-                                        : r.success
-                                            ? (r.finalDamage ?? 0) > 0
-                                                ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
-                                                : `Saved — takes no damage (rolled ${r.roll ?? 0})`
-                                            : `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0})`}
+                                    <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, sleepStaging)}
                                 </div>
                             ))}
                         </div>
@@ -963,7 +1051,7 @@ function SaveAttackAoeModal({
         );
     }
 
-    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions });
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging });
 
     return (
         <CreatureSelectionModal

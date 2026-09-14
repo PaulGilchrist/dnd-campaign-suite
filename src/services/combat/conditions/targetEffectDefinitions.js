@@ -290,7 +290,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'sleep_staged',
     label: 'Sleep',
-    description: 'Staged by the Sleep spell: Incapacitated until the end of the target\'s next turn, when it repeats the WIS save. On a failed repeat save the target becomes Unconscious for the spell\'s duration. The spell ends on a target early if it takes damage or is shaken awake. Elves, undead, constructs, and Exhaustion-immune creatures automatically succeed. Concentration, up to 1 minute.',
+    description: 'Staged by the Sleep spell or a Sleep Breath (MA-0068): Incapacitated until the end of the target\'s next turn, when it repeats the save (WIS for the spell, CON for Sleep Breath). On a failed repeat save the target becomes Unconscious for the effect\'s duration (spell: concentration up to 1 minute; Sleep Breath: 10 minutes). The effect ends on a target early if it takes damage or is shaken awake. For the spell, elves, undead, constructs, and Exhaustion-immune creatures automatically succeed.',
     icon: 'fa-moon',
     cls: 'effect-debuff',
     group: 'Spells',

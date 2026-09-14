@@ -111,6 +111,15 @@ function resolveBlockSaveDcSuccess(spellInfo, action) {
   return action.save_dc != null ? (action.dc_success ?? 'half') : null;
 }
 
+// MA-0068: authored staged sleep row (Adult Brass Dragon Sleep Breath) —
+// failed saves stage the sleep inside the picker (sleepService SP-107 shape:
+// Incapacitated → turn-END repeat save → Unconscious for
+// unconscious_minutes×10 rounds, CLA-334). Byte-inert flag default.
+function sleepStagingForAction(spellInfo, action) {
+  if (spellInfo || !action?.staged_sleep) return null;
+  return { unconsciousRounds: (Number(action.staged_sleep.unconscious_minutes) || 10) * 10 };
+}
+
 function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
@@ -140,11 +149,12 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType,
     }));
   };
+  const sleepStaging = sleepStagingForAction(spellInfo, action);
   if (aoe == null && !recharge.gate) { fire(); return; }
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging });
       return;
     }
     fire();
@@ -1318,6 +1328,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           zoneTe={conePicker.zoneTe}
           zoneOnly={conePicker.zoneOnly === true}
           saveConditions={conePicker.saveConditions}
+          sleepStaging={conePicker.sleepStaging}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}
         />

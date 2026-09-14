@@ -394,3 +394,8 @@ Dead-by-design (accepted models, do not chase): feats with `automation:null` ben
 
 ## MV-22 refinement (MA-0067 disproved, 2026-09-14): Evasion victim invalid for half-on-save
 - AasimarTest carries Evasion → 0 damage on a successful save; do NOT use it to observe half-on-success — pick a non-Evasion target or pin via applyDamage.js tests. Line picker + recharge spend/refusal already live for line rows post-MA-0031/0064 (`.sp-overlay`, spend at picker-open, `rechargeRefusalOnSpent` 2nd-click popup + `<action>_refused (not recharged)` log, chip "(Recharge 5-6 — unavailable)").
+
+## MA-0068 recipe (2026-09-14, fixed): staged monster sleep breath (reusable damageless escalation)
+- Data flags on a save row: `dc_success:"none"` + `staged_sleep:{unconscious_minutes:10}` + `recharge` → MonsterCardModal `sleepStagingForAction` routes picker through SaveAttackAoeModal `sleepStaging` prop → `stageSleepTargets` (reused+parameterized sleepService, spell path byte-identical) grants `sleep_staged` te {saveType,stage,dc} + Incapacitated; NPC turn-END auto repeat save / PC queued "(repeat save)" prompt; 2nd fail → Unconscious + expiry {rounds:100} + auto-remove te; wake-on-damage rides SP-107 wakeSleepOnDamage (effect-key based). Reusable for Green/Copper/Ancient sleep breaths.
+- RESIDUAL: 5-ft shake-awake has no UI producer app-wide (same §7 Sleep-spell gap) — GM-enforced, noted in condition log.
+- PITFALL: queued PC save-prompt entry can vanish once after an awaited prompt — §6-#18 full-store snapshot race class, also hits spell path; re-prompt resolves correctly.
