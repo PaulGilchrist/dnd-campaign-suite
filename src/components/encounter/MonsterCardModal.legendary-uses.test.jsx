@@ -1568,7 +1568,8 @@ const ancient = () => monstersData.find(m => m.name === 'Ancient Black Dragon');
 
 // MA-0161 data lock: Ancient Black Dragon header authors uses:3 (counter
 // renders, 4-in-lair stays advisory); Cloud of Insects numerics byte-
-// untouched; Frightful Presence/Pounce rows byte-untouched (MA-0163/0164).
+// untouched; MA-0163 authored the FP save-cast shape; MA-0164 delegates
+// Pounce to the +15 Rend row.
 describe('MA-0161 monsters.json data: ancient black dragon legendary economy authored', () => {
   it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
     const la = ancient().legendary_actions;
@@ -1585,12 +1586,23 @@ describe('MA-0161 monsters.json data: ancient black dragon legendary economy aut
     expect(row.damage_type_primary).toBe('Poison');
   });
 
-  it('Frightful Presence/Pounce rows byte-untouched (no numerics authored here)', () => {
+  it('FP row MA-0163 save-cast shape; MA-0164 Pounce delegates to the +15 Rend row, no own numbers', () => {
     const fp = ancient().legendary_actions.find(a => a.name === 'Frightful Presence');
-    expect(fp.save_dc == null && fp.attack_bonus == null && fp.uses == null).toBe(true);
+    expect(fp.save_dc).toBe(21);
+    expect(fp.save_type).toBe('Wisdom');
+    expect(fp.repeat_save?.condition).toBe('frightened');
+    expect(fp.success_immunity?.effect).toBe('frightful_presence_immunity');
+    expect(fp.attack_bonus == null && fp.uses == null).toBe(true);
     const pounce = ancient().legendary_actions.find(a => a.name === 'Pounce');
-    expect(pounce.save_dc == null && pounce.attack_bonus == null && pounce.uses == null && pounce.delegates_to == null).toBe(true);
-    expect(pounce.description).toBe('The dragon moves up to half its Speed, and it makes one Rend attack.');
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.uses == null).toBe(true);
+    expect(pounce.description).toBe('The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
+    const rend = ancient().actions.find(a => a.name === 'Rend');
+    expect(rend.attack_bonus).toBe(15);
+    expect(rend.damage_dice_primary).toBe('2d8 + 8');
+    expect(rend.damage_type_primary).toBe('Slashing');
+    expect(rend.damage_dice_secondary).toBe('2d8');
+    expect(rend.damage_type_secondary).toBe('Acid');
   });
 });
 
@@ -1611,7 +1623,7 @@ describe('MA-0161 MonsterCardModal ancient black dragon legendary gated rows', (
       { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
       { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
     ];
-    const m = makeMonster({ name: 'Ancient Black Dragon', legendary_actions: ancient().legendary_actions });
+    const m = makeMonster({ name: 'Ancient Black Dragon', actions: [{ name: 'Rend', attack_bonus: 15, damage_dice_primary: '2d8 + 8', damage_type_primary: 'Slashing', damage_dice_secondary: '2d8', damage_type_secondary: 'Acid', reach: '15 ft.' }], legendary_actions: ancient().legendary_actions });
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Ancient Black Dragon 1', creatures })} />);
   }
   function ancientRow(name) {
@@ -1655,5 +1667,89 @@ describe('MA-0161 MonsterCardModal ancient black dragon legendary gated rows', (
     expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+});
+
+// MA-0164: Ancient Black Dragon legendary "Pounce" was prose-only inert —
+// post-MA-0161 the gated chip spent a use then dead-ended in console.error
+// ("no resolvable mechanic"). Fix mirrors MA-0136 silver / MA-0145 white
+// exactly: delegates_to "Rend"; derived numbers (+15, 2d8 + 8 Slashing +
+// 2d8 Acid) live on the delegate row (actions[1]) and resolve through the
+// identical attack seam; movement clause stays advisory (§7 — no
+// movement-distance consumer).
+describe('MA-0164 MonsterCardModal ancient black dragon Pounce gated delegate row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderAncientArmed(uses) {
+    runtime.store['Ancient Black Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Ancient Black Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 367, maxHp: 367, ac: 22, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({
+      name: 'Ancient Black Dragon',
+      actions: [{ name: 'Rend', attack_bonus: 15, damage_dice_primary: '2d8 + 8', damage_type_primary: 'Slashing', damage_dice_secondary: '2d8', damage_type_secondary: 'Acid', reach: '15 ft.' }],
+      legendary_actions: ancient().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Ancient Black Dragon 1', creatures })} />);
+  }
+  function pounceRow() {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Pounce'));
+  }
+  function pounceChip() {
+    return pounceRow().querySelector('.mc-dice-link-legendary');
+  }
+
+  it('renders the gated Expend-legendary chip (no own numeric affordance)', () => {
+    renderAncientArmed({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    expect(pounceChip()).toBeTruthy();
+    expect(pounceRow().querySelector('.mc-dice-link:not(.mc-dice-link-legendary)')).toBe(null);
+  });
+
+  it('gated click spends 1 and rolls delegated Rend +15 named "Pounce (Rend attack)" with both damage legs', async () => {
+    renderAncientArmed({ max: 3, used: 0 });
+    fireEvent.click(pounceChip());
+    await waitFor(() => expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Pounce (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(15);
+    const options = ROLLERS.rollAttack.mock.calls[0][2];
+    expect(options.autoDamageFormula).toBe('2d8 + 8');
+    expect(options.damageType).toBe('Slashing');
+    expect(options.autoDamageSecondaryFormula).toBe('2d8');
+    expect(options.autoDamageSecondaryDamageType).toBe('Acid');
+    expect(options.targetName).toBe('TestPC');
+    expect(options.isSpellDamage).toBe(false);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Pounce/);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (3/3): chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderAncientArmed({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(pounceChip());
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend, one roll)', async () => {
+    renderAncientArmed({ max: 3, used: 0 });
+    fireEvent.click(pounceChip());
+    await waitFor(() => expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(pounceChip());
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
   });
 });

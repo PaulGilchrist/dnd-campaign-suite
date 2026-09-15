@@ -781,12 +781,13 @@ describe('MA-0145 Adult White Dragon legendary economy (header uses:3)', () => {
 // MA-0161: Ancient Black Dragon — data-only header fix (MA-0145 white shape).
 // Header authors uses:3 (4-in-lair advisory), Cloud of Insects numerics
 // untouched but now budget-gated with the MA-0073 per-action cooldown
-// clause; Frightful Presence/Pounce rows byte-untouched (MA-0163/MA-0164).
+// clause; MA-0163 authored the FP save-cast shape; MA-0164 delegates Pounce.
 describe('MA-0161 Ancient Black Dragon legendary economy (header uses:3)', () => {
   const ancient = monstersData.find(m => m.index === 'ancient-black-dragon');
   const cloud = ancient.legendary_actions.find(a => a.name === 'Cloud of Insects');
   const frightful = ancient.legendary_actions.find(a => a.name === 'Frightful Presence');
   const pounce = ancient.legendary_actions.find(a => a.name === 'Pounce');
+  const rend = ancient.actions.find(a => a.name === 'Rend');
 
   it('header authors uses:3 + lair advisory; max resolves to 3 (gate engages)', () => {
     const header = legendaryHeaderAction(ancient);
@@ -803,11 +804,18 @@ describe('MA-0161 Ancient Black Dragon legendary economy (header uses:3)', () =>
     expect(hasLegendaryCooldownClause(cloud)).toBe(true);
   });
 
-  it('Frightful Presence/Pounce rows byte-untouched (no numerics authored here)', () => {
-    expect(frightful.save_dc == null && frightful.attack_bonus == null && frightful.uses == null).toBe(true);
+  it('FP row MA-0163 save-cast shape; MA-0164 Pounce delegates_to the +15 Rend row with the verbatim advisory movement clause', () => {
+    expect(frightful.save_dc).toBe(21);
+    expect(frightful.save_type).toBe('Wisdom');
+    expect(frightful.repeat_save?.save_type).toBe('Wisdom');
+    expect(frightful.delegates_to == null && frightful.uses == null).toBe(true);
     expect(frightful.description).toMatch(/can't take this action again until the start of its next turn/);
-    expect(pounce.save_dc == null && pounce.attack_bonus == null && pounce.uses == null && pounce.delegates_to == null).toBe(true);
-    expect(pounce.description).toBe('The dragon moves up to half its Speed, and it makes one Rend attack.');
+    expect(hasLegendaryCooldownClause(frightful)).toBe(true);
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.uses == null).toBe(true);
+    expect(pounce.description).toBe('The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
+    expect(legendaryDelegateAction(ancient, pounce)).toBe(rend);
+    expect(legendaryDelegateAttackName(pounce, rend)).toBe('Pounce (Rend attack)');
   });
 
   it('economy is live: Cloud spend 3→2, turn latch, cooldown refusal, exhaustion, turn-start regain', async () => {
@@ -830,7 +838,7 @@ describe('MA-0161 Ancient Black Dragon legendary economy (header uses:3)', () =>
     const fp = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Frightful Presence', action: frightful, campaignName: 'test-campaign', deps });
     expect(fp).toEqual({ spent: true, remaining: 1, max: 3 });
     cs.activeCreatureName = 'ElderPaladin';
-    const pounceSpend = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Pounce', action: pounce, campaignName: 'test-campaign', deps });
+    const pounceSpend = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: legendaryDelegateAttackName(pounce, rend), action: pounce, campaignName: 'test-campaign', deps });
     expect(pounceSpend).toEqual({ spent: true, remaining: 0, max: 3 });
 
     cs.activeCreatureName = 'LightfootHalfling';
