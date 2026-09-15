@@ -1053,8 +1053,10 @@ describe('MA-0184 Ancient Brass Dragon legendary economy (header uses:3)', () =>
     expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.uses == null).toBe(true);
     expect(sands.save_dc).toBe(20);
     expect(sands.save_type).toBe('Dexterity');
+    expect(sands.dc_success).toBe('none');
     expect(sands.damage_dice_primary).toBe('8d8');
     expect(sands.damage_type_primary).toBe('Fire');
+    expect(sands.save_effect).toMatch(/Success: no damage/);
     expect(sands.delegates_to == null && sands.advisory == null && sands.uses == null).toBe(true);
     expect(hasLegendaryCooldownClause(sands)).toBe(true);
     expect(legendaryActionSlug(sands.name)).toBe('scorching_sands');

@@ -3606,9 +3606,10 @@
         "description": "Dexterity Saving Throw: DC 20, one creature the dragon can see within 120 feet. <strong>Failure:</strong> 36 (8d8) Fire damage, and the target's Speed is halved until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
         "save_dc": 20,
         "save_type": "Dexterity",
+        "dc_success": "none",
         "damage_dice_primary": "8d8",
         "damage_type_primary": "Fire",
-        "save_effect": "Failure: 36 (8d8) Fire damage, and the target's Speed is halved until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn. Success: The dragon can't take this action again until the start of its next turn."
+        "save_effect": "Failure: 36 (8d8) Fire damage, and the target's Speed is halved until the end of its next turn. Success: no damage. The dragon can't take this action again until the start of its next turn."
       }
     ],
     "lair_actions": [
