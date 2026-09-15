@@ -2429,7 +2429,7 @@
       "saveDc": 21,
       "saveType": "Charisma",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21, +13 to hit with spell attacks):At Will: Detect Magic, Fear, Melf's Acid Arrow (level 4 version)1/Day Each: Create Undead, Speak with Dead, Vitriolic Sphere (level 5 version)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0160-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0161",
