@@ -3415,6 +3415,7 @@
       },
       {
         "name": "Tail Swipe",
+        "delegates_to": "Rend",
         "description": "The dragon makes one Rend attack."
       }
     ],

@@ -1759,10 +1759,10 @@ const ANCIENT_BLUE_REND = { name: 'Rend', attack_bonus: 16, damage_dice_primary:
 
 // MA-0172 data lock: Ancient Blue Dragon header authors uses:3 (counter
 // renders; 4-in-lair stays advisory — no lair flag consumer, MA-0070
-// residual). Tail Swipe stays byte-untouched prose-only — its affordance is
-// SEPARATE queued bug MA-0175; this lock pins it inert. MA-0173 fixed
-// Cloaked Flight (advisory row) and MA-0174 fixed Sonic Boom (authored
-// save leg, see MA-0174 lock below) — neither is prose-only anymore.
+// residual). Tail Swipe's prose-only inert lock is SUPERSEDED by MA-0175
+// (delegates_to:"Rend" authored, byte-mirror of the adult-blue row) — see
+// MA-0175 lock below. MA-0173 fixed Cloaked Flight (advisory row) and
+// MA-0174 fixed Sonic Boom (authored save leg, see MA-0174 lock below).
 describe('MA-0172 monsters.json data: ancient blue dragon legendary header authors uses:3', () => {
   it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
     const la = ancientBlue().legendary_actions;
@@ -1771,11 +1771,13 @@ describe('MA-0172 monsters.json data: ancient blue dragon legendary header autho
     expect(la[0].description).toMatch(/In its lair the dragon has 4 uses \(advisory — no lair flag consumer; GM-enforced\)\.$/);
   });
 
-  it('Tail Swipe stays prose-only (MA-0175 queued): no affordances authored', () => {
+  it('MA-0175: Tail Swipe delegates_to Rend, no own numbers, description byte-verbatim', () => {
     const row = ancientBlue().legendary_actions.find(a => a.name === 'Tail Swipe');
     expect(row).toBeTruthy();
+    expect(row.delegates_to).toBe('Rend');
     expect(row.attack_bonus == null && row.save_dc == null && row.damage_dice_primary == null
-      && row.delegates_to == null && row.advisory == null && row.uses == null).toBe(true);
+      && row.advisory == null && row.uses == null).toBe(true);
+    expect(row.description).toBe('The dragon makes one Rend attack.');
   });
 
   it('Rend delegate target authors the +16 numeric (control row, byte-untouched)', () => {
@@ -1790,9 +1792,9 @@ describe('MA-0172 monsters.json data: ancient blue dragon legendary header autho
 
 // MA-0172: with the header authored, the ancient blue dragon card renders the
 // "(3 left)" counter and the prose component rows gain the gated
-// Expend-legendary chip (MA-0021 fork). PITFALL pinned as-is (MA-0164
-// fingerprint): Tail Swipe burns a use with console.error "no resolvable
-// mechanic" — its delegates_to is MA-0175's fix, NOT this row's scope.
+// Expend-legendary chip (MA-0021 fork). The MA-0164 chip-burn pitfall on
+// Tail Swipe is FIXED by MA-0175 (delegates_to:"Rend" — see MA-0175 lock
+// below): the gated click now rolls the delegated +16 Rend, no console burn.
 describe('MA-0172 MonsterCardModal ancient blue dragon legendary gated rows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1824,16 +1826,17 @@ describe('MA-0172 MonsterCardModal ancient blue dragon legendary gated rows', ()
     expect(blueRow('Tail Swipe').querySelector('.mc-dice-link:not(.mc-dice-link-legendary)')).toBe(null);
   });
 
-  it('economy walk: Tail Swipe gated click spends 1 (3→2) + ability_use log — chip-burn pinned as-is, no roll (MA-0174/0175 pending)', async () => {
+  it('economy walk: Tail Swipe gated click spends 1 (3→2) + ability_use log + delegated Rend roll (MA-0175)', async () => {
     renderAncientBlue({ max: 3, used: 0 });
     fireEvent.click(blueChip('Tail Swipe'));
     await waitFor(() => expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Tail Swipe/.test(e.description));
     expect(spend.description).toMatch(/expends a legendary use for Tail Swipe/);
     // No tail_swipe cooldown stamp — the row's prose lacks the once-per-turn
-    // clause (only Cloaked Flight/Sonic Boom carry it; MA-0173/0175 scope).
+    // clause (only Cloaked Flight/Sonic Boom carry it; MA-0173/0174 scope).
     expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryActionCooldowns'] == null).toBe(true);
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Tail Swipe (Rend attack)');
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
     expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
   });
@@ -1842,10 +1845,11 @@ describe('MA-0172 MonsterCardModal ancient blue dragon legendary gated rows', ()
     renderAncientBlue({ max: 3, used: 0 });
     fireEvent.click(blueChip('Tail Swipe'));
     await waitFor(() => expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
     fireEvent.click(blueChip('Tail Swipe'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
   });
 
   it('exhausted (3/3): chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
@@ -1999,5 +2003,91 @@ describe('MA-0174 MonsterCardModal ancient blue Sonic Boom gated save row', () =
     expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+});
+
+// MA-0175: Ancient Blue Dragon legendary "Tail Swipe" (stableKey row [3])
+// was prose-only inert — post-MA-0172 the gated chip spent a use then
+// dead-ended in console.error ("no resolvable mechanic", MA-0164 fingerprint).
+// Fix byte-mirrors the adult-blue Tail Swipe MA-0070 delegate shape (and the
+// MA-0164 ancient-black Pounce delegates_to convention): delegates_to
+// "Rend"; derived numbers (+16, 2d8 + 9 Slashing + 2d10 Lightning) live on
+// the delegate row (actions[1]) and resolve through the identical attack
+// seam; description stays byte-verbatim (no movement clause in this row's
+// prose — the manifest's Pounce text is orchestrator-side drift).
+describe('MA-0175 MonsterCardModal ancient blue dragon Tail Swipe gated delegate row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderAncientBlueArmed(uses) {
+    runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Ancient Blue Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 481, maxHp: 481, ac: 22, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Ancient Blue Dragon', actions: [ANCIENT_BLUE_REND], legendary_actions: ancientBlue().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Ancient Blue Dragon 1', creatures })} />);
+  }
+  function tailRow() {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Tail Swipe'));
+  }
+  function tailChip() {
+    return tailRow().querySelector('.mc-dice-link-legendary');
+  }
+
+  it('renders the gated Expend-legendary chip (no own numeric affordance)', () => {
+    renderAncientBlueArmed({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    expect(tailChip()).toBeTruthy();
+    expect(tailRow().querySelector('.mc-dice-link:not(.mc-dice-link-legendary)')).toBe(null);
+  });
+
+  it('gated click spends 1 and rolls delegated Rend +16 named "Tail Swipe (Rend attack)" with both damage legs, no console error', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderAncientBlueArmed({ max: 3, used: 0 });
+    fireEvent.click(tailChip());
+    await waitFor(() => expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Tail Swipe (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(16);
+    const options = ROLLERS.rollAttack.mock.calls[0][2];
+    expect(options.autoDamageFormula).toBe('2d8 + 9');
+    expect(options.damageType).toBe('Slashing');
+    expect(options.autoDamageSecondaryFormula).toBe('2d10');
+    expect(options.autoDamageSecondaryDamageType).toBe('Lightning');
+    expect(options.targetName).toBe('TestPC');
+    expect(options.isSpellDamage).toBe(false);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Tail Swipe/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Tail Swipe/);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(errSpy).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  it('exhausted (3/3): chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderAncientBlueArmed({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(tailChip());
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend, one roll)', async () => {
+    renderAncientBlueArmed({ max: 3, used: 0 });
+    fireEvent.click(tailChip());
+    await waitFor(() => expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    fireEvent.click(tailChip());
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
   });
 });

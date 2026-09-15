@@ -971,3 +971,51 @@ describe('MA-0174 Ancient Blue Dragon Sonic Boom authored save leg', () => {
     expect(rearmed.spent).toBe(true);
   });
 });
+
+// MA-0175: Ancient Blue Dragon "Tail Swipe" legendary row was prose-only
+// inert (MA-0164/MA-0172 fingerprint). Fix byte-mirrors the adult-blue Tail
+// Swipe delegate shape — {name, delegates_to:"Rend", description} verbatim,
+// the MA-0164 ancient-black Pounce delegates_to convention sans movement
+// clause (this row's prose has none). Delegates resolve to the +16 Rend
+// row; no cooldown clause → economy governs via uses + MA-0021 turn latch.
+describe('MA-0175 Ancient Blue Dragon Tail Swipe delegate row', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-blue-dragon');
+  const tail = ancient.legendary_actions.find(a => a.name === 'Tail Swipe');
+  const rend = ancient.actions.find(a => a.name === 'Rend');
+
+  it('byte-mirrors the adult-blue Tail Swipe delegate row verbatim', () => {
+    const adultTail = monstersData.find(m => m.index === 'adult-blue-dragon').legendary_actions.find(a => a.name === 'Tail Swipe');
+    expect(JSON.stringify(tail)).toBe(JSON.stringify(adultTail));
+  });
+
+  it('delegates_to the +16 Rend row; no own numbers, no cooldown clause', () => {
+    expect(tail.delegates_to).toBe('Rend');
+    expect(tail.attack_bonus == null && tail.save_dc == null && tail.uses == null && tail.advisory == null).toBe(true);
+    expect(tail.description).toBe('The dragon makes one Rend attack.');
+    expect(hasLegendaryCooldownClause(tail)).toBe(false);
+    expect(legendaryDelegateAction(ancient, tail)).toBe(rend);
+    expect(legendaryDelegateAttackName(tail, rend)).toBe('Tail Swipe (Rend attack)');
+  });
+
+  it('economy: spend 3→2 stamps turn latch only (no tail_swipe cooldown); same-boundary refuses; regain re-arms', async () => {
+    const monster = { legendary_actions: ancient.legendary_actions };
+    cs.activeCreatureName = 'Thug 1';
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: legendaryDelegateAttackName(tail, rend), action: tail, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY] == null).toBe(true);
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: legendaryDelegateAttackName(tail, rend), action: tail, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+
+    cs.activeCreatureName = 'Ancient Blue Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Blue Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    cs.activeCreatureName = 'HexWarlock';
+    const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: legendaryDelegateAttackName(tail, rend), action: tail, campaignName: 'test-campaign', deps });
+    expect(rearmed.spent).toBe(true);
+  });
+});
