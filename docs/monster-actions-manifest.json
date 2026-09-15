@@ -2613,7 +2613,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0173-cloaked-flight.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0174",

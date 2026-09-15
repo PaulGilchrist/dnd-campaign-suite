@@ -853,3 +853,64 @@ describe('MA-0161 Ancient Black Dragon legendary economy (header uses:3)', () =>
     expect(store['Ancient Black Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
   });
 });
+
+// MA-0173: Ancient Blue Dragon "Cloaked Flight" — data fix byte-mirroring
+// the MA-0058 adult-blue advisory shape (advisory:"invisibility" + advisory
+// movement clause + once-per-turn clause). Gated chip click spends 1, stamps
+// the cloaked_flight cooldown, and lands the advisory popup + ability_use
+// adjudication record instead of burning the use into a console dead-end
+// (MA-0164 chip-burn pitfall).
+describe('MA-0173 Ancient Blue Dragon Cloaked Flight advisory row', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-blue-dragon');
+  const cloaked = ancient.legendary_actions.find(a => a.name === 'Cloaked Flight');
+
+  it('byte-mirrors the MA-0058 adult-blue advisory row shape verbatim', () => {
+    const adult = monstersData.find(m => m.index === 'adult-blue-dragon').legendary_actions.find(a => a.name === 'Cloaked Flight');
+    expect(JSON.stringify(cloaked)).toBe(JSON.stringify(adult));
+  });
+
+  it('advisory row, no own numeric mechanic, cooldown clause present', () => {
+    expect(cloaked.advisory).toBe('invisibility');
+    expect(cloaked.attack_bonus == null && cloaked.save_dc == null).toBe(true);
+    expect(cloaked.description).toMatch(/movement advisory/i);
+    expect(hasLegendaryCooldownClause(cloaked)).toBe(true);
+    expect(legendaryActionSlug(cloaked.name)).toBe('cloaked_flight');
+  });
+
+  it('advisory popup + ability_use log name the spell and the GM-enforced residual', () => {
+    const html = buildLegendaryAdvisoryPopup({ monsterName: 'Ancient Blue Dragon 1', action: cloaked });
+    expect(html).toMatch(/Legendary Action — Cloaked Flight/);
+    expect(html).toMatch(/casts invisibility on itself/);
+    expect(html).toMatch(/GM-enforced/);
+    const e = buildLegendaryAdvisoryLog({ monsterName: 'Ancient Blue Dragon 1', action: cloaked });
+    expect(e.type).toBe('ability_use');
+    expect(e.abilityName).toBe('Cloaked Flight');
+    expect(e.description).toMatch(/casts invisibility on itself.*GM-enforced/s);
+  });
+
+  it('economy: spend stamps cloaked_flight cooldown; later boundary refused once-per-turn; regain re-arms', async () => {
+    const monster = { legendary_actions: ancient.legendary_actions };
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Cloaked Flight', action: cloaked, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ cloaked_flight: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Cloaked Flight', action: cloaked, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Cloaked Flight', action: cloaked, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'cloaked_flight_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'Ancient Blue Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Blue Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    cs.activeCreatureName = 'HexWarlock';
+    const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Cloaked Flight', action: cloaked, campaignName: 'test-campaign', deps });
+    expect(rearmed.spent).toBe(true);
+  });
+});

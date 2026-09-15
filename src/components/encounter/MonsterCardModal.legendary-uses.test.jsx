@@ -1760,8 +1760,9 @@ const ANCIENT_BLUE_REND = { name: 'Rend', attack_bonus: 16, damage_dice_primary:
 // MA-0172 data lock: Ancient Blue Dragon header authors uses:3 (counter
 // renders; 4-in-lair stays advisory — no lair flag consumer, MA-0070
 // residual). Component rows stay byte-untouched prose-only — their
-// affordances are SEPARATE queued bugs (MA-0173 Cloaked Flight,
-// MA-0174 Sonic Boom, MA-0175 Tail Swipe); this lock pins them inert.
+// affordances are SEPARATE queued bugs (MA-0174 Sonic Boom,
+// MA-0175 Tail Swipe); this lock pins them inert. MA-0173 fixed
+// Cloaked Flight — it is no longer prose-only (advisory row, see below).
 describe('MA-0172 monsters.json data: ancient blue dragon legendary header authors uses:3', () => {
   it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
     const la = ancientBlue().legendary_actions;
@@ -1770,8 +1771,8 @@ describe('MA-0172 monsters.json data: ancient blue dragon legendary header autho
     expect(la[0].description).toMatch(/In its lair the dragon has 4 uses \(advisory — no lair flag consumer; GM-enforced\)\.$/);
   });
 
-  it('component rows stay prose-only (MA-0173/0174/0175 queued): no affordances authored', () => {
-    ['Cloaked Flight', 'Sonic Boom', 'Tail Swipe'].forEach(name => {
+  it('component rows stay prose-only (MA-0174/0175 queued): no affordances authored', () => {
+    ['Sonic Boom', 'Tail Swipe'].forEach(name => {
       const row = ancientBlue().legendary_actions.find(a => a.name === name);
       expect(row).toBeTruthy();
       expect(row.attack_bonus == null && row.save_dc == null && row.damage_dice_primary == null
@@ -1859,5 +1860,63 @@ describe('MA-0172 MonsterCardModal ancient blue dragon legendary gated rows', ()
     expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
     expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+});
+
+// MA-0173: Ancient Blue Dragon Cloaked Flight gated chip click — the row is
+// now the MA-0058 adult-blue advisory shape (advisory:"invisibility"). Click
+// spends 1, stamps the cloaked_flight once-per-turn cooldown, and lands the
+// advisory adjudication popup + ability_use log (GM-enforced invisibility/
+// movement residual, §7) — no more chip-burn into a console dead-end
+// (MA-0164 pitfall). No dice roll: advisory row has no numeric mechanic.
+describe('MA-0173 MonsterCardModal ancient blue Cloaked Flight advisory click', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+    runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses'] = { max: 3, used: 0 };
+    const creatures = [
+      { name: 'Ancient Blue Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 481, maxHp: 481, ac: 22, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Ancient Blue Dragon', actions: [ANCIENT_BLUE_REND], legendary_actions: ancientBlue().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Ancient Blue Dragon 1', creatures })} />);
+  });
+  function blueRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+  function blueChip(name) {
+    return blueRow(name).querySelector('.mc-dice-link-legendary');
+  }
+
+  it('gated chip click spends 1 + cloaked_flight cooldown stamp + advisory popup + ability_use log, no roll', async () => {
+    fireEvent.click(blueChip('Cloaked Flight'));
+    await waitFor(() => expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ cloaked_flight: { round: 1 } });
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    const html = String(setPopupHtml.mock.calls.map(c => String(c[0])).find(h => h.includes('Cloaked Flight')));
+    expect(html).toMatch(/Legendary Action — Cloaked Flight/);
+    expect(html).toMatch(/casts invisibility on itself/);
+    expect(html).toMatch(/GM-enforced/);
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e =>
+      e.type === 'ability_use' && e.abilityName === 'Cloaked Flight' && /casts invisibility on itself.*GM-enforced/s.test(e.description))).toBe(true));
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('same-turn second click refuses zero-spend; later boundary refused once-per-turn; no advisory record on refusals', async () => {
+    fireEvent.click(blueChip('Cloaked Flight'));
+    await waitFor(() => expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(blueChip('Cloaked Flight'));
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+
+    ctx.value = { round: 1, activeCreatureName: 'AasimarTest', creatures: CREATURES };
+    fireEvent.click(blueChip('Cloaked Flight'));
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'cloaked_flight_refused (once per turn)')).toBe(true));
+    expect(runtime.store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
 });

@@ -3400,7 +3400,8 @@
       },
       {
         "name": "Cloaked Flight",
-        "description": "The dragon uses Spellcasting to cast <em>Invisibility</em> on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn."
+        "advisory": "invisibility",
+        "description": "The dragon uses Spellcasting to cast <em>Invisibility</em> on itself, and it can fly up to half its Fly Speed (movement advisory — GM moves the token; no movement-distance producer; invisibility GM-enforced, CLA-325). The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Sonic Boom",
