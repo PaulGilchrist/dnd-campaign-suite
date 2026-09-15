@@ -1899,8 +1899,8 @@ describe('MA-0165 ancient-black-dragon grasping tide data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(tide, null, ['prone']);
   });
 
-  it('sibling rows untouched: [1] insect cloud damage dict, [2] darkness raw string', () => {
-    expect(dragon.lair_actions[1].name).toBeUndefined();
+  it('sibling rows untouched: [1] insect cloud dict (structured by MA-0166), [2] darkness raw string', () => {
+    expect(dragon.lair_actions[1].name).toBe('Insect Cloud');
     expect(dragon.lair_actions[1].damage_dice_primary).toBe('3d6');
     expect(typeof dragon.lair_actions[2]).toBe('string');
   });
@@ -1913,5 +1913,104 @@ describe('MA-0165 ancient-black-dragon grasping tide data lock', () => {
     expect(young.lair_actions[1].dc_success).toBeUndefined();
     expect(young.lair_actions[1].save_effect).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+  });
+});
+
+// MA-0166: Ancient Black Dragon lair_actions[1] swarming-insect cloud was a
+// NAMELESS dict (MA-0118/MV-24 inert fingerprint — same as MA-0165 [0] on
+// this same monster): save_dc 15 / Constitution / 3d6 Piercing authored and
+// prose-agreed, but the isLairRowClickable name-gate (monsterLairActions.js:26)
+// killed clickability → static "." row, zero chip, zero picker, zero damage.
+// Data-only fix byte-mirroring the VERIFIED Adult Black Dragon sibling
+// template (MA-0042/MA-0075 recipe): named "Insect Cloud" save row +
+// dc_success "half" + save_effect + persisting 20-ft zone
+// (repeat_turn_end advisory — no turn-end zone-damage consumer, §7) +
+// advisory duration. "cloudwhen" typo fixed to "cloud when" in the process.
+// te `lair_insect_cloud` already registered (targetEffectDefinitions.js) —
+// zoneTeForAction derives it from name+zone with zero code change.
+describe('MA-0166 ancient-black-dragon insect cloud data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-black-dragon');
+  const cloud = dragon.lair_actions[1];
+  const adult = monstersData.find(m => m.index === 'adult-black-dragon');
+  const adultCloud = adult.lair_actions[1];
+
+  it('row is now a structured clickable SAVE row named Insect Cloud (was nameless inert dict)', () => {
+    expect(typeof cloud).toBe('object');
+    expect(cloud.name).toBe('Insect Cloud');
+    expect(isLairRowClickable(cloud)).toBe(true);
+    expect(lairRowAffordance(cloud)).toBe('save');
+  });
+
+  it('byte-mirrors the VERIFIED adult-black-dragon sibling row exactly (MA-0075 parity recipe)', () => {
+    expect(cloud).toEqual(adultCloud);
+    expect(Object.keys(cloud)).toEqual(Object.keys(adultCloud));
+    expect(Object.keys(cloud.zone)).toEqual(Object.keys(adultCloud.zone));
+  });
+
+  it('authored save/damage fields: DC 15 Constitution, 3d6 Piercing, half on success', () => {
+    expect(cloud.save_dc).toBe(15);
+    expect(cloud.save_type).toBe('Constitution');
+    expect(cloud.damage_dice_primary).toBe('3d6');
+    expect(cloud.damage_type_primary).toBe('Piercing');
+    expect(cloud.dc_success).toBe('half');
+    expect(cloud.save_effect).toBe('Failure: 10 (3d6) piercing damage. Success: Half damage.');
+  });
+
+  it('machine-readable persisting zone: 20-ft radius, repeat_turn_end advisory, advisory duration', () => {
+    expect(cloud.zone).toEqual({ radius_ft: 20, repeat_turn_end: true });
+    expect(cloud.duration).toBe('until dismissed or used again (advisory)');
+  });
+
+  it('description fixed: "cloudwhen" typo repaired to "cloud when", canonical mechanics intact', () => {
+    expect(cloud.description).not.toMatch(/cloudwhen/);
+    expect(cloud.description).toMatch(/in the cloud when it appears/i);
+    expect(cloud.description).toMatch(/20-foot-radius sphere/i);
+    expect(cloud.description).toMatch(/DC 15 Constitution saving throw/i);
+    expect(cloud.description).toMatch(/ends its turn in the cloud takes 10 \(3d6\) piercing damage/i);
+  });
+
+  it('damage save row: no condition over-extraction from the damage-only save_effect', () => {
+    expect(extractConditionsFromSaveEffect(cloud.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with the full damage formula, zero attack/zone calls', async () => {
+    const handleSaveRoll = vi.fn();
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: cloud,
+      monsterName: 'Ancient Black Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+      saveDamageFormula: '3d6',
+      saveConditions: [],
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(cloud, '3d6', []);
+    expect(handleZone).not.toHaveBeenCalled();
+  });
+
+  it('sibling rows untouched: [0] MA-0165 Grasping Tide, [2] darkness raw string (MA-0167 scope)', () => {
+    expect(dragon.lair_actions[0].name).toBe('Grasping Tide');
+    expect(typeof dragon.lair_actions[2]).toBe('string');
+  });
+
+  it('young-black-dragon scope guard: its nameless insect-cloud dict [2] is NOT touched by this fix', () => {
+    const young = monstersData.find(m => m.index === 'young-black-dragon');
+    const youngCloud = young.lair_actions[2];
+    expect(youngCloud.name).toBeUndefined();
+    expect(youngCloud.dc_success).toBeUndefined();
+    expect(youngCloud.zone).toBeUndefined();
+    expect(youngCloud.description).toMatch(/cloudwhen/);
+    expect(isLairRowClickable(youngCloud)).toBe(false);
+  });
+
+  it('adult-black-dragon template row untouched by this fix (still the verified MA-0042 shape)', () => {
+    expect(adultCloud.name).toBe('Insect Cloud');
+    expect(adultCloud.zone).toEqual({ radius_ft: 20, repeat_turn_end: true });
+    expect(adultCloud.description).toMatch(/in the cloud when it appears/i);
   });
 });
