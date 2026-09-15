@@ -705,3 +705,75 @@ describe('MA-0073 expendLegendaryUse per-action cooldown gate', () => {
     expect(deps.setRuntimeValue.mock.calls.some(c => String(c[1]).includes(MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY))).toBe(false);
   });
 });
+
+// MA-0145: Adult White Dragon — data-only header fix (MA-0136 silver shape).
+// Header authors uses:3 (4-in-lair advisory), Freezing Burst/Frightful
+// Presence numerics untouched but now budget-gated with the MA-0073
+// per-action cooldown clause, Pounce delegates_to the +11 Rend row.
+describe('MA-0145 Adult White Dragon legendary economy (header uses:3)', () => {
+  const white = monstersData.find(m => m.index === 'adult-white-dragon');
+  const pounce = white.legendary_actions.find(a => a.name === 'Pounce');
+  const rend = white.actions.find(a => a.name === 'Rend');
+  const freezing = white.legendary_actions.find(a => a.name === 'Freezing Burst');
+  const frightful = white.legendary_actions.find(a => a.name === 'Frightful Presence');
+
+  it('header authors uses:3 + lair advisory; max resolves to 3 (gate engages)', () => {
+    const header = legendaryHeaderAction(white);
+    expect(header?.uses).toBe(3);
+    expect(header?.description).toMatch(/lair.*advisory/i);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+  });
+
+  it('Freezing Burst/Frightful Presence numerics untouched; cooldown clause live', () => {
+    expect(freezing.save_dc).toBe(14);
+    expect(freezing.save_type).toBe('Constitution');
+    expect(freezing.damage_dice_primary).toBe('2d6');
+    expect(frightful.save_dc).toBe(14);
+    expect(frightful.save_type).toBe('Charisma');
+    expect(hasLegendaryCooldownClause(freezing)).toBe(true);
+    expect(hasLegendaryCooldownClause(frightful)).toBe(true);
+  });
+
+  it('Pounce delegates_to the +11 Rend row with the verbatim advisory movement clause', () => {
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.uses == null).toBe(true);
+    expect(pounce.description).toBe('The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
+    expect(legendaryDelegateAction(white, pounce)).toBe(rend);
+    expect(legendaryDelegateAttackName(pounce, rend)).toBe('Pounce (Rend attack)');
+  });
+
+  it('economy is live: spend 3→2, turn latch, per-action cooldown refusal, exhaustion, turn-start regain', async () => {
+    const first = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Freezing Burst', action: freezing, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Adult White Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ freezing_burst: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Freezing Burst', action: freezing, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Freezing Burst', action: freezing, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'freezing_burst_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'HexWarlock';
+    const fp = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Frightful Presence', action: frightful, campaignName: 'test-campaign', deps });
+    expect(fp).toEqual({ spent: true, remaining: 1, max: 3 });
+    cs.activeCreatureName = 'ElderPaladin';
+    const pounceSpend = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: legendaryDelegateAttackName(pounce, rend), action: pounce, campaignName: 'test-campaign', deps });
+    expect(pounceSpend).toEqual({ spent: true, remaining: 0, max: 3 });
+
+    cs.activeCreatureName = 'LightfootHalfling';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Freezing Burst', action: freezing, campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+    expect(store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+
+    cs.activeCreatureName = 'Adult White Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Adult White Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Adult White Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Adult White Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+  });
+});

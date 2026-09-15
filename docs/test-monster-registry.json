@@ -226,5 +226,17 @@
       "csIndex": 0,
       "verifiedRow": "MA-0136 (FIXED: header uses:3 + Chill save shape DC19 WIS dc_success none + Pounce delegates_to Rend; counter/spend/refusal/regain live 2026-09-15)"
     }
+  },
+  "adult-white-dragon": {
+    "monsterIndex": "adult-white-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Adult White Dragon 1",
+      "hp": 200,
+      "ac": 18,
+      "init": 9,
+      "csIndex": 0,
+      "verifiedRow": "MA-0145 (FIXED: header uses:3 + Pounce delegates_to Rend; counter/spend/latch/refusal/regain live 2026-09-15)"
+    }
   }
 }

@@ -1436,3 +1436,130 @@ describe('MA-0136 MonsterCardModal silver dragon legendary gated rows', () => {
     expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
   });
 });
+
+const white = () => monstersData.find(m => m.name === 'Adult White Dragon');
+const whiteActions = () => [{ name: 'Rend', attack_bonus: 11, damage_dice_primary: '2d6 + 6', damage_type_primary: 'Slashing', damage_dice_secondary: '1d8', damage_type_secondary: 'Cold', reach: '10 ft.' }];
+
+// MA-0145 data lock: Adult White Dragon legendary rows mirror the verified
+// MA-0136 silver shape — header authors uses:3 (counter renders, 4-in-lair
+// stays advisory), Freezing Burst/Frightful Presence numerics byte-untouched
+// (FP structuring is MA-0147), Pounce delegates to the +11 Rend row.
+describe('MA-0145 monsters.json data: adult white dragon legendary economy authored', () => {
+  it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
+    const la = white().legendary_actions;
+    expect(la[0].name).toMatch(/Legendary Action Uses: 3 \(4 in Lair\)/);
+    expect(la[0].uses).toBe(3);
+    expect(la[0].description).toMatch(/lair.*advisory/i);
+  });
+
+  it('Freezing Burst numerics byte-untouched: DC 14 Constitution, 2d6 Cold', () => {
+    const row = white().legendary_actions.find(a => a.name === 'Freezing Burst');
+    expect(row.save_dc).toBe(14);
+    expect(row.save_type).toBe('Constitution');
+    expect(row.damage_dice_primary).toBe('2d6');
+    expect(row.damage_type_primary).toBe('Cold');
+    expect(row.save_effect).toMatch(/Speed is 0/);
+  });
+
+  it('Frightful Presence numerics byte-untouched: DC 14 Charisma (MA-0147 stays queued)', () => {
+    const row = white().legendary_actions.find(a => a.name === 'Frightful Presence');
+    expect(row.save_dc).toBe(14);
+    expect(row.save_type).toBe('Charisma');
+    expect(row.description).toMatch(/spell save DC 14/i);
+  });
+
+  it('Pounce delegates_to the +11 Rend row with the verbatim advisory movement clause', () => {
+    const row = white().legendary_actions.find(a => a.name === 'Pounce');
+    expect(row.delegates_to).toBe('Rend');
+    expect(row.attack_bonus == null && row.save_dc == null && row.uses == null).toBe(true);
+    expect(row.description).toBe('The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
+    expect(white().actions.find(a => a.name === 'Rend')?.attack_bonus).toBe(11);
+  });
+});
+
+// MA-0145: with the header authored, the white dragon card renders the
+// "(3 left)" counter and every legendary row click routes through the gated
+// spend (Freezing Burst/Frightful Presence no longer the ungated generic
+// save paths).
+describe('MA-0145 MonsterCardModal white dragon legendary gated rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderWhite(uses) {
+    if (uses !== undefined) runtime.store['Adult White Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Adult White Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 200, maxHp: 200, ac: 18, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Adult White Dragon', actions: whiteActions(), legendary_actions: white().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult White Dragon 1', creatures })} />);
+  }
+  function whiteRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('header shows (3 left); Freezing Burst/Frightful Presence save chips; Pounce the expend chip', () => {
+    renderWhite({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    expect(whiteRow('Freezing Burst').querySelector('.mc-dice-link-save-clickable').textContent).toMatch(/DC 14 Constitution/);
+    expect(whiteRow('Frightful Presence').querySelector('.mc-dice-link-save-clickable').textContent).toMatch(/DC 14 Charisma/);
+    expect(whiteRow('Pounce').querySelector('.mc-dice-link-legendary')).toBeTruthy();
+  });
+
+  it('Freezing Burst gated click spends 1, stamps freezing_burst cooldown, opens the DC 14 CON picker', async () => {
+    renderWhite({ max: 3, used: 0 });
+    fireEvent.click(whiteRow('Freezing Burst').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult White Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ freezing_burst: { round: 1 } });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Freezing Burst/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Freezing Burst/);
+    expect(document.querySelector('.sp-overlay')).toBeTruthy();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+
+  it('Frightful Presence gated click spends 1 on its own boundary (no longer the ungated generic save path)', async () => {
+    renderWhite({ max: 3, used: 0 });
+    fireEvent.click(whiteRow('Frightful Presence').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult White Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ frightful_presence: { round: 1 } });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Frightful Presence/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Frightful Presence/);
+  });
+
+  it('Pounce gated click spends 1 and rolls delegated Rend +11 named "Pounce (Rend attack)"', async () => {
+    renderWhite({ max: 3, used: 0 });
+    fireEvent.click(whiteRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Pounce (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(11);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Pounce/);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (3/3): save-chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderWhite({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(whiteRow('Freezing Burst').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
+    renderWhite({ max: 3, used: 0 });
+    fireEvent.click(whiteRow('Freezing Burst').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(whiteRow('Freezing Burst').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+});
