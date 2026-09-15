@@ -2457,3 +2457,44 @@ describe('MA-0188/MA-0189 ancient brass dragon lair rows byte-mirror adult-brass
     expect(cloud.save_effect).toMatch(/deals no damage/i);
   });
 });
+
+// MA-0199/MA-0200: Ancient Bronze Dragon lair block — fog raw-string +
+// nameless Thunderclap dict (with 1dlO letter-O typo) both inert. Fix
+// byte-mirrors the adult-bronze verified rows: MA-0085 fog zone shape
+// (lair_fog_cloud te, no_save) + named DC 15 CON 1d10 save row.
+describe('MA-0199/MA-0200 ancient bronze dragon lair rows byte-mirror adult-bronze', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-bronze-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-bronze-dragon');
+
+  it('no raw strings; both rows byte-identical to adult siblings; clickable', () => {
+    expect(ancient.lair_actions.every(r => typeof r === 'object')).toBe(true);
+    expect(JSON.stringify(ancient.lair_actions[0])).toBe(JSON.stringify(adult.lair_actions[0]));
+    expect(JSON.stringify(ancient.lair_actions[1])).toBe(JSON.stringify(adult.lair_actions[1]));
+    expect(isLairRowClickable(ancient.lair_actions[0])).toBe(true);
+    expect(isLairRowClickable(ancient.lair_actions[1])).toBe(true);
+    expect(JSON.stringify(ancient.lair_actions)).not.toMatch(/1dlO/);
+  });
+
+  it('Fog Cloud: zone-only affordance, lair_fog_cloud te key, no save fields', () => {
+    const fog = ancient.lair_actions[0];
+    expect(fog.name).toBe('Fog Cloud');
+    expect(fog.zone.no_save).toBe(true);
+    expect(fog.zone.radius_ft).toBe(20);
+    expect(fog.zone.effect_key).toBe('lair_fog_cloud');
+    expect(fog.zone.noun).toBe('fog');
+    expect(fog.save_dc == null).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('zone');
+  });
+
+  it('Thunderclap: DC 15 CON 1d10 Thunder, dc_success none, deafened vocab, save affordance', () => {
+    const tc = ancient.lair_actions[1];
+    expect(tc.name).toBe('Thunderclap');
+    expect(tc.save_dc).toBe(15);
+    expect(tc.save_type).toBe('Constitution');
+    expect(tc.damage_dice_primary).toBe('1d10');
+    expect(tc.damage_type_primary).toBe('Thunder');
+    expect(tc.dc_success).toBe('none');
+    expect(extractConditionsFromSaveEffect(tc.save_effect)).toContain('deafened');
+    expect(lairRowAffordance(tc)).toBe('save');
+  });
+});

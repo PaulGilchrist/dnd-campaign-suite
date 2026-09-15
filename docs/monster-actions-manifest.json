@@ -2998,11 +2998,11 @@
       "monsterIndex": "ancient-bronze-dragon",
       "monster": "Ancient Bronze Dragon",
       "actionIndex": 0,
-      "actionName": "Unnamed lair actions 1",
+      "actionName": "Fog Cloud",
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon creates fog as though it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0199-lair-fog-cloud.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0200",
@@ -3010,7 +3010,7 @@
       "monsterIndex": "ancient-bronze-dragon",
       "monster": "Ancient Bronze Dragon",
       "actionIndex": 1,
-      "actionName": "Unnamed lair actions 2",
+      "actionName": "Thunderclap",
       "category": "lair_actions",
       "actionType": "other",
       "saveDc": 15,
@@ -3019,7 +3019,7 @@
         "deafened"
       ],
       "description": "A thunderclap originates at a point the dragon can see within 120 feet of it. Each creature within a 20-foot radius centered on that point must make a DC 15 Constitution saving throw or take 5 (1dlO) thunder damage and be deafened until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0200-lair-thunderclap.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0201",
