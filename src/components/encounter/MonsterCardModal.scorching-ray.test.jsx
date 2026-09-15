@@ -188,6 +188,19 @@ describe('MA-0065 data — adult-brass-dragon Spellcasting row + 5e scorching-ra
   });
 });
 
+describe('MA-0179 data — ancient-brass-dragon Spellcasting row authors spell_attack_bonus 12', () => {
+  it('row authors spell_attack_bonus 12 (+ prose) and enumerates Scorching Ray (level 3 version)', () => {
+    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+    const dragon = monsters.find(m => m.index === 'ancient-brass-dragon');
+    const row = dragon.actions.find(a => a.name === 'Spellcasting');
+    expect(extractSpellNamesFromSpellcasting(row.description)).toContain('Scorching Ray');
+    expect(row.description).toMatch(/Scorching Ray<\/em> \(level 3 version\)/);
+    expect(row.spell_attack_bonus).toBe(12);
+    expect(row.description).toMatch(/\+12 to hit with spell attacks/);
+    expect(monsterSpellAttackBonus(row)).toBe(12);
+  });
+});
+
 describe('MA-0065 MonsterCardModal — Scorching Ray casts as a spell attack, not a block save', () => {
   it('routes the per-spell click through the attack seam with +8, 2d6 Fire, spell-named and isSpellDamage-marked', async () => {
     renderDragon(true);

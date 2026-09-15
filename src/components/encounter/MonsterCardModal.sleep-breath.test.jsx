@@ -147,6 +147,19 @@ describe('MA-0068 Adult Brass Dragon Sleep Breath data lock', () => {
   });
 });
 
+describe('MA-0179 Ancient Brass Dragon Sleep Breath data lock', () => {
+  it('row authors dc_success none + staged_sleep 10 minutes on DC 21 CON, no damage dice, no generic unconscious over-apply', () => {
+    const dragon = monstersData.find(m => m.index === 'ancient-brass-dragon');
+    const action = dragon.actions.find(a => a.name === 'Sleep Breath');
+    expect(action).toBeTruthy();
+    expect(action.save_dc).toBe(21);
+    expect(action.save_type).toBe('Constitution');
+    expect(action.dc_success).toBe('none');
+    expect(action.staged_sleep).toEqual({ unconscious_minutes: 10 });
+    expect(action.damage_dice_primary == null).toBe(true);
+  });
+});
+
 describe('MA-0068 Sleep Breath recharge gate + staged cone picker', () => {
   it('fresh click spends the recharge and arms the cone picker with sleepStaging (100 rounds), dc_success none, no damage', async () => {
     renderBrass();
