@@ -361,6 +361,13 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     if (context?.acPenaltyClause) {
         await grantAcPenaltyClause({ context, campaignName, attackerName, applyTarget });
     }
+    // MA-0146: Adult White Dragon Freezing Burst — "the target's Speed is 0
+    // until the end of the target's next turn". te + activeCondition producer
+    // mirror of the MA-0073 shape (the sphere row normally routes through the
+    // radius picker seam; this leg covers any single-target save resolution).
+    if (context?.speedZeroClause) {
+        await grantSpeedZeroClause({ context, campaignName, attackerName, applyTarget });
+    }
 }
 
 async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
@@ -533,6 +540,46 @@ async function grantAcPenaltyClause({ context, campaignName, attackerName, apply
         description: `${applyTarget} failed ${attackerName}'s ${actionName} save — takes a \u2212${value} penalty to AC until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:ac-penalty-granted]', e); });
+}
+
+// MA-0146: failed-save speed-zero grant (Adult White Dragon Freezing Burst).
+// Writes the registry te (speed_zero) on the target sourced from the attacker
+// AND the activeCondition speed_zero (live consumers: conditionEffects
+// speedZero → CharSummary/MonsterCardBody Speed 0), duration
+// until_end_of_next_turn (rounds:2 clock, MA-0073 shape — the clock removes
+// both via remove_target_effect + the registered 'speed_zero' condition-clear
+// expiry), and logs the named clause.
+async function grantSpeedZeroClause({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, 'speed_zero', attackerName, {
+        duration: 'until_end_of_next_turn',
+        actionName,
+    });
+    const stored = getRuntimeValue(applyTarget, 'activeConditions');
+    const conditions = Array.isArray(stored) ? stored : [];
+    if (!conditions.some(c => String(c).toLowerCase() === 'speed_zero')) {
+        await setRuntimeValue(applyTarget, 'activeConditions', [...conditions, 'speed_zero'], campaignName);
+    }
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [
+            { type: 'remove_target_effect', effectKey: 'speed_zero', source: attackerName, target: applyTarget },
+            { type: 'speed_zero' },
+        ],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'speed_zero');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'speed_zero_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — Speed is 0 until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:speed-zero-granted]', e); });
 }
 
 // MA-0104: failed-save demiplane-transport grant (Adult Gold Dragon Banish).

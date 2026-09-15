@@ -2217,7 +2217,7 @@
       "damageDicePrimary": "2d6",
       "damageTypePrimary": "Cold",
       "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot-radius Sphere centered on a point the dragon can see within 120 feet. Failure: 7 (2d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0146-freezing-burst.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0147",

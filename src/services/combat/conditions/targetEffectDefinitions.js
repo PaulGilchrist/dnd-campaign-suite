@@ -906,6 +906,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    effect: 'speed_zero',
+    label: 'Speed 0',
+    description: 'The creature\'s Speed is 0 until the end of its next turn (MA-0146 Freezing Burst failed-save clause).',
+    icon: 'fa-gauge-simple',
+    cls: 'effect-speed-zero',
+    group: 'Movement',
+    fields: ['source'],
+  },
+  {
     effect: 'speed_reduction',
     label: 'Speed Reduced',
     description: 'The creature\'s Speed is reduced by N feet.',

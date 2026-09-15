@@ -155,7 +155,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, conditionDurationNote: ctx.conditionDurationNote });
+    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, conditionDurationNote: ctx.conditionDurationNote });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -464,11 +464,22 @@ function applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetN
 
 // Failed-save dispatch: MA-0068 staged sleep rows route through the SP-107
 // staging seams; everything else keeps the MA-0063 one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote }) {
+function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
     }
+    // Authored failed-save te clause legs (MA-0087/0102/0115/0138/0146) —
+    // split from the dispatcher to keep both functions under the lint
+    // complexity ceiling (saveProcessing applyFailedSaveClauseGrants shape).
+    applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause });
+    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
+}
+
+// Failed-save authored te clause dispatch (MA-0087 slowed trio, MA-0102
+// weakening breath, MA-0115 AC penalty, MA-0138 push-only marker, MA-0146
+// speed zero). Every leg is byte-inert when its clause is null.
+function applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause }) {
     // MA-0087: "slowed" rider clauses grant te for each authored clause on a
     // failed save ('slowed' is not a registered condition, so each clause maps
     // to a registered te with a live consumer). Byte-inert when null.
@@ -498,7 +509,13 @@ function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetN
     if (!success && pushFeet != null && (!saveConditions || saveConditions.length === 0)) {
         grantPushOnlyClause({ pushFeet, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
     }
-    applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
+    // MA-0146: Freezing Burst failed-save speed-zero clause — speed_zero te +
+    // activeCondition until the end of the target's next turn, rounds:2 clock
+    // (MA-0073/MA-0115 shape); live consumer conditionEffects speedZero →
+    // sheet/mob-card Speed 0. Byte-inert when null.
+    if (!success && speedZeroClause) {
+        grantSpeedZeroClause({ campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
+    }
 }
 
 // MA-0138: push-only failed-save grant (Cold Gale registry push te, value 30,
@@ -546,6 +563,47 @@ function grantAcPenaltyClause({ acPenaltyClause, campaignName, targetName, caste
         description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — \u2212${value} AC until the end of ${targetName}'s next turn.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging AC penalty:', e); });
+}
+
+// MA-0146: Freezing Burst failed-save speed-zero grant (Adult White Dragon
+// sphere). Registry speed_zero te (badge + provenance, MA-0115 shape) PLUS
+// the activeCondition speed_zero (live consumer conditionEffects → sheet
+// Speed 0, charSummaryCalc zero). Drained by one rounds:2 clock removing
+// both (MA-0073 expiry recipe; 'speed_zero' condition-clear expiry type is
+// registered in clearExpirationEffects).
+function grantSpeedZeroClause({ campaignName, targetName, casterName, actionName, saveType, saveDc }) {
+    registerTargetEffect(campaignName, targetName, 'speed_zero', casterName, {
+        duration: 'until_end_of_next_turn',
+        actionName,
+    });
+    const ability = String(saveType || '').toLowerCase().slice(0, 3) || 'con';
+    const existing = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(existing) ? existing : [];
+    if (!conditions.some(c => String(c).toLowerCase() === 'speed_zero')) {
+        setRuntimeValue(targetName, 'activeConditions', [...conditions, 'speed_zero'], campaignName);
+    }
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    setRuntimeValue(targetName, 'activeConditionMeta', { ...existingMeta, speed_zero: { ...(existingMeta.speed_zero || {}), dc: saveDc, ability, source: casterName } }, campaignName);
+    addExpiration({
+        attackerName: casterName,
+        targetName,
+        campaignName,
+        rounds: 2,
+        effects: [
+            { type: 'remove_target_effect', effectKey: 'speed_zero', source: casterName, target: targetName },
+            { type: 'speed_zero' },
+        ],
+    });
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Speed 0',
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — Speed is 0 until the end of ${targetName}'s next turn.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging speed zero:', e); });
 }
 
 // MA-0087: Slowing Breath failed-save rider te grants (Adult Copper Dragon).
@@ -812,6 +870,11 @@ function SaveAttackAoeModal({
     // ac_penalty te (value −2, until_end_of_next_turn, rounds:2 clock) on
     // each failed save; live consumer conditionEffects → sheet AC fold.
     acPenaltyClause,
+    // MA-0146 optional failed-save speed-zero clause (byte-inert undefined
+    // default): Adult White Dragon Freezing Burst — grants speed_zero te +
+    // activeCondition (until_end_of_next_turn, rounds:2 clock) on each failed
+    // save; live consumer conditionEffects speedZero → sheet Speed 0.
+    speedZeroClause,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -873,7 +936,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -904,7 +967,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -1032,7 +1095,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote });
+        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -1061,7 +1124,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

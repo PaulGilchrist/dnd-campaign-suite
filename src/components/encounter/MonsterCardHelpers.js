@@ -60,6 +60,17 @@ export function parseSpeedHalfClause(saveEffect) {
   return /speed is halved/i.test(saveEffect) ? { effect: 'speed_half' } : null;
 }
 
+// MA-0146: authored failed-save speed-zero clause (Adult White Dragon
+// Freezing Burst — "the target's Speed is 0 until the end of the target's
+// next turn"). Not a canonical condition, so extractConditionsFromSaveEffect
+// can never see it; this clause parse arms the speed_zero producer (te +
+// activeCondition) in the picker/saveProcessing failed-save seams
+// (MA-0073 parse shape). Byte-inert (null) for rows without the clause.
+export function parseSpeedZeroClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /speed is 0\b/i.test(saveEffect) ? { effect: 'speed_zero' } : null;
+}
+
 // MA-0093: authored failed-save subtract-die debuff clause (Adult Copper
 // Dragon Giggling Magic — "the target rolls 1d6 whenever it makes an
 // ability check or attack roll and subtracts the number rolled"). Maps the
