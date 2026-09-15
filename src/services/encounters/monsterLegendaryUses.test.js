@@ -1019,3 +1019,81 @@ describe('MA-0175 Ancient Blue Dragon Tail Swipe delegate row', () => {
     expect(rearmed.spent).toBe(true);
   });
 });
+
+// MA-0184: Ancient Brass Dragon — data-only header fix (MA-0172/MA-0161
+// shape). Header row [0] gains uses:3 + the adult-brass "4 in Lair" advisory
+// tail byte-mirrored verbatim; rows [1] Blazing Light / [2] Pounce stay
+// prose-only (MA-0185/MA-0186 queued) and [3] Scorching Sands numerics are
+// untouched — gating the section (header.uses present) auto-routes its
+// save-chip through the legendaryGate spend (MA-0136 silver precedent).
+describe('MA-0184 Ancient Brass Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-brass-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-brass-dragon');
+  const header = ancient.legendary_actions[0];
+  const blazing = ancient.legendary_actions[1];
+  const pounce = ancient.legendary_actions[2];
+  const sands = ancient.legendary_actions[3];
+
+  it('header authors uses:3 and byte-mirrors the adult-brass header incl. advisory tail', () => {
+    expect(header.name).toBe('Legendary Action Uses: 3 (4 in Lair)');
+    expect(header.uses).toBe(3);
+    expect(JSON.stringify(header)).toBe(JSON.stringify(adult.legendary_actions[0]));
+    expect(header.description).toMatch(/lair.*advisory/i);
+    const gated = legendaryHeaderAction(ancient);
+    expect(gated).toBe(header);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+    expect(legendaryUsesRemaining(header, {})).toBe(3);
+  });
+
+  it('rows [1]/[2] stay prose-only (MA-0185/0186 queued); [3] Scorching Sands numerics untouched, cooldown clause live', () => {
+    expect(blazing.attack_bonus == null && blazing.save_dc == null && blazing.delegates_to == null && blazing.advisory == null && blazing.uses == null).toBe(true);
+    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.delegates_to == null && pounce.advisory == null && pounce.uses == null).toBe(true);
+    expect(sands.save_dc).toBe(20);
+    expect(sands.save_type).toBe('Dexterity');
+    expect(sands.damage_dice_primary).toBe('8d8');
+    expect(sands.damage_type_primary).toBe('Fire');
+    expect(sands.delegates_to == null && sands.advisory == null && sands.uses == null).toBe(true);
+    expect(hasLegendaryCooldownClause(sands)).toBe(true);
+    expect(legendaryActionSlug(sands.name)).toBe('scorching_sands');
+  });
+
+  it('economy is live: Scorching Sands spend 3→2 + cooldown stamp, turn latch, refusal legs, exhaustion, turn-start regain re-arms', async () => {
+    cs.activeCreatureName = 'Thug 1';
+    const monster = { legendary_actions: ancient.legendary_actions };
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ scorching_sands: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'scorching_sands_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'HexWarlock';
+    const blazingSpend = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Blazing Light', action: blazing, campaignName: 'test-campaign', deps });
+    expect(blazingSpend).toEqual({ spent: true, remaining: 1, max: 3 });
+    cs.activeCreatureName = 'ElderPaladin';
+    const pounceSpend = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Pounce', action: pounce, campaignName: 'test-campaign', deps });
+    expect(pounceSpend).toEqual({ spent: true, remaining: 0, max: 3 });
+
+    cs.activeCreatureName = 'LightfootHalfling';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+    expect(store['Ancient Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+
+    cs.activeCreatureName = 'Ancient Brass Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Brass Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Brass Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Ancient Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    cs.activeCreatureName = 'HexWarlock';
+    const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(rearmed.spent).toBe(true);
+  });
+});
