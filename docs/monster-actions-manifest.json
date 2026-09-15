@@ -396,7 +396,7 @@
       "monsterIndex": "aboleth",
       "monster": "Aboleth",
       "actionIndex": 0,
-      "actionName": "Unnamed lair actions 1",
+      "actionName": "Stone Spikes",
       "category": "lair_actions",
       "actionType": "other",
       "description": "The aboleth casts phantasmal force (no components required) on any number of creatures it can see within 60 feet of it. While maintaining concentration on this effect, the aboleth can't take other lair actions. If a tar­get succeeds on the saving throw or if the effect ends for it, the target is immune to the aboleth's phantasmal force lair action for the next 24 hours, although such a creature can choose to be affected.",
@@ -408,7 +408,7 @@
       "monsterIndex": "aboleth",
       "monster": "Aboleth",
       "actionIndex": 1,
-      "actionName": "Unnamed lair actions 2",
+      "actionName": "Liquid Mud",
       "category": "lair_actions",
       "actionType": "other",
       "conditions": [
@@ -3157,11 +3157,11 @@
       "monsterIndex": "ancient-copper-dragon",
       "monster": "Ancient Copper Dragon",
       "actionIndex": 0,
-      "actionName": "Unnamed lair actions 1",
+      "actionName": "Stone Spikes",
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon chooses a point on the ground that it can see within 120 feet of it. Stone spikes sprout from the ground in a 20-foot radius centered on that point. The effect is otherwise identical to the spike growth spell and lasts until the dragon uses this lair action again or until the dragon dies.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0210-stone-spikes-lair.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0211",
@@ -3169,7 +3169,7 @@
       "monsterIndex": "ancient-copper-dragon",
       "monster": "Ancient Copper Dragon",
       "actionIndex": 1,
-      "actionName": "Unnamed lair actions 2",
+      "actionName": "Liquid Mud",
       "category": "lair_actions",
       "actionType": "other",
       "saveDc": 15,
@@ -3178,7 +3178,7 @@
         "restrained"
       ],
       "description": "The dragon chooses a 10-foot-square area on the ground that it can see within 120 feet of it. The ground in that area turns into 3-foot-deep mud. Each creature on the ground in that area when the mud appears must succeed on a DC 15 Dexterity saving throw or sink into the mud and become restrained. A creature can take an action to attempt a DC 15 Strength check, freeing itself or another creature within its reach and ending the restrained condition on a success. Moving 1 foot in the mud costs 2 feet of movement. On initia­tive count 20 on the next round, the mud hardens, and the Strength DC to work free increases to 20.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0211-lair-mud.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0212",

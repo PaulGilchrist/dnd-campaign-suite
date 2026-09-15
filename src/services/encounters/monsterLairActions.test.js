@@ -979,10 +979,11 @@ describe('MA-0097 adult-copper-dragon liquid mud data lock', () => {
     expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
   });
 
-  it('ancient-copper-dragon scope guard: its rows are NOT touched by this fix', () => {
+  it('ancient-copper-dragon scope guard: rows since FIXED by MA-0210/MA-0211 (see those locks)', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
-    expect(ancient.lair_actions[0]).toEqual(expect.any(String));
-    expect(ancient.lair_actions[1].name).toBeUndefined();
+    expect(typeof ancient.lair_actions[0]).toBe('object');
+    expect(ancient.lair_actions[0].name).toBe('Stone Spikes');
+    expect(ancient.lair_actions[1].name).toBe('Liquid Mud');
   });
 });
 
@@ -2496,5 +2497,44 @@ describe('MA-0199/MA-0200 ancient bronze dragon lair rows byte-mirror adult-bron
     expect(tc.dc_success).toBe('none');
     expect(extractConditionsFromSaveEffect(tc.save_effect)).toContain('deafened');
     expect(lairRowAffordance(tc)).toBe('save');
+  });
+});
+
+// MA-0210/MA-0211: Ancient Copper Dragon lair block — raw-string Stone
+// Spikes + nameless Liquid Mud dict both inert. Fix: register lair_spike_growth
+// te (registry rule) + MA-0085 zone dict; name the mud row with MA-0075
+// save+zone shape (lair_mud te, 10-ft square → 5-ft radius precedent,
+// dc_success none honest no-damage copy).
+describe('MA-0210/MA-0211 ancient copper dragon lair rows', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
+
+  it('Stone Spikes: named zone dict, no_save, lair_spike_growth key, te registered', async () => {
+    const spikes = ancient.lair_actions[0];
+    expect(typeof spikes).toBe('object');
+    expect(spikes.name).toBe('Stone Spikes');
+    expect(spikes.zone.radius_ft).toBe(20);
+    expect(spikes.zone.no_save).toBe(true);
+    expect(spikes.zone.effect_key).toBe('lair_spike_growth');
+    expect(spikes.save_dc == null).toBe(true);
+    expect(isLairRowClickable(spikes)).toBe(true);
+    expect(lairRowAffordance(spikes)).toBe('zone');
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_spike_growth');
+    expect(def).toBeTruthy();
+    expect(def.group).toBe('Lair');
+  });
+
+  it('Liquid Mud: named save row DC 15 DEX, dc_success none, restrained vocab, lair_mud zone te radius 5', () => {
+    const mud = ancient.lair_actions[1];
+    expect(mud.name).toBe('Liquid Mud');
+    expect(mud.save_dc).toBe(15);
+    expect(mud.save_type).toBe('Dexterity');
+    expect(mud.dc_success).toBe('none');
+    expect(extractConditionsFromSaveEffect(mud.save_effect)).toContain('restrained');
+    expect(mud.save_effect).toMatch(/deals no damage/i);
+    expect(mud.zone.radius_ft).toBe(5);
+    expect(mud.zone.effect_key).toBe('lair_mud');
+    expect(isLairRowClickable(mud)).toBe(true);
+    expect(lairRowAffordance(mud)).toBe('save');
   });
 });
