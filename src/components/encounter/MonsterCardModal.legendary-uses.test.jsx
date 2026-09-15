@@ -767,13 +767,44 @@ describe('MA-0124 monsters.json data: adult red dragon legendary header authors 
     expect(la[0].description).toMatch(/lair.*advisory/i);
   });
 
-  it('Commanding Presence / Fiery Rays / Pounce remain verbatim (MA-0125/0126/0127 own payloads)', () => {
-    for (const name of ['Commanding Presence', 'Fiery Rays', 'Pounce']) {
+  it('Fiery Rays / Pounce remain verbatim (MA-0126/MA-0127 own payloads)', () => {
+    for (const name of ['Fiery Rays', 'Pounce']) {
       const row = red().legendary_actions.find(a => a.name === name);
       expect(row.uses == null).toBe(true);
       expect(row.save_dc == null).toBe(true);
       expect(row.attack_bonus == null).toBe(true);
     }
+  });
+});
+
+// MA-0125 data lock: Adult Red Dragon legendary "Commanding Presence" was a
+// prose-only "uses Spellcasting to cast Command (level 2 version)" row with
+// ZERO affordances (0 clickableChildren) — the gated "Expend Legendary" chip
+// spent a use then console.errored "no resolvable mechanic" (MA-0114 inert
+// fingerprint). Fix authors the numeric save shape mirroring the MA-0114 Mind
+// Invasion recipe: WIS save vs the Spellcasting save_dc 20, NO damage
+// (dc_success "none" — Command deals none), failed save charms the target
+// ("charmed" — RE-USED canonical condition vocabulary from charmSpellUtils /
+// charmPersonHandler; no new te, no "commanded" key exists in the registry),
+// the per-action "can't take again until next turn" latch rides verbatim
+// (MA-0073 commanding_presence cooldown, already LIVE via expendLegendaryUse).
+describe('MA-0125 monsters.json data: adult red dragon Commanding Presence authors the numeric save shape', () => {
+  it('Commanding Presence authors DC 20 Wisdom, dc_success none, charmed save_effect (advisory placeholder gone)', () => {
+    const row = red().legendary_actions.find(a => a.name === 'Commanding Presence');
+    expect(row.advisory == null).toBe(true);
+    expect(row.save_dc).toBe(20);
+    expect(row.save_type).toBe('Wisdom');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary == null).toBe(true);
+    expect(row.save_effect).toMatch(/charmed/i);
+    expect(row.description).toMatch(/Command.*level 2 version/i);
+    expect(row.description).toMatch(/DC 20 Wisdom saving throw/i);
+    expect(row.description).toMatch(/second creature.*advisory/i);
+    expect(row.description).toMatch(/can'?t take this action again until the start of its next turn/i);
+    expect(red().actions.find(a => a.name === 'Spellcasting')?.save_dc).toBe(20);
+    const command = spells2024.find(s => s.index === 'command');
+    expect(command.dc.dc_type).toBe('WIS');
+    expect(command.dc.dc_success).toBe('none');
   });
 });
 
@@ -817,10 +848,10 @@ describe('MA-0124 MonsterCardModal red dragon legendary gated rows', () => {
     errSpy.mockRestore();
   });
 
-  it('exhausted (3/3): Commanding Presence click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+  it('exhausted (3/3): Commanding Presence save-chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
     renderRed({ max: 3, used: 3 });
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-legendary'));
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
@@ -841,17 +872,92 @@ describe('MA-0124 MonsterCardModal red dragon legendary gated rows', () => {
     errSpy.mockRestore();
   });
 
-  it('per-action cooldown: Commanding Presence re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('per-action cooldown: Commanding Presence save-chip re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
     renderRed({ max: 3, used: 0 });
-    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-legendary'));
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
     await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
     expect(runtime.store['Adult Red Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ commanding_presence: { round: 1 } });
     ctx.value = { round: 1, activeCreatureName: 'TestPC', creatures: CREATURES };
-    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-legendary'));
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'commanding_presence_refused (once per turn)')).toBe(true));
     expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-    errSpy.mockRestore();
+  });
+});
+
+// MA-0125: Commanding Presence is no longer an inert expend chip — it renders
+// the numeric save chip ("DC 20 Wisdom") and a gated click spends 1, stamps
+// the commanding_presence latch, and rolls the damageless WIS DC 20 save leg
+// (armed target, no AoE picker, no auto-damage — Command deals none, save
+// fail charms the target). MA-0073 per-action cooldown refuses same-turn
+// re-click zero-spend; regain clears it.
+describe('MA-0125 MonsterCardModal red dragon Commanding Presence gated save row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderRedArmed(uses) {
+    runtime.store['Adult Red Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Adult Red Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 256, maxHp: 256, ac: 22, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Adult Red Dragon', actions: redActions(), legendary_actions: red().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Red Dragon 1', creatures })} />);
+  }
+  function redRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('renders the DC 20 Wisdom save chip (no expend-legendary chip, no advisory)', () => {
+    renderRedArmed({ max: 3, used: 0 });
+    const row = redRow('Commanding Presence');
+    expect(row.querySelector('.mc-dice-link-legendary')).toBe(null);
+    expect(row.querySelector('.mc-dice-link-save-clickable').textContent).toMatch(/DC 20 Wisdom/);
+  });
+
+  it('gated click spends 1, stamps the commanding_presence latch, rolls damageless WIS DC 20 (charmed, no auto-damage)', async () => {
+    renderRedArmed({ max: 3, used: 0 });
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ commanding_presence: { round: 1 } });
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('WIS');
+    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(context.saveDc).toBe(20);
+    expect(context.saveType).toBe('Wisdom');
+    expect(context.dcSuccess).toBe('none');
+    expect(context.autoDamageFormula == null).toBe(true);
+    expect(context.saveConditions).toEqual(['charmed']);
+    expect(context.targetName).toBe('TestPC');
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Commanding Presence/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Commanding Presence/);
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('same-turn re-click (latch) refuses zero-spend, zero extra save roll', async () => {
+    renderRedArmed({ max: 3, used: 0 });
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(ROLLERS.rollSavingThrow.mock.calls.length).toBe(1);
+  });
+
+  it('regain at the dragon turn-start clears the latch; next-boundary click spends again', async () => {
+    renderRedArmed({ max: 3, used: 0 });
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    ctx.value = { round: 2, activeCreatureName: 'Thug 1', creatures: CREATURES };
+    runtime.store['Adult Red Dragon 1.monsterLegendaryUses'] = { max: 3, used: 0 };
+    delete runtime.store['Adult Red Dragon 1.monsterLegendaryActionCooldowns'];
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(ROLLERS.rollSavingThrow.mock.calls.length).toBe(2);
   });
 });
 

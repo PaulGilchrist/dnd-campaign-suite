@@ -2554,7 +2554,11 @@
       },
       {
         "name": "Commanding Presence",
-        "description": "The dragon uses Spellcasting to cast <em>Command</em> (level 2 version). The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Command</em> (level 2 version). One creature it can see within 60 feet must succeed on a DC 20 Wisdom saving throw or obey a one-word command on its next turn (the target is charmed — command word, movement, and compliance are GM-enforced, no command-control subsystem consumer; charmed is the mechanical marker). No damage — a successful save has no effect. The level 2 version can affect a second creature within 30 feet of the first (advisory — no multi-target producer at the save leg; GM adjudicates the extra target). The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 20,
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "save_effect": "The target is charmed by the dragon and obeys its one-word command on its next turn — command word, movement, and compliance are GM-enforced (charmed is the mechanical marker). Command 1-round duration is advisory (GM clears the charmed marker after the target's next turn)."
       },
       {
         "name": "Fiery Rays",
