@@ -491,7 +491,7 @@ function applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, play
     // the turn-END repeat-save marker and a 10-round auto-success clock
     // (weakeningBreathService, MA-0048/MA-0087 shapes). Byte-inert when null.
     if (!success && weakeningBreath) {
-        grantWeakeningBreath({ campaignName, attackerName: playerStats.name, targetName, saveType, saveDc, roll: saveRoll, saveBonus }).catch((e) => { console.error('[SaveAttackAoeModal] Error granting weakening breath:', e); });
+        grantWeakeningBreath({ campaignName, attackerName: playerStats.name, targetName, saveType, saveDc, roll: saveRoll, saveBonus, die: weakeningBreath.damageSubtractDie }).catch((e) => { console.error('[SaveAttackAoeModal] Error granting weakening breath:', e); });
     }
     // MA-0115: Noxious Miasma failed-save AC-penalty clause — ac_penalty te
     // (value −2) until the end of the target's next turn, rounds:2 clock

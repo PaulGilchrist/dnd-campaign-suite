@@ -399,7 +399,7 @@
       "actionName": "Stone Spikes",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "The aboleth casts phantasmal force (no components required) on any number of creatures it can see within 60 feet of it. While maintaining concentration on this effect, the aboleth can't take other lair actions. If a tar­get succeeds on the saving throw or if the effect ends for it, the target is immune to the aboleth's phantasmal force lair action for the next 24 hours, although such a creature can choose to be affected.",
+      "description": "The aboleth casts phantasmal force (no components required) on any number of creatures it can see within 60 feet of it. While maintaining concentration on this effect, the aboleth can't take other lair actions. If a tar\u00adget succeeds on the saving throw or if the effect ends for it, the target is immune to the aboleth's phantasmal force lair action for the next 24 hours, although such a creature can choose to be affected.",
       "verified": "verified"
     },
     {
@@ -414,7 +414,7 @@
       "conditions": [
         "prone"
       ],
-      "description": "Pools of water within 90 feet of the aboleth surge out­ ward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 14 Strength saving throw or be pulled up to 20 feet into the water and knocked prone. The aboleth can't use this lair action again until it has used a different one.",
+      "description": "Pools of water within 90 feet of the aboleth surge out\u00ad ward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 14 Strength saving throw or be pulled up to 20 feet into the water and knocked prone. The aboleth can't use this lair action again until it has used a different one.",
       "verified": "verified"
     },
     {
@@ -426,7 +426,7 @@
       "actionName": "Unnamed lair actions 3",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "Water in the aboleth's lair magically becomes a con­ duit for the creature's rage. The aboleth can target any number of creatures it can see in such water within 90 feet of it. A target must succeed on a DC 14 Wisdom saving throw or take 7 (2d6) psychic damage. The aboleth can't use this lair action again until it has used a different one.",
+      "description": "Water in the aboleth's lair magically becomes a con\u00ad duit for the creature's rage. The aboleth can target any number of creatures it can see in such water within 90 feet of it. A target must succeed on a DC 14 Wisdom saving throw or take 7 (2d6) psychic damage. The aboleth can't use this lair action again until it has used a different one.",
       "verified": "verified"
     },
     {
@@ -1497,7 +1497,7 @@
       "conditions": [
         "restrained"
       ],
-      "description": "The dragon chooses a 10-foot-square area on the ground that it can see within 120 feet of it. The ground in that area turns into 3-foot-deep mud. Each creature on the ground in that area when the mud appears must succeed on a DC 15 Dexterity saving throw or sink into the mud and become restrained. A creature can take an action to attempt a DC 15 Strength check, freeing itself or another creature within its reach and ending the restrained condition on a success. Moving 1 foot in the mud costs 2 feet of movement. On initia­tive count 20 on the next round, the mud hardens, and the Strength DC to work free increases to 20.",
+      "description": "The dragon chooses a 10-foot-square area on the ground that it can see within 120 feet of it. The ground in that area turns into 3-foot-deep mud. Each creature on the ground in that area when the mud appears must succeed on a DC 15 Dexterity saving throw or sink into the mud and become restrained. A creature can take an action to attempt a DC 15 Strength check, freeing itself or another creature within its reach and ending the restrained condition on a success. Moving 1 foot in the mud costs 2 feet of movement. On initia\u00adtive count 20 on the next round, the mud hardens, and the Strength DC to work free increases to 20.",
       "verified": "verified"
     },
     {
@@ -1657,7 +1657,7 @@
       "actionName": "Unnamed lair actions 2",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane, a different plane of exis­ tence the dragon has imagined into being. To escape, the creature must use its action to make a Charisma check contested by the dragon's. If the creature wins, it escapes the dream plane. Otherwise, the effect ends on initiative count 20 on the next round. When the effect ends, the creature reappears in the space it left or in the nearest unoccupied space if that one is occupied.",
+      "description": "One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane, a different plane of exis\u00ad tence the dragon has imagined into being. To escape, the creature must use its action to make a Charisma check contested by the dragon's. If the creature wins, it escapes the dream plane. Otherwise, the effect ends on initiative count 20 on the next round. When the effect ends, the creature reappears in the space it left or in the nearest unoccupied space if that one is occupied.",
       "verified": "verified"
     },
     {
@@ -1757,10 +1757,10 @@
       "actionType": "aoe-save",
       "saveDc": 17,
       "saveType": "Constitution",
-      "saveEffect": "7 (2d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn",
+      "saveEffect": "7 (2d6) Poison damage, and the target takes a \u22122 penalty to AC until the end of its next turn",
       "damageDicePrimary": "2d6",
       "damageTypePrimary": "Poison",
-      "description": "Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+      "description": "Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a \u22122 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
       "verified": "verified"
     },
     {
@@ -1792,7 +1792,7 @@
       "conditions": [
         "restrained"
       ],
-      "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif­ficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
+      "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif\u00adficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
       "verified": "verified"
     },
     {
@@ -1804,7 +1804,7 @@
       "actionName": "Unnamed lair actions 2",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec­ tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
+      "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec\u00ad tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
       "verified": "verified"
     },
     {
@@ -1945,7 +1945,7 @@
       "saveType": "Dexterity",
       "damageDicePrimary": "6d6",
       "damageTypePrimary": "Fire",
-      "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
+      "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak\u00ad ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
       "verified": "verified"
     },
     {
@@ -2282,7 +2282,7 @@
       "actionName": "Unnamed lair actions 3",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec­ tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies.",
+      "description": "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec\u00ad tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies.",
       "verified": "verified"
     },
     {
@@ -3177,7 +3177,7 @@
       "conditions": [
         "restrained"
       ],
-      "description": "The dragon chooses a 10-foot-square area on the ground that it can see within 120 feet of it. The ground in that area turns into 3-foot-deep mud. Each creature on the ground in that area when the mud appears must succeed on a DC 15 Dexterity saving throw or sink into the mud and become restrained. A creature can take an action to attempt a DC 15 Strength check, freeing itself or another creature within its reach and ending the restrained condition on a success. Moving 1 foot in the mud costs 2 feet of movement. On initia­tive count 20 on the next round, the mud hardens, and the Strength DC to work free increases to 20.",
+      "description": "The dragon chooses a 10-foot-square area on the ground that it can see within 120 feet of it. The ground in that area turns into 3-foot-deep mud. Each creature on the ground in that area when the mud appears must succeed on a DC 15 Dexterity saving throw or sink into the mud and become restrained. A creature can take an action to attempt a DC 15 Strength check, freeing itself or another creature within its reach and ending the restrained condition on a success. Moving 1 foot in the mud costs 2 feet of movement. On initia\u00adtive count 20 on the next round, the mud hardens, and the Strength DC to work free increases to 20.",
       "verified": "verified"
     },
     {
@@ -3190,7 +3190,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Spellcasting to cast Guiding Bolt (level 4 version) or (B) Weakening Breath.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0212-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0213",
@@ -3336,7 +3336,7 @@
       "actionType": "other",
       "saveDc": 15,
       "saveType": "Charisma",
-      "description": "One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane, a different plane of exis­ tence the dragon has imagined into being. To escape, the creature must use its action to make a Charisma check contested by the dragon's. If the creature wins, it escapes the dream plane. Otherwise, the effect ends on initiative count 20 on the next round. When the effect ends, the creature reappears in the space it left or in the nearest unoccupied space if that one is occupied.",
+      "description": "One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane, a different plane of exis\u00ad tence the dragon has imagined into being. To escape, the creature must use its action to make a Charisma check contested by the dragon's. If the creature wins, it escapes the dream plane. Otherwise, the effect ends on initiative count 20 on the next round. When the effect ends, the creature reappears in the space it left or in the nearest unoccupied space if that one is occupied.",
       "verified": "not verified"
     },
     {
@@ -3436,10 +3436,10 @@
       "actionType": "aoe-save",
       "saveDc": 21,
       "saveType": "Constitution",
-      "saveEffect": "Failure: 17 (5d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn. Success: The dragon can't take this action again until the start of its next turn.",
+      "saveEffect": "Failure: 17 (5d6) Poison damage, and the target takes a \u22122 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn. Success: The dragon can't take this action again until the start of its next turn.",
       "damageDicePrimary": "5d6",
       "damageTypePrimary": "Poison",
-      "description": "Constitution Saving Throw: DC 21, each creature in a 30-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 17 (5d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+      "description": "Constitution Saving Throw: DC 21, each creature in a 30-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 17 (5d6) Poison damage, and the target takes a \u22122 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
       "verified": "not verified"
     },
     {
@@ -3468,7 +3468,7 @@
       "conditions": [
         "restrained"
       ],
-      "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif­ficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
+      "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif\u00adficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
       "verified": "not verified"
     },
     {
@@ -3484,7 +3484,7 @@
       "saveType": "Dexterity",
       "damageDicePrimary": "4d8",
       "damageTypePrimary": "Piercing",
-      "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec­ tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
+      "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec\u00ad tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
       "verified": "not verified"
     },
     {
@@ -3626,7 +3626,7 @@
       "saveEffect": "Failure: 21 (6d6) Fire damage. Success: Half damage.",
       "damageDicePrimary": "6d6",
       "damageTypePrimary": "Fire",
-      "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
+      "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak\u00ad ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
       "verified": "not verified"
     },
     {
@@ -3966,7 +3966,7 @@
       "actionName": "Unnamed lair actions 3",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec­ tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies.",
+      "description": "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec\u00ad tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies.",
       "verified": "not verified"
     },
     {
@@ -4959,7 +4959,7 @@
       "damageDicePrimary": "1d4 - 1",
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
-      "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 − 1) Piercing damage.",
+      "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 \u2212 1) Piercing damage.",
       "verified": "not verified"
     },
     {
@@ -5884,7 +5884,7 @@
       "monsterIndex": "bestial-spirit-land",
       "monster": "Bestial Spirit (Land)",
       "actionIndex": 1,
-      "actionName": "Beast's Strike — Charge",
+      "actionName": "Beast's Strike \u2014 Charge",
       "category": "actions",
       "actionType": "save",
       "saveDc": 20,
@@ -5917,7 +5917,7 @@
       "monsterIndex": "bestial-spirit-water",
       "monster": "Bestial Spirit (Water)",
       "actionIndex": 1,
-      "actionName": "Beast's Strike — Grapple",
+      "actionName": "Beast's Strike \u2014 Grapple",
       "category": "actions",
       "actionType": "save",
       "saveDc": 20,
@@ -6018,7 +6018,7 @@
       "damageDicePrimary": "4d6 + 3",
       "damageTypePrimary": "Acid",
       "reach": "10 ft.",
-      "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 17 (4d6 + 3) Acid damage. Nonmagical armor worn by the target takes a −1 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the Mending spell on the armor.",
+      "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 17 (4d6 + 3) Acid damage. Nonmagical armor worn by the target takes a \u22121 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the Mending spell on the armor.",
       "verified": "not verified"
     },
     {
@@ -9166,7 +9166,7 @@
       "conditions": [
         "prone"
       ],
-      "description": "The tomb trembles violently for a moment. Each crea­ture on the floor of the tomb must succeed on a DC 19 Dexterity saving throw or be knocked prone.",
+      "description": "The tomb trembles violently for a moment. Each crea\u00adture on the floor of the tomb must succeed on a DC 19 Dexterity saving throw or be knocked prone.",
       "verified": "not verified"
     },
     {
@@ -14248,7 +14248,7 @@
       "damageDicePrimary": "2d8 + 1",
       "damageTypePrimary": "Acid",
       "reach": "5 ft.",
-      "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 10 (2d8 + 1) Acid damage. Nonmagical armor worn by the target takes a −1 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the Mending spell on the armor.",
+      "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 10 (2d8 + 1) Acid damage. Nonmagical armor worn by the target takes a \u22121 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the Mending spell on the armor.",
       "verified": "not verified"
     },
     {
@@ -16362,7 +16362,7 @@
       "reach": "5 ft.",
       "range": "",
       "recharge": "",
-      "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 − 1) Piercing damage.",
+      "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 \u2212 1) Piercing damage.",
       "verified": "not verified"
     },
     {
@@ -16842,7 +16842,7 @@
       "actionName": "Unnamed lair actions 1",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "A strong current moves through the kraken's lair. Each creature within 60 feet of the kraken must suc­ ceed on a DC 23 Strength saving throw or be pushed up to 60 feet away from the kraken. On a success, the creature is pushed 10 feet away from the kraken.",
+      "description": "A strong current moves through the kraken's lair. Each creature within 60 feet of the kraken must suc\u00ad ceed on a DC 23 Strength saving throw or be pushed up to 60 feet away from the kraken. On a success, the creature is pushed 10 feet away from the kraken.",
       "verified": "not verified"
     },
     {
@@ -17257,7 +17257,7 @@
       "reach": "5 ft.",
       "range": "",
       "recharge": "",
-      "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 − 1) Necrotic damage.",
+      "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 \u2212 1) Necrotic damage.",
       "verified": "not verified"
     },
     {
@@ -18800,7 +18800,7 @@
       "conditions": [
         "grappled"
       ],
-      "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the mimic), reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage—or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic—plus 4 (1d8) Acid damage.",
+      "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the mimic), reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage\u2014or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic\u2014plus 4 (1d8) Acid damage.",
       "verified": "not verified"
     },
     {
@@ -19743,7 +19743,7 @@
       "actionName": "Unnamed lair actions 1",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "Each undead creature in the lair can pinpoint the loca­tion of each living creature within 120 feet of it until initiative count 20 on the next round.",
+      "description": "Each undead creature in the lair can pinpoint the loca\u00adtion of each living creature within 120 feet of it until initiative count 20 on the next round.",
       "verified": "not verified"
     },
     {
@@ -23287,7 +23287,7 @@
       "reach": "10 ft.",
       "range": "",
       "recharge": "",
-      "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 10 (2d6 + 3) Piercing damage. If the target is a Humanoid not cursed by a slaad, it is subjected to the following effect. Constitution Saving Throw: DC 14. Failure: The target is cursed unawares, and a minuscule slaad egg is implanted in it. Removing the curse destroys the egg.Over 2d4 × 10 days, the egg gestates. In the final 24 hours, the cursed target feels unwell; its Speed is halved, and it has Disadvantage on D20 Tests.At the end of this time, the egg turns into a Slaad Tadpole, which chews out of the host and kills it.",
+      "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 10 (2d6 + 3) Piercing damage. If the target is a Humanoid not cursed by a slaad, it is subjected to the following effect. Constitution Saving Throw: DC 14. Failure: The target is cursed unawares, and a minuscule slaad egg is implanted in it. Removing the curse destroys the egg.Over 2d4 \u00d7 10 days, the egg gestates. In the final 24 hours, the cursed target feels unwell; its Speed is halved, and it has Disadvantage on D20 Tests.At the end of this time, the egg turns into a Slaad Tadpole, which chews out of the host and kills it.",
       "verified": "not verified"
     },
     {
@@ -23676,7 +23676,7 @@
       "reach": "",
       "range": "",
       "recharge": "",
-      "description": "The rust monster targets one nonmagical metal object—armor or a weapon—worn or carried by a creature within 5 feet of itself. Dexterity Saving Throw: DC 11, the creature with the object. Failure: The object takes a −1 penalty to the AC it offers (armor) or to its attack rolls (weapon). Armor is destroyed if the penalty reduces its AC to 10, and a weapon is destroyed if its penalty reaches −5. The penalty can be removed by casting the Mending spell on the armor or weapon.",
+      "description": "The rust monster targets one nonmagical metal object\u2014armor or a weapon\u2014worn or carried by a creature within 5 feet of itself. Dexterity Saving Throw: DC 11, the creature with the object. Failure: The object takes a \u22121 penalty to the AC it offers (armor) or to its attack rolls (weapon). Armor is destroyed if the penalty reduces its AC to 10, and a weapon is destroyed if its penalty reaches \u22125. The penalty can be removed by casting the Mending spell on the armor or weapon.",
       "verified": "not verified"
     },
     {
@@ -26533,7 +26533,7 @@
       "damageDiceSecondary": "3d6",
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
-      "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage—or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied—plus 10 (3d6) Poison damage.",
+      "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage\u2014or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied\u2014plus 10 (3d6) Poison damage.",
       "verified": "not verified"
     },
     {
@@ -29881,7 +29881,7 @@
       "conditions": [
         "restrained"
       ],
-      "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif­ficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
+      "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif\u00adficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
       "verified": "not verified"
     },
     {
@@ -29898,7 +29898,7 @@
       "conditions": [
         "restrained"
       ],
-      "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif­ficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
+      "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif\u00adficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
       "verified": "not verified"
     },
     {
@@ -29914,7 +29914,7 @@
       "saveType": "Dexterity",
       "damageDicePrimary": "4d8",
       "damageTypePrimary": "Piercing",
-      "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec­ tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
+      "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec\u00ad tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
       "verified": "not verified"
     },
     {
@@ -29974,7 +29974,7 @@
       "actionName": "Unnamed lair actions 1",
       "category": "lair_actions",
       "actionType": "other",
-      "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
+      "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak\u00ad ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
       "verified": "not verified"
     },
     {
@@ -29990,7 +29990,7 @@
       "saveType": "Dexterity",
       "damageDicePrimary": "6d6",
       "damageTypePrimary": "Fire",
-      "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
+      "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak\u00ad ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
       "verified": "not verified"
     },
     {

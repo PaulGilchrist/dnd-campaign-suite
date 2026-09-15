@@ -28,17 +28,18 @@ function findWeakeningBreathEffect(targetName, campaignName) {
 
 // Failed-save grant (cone picker NPC auto-leg and PC prompt leg both route
 // here): te + ONE merged 10-round clock + save_result + condition logs.
-export async function grantWeakeningBreath({ campaignName, attackerName, targetName, saveType, saveDc, roll, saveBonus }) {
+export async function grantWeakeningBreath({ campaignName, attackerName, targetName, saveType, saveDc, roll, saveBonus, die }) {
     if (!campaignName || !attackerName || !targetName || saveDc == null) return;
     const ability = saveType || 'Strength';
-    const die = '1d6';
+    // MA-0212: die is per-monster parsed (Ancient Gold 1d10); Adult default 1d6.
+    const subtractDie = die || '1d6';
     registerTargetEffect(campaignName, targetName, WEAKENING_BREATH_TE, attackerName, {
         duration: '1_minute',
         rounds: WEAKENING_BREATH_ROUNDS,
         dc: saveDc,
         saveType: ability,
         strCheckDisadvantage: true,
-        damageSubtractDie: die,
+        damageSubtractDie: subtractDie,
     });
     addExpiration({
         attackerName,
@@ -69,7 +70,7 @@ export async function grantWeakeningBreath({ campaignName, attackerName, targetN
         condition: 'Weakened',
         sourceName: attackerName,
         sourceAbility: 'Weakening Breath',
-        description: `${targetName} failed the ${ability} save (DC ${saveDc}) in ${attackerName}'s Weakening Breath — Disadvantage on Strength-based d20 tests and subtracts ${die} from damage rolls; repeats the save at the end of each of its turns (auto-succeeds after 1 minute — 10 rounds).`,
+        description: `${targetName} failed the ${ability} save (DC ${saveDc}) in ${attackerName}'s Weakening Breath — Disadvantage on Strength-based d20 tests and subtracts ${subtractDie} from damage rolls; repeats the save at the end of each of its turns (auto-succeeds after 1 minute — 10 rounds).`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[weakeningBreathService:granted]', e); });
 }

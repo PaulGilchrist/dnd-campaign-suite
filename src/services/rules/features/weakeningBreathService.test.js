@@ -134,3 +134,25 @@ describe('MA-0102 applyWeakeningBreathTurnEnd', () => {
         expect(logs.find(l => l.type === 'condition' && l.action === 'removed')).toBeFalsy();
     });
 });
+
+// MA-0212: die is per-monster parsed — Ancient Gold clause subtracts 1d10.
+describe('MA-0212 grantWeakeningBreath per-monster die', () => {
+    it('die:"1d10" lands on te and condition log; Adult default stays byte-identical 1d6', async () => {
+        await grantWeakeningBreath({ campaignName: CAMPAIGN, attackerName: ATTACKER, targetName: TARGET, saveType: 'Strength', saveDc: 24, roll: 2, saveBonus: 1, die: '1d10' });
+        const te = registered.find(r => r.effectKey === WEAKENING_BREATH_TE && r.targetName === TARGET);
+        expect(te.damageSubtractDie).toBe('1d10');
+        const cond = logs.find(l => l.type === 'condition' && l.action === 'applied' && l.condition === 'Weakened');
+        expect(cond.description).toMatch(/subtracts 1d10 from damage rolls/);
+        // Adult default (no die arg) stays 1d6 (MA-0102 byte-lock)
+        await grantWeakeningBreath({ campaignName: CAMPAIGN, attackerName: ATTACKER, targetName: 'Other Target', saveType: 'Strength', saveDc: 21, roll: 4, saveBonus: 1 });
+        const adultTe = registered.find(r => r.effectKey === WEAKENING_BREATH_TE && r.targetName === 'Other Target');
+        expect(adultTe.damageSubtractDie).toBe('1d6');
+    });
+
+    it('ancient-gold-dragon data clause parses 1d10 (data lock)', async () => {
+        const monsters = (await import('../../../../public/data/monsters.json')).default;
+        const list = Array.isArray(monsters) ? monsters : Object.values(monsters);
+        const gold = list.find(x => x.index === 'ancient-gold-dragon');
+        expect(gold.actions.some(a => /subtracts 5 \(1d10\)/i.test(a.save_effect || ''))).toBe(true);
+    });
+});

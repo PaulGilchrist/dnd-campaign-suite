@@ -197,3 +197,47 @@ describe('MA-0102 Adult Gold Weakening Breath picker', () => {
     expect(applyDamageToTarget).not.toHaveBeenCalled();
   });
 });
+
+// MA-0212: the parsed per-monster die must ride the grant call — Ancient
+// Gold clause (1d10) forwards die:"1d10"; Adult clause still forwards 1d6.
+describe('MA-0212 weakening breath grant forwards parsed die', () => {
+  const ANCIENT_WEAKENING = {
+    name: 'Weakening Breath',
+    save_dc: 24,
+    save_type: 'Strength',
+    save_effect: 'Failure: The target has Disadvantage on Strength-based D20 Tests and subtracts 5 (1d10) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.',
+  };
+
+  it('ancient clause grants die 1d10; adult clause forwards 1d6', async () => {
+    expect(parseWeakeningBreathClause(ANCIENT_WEAKENING.save_effect).damageSubtractDie).toBe('1d10');
+    expect(parseWeakeningBreathClause(WEAKENING.save_effect).damageSubtractDie).toBe('1d6');
+    spyRandom([0.05, 0.05, 0.05, 0.05, 0.05, 0.05]);
+    render(
+      <SaveAttackAoeModal
+        action={ANCIENT_WEAKENING}
+        playerStats={{ name: 'Ancient Gold Dragon 1' }}
+        campaignName="test-campaign"
+        range={60}
+        damage={null}
+        damageType=""
+        saveType="Strength"
+        saveDc={24}
+        dcSuccess="none"
+        titleOverride="60-ft Cone (GM positions tokens; selection advisory)"
+        excludeNames={['Ancient Gold Dragon 1']}
+        rangeGateFt={60}
+        saveConditions={[]}
+        weakeningBreath={parseWeakeningBreathClause(ANCIENT_WEAKENING.save_effect)}
+        storeLastAttack={false}
+        onClose={vi.fn()}
+      />
+    );
+    await waitFor(() => expect(seenTargets.current.length).toBeGreaterThan(0));
+    const row = document.querySelector('.secondary-target-row');
+    fireEvent.click(row);
+    const confirm = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Confirm');
+    fireEvent.click(confirm);
+    await waitFor(() => expect(grants.current.length).toBeGreaterThanOrEqual(1));
+    expect(grants.current[0].die).toBe('1d10');
+  });
+});
