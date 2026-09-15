@@ -22,7 +22,24 @@ import pipelineEventsRoutes from './server/routes/pipeline-events.js';
 
 const PORT = process.env.PORT || 80;
 
+// Campaign lockdown: when CAMPAIGN_LOCK is set, all mutating requests to
+// /api/campaigns/* are rejected unless they target the locked campaign.
+// Used during automated verification so subagents can never touch production
+// campaigns. Unset (normal use) = no behavior change.
+const CAMPAIGN_LOCK = process.env.CAMPAIGN_LOCK ? decodeURIComponent(process.env.CAMPAIGN_LOCK.trim()) : null;
+
 const app = express();
+
+app.use((req, res, next) => {
+    if (!CAMPAIGN_LOCK) return next();
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+    if (!req.path.startsWith('/api/campaigns')) return next();
+    const rest = req.path.slice('/api/campaigns'.length).replace(/^\//, '');
+    const target = rest ? decodeURIComponent(rest.split('/')[0]) : '';
+    if (target === CAMPAIGN_LOCK) return next();
+    console.error(`[campaign-lock] BLOCKED ${req.method} ${req.path} (locked to "${CAMPAIGN_LOCK}")`);
+    return res.status(403).json({ error: `Campaign locked to "${CAMPAIGN_LOCK}" — ${req.method} ${req.path} denied` });
+});
 
 // Increase JSON body limit to accommodate base64 image uploads
 app.use(express.json({ limit: '5mb' }));

@@ -9,6 +9,11 @@
       "init": 4,
       "csIndex": 0,
       "verifiedRow": "MA-0160 (FAIL spellcasting: save-leg upcast Vitriolic Sphere lv5 rolled base 10d4; list+DC21/CHA+1/Day gate all PASS)",
+      "verifiedRow2": "MA-0163 (FAIL legendary Frightful Presence: inert row + header missing uses, MA-0092 fingerprint; EB re-join init 14)",
+      "verifiedRow3": "MA-0164 (FAIL legendary Pounce: inert DIV.mc-action, control Rend +15 live; EB re-join init 18)",
+      "verifiedRow4": "MA-0165 (FAIL lair grasping tide: nameless-dict inert, MA-0118 fingerprint; control DC22 breath picker live)",
+      "verifiedRow5": "MA-0166 (FAIL lair insect cloud: nameless-dict inert, MA-0118 fingerprint; control DC22 breath picker live)",
+      "verifiedRow6": "MA-0167 (FAIL lair darkness: raw-string inert, static branch pre-name-gate; lair_darkness te zero producer)",
       "date": "2026-09-14"
     }
   },
@@ -139,6 +144,75 @@
       "csIndex": 0,
       "verifiedRow": "MA-0109(PASS multiattack: 3 Rend +11 2d8+6+2d6 Poison, replace→Mind Spike lv3 DC17 base-3d8 residual)",
       "date": "2026-09-14"
+    }
+  },
+  "Ancient Blue Dragon": {
+    "monsterIndex": "ancient-blue-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Blue Dragon 1",
+      "hp": 481,
+      "ac": 22,
+      "init": 20,
+      "csIndex": 0,
+      "verifiedRow": "MA-0168 (PASS multiattack: 3 Rend +16 2d8+9+2d10 exact vs AC19; replace->Shatter lv3 4d8 DC22 CON fail-full/success-half; MA-0087 save-leg lv-lands) | MA-0169 (PASS Rend standalone 6× exact dual damage) | MA-0170 (PASS lightning breath line DC23; fail-full/success-floor-half exact; recharge refuse+recovery live) | MA-0171 (PASS spellcasting: 6 links, Shatter lv3 DC22 CON half-exact, 1/Day Scrying/Sending gates live, At-Will advisory) | MA-0172 (FAIL legendary header no uses authored, rows 1-3 inert MA-0092; control Rend live) | MA-0173 (FAIL Cloaked Flight inert; control Rend live) | MA-0174 (FAIL Sonic Boom inert legendary; only live Shatter = actions[3] row) | MA-0175 (FAIL Tail Swipe inert legendary; manifest row was stale-Pounce, fixed in place to canonical Tail Swipe text) | MA-0176 (FAIL lair ceiling: nameless dict, no damage fields, inert; whole lair block nameless-inert) | MA-0176 (FAIL lair ceiling nameless-dict inert; whole lair block nameless-inert) | MA-0177 (FAIL lair sand cloud nameless-dict inert; adult fix template MA-0063 byte-mirror) | MA-0178 (FAIL lair lightning arcs nameless-dict inert; 3d6 text-only double gap)",
+      "verdict": "PASS",
+      "date": "2026-09-15"
+    }
+  },
+  "Ancient Brass Dragon": {
+    "monsterIndex": "ancient-brass-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Brass Dragon 1",
+      "hp": 332,
+      "ac": 20,
+      "init": 20,
+      "csIndex": 0,
+      "verifiedRow": "MA-0179 (FAIL multiattack: Rend +14 incl crit exact; Sleep Breath staging inert no staged_sleep/dc_success MA-0068 fingerprint; Scorching Ray refused no spell_attack_bonus MA-0065) | MA-0180 (PASS Rend standalone 5× incl nat-19 boundary exact dual damage) | MA-0181 (PASS fire breath line DC21 13d8 full/half exact, recharge refuse+recover live) | MA-0182 (FAIL sleep breath un-staged: first-fail incapacitated+unconscious simultaneous, no sleep_staged te/clock MA-0068 gap) | MA-0183 (FAIL spellcasting: Scorching Ray no spell_attack_bonus(+12 needed) blocked; 1/Day gates+advisory legs live; DT/CW/Shapechange advisory-only app-data) | MA-0184 (FAIL legendary header no uses; Scorching Sands numeric save fires UNGATED outside economy) | MA-0185 (FAIL Blazing Light inert cast-spell prose legendary) | MA-0186 (FAIL Pounce inert legendary prose; control Rend live) | MA-0187 (FAIL Scorching Sands: DC20 math+speed_half PASS, once-per-turn gate dead — cooldown only inside expendLegendaryUse) | MA-0188 (FAIL lair wind nameless-dict inert) | MA-0189 (FAIL lair sand cloud nameless-dict inert, MA-0177 fingerprint)",
+      "verdict": "mixed",
+      "date": "2026-09-15"
+    }
+  },
+  "Ancient Bronze Dragon": {
+    "monsterIndex": "ancient-bronze-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Bronze Dragon 1",
+      "hp": 444,
+      "ac": 22,
+      "init": 9,
+      "csIndex": 0,
+      "verifiedRow": "MA-0190 (PASS multiattack: 3 Rend +16 2d8+9+2d8 exact; Repulsion Breath cone DC23 STR prone+push te60 live, success clean; Guiding Bolt lv2 +14 5d6 Radiant live) | MA-0191 (PASS Rend standalone 4× exact dual vs AC11) | MA-0192 (PASS lightning breath line DC23 15d10 full/half exact; recharge refuse+recover live) | MA-0193 (PASS-subset repulsion breath: cone DC23 STR prone+push te60 exact, zero dmg, no expiry registered) | MA-0194 (PASS-subset spellcasting: 9 links+4 gates live; Guiding Bolt +14 lv2 5d6; Control Water save DC22; DT/Scrying/WB/Shapechange advisory) | MA-0195 (FAIL legendary header no uses; Thunderclap DC22 CON numeric fires UNGATED — MA-0184/0187 leak) | MA-0196 (FAIL Guiding Light inert cast-spell prose legendary; Spellcasting Guiding Bolt control live) | MA-0197 (FAIL Pounce inert legendary; control Rend live) | MA-0198 (PASS-subset Thunderclap radius DC22 CON: fail 3d8+Deafened exact, success zero per fail-only text; ungated repeat cited MA-0195; no expiry clock) | MA-0199 (FAIL lair fog cloud raw-string inert; adult-bronze zone dict fix template exists) | MA-0200 (FAIL lair thunderclap nameless-dict inert + 1dlO typo in text, canonical 1d10)",
+      "verdict": "PASS",
+      "date": "2026-09-15"
+    }
+  },
+  "Ancient Copper Dragon": {
+    "monsterIndex": "ancient-copper-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Copper Dragon 1",
+      "hp": 367,
+      "ac": 21,
+      "init": 20,
+      "csIndex": 0,
+      "verifiedRow": "MA-0201(PASS — 3×Rend +15 incl 2d8 Acid secondary exact; Slowing Breath cone DC22 fail→te trio+rounds:2 expiry+'Slowed' log, success zero-grants; Mind Spike lv5 6d8 WIS DC21 half-on-success live) | MA-0202 (PASS Rend chip live; 5 rolls: 3 hits exact 2d10+8+2d8 Acid, 2 misses nat1/2 zero-dmg vs AC19) | MA-0203 (PASS Acid Breath line DC22 Dex: fail full 14d8, success floor-half; recharge refused+spent+d6 recovery@6 live) | MA-0204 (PASS Slowing Breath standalone cone DC22: trio te+rounds:2+Slowed log exact, zero on success, no damage leak) | MA-0205 (PASS Spellcasting: lv5 spike 6d8 DC21, utilities advisory-honest, 1/Day gate monsterSpellUses+refusals live; Greater Restoration heal advisory-only per CLA-325) | MA-0206 (FAIL legendary header uses-in-name-text only, no numeric uses block-wide; children ungated leak MA-0184 family) | MA-0207 (PASS-subset Giggling Magic: DC21 CHA fail 9d6 exact + giggling_magic_debuff te 1d8 rider+rounds:2 expiry+badge live; ungated cite MA-0206) | MA-0208 (FAIL Mind Jolt inert cast-prose legendary; Spike lv5 control live) | MA-0209 (FAIL Pounce inert legendary family; Rend control live) | MA-0210/0211 (FAIL lair raw-string spike_growth + nameless mud dict inert; lair_mud te registered no producer) | MA-0210 (FAIL spike_growth raw-string inert)",
+      "note": "first join bound correctly; Slowing Breath lacks recharge field (no gate, correct); concentration GM-advisory on monster save-leg",
+      "date": "2026-09-15"
+    }
+  },
+  "Ancient Gold Dragon": {
+    "monsterIndex": "ancient-gold-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Gold Dragon 1",
+      "hp": 546,
+      "ac": 22,
+      "init": 12,
+      "csIndex": 0,
+      "verifiedRow": "MA-0212 (FAIL replace-B die: te/logs 1d6 vs data 1d10 — bug-mon-MA-0212-multiattack.md; Rends+A exact; repeat-save consumer live; GuidingBolt rider inert) | MA-0213 (PASS Rend chip: 2 hits exact Slashing+Fire, 1 miss nat1 zero-dmg) | MA-0214 (PASS Fire Breath cone DC24: fail full 13d10, success floor-half; recharge refusal+d6 recovery@6 live)",
+      "date": "2026-09-15"
     }
   }
 }
