@@ -1563,3 +1563,97 @@ describe('MA-0145 MonsterCardModal white dragon legendary gated rows', () => {
     expect(runtime.store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
   });
 });
+
+const ancient = () => monstersData.find(m => m.name === 'Ancient Black Dragon');
+
+// MA-0161 data lock: Ancient Black Dragon header authors uses:3 (counter
+// renders, 4-in-lair stays advisory); Cloud of Insects numerics byte-
+// untouched; Frightful Presence/Pounce rows byte-untouched (MA-0163/0164).
+describe('MA-0161 monsters.json data: ancient black dragon legendary economy authored', () => {
+  it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
+    const la = ancient().legendary_actions;
+    expect(la[0].name).toMatch(/Legendary Action Uses: 3 \(4 in Lair\)/);
+    expect(la[0].uses).toBe(3);
+    expect(la[0].description).toMatch(/lair.*advisory/i);
+  });
+
+  it('Cloud of Insects numerics byte-untouched: DC 21 Dexterity, 6d10 Poison', () => {
+    const row = ancient().legendary_actions.find(a => a.name === 'Cloud of Insects');
+    expect(row.save_dc).toBe(21);
+    expect(row.save_type).toBe('Dexterity');
+    expect(row.damage_dice_primary).toBe('6d10');
+    expect(row.damage_type_primary).toBe('Poison');
+  });
+
+  it('Frightful Presence/Pounce rows byte-untouched (no numerics authored here)', () => {
+    const fp = ancient().legendary_actions.find(a => a.name === 'Frightful Presence');
+    expect(fp.save_dc == null && fp.attack_bonus == null && fp.uses == null).toBe(true);
+    const pounce = ancient().legendary_actions.find(a => a.name === 'Pounce');
+    expect(pounce.save_dc == null && pounce.attack_bonus == null && pounce.uses == null && pounce.delegates_to == null).toBe(true);
+    expect(pounce.description).toBe('The dragon moves up to half its Speed, and it makes one Rend attack.');
+  });
+});
+
+// MA-0161: with the header authored, the ancient black dragon card renders
+// the "(3 left)" counter and Cloud of Insects routes through the gated
+// spend (no longer the ungated generic save path).
+describe('MA-0161 MonsterCardModal ancient black dragon legendary gated rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderAncient(uses) {
+    if (uses !== undefined) runtime.store['Ancient Black Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Ancient Black Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 367, maxHp: 367, ac: 22, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Ancient Black Dragon', legendary_actions: ancient().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Ancient Black Dragon 1', creatures })} />);
+  }
+  function ancientRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('header shows (3 left); Cloud of Insects gated save chip DC 21 Dexterity', () => {
+    renderAncient({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    expect(ancientRow('Cloud of Insects').querySelector('.mc-dice-link-save-clickable').textContent).toMatch(/DC 21 Dexterity/);
+  });
+
+  it('Cloud gated click spends 1 (3→2), stamps cloud_of_insects cooldown, routes the DEX save through the block-save seam', async () => {
+    renderAncient({ max: 3, used: 0 });
+    fireEvent.click(ancientRow('Cloud of Insects').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ cloud_of_insects: { round: 1 } });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Cloud of Insects/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Cloud of Insects/);
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('DEX');
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second Cloud click refuses via the MA-0021 latch (zero extra spend)', async () => {
+    renderAncient({ max: 3, used: 0 });
+    fireEvent.click(ancientRow('Cloud of Insects').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(ancientRow('Cloud of Insects').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+
+  it('exhausted (3/3): Cloud save-chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderAncient({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(ancientRow('Cloud of Insects').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+});

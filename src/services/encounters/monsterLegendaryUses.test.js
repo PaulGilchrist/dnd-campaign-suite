@@ -777,3 +777,71 @@ describe('MA-0145 Adult White Dragon legendary economy (header uses:3)', () => {
     expect(store['Adult White Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
   });
 });
+
+// MA-0161: Ancient Black Dragon — data-only header fix (MA-0145 white shape).
+// Header authors uses:3 (4-in-lair advisory), Cloud of Insects numerics
+// untouched but now budget-gated with the MA-0073 per-action cooldown
+// clause; Frightful Presence/Pounce rows byte-untouched (MA-0163/MA-0164).
+describe('MA-0161 Ancient Black Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-black-dragon');
+  const cloud = ancient.legendary_actions.find(a => a.name === 'Cloud of Insects');
+  const frightful = ancient.legendary_actions.find(a => a.name === 'Frightful Presence');
+  const pounce = ancient.legendary_actions.find(a => a.name === 'Pounce');
+
+  it('header authors uses:3 + lair advisory; max resolves to 3 (gate engages)', () => {
+    const header = legendaryHeaderAction(ancient);
+    expect(header?.uses).toBe(3);
+    expect(header?.description).toMatch(/lair.*advisory/i);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+  });
+
+  it('Cloud of Insects numerics untouched; cooldown clause live', () => {
+    expect(cloud.save_dc).toBe(21);
+    expect(cloud.save_type).toBe('Dexterity');
+    expect(cloud.damage_dice_primary).toBe('6d10');
+    expect(cloud.damage_type_primary).toBe('Poison');
+    expect(hasLegendaryCooldownClause(cloud)).toBe(true);
+  });
+
+  it('Frightful Presence/Pounce rows byte-untouched (no numerics authored here)', () => {
+    expect(frightful.save_dc == null && frightful.attack_bonus == null && frightful.uses == null).toBe(true);
+    expect(frightful.description).toMatch(/can't take this action again until the start of its next turn/);
+    expect(pounce.save_dc == null && pounce.attack_bonus == null && pounce.uses == null && pounce.delegates_to == null).toBe(true);
+    expect(pounce.description).toBe('The dragon moves up to half its Speed, and it makes one Rend attack.');
+  });
+
+  it('economy is live: Cloud spend 3→2, turn latch, cooldown refusal, exhaustion, turn-start regain', async () => {
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Cloud of Insects', action: cloud, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Black Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ cloud_of_insects: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Cloud of Insects', action: cloud, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Cloud of Insects', action: cloud, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'cloud_of_insects_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'HexWarlock';
+    const fp = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Frightful Presence', action: frightful, campaignName: 'test-campaign', deps });
+    expect(fp).toEqual({ spent: true, remaining: 1, max: 3 });
+    cs.activeCreatureName = 'ElderPaladin';
+    const pounceSpend = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Pounce', action: pounce, campaignName: 'test-campaign', deps });
+    expect(pounceSpend).toEqual({ spent: true, remaining: 0, max: 3 });
+
+    cs.activeCreatureName = 'LightfootHalfling';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Cloud of Insects', action: cloud, campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+    expect(store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+
+    cs.activeCreatureName = 'Ancient Black Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Black Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Black Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Ancient Black Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+  });
+});
