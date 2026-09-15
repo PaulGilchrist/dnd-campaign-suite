@@ -1222,3 +1222,16 @@ describe('MA-0208 Ancient Copper Mind Jolt authored save legs', () => {
     expect(hasLegendaryCooldownClause(mj)).toBe(true);
   });
 });
+
+// MA-0209: Ancient Copper Pounce — prose-only inert (family 5th instance);
+// byte-mirrors adult-copper delegates_to Rend row (movement advisory).
+describe('MA-0209 Ancient Copper Pounce delegates_to Rend', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-copper-dragon');
+
+  it('byte-matches adult-copper Pounce delegate row', () => {
+    expect(JSON.stringify(ancient.legendary_actions.find(r => r.name === 'Pounce')))
+      .toBe(JSON.stringify(adult.legendary_actions.find(r => r.name === 'Pounce')));
+    expect(ancient.legendary_actions.find(r => r.name === 'Pounce').delegates_to).toBe('Rend');
+  });
+});
