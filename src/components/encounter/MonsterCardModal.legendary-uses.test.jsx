@@ -754,11 +754,8 @@ const redActions = () => [{ name: 'Rend', attack_bonus: 14, damage_dice_primary:
 // MA-0124 data lock: Adult Red Dragon legendary header mirrors the verified
 // MA-0070/MA-0081/MA-0092/MA-0103/MA-0113 shape — header authors uses:3
 // (counter renders; 4-in-lair stays advisory, monsterLegendaryUses.js:114).
-// SCOPE HEADER ONLY: Commanding Presence / Fiery Rays / Pounce stay verbatim
-// (their save/attack payloads are MA-0125/MA-0126/MA-0127) — per the MA-0021
-// verbatim-row behavior the gated "Expend Legendary" chip makes each row
-// click-to-spend with zero mechanic legs (console.error adjudication
-// residual owned by those bug files).
+// SCOPE HEADER ONLY: Commanding Presence / Fiery Rays payloads landed in
+// MA-0125 / MA-0126; Pounce stays verbatim (MA-0127 owns its payload).
 describe('MA-0124 monsters.json data: adult red dragon legendary header authors uses:3', () => {
   it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
     const la = red().legendary_actions;
@@ -767,13 +764,11 @@ describe('MA-0124 monsters.json data: adult red dragon legendary header authors 
     expect(la[0].description).toMatch(/lair.*advisory/i);
   });
 
-  it('Fiery Rays / Pounce remain verbatim (MA-0126/MA-0127 own payloads)', () => {
-    for (const name of ['Fiery Rays', 'Pounce']) {
-      const row = red().legendary_actions.find(a => a.name === name);
-      expect(row.uses == null).toBe(true);
-      expect(row.save_dc == null).toBe(true);
-      expect(row.attack_bonus == null).toBe(true);
-    }
+  it('Pounce remains verbatim (MA-0127 owns its payload)', () => {
+    const row = red().legendary_actions.find(a => a.name === 'Pounce');
+    expect(row.uses == null).toBe(true);
+    expect(row.save_dc == null).toBe(true);
+    expect(row.attack_bonus == null).toBe(true);
   });
 });
 
@@ -831,21 +826,12 @@ describe('MA-0124 MonsterCardModal red dragon legendary gated rows', () => {
     return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
   }
 
-  it('header shows (3 left); verbatim Fiery Rays renders the gated expend chip and click spends 1, logs spend, zero roll', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('header shows (3 left); Fiery Rays expend chip is gone — numeric +12 chip owns the row (MA-0126)', () => {
     renderRed({ max: 3, used: 0 });
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
-    const chip = redRow('Fiery Rays').querySelector('.mc-dice-link-legendary');
-    expect(chip).toBeTruthy();
-    fireEvent.click(chip);
-    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Fiery Rays/.test(e.description));
-    expect(spend.description).toMatch(/expends a legendary use for Fiery Rays/);
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Fiery Rays'));
-    errSpy.mockRestore();
+    const row = redRow('Fiery Rays');
+    expect(row.querySelector('.mc-dice-link-legendary')).toBe(null);
+    expect(row.querySelector('.mc-dice-link').textContent).toContain('+12');
   });
 
   it('exhausted (3/3): Commanding Presence save-chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
@@ -862,14 +848,12 @@ describe('MA-0124 MonsterCardModal red dragon legendary gated rows', () => {
   });
 
   it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     renderRed({ max: 3, used: 0 });
-    fireEvent.click(redRow('Fiery Rays').querySelector('.mc-dice-link-legendary'));
+    fireEvent.click(redRow('Fiery Rays').querySelector('.mc-dice-link'));
     await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    fireEvent.click(redRow('Fiery Rays').querySelector('.mc-dice-link-legendary'));
+    fireEvent.click(redRow('Fiery Rays').querySelector('.mc-dice-link'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-    errSpy.mockRestore();
   });
 
   it('per-action cooldown: Commanding Presence save-chip re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
@@ -958,6 +942,126 @@ describe('MA-0125 MonsterCardModal red dragon Commanding Presence gated save row
     fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
     await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
     expect(ROLLERS.rollSavingThrow.mock.calls.length).toBe(2);
+  });
+});
+
+// MA-0126 data lock: Adult Red Dragon legendary "Fiery Rays" was prose-only
+// ("uses Spellcasting to cast Scorching Ray") — inert text with zero numeric
+// mechanic (MA-0114 fingerprint). Fix authors the MA-0033 spell-attack seam
+// mirroring the verified MA-0070 Adult Brass "Blazing Light" shape: +12 to
+// hit (Spellcasting row "+12 to hit with spell attacks"), 2d6 Fire per ray
+// per spells.json (both paths carry the MA-0065 numeric damage shape),
+// single-ray-per-click (multi-ray stays §7 advisory, GM-enforced for
+// monsters). The verbatim "can't take this action again until the start of
+// its next turn" clause rides the LIVE MA-0073 per-action cooldown latch.
+describe('MA-0126 monsters.json data: adult red dragon Fiery Rays authors the spell-attack seam', () => {
+  it('Fiery Rays authors +12 spell attack, 2d6 Fire, 120 ft range, verbatim cooldown clause', () => {
+    const row = red().legendary_actions.find(a => a.name === 'Fiery Rays');
+    expect(row.attack_bonus).toBe(12);
+    expect(row.spell_attack_bonus).toBe(12);
+    expect(row.damage_dice_primary).toBe('2d6');
+    expect(row.damage_type_primary).toBe('Fire');
+    expect(row.range).toBe('120 ft.');
+    expect(row.description).toMatch(/uses Spellcasting to cast <em>Scorching Ray<\/em>/);
+    expect(row.description).toMatch(/Ranged Spell Attack: \+12/);
+    expect(row.description).toMatch(/2d6 Fire damage per ray/);
+    expect(row.description).toMatch(/multi-ray.*advisory/i);
+    expect(row.description).toMatch(/can'?t take this action again until the start of its next turn/i);
+    expect(red().actions.find(a => a.name === 'Spellcasting')?.description).toMatch(/\+12 to hit with spell attacks/);
+    const ray = spells2024.find(s => s.index === 'scorching-ray');
+    expect(ray.damage.damage_type).toBe('Fire');
+    expect(ray.damage.damage_at_slot_level['2']).toBe('2d6');
+    expect(ray.attack_type).toBe('ranged');
+  });
+});
+
+// MA-0126: the gated +12 chip spends 1 legendary use then rolls the spell
+// attack through the LIVE attack seam (armed target, 2d6 Fire auto-damage on
+// hit, isSpellDamage marker), cooldown refuses later re-clicks zero-spend.
+describe('MA-0126 MonsterCardModal red dragon Fiery Rays gated spell-attack row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderRedArmed(uses) {
+    runtime.store['Adult Red Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Adult Red Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 256, maxHp: 256, ac: 19, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Adult Red Dragon', actions: redActions(), legendary_actions: red().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Red Dragon 1', creatures })} />);
+  }
+  function redRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+  function fieryChip() {
+    return redRow('Fiery Rays').querySelector('.mc-dice-link');
+  }
+
+  it('renders the +12 numeric chip, no expend-legendary chip', () => {
+    renderRedArmed({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    const row = redRow('Fiery Rays');
+    expect(row.querySelector('.mc-dice-link-legendary')).toBe(null);
+    expect(fieryChip().textContent).toContain('+12');
+  });
+
+  it('gated click spends 1, stamps the fiery_rays latch, rolls +12 spell attack (2d6 Fire auto-damage, spell-origin, armed target)', async () => {
+    renderRedArmed({ max: 3, used: 0 });
+    fireEvent.click(fieryChip());
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ fiery_rays: { round: 1 } });
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Fiery Rays');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(12);
+    const options = ROLLERS.rollAttack.mock.calls[0][2];
+    expect(options.autoDamageFormula).toBe('2d6');
+    expect(options.autoDamageName).toBe('Fiery Rays');
+    expect(options.damageType).toBe('Fire');
+    expect(options.isSpellDamage).toBe(true);
+    expect(options.targetName).toBe('TestPC');
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Fiery Rays/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Fiery Rays/);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (3/3): +12 chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderRedArmed({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(fieryChip());
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('per-action cooldown: re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
+    renderRedArmed({ max: 3, used: 0 });
+    fireEvent.click(fieryChip());
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    ctx.value = { round: 1, activeCreatureName: 'TestPC', creatures: CREATURES };
+    fireEvent.click(fieryChip());
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'fiery_rays_refused (once per turn)')).toBe(true));
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
+  });
+
+  it('regain at the dragon turn-start clears the latch; next-boundary click spends and rolls again', async () => {
+    renderRedArmed({ max: 3, used: 0 });
+    fireEvent.click(fieryChip());
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    ctx.value = { round: 2, activeCreatureName: 'Thug 1', creatures: CREATURES };
+    runtime.store['Adult Red Dragon 1.monsterLegendaryUses'] = { max: 3, used: 0 };
+    delete runtime.store['Adult Red Dragon 1.monsterLegendaryActionCooldowns'];
+    fireEvent.click(fieryChip());
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(ROLLERS.rollAttack.mock.calls.length).toBe(2);
   });
 });
 

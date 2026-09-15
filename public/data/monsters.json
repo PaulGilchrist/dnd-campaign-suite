@@ -2562,7 +2562,12 @@
       },
       {
         "name": "Fiery Rays",
-        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em>. The dragon can't take this action again until the start of its next turn."
+        "attack_bonus": 12,
+        "spell_attack_bonus": 12,
+        "range": "120 ft.",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Fire",
+        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em>: Ranged Spell Attack: +12 to hit (Spellcasting spell attack bonus). Hit: 2d6 Fire damage per ray, nothing on a miss (single ray resolves per click — multi-ray extra-ray targeting is advisory, GM-enforced for monsters; three rays per spells.json). The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Pounce",
