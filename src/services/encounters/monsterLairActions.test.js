@@ -1899,10 +1899,11 @@ describe('MA-0165 ancient-black-dragon grasping tide data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(tide, null, ['prone']);
   });
 
-  it('sibling rows untouched: [1] insect cloud dict (structured by MA-0166), [2] darkness raw string', () => {
+  it('sibling rows untouched: [1] insect cloud dict (structured by MA-0166), [2] darkness dict (structured by MA-0167)', () => {
     expect(dragon.lair_actions[1].name).toBe('Insect Cloud');
     expect(dragon.lair_actions[1].damage_dice_primary).toBe('3d6');
-    expect(typeof dragon.lair_actions[2]).toBe('string');
+    expect(dragon.lair_actions[2].name).toBe('Darkness');
+    expect(dragon.lair_actions[2].zone.no_save).toBe(true);
   });
 
   it('young-black-dragon scope guard: its raw-string and identical nameless grasping-tide dict are NOT touched by this fix', () => {
@@ -1993,9 +1994,10 @@ describe('MA-0166 ancient-black-dragon insect cloud data lock', () => {
     expect(handleZone).not.toHaveBeenCalled();
   });
 
-  it('sibling rows untouched: [0] MA-0165 Grasping Tide, [2] darkness raw string (MA-0167 scope)', () => {
+  it('sibling rows untouched: [0] MA-0165 Grasping Tide, [2] MA-0167 Darkness zone dict', () => {
     expect(dragon.lair_actions[0].name).toBe('Grasping Tide');
-    expect(typeof dragon.lair_actions[2]).toBe('string');
+    expect(dragon.lair_actions[2].name).toBe('Darkness');
+    expect(dragon.lair_actions[2].zone.effect_key).toBe('lair_darkness');
   });
 
   it('young-black-dragon scope guard: its nameless insect-cloud dict [2] is NOT touched by this fix', () => {
@@ -2012,5 +2014,106 @@ describe('MA-0166 ancient-black-dragon insect cloud data lock', () => {
     expect(adultCloud.name).toBe('Insect Cloud');
     expect(adultCloud.zone).toEqual({ radius_ft: 20, repeat_turn_end: true });
     expect(adultCloud.description).toMatch(/in the cloud when it appears/i);
+  });
+});
+
+// MA-0167: Ancient Black Dragon lair_actions[2] save-less 15-ft magical
+// darkness was a LEGACY RAW STRING (MA-0118 fingerprint) — it hit the
+// typeof la === 'string' static branch in MonsterCardBody.jsx BEFORE the
+// isLairRowClickable name-gate was even consulted → zero chip, zero
+// affordance, zero handler, inert live (2026-09-15). Data-only fix
+// byte-mirroring the VERIFIED MA-0085 save-less zone recipe + MA-0043
+// darkness default-noun shape: named "Darkness" zone dict
+// {radius_ft:15, no_save:true, effect_key:"lair_darkness", noun:"darkness"}
+// → affordance 'zone' → zoneOnly picker "15-foot darkness. No saving throw"
+// → te arm + ability_use log, ZERO save prompt, ZERO damage. te
+// `lair_darkness` already registered (MA-0043) — no re-register, no code
+// change. Light/darkvision/dispel clauses and dismiss persistence stay
+// GM-advisory (§7 — no light-level model, no initiative-20 lair seam).
+describe('MA-0167 ancient-black-dragon darkness zone data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-black-dragon');
+  const dark = dragon.lair_actions[2];
+  const adult = monstersData.find(m => m.index === 'adult-black-dragon');
+  const adultDark = adult.lair_actions[2];
+  const VERBATIM = "Magical darkness spreads from a point the dragon chooses within 60 feet of it, filling a 15-foot-radius sphere until the dragon dismisses it as an action, uses this lair action again, or dies. The darkness spreads around corners. A creature with darkvision can't see through this darkness, and nonmagical light can't illuminate it. If any of the effect's area overlaps with an area of light created by a spell of 2nd level or lower, the spell that created the light is dispelled.";
+
+  it('row is now a structured clickable ZONE row named Darkness (was raw-string inert)', () => {
+    expect(typeof dark).toBe('object');
+    expect(dark.name).toBe('Darkness');
+    expect(isLairRowClickable(dark)).toBe(true);
+    expect(lairRowAffordance(dark)).toBe('zone');
+  });
+
+  it('description verbatim (manifest MA-0167), no fabricated save/dice fields', () => {
+    expect(dark.description).toBe(VERBATIM);
+    expect(dark.save_dc).toBeUndefined();
+    expect(dark.save_type).toBeUndefined();
+    expect(dark.damage_dice_primary).toBeUndefined();
+    expect(dark.damage_type_primary).toBeUndefined();
+    expect(dark.save_effect).toBeUndefined();
+    expect(dark.dc_success).toBeUndefined();
+  });
+
+  it('save-less zone shape mirrors MA-0043/MA-0085 recipe: 15-ft, no_save, lair_darkness key, darkness noun', () => {
+    expect(dark.zone).toEqual({ radius_ft: 15, no_save: true, effect_key: 'lair_darkness', noun: 'darkness' });
+    expect(dark.zone.radius_ft).toBe(15);
+    expect(dark.zone.no_save).toBe(true);
+    expect(dark.zone.effect_key).toBe('lair_darkness');
+    expect(dark.zone.noun).toBe('darkness');
+    expect(dark.duration).toBe('until dismissed, used again, or dragon dies (advisory)');
+  });
+
+  it('te lair_darkness already registered (MA-0043) — no duplicate registration needed', async () => {
+    const { getEffectDefinition, TARGET_EFFECT_DEFINITIONS } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_darkness');
+    expect(def).toBeDefined();
+    expect(def.label).toBe('Magical Darkness (Lair)');
+    expect(def.group).toBe('Lair');
+    expect(TARGET_EFFECT_DEFINITIONS.filter(d => d.effect === 'lair_darkness')).toHaveLength(1);
+  });
+
+  it('zone row routes through handleZone with ZERO save/attack/damage handlers', async () => {
+    const handleZone = vi.fn();
+    const handleSaveRoll = vi.fn();
+    const setPopupHtml = vi.fn();
+    const res = await resolveLairRow({
+      action: dark,
+      monsterName: 'Ancient Black Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(dark);
+    expect(handleSaveRoll).not.toHaveBeenCalled();
+    expect(setPopupHtml).not.toHaveBeenCalled();
+  });
+
+  it('sibling rows intact: [0] MA-0165 Grasping Tide save row, [1] MA-0166 Insect Cloud save row', () => {
+    expect(dragon.lair_actions[0].name).toBe('Grasping Tide');
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
+    expect(dragon.lair_actions[1].name).toBe('Insect Cloud');
+    expect(lairRowAffordance(dragon.lair_actions[1])).toBe('save');
+    expect(dragon.lair_actions[1].zone).toEqual({ radius_ft: 20, repeat_turn_end: true });
+  });
+
+  it('MA-0043/MA-0085 template rows untouched (adult-black shroud, adult-bronze fog)', () => {
+    expect(adultDark.name).toBe('Shroud of Darkness');
+    expect(adultDark.zone.radius_ft).toBe(15);
+    expect(adultDark.zone.effect_key).toBe('lair_darkness');
+    const bronze = monstersData.find(m => m.index === 'adult-bronze-dragon');
+    expect(bronze.lair_actions[0].name).toBe('Fog Cloud');
+    expect(bronze.lair_actions[0].zone.noun).toBe('fog');
+  });
+
+  it('scope guard: legacy raw-string lair rows elsewhere never become clickable', () => {
+    const young = monstersData.find(m => m.index === 'young-black-dragon');
+    const rawRow = young.lair_actions.find(la => typeof la === 'string');
+    expect(typeof rawRow).toBe('string');
+    expect(isLairRowClickable(rawRow)).toBe(false);
+    expect(lairRowAffordance(rawRow)).toBeNull();
   });
 });

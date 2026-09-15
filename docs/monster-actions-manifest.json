@@ -2527,7 +2527,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Magical darkness spreads from a point the dragon chooses within 60 feet of it, filling a 15-foot-radius sphere until the dragon dismisses it as an action, uses this lair action again, or dies. The darkness spreads around corners. A creature with darkvision can't see through this darkness, and nonmagical light can't illuminate it. If any of the effect's area overlaps with an area of light created by a spell of 2nd level or lower, the spell that created the light is dispelled.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0167-lair-darkness.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0168",
