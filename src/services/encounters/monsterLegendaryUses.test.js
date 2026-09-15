@@ -1122,3 +1122,33 @@ describe('MA-0186 Ancient Brass Dragon Pounce delegates_to Rend', () => {
     expect(rend.damage_dice_secondary).toBe('2d6');
   });
 });
+
+// MA-0195: Ancient Bronze Dragon header uses:3 (MA-0070/0184 pattern) —
+// byte-mirrors adult-bronze header; gating the section auto-routes the
+// numeric Thunderclap save chip through the spend gate (MA-0136/0184).
+describe('MA-0195 Ancient Bronze Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-bronze-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-bronze-dragon');
+
+  it('header byte-matches adult-bronze sibling; economy walk spends, latches, refuses, regains', async () => {
+    const header = ancient.legendary_actions[0];
+    expect(JSON.stringify(header)).toBe(JSON.stringify(adult.legendary_actions[0]));
+    expect(header.uses).toBe(3);
+    expect(ancient.legendary_actions[3].dc_success).toBe('none');
+    expect(ancient.legendary_actions[3].save_effect).toMatch(/Success: no damage/);
+    const cs = { activeCreatureName: 'Thug 1' };
+    const logs = [];
+    const store = {};
+    const deps = { getCombatContext: () => cs, addEntry: (_c, e) => logs.push(e), getRuntimeValue: (_m, k) => store[k] ?? null, setRuntimeValue: (_m, k, v) => { store[k] = v; return Promise.resolve(); } };
+    const tc = ancient.legendary_actions[3];
+    const monster = { legendary_actions: ancient.legendary_actions };
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Bronze Dragon 1', monster, actionName: 'Thunderclap', action: tc, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Bronze Dragon 1', monster, actionName: 'Thunderclap', action: tc, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+    cs.activeCreatureName = 'Ancient Bronze Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Bronze Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+  });
+});
