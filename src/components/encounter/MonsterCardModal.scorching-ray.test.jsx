@@ -201,6 +201,23 @@ describe('MA-0179 data — ancient-brass-dragon Spellcasting row authors spell_a
   });
 });
 
+describe('MA-0185 data — ancient-brass-dragon Blazing Light legendary row attacks via Scorching Ray lv3', () => {
+  it('row authors attack_bonus 12 spell_attack_bonus 12 2d6 Fire 120 ft mirroring adult-brass shape', () => {
+    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+    const dragon = monsters.find(m => m.index === 'ancient-brass-dragon');
+    const adult = monsters.find(m => m.index === 'adult-brass-dragon');
+    const row = dragon.legendary_actions.find(a => a.name === 'Blazing Light');
+    expect(row.attack_bonus).toBe(12);
+    expect(row.spell_attack_bonus).toBe(12);
+    expect(row.range).toBe('120 ft.');
+    expect(row.damage_dice_primary).toBe('2d6');
+    expect(row.damage_type_primary).toBe('Fire');
+    expect(row.description).toMatch(/\+12 to hit/);
+    expect(row.description).toMatch(/level 3 version/);
+    expect(Object.keys(row).sort()).toEqual(Object.keys(adult.legendary_actions.find(a => a.name === 'Blazing Light')).sort());
+  });
+});
+
 describe('MA-0065 MonsterCardModal — Scorching Ray casts as a spell attack, not a block save', () => {
   it('routes the per-spell click through the attack seam with +8, 2d6 Fire, spell-named and isSpellDamage-marked', async () => {
     renderDragon(true);

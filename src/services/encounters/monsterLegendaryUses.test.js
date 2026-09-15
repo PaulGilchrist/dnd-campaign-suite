@@ -1045,8 +1045,10 @@ describe('MA-0184 Ancient Brass Dragon legendary economy (header uses:3)', () =>
     expect(legendaryUsesRemaining(header, {})).toBe(3);
   });
 
-  it('rows [1]/[2] stay prose-only (MA-0185/0186 queued); [3] Scorching Sands numerics untouched, cooldown clause live', () => {
-    expect(blazing.attack_bonus == null && blazing.save_dc == null && blazing.delegates_to == null && blazing.advisory == null && blazing.uses == null).toBe(true);
+  it('row [1] Blazing Light numeric via MA-0185; row [2] stays prose-only (MA-0186 queued); [3] Scorching Sands numerics untouched, cooldown clause live', () => {
+    expect(blazing.attack_bonus).toBe(12);
+    expect(blazing.spell_attack_bonus).toBe(12);
+    expect(blazing.damage_dice_primary).toBe('2d6');
     expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.delegates_to == null && pounce.advisory == null && pounce.uses == null).toBe(true);
     expect(sands.save_dc).toBe(20);
     expect(sands.save_type).toBe('Dexterity');

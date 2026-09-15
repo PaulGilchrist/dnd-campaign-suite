@@ -2791,7 +2791,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Scorching Ray (level 3 version).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0185-blazing-light.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0186",

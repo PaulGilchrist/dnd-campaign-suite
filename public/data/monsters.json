@@ -3589,7 +3589,12 @@
       },
       {
         "name": "Blazing Light",
-        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em> (level 3 version)."
+        "attack_bonus": 12,
+        "spell_attack_bonus": 12,
+        "range": "120 ft.",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Fire",
+        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em> (level 3 version): Ranged Spell Attack: +12 to hit. Hit: 2d6 Fire damage per ray (single ray resolves per click — multi-ray advisory, GM clicks again per ray)."
       },
       {
         "name": "Pounce",
