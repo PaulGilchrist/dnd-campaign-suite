@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseDreamPlaneBanishClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -172,6 +172,17 @@ function weakeningBreathForAction(spellInfo, action) {
   return parseWeakeningBreathClause(action?.save_effect);
 }
 
+// MA-0115: authored failed-save AC-penalty clause (Adult Green Dragon
+// Noxious Miasma — "the target takes a −2 penalty to AC until the end of
+// its next turn"). Parsed once and forwarded to the radius picker as an
+// optional te-grant seam (byte-inert null for clauseless rows, MA-0087
+// shape): the picker grants the registered ac_penalty te on each failed
+// save (live consumer: conditionEffects acPenalty → sheet AC fold).
+function acPenaltyClauseForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parseAcPenaltyClause(action?.save_effect);
+}
+
 function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
@@ -208,11 +219,12 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   const pushFeet = pushFeetForAction(spellInfo, action);
   const slowedClauses = slowedClausesForAction(spellInfo, action);
   const weakeningBreath = weakeningBreathForAction(spellInfo, action);
+  const acPenaltyClause = acPenaltyClauseForAction(spellInfo, action);
   if (aoe == null && !recharge.gate) { fire(); return; }
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -821,6 +833,10 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     // Dragon lair action) — lair_dream_plane te producer arm for
     // saveProcessing on a fail (MA-0104 shape).
     dreamPlaneBanishment: parseDreamPlaneBanishClause(saveEffect),
+    // MA-0115: authored failed-save AC-penalty clause (Noxious Miasma
+    // "−2 penalty to AC until the end of its next turn") — ac_penalty te
+    // producer arm for saveProcessing on a fail (MA-0073 shape).
+    acPenaltyClause: parseAcPenaltyClause(saveEffect),
   };
 }
 
@@ -1416,6 +1432,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           pushFeet={conePicker.pushFeet}
           slowedClauses={conePicker.slowedClauses}
           weakeningBreath={conePicker.weakeningBreath}
+          acPenaltyClause={conePicker.acPenaltyClause}
           conditionDurationNote={conePicker.conditionDurationNote}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}

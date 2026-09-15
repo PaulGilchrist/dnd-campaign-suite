@@ -181,6 +181,11 @@ const BADGE_SPECS = [
         find: ctx => findDirect(ctx, 'speed_half'),
         build: ctx => ({ label: 'Speed Halved', cls: 'effect-debuff', icon: 'fa-gauge-high', removable: true, removeAction: 'target_effect', effectType: 'speed_half', tooltip: `Speed halved by ${ctx.te.source || 'unknown'} until the end of the next turn` }),
     },
+    // MA-0115: Noxious Miasma failed-save ac_penalty te badge.
+    {
+        find: ctx => findDirect(ctx, 'ac_penalty'),
+        build: ctx => ({ label: `AC \u2212${ctx.te.value || 2}`, cls: 'effect-debuff', icon: 'fa-shield-halved', removable: true, removeAction: 'target_effect', effectType: 'ac_penalty', tooltip: `AC reduced by ${ctx.te.value || 2} by ${ctx.te.source || 'unknown'} until the end of the next turn` }),
+    },
     {
         guard: ctx => ctx.effects.noAdvantageAgainst,
         build: () => ({ label: 'No Adv vs', cls: 'effect-buff', icon: 'fa-arrow-down', removable: true, removeAction: 'remove_derived', effectTypes: ['blur', 'foresight', 'escape_the_horde', 'protection', 'multiattack_defense'] }),

@@ -538,6 +538,10 @@ const LATE_TARGET_EFFECT_HANDLERS = {
   // Handle Slow — AC penalty and DEX save disadvantage
   ac_penalty: (effects, te) => {
     effects.acPenalty = (effects.acPenalty || 0) + (te.value || 2);
+    // MA-0115: source attribution (Noxious Miasma te) — CharSummary penalty
+    // line reads the source; the Slow path (condition 'slow', no te) keeps
+    // its byte-identical fallback label.
+    if (te.source) effects.acPenaltySource = te.source;
   },
   dodge: (effects) => {
     bumpCount(effects, 'targetDisadvantageCount');

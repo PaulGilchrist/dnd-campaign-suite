@@ -88,7 +88,9 @@ const AC_BADGE_SPECS = [
     {
         key: 'slow-penalty',
         guard: (ctx, ce) => (ce?.acPenalty || 0) > 0,
-        render: (ctx, ce) => <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{ce.acPenalty} from Slow)</span>,
+        // MA-0115: te-sourced penalties attribute to their source (Noxious
+        // Miasma); the te-less Slow condition path keeps the old label.
+        render: (ctx, ce) => <span className="stat--penalized" title={`${ce.acPenaltySource || 'Slow'} penalty`}> ({'−'}{ce.acPenalty} from {ce.acPenaltySource || 'Slow'})</span>,
     },
     {
         key: 'smite-cover',

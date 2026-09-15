@@ -125,6 +125,20 @@ export function parseSlowedClauses(saveEffect) {
   return clauses.length > 0 ? { effects: clauses } : null;
 }
 
+// MA-0115: authored failed-save AC-penalty clause (Adult Green Dragon
+// Noxious Miasma — "the target takes a −2 penalty to AC until the end of
+// its next turn"). Not a condition, so extractConditionsFromSaveEffect can
+// never see it; this parse arms the ac_penalty te producer at the failed-
+// save seams (saveProcessing + SaveAttackAoeModal picker, MA-0073 parse
+// shape). Value N parsed from the −N/-N token; the live consumer
+// (conditionEffects acPenalty accumulation) already folds it into AC.
+// Byte-inert (null) for rows without the clause.
+export function parseAcPenaltyClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/[\u2212-]\s*(\d+)\s*penalt(?:y|ies) to AC/i);
+  return m ? { effect: 'ac_penalty', value: Number(m[1]) } : null;
+}
+
 // MA-0104: authored failed-save demiplane-transport clause (Adult/Ancient
 // Gold Dragon Banish — "transported to a harmless demiplane until the start
 // of the dragon's next turn"). Not a condition, so extractConditionsFromSaveEffect

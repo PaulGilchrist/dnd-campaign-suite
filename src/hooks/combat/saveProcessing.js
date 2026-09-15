@@ -354,6 +354,13 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     if (context?.dreamPlaneBanishment) {
         await grantDreamPlaneBanishment({ context, campaignName, attackerName, applyTarget });
     }
+    // MA-0115: Adult Green Dragon Noxious Miasma — "the target takes a −2
+    // penalty to AC until the end of its next turn". te producer mirror of
+    // the MA-0073 shape; the parsed value rides the te to the live consumer
+    // (conditionEffects acPenalty → CharSummary AC fold + penalty line).
+    if (context?.acPenaltyClause) {
+        await grantAcPenaltyClause({ context, campaignName, attackerName, applyTarget });
+    }
 }
 
 async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
@@ -493,6 +500,39 @@ async function grantSubtractDieDebuff({ context, campaignName, attackerName, app
         description: `${applyTarget} failed ${attackerName}'s ${actionName} save — rolls ${debuff.die} and subtracts it from ability checks and attack rolls until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:subtract-die-debuff-granted]', e); });
+}
+
+// MA-0115: failed-save AC-penalty grant (Adult Green Dragon Noxious
+// Miasma). Writes the registry te (ac_penalty) on the target sourced from
+// the attacker with the parsed value (−2), duration until_end_of_next_turn
+// (rounds:2 clock, MA-0073 shape), and logs the named clause. Consumers:
+// conditionEffects acPenalty accumulation → CharSummary AC fold (live).
+async function grantAcPenaltyClause({ context, campaignName, attackerName, applyTarget }) {
+    const clause = context.acPenaltyClause;
+    const value = Number(clause?.value) || 2;
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, 'ac_penalty', attackerName, {
+        duration: 'until_end_of_next_turn',
+        value,
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'ac_penalty', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'ac_penalty');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'ac_penalty_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — takes a \u2212${value} penalty to AC until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:ac-penalty-granted]', e); });
 }
 
 // MA-0104: failed-save demiplane-transport grant (Adult Gold Dragon Banish).

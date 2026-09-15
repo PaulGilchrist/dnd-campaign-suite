@@ -1761,7 +1761,7 @@
       "damageDicePrimary": "2d6",
       "damageTypePrimary": "Poison",
       "description": "Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0115-noxious-miasma.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0116",

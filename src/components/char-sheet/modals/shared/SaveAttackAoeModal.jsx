@@ -155,7 +155,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, conditionDurationNote: ctx.conditionDurationNote });
+    resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, conditionDurationNote: ctx.conditionDurationNote });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -464,7 +464,7 @@ function applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetN
 
 // Failed-save dispatch: MA-0068 staged sleep rows route through the SP-107
 // staging seams; everything else keeps the MA-0063 one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote }) {
+function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
@@ -482,7 +482,42 @@ function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetN
     if (!success && weakeningBreath) {
         grantWeakeningBreath({ campaignName, attackerName: playerStats.name, targetName, saveType, saveDc, roll: saveRoll, saveBonus }).catch((e) => { console.error('[SaveAttackAoeModal] Error granting weakening breath:', e); });
     }
+    // MA-0115: Noxious Miasma failed-save AC-penalty clause — ac_penalty te
+    // (value −2) until the end of the target's next turn, rounds:2 clock
+    // (MA-0073 recipe); live consumer conditionEffects → sheet AC fold.
+    if (!success && acPenaltyClause) {
+        grantAcPenaltyClause({ acPenaltyClause, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
+    }
     applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
+}
+
+// MA-0115: Noxious Miasma failed-save AC-penalty grant (Adult Green Dragon
+// sphere). Registry ac_penalty te with the parsed value; drained by a
+// rounds:2 clock (MA-0073/MA-0087 shape). Badge consumer: ConditionEffectBadges.
+function grantAcPenaltyClause({ acPenaltyClause, campaignName, targetName, casterName, actionName, saveType, saveDc }) {
+    const value = Number(acPenaltyClause?.value) || 2;
+    registerTargetEffect(campaignName, targetName, 'ac_penalty', casterName, {
+        duration: 'until_end_of_next_turn',
+        value,
+        actionName,
+    });
+    addExpiration({
+        attackerName: casterName,
+        targetName,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'ac_penalty', source: casterName, target: targetName }],
+    });
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'AC Penalty',
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — \u2212${value} AC until the end of ${targetName}'s next turn.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging AC penalty:', e); });
 }
 
 // MA-0087: Slowing Breath failed-save rider te grants (Adult Copper Dragon).
@@ -744,6 +779,11 @@ function SaveAttackAoeModal({
     // clock; targets already affected by this dragon's breath are excluded
     // (RAW "each creature that isn't currently affected by this breath").
     weakeningBreath,
+    // MA-0115 optional failed-save AC-penalty clause (byte-inert undefined
+    // default): Adult Green Dragon Noxious Miasma — grants the registered
+    // ac_penalty te (value −2, until_end_of_next_turn, rounds:2 clock) on
+    // each failed save; live consumer conditionEffects → sheet AC fold.
+    acPenaltyClause,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -805,7 +845,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -836,7 +876,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -964,7 +1004,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote });
+        resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -993,7 +1033,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, conditionDurationNote]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, conditionDurationNote]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
