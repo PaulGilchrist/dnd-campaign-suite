@@ -488,7 +488,35 @@ function resolveSaveFailGrant({ sleepStaging, success, saveDc, saveType, targetN
     if (!success && acPenaltyClause) {
         grantAcPenaltyClause({ acPenaltyClause, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
     }
+    // MA-0138: push-only failed-save clause (Adult Silver Dragon Cold Gale —
+    // "pushed up to 30 feet straight away", zero canonical conditions, so
+    // applySaveFailConditions early-returns at its empty-saveConditions guard
+    // before the MA-0079 push marker). Fail-only instant marker te + advisory
+    // condition log (MA-0079 grant shape; token movement GM-enforced §7).
+    // Byte-inert when pushFeet is null or conditions exist — every
+    // Repulsion Breath path stays byte-identical.
+    if (!success && pushFeet != null && (!saveConditions || saveConditions.length === 0)) {
+        grantPushOnlyClause({ pushFeet, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
+    }
     applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
+}
+
+// MA-0138: push-only failed-save grant (Cold Gale registry push te, value 30,
+// instant marker — CLA-384/MA-0079 marker semantics, no expiry clock, no
+// position consumer; the picker copy says GM positions tokens).
+function grantPushOnlyClause({ pushFeet, campaignName, targetName, casterName, actionName, saveType, saveDc }) {
+    const feet = Number(pushFeet) || 0;
+    registerTargetEffect(campaignName, targetName, 'push', casterName, { duration: 'instant', value: feet, actionName });
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Pushed',
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — pushed up to ${feet} ft straight away from ${casterName} (marker te; token movement GM-enforced).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging push clause:', e); });
 }
 
 // MA-0115: Noxious Miasma failed-save AC-penalty grant (Adult Green Dragon
