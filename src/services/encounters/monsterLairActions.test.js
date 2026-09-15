@@ -690,18 +690,131 @@ describe('MA-0085 adult-bronze-dragon fog cloud + thunderclap data lock', () => 
   });
 });
 
-// MA-0137 (clean-code note): Adult Silver Dragon lair_actions[1] raw-string
-// cold-wind row carried the letter-O damage typo "1dlO" (MA-0085 family) —
-// MV-12 suppresses the unparseable token, so the canonical 5 (1d10) cold
-// damage was silently dropped. Data-only fix: author "1d10" explicitly.
+// MA-0137 (clean-code note): Adult Silver Dragon lair_actions[1] cold-wind
+// row carried the letter-O damage typo "1dlO" (MA-0085 family) — MV-12
+// suppresses the unparseable token, so the canonical 5 (1d10) cold damage was
+// silently dropped. Data-only fix: author "1d10" explicitly. MA-0140 has
+// since structured the row — typo lock now guards the structured description.
 describe('MA-0137 adult-silver-dragon lair cold-wind typo data lock', () => {
   const wind = monstersData.find(m => m.index === 'adult-silver-dragon').lair_actions[1];
 
-  it('[1] raw-string cold wind authors canonical 1d10 — no letter-O token', () => {
-    expect(typeof wind).toBe('string');
-    expect(wind).not.toMatch(/1dlO/);
-    expect(wind).toMatch(/5 \(1d10\) cold damage/i);
-    expect(wind).toMatch(/DC 15 Constitution saving throw/i);
+  it('[1] cold wind authors canonical 1d10 — no letter-O token', () => {
+    expect(JSON.stringify(wind)).not.toMatch(/1dlO/);
+    expect(wind.description).toMatch(/5 \(1d10\) cold damage/i);
+    expect(wind.description).toMatch(/DC 15 Constitution saving throw/i);
+  });
+});
+
+// MA-0140: Adult Silver Dragon lair_actions[0] was a NAMELESS dict (MV-24) —
+// its description is the fog-cloud text while its machine-readable save legs
+// (save_dc 15 / Constitution / 1d10 Cold / half-on-success) are the COLD-WIND
+// lair action's numbers, misfiled intra-row (MA-0117 shape). Name-gate
+// (isLairRowClickable :26) killed clickability → inert static "." row, while
+// [1] cold wind was an inert raw string. Split fix (MA-0107 vocabulary):
+// [0] → named ADVISORY row "Fog Cloud" (advisory:"fog_cloud" → honest
+// "casts fog cloud" ability_use record, initiative-20 cadence GM-enforced —
+// no initiative lair seam), misfiled save legs STRIPPED; [1] → named
+// structured SAVE row "Cold Wind" legitimately owning DC 15 CON 1d10 Cold
+// half-on-success (MA-0085 thunderclap family). lair_fog_cloud te stays the
+// MA-0085 registration (no re-register). Gas/flame extinguishing clauses and
+// the 120-ft area gate have no consumers — GM-advisory prose residuals.
+describe('MA-0140 adult-silver-dragon fog cloud advisory + cold wind save data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-silver-dragon');
+  const fog = dragon.lair_actions[0];
+  const wind = dragon.lair_actions[1];
+
+  it('[0] is now a named clickable ADVISORY row (was nameless inert dict)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Fog Cloud');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('advisory');
+  });
+
+  it('[0] misfiled cold-wind save legs STRIPPED (they belong to row [1])', () => {
+    expect(fog.save_dc).toBeUndefined();
+    expect(fog.save_type).toBeUndefined();
+    expect(fog.damage_dice_primary).toBeUndefined();
+    expect(fog.damage_type_primary).toBeUndefined();
+    expect(fog.save_effect).toBeUndefined();
+  });
+
+  it('[0] description kept verbatim (fog cloud spell, initiative count 20)', () => {
+    expect(fog.description).toBe('The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.');
+  });
+
+  it('[0] advisory click logs ability_use record, zero save/attack/damage', async () => {
+    const logs = [];
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Adult Silver Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].description).toMatch(/casts fog cloud/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(logs[0].description).not.toMatch(/save DC/i);
+  });
+
+  it('[1] is now a named structured clickable SAVE row (was inert raw string)', () => {
+    expect(typeof wind).toBe('object');
+    expect(wind.name).toBe('Cold Wind');
+    expect(isLairRowClickable(wind)).toBe(true);
+    expect(lairRowAffordance(wind)).toBe('save');
+  });
+
+  it('[1] cold wind legitimately owns DC 15 Constitution, 1d10 Cold half-on-success', () => {
+    expect(wind.save_dc).toBe(15);
+    expect(wind.save_type).toBe('Constitution');
+    expect(wind.damage_dice_primary).toBe('1d10');
+    expect(wind.damage_type_primary).toBe('Cold');
+    expect(wind.dc_success).toBe('half');
+    expect(wind.description).toMatch(/DC 15 Constitution saving throw/i);
+    expect(wind.description).toMatch(/within 120 feet/i);
+  });
+
+  it('[1] save_effect vocabulary extracts no conditions (pure damage row)', () => {
+    expect(wind.save_effect).toMatch(/5 \(1d10\) cold damage/i);
+    expect(wind.save_effect).toMatch(/[Hh]alf damage/i);
+    expect(extractConditionsFromSaveEffect(wind.save_effect)).toEqual([]);
+  });
+
+  it('[1] save row routes through handleSaveRoll with 1d10 formula, zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wind,
+      monsterName: 'Adult Silver Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '1d10',
+      saveConditions: extractConditionsFromSaveEffect(wind.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wind, '1d10', []);
+  });
+
+  it('lair_fog_cloud te remains the single MA-0085 registration (no duplicate)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_fog_cloud');
+    expect(def).toBeTruthy();
+    expect(def.label).toBe('Fog Cloud (Lair)');
+    expect(def.group).toBe('Lair');
+  });
+
+  it('sibling scope guard: adult bronze fog zone row untouched (MA-0085 zone shape)', () => {
+    const bronze = monstersData.find(m => m.index === 'adult-bronze-dragon');
+    expect(bronze.lair_actions[0].name).toBe('Fog Cloud');
+    expect(lairRowAffordance(bronze.lair_actions[0])).toBe('zone');
+    expect(bronze.lair_actions[0].zone.effect_key).toBe('lair_fog_cloud');
   });
 });
 

@@ -2119,7 +2119,7 @@
       "monsterIndex": "adult-silver-dragon",
       "monster": "Adult Silver Dragon",
       "actionIndex": 0,
-      "actionName": "Unnamed lair actions 1",
+      "actionName": "Fog Cloud",
       "category": "lair_actions",
       "actionType": "other",
       "saveDc": 15,
@@ -2128,7 +2128,7 @@
       "damageDicePrimary": "1d10",
       "damageTypePrimary": "Cold",
       "description": "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0140-lair-1.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0141",
