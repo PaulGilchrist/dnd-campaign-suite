@@ -3405,7 +3405,13 @@
       },
       {
         "name": "Sonic Boom",
-        "description": "The dragon uses Spellcasting to cast <em>Shatter</em> (level 3 version). The dragon can't take this action again until the start of its next turn."
+        "save_dc": 22,
+        "save_type": "Constitution",
+        "damage_dice_primary": "4d8",
+        "damage_type_primary": "Thunder",
+        "dc_success": "half",
+        "save_effect": "Failure: 4d8 Thunder damage. Success: Half damage.",
+        "description": "The dragon uses Spellcasting to cast <em>Shatter</em> (level 3 version). 10-ft-radius sphere selection advisory — GM positions the center; no range-gate consumer. The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Tail Swipe",

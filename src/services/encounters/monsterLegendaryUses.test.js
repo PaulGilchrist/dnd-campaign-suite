@@ -914,3 +914,60 @@ describe('MA-0173 Ancient Blue Dragon Cloaked Flight advisory row', () => {
     expect(rearmed.spent).toBe(true);
   });
 });
+
+// MA-0174: Ancient Blue Dragon "Sonic Boom" — data fix mirrors the verified
+// MA-0058 adult-blue authored save-leg shape at level-3 Shatter values
+// (save_dc 22 Constitution, 4d8 Thunder, half on success; verbatim
+// "(level 3 version)" + once-per-turn clause). delegates_to cannot resolve
+// a Spellcasting row through the legendary seam (no spell name/dice), so
+// the numbers live on the row itself; the gated click spends 1, stamps the
+// sonic_boom cooldown, refuses once-per-turn, and regain re-arms.
+describe('MA-0174 Ancient Blue Dragon Sonic Boom authored save leg', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-blue-dragon');
+  const sonic = ancient.legendary_actions.find(a => a.name === 'Sonic Boom');
+
+  it('authored save leg: DC 22 Constitution, 4d8 Thunder, half on success', () => {
+    expect(sonic.save_dc).toBe(22);
+    expect(sonic.save_type).toBe('Constitution');
+    expect(sonic.damage_dice_primary).toBe('4d8');
+    expect(sonic.damage_type_primary).toBe('Thunder');
+    expect(sonic.dc_success).toBe('half');
+    expect(sonic.save_effect).toMatch(/4d8 Thunder damage.*Half damage/i);
+    expect(sonic.attack_bonus == null && sonic.delegates_to == null && sonic.advisory == null && sonic.uses == null).toBe(true);
+  });
+
+  it('description keeps the verbatim cast + once-per-turn clauses and authors the 10-ft sphere picker clause', () => {
+    expect(sonic.description).toMatch(/^The dragon uses Spellcasting to cast <em>Shatter<\/em> \(level 3 version\)\./);
+    expect(sonic.description).toMatch(/10-ft-radius sphere/);
+    expect(hasLegendaryCooldownClause(sonic)).toBe(true);
+    expect(legendaryActionSlug(sonic.name)).toBe('sonic_boom');
+  });
+
+  it('economy: spend stamps sonic_boom cooldown; later boundary refused once-per-turn; regain clears; re-arms', async () => {
+    const monster = { legendary_actions: ancient.legendary_actions };
+    cs.activeCreatureName = 'Thug 1';
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Sonic Boom', action: sonic, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ sonic_boom: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Sonic Boom', action: sonic, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Sonic Boom', action: sonic, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'sonic_boom_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'Ancient Blue Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Blue Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    cs.activeCreatureName = 'HexWarlock';
+    const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Sonic Boom', action: sonic, campaignName: 'test-campaign', deps });
+    expect(rearmed.spent).toBe(true);
+  });
+});
