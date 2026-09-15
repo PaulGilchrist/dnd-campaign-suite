@@ -1045,11 +1045,12 @@ describe('MA-0184 Ancient Brass Dragon legendary economy (header uses:3)', () =>
     expect(legendaryUsesRemaining(header, {})).toBe(3);
   });
 
-  it('row [1] Blazing Light numeric via MA-0185; row [2] stays prose-only (MA-0186 queued); [3] Scorching Sands numerics untouched, cooldown clause live', () => {
+  it('row [1] Blazing Light numeric via MA-0185; row [2] Pounce delegates Rend via MA-0186; [3] Scorching Sands numerics untouched, cooldown clause live', () => {
     expect(blazing.attack_bonus).toBe(12);
     expect(blazing.spell_attack_bonus).toBe(12);
     expect(blazing.damage_dice_primary).toBe('2d6');
-    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.delegates_to == null && pounce.advisory == null && pounce.uses == null).toBe(true);
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.uses == null).toBe(true);
     expect(sands.save_dc).toBe(20);
     expect(sands.save_type).toBe('Dexterity');
     expect(sands.damage_dice_primary).toBe('8d8');
@@ -1097,5 +1098,25 @@ describe('MA-0184 Ancient Brass Dragon legendary economy (header uses:3)', () =>
     cs.activeCreatureName = 'HexWarlock';
     const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
     expect(rearmed.spent).toBe(true);
+  });
+});
+
+// MA-0186: Ancient Brass Dragon Pounce — prose-only inert row burned uses
+// (MA-0164 fingerprint). Fix byte-mirrors the adult-brass Pounce delegate
+// row verbatim: delegates_to "Rend" + movement-advisory prose; delegated
+// +14 Rend (+ 2d10 + 8 Slashing / 2d6 Fire) resolves through the spend gate.
+describe('MA-0186 Ancient Brass Dragon Pounce delegates_to Rend', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-brass-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-brass-dragon');
+
+  it('row byte-matches the adult-brass Pounce delegate row', () => {
+    const pounce = ancient.legendary_actions.find(a => a.name === 'Pounce');
+    expect(JSON.stringify(pounce)).toBe(JSON.stringify(adult.legendary_actions.find(a => a.name === 'Pounce')));
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.description).toMatch(/movement advisory/i);
+    const rend = ancient.actions.find(a => a.name === 'Rend');
+    expect(rend.attack_bonus).toBe(14);
+    expect(rend.damage_dice_primary).toBe('2d10 + 8');
+    expect(rend.damage_dice_secondary).toBe('2d6');
   });
 });
