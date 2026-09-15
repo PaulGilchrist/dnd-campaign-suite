@@ -865,6 +865,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Lair',
     fields: ['source', 'dc'],
   },
+  {
+    effect: 'lair_volcanic_gas',
+    label: 'Volcanic Gas (Lair)',
+    description: 'Inside a volcanic-gas cloud (20-foot-radius sphere, lair action): lightly obscured. CON save (DC indicated) when the cloud appears; on a failed save the target is Poisoned until the end of its turn and Incapacitated while poisoned in this way. A creature that starts its turn in the cloud repeats the save — GM-enforced (no turn-start zone-save consumer for lair clouds and no initiative-20 lair seam in this engine). Lasts until initiative count 20 on the next round — GM-enforced.',
+    icon: 'fa-smog',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source', 'dc'],
+  },
 
   // ── Movement ────────────────────────────────────────────
   {

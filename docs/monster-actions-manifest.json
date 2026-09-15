@@ -1969,7 +1969,7 @@
       "monsterIndex": "adult-red-dragon",
       "monster": "Adult Red Dragon",
       "actionIndex": 2,
-      "actionName": "Unnamed lair actions 3",
+      "actionName": "Volcanic Gases",
       "category": "lair_actions",
       "actionType": "other",
       "conditions": [
@@ -1977,7 +1977,7 @@
         "poisoned"
       ],
       "description": "Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The sphere spreads around corners, and its area is lightly obscured. It lasts until initiative count 20 on the next round. Each creature that starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn. While poisoned in this way, a creature is incapacitated.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0130-lair-volcanic-gas.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0131",

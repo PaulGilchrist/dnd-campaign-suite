@@ -1287,11 +1287,11 @@ describe('MA-0128 adult-red-dragon magma geyser data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
   });
 
-  it('sibling rows: [1] tremor now structured as of MA-0129; [2] volcanic gases stays a legacy raw string', () => {
+  it('sibling rows: [1] tremor now structured as of MA-0129; [2] volcanic gases structured as of MA-0130', () => {
     expect(typeof dragon.lair_actions[1]).toBe('object');
     expect(dragon.lair_actions[1].name).toBe('Tremor');
-    expect(typeof dragon.lair_actions[2]).toBe('string');
-    expect(dragon.lair_actions[2]).toMatch(/DC 13 Constitution saving throw/i);
+    expect(typeof dragon.lair_actions[2]).toBe('object');
+    expect(dragon.lair_actions[2].name).toBe('Volcanic Gases');
   });
 });
 
@@ -1357,14 +1357,110 @@ describe('MA-0129 adult-red-dragon tremor data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(tremor, null, ['prone']);
   });
 
-  it('sibling rows untouched: [0] Magma Geyser stays MA-0128 half-damage save row; [2] volcanic gases stays raw string', () => {
+  it('sibling rows untouched: [0] Magma Geyser stays MA-0128 half-damage save row; [2] volcanic gases structured as of MA-0130', () => {
     expect(dragon.lair_actions[0].name).toBe('Magma Geyser');
     expect(dragon.lair_actions[0].dc_success).toBe('half');
-    expect(typeof dragon.lair_actions[2]).toBe('string');
+    expect(typeof dragon.lair_actions[2]).toBe('object');
+    expect(dragon.lair_actions[2].name).toBe('Volcanic Gases');
   });
 
   it('ancient-red-dragon scope guard: its nameless tremor dict is NOT touched by this fix', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-red-dragon');
     expect(ancient.lair_actions[1].name).toBeUndefined();
+  });
+});
+
+// MA-0130: Adult Red Dragon lair_actions[2] volcanic gases was a RAW STRING
+// (MA-0097/MA-0118 inert fingerprint) — behind the MonsterCardBody.jsx string
+// short-circuit (:339-340) the row rendered prose with zero affordance: no
+// DC 13 Constitution roll, no poisoned/incapacitated, no logs (live inert,
+// 2026-09-15). Data-only fix byte-mirroring the VERIFIED MA-0075 zone-cloud
+// shape (Blue→Brass sand cloud): named "Volcanic Gases" save+zone dict arming
+// the untouched MA-0024 seam — chip → 20-ft Radius picker (zone.radius_ft at
+// MonsterCardModal breathAoeShape :52, before the MA-0084 prose path) →
+// zone-arm te `lair_volcanic_gas` + tracking key + arm log → per-target save
+// at DC 13 CON → poisoned + incapacitated on fail via the MA-0017/MA-0063
+// damageless grant (canonical vocabulary; dc_success "none" suppresses the
+// MV-19/20 half-damage boilerplate on BOTH surfaces). The RAW turn-start
+// repeat save and initiative-count-20 cloud cadence stay GM-advisory
+// (no initiative-20 lair seam, no turn-start zone-save consumer for lair
+// clouds — MA-0024/MA-0075 residual). Sibling rows [0]/[1] untouched.
+describe('MA-0130 adult-red-dragon volcanic gases data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-red-dragon');
+  const cloud = dragon.lair_actions[2];
+
+  it('row is now a structured clickable SAVE row named Volcanic Gases', () => {
+    expect(typeof cloud).toBe('object');
+    expect(cloud.name).toBe('Volcanic Gases');
+    expect(isLairRowClickable(cloud)).toBe(true);
+    expect(lairRowAffordance(cloud)).toBe('save');
+  });
+
+  it('save fields: DC 13 Constitution, dc_success none (no damage authored)', () => {
+    expect(cloud.save_dc).toBe(13);
+    expect(cloud.save_type).toBe('Constitution');
+    expect(cloud.dc_success).toBe('none');
+    expect(cloud.damage_dice_primary).toBeUndefined();
+    expect(cloud.damage_type_primary).toBeUndefined();
+    expect(cloud.save_effect).toMatch(/deals no damage/i);
+  });
+
+  it('save_effect vocabulary extracts ONLY incapacitated + poisoned (MA-0017 damageless seam)', () => {
+    expect(cloud.save_effect).toBe('Failure: The target is poisoned until the end of its turn and is incapacitated while poisoned in this way. Success: unaffected. This effect deals no damage.');
+    expect(extractConditionsFromSaveEffect(cloud.save_effect)).toEqual(['incapacitated', 'poisoned']);
+  });
+
+  it('machine-readable persisting zone: 20-ft radius, lair_volcanic_gas key, repeat_save', () => {
+    expect(cloud.zone.radius_ft).toBe(20);
+    expect(cloud.zone.effect_key).toBe('lair_volcanic_gas');
+    expect(cloud.zone.repeat_save).toBe(true);
+    expect(cloud.zone.advisory).toMatch(/GM-enforced/);
+    expect(cloud.duration).toMatch(/poisoned until end of turn/i);
+    expect(cloud.duration).toMatch(/incapacitated while poisoned/i);
+  });
+
+  it('description carries the verbatim mechanics (20-ft sphere, DC 13 CON, poisoned, incapacitated, initiative 20)', () => {
+    expect(cloud.description).toMatch(/^Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it\./i);
+    expect(cloud.description).toMatch(/lasts until initiative count 20 on the next round/i);
+    expect(cloud.description).toMatch(/starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn/i);
+    expect(cloud.description).toMatch(/While poisoned in this way, a creature is incapacitated/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + poisoned/incapacitated', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: cloud,
+      monsterName: 'Adult Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(cloud.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(cloud, null, ['incapacitated', 'poisoned']);
+  });
+
+  it('lair_volcanic_gas te is registered in the target-effect registry (Lair group)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_volcanic_gas');
+    expect(def).toBeTruthy();
+    expect(def.label).toBe('Volcanic Gas (Lair)');
+    expect(def.group).toBe('Lair');
+  });
+
+  it('sibling rows untouched: [0] Magma Geyser half-damage save row; [1] Tremor damageless save row', () => {
+    expect(dragon.lair_actions[0].name).toBe('Magma Geyser');
+    expect(dragon.lair_actions[0].dc_success).toBe('half');
+    expect(dragon.lair_actions[1].name).toBe('Tremor');
+    expect(dragon.lair_actions[1].save_dc).toBe(15);
+  });
+
+  it('ancient-red-dragon scope guard: its nameless volcanic-gases dict is NOT touched by this fix', () => {
+    const ancient = monstersData.find(m => m.index === 'ancient-red-dragon');
+    expect(ancient.lair_actions[2].name).toBeUndefined();
+    expect(ancient.lair_actions[2].zone).toBeUndefined();
   });
 });
