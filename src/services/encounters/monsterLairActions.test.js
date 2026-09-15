@@ -2193,13 +2193,13 @@ describe('MA-0176 ancient-blue-dragon ceiling collapse data lock', () => {
     expect(handleZone).not.toHaveBeenCalled();
   });
 
-  it('sibling rows: [1] sand cloud structured as of MA-0177; [2] lightning arcs stays nameless dict (MA-0178 queued)', () => {
+  it('sibling rows: [1] sand cloud structured as of MA-0177; [2] lightning arcs structured as of MA-0178', () => {
     expect(dragon.lair_actions[1].name).toBe('Sand Cloud');
     expect(isLairRowClickable(dragon.lair_actions[1])).toBe(true);
-    expect(dragon.lair_actions[2].name).toBeUndefined();
+    expect(dragon.lair_actions[2].name).toBe('Lightning Arcs');
     expect(dragon.lair_actions[2].save_dc).toBe(15);
     expect(dragon.lair_actions[2].save_type).toBe('Dexterity');
-    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(true);
   });
 
   it('adult-blue-dragon template row untouched by this fix (still the verified MA-0074 Falling Ceiling shape)', () => {
@@ -2311,17 +2311,110 @@ describe('MA-0177 ancient-blue-dragon sand cloud data lock', () => {
     expect(handleZone).not.toHaveBeenCalled();
   });
 
-  it('scope guard: sibling lightning-arcs row [2] stays nameless dict (MA-0178 queued, untouched)', () => {
-    expect(dragon.lair_actions[2].name).toBeUndefined();
+  it('scope guard: sibling lightning-arcs row [2] structured as of MA-0178, no zone (line row)', () => {
+    expect(dragon.lair_actions[2].name).toBe('Lightning Arcs');
     expect(dragon.lair_actions[2].save_dc).toBe(15);
     expect(dragon.lair_actions[2].save_type).toBe('Dexterity');
     expect(dragon.lair_actions[2].zone).toBeUndefined();
-    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(true);
   });
 
   it('scope guard: adult-blue template row untouched by this fix (still the verified MA-0063 shape)', () => {
     expect(adultCloud.name).toBe('Sand Cloud');
     expect(adultCloud.save_dc).toBe(15);
+    expect(adult.lair_actions.length).toBe(3);
+  });
+});
+
+// MA-0178: Ancient Blue Dragon lair_actions[2] lightning arcs was a NAMELESS
+// dict (MV-24/MA-0118 inert fingerprint — completes the MA-0176/0177 whole-block
+// nameless-inert sweep): save_dc 15 / Dexterity authored and prose-agreed, but
+// the isLairRowClickable name-gate (monsterLairActions.js:26) killed clickability
+// → static "." row, zero chip, zero DC 15 DEX line prompt, zero 3d6 lightning
+// (live inert, 2026-09-15). Double gap (MV-14 family): the 10 (3d6) lightning
+// existed in description prose only — no damage_dice_primary. Data-only fix
+// byte-mirroring the VERIFIED MA-0064 adult-blue lightning-arcs row: name
+// "Lightning Arcs", damage_dice_primary 3d6, Lightning, dc_success "half",
+// honest half-on-success save_effect. Line shape (5-ft wide, 120-ft endpoints,
+// GM-positioned) rides the live MA-0064 max-feet-token gate fix in
+// breathAoeShape (MonsterCardModal.jsx) — no code change, no zone key.
+describe('MA-0178 ancient-blue-dragon lightning arcs data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-blue-dragon');
+  const arcs = dragon.lair_actions[2];
+  const adult = monstersData.find(m => m.index === 'adult-blue-dragon');
+  const adultArcs = adult.lair_actions[2];
+
+  it('row is now a structured clickable SAVE row named Lightning Arcs (was nameless inert dict)', () => {
+    expect(typeof arcs).toBe('object');
+    expect(arcs.name).toBe('Lightning Arcs');
+    expect(isLairRowClickable(arcs)).toBe(true);
+    expect(lairRowAffordance(arcs)).toBe('save');
+  });
+
+  it('byte-mirrors the VERIFIED MA-0064 adult-blue sibling row (JSON.stringify equality)', () => {
+    expect(Object.keys(arcs)).toEqual(Object.keys(adultArcs));
+    expect(JSON.stringify(arcs)).toBe(JSON.stringify(adultArcs));
+  });
+
+  it('save/damage fields: DC 15 Dexterity, 3d6 Lightning, half on success (prose-agreed)', () => {
+    expect(arcs.save_dc).toBe(15);
+    expect(arcs.save_type).toBe('Dexterity');
+    expect(arcs.damage_dice_primary).toBe('3d6');
+    expect(arcs.damage_type_primary).toBe('Lightning');
+    expect(arcs.dc_success).toBe('half');
+    expect(arcs.save_effect).toBe('Failure: 10 (3d6) Lightning damage. Success: Half damage.');
+  });
+
+  it('description kept verbatim from the original dict (byte-identical to adult sibling, line-shape prose)', () => {
+    expect(arcs.description).toBe(adultArcs.description);
+    expect(arcs.description).toMatch(/5-foot-wide line/i);
+    expect(arcs.description).toMatch(/within 120 feet of the dragon and 120 feet of each other/i);
+    expect(arcs.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(arcs.description).toMatch(/10 \(3d6\) lightning damage/i);
+  });
+
+  it('damageless save_effect extracts NO conditions (pure damage row); no zone key (line, not cloud)', () => {
+    expect(extractConditionsFromSaveEffect(arcs.save_effect)).toEqual([]);
+    expect(arcs.zone).toBeUndefined();
+    expect(arcs.duration).toBeUndefined();
+  });
+
+  it('save row routes through handleSaveRoll with the 3d6 formula, zero zone/attack calls', async () => {
+    const handleSaveRoll = vi.fn();
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: arcs,
+      monsterName: 'Ancient Blue Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+      saveDamageFormula: '3d6',
+      saveConditions: [],
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(arcs, '3d6', []);
+    expect(handleZone).not.toHaveBeenCalled();
+  });
+
+  it('whole-block now-chipped lock: [0] Ceiling Collapse, [1] Sand Cloud, [2] Lightning Arcs all clickable', () => {
+    expect(dragon.lair_actions.length).toBe(3);
+    for (const row of dragon.lair_actions) {
+      expect(typeof row).toBe('object');
+      expect(row.name).toBeTruthy();
+      expect(isLairRowClickable(row)).toBe(true);
+      expect(lairRowAffordance(row)).not.toBeNull();
+    }
+    expect(dragon.lair_actions.map(r => r.name)).toEqual(['Ceiling Collapse', 'Sand Cloud', 'Lightning Arcs']);
+  });
+
+  it('scope guard: adult-blue template row untouched by this fix (still the verified MA-0064 shape)', () => {
+    expect(adultArcs.name).toBe('Lightning Arcs');
+    expect(adultArcs.damage_dice_primary).toBe('3d6');
+    expect(adultArcs.damage_type_primary).toBe('Lightning');
+    expect(adultArcs.dc_success).toBe('half');
     expect(adult.lair_actions.length).toBe(3);
   });
 });

@@ -2680,13 +2680,13 @@
       "monsterIndex": "ancient-blue-dragon",
       "monster": "Ancient Blue Dragon",
       "actionIndex": 2,
-      "actionName": "Unnamed lair actions 3",
+      "actionName": "Lightning Arcs",
       "category": "lair_actions",
       "actionType": "other",
       "saveDc": 15,
       "saveType": "Dexterity",
       "description": "Lightning arcs, forming a 5-foot-wide line between two of the lair's solid surfaces that the dragon can see. They must be within 120 feet of the dragon and 120 feet of each other. Each creature in that line must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) lightning damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0178-lair-lightning-arcs.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0179",
