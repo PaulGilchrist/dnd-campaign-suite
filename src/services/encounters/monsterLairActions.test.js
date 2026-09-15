@@ -1592,3 +1592,82 @@ describe('MA-0130 adult-red-dragon volcanic gases data lock', () => {
     expect(ancient.lair_actions[2].zone).toBeUndefined();
   });
 });
+
+// MA-0149: Adult White Dragon lair_actions[0] freezing fog was a NAMELESS
+// dict (MV-24/MA-0118 inert fingerprint) — its save legs (DC 10 Constitution,
+// 3d6 Cold, half-on-success) fully matched the verbatim description prose
+// (manifest agreed, no drift), but the isLairRowClickable name-gate
+// (monsterLairActions.js:26) killed clickability → static "." row, zero
+// affordance, zero save prompt, zero damage, zero logs (live inert,
+// 2026-09-14). Data-only fix mirroring the VERIFIED MA-0128 shape: named
+// "Freezing Fog" save dict + dc_success "half" (prose: "half as much damage
+// on a successful one"), save legs untouched — chip "DC 10 Constitution" →
+// handleSaveRoll → MA-0084 radius picker (sphereRadiusFeet on the verbatim
+// "20-foot-radius sphere" prose, NO zone field needed MA-0129 precedent),
+// full-on-fail / floor-half untouched. End-of-turn re-damage, heavily
+// obscured area, wind dispersal and initiative-20 cadence stay GM-advisory
+// prose residuals (no turn-end zone-damage consumer, no initiative lair
+// seam — MA-0024 residual). Sibling rows [1] ice shards / [2] wall of ice
+// raw strings stay static by design.
+describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-white-dragon');
+  const fog = dragon.lair_actions[0];
+
+  it('row is now a structured clickable SAVE row named Freezing Fog (was nameless inert dict)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Freezing Fog');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('save');
+  });
+
+  it('save fields: DC 10 Constitution, 3d6 Cold, dc_success half (prose-agreed)', () => {
+    expect(fog.save_dc).toBe(10);
+    expect(fog.save_type).toBe('Constitution');
+    expect(fog.damage_dice_primary).toBe('3d6');
+    expect(fog.damage_type_primary).toBe('Cold');
+    expect(fog.dc_success).toBe('half');
+    expect(fog.description).toMatch(/DC 10 Constitution saving throw/i);
+    expect(fog.description).toMatch(/half as much damage on a successful one/i);
+    expect(fog.description).toMatch(/20-foot-radius sphere/i);
+  });
+
+  it('no save_effect authored — zero condition extraction (pure damage row)', () => {
+    expect(fog.save_effect).toBeUndefined();
+    expect(extractConditionsFromSaveEffect(fog.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with 3d6 formula and no conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Adult White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '3d6',
+      saveConditions: extractConditionsFromSaveEffect(fog.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
+  });
+
+  it('sibling rows untouched: [1] ice shards and [2] wall of ice stay raw strings', () => {
+    expect(typeof dragon.lair_actions[1]).toBe('string');
+    expect(typeof dragon.lair_actions[2]).toBe('string');
+  });
+
+  it('ancient-white-dragon scope guard: its nameless fog dict (with save_effect) is NOT touched by this fix', () => {
+    const ancient = monstersData.find(m => m.index === 'ancient-white-dragon');
+    expect(ancient.lair_actions[0].name).toBeUndefined();
+    expect(ancient.lair_actions[0].save_effect).toBeDefined();
+    expect(ancient.lair_actions[0].dc_success).toBeUndefined();
+  });
+
+  it('young-white-dragon scope guard: its fog rows (string + nameless dict) untouched', () => {
+    const young = monstersData.find(m => m.index === 'young-white-dragon');
+    expect(typeof young.lair_actions[0]).toBe('string');
+    expect(young.lair_actions[1].name).toBeUndefined();
+  });
+});
