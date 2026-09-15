@@ -3946,7 +3946,13 @@
       },
       {
         "name": "Mind Jolt",
-        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 5 version). The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 5 version) at one creature it can see within 120 feet. The target makes a DC 21 Wisdom saving throw, taking 27 (6d8) Psychic damage on a failed save or half as much on a successful one. The dragon always knows the target's location until the spell ends (no Invisible benefit against the dragon) — location tracking GM-enforced for monsters. The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 21,
+        "save_type": "Wisdom",
+        "dc_success": "half",
+        "damage_dice_primary": "6d8",
+        "damage_type_primary": "Psychic",
+        "save_effect": "6d8 Psychic damage. Success: Half damage. Location known to the dragon until the spell ends (advisory — GM-enforced for monsters). Until the end of its next turn."
       },
       {
         "name": "Pounce",

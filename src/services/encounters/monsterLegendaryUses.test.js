@@ -1198,3 +1198,27 @@ describe('MA-0206 Ancient Copper Dragon legendary economy (header uses:3)', () =
     expect(regain).toEqual({ regained: true, max: 3 });
   });
 });
+
+// MA-0208: Ancient Copper Mind Jolt was cast-prose inert (MA-0163 family;
+// delegates_to Spellcasting NOT resolvable at the legendary seam — MA-0174
+// proof). Fix = authored save legs mirroring the adult-copper Mind Jolt
+// shape at ancient lv5 values: DC 21 WIS 6d8 Psychic half (live control
+// Spellcasting Mind Spike lv5 = 6d8 per MA-0208 evidence).
+describe('MA-0208 Ancient Copper Mind Jolt authored save legs', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-copper-dragon');
+
+  it('row authors DC 21 WIS 6d8 Psychic half, adult-shape key parity, verbatim rider prose', () => {
+    const mj = ancient.legendary_actions[2];
+    expect(Object.keys(mj).sort()).toEqual(Object.keys(adult.legendary_actions[2]).sort());
+    expect(mj.save_dc).toBe(21);
+    expect(mj.save_type).toBe('Wisdom');
+    expect(mj.dc_success).toBe('half');
+    expect(mj.damage_dice_primary).toBe('6d8');
+    expect(mj.damage_type_primary).toBe('Psychic');
+    expect(mj.description).toMatch(/level 5 version/);
+    expect(mj.description).toMatch(/DC 21 Wisdom saving throw/);
+    expect(mj.description).toMatch(/can't take this action again/i);
+    expect(hasLegendaryCooldownClause(mj)).toBe(true);
+  });
+});
