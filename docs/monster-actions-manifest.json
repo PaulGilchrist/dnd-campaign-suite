@@ -1954,14 +1954,14 @@
       "monsterIndex": "adult-red-dragon",
       "monster": "Adult Red Dragon",
       "actionIndex": 1,
-      "actionName": "Unnamed lair actions 2",
+      "actionName": "Tremor",
       "category": "lair_actions",
       "actionType": "other",
       "conditions": [
         "prone"
       ],
       "description": "A tremor shakes the lair in a 60-foot radius around the dragon. Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0129-lair-tremor-prone.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0130",

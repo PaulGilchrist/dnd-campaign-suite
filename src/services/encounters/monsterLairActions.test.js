@@ -1287,10 +1287,84 @@ describe('MA-0128 adult-red-dragon magma geyser data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
   });
 
-  it('sibling rows untouched: [1] tremor and [2] volcanic gases stay legacy raw strings', () => {
-    expect(typeof dragon.lair_actions[1]).toBe('string');
-    expect(dragon.lair_actions[1]).toMatch(/tremor shakes the lair/i);
+  it('sibling rows: [1] tremor now structured as of MA-0129; [2] volcanic gases stays a legacy raw string', () => {
+    expect(typeof dragon.lair_actions[1]).toBe('object');
+    expect(dragon.lair_actions[1].name).toBe('Tremor');
     expect(typeof dragon.lair_actions[2]).toBe('string');
     expect(dragon.lair_actions[2]).toMatch(/DC 13 Constitution saving throw/i);
+  });
+});
+
+// MA-0129: Adult Red Dragon lair_actions[1] tremor knock-prone was a RAW
+// STRING (MA-0097/MA-0118 inert fingerprint) — behind the MonsterCardBody.jsx
+// string short-circuit (:339-340) the row rendered prose with zero affordance:
+// no DC 15 Dexterity roll, no prone, no logs (live inert ×9, 2026-09-14).
+// Data-only fix mirroring the VERIFIED MA-0074 Strong Wind damageless
+// push/prone shape: named "Tremor" dict arming the untouched MA-0024 seam —
+// chip "DC 15 Dexterity" → handleSaveRoll → 60-ft Radius picker (MA-0084
+// sphereRadiusFeet on the verbatim "60-foot radius" prose) → MA-0017
+// damageless failed-save condition landing (prone via extractConditionsFrom
+// SaveEffect canonical vocabulary; dc_success "none" suppresses the MV-19/20
+// half-damage boilerplate, NO damage fields authored). The dragon-exclusion
+// and ground-only gate stay advisory prose (§7 — no ground-state/flying
+// consumer; MA-0024 advisory vocabulary). Sibling rows: [0] Magma Geyser
+// (MA-0128) and [2] volcanic gases raw string stay untouched.
+describe('MA-0129 adult-red-dragon tremor data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-red-dragon');
+  const tremor = dragon.lair_actions[1];
+
+  it('row is now a structured clickable SAVE row named Tremor', () => {
+    expect(typeof tremor).toBe('object');
+    expect(tremor.name).toBe('Tremor');
+    expect(isLairRowClickable(tremor)).toBe(true);
+    expect(lairRowAffordance(tremor)).toBe('save');
+  });
+
+  it('save fields: DC 15 Dexterity, dc_success none (no damage authored)', () => {
+    expect(tremor.save_dc).toBe(15);
+    expect(tremor.save_type).toBe('Dexterity');
+    expect(tremor.dc_success).toBe('none');
+    expect(tremor.damage_dice_primary).toBeUndefined();
+    expect(tremor.damage_type_primary).toBeUndefined();
+    expect(tremor.save_effect).toMatch(/deals no damage/i);
+  });
+
+  it('save_effect vocabulary extracts ONLY prone (MA-0017 damageless seam)', () => {
+    expect(tremor.save_effect).toBe('Failure: The target is knocked prone. Success: unaffected. This effect deals no damage.');
+    expect(extractConditionsFromSaveEffect(tremor.save_effect)).toEqual(['prone']);
+  });
+
+  it('description keeps the canonical prose verbatim + advisory ground/flight exclusion', () => {
+    expect(tremor.description).toMatch(/^A tremor shakes the lair in a 60-foot radius around the dragon\./i);
+    expect(tremor.description).toMatch(/Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone/i);
+    expect(tremor.description).toMatch(/ground\/flight gate is GM-enforced/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + prone', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: tremor,
+      monsterName: 'Adult Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(tremor.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(tremor, null, ['prone']);
+  });
+
+  it('sibling rows untouched: [0] Magma Geyser stays MA-0128 half-damage save row; [2] volcanic gases stays raw string', () => {
+    expect(dragon.lair_actions[0].name).toBe('Magma Geyser');
+    expect(dragon.lair_actions[0].dc_success).toBe('half');
+    expect(typeof dragon.lair_actions[2]).toBe('string');
+  });
+
+  it('ancient-red-dragon scope guard: its nameless tremor dict is NOT touched by this fix', () => {
+    const ancient = monstersData.find(m => m.index === 'ancient-red-dragon');
+    expect(ancient.lair_actions[1].name).toBeUndefined();
   });
 });
