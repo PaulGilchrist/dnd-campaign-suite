@@ -2193,11 +2193,9 @@ describe('MA-0176 ancient-blue-dragon ceiling collapse data lock', () => {
     expect(handleZone).not.toHaveBeenCalled();
   });
 
-  it('sibling rows untouched: [1] sand cloud and [2] lightning arcs stay nameless dicts (MA-0177/MA-0178 queued)', () => {
-    expect(dragon.lair_actions[1].name).toBeUndefined();
-    expect(dragon.lair_actions[1].save_dc).toBe(15);
-    expect(dragon.lair_actions[1].save_type).toBe('Constitution');
-    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(false);
+  it('sibling rows: [1] sand cloud structured as of MA-0177; [2] lightning arcs stays nameless dict (MA-0178 queued)', () => {
+    expect(dragon.lair_actions[1].name).toBe('Sand Cloud');
+    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(true);
     expect(dragon.lair_actions[2].name).toBeUndefined();
     expect(dragon.lair_actions[2].save_dc).toBe(15);
     expect(dragon.lair_actions[2].save_type).toBe('Dexterity');
@@ -2227,5 +2225,103 @@ describe('MA-0176 ancient-blue-dragon ceiling collapse data lock', () => {
     const youngRaw = young.lair_actions.find(la => typeof la === 'string' && la.startsWith('Part of the ceiling collapses'));
     expect(typeof youngRaw).toBe('string');
     expect(isLairRowClickable(youngRaw)).toBe(false);
+  });
+});
+
+// MA-0177: Ancient Blue Dragon lair_actions[1] sand cloud was a NAMELESS dict
+// (MV-24/MA-0118 inert fingerprint — extends the MA-0176 whole-block
+// nameless-inert signature): save_dc 15 / Constitution authored and
+// prose-agreed, but the isLairRowClickable name-gate (monsterLairActions.js:26)
+// killed clickability → static "." row, zero chip, zero DC 15 CON prompt, zero
+// blinded, zero 20-ft zone armed (live inert, 2026-09-15). Data-only fix
+// byte-mirroring the VERIFIED MA-0063/MA-0075 adult-blue sand-cloud zone
+// shape onto the ancient row: name "Sand Cloud", dc_success "none" (damageless
+// honest "no damage" copy), save_effect blinded 1 min + end-of-turn repeat-save
+// prose, zone {radius_ft 20, effect_key lair_sand_cloud, repeat_save, advisory},
+// duration advisory. Descriptions already byte-identical. Repeat-save NPC
+// auto-repeat stays advisory (no NPC turn-end zone-save consumer). Sibling row
+// [2] lightning arcs untouched (queued MA-0178).
+describe('MA-0177 ancient-blue-dragon sand cloud data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-blue-dragon');
+  const cloud = dragon.lair_actions[1];
+  const adult = monstersData.find(m => m.index === 'adult-blue-dragon');
+  const adultCloud = adult.lair_actions[1];
+
+  it('row is now a structured clickable SAVE row named Sand Cloud (was nameless inert dict)', () => {
+    expect(typeof cloud).toBe('object');
+    expect(cloud.name).toBe('Sand Cloud');
+    expect(isLairRowClickable(cloud)).toBe(true);
+    expect(lairRowAffordance(cloud)).toBe('save');
+  });
+
+  it('byte-mirrors the VERIFIED MA-0063 adult-blue sibling row (JSON.stringify equality)', () => {
+    expect(Object.keys(cloud)).toEqual(Object.keys(adultCloud));
+    expect(Object.keys(cloud.zone)).toEqual(Object.keys(adultCloud.zone));
+    expect(JSON.stringify(cloud)).toBe(JSON.stringify(adultCloud));
+  });
+
+  it('description kept verbatim from the original dict (byte-identical to adult sibling)', () => {
+    expect(cloud.description).toBe(adultCloud.description);
+    expect(cloud.description).toMatch(/20-foot-radius sphere/i);
+    expect(cloud.description).toMatch(/Each creature in the cloud must succeed on a DC 15 Constitution saving throw/i);
+    expect(cloud.description).toMatch(/blinded for 1 minute/i);
+    expect(cloud.description).toMatch(/repeat the saving throw at the end of each of its turns/i);
+  });
+
+  it('no damage authored (dc_success none) — honest "no damage" copy on a pure blinded control row', () => {
+    expect(cloud.damage_dice_primary).toBeUndefined();
+    expect(cloud.damage_type_primary).toBeUndefined();
+    expect(cloud.dc_success).toBe('none');
+    expect(cloud.save_effect).toMatch(/deals no damage/i);
+  });
+
+  it('save_effect vocabulary → MA-0017 seam extracts ONLY blinded', () => {
+    expect(extractConditionsFromSaveEffect(cloud.save_effect)).toEqual(['blinded']);
+  });
+
+  it('machine-readable persisting zone: 20-ft radius, lair_sand_cloud key, repeat_save', async () => {
+    expect(cloud.zone.radius_ft).toBe(20);
+    expect(cloud.zone.effect_key).toBe('lair_sand_cloud');
+    expect(cloud.zone.repeat_save).toBe(true);
+    expect(cloud.zone.advisory).toMatch(/GM-enforced/);
+    expect(cloud.duration).toMatch(/blinded 1 minute/i);
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_sand_cloud');
+    expect(def).toBeTruthy();
+    expect(def.effect).toBe('lair_sand_cloud');
+  });
+
+  it('save row routes through handleSaveRoll with blinded conditions, zero damage formula', async () => {
+    const handleSaveRoll = vi.fn();
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: cloud,
+      monsterName: 'Ancient Blue Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(cloud.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(cloud, null, ['blinded']);
+    expect(handleZone).not.toHaveBeenCalled();
+  });
+
+  it('scope guard: sibling lightning-arcs row [2] stays nameless dict (MA-0178 queued, untouched)', () => {
+    expect(dragon.lair_actions[2].name).toBeUndefined();
+    expect(dragon.lair_actions[2].save_dc).toBe(15);
+    expect(dragon.lair_actions[2].save_type).toBe('Dexterity');
+    expect(dragon.lair_actions[2].zone).toBeUndefined();
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
+  });
+
+  it('scope guard: adult-blue template row untouched by this fix (still the verified MA-0063 shape)', () => {
+    expect(adultCloud.name).toBe('Sand Cloud');
+    expect(adultCloud.save_dc).toBe(15);
+    expect(adult.lair_actions.length).toBe(3);
   });
 });
