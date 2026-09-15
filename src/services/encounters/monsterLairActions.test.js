@@ -1607,8 +1607,8 @@ describe('MA-0130 adult-red-dragon volcanic gases data lock', () => {
 // full-on-fail / floor-half untouched. End-of-turn re-damage, heavily
 // obscured area, wind dispersal and initiative-20 cadence stay GM-advisory
 // prose residuals (no turn-end zone-damage consumer, no initiative lair
-// seam — MA-0024 residual). Sibling rows [1] ice shards / [2] wall of ice
-// raw strings stay static by design.
+// seam — MA-0024 residual). Sibling row [1] ice shards was converted to a
+// structured ATTACK row in MA-0150; [2] wall of ice raw string stays static.
 describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
   const dragon = monstersData.find(m => m.index === 'adult-white-dragon');
   const fog = dragon.lair_actions[0];
@@ -1653,8 +1653,8 @@ describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
   });
 
-  it('sibling rows untouched: [1] ice shards and [2] wall of ice stay raw strings', () => {
-    expect(typeof dragon.lair_actions[1]).toBe('string');
+  it('sibling rows: [1] ice shards structured ATTACK row (MA-0150), [2] wall of ice stays raw string', () => {
+    expect(typeof dragon.lair_actions[1]).toBe('object');
     expect(typeof dragon.lair_actions[2]).toBe('string');
   });
 
@@ -1669,5 +1669,90 @@ describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
     const young = monstersData.find(m => m.index === 'young-white-dragon');
     expect(typeof young.lair_actions[0]).toBe('string');
     expect(young.lair_actions[1].name).toBeUndefined();
+  });
+});
+
+// MA-0150: Adult White Dragon lair_actions[1] jagged ice shards was a raw
+// string (MA-0118 inert fingerprint) → static text row, zero affordance,
+// zero attack roll, zero damage, zero logs (live inert, 2026-09-14). Data-only
+// fix: converted to a structured ATTACK row. The 'attack' affordance and its
+// resolution leg ALREADY exist in the lair pipeline (lairRowAffordance
+// monsterLairActions.js:43, resolveLairRow :99-101) and reuse the UNCHANGED
+// monster attack seam (handleAttack(name, bonus, action)) — the same handler
+// the Actions-row "+N" links and the legendary attack rows
+// (resolveLegendaryRowMechanic, MonsterCardModal.jsx:263, Adult Black Dragon
+// Water Surge-style range rows) ride. No new architecture. Data shape mirrors
+// the VERIFIED ranged attack rows (Adult Brass Dragon Blazing Light:
+// attack_bonus + range + damage dice/type): chip "Jagged Ice Shards" →
+// handleAttack at +7 vs armed target AC, 3d6 Piercing auto-damage on hit,
+// 120-ft range gate via resolveAttackRange/computeMapRangeState. "Up to
+// three creatures" stays GM-click-per-target (MA-0068/MA-0009 convention —
+// handleAttack adjudicates the single armed target per click); ceiling
+// placement and initiative-20 cadence stay GM-advisory (MA-0024 residual).
+describe('MA-0150 adult-white-dragon jagged ice shards data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-white-dragon');
+  const shards = dragon.lair_actions[1];
+
+  it('row is now a structured clickable ATTACK row named Jagged Ice Shards (was raw string)', () => {
+    expect(typeof shards).toBe('object');
+    expect(shards.name).toBe('Jagged Ice Shards');
+    expect(isLairRowClickable(shards)).toBe(true);
+    expect(lairRowAffordance(shards)).toBe('attack');
+  });
+
+  it('attack fields: +7 to hit, 120 ft range, 3d6 Piercing (prose-agreed)', () => {
+    expect(shards.attack_bonus).toBe(7);
+    expect(shards.range).toBe('120 ft.');
+    expect(shards.damage_dice_primary).toBe('3d6');
+    expect(shards.damage_type_primary).toBe('Piercing');
+    expect(shards.description).toMatch(/\+7 to hit/i);
+    expect(shards.description).toMatch(/up to three creatures/i);
+    expect(shards.description).toMatch(/within 120 feet/i);
+    expect(shards.description).toMatch(/10 \(3d6\) piercing damage/i);
+  });
+
+  it('no save authored on the row — zero save-prompt routing', () => {
+    expect(shards.save_dc).toBeUndefined();
+    expect(shards.save_effect).toBeUndefined();
+    expect(extractConditionsFromSaveEffect(shards.save_effect)).toEqual([]);
+  });
+
+  it('attack row routes through the UNCHANGED monster attack seam: handleAttack(name, +7, row)', async () => {
+    const handleAttack = vi.fn();
+    const handleSaveRoll = vi.fn();
+    const handleDamage = vi.fn();
+    const res = await resolveLairRow({
+      action: shards,
+      monsterName: 'Adult White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack,
+      handleDamage,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'attack' });
+    expect(handleAttack).toHaveBeenCalledWith('Jagged Ice Shards', 7, shards);
+    expect(handleSaveRoll).not.toHaveBeenCalled();
+    expect(handleDamage).not.toHaveBeenCalled();
+  });
+
+  it('sibling rows untouched: [0] Freezing Fog save row (MA-0149) and [2] wall of ice raw string', () => {
+    expect(dragon.lair_actions[0].name).toBe('Freezing Fog');
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
+    expect(typeof dragon.lair_actions[2]).toBe('string');
+  });
+
+  it('ancient-white-dragon scope guard: its jagged-ice raw string is NOT touched by this fix', () => {
+    const ancient = monstersData.find(m => m.index === 'ancient-white-dragon');
+    expect(typeof ancient.lair_actions[1]).toBe('string');
+  });
+
+  it('young-white-dragon scope guard: its nameless jagged-ice dict is NOT touched by this fix', () => {
+    const young = monstersData.find(m => m.index === 'young-white-dragon');
+    const jagged = (young.lair_actions || []).find(r => typeof r === 'object' && r?.description?.includes('Jagged ice shards'));
+    expect(jagged).toBeDefined();
+    expect(jagged.name).toBeUndefined();
+    expect(jagged.attack_bonus).toBeUndefined();
+    expect(isLairRowClickable(jagged)).toBe(false);
   });
 });
