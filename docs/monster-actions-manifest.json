@@ -2231,7 +2231,7 @@
       "saveDc": 14,
       "saveType": "Charisma",
       "description": "The dragon casts *Fear*, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14). The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0147-frightful-presence.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0148",

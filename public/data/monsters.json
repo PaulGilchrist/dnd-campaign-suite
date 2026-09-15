@@ -2891,9 +2891,21 @@
       },
       {
         "name": "Frightful Presence",
-        "description": "The dragon casts *Fear*, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14). The dragon can't take this action again until the start of its next turn.",
+        "description": "The dragon casts *Fear*, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14). Each creature of the dragon's choice within 120 feet of it that can see and hear the dragon must succeed on a DC 14 Charisma saving throw or become Frightened for 1 minute. 120-ft selection advisory — single armed target resolves; GM picks targets (no zone consumer). A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to the dragon's Frightful Presence for the next 24 hours. The dragon can't take this action again until the start of its next turn.",
         "save_dc": 14,
-        "save_type": "Charisma"
+        "save_type": "Charisma",
+        "dc_success": "none",
+        "success_immunity": {
+          "effect": "frightful_presence_immunity",
+          "duration": "24_hours",
+          "duration_minutes": 1440
+        },
+        "repeat_save": {
+          "condition": "frightened",
+          "save_type": "Charisma",
+          "duration_minutes": 1
+        },
+        "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage."
       },
       {
         "name": "Pounce",

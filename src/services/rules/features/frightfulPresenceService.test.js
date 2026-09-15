@@ -141,6 +141,36 @@ describe('applyFrightfulPresenceTurnEnd (MA-0048)', () => {
     });
 });
 
+describe('MA-0147 Adult White Dragon FP — CHA row engages the MA-0048 service', () => {
+    const WHITE = 'Adult White Dragon 1';
+
+    it('authored row shape arms trackFrightfulPresence with Charisma te + 10-round clock', async () => {
+        const monsters = (await import('../../../../public/data/monsters.json')).default;
+        const row = monsters.find(m => m.name === 'Adult White Dragon').legendary_actions.find(a => a.name === 'Frightful Presence');
+        expect(row.repeat_save).toBeTruthy();
+        expect(row.success_immunity?.effect).toBe(FP_IMMUNITY_TE_EFFECT);
+        // saveProcessing:387 arms on context.repeatSave truthy (row.repeat_save forwarded)
+        await trackFrightfulPresence({ campaignName: CAMPAIGN, attackerName: WHITE, targetName: TARGET, saveType: row.repeat_save.save_type, saveDc: row.save_dc });
+        expect(registered[0]).toMatchObject({ targetName: TARGET, effectKey: FP_TE_EFFECT, source: WHITE, dc: 14, saveType: 'Charisma' });
+        expect(expirations[0].rounds).toBe(10);
+    });
+
+    it('turn-END repeat save with Charisma te: success strips te + grants 24h immunity sourced from the dragon', async () => {
+        csCreatures = [{ name: TARGET, type: 'player' }];
+        armFpTe({ saveType: 'Charisma', dc: 14, source: WHITE });
+        runtimeStore[`${TARGET}.activeConditions`] = ['frightened'];
+        nextSaveSuccess = true;
+
+        const res = await applyFrightfulPresenceTurnEnd(CAMPAIGN, TARGET);
+        expect(res.handled).toBe(true);
+        expect(res.success).toBe(true);
+        expect(runtimeStore['campaign.targetEffects']).toEqual([]);
+        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual([]);
+        expect(registered).toEqual([expect.objectContaining({ targetName: TARGET, effectKey: FP_IMMUNITY_TE_EFFECT, source: WHITE, rounds: 14400 })]);
+        expect(logs.some(l => l.rollType === 'save-fp-repeat' && l.success === true)).toBe(true);
+    });
+});
+
 describe('grantFrightfulPresenceImmunity (MA-0048)', () => {
     it('writes 24h te (14400 rounds, CLA-334 minutes×10) + clock + granted log', async () => {
         await grantFrightfulPresenceImmunity({ campaignName: CAMPAIGN, attackerName: ATTACKER, targetName: TARGET, reason: 'test' });
