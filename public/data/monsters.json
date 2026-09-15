@@ -2578,11 +2578,12 @@
     "lair_actions": [
       {
         "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
-        "save_dc": 13,
-        "save_type": "Constitution",
+        "save_dc": 15,
+        "save_type": "Dexterity",
         "damage_dice_primary": "6d6",
         "damage_type_primary": "Fire",
-        "save_effect": "The target is knocked prone."
+        "name": "Magma Geyser",
+        "dc_success": "half"
       },
       "A tremor shakes the lair in a 60-foot radius around the dragon. Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone.",
       "Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The sphere spreads around corners, and its area is lightly obscured. It lasts until initiative count 20 on the next round. Each creature that starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn. While poisoned in this way, a creature is incapacitated."

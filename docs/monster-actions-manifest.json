@@ -1938,19 +1938,15 @@
       "monsterIndex": "adult-red-dragon",
       "monster": "Adult Red Dragon",
       "actionIndex": 0,
-      "actionName": "Unnamed lair actions 1",
+      "actionName": "Magma Geyser",
       "category": "lair_actions",
       "actionType": "other",
-      "saveDc": 13,
-      "saveType": "Constitution",
-      "saveEffect": "The target is knocked prone.",
+      "saveDc": 15,
+      "saveType": "Dexterity",
       "damageDicePrimary": "6d6",
       "damageTypePrimary": "Fire",
-      "conditions": [
-        "prone"
-      ],
       "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0128-lair-magma-geyser.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0129",

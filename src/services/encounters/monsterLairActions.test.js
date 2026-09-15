@@ -1236,3 +1236,61 @@ describe('MA-0119 adult-green-dragon fog charm data lock', () => {
     expect(dragon.lair_actions[1].save_type).toBe('Dexterity');
   });
 });
+
+// MA-0128: Adult Red Dragon lair_actions[0] magma geyser was a NAMELESS
+// drifting dict (inert per MV-24/MA-0117 fingerprint) with structured-field
+// drift: save_dc 13/Constitution vs description "DC 15 Dexterity" (the 13/CON
+// pair belongs to row [2] volcanic gases) and a misfiled knocked-prone
+// save_effect (belongs to row [1] tremor). Data-only fix mirrors the
+// verified MA-0064/MA-0074 shape: named save row, dc_success "half"
+// (geyser = half damage on success, no condition), dice untouched.
+describe('MA-0128 adult-red-dragon magma geyser data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-red-dragon');
+  const geyser = dragon.lair_actions[0];
+
+  it('row is now a structured clickable SAVE row named Magma Geyser', () => {
+    expect(typeof geyser).toBe('object');
+    expect(geyser.name).toBe('Magma Geyser');
+    expect(isLairRowClickable(geyser)).toBe(true);
+    expect(lairRowAffordance(geyser)).toBe('save');
+  });
+
+  it('structured fields match the description and canonical SRD (DC 15 DEX, 6d6 Fire, half on success)', () => {
+    expect(geyser.save_dc).toBe(15);
+    expect(geyser.save_type).toBe('Dexterity');
+    expect(geyser.damage_dice_primary).toBe('6d6');
+    expect(geyser.damage_type_primary).toBe('Fire');
+    expect(geyser.dc_success).toBe('half');
+    expect(geyser.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(geyser.description).toMatch(/half as much damage on a successful one/i);
+  });
+
+  it('misfiled prone save_effect removed: zero condition extraction, zero saveConditions', () => {
+    expect(geyser.save_effect).toBeUndefined();
+    expect(extractConditionsFromSaveEffect(geyser.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with 6d6 formula and no conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: geyser,
+      monsterName: 'Adult Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '6d6',
+      saveConditions: extractConditionsFromSaveEffect(geyser.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
+  });
+
+  it('sibling rows untouched: [1] tremor and [2] volcanic gases stay legacy raw strings', () => {
+    expect(typeof dragon.lair_actions[1]).toBe('string');
+    expect(dragon.lair_actions[1]).toMatch(/tremor shakes the lair/i);
+    expect(typeof dragon.lair_actions[2]).toBe('string');
+    expect(dragon.lair_actions[2]).toMatch(/DC 13 Constitution saving throw/i);
+  });
+});
