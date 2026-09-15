@@ -989,3 +989,83 @@ describe('MA-0107 adult-gold-dragon glimpse future + dream plane banishment data
     expect(ancient.lair_actions[1].save_effect).toBeUndefined();
   });
 });
+
+// MA-0117: Adult Green Dragon lair_actions[0] was a NAMELESS dict (MV-24)
+// with INTRA-ROW DRIFT — save_dc 15 ✓ but save_type Wisdom + charm
+// save_effect + 4d8 Piercing damage, all canonically belonging to sibling
+// rows ([1] thorn wall 4d8 piercing, [2] fog Wisdom-charm). Behind the dead
+// `row.name` gate (isLairRowClickable :26) the row was inert AND
+// wrong-mechanic if it had ever armed. Data-only fix (MA-0096 pattern):
+// named "Grasping Roots", de-drifted to its own STR DC 15 → restrained
+// mechanics, dc_success "none" (damageless), no damage fields — arms the
+// untouched MA-0024 seam → handleSaveRoll → MA-0017 damageless failed-save
+// condition landing. Difficult-terrain zone, DC 15 STR escape action, and
+// wilt-when-reused/on-death expiry stay advisory prose (§7 — no zone/
+// rescue-engine/cadence consumer). Sibling rows [1]/[2] stay raw strings —
+// MA-0118/MA-0119 own those rows.
+describe('MA-0117 adult-green-dragon grasping roots data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-green-dragon');
+  const roots = dragon.lair_actions[0];
+
+  it('row is now a structured clickable SAVE row named Grasping Roots', () => {
+    expect(typeof roots).toBe('object');
+    expect(roots.name).toBe('Grasping Roots');
+    expect(isLairRowClickable(roots)).toBe(true);
+    expect(lairRowAffordance(roots)).toBe('save');
+  });
+
+  it('save metadata de-drifted to own mechanics: DC 15 Strength (not Wisdom)', () => {
+    expect(roots.save_dc).toBe(15);
+    expect(roots.save_type).toBe('Strength');
+    expect(roots.description).toMatch(/Grasping roots and vines/i);
+    expect(roots.description).toMatch(/20-foot radius/i);
+    expect(roots.description).toMatch(/DC 15 Strength saving throw/i);
+  });
+
+  it('drift trio removed: no Wisdom save_type, no charm save_effect, no 4d8 piercing', () => {
+    expect(roots.save_type).not.toBe('Wisdom');
+    expect(roots.save_effect).not.toMatch(/charmed/i);
+    expect(roots.save_effect).not.toMatch(/initiative count 20/i);
+    expect(roots.damage_dice_primary).toBeUndefined();
+    expect(roots.damage_type_primary).toBeUndefined();
+    expect(roots.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('no damage authored — dc_success none suppresses half-damage boilerplate', () => {
+    expect(roots.dc_success).toBe('none');
+  });
+
+  it('save_effect vocabulary extracts ONLY restrained (MA-0017 damageless seam)', () => {
+    expect(roots.save_effect).toBe('The target is restrained by the roots and vines.');
+    expect(extractConditionsFromSaveEffect(roots.save_effect)).toEqual(['restrained']);
+  });
+
+  it('advisory residuals annotated in description: difficult terrain, escape action, wilt expiry (GM-enforced, no consumers)', () => {
+    expect(roots.description).toMatch(/difficult terrain is GM-enforced/i);
+    expect(roots.description).toMatch(/DC 15 Strength action to break free/i);
+    expect(roots.description).toMatch(/wilt.*GM-enforced/i);
+    expect(roots.description).toMatch(/no rescue-engine.*consumer|no zone\/movement-cost consumer/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + restrained', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: roots,
+      monsterName: 'Adult Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(roots.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
+  });
+
+  it('sibling rows untouched: [1] thorn wall and [2] fog charm stay raw strings (MA-0118/0119 scope)', () => {
+    expect(dragon.lair_actions[1]).toEqual(expect.any(String));
+    expect(dragon.lair_actions[2]).toEqual(expect.any(String));
+  });
+});
