@@ -2082,7 +2082,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0137-chill.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0138",

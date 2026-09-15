@@ -690,6 +690,21 @@ describe('MA-0085 adult-bronze-dragon fog cloud + thunderclap data lock', () => 
   });
 });
 
+// MA-0137 (clean-code note): Adult Silver Dragon lair_actions[1] raw-string
+// cold-wind row carried the letter-O damage typo "1dlO" (MA-0085 family) —
+// MV-12 suppresses the unparseable token, so the canonical 5 (1d10) cold
+// damage was silently dropped. Data-only fix: author "1d10" explicitly.
+describe('MA-0137 adult-silver-dragon lair cold-wind typo data lock', () => {
+  const wind = monstersData.find(m => m.index === 'adult-silver-dragon').lair_actions[1];
+
+  it('[1] raw-string cold wind authors canonical 1d10 — no letter-O token', () => {
+    expect(typeof wind).toBe('string');
+    expect(wind).not.toMatch(/1dlO/);
+    expect(wind).toMatch(/5 \(1d10\) cold damage/i);
+    expect(wind).toMatch(/DC 15 Constitution saving throw/i);
+  });
+});
+
 // MA-0096: Adult Copper Dragon lair_actions[0] was a NAMELESS dict (MV-24) —
 // save_dc 15 Dexterity + restrained authored behind the dead `row.name` gate
 // (isLairRowClickable :26) → inert static branch, header "." rendered, save
