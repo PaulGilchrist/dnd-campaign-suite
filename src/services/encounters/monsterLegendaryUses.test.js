@@ -1164,3 +1164,37 @@ describe('MA-0195 Ancient Bronze Dragon legendary economy (header uses:3)', () =
     expect(regain).toEqual({ regained: true, max: 3 });
   });
 });
+
+// MA-0206: Ancient Copper Dragon header uses:3 (MA-0070/0184/0195 pattern)
+// — byte-mirrors adult-copper header; gating auto-routes numeric rows
+// (Giggling Magic) through the spend gate (MA-0136/0184), killing the
+// ungated leak. Giggling Magic gains dc_success:"none" + honest success
+// wording per adult "no effect on a successful save" precedent.
+describe('MA-0206 Ancient Copper Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-copper-dragon');
+
+  it('header byte-matches adult-copper sibling; Giggling Magic dc_success none', () => {
+    expect(JSON.stringify(ancient.legendary_actions[0])).toBe(JSON.stringify(adult.legendary_actions[0]));
+    expect(ancient.legendary_actions[0].uses).toBe(3);
+    expect(ancient.legendary_actions[1].dc_success).toBe('none');
+    expect(ancient.legendary_actions[1].save_effect).toMatch(/Success: no damage and no debuff/);
+  });
+
+  it('economy walk: spend after other creature, turn latch refusal, turn-start regain', async () => {
+    const cs = { activeCreatureName: 'Thug 1' };
+    const store = {};
+    const logs = [];
+    const deps = { getCombatContext: () => cs, addEntry: (_c, e) => logs.push(e), getRuntimeValue: (_m, k) => store[k] ?? null, setRuntimeValue: (_m, k, v) => { store[k] = v; return Promise.resolve(); } };
+    const monster = { legendary_actions: ancient.legendary_actions };
+    const giggling = ancient.legendary_actions[1];
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Copper Dragon 1', monster, actionName: 'Giggling Magic', action: giggling, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Copper Dragon 1', monster, actionName: 'Giggling Magic', action: giggling, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+    cs.activeCreatureName = 'Ancient Copper Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Copper Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+  });
+});
