@@ -1064,8 +1064,96 @@ describe('MA-0117 adult-green-dragon grasping roots data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
   });
 
-  it('sibling rows untouched: [1] thorn wall and [2] fog charm stay raw strings (MA-0118/0119 scope)', () => {
-    expect(dragon.lair_actions[1]).toEqual(expect.any(String));
+  it('sibling rows: [1] thorn wall now structured (MA-0118), [2] fog charm stays raw string (MA-0119 scope)', () => {
+    expect(dragon.lair_actions[1]).toEqual(expect.any(Object));
+    expect(dragon.lair_actions[1].name).toBe('Wall of Thorns');
+    expect(dragon.lair_actions[2]).toEqual(expect.any(String));
+  });
+});
+
+// MA-0118: Adult Green Dragon lair_actions[1] was a RAW STRING
+// (MA-0097/MA-0108 inert fingerprint) — behind the MonsterCardBody.jsx
+// string short-circuit (:340) the row rendered prose with zero affordance:
+// no DC 15 Dexterity roll, no 4d8 piercing, no push, no logs. Data-only fix
+// (MA-0117 sibling pattern): named "Wall of Thorns" dict arming the MA-0024
+// save seam — chip "DC 15 Dexterity" → handleSaveRoll → 4d8 Piercing with
+// half-on-success block-save math (dc_success "half"). LAIR_ADVISORY_NOTE
+// already covers initiative-20 cadence. Residuals stay advisory prose
+// (§7 — no zone/object/movement-cost/lair-cadence consumer): recurring
+// once-each-round contact saves, exact-distance push (MA-0079 parse expects
+// "pushed up to N feet" — canonical is exact 5 ft, wording NOT falsified),
+// wall object stats per 10-ft section, 4-ft-per-1-ft movement cost, and
+// sinks-back-when-reused/on-death expiry.
+describe('MA-0118 adult-green-dragon wall of thorns data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-green-dragon');
+  const wall = dragon.lair_actions[1];
+
+  it('row is now a structured clickable SAVE row named Wall of Thorns', () => {
+    expect(typeof wall).toBe('object');
+    expect(wall.name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(wall)).toBe(true);
+    expect(lairRowAffordance(wall)).toBe('save');
+  });
+
+  it('save metadata: DC 15 Dexterity, 4d8 Piercing, half on success', () => {
+    expect(wall.save_dc).toBe(15);
+    expect(wall.save_type).toBe('Dexterity');
+    expect(wall.damage_dice_primary).toBe('4d8');
+    expect(wall.damage_type_primary).toBe('Piercing');
+    expect(wall.dc_success).toBe('half');
+  });
+
+  it('description keeps verbatim canonical prose: wall shape, DC 15 DEX, push, recurring save, object stats', () => {
+    expect(wall.description).toMatch(/wall of tangled brush bristling with thorns/i);
+    expect(wall.description).toMatch(/60 feet long, 10 feet high, and 5 feet thick/i);
+    expect(wall.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(wall.description).toMatch(/18 \(4d8\) piercing damage/i);
+    expect(wall.description).toMatch(/pushed 5 feet out of the wall's space/i);
+    expect(wall.description).toMatch(/once each round it's in contact with the wall/i);
+    expect(wall.description).toMatch(/AC 5, 15 hit points/i);
+    expect(wall.description).toMatch(/vulnerability to fire/i);
+    expect(wall.description).toMatch(/resistance to bludgeoning and piercing/i);
+    expect(wall.description).toMatch(/immunity to psychic/i);
+    expect(wall.description).toMatch(/sinks back into the ground/i);
+  });
+
+  it('save_effect vocabulary: full 4d8 piercing + push prose; NO canonical condition extracted (damage-only leg)', () => {
+    expect(wall.save_effect).toBe("The target takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space.");
+    expect(extractConditionsFromSaveEffect(wall.save_effect)).toEqual([]);
+  });
+
+  it('advisory residuals annotated in description: recurring cadence, push parse gap, wall object stats, movement cost, sinks-back expiry (GM-enforced, no consumers)', () => {
+    expect(wall.description).toMatch(/recurring once-each-round contact-save cadence/i);
+    expect(wall.description).toMatch(/pushed up to N feet/i);
+    expect(wall.description).toMatch(/GM-enforced/i);
+    expect(wall.description).toMatch(/no zone\/object\/movement-cost\/lair-cadence consumer/i);
+  });
+
+  it('save row routes through handleSaveRoll with 4d8 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wall,
+      monsterName: 'Adult Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '4d8',
+      saveConditions: extractConditionsFromSaveEffect(wall.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wall, '4d8', []);
+  });
+
+  it('push clause NOT falsified: canonical exact "pushed 5 feet" does not match the MA-0079 up-to regex (documented residual, no new engine)', () => {
+    expect(wall.save_effect).toMatch(/pushed 5 feet/);
+    expect(wall.save_effect).not.toMatch(/pushed up to \d+ feet/i);
+  });
+
+  it('sibling rows untouched: [0] Grasping Roots stays de-drifted STR save, [2] fog charm stays raw string (MA-0119 scope)', () => {
+    expect(dragon.lair_actions[0].name).toBe('Grasping Roots');
+    expect(dragon.lair_actions[0].save_type).toBe('Strength');
     expect(dragon.lair_actions[2]).toEqual(expect.any(String));
   });
 });

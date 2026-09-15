@@ -2421,7 +2421,16 @@
         "dc_success": "none",
         "save_effect": "The target is restrained by the roots and vines."
       },
-      "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec­ tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
+      {
+        "name": "Wall of Thorns",
+        "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec­ tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies. The recurring once-each-round contact-save cadence, the exact 5-foot push out of the wall's space (the MA-0079 push-marker parse expects a \"pushed up to N feet\" clause), the wall object stats (AC 5, 15 hit points per 10-foot section, vulnerability to fire, resistance to bludgeoning and piercing, immunity to psychic), the 4-feet-of-movement-per-1-foot cost, and the sinks-back-when-reused/on-death expiry are GM-enforced (no zone/object/movement-cost/lair-cadence consumer).",
+        "save_dc": 15,
+        "save_type": "Dexterity",
+        "dc_success": "half",
+        "damage_dice_primary": "4d8",
+        "damage_type_primary": "Piercing",
+        "save_effect": "The target takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space."
+      },
       "Magical fog billows around one creature the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Wisdom saving throw or be charmed by the dragon until initiative count 20 on the next round."
     ],
     "environments": [
