@@ -1608,7 +1608,7 @@ describe('MA-0130 adult-red-dragon volcanic gases data lock', () => {
 // obscured area, wind dispersal and initiative-20 cadence stay GM-advisory
 // prose residuals (no turn-end zone-damage consumer, no initiative lair
 // seam — MA-0024 residual). Sibling row [1] ice shards was converted to a
-// structured ATTACK row in MA-0150; [2] wall of ice raw string stays static.
+// structured ATTACK row in MA-0150; [2] wall of ice advisory row in MA-0151.
 describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
   const dragon = monstersData.find(m => m.index === 'adult-white-dragon');
   const fog = dragon.lair_actions[0];
@@ -1653,9 +1653,10 @@ describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
   });
 
-  it('sibling rows: [1] ice shards structured ATTACK row (MA-0150), [2] wall of ice stays raw string', () => {
+  it('sibling rows: [1] ice shards structured ATTACK row (MA-0150), [2] wall of ice advisory row (MA-0151)', () => {
     expect(typeof dragon.lair_actions[1]).toBe('object');
-    expect(typeof dragon.lair_actions[2]).toBe('string');
+    expect(typeof dragon.lair_actions[2]).toBe('object');
+    expect(lairRowAffordance(dragon.lair_actions[2])).toBe('advisory');
   });
 
   it('ancient-white-dragon scope guard: its nameless fog dict (with save_effect) is NOT touched by this fix', () => {
@@ -1736,10 +1737,11 @@ describe('MA-0150 adult-white-dragon jagged ice shards data lock', () => {
     expect(handleDamage).not.toHaveBeenCalled();
   });
 
-  it('sibling rows untouched: [0] Freezing Fog save row (MA-0149) and [2] wall of ice raw string', () => {
+  it('sibling rows untouched: [0] Freezing Fog save row (MA-0149) and [2] wall of ice advisory row (MA-0151)', () => {
     expect(dragon.lair_actions[0].name).toBe('Freezing Fog');
     expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
-    expect(typeof dragon.lair_actions[2]).toBe('string');
+    expect(dragon.lair_actions[2].name).toBe('Wall of Ice');
+    expect(lairRowAffordance(dragon.lair_actions[2])).toBe('advisory');
   });
 
   it('ancient-white-dragon scope guard: its jagged-ice raw string is NOT touched by this fix', () => {
@@ -1754,5 +1756,91 @@ describe('MA-0150 adult-white-dragon jagged ice shards data lock', () => {
     expect(jagged.name).toBeUndefined();
     expect(jagged.attack_bonus).toBeUndefined();
     expect(isLairRowClickable(jagged)).toBe(false);
+  });
+});
+
+// MA-0151: Adult White Dragon lair_actions[2] wall of ice was a raw string
+// (MA-0118 inert fingerprint) → static text row, zero affordance, zero logs
+// (live inert, 2026-09-14). Data-only fix mirroring the MA-0107 fog-split
+// advisory vocabulary ({name, advisory:"<key>", description}): the row is a
+// pure terrain/object action — AC 5 / 30 hp per 10-ft section, fire
+// vulnerability, acid/cold/necrotic/poison/psychic immunity, 5-ft push on
+// appear, 120-ft placement gate, keyed replacement ("disappears when used
+// again or the dragon dies") — with NO save, attack, or damage leg, so the
+// MA-0024 save/attack/damage/zone affordances cannot adjudicate any clause.
+// It arms the ADVISORY affordance instead: clickable .mc-dice-link-lair chip
+// → advisory popup + spell-named ability_use record, initiative-20 cadence
+// GM-enforced (§7 residual). True terrain-object enforcement (wall as
+// persistent AC/HP object, push-on-appear, keyed replacement, a
+// lair_wall_of_ice te) is the documented §7 residual — NOT built here.
+describe('MA-0151 adult-white-dragon wall of ice advisory data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'adult-white-dragon');
+  const wall = dragon.lair_actions[2];
+  const VERBATIM = "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec\u00ad tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies.";
+
+  it('row is now a named clickable ADVISORY row (was inert raw string)', () => {
+    expect(typeof wall).toBe('object');
+    expect(wall.name).toBe('Wall of Ice');
+    expect(wall.advisory).toBe('wall_of_ice');
+    expect(isLairRowClickable(wall)).toBe(true);
+    expect(lairRowAffordance(wall)).toBe('advisory');
+  });
+
+  it('description kept verbatim (terrain-object clauses retained as GM-advisory prose, §7 residual)', () => {
+    expect(wall.description).toBe(VERBATIM);
+    expect(wall.description).toMatch(/AC 5, 30 hit points/i);
+    expect(wall.description).toMatch(/pushed 5 feet/i);
+    expect(wall.description).toMatch(/within 120 feet/i);
+    expect(wall.description).toMatch(/disappears when the dragon uses this lair action again/i);
+  });
+
+  it('no machine-readable enforcement keys — no fake save/attack/damage/zone authored', () => {
+    expect(wall.save_dc).toBeUndefined();
+    expect(wall.save_type).toBeUndefined();
+    expect(wall.attack_bonus).toBeUndefined();
+    expect(wall.damage_dice_primary).toBeUndefined();
+    expect(wall.zone).toBeUndefined();
+  });
+
+  it('advisory click logs ability_use record, zero save/attack/damage/zone', async () => {
+    const logs = [];
+    const setPopupHtml = vi.fn();
+    const res = await resolveLairRow({
+      action: wall,
+      monsterName: 'Adult White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].abilityName).toBe('Wall of Ice');
+    expect(logs[0].description).toMatch(/casts wall of ice/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(logs[0].description).not.toMatch(/save DC/i);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringMatching(/Lair Action — Wall of Ice/));
+  });
+
+  it('sibling rows intact: [0] Freezing Fog save row (MA-0149), [1] Jagged Ice Shards attack row (MA-0150)', () => {
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
+    expect(dragon.lair_actions[0].save_dc).toBe(10);
+    expect(lairRowAffordance(dragon.lair_actions[1])).toBe('attack');
+    expect(dragon.lair_actions[1].attack_bonus).toBe(7);
+  });
+
+  it('no lair_wall_of_ice te registered (§7 residual model not built)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    expect(getEffectDefinition('lair_wall_of_ice')).toBeFalsy();
+  });
+
+  it('ancient-white-dragon scope guard: its wall of ice raw string is NOT touched by this fix', () => {
+    const ancient = monstersData.find(m => m.index === 'ancient-white-dragon');
+    expect(typeof ancient.lair_actions[2]).toBe('string');
+    expect(isLairRowClickable(ancient.lair_actions[2])).toBe(false);
   });
 });
