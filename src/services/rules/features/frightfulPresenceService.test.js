@@ -171,6 +171,55 @@ describe('MA-0147 Adult White Dragon FP — CHA row engages the MA-0048 service'
     });
 });
 
+describe('MA-0163 Ancient Black Dragon FP — WIS row engages the MA-0048 service', () => {
+    const ABD = 'Ancient Black Dragon 1';
+
+    it('authored row shape arms trackFrightfulPresence with Wisdom DC 21 te + 10-round clock', async () => {
+        const monsters = (await import('../../../../public/data/monsters.json')).default;
+        const row = monsters.find(m => m.name === 'Ancient Black Dragon').legendary_actions.find(a => a.name === 'Frightful Presence');
+        expect(row.save_dc).toBe(21);
+        expect(row.save_type).toBe('Wisdom');
+        expect(row.repeat_save).toEqual({ condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 });
+        expect(row.success_immunity?.effect).toBe(FP_IMMUNITY_TE_EFFECT);
+        // saveProcessing:387 arms on context.repeatSave truthy (row.repeat_save forwarded)
+        await trackFrightfulPresence({ campaignName: CAMPAIGN, attackerName: ABD, targetName: TARGET, saveType: row.repeat_save.save_type, saveDc: row.save_dc });
+        expect(registered[0]).toMatchObject({ targetName: TARGET, effectKey: FP_TE_EFFECT, source: ABD, dc: 21, saveType: 'Wisdom' });
+        expect(expirations[0].rounds).toBe(10);
+    });
+
+    it('turn-END repeat save with Wisdom DC 21 te: success strips te + grants 24h immunity sourced from the dragon', async () => {
+        csCreatures = [{ name: TARGET, type: 'player' }];
+        armFpTe({ dc: 21, source: ABD });
+        runtimeStore[`${TARGET}.activeConditions`] = ['frightened'];
+        nextSaveSuccess = true;
+
+        const res = await applyFrightfulPresenceTurnEnd(CAMPAIGN, TARGET);
+        expect(res.handled).toBe(true);
+        expect(res.success).toBe(true);
+        expect(listenerOpts[0]).toMatchObject({ targetName: TARGET, saveType: 'WIS', saveDc: 21, dcSuccess: 'none' });
+        expect(runtimeStore['campaign.targetEffects']).toEqual([]);
+        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual([]);
+        expect(registered).toEqual([expect.objectContaining({ targetName: TARGET, effectKey: FP_IMMUNITY_TE_EFFECT, source: ABD, rounds: 14400 })]);
+        expect(logs.some(l => l.rollType === 'save-fp-repeat' && l.success === true)).toBe(true);
+    });
+
+    it('failed repeat save vs DC 21: Frightened stays, te stays, no immunity', async () => {
+        csCreatures = [{ name: TARGET, type: 'npc', saveBonuses: { wis: 1 } }];
+        armFpTe({ dc: 21, source: ABD });
+        runtimeStore[`${TARGET}.activeConditions`] = ['frightened'];
+        vi.spyOn(Math, 'random').mockReturnValue(0); // roll 1 → 2 < 21 fail
+
+        const res = await applyFrightfulPresenceTurnEnd(CAMPAIGN, TARGET);
+        expect(res.handled).toBe(true);
+        expect(res.success).toBe(false);
+        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['frightened']);
+        expect(runtimeStore['campaign.targetEffects']).toHaveLength(1);
+        expect(registered).toHaveLength(0);
+        expect(logs.some(l => l.rollType === 'save-fp-repeat' && l.success === false)).toBe(true);
+        vi.restoreAllMocks();
+    });
+});
+
 describe('grantFrightfulPresenceImmunity (MA-0048)', () => {
     it('writes 24h te (14400 rounds, CLA-334 minutes×10) + clock + granted log', async () => {
         await grantFrightfulPresenceImmunity({ campaignName: CAMPAIGN, attackerName: ATTACKER, targetName: TARGET, reason: 'test' });
