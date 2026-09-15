@@ -1136,6 +1136,15 @@ describe('MA-0195 Ancient Bronze Dragon legendary economy (header uses:3)', () =
     expect(header.uses).toBe(3);
     expect(ancient.legendary_actions[3].dc_success).toBe('none');
     expect(ancient.legendary_actions[3].save_effect).toMatch(/Success: no damage/);
+    const gl = ancient.legendary_actions[1];
+    expect(Object.keys(gl).sort()).toEqual(Object.keys(adult.legendary_actions[1]).sort());
+    expect(gl.attack_bonus).toBe(14);
+    expect(gl.spell_attack_bonus).toBe(14);
+    expect(gl.range).toBe('120 ft.');
+    expect(gl.damage_dice_primary).toBe('5d6');
+    expect(gl.damage_type_primary).toBe('Radiant');
+    expect(gl.description).toMatch(/\+14 to hit/);
+    expect(gl.description).toMatch(/GM-enforced, CLA-325/);
     const cs = { activeCreatureName: 'Thug 1' };
     const logs = [];
     const store = {};
