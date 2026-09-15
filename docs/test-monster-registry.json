@@ -214,5 +214,17 @@
       "verifiedRow": "MA-0212 (FAIL replace-B die: te/logs 1d6 vs data 1d10 — bug-mon-MA-0212-multiattack.md; Rends+A exact; repeat-save consumer live; GuidingBolt rider inert) | MA-0213 (PASS Rend chip: 2 hits exact Slashing+Fire, 1 miss nat1 zero-dmg) | MA-0214 (PASS Fire Breath cone DC24: fail full 13d10, success floor-half; recharge refusal+d6 recovery@6 live)",
       "date": "2026-09-15"
     }
+  },
+  "adult-silver-dragon": {
+    "monsterIndex": "adult-silver-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Adult Silver Dragon 1",
+      "hp": 216,
+      "ac": 19,
+      "init": 3,
+      "csIndex": 0,
+      "verifiedRow": "MA-0136 (FIXED: header uses:3 + Chill save shape DC19 WIS dc_success none + Pounce delegates_to Rend; counter/spend/refusal/regain live 2026-09-15)"
+    }
   }
 }

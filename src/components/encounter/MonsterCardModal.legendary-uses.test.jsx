@@ -1286,3 +1286,153 @@ describe('MA-0127 MonsterCardModal red dragon Pounce gated delegate row', () => 
     expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
   });
 });
+
+const silver = () => monstersData.find(m => m.name === 'Adult Silver Dragon');
+const silverActions = () => [{ name: 'Rend', attack_bonus: 13, damage_dice_primary: '2d8 + 8', damage_type_primary: 'Slashing', damage_dice_secondary: '1d8', damage_type_secondary: 'Cold', reach: '10 ft.' }];
+
+// MA-0136 data lock: Adult Silver Dragon legendary rows mirror the verified
+// MA-0070/MA-0113/MA-0124 shape — header authors uses:3 (counter renders,
+// 4-in-lair stays advisory), Chill authors the numeric save shape mirroring
+// red Commanding Presence (DC 19 from the Spellcasting block, Wisdom per
+// hold-monster dc_type, dc_success none, paralyzed mechanical marker),
+// Cold Gale stays byte-identical (generic save path, default half matches
+// "Half damage only" prose), Pounce delegates to the +13 Rend row.
+describe('MA-0136 monsters.json data: adult silver dragon legendary economy authored', () => {
+  it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
+    const la = silver().legendary_actions;
+    expect(la[0].name).toMatch(/Legendary Action Uses: 3 \(4 in Lair\)/);
+    expect(la[0].uses).toBe(3);
+    expect(la[0].description).toMatch(/lair.*advisory/i);
+  });
+
+  it('Chill authors DC 19 Wisdom, dc_success none, paralyzed save_effect (inert prose gone)', () => {
+    const row = silver().legendary_actions.find(a => a.name === 'Chill');
+    expect(row.save_dc).toBe(19);
+    expect(row.save_type).toBe('Wisdom');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary == null).toBe(true);
+    expect(row.save_effect).toMatch(/paralyzed/i);
+    expect(row.description).toMatch(/Hold Monster/i);
+    expect(row.description).toMatch(/DC 19 Wisdom saving throw/i);
+    expect(row.description).toMatch(/90 feet.*advisory|advisory/i);
+    expect(row.description).toMatch(/can'?t take this action again until the start of its next turn/i);
+    expect(silver().actions.find(a => a.name === 'Spellcasting')?.save_dc).toBe(19);
+    const hold = spells2024.find(s => s.index === 'hold-monster');
+    expect(hold.dc.dc_type).toBe('WIS');
+    expect(hold.dc.dc_success).toBe('none');
+  });
+
+  it('Cold Gale untouched: DC 19 Dexterity, 4d6 Cold, dc_success default half matches prose', () => {
+    const row = silver().legendary_actions.find(a => a.name === 'Cold Gale');
+    expect(row.save_dc).toBe(19);
+    expect(row.save_type).toBe('Dexterity');
+    expect(row.dc_success == null).toBe(true);
+    expect(row.damage_dice_primary).toBe('4d6');
+    expect(row.damage_type_primary).toBe('Cold');
+    expect(row.save_effect).toMatch(/Half damage only/);
+  });
+
+  it('Pounce delegates_to the +13 Rend row with the verbatim advisory movement clause', () => {
+    const row = silver().legendary_actions.find(a => a.name === 'Pounce');
+    expect(row.delegates_to).toBe('Rend');
+    expect(row.attack_bonus == null && row.save_dc == null && row.uses == null).toBe(true);
+    expect(row.description).toBe('The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
+    expect(silver().actions.find(a => a.name === 'Rend')?.attack_bonus).toBe(13);
+  });
+});
+
+// MA-0136: with the header authored, the silver dragon card renders the
+// "(3 left)" counter and every legendary row click routes through the gated
+// spend (Cold Gale no longer the ungated generic save path).
+describe('MA-0136 MonsterCardModal silver dragon legendary gated rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderSilver(uses) {
+    if (uses !== undefined) runtime.store['Adult Silver Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Adult Silver Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 216, maxHp: 216, ac: 19, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Adult Silver Dragon', actions: silverActions(), legendary_actions: silver().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Silver Dragon 1', creatures })} />);
+  }
+  function silverRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('header shows (3 left); Chill renders the DC 19 Wisdom save chip; Pounce the expend chip', () => {
+    renderSilver({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    expect(silverRow('Chill').querySelector('.mc-dice-link-save-clickable').textContent).toMatch(/DC 19 Wisdom/);
+    expect(silverRow('Pounce').querySelector('.mc-dice-link-legendary')).toBeTruthy();
+  });
+
+  it('Chill gated click spends 1, stamps chill latch, rolls damageless WIS DC 19 (paralyzed, no auto-damage)', async () => {
+    renderSilver({ max: 3, used: 0 });
+    fireEvent.click(silverRow('Chill').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ chill: { round: 1 } });
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('WIS');
+    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(context.saveDc).toBe(19);
+    expect(context.saveType).toBe('Wisdom');
+    expect(context.dcSuccess).toBe('none');
+    expect(context.autoDamageFormula == null).toBe(true);
+    expect(context.saveConditions).toEqual(['paralyzed']);
+    expect(context.targetName).toBe('TestPC');
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Chill/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Chill/);
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('Cold Gale gated click spends 1 (no longer the ungated generic save path), stamps cold_gale cooldown, half-on-save intact', async () => {
+    renderSilver({ max: 3, used: 0 });
+    fireEvent.click(silverRow('Cold Gale').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ cold_gale: { round: 1 } });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Cold Gale/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Cold Gale/);
+    expect(document.querySelector('.sp-overlay')).toBeTruthy();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+
+  it('Pounce gated click spends 1 and rolls delegated Rend +13 named "Pounce (Rend attack)"', async () => {
+    renderSilver({ max: 3, used: 0 });
+    fireEvent.click(silverRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Pounce (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(13);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Pounce/);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (3/3): save-chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderSilver({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(silverRow('Cold Gale').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
+    renderSilver({ max: 3, used: 0 });
+    fireEvent.click(silverRow('Cold Gale').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(silverRow('Cold Gale').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult Silver Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+  });
+});
