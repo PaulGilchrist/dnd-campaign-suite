@@ -2431,7 +2431,14 @@
         "damage_type_primary": "Piercing",
         "save_effect": "The target takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space."
       },
-      "Magical fog billows around one creature the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Wisdom saving throw or be charmed by the dragon until initiative count 20 on the next round."
+      {
+        "name": "Fog Charm",
+        "description": "Magical fog billows around one creature the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Wisdom saving throw or be charmed by the dragon until initiative count 20 on the next round. The \"until initiative count 20 on the next round\" expiry is GM-enforced (no initiative lair seam — the charmed condition persists until manually cleared); the fog is not modeled as a zone/obscurement effect (no zone consumer).",
+        "save_dc": 15,
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "save_effect": "The target is charmed by the dragon."
+      }
     ],
     "environments": [
       "coastal"
