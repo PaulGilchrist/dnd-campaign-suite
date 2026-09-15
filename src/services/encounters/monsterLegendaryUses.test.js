@@ -1145,6 +1145,9 @@ describe('MA-0195 Ancient Bronze Dragon legendary economy (header uses:3)', () =
     expect(gl.damage_type_primary).toBe('Radiant');
     expect(gl.description).toMatch(/\+14 to hit/);
     expect(gl.description).toMatch(/GM-enforced, CLA-325/);
+    const pounce = ancient.legendary_actions[2];
+    expect(JSON.stringify(pounce)).toBe(JSON.stringify(adult.legendary_actions[2]));
+    expect(pounce.delegates_to).toBe('Rend');
     const cs = { activeCreatureName: 'Thug 1' };
     const logs = [];
     const store = {};
