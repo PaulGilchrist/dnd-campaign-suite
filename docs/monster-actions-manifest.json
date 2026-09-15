@@ -2828,7 +2828,7 @@
       "monsterIndex": "ancient-brass-dragon",
       "monster": "Ancient Brass Dragon",
       "actionIndex": 0,
-      "actionName": "Unnamed lair actions 1",
+      "actionName": "Strong Wind",
       "category": "lair_actions",
       "actionType": "other",
       "saveDc": 15,
@@ -2837,7 +2837,7 @@
         "prone"
       ],
       "description": "A strong wind blows around the dragon. Each creature within 60 feet of the dragon must succeed on a DC 15 Strength saving throw or be pushed 15 feet away from the dragon and knocked prone. Gases and vapors are dispersed by the wind, and unprotected flames are extinguished. Protected flames, such as lanterns, have a 50 percent chance of being extinguished.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0188-lair-wind.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0189",
@@ -2845,7 +2845,7 @@
       "monsterIndex": "ancient-brass-dragon",
       "monster": "Ancient Brass Dragon",
       "actionIndex": 1,
-      "actionName": "Unnamed lair actions 2",
+      "actionName": "Sand Cloud",
       "category": "lair_actions",
       "actionType": "other",
       "saveDc": 15,
@@ -2854,7 +2854,7 @@
         "blinded"
       ],
       "description": "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in it must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0189-lair-sand-cloud.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0190",

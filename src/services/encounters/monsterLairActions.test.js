@@ -2418,3 +2418,42 @@ describe('MA-0178 ancient-blue-dragon lightning arcs data lock', () => {
     expect(adult.lair_actions.length).toBe(3);
   });
 });
+
+// MA-0188/MA-0189: Ancient Brass Dragon lair block — both rows were nameless
+// dicts (stray-`.` inert, zero chips). Fix byte-mirrors the adult-brass
+// verified rows verbatim: MA-0074 named Strength save (push+prone advisory,
+// no damage) and MA-0063/0075 Sand Cloud zone shape (lair_sand_cloud te,
+// repeat-save advisory).
+describe('MA-0188/MA-0189 ancient brass dragon lair rows byte-mirror adult-brass', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-brass-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-brass-dragon');
+
+  it('both rows named and byte-identical to the adult-brass siblings', () => {
+    expect(JSON.stringify(ancient.lair_actions[0])).toBe(JSON.stringify(adult.lair_actions[0]));
+    expect(JSON.stringify(ancient.lair_actions[1])).toBe(JSON.stringify(adult.lair_actions[1]));
+    expect(isLairRowClickable(ancient.lair_actions[0])).toBe(true);
+    expect(isLairRowClickable(ancient.lair_actions[1])).toBe(true);
+  });
+
+  it('Strong Wind: DC 15 Strength, dc_success none, prone in save_effect vocab, no damage fields', () => {
+    const wind = ancient.lair_actions[0];
+    expect(wind.name).toBe('Strong Wind');
+    expect(wind.save_dc).toBe(15);
+    expect(wind.save_type).toBe('Strength');
+    expect(wind.dc_success).toBe('none');
+    expect(wind.damage_dice_primary == null).toBe(true);
+    expect(extractConditionsFromSaveEffect(wind.save_effect)).toContain('prone');
+    expect(lairRowAffordance(wind)).toBe('save');
+  });
+
+  it('Sand Cloud: zone radius 20 lair_sand_cloud repeat_save, blinded vocab, honest no-damage copy', () => {
+    const cloud = ancient.lair_actions[1];
+    expect(cloud.name).toBe('Sand Cloud');
+    expect(cloud.zone.radius_ft).toBe(20);
+    expect(cloud.zone.effect_key).toBe('lair_sand_cloud');
+    expect(cloud.zone.repeat_save).toBe(true);
+    expect(cloud.dc_success).toBe('none');
+    expect(extractConditionsFromSaveEffect(cloud.save_effect)).toContain('blinded');
+    expect(cloud.save_effect).toMatch(/deals no damage/i);
+  });
+});
