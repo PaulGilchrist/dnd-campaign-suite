@@ -748,6 +748,113 @@ describe('MA-0113 MonsterCardModal green dragon legendary gated rows', () => {
   });
 });
 
+const red = () => monstersData.find(m => m.name === 'Adult Red Dragon');
+const redActions = () => [{ name: 'Rend', attack_bonus: 14, damage_dice_primary: '1d10 + 8', damage_type_primary: 'Slashing', reach: '10 ft.' }];
+
+// MA-0124 data lock: Adult Red Dragon legendary header mirrors the verified
+// MA-0070/MA-0081/MA-0092/MA-0103/MA-0113 shape — header authors uses:3
+// (counter renders; 4-in-lair stays advisory, monsterLegendaryUses.js:114).
+// SCOPE HEADER ONLY: Commanding Presence / Fiery Rays / Pounce stay verbatim
+// (their save/attack payloads are MA-0125/MA-0126/MA-0127) — per the MA-0021
+// verbatim-row behavior the gated "Expend Legendary" chip makes each row
+// click-to-spend with zero mechanic legs (console.error adjudication
+// residual owned by those bug files).
+describe('MA-0124 monsters.json data: adult red dragon legendary header authors uses:3', () => {
+  it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
+    const la = red().legendary_actions;
+    expect(la[0].name).toMatch(/Legendary Action Uses: 3 \(4 in Lair\)/);
+    expect(la[0].uses).toBe(3);
+    expect(la[0].description).toMatch(/lair.*advisory/i);
+  });
+
+  it('Commanding Presence / Fiery Rays / Pounce remain verbatim (MA-0125/0126/0127 own payloads)', () => {
+    for (const name of ['Commanding Presence', 'Fiery Rays', 'Pounce']) {
+      const row = red().legendary_actions.find(a => a.name === name);
+      expect(row.uses == null).toBe(true);
+      expect(row.save_dc == null).toBe(true);
+      expect(row.attack_bonus == null).toBe(true);
+    }
+  });
+});
+
+// MA-0124: with the header authored, the red dragon card renders the
+// "(3 left)" counter and every legendary row click routes through the gated
+// spend (never the ungated generic handlers).
+describe('MA-0124 MonsterCardModal red dragon legendary gated rows', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderRed(uses) {
+    if (uses !== undefined) runtime.store['Adult Red Dragon 1.monsterLegendaryUses'] = uses;
+    const m = makeMonster({
+      name: 'Adult Red Dragon',
+      actions: redActions(),
+      legendary_actions: red().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Red Dragon 1', creatures: CREATURES })} />);
+  }
+  function redRow(name) {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
+  }
+
+  it('header shows (3 left); verbatim Fiery Rays renders the gated expend chip and click spends 1, logs spend, zero roll', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderRed({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    const chip = redRow('Fiery Rays').querySelector('.mc-dice-link-legendary');
+    expect(chip).toBeTruthy();
+    fireEvent.click(chip);
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Fiery Rays/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Fiery Rays/);
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Fiery Rays'));
+    errSpy.mockRestore();
+  });
+
+  it('exhausted (3/3): Commanding Presence click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderRed({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderRed({ max: 3, used: 0 });
+    fireEvent.click(redRow('Fiery Rays').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(redRow('Fiery Rays').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    errSpy.mockRestore();
+  });
+
+  it('per-action cooldown: Commanding Presence re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderRed({ max: 3, used: 0 });
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ commanding_presence: { round: 1 } });
+    ctx.value = { round: 1, activeCreatureName: 'TestPC', creatures: CREATURES };
+    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'commanding_presence_refused (once per turn)')).toBe(true));
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    errSpy.mockRestore();
+  });
+});
+
 describe('MA-0021 MonsterCardModal legendary economy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
