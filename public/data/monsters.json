@@ -2571,7 +2571,8 @@
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [

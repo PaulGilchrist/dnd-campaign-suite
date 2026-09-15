@@ -749,13 +749,16 @@ describe('MA-0113 MonsterCardModal green dragon legendary gated rows', () => {
 });
 
 const red = () => monstersData.find(m => m.name === 'Adult Red Dragon');
-const redActions = () => [{ name: 'Rend', attack_bonus: 14, damage_dice_primary: '1d10 + 8', damage_type_primary: 'Slashing', reach: '10 ft.' }];
+// MA-0127: mirrors the live actions[1] Rend exactly (secondary Fire leg rides
+// the delegate through buildAutoDamageOptions autoDamageSecondaryFormula).
+const redActions = () => [{ name: 'Rend', attack_bonus: 14, damage_dice_primary: '1d10 + 8', damage_type_primary: 'Slashing', damage_dice_secondary: '2d4', damage_type_secondary: 'Fire', reach: '10 ft.' }];
 
 // MA-0124 data lock: Adult Red Dragon legendary header mirrors the verified
 // MA-0070/MA-0081/MA-0092/MA-0103/MA-0113 shape — header authors uses:3
 // (counter renders; 4-in-lair stays advisory, monsterLegendaryUses.js:114).
 // SCOPE HEADER ONLY: Commanding Presence / Fiery Rays payloads landed in
-// MA-0125 / MA-0126; Pounce stays verbatim (MA-0127 owns its payload).
+// MA-0125 / MA-0126; Pounce carries no own numbers — MA-0127 authored its
+// delegates_to payload.
 describe('MA-0124 monsters.json data: adult red dragon legendary header authors uses:3', () => {
   it('header carries numeric uses 3 + lair advisory (no longer name-text only)', () => {
     const la = red().legendary_actions;
@@ -764,7 +767,7 @@ describe('MA-0124 monsters.json data: adult red dragon legendary header authors 
     expect(la[0].description).toMatch(/lair.*advisory/i);
   });
 
-  it('Pounce remains verbatim (MA-0127 owns its payload)', () => {
+  it('Pounce authors no own numbers — the delegate seam owns them (MA-0127)', () => {
     const row = red().legendary_actions.find(a => a.name === 'Pounce');
     expect(row.uses == null).toBe(true);
     expect(row.save_dc == null).toBe(true);
@@ -1180,5 +1183,106 @@ describe('MA-0073 MonsterCardModal Scorching Sands once-per-turn gate', () => {
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'scorching_sands_refused (once per turn)')).toBe(true));
     expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
     expect(String(setPopupHtml.mock.calls.map(c => c[0]).join('|'))).toMatch(/can't take Scorching Sands again/);
+  });
+});
+
+// MA-0127 data lock: Adult Red Dragon legendary "Pounce" was prose-only
+// ("moves up to half its Speed, and it makes one Rend attack") — inert
+// MA-0116 fingerprint (zero affordances, clicks zero-effect). Fix mirrors the
+// MA-0113 Green Pounce exactly: delegates_to "Rend", derived numbers live on
+// the delegate row (actions[1]: +14, 1d10 + 8 Slashing + 2d4 Fire) and are
+// resolved through the identical attack seam; the secondary Fire leg forwards
+// via buildAutoDamageOptions autoDamageSecondaryFormula (MonsterCardModal.jsx
+// :502, MA-0116 disproval proof). Movement clause stays advisory (§7 — no
+// movement-distance consumer).
+describe('MA-0127 monsters.json data: adult red dragon Pounce delegates to the +14 Rend row', () => {
+  it('Pounce authors delegates_to Rend, no own numbers; Rend carries +14, 1d10 + 8 Slashing, 2d4 Fire', () => {
+    const row = red().legendary_actions.find(a => a.name === 'Pounce');
+    expect(row.delegates_to).toBe('Rend');
+    expect(row.attack_bonus == null && row.save_dc == null && row.uses == null).toBe(true);
+    expect(row.description).toMatch(/moves up to half its Speed.*advisory/i);
+    expect(row.description).toMatch(/makes one Rend attack/);
+    const rend = red().actions.find(a => a.name === 'Rend');
+    expect(rend.attack_bonus).toBe(14);
+    expect(rend.damage_dice_primary).toBe('1d10 + 8');
+    expect(rend.damage_type_primary).toBe('Slashing');
+    expect(rend.damage_dice_secondary).toBe('2d4');
+    expect(rend.damage_type_secondary).toBe('Fire');
+  });
+});
+
+// MA-0127: the gated "Expend Legendary" chip spends 1 and rolls the
+// delegated Rend (+14, both damage legs, armed target) named
+// "Pounce (Rend attack)"; exhausted clicks refuse zero-spend.
+describe('MA-0127 MonsterCardModal red dragon Pounce gated delegate row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+  });
+
+  function renderRedArmed(uses) {
+    runtime.store['Adult Red Dragon 1.monsterLegendaryUses'] = uses;
+    const creatures = [
+      { name: 'Adult Red Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 256, maxHp: 256, ac: 19, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [], computedStats: {} },
+    ];
+    const m = makeMonster({ name: 'Adult Red Dragon', actions: redActions(), legendary_actions: red().legendary_actions });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Red Dragon 1', creatures })} />);
+  }
+  function pounceRow() {
+    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Pounce'));
+  }
+  function pounceChip() {
+    return pounceRow().querySelector('.mc-dice-link-legendary');
+  }
+
+  it('renders the gated Expend-legendary chip (no own numeric affordance)', () => {
+    renderRedArmed({ max: 3, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    expect(pounceChip()).toBeTruthy();
+    expect(pounceRow().querySelector('.mc-dice-link:not(.mc-dice-link-legendary)')).toBe(null);
+  });
+
+  it('gated click spends 1 and rolls delegated Rend +14 named "Pounce (Rend attack)" with both damage legs', async () => {
+    renderRedArmed({ max: 3, used: 0 });
+    fireEvent.click(pounceChip());
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Pounce (Rend attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(14);
+    const options = ROLLERS.rollAttack.mock.calls[0][2];
+    expect(options.autoDamageFormula).toBe('1d10 + 8');
+    expect(options.damageType).toBe('Slashing');
+    expect(options.autoDamageSecondaryFormula).toBe('2d4');
+    expect(options.autoDamageSecondaryDamageType).toBe('Fire');
+    expect(options.targetName).toBe('TestPC');
+    expect(options.isSpellDamage).toBe(false);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Pounce/);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (3/3): chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderRedArmed({ max: 3, used: 3 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(pounceChip());
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+  });
+
+  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend, one roll)', async () => {
+    renderRedArmed({ max: 3, used: 0 });
+    fireEvent.click(pounceChip());
+    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    fireEvent.click(pounceChip());
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
   });
 });
