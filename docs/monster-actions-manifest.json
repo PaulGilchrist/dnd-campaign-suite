@@ -2499,7 +2499,7 @@
         "prone"
       ],
       "description": "Pools of water that the dragon can see within 120 feet of it surge outward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 15 Strength saving throw or be pulled up to 20 feet into the water and knocked prone.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0165-lair-grasping-tide.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0166",

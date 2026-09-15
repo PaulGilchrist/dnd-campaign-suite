@@ -1844,3 +1844,74 @@ describe('MA-0151 adult-white-dragon wall of ice advisory data lock', () => {
     expect(isLairRowClickable(ancient.lair_actions[2])).toBe(false);
   });
 });
+
+// MA-0165: Ancient Black Dragon lair_actions[0] grasping tide was a NAMELESS
+// dict (MV-24/MA-0118 inert fingerprint) — save_dc 15 / save_type Strength
+// were authored and prose-agreed, but the isLairRowClickable name-gate
+// (monsterLairActions.js:26) killed clickability → static "." row, zero
+// chip, zero save prompt, zero prone, zero logs (live inert, 2026-09-15).
+// Data-only fix mirroring the VERIFIED MA-0074 recipe: named "Grasping Tide"
+// save dict + dc_success "none" (damageless pull/prone, success = nothing) +
+// save_effect carrying the prone clause (canonical vocabulary; Adult Black
+// "Water Surge" / Aboleth "Grasping Tide" precedent prose). Pull distance and
+// "into the water" clauses stay GM-advisory prose (§7 residual — no grid/pull
+// consumer app-wide). Sibling rows untouched; young-black-dragon's identical
+// nameless dict is the scope guard.
+describe('MA-0165 ancient-black-dragon grasping tide data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-black-dragon');
+  const tide = dragon.lair_actions[0];
+  const VERBATIM = 'Pools of water that the dragon can see within 120 feet of it surge outward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 15 Strength saving throw or be pulled up to 20 feet into the water and knocked prone.';
+
+  it('row is now a structured clickable SAVE row named Grasping Tide (was nameless inert dict)', () => {
+    expect(typeof tide).toBe('object');
+    expect(tide.name).toBe('Grasping Tide');
+    expect(isLairRowClickable(tide)).toBe(true);
+    expect(lairRowAffordance(tide)).toBe('save');
+  });
+
+  it('save fields: DC 15 Strength, dc_success none (prose-agreed, success = nothing)', () => {
+    expect(tide.save_dc).toBe(15);
+    expect(tide.save_type).toBe('Strength');
+    expect(tide.dc_success).toBe('none');
+    expect(tide.description).toBe(VERBATIM);
+    expect(tide.description).toMatch(/DC 15 Strength saving throw/i);
+  });
+
+  it('save_effect carries the prone clause — prone extracted on fail, no other conditions over-extracted', () => {
+    expect(tide.save_effect).toMatch(/knocked prone/i);
+    expect(extractConditionsFromSaveEffect(tide.save_effect)).toEqual(['prone']);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula and prone conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: tide,
+      monsterName: 'Ancient Black Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(tide.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(tide, null, ['prone']);
+  });
+
+  it('sibling rows untouched: [1] insect cloud damage dict, [2] darkness raw string', () => {
+    expect(dragon.lair_actions[1].name).toBeUndefined();
+    expect(dragon.lair_actions[1].damage_dice_primary).toBe('3d6');
+    expect(typeof dragon.lair_actions[2]).toBe('string');
+  });
+
+  it('young-black-dragon scope guard: its raw-string and identical nameless grasping-tide dict are NOT touched by this fix', () => {
+    const young = monstersData.find(m => m.index === 'young-black-dragon');
+    expect(typeof young.lair_actions[0]).toBe('string');
+    expect(young.lair_actions[1].description).toBe(VERBATIM);
+    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(young.lair_actions[1].dc_success).toBeUndefined();
+    expect(young.lair_actions[1].save_effect).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+  });
+});
