@@ -4838,7 +4838,11 @@
         "damage_dice_primary": "3d6",
         "damage_type_primary": "Piercing"
       },
-      "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec­ tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies."
+      {
+        "name": "Wall of Ice",
+        "advisory": "wall_of_ice",
+        "description": "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec­ tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies."
+      }
     ],
     "environments": [
       "coastal"
