@@ -3323,7 +3323,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0221-lair-action.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0222",

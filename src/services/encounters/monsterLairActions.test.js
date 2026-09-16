@@ -1111,9 +1111,9 @@ describe('MA-0107 adult-gold-dragon glimpse future + dream plane banishment data
     expect(def.description).toMatch(/initiative count 20/i);
   });
 
-  it('ancient-gold-dragon scope guard: its rows are NOT touched by this fix', () => {
+  it('ancient-gold-dragon scope guard: [0] structured as of MA-0221 (byte-mirror of this fix); [1] stays nameless (MA-0222)', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-gold-dragon');
-    expect(ancient.lair_actions[0]).toEqual(expect.any(String));
+    expect(ancient.lair_actions[0]).toEqual(glimpse);
     expect(ancient.lair_actions[1].name).toBeUndefined();
     expect(ancient.lair_actions[1].save_effect).toBeUndefined();
   });
@@ -2536,5 +2536,93 @@ describe('MA-0210/MA-0211 ancient copper dragon lair rows', () => {
     expect(mud.zone.effect_key).toBe('lair_mud');
     expect(isLairRowClickable(mud)).toBe(true);
     expect(lairRowAffordance(mud)).toBe('save');
+  });
+});
+
+// MA-0221: Ancient Gold Dragon lair_actions[0] was a RAW STRING (MV-24 inert
+// fingerprint) — behind the MonsterCardBody.jsx string short-circuit (:340) the
+// row rendered prose with zero affordance: no chip, zero click delta, zero logs
+// (live inert, 2026-09-15). Data-only fix byte-mirroring the VERIFIED MA-0107
+// adult-gold-dragon self-buff advisory row (same canonical text): named
+// "Glimpse the Future" advisory dict → affordance 'advisory' → clickable
+// .mc-dice-link-lair chip → advisory popup + spell-named ability_use record.
+// No monster-self advantage te consumer exists (§7) and no initiative-20 lair
+// seam — the advantage-until-init-20 clause is GM-enforced advisory, mirroring
+// the verified siblings' documented behavior. Sibling [1] nameless dream-plane
+// dict stays untouched (MA-0222 scope) — a shared fix could byte-mirror the
+// VERIFIED adult-gold "Dream Plane Banishment" row onto it.
+describe('MA-0221 ancient-gold-dragon glimpse the future advisory data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-gold-dragon');
+  const glimpse = dragon.lair_actions[0];
+  const adult = monstersData.find(m => m.index === 'adult-gold-dragon');
+  const adultGlimpse = adult.lair_actions[0];
+
+  it('[0] is now a named clickable ADVISORY row (was inert raw string)', () => {
+    expect(typeof glimpse).toBe('object');
+    expect(glimpse.name).toBe('Glimpse the Future');
+    expect(glimpse.advisory).toBe('glimpse_the_future');
+    expect(isLairRowClickable(glimpse)).toBe(true);
+    expect(lairRowAffordance(glimpse)).toBe('advisory');
+  });
+
+  it('byte-mirrors the VERIFIED MA-0107 adult-gold-dragon row exactly', () => {
+    expect(glimpse).toEqual(adultGlimpse);
+    expect(Object.keys(glimpse)).toEqual(Object.keys(adultGlimpse));
+  });
+
+  it('description kept verbatim from the original string row (advantage until initiative count 20)', () => {
+    expect(glimpse.description).toBe('The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.');
+  });
+
+  it('no machine-readable enforcement keys — no fake save/attack/damage/zone authored', () => {
+    expect(glimpse.save_dc).toBeUndefined();
+    expect(glimpse.save_type).toBeUndefined();
+    expect(glimpse.save_effect).toBeUndefined();
+    expect(glimpse.attack_bonus).toBeUndefined();
+    expect(glimpse.damage_dice_primary).toBeUndefined();
+    expect(glimpse.zone).toBeUndefined();
+  });
+
+  it('advisory click logs ability_use record + popup, zero save/attack/damage/zone', async () => {
+    const logs = [];
+    const setPopupHtml = vi.fn();
+    const res = await resolveLairRow({
+      action: glimpse,
+      monsterName: 'Ancient Gold Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].characterName).toBe('Ancient Gold Dragon 1');
+    expect(logs[0].abilityName).toBe('Glimpse the Future');
+    expect(logs[0].description).toMatch(/casts glimpse the future/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(logs[0].description).not.toMatch(/save DC/i);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringMatching(/Lair Action — Glimpse the Future/));
+  });
+
+  it('no glimpse-the-future te registered (no self-advantage consumer — advisory model)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    expect(getEffectDefinition('lair_glimpse_the_future')).toBeFalsy();
+  });
+
+  it('sibling scope guard: [1] dream-plane nameless dict stays untouched (MA-0222)', () => {
+    const banish = dragon.lair_actions[1];
+    expect(banish.name).toBeUndefined();
+    expect(banish.save_dc).toBe(15);
+    expect(banish.save_type).toBe('Charisma');
+    expect(isLairRowClickable(banish)).toBe(false);
+  });
+
+  it('template scope guard: adult-gold-dragon rows untouched by this fix (MA-0107 shape)', () => {
+    expect(adultGlimpse.name).toBe('Glimpse the Future');
+    expect(adult.lair_actions[1].name).toBe('Dream Plane Banishment');
   });
 });
