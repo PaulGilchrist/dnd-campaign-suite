@@ -4614,7 +4614,9 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Hold Monster</em>, <em>Ice Knife</em> (level 2 version), <em>Shapechange</em> (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell)<br><strong>1/Day Each:</strong> <em>Control Weather</em>, <em>Ice Storm</em> (level 7 version), <em>Teleport</em>, <em>Zone of Truth</em>"
+        "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Hold Monster</em>, <em>Ice Knife</em> (level 2 version), <em>Shapechange</em> (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell)<br><strong>1/Day Each:</strong> <em>Control Weather</em>, <em>Ice Storm</em> (level 7 version), <em>Teleport</em>, <em>Zone of Truth</em>",
+        "save_dc": 23,
+        "save_type": "Charisma"
       }
     ],
     "legendary_actions": [

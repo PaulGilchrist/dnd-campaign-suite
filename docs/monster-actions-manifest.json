@@ -3676,7 +3676,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Paralyzing Breath or (B) Spellcasting to cast *Ice Knife* (level 2 version).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0245-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0246",
