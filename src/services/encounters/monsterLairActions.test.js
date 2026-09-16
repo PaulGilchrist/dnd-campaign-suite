@@ -1745,9 +1745,12 @@ describe('MA-0150 adult-white-dragon jagged ice shards data lock', () => {
     expect(lairRowAffordance(dragon.lair_actions[2])).toBe('advisory');
   });
 
-  it('ancient-white-dragon scope guard: its jagged-ice raw string is NOT touched by this fix', () => {
+  it('ancient-white-dragon scope guard: its jagged-ice row was raw at MA-0150 time; structured later by MA-0264 (adult numerics byte-mirrored)', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-white-dragon');
-    expect(typeof ancient.lair_actions[1]).toBe('string');
+    expect(typeof ancient.lair_actions[1]).toBe('object');
+    expect(ancient.lair_actions[1].name).toBe('Jagged Ice Shards');
+    expect(ancient.lair_actions[1].attack_bonus).toBe(7);
+    expect(ancient.lair_actions[1].description).toBe(shards.description);
   });
 
   it('young-white-dragon scope guard: its nameless jagged-ice dict is NOT touched by this fix', () => {
@@ -3431,13 +3434,95 @@ describe('MA-0263 ancient-white-dragon freezing fog nameless-dict data lock', ()
     expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
   });
 
-  it('scope guard: adult-white MA-0149 sibling byte-untouched; [1]/[2] raw strings stay inert', () => {
+  it('scope guard: adult-white MA-0149 sibling byte-untouched; [1] structured later by MA-0264, [2] raw string stays inert', () => {
     const adultWhite = monstersData.find(m => m.index === 'adult-white-dragon');
     expect(adultWhite.lair_actions[0].name).toBe('Freezing Fog');
     expect(adultWhite.lair_actions[0].save_dc).toBe(10);
     expect(adultWhite.lair_actions[0].zone).toBeUndefined();
-    expect(typeof dragon.lair_actions[1]).toBe('string');
-    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(false);
+    expect(typeof dragon.lair_actions[1]).toBe('object');
+    expect(dragon.lair_actions[1].name).toBe('Jagged Ice Shards');
+    expect(typeof dragon.lair_actions[2]).toBe('string');
     expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
+  });
+});
+
+// MA-0264: Ancient White Dragon lair_actions[1] jagged ice shards was a
+// raw string (MA-0254/0221/0199 raw-string family fingerprint: bare
+// "Jagged ice shards fall…" scalar → static <div class="mc-action"><span>
+// row, no <strong> name, zero .mc-dice-link, unclickable; live inert
+// 2026-09-16: click → zero overlays, zero log lines, control DC 10 CON fog
+// chip alive). Data-only fix byte-mirroring the VERIFIED MA-0150 adult
+// white sibling structured attack dict (name "Jagged Ice Shards",
+// attack_bonus 7, range 120 ft., 3d6 Piercing, canonical prose incl. the
+// up-to-three-targets clause retained verbatim as GM-adjudicated residual —
+// multi-target leg has no multi-roll consumer, single-target resolution vs
+// armed target is the documented MA-0024 model). No dc/zone keys authored:
+// the adult sibling carries none (attack affordance routes via attack_bonus,
+// monsterLairActions.js:43 → handleAttack :99). [2] wall of ice stays a raw
+// string — MA-0265 scope.
+describe('MA-0264 ancient-white-dragon jagged ice shards raw-string data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-white-dragon');
+  const shards = dragon.lair_actions[1];
+
+  it('[1] is now a structured clickable ATTACK row named Jagged Ice Shards (was raw string)', () => {
+    expect(typeof shards).toBe('object');
+    expect(shards.name).toBe('Jagged Ice Shards');
+    expect(isLairRowClickable(shards)).toBe(true);
+    expect(lairRowAffordance(shards)).toBe('attack');
+  });
+
+  it('attack fields byte-mirror VERIFIED adult sibling: +7 to hit, 120 ft range, 3d6 Piercing (prose-agreed)', () => {
+    const adult = monstersData.find(m => m.index === 'adult-white-dragon');
+    expect(shards.attack_bonus).toBe(7);
+    expect(shards.range).toBe('120 ft.');
+    expect(shards.damage_dice_primary).toBe('3d6');
+    expect(shards.damage_type_primary).toBe('Piercing');
+    expect(shards.description).toBe(adult.lair_actions[1].description);
+    expect(Object.keys(shards)).toEqual(Object.keys(adult.lair_actions[1]));
+    expect(shards.description).toMatch(/\+7 to hit/i);
+    expect(shards.description).toMatch(/up to three creatures/i);
+    expect(shards.description).toMatch(/within 120 feet/i);
+    expect(shards.description).toMatch(/10 \(3d6\) piercing damage/i);
+  });
+
+  it('no save/zone/advisory authored (adult sibling shape) — zero save-prompt or zone routing', () => {
+    expect(shards.save_dc).toBeUndefined();
+    expect(shards.save_effect).toBeUndefined();
+    expect(shards.zone).toBeUndefined();
+    expect(shards.advisory).toBeUndefined();
+    expect(extractConditionsFromSaveEffect(shards.save_effect)).toEqual([]);
+  });
+
+  it('attack row routes through the UNCHANGED monster attack seam: handleAttack(name, +7, row)', async () => {
+    const handleAttack = vi.fn();
+    const handleSaveRoll = vi.fn();
+    const handleDamage = vi.fn();
+    const res = await resolveLairRow({
+      action: shards,
+      monsterName: 'Ancient White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack,
+      handleDamage,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'attack' });
+    expect(handleAttack).toHaveBeenCalledWith('Jagged Ice Shards', 7, shards);
+    expect(handleSaveRoll).not.toHaveBeenCalled();
+    expect(handleDamage).not.toHaveBeenCalled();
+  });
+
+  it('scope guards: [0] MA-0263 fog dict byte-untouched; adult MA-0150 sibling byte-identical; young-white nameless dict still inert', () => {
+    expect(dragon.lair_actions[0].name).toBe('Freezing Fog');
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
+    expect(typeof dragon.lair_actions[2]).toBe('string');
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
+    const adult = monstersData.find(m => m.index === 'adult-white-dragon');
+    expect(JSON.stringify(adult.lair_actions[1])).toBe(JSON.stringify(shards));
+    const young = monstersData.find(m => m.index === 'young-white-dragon');
+    const jagged = (young.lair_actions || []).find(r => typeof r === 'object' && r?.description?.includes('Jagged ice shards'));
+    expect(jagged).toBeDefined();
+    expect(jagged.name).toBeUndefined();
+    expect(isLairRowClickable(jagged)).toBe(false);
   });
 });
