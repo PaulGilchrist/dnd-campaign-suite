@@ -4278,11 +4278,18 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory \u2014 no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Mind Invasion",
-        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 5 version)."
+        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 5 version) at one creature it can see within 120 feet. The target makes a DC 21 Wisdom saving throw, taking 27 (6d8) Psychic damage on a failed save or half as much on a successful one. The dragon always knows the target's location until the spell ends (no Invisible benefit against the dragon) \u2014 location tracking GM-enforced for monsters. The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 21,
+        "save_type": "Wisdom",
+        "dc_success": "half",
+        "damage_dice_primary": "6d8",
+        "damage_type_primary": "Psychic",
+        "save_effect": "6d8 Psychic damage. Success: Half damage. Location known to the dragon until the spell ends (advisory \u2014 GM-enforced for monsters)."
       },
       {
         "name": "Noxious Miasma",
@@ -4295,7 +4302,8 @@
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory \u2014 GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
