@@ -3743,7 +3743,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):At Will: Detect Magic, Hold Monster, Ice Knife (level 2 version), Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell)1/Day Each: Control Weather, Ice Storm (level 7 version), Teleport, Zone of Truth",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0250",
