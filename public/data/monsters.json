@@ -5137,7 +5137,9 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The animal lord casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20):<br><strong>At Will:</strong> <em>Animal Friendship</em>, <em>Animal Messenger</em>, <em>Speak with Animals</em><br><strong>2/Day Each:</strong> <em>Awaken</em>, <em>Greater Restoration</em><br><strong>1/Day Each (Sage Only):</strong> <em>Animal Shapes</em>, <em>Sunburst</em>"
+        "description": "The animal lord casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20):<br><strong>At Will:</strong> <em>Animal Friendship</em>, <em>Animal Messenger</em>, <em>Speak with Animals</em><br><strong>2/Day Each:</strong> <em>Awaken</em>, <em>Greater Restoration</em><br><strong>1/Day Each:</strong> <em>Animal Shapes</em>, <em>Sunburst</em> (Sage Only - the animal lord represents a Forager, Hunter, or Sage; the Sage restriction on this tier is GM-enforced, no subclass consumer)",
+        "save_dc": 20,
+        "save_type": "Wisdom"
       }
     ],
     "bonus_actions": [

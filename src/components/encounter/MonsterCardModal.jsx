@@ -737,17 +737,22 @@ async function refuseMonsterSpellAttack({ monsterName, spellName, reason, campai
   }).catch((e) => { console.error('[MonsterCardModal] Error logging spell-attack refusal:', e); });
 }
 
-async function spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName }) {
+// MA-0276: advisory-path casts (no save, no attack) log their own richer
+// ability_use record downstream (buildMonsterSpellCastEntry carries the same
+// usesNote) — skipLog prevents the double ability_use pair per spend.
+async function spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName, skipLog = false }) {
   if (gate.usesMax == null) return null;
   const usesNote = ` ${gate.usesMax}/Day use spent — ${gate.usesMax - gate.used - 1} remaining today (resets at a long rest, GM-enforced for monsters).`;
   await setRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, { ...gate.storedUses, [spellName]: gate.used + 1 }, campaignName);
-  await addEntry(campaignName, {
-    type: 'ability_use',
-    characterName: monsterName,
-    abilityName: spellName,
-    description: `${monsterName} casts ${spellName} via Spellcasting.${usesNote}`,
-    timestamp: Date.now(),
-  }).catch((e) => { console.error('[MonsterCardModal] Error logging monster spell use spend:', e); });
+  if (!skipLog) {
+    await addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: monsterName,
+      abilityName: spellName,
+      description: `${monsterName} casts ${spellName} via Spellcasting.${usesNote}`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[MonsterCardModal] Error logging monster spell use spend:', e); });
+  }
   return usesNote;
 }
 
@@ -1223,7 +1228,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       await refuseMonsterSpellAttack({ monsterName, spellName, reason: attackPlan.reason, campaignName, setPopupHtml });
       return;
     }
-    const usesNote = await spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName });
+    // MA-0276: attack and advisory paths emit their own ability_use cast log
+    // carrying the usesNote — only the block-save path needs the spend log.
+    const skipSpendLog = Boolean(attackPlan) || !spellHasDamage(spell);
+    const usesNote = await spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName, skipLog: skipSpendLog });
     if (attackPlan) {
       await executeMonsterSpellAttackCast({ monsterName, spellName, plan: attackPlan, usesNote, campaignName, handleAttack: rollHandlerRef.current });
       return;
