@@ -4444,19 +4444,30 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Commanding Presence",
-        "description": "The dragon uses Spellcasting to cast <em>Command</em> (level 2 version). The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Command</em> (level 2 version). One creature it can see within 60 feet must succeed on a DC 23 Wisdom saving throw or obey a one-word command on its next turn (the target is charmed — command word, movement, and compliance are GM-enforced, no command-control subsystem consumer; charmed is the mechanical marker). No damage — a successful save has no effect. The level 2 version can affect a second creature within 30 feet of the first (advisory — no multi-target producer at the save leg; GM adjudicates the extra target). The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 23,
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "save_effect": "The target is charmed by the dragon and obeys its one-word command on its next turn — command word, movement, and compliance are GM-enforced (charmed is the mechanical marker). Command 1-round duration is advisory (GM clears the charmed marker after the target's next turn)."
       },
       {
         "name": "Fiery Rays",
-        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em> (level 3 version). The dragon can't take this action again until the start of its next turn."
+        "attack_bonus": 15,
+        "spell_attack_bonus": 15,
+        "range": "120 ft.",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Fire",
+        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em>: Ranged Spell Attack: +15 to hit (Spellcasting spell attack bonus). Hit: 2d6 Fire damage per ray, nothing on a miss (single ray resolves per click — multi-ray extra-ray targeting is advisory, GM-enforced for monsters; three rays per spells.json). The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
