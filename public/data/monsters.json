@@ -4149,9 +4149,13 @@
         "description": "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round."
       },
       {
+        "name": "Dream Plane Banishment",
         "description": "One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane, a different plane of exis­ tence the dragon has imagined into being. To escape, the creature must use its action to make a Charisma check contested by the dragon's. If the creature wins, it escapes the dream plane. Otherwise, the effect ends on initiative count 20 on the next round. When the effect ends, the creature reappears in the space it left or in the nearest unoccupied space if that one is occupied.",
         "save_dc": 15,
-        "save_type": "Charisma"
+        "save_type": "Charisma",
+        "dc_success": "none",
+        "save_effect": "The target is banished to a dream plane until the effect ends on initiative count 20 on the next round (lair_dream_plane te granted on a failed save). To escape, the target must use its action to make a Charisma check contested by the dragon's — escape contest, initiative-20 expiry, and reappearance placement are GM-enforced (no initiative lair seam).",
+        "duration": "until initiative count 20 on the next round (contested Charisma check to escape early — GM-enforced)"
       }
     ],
     "environments": [

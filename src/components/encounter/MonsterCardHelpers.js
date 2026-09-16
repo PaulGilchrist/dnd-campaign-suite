@@ -172,7 +172,7 @@ export function parseBanishTransportClause(saveEffect) {
 // saveProcessing (MA-0104 parse shape). Distinct te from the MA-0104
 // `banished_demiplane` (Banish wording never matches) and from the PC spell
 // `banishment`. Byte-inert (null) for rows without the clause; the ancient
-// gold dragon's nameless lair dict has no save_effect so it never arms.
+// gold dragon's lair dict gained the clause in MA-0222 (byte-mirror here).
 export function parseDreamPlaneBanishClause(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return null;
   return /banished to a dream plane/i.test(saveEffect) ? { effect: 'lair_dream_plane' } : null;

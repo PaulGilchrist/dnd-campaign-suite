@@ -1111,11 +1111,10 @@ describe('MA-0107 adult-gold-dragon glimpse future + dream plane banishment data
     expect(def.description).toMatch(/initiative count 20/i);
   });
 
-  it('ancient-gold-dragon scope guard: [0] structured as of MA-0221 (byte-mirror of this fix); [1] stays nameless (MA-0222)', () => {
+  it('ancient-gold-dragon scope guard: [0] structured as of MA-0221; [1] byte-mirror of this row as of MA-0222', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-gold-dragon');
     expect(ancient.lair_actions[0]).toEqual(glimpse);
-    expect(ancient.lair_actions[1].name).toBeUndefined();
-    expect(ancient.lair_actions[1].save_effect).toBeUndefined();
+    expect(ancient.lair_actions[1]).toEqual(banish);
   });
 });
 
@@ -2548,9 +2547,9 @@ describe('MA-0210/MA-0211 ancient copper dragon lair rows', () => {
 // .mc-dice-link-lair chip → advisory popup + spell-named ability_use record.
 // No monster-self advantage te consumer exists (§7) and no initiative-20 lair
 // seam — the advantage-until-init-20 clause is GM-enforced advisory, mirroring
-// the verified siblings' documented behavior. Sibling [1] nameless dream-plane
-// dict stays untouched (MA-0222 scope) — a shared fix could byte-mirror the
-// VERIFIED adult-gold "Dream Plane Banishment" row onto it.
+// the verified siblings' documented behavior. Sibling [1] dream-plane dict was
+// left untouched here (MA-0222 scope) — landed in MA-0222 byte-mirroring the
+// VERIFIED adult-gold "Dream Plane Banishment" row.
 describe('MA-0221 ancient-gold-dragon glimpse the future advisory data lock', () => {
   const dragon = monstersData.find(m => m.index === 'ancient-gold-dragon');
   const glimpse = dragon.lair_actions[0];
@@ -2613,16 +2612,98 @@ describe('MA-0221 ancient-gold-dragon glimpse the future advisory data lock', ()
     expect(getEffectDefinition('lair_glimpse_the_future')).toBeFalsy();
   });
 
-  it('sibling scope guard: [1] dream-plane nameless dict stays untouched (MA-0222)', () => {
+  it('sibling scope guard: [1] dream-plane row structured as of MA-0222 (byte-mirror of VERIFIED MA-0107)', () => {
     const banish = dragon.lair_actions[1];
-    expect(banish.name).toBeUndefined();
+    expect(banish.name).toBe('Dream Plane Banishment');
     expect(banish.save_dc).toBe(15);
     expect(banish.save_type).toBe('Charisma');
-    expect(isLairRowClickable(banish)).toBe(false);
+    expect(isLairRowClickable(banish)).toBe(true);
+    expect(banish).toEqual(adult.lair_actions[1]);
   });
 
   it('template scope guard: adult-gold-dragon rows untouched by this fix (MA-0107 shape)', () => {
     expect(adultGlimpse.name).toBe('Glimpse the Future');
     expect(adult.lair_actions[1].name).toBe('Dream Plane Banishment');
+  });
+});
+
+// MA-0222: Ancient Gold Dragon lair_actions[1] was a NAMELESS dict (MV-24
+// name-gate fingerprint) — DC 15 Charisma save_dc/save_type present in data
+// yet the row rendered a static `<strong>.</strong>` + prose with zero
+// affordance (live inert, 2026-09-15): isLairRowClickable (:26) gates on
+// !row.name before the DC branch is ever consulted, and no save_effect meant
+// parseDreamPlaneBanishClause could never arm the lair_dream_plane te even
+// behind the gate. Data-only fix byte-mirroring the VERIFIED MA-0107
+// adult-gold-dragon "Dream Plane Banishment" row (identical canonical
+// description text): named SAVE row → affordance 'save' → "DC 15 Charisma"
+// chip → handleSaveRoll → failed save arms lair_dream_plane te + rounds:2
+// expiry clock + badge (saveProcessing grantDreamPlaneBanishment :618-643).
+// Contested-Charisma escape check and initiative-20 expiry/reappearance stay
+// GM-enforced advisory (no initiative lair seam §7).
+describe('MA-0222 ancient-gold-dragon dream plane banishment data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-gold-dragon');
+  const banish = dragon.lair_actions[1];
+  const adult = monstersData.find(m => m.index === 'adult-gold-dragon');
+  const adultBanish = adult.lair_actions[1];
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof banish).toBe('object');
+    expect(banish.name).toBe('Dream Plane Banishment');
+    expect(isLairRowClickable(banish)).toBe(true);
+    expect(lairRowAffordance(banish)).toBe('save');
+  });
+
+  it('byte-mirrors the VERIFIED MA-0107 adult-gold-dragon row exactly', () => {
+    expect(banish).toEqual(adultBanish);
+    expect(Object.keys(banish)).toEqual(Object.keys(adultBanish));
+  });
+
+  it('[1] save fields: DC 15 Charisma kept byte-intact, dc_success none (no damage authored)', () => {
+    expect(banish.save_dc).toBe(15);
+    expect(banish.save_type).toBe('Charisma');
+    expect(banish.dc_success).toBe('none');
+    expect(banish.damage_dice_primary).toBeUndefined();
+    expect(banish.damage_type_primary).toBeUndefined();
+  });
+
+  it('[1] description kept verbatim (soft hyphen preserved)', () => {
+    expect(banish.description).toMatch(/^One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane/i);
+    expect(banish.description).toMatch(/exis\xAD? tence the dragon has imagined into being/i);
+    expect(banish.description).toMatch(/If the creature wins, it escapes the dream plane/i);
+  });
+
+  it('[1] save_effect arms the lair_dream_plane te producer (MA-0104 parse shape)', () => {
+    expect(parseDreamPlaneBanishClause(banish.save_effect)).toEqual({ effect: 'lair_dream_plane' });
+  });
+
+  it('[1] dream-plane wording NEVER matches the MA-0104 demiplane parser (distinct te)', () => {
+    expect(parseBanishTransportClause(banish.save_effect)).toBeNull();
+  });
+
+  it('[1] save_effect has no canonical condition word — te is the sole enforcement (MA-0017 stays inert)', () => {
+    expect(extractConditionsFromSaveEffect(banish.save_effect)).toEqual([]);
+  });
+
+  it('[1] save row routes through handleSaveRoll, zero damage formula', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: banish,
+      monsterName: 'Ancient Gold Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(banish.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(banish, null, []);
+  });
+
+  it('scope guard: sibling [0] and adult-gold-dragon rows untouched by this fix', () => {
+    expect(dragon.lair_actions[0].advisory).toBe('glimpse_the_future');
+    expect(adultBanish.name).toBe('Dream Plane Banishment');
+    expect(adult.lair_actions[0].advisory).toBe('glimpse_the_future');
   });
 });

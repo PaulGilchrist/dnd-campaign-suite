@@ -3337,7 +3337,7 @@
       "saveDc": 15,
       "saveType": "Charisma",
       "description": "One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane, a different plane of exis\u00ad tence the dragon has imagined into being. To escape, the creature must use its action to make a Charisma check contested by the dragon's. If the creature wins, it escapes the dream plane. Otherwise, the effect ends on initiative count 20 on the next round. When the effect ends, the creature reappears in the space it left or in the nearest unoccupied space if that one is occupied.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0222-lair-banish.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0223",
