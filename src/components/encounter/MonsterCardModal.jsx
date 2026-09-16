@@ -143,6 +143,18 @@ function sleepStagingForAction(spellInfo, action) {
   return { unconsciousRounds: (Number(action.staged_sleep.unconscious_minutes) || 10) * 10 };
 }
 
+// MA-0248: authored staged paralysis row (Ancient Silver Dragon Paralyzing
+// Breath) — failed saves stage the ladder inside the picker (MA-0068 staged
+// shape: Incapacitated → turn-END repeat save → Paralyzed, repeating each
+// turn with auto-success after paralyzed_minutes×10 rounds, CLA-334). NOT
+// sleep staging — paralysis never wakes on damage, so it rides its own
+// paralyzing_staged te (paralyzingBreathService, MA-0102 sibling shape).
+// Byte-inert flag default.
+function stagedParalysisForAction(spellInfo, action) {
+  if (spellInfo || !action?.staged_paralysis) return null;
+  return { paralyzedRounds: (Number(action.staged_paralysis.paralyzed_minutes) || 1) * 10 };
+}
+
 // MA-0079: authored push clause (Adult Bronze Dragon Repulsion Breath —
 // "pushed up to 60 feet straight away"). Feet parsed for the picker's failed-
 // save push marker te (MA-0073 parse shape); null for every clauseless row —
@@ -225,6 +237,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     }));
   };
   const sleepStaging = sleepStagingForAction(spellInfo, action);
+  const stagedParalysis = stagedParalysisForAction(spellInfo, action);
   // MA-0079: authored push clause (Repulsion Breath "pushed up to 60 feet")
   // rides the picker as an instant marker te on failed saves (MA-0073 parse
   // shape). Null for every row without the clause — byte-inert.
@@ -237,7 +250,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -1448,6 +1461,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           zoneOnly={conePicker.zoneOnly === true}
           saveConditions={conePicker.saveConditions}
           sleepStaging={conePicker.sleepStaging}
+          stagedParalysis={conePicker.stagedParalysis}
           pushFeet={conePicker.pushFeet}
           slowedClauses={conePicker.slowedClauses}
           weakeningBreath={conePicker.weakeningBreath}

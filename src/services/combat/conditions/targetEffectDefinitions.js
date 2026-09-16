@@ -327,6 +327,22 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'dc'],
   },
   {
+    // MA-0248: Ancient Silver Dragon Paralyzing Breath staged ladder —
+    // first failed CON save stages Incapacitated until the end of the
+    // target's next turn (repeat save); second failed save Paralyzes, the
+    // target repeats the save at the end of each of its turns ending on a
+    // success, and auto-succeeds after 1 minute (10-round clock, CLA-334).
+    // Own te key (NOT sleep_staged): paralysis never wakes on damage, so
+    // sleepService.wakeSleepOnDamage stays out of this ladder.
+    effect: 'paralyzing_staged',
+    label: 'Paralyzing Breath',
+    description: 'Staged by Paralyzing Breath (MA-0248): Incapacitated until the end of the target\'s next turn, when it repeats the CON save. On a failed repeat save the target becomes Paralyzed, repeating the save at the end of each of its turns and ending on a success; after 1 minute it succeeds automatically.',
+    icon: 'fa-bolt',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source', 'dc', 'saveType'],
+  },
+  {
     effect: 'tashas_hideous_laughter',
     label: "Tasha's Hideous Laughter",
     description: 'Target laughs uncontrollably: Prone and Incapacitated for the duration. Target can\'t end the Prone condition on itself. At the end of each turn and each time it takes damage, target can repeat the WIS save (has Advantage on save triggered by damage). On a success, the spell ends. Concentration, up to 1 minute.',

@@ -4610,6 +4610,10 @@
         "description": "Constitution Saving Throw: DC 24, each creature in a 90-foot <strong>Cone</strong>. First Failure: The target has the <strong>Incapacitated</strong> condition until the end of its next turn, when it repeats the save. Second Failure: The target has the <strong>Paralyzed</strong> condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
         "save_dc": 24,
         "save_type": "Constitution",
+        "dc_success": "none",
+        "staged_paralysis": {
+          "paralyzed_minutes": 1
+        },
         "save_effect": "First Failure: The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically."
       },
       {
