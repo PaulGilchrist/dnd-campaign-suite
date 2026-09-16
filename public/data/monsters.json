@@ -4122,6 +4122,7 @@
         "description": "Charisma Saving Throw: DC 24, one creature the dragon can see within 120 feet. <strong>Failure:</strong> 24 (7d6) Force damage, and the target has the <strong>Incapacitated</strong> condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon. Failure or Success: The dragon can't take this action again until the start of its next turn.",
         "save_dc": 24,
         "save_type": "Charisma",
+        "dc_success": "none",
         "damage_dice_primary": "7d6",
         "damage_type_primary": "Force",
         "save_effect": "Failure: 24 (7d6) Force damage, and the target has the Incapacitated condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon. Failure or Success: The dragon can't take this action again until the start of its next turn. Success: The dragon can't take this action again until the start of its next turn."
