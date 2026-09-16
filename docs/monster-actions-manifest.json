@@ -3423,7 +3423,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Mind Spike (level 5 version).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0228-mind-invasion.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0229",
