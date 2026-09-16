@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -32,6 +32,17 @@ import './MonsterCardModal.css';
 // single-target block save. Coverage feet parsed from the row text
 // ("30-foot Cone" / "60-foot-long, 5-foot-wide Line"); gridless coverage
 // stays advisory via isWithinRange lenient mode (§7).
+// MA-0084: coverage feet for an authored point-centered sphere/radius save
+// row (Adult Bronze Dragon Thunderclap "20-foot-radius Sphere … within 90
+// feet") — parsed from the RADIUS token ("20-foot-radius" / "10-ft-radius"),
+// never the point-placement text (90 ft). Cylinder rows (radius + height
+// clause) stay untouched (null).
+function sphereRadiusFeet(description) {
+  if (/\bcylinder\b/i.test(description)) return null;
+  const m = description.match(/(\d+(?:\.\d+)?)\s*[- ]?(?:foot|feet|ft\.?)?[- ]?radius\b/i);
+  return m ? Number(m[1]) : null;
+}
+
 function breathAoeShape(action, spellInfo) {
   if (spellInfo) return null;
   if (!action || action.save_dc == null) return null;
@@ -43,9 +54,24 @@ function breathAoeShape(action, spellInfo) {
   }
   const description = String(action.description || '');
   const shape = /\bcone\b/i.test(description) ? 'Cone' : (/\bline\b/i.test(description) ? 'Line' : null);
+  // MA-0084: a sphere/radius save row is an area too — route it through the
+  // same area picker as the MA-0031 cones / MA-0042 zones. The GM positions
+  // the center, so the attacker-origin gate does NOT apply (zone shape).
+  if (shape === null) {
+    const radiusFt = sphereRadiusFeet(description);
+    if (radiusFt != null) {
+      return { shape: 'Radius', feet: radiusFt, rangeGateFt: null };
+    }
+  }
   if (!shape) return null;
-  const m = description.match(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/i);
-  const feet = m ? Number(m[1]) : (shape === 'Cone' ? 30 : 60);
+  const tokens = [...description.matchAll(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/gi)].map(t => Number(t[1]));
+  // MA-0064: a lair line leads with its WIDTH ("5-foot-wide line … within
+  // 120 feet") — coverage extends to the greatest authored distance, so the
+  // gate takes the largest token. Verified breath lines state length first
+  // (first === max), keeping every existing row byte-identical.
+  const feet = shape === 'Line'
+    ? (tokens.length ? Math.max(...tokens) : 60)
+    : (tokens[0] ?? 30);
   return { shape, feet, rangeGateFt: feet };
 }
 
@@ -74,6 +100,9 @@ function zoneTeForAction(action) {
   // 2nd-level+ light — GM-enforced") rides the arm log. Absent on
   // MA-0042's insect-cloud row (payload byte-identical there).
   if (action.zone.advisory) payload.clause = action.zone.advisory;
+  // MA-0085: optional zone noun (e.g. Adult Bronze Dragon Fog Cloud "fog")
+  // for the save-less picker copy. Absent → 'darkness' (MA-0043 byte-identical).
+  if (action.zone.noun) payload.noun = action.zone.noun;
   return payload;
 }
 
@@ -105,6 +134,67 @@ function resolveBlockSaveDcSuccess(spellInfo, action) {
   return action.save_dc != null ? (action.dc_success ?? 'half') : null;
 }
 
+// MA-0068: authored staged sleep row (Adult Brass Dragon Sleep Breath) —
+// failed saves stage the sleep inside the picker (sleepService SP-107 shape:
+// Incapacitated → turn-END repeat save → Unconscious for
+// unconscious_minutes×10 rounds, CLA-334). Byte-inert flag default.
+function sleepStagingForAction(spellInfo, action) {
+  if (spellInfo || !action?.staged_sleep) return null;
+  return { unconsciousRounds: (Number(action.staged_sleep.unconscious_minutes) || 10) * 10 };
+}
+
+// MA-0079: authored push clause (Adult Bronze Dragon Repulsion Breath —
+// "pushed up to 60 feet straight away"). Feet parsed for the picker's failed-
+// save push marker te (MA-0073 parse shape); null for every clauseless row —
+// byte-inert. Spell rows never carry the monster push clause.
+function pushFeetForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parsePushFeetClause(action?.save_effect)?.feet ?? null;
+}
+
+// MA-0087: authored failed-save "slowed" rider clause (Adult Copper Dragon
+// Slowing Breath). Parsed once and forwarded to the cone picker as an
+// optional te-grant seam (byte-inert null for clauseless rows). 'slowed' is
+// not a registered condition, so each clause maps to an existing registered te.
+function slowedClausesForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parseSlowedClauses(action?.save_effect);
+}
+
+// MA-0102: authored failed-save weakening clause (Adult Gold Dragon Weakening
+// Breath). Parsed once and forwarded to the cone picker as an optional
+// te-grant seam (byte-inert null for clauseless rows, MA-0087 shape): the
+// picker grants the registered weakening_breath te on failed saves, excludes
+// creatures already weakened by this dragon, and the turn-END seam repeats
+// the save at Disadvantage until success or the 1-minute auto-success clock.
+function weakeningBreathForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parseWeakeningBreathClause(action?.save_effect);
+}
+
+// MA-0115: authored failed-save AC-penalty clause (Adult Green Dragon
+// Noxious Miasma — "the target takes a −2 penalty to AC until the end of
+// its next turn"). Parsed once and forwarded to the radius picker as an
+// optional te-grant seam (byte-inert null for clauseless rows, MA-0087
+// shape): the picker grants the registered ac_penalty te on each failed
+// save (live consumer: conditionEffects acPenalty → sheet AC fold).
+function acPenaltyClauseForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parseAcPenaltyClause(action?.save_effect);
+}
+
+// MA-0146: authored failed-save speed-zero clause (Adult White Dragon
+// Freezing Burst — "the target's Speed is 0 until the end of the target's
+// next turn"). Parsed once and forwarded to the radius picker as an optional
+// te+condition grant seam (byte-inert null for clauseless rows, MA-0115
+// shape): the picker grants speed_zero te + activeCondition on each failed
+// save with a rounds:2 expiry clock; live consumer conditionEffects
+// speedZero → sheet Speed 0.
+function speedZeroClauseForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parseSpeedZeroClause(action?.save_effect);
+}
+
 function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
@@ -134,11 +224,20 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType,
     }));
   };
+  const sleepStaging = sleepStagingForAction(spellInfo, action);
+  // MA-0079: authored push clause (Repulsion Breath "pushed up to 60 feet")
+  // rides the picker as an instant marker te on failed saves (MA-0073 parse
+  // shape). Null for every row without the clause — byte-inert.
+  const pushFeet = pushFeetForAction(spellInfo, action);
+  const slowedClauses = slowedClausesForAction(spellInfo, action);
+  const weakeningBreath = weakeningBreathForAction(spellInfo, action);
+  const acPenaltyClause = acPenaltyClauseForAction(spellInfo, action);
+  const speedZeroClause = speedZeroClauseForAction(spellInfo, action);
   if (aoe == null && !recharge.gate) { fire(); return; }
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -226,7 +325,7 @@ async function resolveLegendaryRow({ action, monsterName, monster, campaignName,
       .catch((e) => { console.error('[MonsterCardModal] Error logging check-bonus refusal:', e); });
     return;
   }
-  const result = await expendLegendaryUse({ monsterName, monster, actionName, campaignName });
+  const result = await expendLegendaryUse({ monsterName, monster, actionName, campaignName, action });
   if (!result.spent) {
     setPopupHtml(result.popupHtml);
     return;
@@ -531,8 +630,12 @@ function logBlockedDamageRoll(campaignName, monsterName, name, formula) {
   }).catch((e) => { console.error('[MonsterCardModal] Error logging blocked damage roll:', e); });
 }
 
-function hasRayOfEnfeebleOn(targetEffects, monsterName) {
-  return targetEffects?.some(te => te.target === monsterName && te.effect === 'ray_of_enfeeble_debuff');
+// MA-0102 generalization: any te on this monster carrying the generic
+// strCheckDisadvantage flag (ray_of_enfeeble_debuff, weakening_breath)
+// forces Disadvantage on its STR ability/skill checks. Ray te already
+// carries the flag, so ray behavior is byte-identical.
+function hasStrTestDisadvantageOn(targetEffects, monsterName) {
+  return targetEffects?.some(te => te.target === monsterName && (te.effect === 'ray_of_enfeeble_debuff' || te.strCheckDisadvantage));
 }
 
 function rayDisadvantageContext(applies) {
@@ -638,8 +741,15 @@ async function spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, camp
 // (own dc_type/dc_success); hoisted to keep handleSpellCast branch-free.
 function executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll }) {
   const dcSuccess = spell?.dc?.dc_success === 'none' ? 'none' : 'half';
-  handleSaveRoll(action, spellDamageFormulaAtBaseLevel(spell), extractConditionsFromSaveEffect(spell?.save_effect), {
+  // MA-0087: honor the row's authored "(level N version)" upcast on the SAVE
+  // leg too (Adult Copper Mind Spike lv4 = 5d8, not the base lv2 3d8) — the
+  // MA-0112 base-dice residual. spellDamageFormulaAtLevel falls back to base
+  // when the row author no level clause, so every clauseless row is unchanged.
+  const castLevel = spellCastLevelFromSpellcasting(action?.description, spellName, spell);
+  const formula = spellDamageFormulaAtLevel(spell, castLevel) || spellDamageFormulaAtBaseLevel(spell);
+  handleSaveRoll(action, formula, extractConditionsFromSaveEffect(spell?.save_effect), {
     spellName, saveType: spell?.dc?.dc_type || action.save_type, dcSuccess,
+    castLevel,
     // MA-0054: Spellcasting rows carry no damage_type_primary, so without the
     // spell's own spells.json damage type the save-damage log defaults Slashing.
     damageType: spell?.damage?.damage_type || null,
@@ -695,24 +805,26 @@ function savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction)
 
 function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
+  const actionName = spellName || action.name;
+  const saveEffect = action?.save_effect ?? null;
   return {
     attackerName: monsterName,
     targetName: target?.name,
-    actionName: spellName || action.name,
+    actionName,
     spellName,
     saveDc: action.save_dc,
     saveType,
     dcSuccess,
     autoDamageFormula: saveDamageFormula,
     autoDamageDamageType: saveDamageFormula && primaryDamageType ? formatDamageTypes([primaryDamageType]) : null,
-    autoDamageName: spellName || action.name,
+    autoDamageName: actionName,
     saveConditions,
     isSpellDamage: !!spellName,
     consumeMemoriesClause: !!prerequisite,
     // MA-0020: spend marker lands at prompt-confirm (saveProcessing); the
     // until-clause rides the condition meta as a GM-enforced durationNote.
-    monsterAbilityUse: usesGate ? { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName: spellName || action.name } : undefined,
-    conditionDurationNote: extractConditionDurationNote(action?.save_effect),
+    monsterAbilityUse: usesGate ? { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName } : undefined,
+    conditionDurationNote: extractConditionDurationNote(saveEffect),
     // MA-0030: authored success-immunity clause (granted at save success in saveProcessing).
     successImmunity: action?.success_immunity || null,
     // MA-0048: authored repeat-save clause (Frightful Presence) — arm the
@@ -720,7 +832,30 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     repeatSave: action?.repeat_save || null,
     // MA-0038: authored failed-save concentration-disadvantage clause
     // (Cloud of Insects) — te producer arm for saveProcessing on a fail.
-    concentrationDisadvantage: parseConcentrationDisadvantageClause(action?.save_effect),
+    concentrationDisadvantage: parseConcentrationDisadvantageClause(saveEffect),
+    // MA-0073: authored failed-save speed-halved clause (Scorching Sands) —
+    // speed_half te producer arm for saveProcessing on a fail.
+    speedHalf: parseSpeedHalfClause(saveEffect),
+    // MA-0093: authored failed-save subtract-die debuff clause (Giggling
+    // Magic) — giggling_magic_debuff te producer arm for saveProcessing.
+    subtractDebuff: parseSubtractDieClause(saveEffect),
+    // MA-0104: authored failed-save demiplane-transport clause (Banish) —
+    // banished_demiplane te producer arm for saveProcessing on a fail.
+    demiplaneTransport: parseBanishTransportClause(saveEffect),
+    // MA-0107: authored failed-save dream-plane banishment clause (Adult Gold
+    // Dragon lair action) — lair_dream_plane te producer arm for
+    // saveProcessing on a fail (MA-0104 shape).
+    dreamPlaneBanishment: parseDreamPlaneBanishClause(saveEffect),
+    // MA-0115: authored failed-save AC-penalty clause (Noxious Miasma
+    // "−2 penalty to AC until the end of its next turn") — ac_penalty te
+    // producer arm for saveProcessing on a fail (MA-0073 shape).
+    acPenaltyClause: parseAcPenaltyClause(saveEffect),
+    // MA-0146: authored failed-save speed-zero clause (Adult White Dragon
+    // Freezing Burst "the target's Speed is 0 until the end of the target's
+    // next turn") — speed_zero producer arm for saveProcessing on a fail
+    // (MA-0073 shape; the sphere row normally routes through the radius
+    // picker, which carries its own speedZeroClause seam).
+    speedZeroClause: parseSpeedZeroClause(saveEffect),
   };
 }
 
@@ -1008,14 +1143,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleAbilityCheck = (abbr, mod) => {
     const fullName = abilityNameMap[abbr] || abbr.toUpperCase();
-    const context = rayDisadvantageContext(abbr === 'str' && hasRayOfEnfeebleOn(monsterTargetEffects, monsterName));
+    const context = rayDisadvantageContext(abbr === 'str' && hasStrTestDisadvantageOn(monsterTargetEffects, monsterName));
     rollAbilityCheck(fullName, mod, context);
   };
 
   const handleSaveThrow = (ability, mod) => rollSavingThrow(saveAbilityAbbr(ability), mod);
 
   const handleSkillCheck = (name, mod) => {
-    const context = rayDisadvantageContext(name === 'Athletics' && hasRayOfEnfeebleOn(monsterTargetEffects, monsterName));
+    const context = rayDisadvantageContext(name === 'Athletics' && hasStrTestDisadvantageOn(monsterTargetEffects, monsterName));
     rollSkillCheck(name, mod, context);
   };
 
@@ -1312,6 +1447,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           zoneTe={conePicker.zoneTe}
           zoneOnly={conePicker.zoneOnly === true}
           saveConditions={conePicker.saveConditions}
+          sleepStaging={conePicker.sleepStaging}
+          pushFeet={conePicker.pushFeet}
+          slowedClauses={conePicker.slowedClauses}
+          weakeningBreath={conePicker.weakeningBreath}
+          acPenaltyClause={conePicker.acPenaltyClause}
+          speedZeroClause={conePicker.speedZeroClause}
+          conditionDurationNote={conePicker.conditionDurationNote}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}
         />

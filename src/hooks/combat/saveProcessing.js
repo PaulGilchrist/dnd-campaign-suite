@@ -310,12 +310,63 @@ async function applyAuthoredClauseGrants({ context, saveSuccess, campaignName, a
     if (saveSuccess === true && context?.successImmunity) {
         await grantSuccessImmunity({ context, campaignName, attackerName, applyTarget });
     }
+    if (saveSuccess === false) {
+        await applyFailedSaveClauseGrants({ context, campaignName, attackerName, applyTarget });
+    }
+}
+
+// Failed-save te clause grants (MA-0038/0073/0093/0104) — split from the
+// dispatcher to keep both functions under the lint complexity ceiling.
+async function applyFailedSaveClauseGrants({ context, campaignName, attackerName, applyTarget }) {
     // MA-0038: Cloud of Insects — "Disadvantage on saving throws to maintain
     // Concentration until the end of its next turn". te sourced from the
     // dragon; duration: 'until_end_of_next_turn' with rounds:2 drained by
     // the pendingExpirations clock (HurlThroughHell codebase convention).
-    if (saveSuccess === false && context?.concentrationDisadvantage) {
+    if (context?.concentrationDisadvantage) {
         await grantConcentrationDisadvantage({ context, campaignName, attackerName, applyTarget });
+    }
+    // MA-0073: Scorching Sands — "the target's Speed is halved until the
+    // end of its next turn". te producer mirror of the MA-0038 shape.
+    if (context?.speedHalf) {
+        await grantSpeedHalf({ context, campaignName, attackerName, applyTarget });
+    }
+    // MA-0093: Giggling Magic — "the target rolls 1d6 whenever it makes an
+    // ability check or attack roll and subtracts the number rolled" until the
+    // end of its next turn. te producer mirror of the MA-0073 shape; the
+    // subtractDie value rides the te to the generalized roll-time consumer.
+    if (context?.subtractDebuff) {
+        await grantSubtractDieDebuff({ context, campaignName, attackerName, applyTarget });
+    }
+    // MA-0104: Adult Gold Dragon Banish — "transported to a harmless
+    // demiplane until the start of the dragon's next turn". Distinct te from
+    // the PC spell banishment (concentration/permanent semantics); badge +
+    // honest advisory display, reappearance placement GM-enforced (§7).
+    if (context?.demiplaneTransport) {
+        await grantDemiplaneTransport({ context, campaignName, attackerName, applyTarget });
+    }
+    // MA-0107: Adult Gold Dragon lair action Dream Plane Banishment —
+    // "banished to a dream plane ... the effect ends on initiative count 20
+    // on the next round". Distinct te from banished_demiplane (MA-0104 —
+    // the Banish wording never matches, and vice versa); rounds:2 clock
+    // mirrors the verified MA-0104 shape (initiative-20 cadence stays
+    // GM-enforced — no initiative lair seam §7). The escape clause
+    // (contested Charisma check action) stays advisory prose (§7).
+    if (context?.dreamPlaneBanishment) {
+        await grantDreamPlaneBanishment({ context, campaignName, attackerName, applyTarget });
+    }
+    // MA-0115: Adult Green Dragon Noxious Miasma — "the target takes a −2
+    // penalty to AC until the end of its next turn". te producer mirror of
+    // the MA-0073 shape; the parsed value rides the te to the live consumer
+    // (conditionEffects acPenalty → CharSummary AC fold + penalty line).
+    if (context?.acPenaltyClause) {
+        await grantAcPenaltyClause({ context, campaignName, attackerName, applyTarget });
+    }
+    // MA-0146: Adult White Dragon Freezing Burst — "the target's Speed is 0
+    // until the end of the target's next turn". te + activeCondition producer
+    // mirror of the MA-0073 shape (the sphere row normally routes through the
+    // radius picker seam; this leg covers any single-target save resolution).
+    if (context?.speedZeroClause) {
+        await grantSpeedZeroClause({ context, campaignName, attackerName, applyTarget });
     }
 }
 
@@ -393,6 +444,205 @@ async function grantConcentrationDisadvantage({ context, campaignName, attackerN
         description: `${applyTarget} failed ${attackerName}'s ${actionName} save — Disadvantage on saving throws to maintain Concentration until the end of ${attackerName}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:concentration-disadvantage-granted]', e); });
+}
+
+// MA-0073: failed-save speed-halved grant. Writes the registry te
+// (speed_half) on the target sourced from the attacker, duration
+// until_end_of_next_turn (rounds:2 clock, MA-0038 shape), and logs the
+// named clause. Consumers: ConditionEffectBadges 'Speed Halved' badge,
+// computeConditionEffects → CharSummary halved Speed line (PC sheet).
+async function grantSpeedHalf({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, 'speed_half', attackerName, {
+        duration: 'until_end_of_next_turn',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'speed_half', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'speed_half');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'speed_half_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — Speed halved until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:speed-half-granted]', e); });
+}
+
+// MA-0093: failed-save subtract-die debuff grant (Giggling Magic). Writes
+// the registry te (giggling_magic_debuff) on the target sourced from the
+// attacker with subtractDie: '1d6', duration until_end_of_next_turn
+// (rounds:2 clock, MA-0073 shape), and logs the named clause. Consumers:
+// computeSubtractDiePenalty (attack/check rolls), ConditionEffectBadges.
+async function grantSubtractDieDebuff({ context, campaignName, attackerName, applyTarget }) {
+    const debuff = context.subtractDebuff;
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, debuff.effect, attackerName, {
+        duration: 'until_end_of_next_turn',
+        subtractDie: debuff.die,
+        displayLabel: debuff.displayLabel || 'Giggling Magic',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: debuff.effect, source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, debuff.effect);
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: `${debuff.effect}_granted`,
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — rolls ${debuff.die} and subtracts it from ability checks and attack rolls until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:subtract-die-debuff-granted]', e); });
+}
+
+// MA-0115: failed-save AC-penalty grant (Adult Green Dragon Noxious
+// Miasma). Writes the registry te (ac_penalty) on the target sourced from
+// the attacker with the parsed value (−2), duration until_end_of_next_turn
+// (rounds:2 clock, MA-0073 shape), and logs the named clause. Consumers:
+// conditionEffects acPenalty accumulation → CharSummary AC fold (live).
+async function grantAcPenaltyClause({ context, campaignName, attackerName, applyTarget }) {
+    const clause = context.acPenaltyClause;
+    const value = Number(clause?.value) || 2;
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, 'ac_penalty', attackerName, {
+        duration: 'until_end_of_next_turn',
+        value,
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'ac_penalty', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'ac_penalty');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'ac_penalty_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — takes a \u2212${value} penalty to AC until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:ac-penalty-granted]', e); });
+}
+
+// MA-0146: failed-save speed-zero grant (Adult White Dragon Freezing Burst).
+// Writes the registry te (speed_zero) on the target sourced from the attacker
+// AND the activeCondition speed_zero (live consumers: conditionEffects
+// speedZero → CharSummary/MonsterCardBody Speed 0), duration
+// until_end_of_next_turn (rounds:2 clock, MA-0073 shape — the clock removes
+// both via remove_target_effect + the registered 'speed_zero' condition-clear
+// expiry), and logs the named clause.
+async function grantSpeedZeroClause({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, 'speed_zero', attackerName, {
+        duration: 'until_end_of_next_turn',
+        actionName,
+    });
+    const stored = getRuntimeValue(applyTarget, 'activeConditions');
+    const conditions = Array.isArray(stored) ? stored : [];
+    if (!conditions.some(c => String(c).toLowerCase() === 'speed_zero')) {
+        await setRuntimeValue(applyTarget, 'activeConditions', [...conditions, 'speed_zero'], campaignName);
+    }
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [
+            { type: 'remove_target_effect', effectKey: 'speed_zero', source: attackerName, target: applyTarget },
+            { type: 'speed_zero' },
+        ],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'speed_zero');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'speed_zero_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — Speed is 0 until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:speed-zero-granted]', e); });
+}
+
+// MA-0104: failed-save demiplane-transport grant (Adult Gold Dragon Banish).
+// Writes the registry te (banished_demiplane) on the target sourced from the
+// dragon, duration until_start_of_attacker_next_turn with the MA-0073 rounds:2
+// clock, and logs the named clause. Consumers: ConditionEffectBadges 'Banished'
+// badge. Incapacitation lands via saveConditions — not duplicated here.
+// Reappearing in an unoccupied space of the dragon's choice within 120 feet
+// stays GM-enforced advisory (§7 — no grid transport consumer).
+async function grantDemiplaneTransport({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'Banish';
+    registerTargetEffect(campaignName, applyTarget, 'banished_demiplane', attackerName, {
+        duration: 'until_start_of_attacker_next_turn',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'banished_demiplane', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'banished_demiplane');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'banished_demiplane_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — transported to a harmless demiplane (Incapacitated) until the start of ${attackerName}'s next turn, then reappears in an unoccupied space of ${attackerName}'s choice within 120 feet (reappearance placement GM-enforced).${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:demiplane-transport-granted]', e); });
+}
+
+// MA-0107: failed-save dream-plane banishment grant (Adult Gold Dragon lair
+// action). Writes the registry te (lair_dream_plane) on the target sourced
+// from the dragon with the MA-0104 rounds:2 clock — the RAW "ends on
+// initiative count 20 on the next round" cadence maps to the nearest expiry
+// seam (initiative-20 lair seam absent §7), so expiry/reappearance stays
+// GM-enforced advisory. Consumers: ConditionEffectBadges 'Dream Plane' badge.
+async function grantDreamPlaneBanishment({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context?.actionName || context?.name || 'Dream Plane Banishment';
+    registerTargetEffect(campaignName, applyTarget, 'lair_dream_plane', attackerName, {
+        duration: 'until_initiative_count_20_next_round',
+        actionName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'lair_dream_plane', source: attackerName, target: applyTarget }],
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, 'lair_dream_plane');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'lair_dream_plane_granted',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — banished to a dream plane until the effect ends on initiative count 20 on the next round; escaping early requires a contested Charisma check and reappearance placement is GM-enforced (no initiative lair seam).${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:dream-plane-banishment-granted]', e); });
 }
 
 // MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.

@@ -241,6 +241,36 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { dc: 15, displayLabel: 'Bane' },
   },
   {
+    // MA-0093: Adult Copper Dragon Giggling Magic failed-save clause — the
+    // creature rolls 1d6 and subtracts the result from ability checks and
+    // attack rolls until the end of its next turn. subtractDie drives the
+    // generalized roll-time consumer (computeSubtractDiePenalty).
+    effect: 'giggling_magic_debuff',
+    label: 'Giggling Magic (-1d6)',
+    description: 'The creature rolls 1d6 and subtracts the number rolled from ability checks and attack rolls until the end of its next turn (Giggling Magic).',
+    icon: 'fa-face-laugh-squint',
+    cls: 'effect-disadvantage',
+    group: 'Saves & Checks',
+    fields: ['source', 'displayLabel'],
+    defaults: { displayLabel: 'Giggling Magic' },
+  },
+  {
+    // MA-0102: Adult Gold Dragon Weakening Breath failed-save clause —
+    // Disadvantage on Strength-based D20 Tests and 1d6 subtracted from its
+    // damage rolls; repeats the save at the end of each of its turns (ends
+    // on a success), auto-succeeds after 1 minute. strCheckDisadvantage is
+    // the generic te field the STR-test roll consumers read (ray chain);
+    // damageSubtractDie feeds the damage-roll consumer in handlePlainDamage.
+    effect: 'weakening_breath',
+    label: 'Weakening Breath',
+    description: 'Disadvantage on Strength-based d20 tests and 1d6 subtracted from damage rolls; repeats the save at the end of each of its turns (auto-succeeds after 1 minute).',
+    icon: 'fa-hand-fist',
+    cls: 'effect-disadvantage',
+    group: 'Saves & Checks',
+    fields: ['source', 'dc', 'saveType', 'damageSubtractDie'],
+    defaults: { damageSubtractDie: '1d6' },
+  },
+  {
     effect: 'hex_ability_check_disadvantage',
     label: 'Check Disadv',
     description: 'Disadvantage on ability checks of the chosen ability.',
@@ -290,7 +320,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'sleep_staged',
     label: 'Sleep',
-    description: 'Staged by the Sleep spell: Incapacitated until the end of the target\'s next turn, when it repeats the WIS save. On a failed repeat save the target becomes Unconscious for the spell\'s duration. The spell ends on a target early if it takes damage or is shaken awake. Elves, undead, constructs, and Exhaustion-immune creatures automatically succeed. Concentration, up to 1 minute.',
+    description: 'Staged by the Sleep spell or a Sleep Breath (MA-0068): Incapacitated until the end of the target\'s next turn, when it repeats the save (WIS for the spell, CON for Sleep Breath). On a failed repeat save the target becomes Unconscious for the effect\'s duration (spell: concentration up to 1 minute; Sleep Breath: 10 minutes). The effect ends on a target early if it takes damage or is shaken awake. For the spell, elves, undead, constructs, and Exhaustion-immune creatures automatically succeed.',
     icon: 'fa-moon',
     cls: 'effect-debuff',
     group: 'Spells',
@@ -354,6 +384,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     effect: 'banishment',
     label: 'Banishment',
     description: 'The target is transported to a harmless demiplane. While banished, the target has the Incapacitated condition. When the spell ends, the target reappears in the space it left or nearest unoccupied space. If the target is an Aberration, Celestial, Elemental, Fey, or Fiend and the spell lasts 1 minute, it is permanently banished to another plane.',
+    icon: 'fa-door-open',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
+    effect: 'banished_demiplane',
+    label: 'Banished (Demiplane)',
+    description: 'Monster legendary Banish: the target is transported to a harmless demiplane until the start of the dragon\'s next turn (Incapacitated while banished), then reappears in an unoccupied space of the dragon\'s choice within 120 feet — reappearance placement is GM-enforced.',
     icon: 'fa-door-open',
     cls: 'effect-debuff',
     group: 'Spells',
@@ -773,6 +812,15 @@ const TARGET_EFFECT_DEFINITIONS = [
 
   // ── Lair ─────────────────────────────────────────────────
   {
+    effect: 'lair_dream_plane',
+    label: 'Dream Plane (Lair)',
+    description: 'Banished to a dream plane by a gold dragon\'s lair action: the target is banished to an imagined plane until the effect ends on initiative count 20 on the next round (modeled as the MA-0038/0104 rounds:2 clock — nearest expiry seam; initiative-20 cadence GM-enforced, no initiative lair seam). Escaping early requires an action and a Charisma check contested by the dragon\'s — GM-enforced (no contested-check consumer). Reappearance placement is GM-enforced.',
+    icon: 'fa-cloud-moon',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source'],
+  },
+  {
     effect: 'lair_darkness',
     label: 'Magical Darkness (Lair)',
     description: 'Inside magical darkness (15-foot radius, lair action): heavily obscured — darkvision can\'t see through it and nonmagical light can\'t illuminate it. Overlapping light created by a spell of 2nd level or lower is dispelled — GM-enforced (no light-level model in this engine). No saving throw. Lasts until the dragon dismisses it, uses this lair action again, or dies.',
@@ -799,6 +847,42 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Lair',
     fields: ['source', 'dc'],
   },
+  {
+    effect: 'lair_fog_cloud',
+    label: 'Fog Cloud (Lair)',
+    description: 'Inside a magical fog cloud (20-foot radius, lair action): lightly obscured. No saving throw (canonical fog cloud lair action). Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam in this engine).',
+    icon: 'fa-cloud-fog',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source'],
+  },
+  {
+    effect: 'lair_spike_growth',
+    label: 'Stone Spikes (Lair)',
+    description: 'Spike-growth terrain (20-foot-radius sphere, lair action): difficult terrain; creatures moving there take piercing damage — GM-enforced (no terrain/area-damage subsystem in this engine). Lasts until the dragon uses this lair action again or the dragon dies — GM-enforced (no initiative-20 lair seam in this engine).',
+    icon: 'fa-mountain',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source'],
+  },
+  {
+    effect: 'lair_mud',
+    label: 'Liquid Mud (Lair)',
+    description: 'In 3-foot-deep mud (10-foot square, modeled as radius, lair action): Dexterity save (DC indicated) when the mud appears; on a failed save the target is restrained until freed by a DC 15 Strength check action — GM-enforced (no rescue-engine consumer). Moving 1 foot costs 2 feet of movement, and the mud hardens at initiative count 20 next round (Strength DC rises to 20) — GM-enforced (no movement-cost or initiative-20 lair seam in this engine).',
+    icon: 'fa-water',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source', 'dc'],
+  },
+  {
+    effect: 'lair_volcanic_gas',
+    label: 'Volcanic Gas (Lair)',
+    description: 'Inside a volcanic-gas cloud (20-foot-radius sphere, lair action): lightly obscured. CON save (DC indicated) when the cloud appears; on a failed save the target is Poisoned until the end of its turn and Incapacitated while poisoned in this way. A creature that starts its turn in the cloud repeats the save — GM-enforced (no turn-start zone-save consumer for lair clouds and no initiative-20 lair seam in this engine). Lasts until initiative count 20 on the next round — GM-enforced.',
+    icon: 'fa-smog',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source', 'dc'],
+  },
 
   // ── Movement ────────────────────────────────────────────
   {
@@ -820,6 +904,24 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Movement',
     fields: ['source', 'value'],
     defaults: { value: 10 },
+  },
+  {
+    effect: 'speed_half',
+    label: 'Speed Halved',
+    description: 'The creature\'s Speed is halved until the end of its next turn (MA-0073 Scorching Sands failed-save clause).',
+    icon: 'fa-gauge-high',
+    cls: 'effect-debuff',
+    group: 'Movement',
+    fields: ['source'],
+  },
+  {
+    effect: 'speed_zero',
+    label: 'Speed 0',
+    description: 'The creature\'s Speed is 0 until the end of its next turn (MA-0146 Freezing Burst failed-save clause).',
+    icon: 'fa-gauge-simple',
+    cls: 'effect-speed-zero',
+    group: 'Movement',
+    fields: ['source'],
   },
   {
     effect: 'speed_reduction',

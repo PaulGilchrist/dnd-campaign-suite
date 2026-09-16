@@ -432,6 +432,17 @@
       "ac": 11,
       "wisMod": 0,
       "note": "Humanoid save-sponge for charm/domination tests: HP 32 survives multi-hit re-save scenarios, AC 11 trivially hittable, WIS +0 fails DC<=16 on 16 or less. Joined via Encounter Builder exact 'Select Thug' checkbox. SP-037 VERIFIED target 2026-09-02 (auto-rolled WIS 16+0=16 fail vs DC 17, Charmed applied+badged). | SP-066 2026-09-02 repeat target (paralyzed via Hold Person DC 19, CON-saved out via badge clicks, removed+cleared). | SP-123 2026-09-08: WIS +0 vs DC 18 — fails save d20<=17 at cast, ~10%/click badge re-save until nat19/20 success-ends-spell (proven nat 18 ends Tasha's cleanly, other targets' te untouched)."
+    },
+    {
+      "name": "Ancient Red Dragon",
+      "index": "ancient-red-dragon",
+      "source": "public/data/monsters.json",
+      "monsterType": "Dragon",
+      "cr": "24",
+      "hp": 507,
+      "ac": 22,
+      "init": 0,
+      "note": "MA-0234 VERIFIED PASS 2026-09-15: Multiattack header TEXT row (no roll button, numericAffordance false); Rend .mc-dice-link +17 x3 live vs ElderPaladin AC19 (18+17=35, 14+17=31, 15+17=32 all HIT; damage 2d8+10 Slashing + 3d6 Fire both types in hp_change damageBreakdown). Replace path: Spellcasting .mc-dice-link-spell Scorching Ray lv3 via spellCastLevelFromSpellcasting ('(level 3 version)' prose) = ranged SPELL ATTACK +15 (prose fallback, no structured spell_attack_bonus), d20 14+15=29 HIT, 2d6 Fire applied (rolls [2,3]=5); ability_use logs 'level 3 ranged spell attack +15'. At Will = monsterSpellUses never written. Residual (app model, MA-0065 parity): single attack roll + 2d6, multi-ray count GM-enforced advisory in log. Fire immunity. cs init 17 (card spinbutton). Joined EB exact, target-select armed ElderPaladin."
     }
   ]
 }

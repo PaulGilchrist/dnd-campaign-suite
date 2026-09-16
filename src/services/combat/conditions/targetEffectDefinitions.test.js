@@ -58,7 +58,7 @@ describe('targetEffectDefinitions', () => {
         if (def.fields) {
           expect(Array.isArray(def.fields)).toBe(true);
           for (const field of def.fields) {
-            expect(['value', 'ability', 'source', 'dc', 'constellation', 'beastName', 'mode', 'objectType', 'displayLabel', 'formName']).toContain(field);
+            expect(['value', 'ability', 'source', 'dc', 'constellation', 'beastName', 'mode', 'objectType', 'displayLabel', 'formName', 'saveType', 'damageSubtractDie']).toContain(field);
           }
         }
         if (def.defaults) {
@@ -161,6 +161,7 @@ describe('targetEffectDefinitions', () => {
         expect(effectKeys).toContain('maze');
         expect(effectKeys).toContain('confusion');
         expect(effectKeys).toContain('banishment');
+        expect(effectKeys).toContain('banished_demiplane');
         expect(effectKeys).toContain('holy_aura');
         expect(effectKeys).toContain('antimagic_field');
         expect(effectKeys).toContain('aura_of_life');

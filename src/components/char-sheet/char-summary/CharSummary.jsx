@@ -88,7 +88,9 @@ const AC_BADGE_SPECS = [
     {
         key: 'slow-penalty',
         guard: (ctx, ce) => (ce?.acPenalty || 0) > 0,
-        render: (ctx, ce) => <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{ce.acPenalty} from Slow)</span>,
+        // MA-0115: te-sourced penalties attribute to their source (Noxious
+        // Miasma); the te-less Slow condition path keeps the old label.
+        render: (ctx, ce) => <span className="stat--penalized" title={`${ce.acPenaltySource || 'Slow'} penalty`}> ({'−'}{ce.acPenalty} from {ce.acPenaltySource || 'Slow'})</span>,
     },
     {
         key: 'smite-cover',
@@ -138,7 +140,7 @@ function SpeedSummary({ ctx, conditionEffects, exhaustionLevel }) {
     const { auraSpeedBonus, auraSpeedSource, totalSpeedWithBuff } = ctx;
     return (
         <>
-            <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{speedSuffixText(ctx)}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}{conditionEffects?.speedHalved && <span className="stat--penalized" title="Slow spell penalty"> (Speed halved from Slow)</span>}<br />
+            <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff} ft.{speedSuffixText(ctx)}</span> {auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}{conditionEffects?.speedHalved && <span className="stat--penalized" title={conditionEffects.speedHalvedSource ? `Speed halved by ${conditionEffects.speedHalvedSource}` : 'Slow spell penalty'}>{conditionEffects.speedHalvedSource ? ` (Speed halved by ${conditionEffects.speedHalvedSource})` : ' (Speed halved from Slow)'}</span>}<br />
         </>
     );
 }

@@ -50,6 +50,134 @@ export function parseConcentrationDisadvantageClause(saveEffect) {
   return re.test(saveEffect) ? { effect: 'concentration_disadvantage' } : null;
 }
 
+// MA-0073: authored failed-save speed-halved clause (Adult/Ancient Brass
+// Dragon Scorching Sands — "the target's Speed is halved until the end of
+// its next turn"). Not a condition, so extractConditionsFromSaveEffect can
+// never see it; this clause parse arms the speed_half te producer in
+// saveProcessing on a failed save (MA-0038 pattern).
+export function parseSpeedHalfClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /speed is halved/i.test(saveEffect) ? { effect: 'speed_half' } : null;
+}
+
+// MA-0146: authored failed-save speed-zero clause (Adult White Dragon
+// Freezing Burst — "the target's Speed is 0 until the end of the target's
+// next turn"). Not a canonical condition, so extractConditionsFromSaveEffect
+// can never see it; this clause parse arms the speed_zero producer (te +
+// activeCondition) in the picker/saveProcessing failed-save seams
+// (MA-0073 parse shape). Byte-inert (null) for rows without the clause.
+export function parseSpeedZeroClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /speed is 0\b/i.test(saveEffect) ? { effect: 'speed_zero' } : null;
+}
+
+// MA-0093: authored failed-save subtract-die debuff clause (Adult Copper
+// Dragon Giggling Magic — "the target rolls 1d6 whenever it makes an
+// ability check or attack roll and subtracts the number rolled"). Maps the
+// clause to the registered giggling_magic_debuff te; the parsed die rides
+// the te as subtractDie and drives the generalized roll-time consumer
+// (computeSubtractDiePenalty). Arms the te producer in saveProcessing on a
+// failed save (MA-0073 parse shape).
+export function parseSubtractDieClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/rolls\s+(\d+d\d+)\b[^.]*subtract(?:s)?\s+the number rolled/i);
+  return m ? { effect: 'giggling_magic_debuff', die: m[1].toLowerCase(), displayLabel: 'Giggling Magic' } : null;
+}
+
+// MA-0102: authored failed-save weakening clause (Adult Gold Dragon Weakening
+// Breath — "Disadvantage on Strength-based D20 Tests and subtracts 3 (1d6)
+// from its damage rolls. It repeats the save at the end of each of its turns,
+// ending the effect on itself on a success. After 1 minute, it succeeds
+// automatically."). Maps the clause to the registered weakening_breath te;
+// strCheckDisadvantage rides the generic te field the generalized roll-time
+// consumers already read (ray_of_enfeeble_debuff chain, MA-0093 shape), and
+// damageSubtractDie carries the die for the damage-roll consumer (NOT
+// subtractDie — that key subtracts from d20 tests, wrong RAW here). Arms the
+// te producer at the monster cone picker on a failed save (MA-0087 parse
+// shape). Byte-inert (null) for rows without the clause.
+export function parseWeakeningBreathClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/disadvantage on strength-based\s*(?:<\/?strong>)?\s*d20 tests?[^.]*subtract(?:s)?[^.]*\((\d+d\d+)\)/i);
+  if (!m) return null;
+  return {
+    effect: 'weakening_breath',
+    strCheckDisadvantage: true,
+    damageSubtractDie: m[1].toLowerCase(),
+    repeatSave: true,
+    autoSuccessMinutes: /after 1 minute/i.test(saveEffect) ? 1 : null,
+  };
+}
+
+// MA-0079: authored failed-save push clause (Adult Bronze Dragon Repulsion
+// Breath — "pushed up to 60 feet straight away from the dragon"). Not a
+// condition, so extractConditionsFromSaveEffect can never see it; this clause
+// parse arms the push te marker grant in the AoE picker on a failed save
+// (MA-0073 parse shape; token movement itself stays GM-enforced §7).
+export function parsePushFeetClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/push(?:ed)? up to (\d+) feet/i);
+  return m ? { feet: Number(m[1]) } : null;
+}
+
+// MA-0087: authored failed-save "slowed" rider clause (Adult Copper Dragon
+// Slowing Breath — "can't take Reactions; its Speed is halved; and it can
+// take either an action or a Bonus Action, not both"). 'slowed' is NOT a
+// registered condition (no badge consumer in conditions.json / the sheet), so
+// the canonical machinery maps each clause to an EXISTING registered te with a
+// live consumer: speed_half (MA-0073), no_reactions, no_action_and_bonus_action
+// (Stinking Cloud / slow2024 / CharReactions). Byte-inert (null) for rows
+// without any clause. Mirrors the MA-0073 parse shape.
+export function parseSlowedClauses(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const clauses = [];
+  if (/speed is halved/i.test(saveEffect)) clauses.push('speed_half');
+  if (/can[’']?t take Reactions/i.test(saveEffect)) clauses.push('no_reactions');
+  if (/either an action or a Bonus Action[^.]*not both/i.test(saveEffect)) clauses.push('no_action_and_bonus_action');
+  return clauses.length > 0 ? { effects: clauses } : null;
+}
+
+// MA-0115: authored failed-save AC-penalty clause (Adult Green Dragon
+// Noxious Miasma — "the target takes a −2 penalty to AC until the end of
+// its next turn"). Not a condition, so extractConditionsFromSaveEffect can
+// never see it; this parse arms the ac_penalty te producer at the failed-
+// save seams (saveProcessing + SaveAttackAoeModal picker, MA-0073 parse
+// shape). Value N parsed from the −N/-N token; the live consumer
+// (conditionEffects acPenalty accumulation) already folds it into AC.
+// Byte-inert (null) for rows without the clause.
+export function parseAcPenaltyClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/[\u2212-]\s*(\d+)\s*penalt(?:y|ies) to AC/i);
+  return m ? { effect: 'ac_penalty', value: Number(m[1]) } : null;
+}
+
+// MA-0104: authored failed-save demiplane-transport clause (Adult/Ancient
+// Gold Dragon Banish — "transported to a harmless demiplane until the start
+// of the dragon's next turn"). Not a condition, so extractConditionsFromSaveEffect
+// can never see it; this parse arms the banished_demiplane te producer at the
+// failed-save seam in saveProcessing (MA-0073 parse shape). Distinct te from
+// the PC spell `banishment` (concentration/permanent semantics would misfire
+// its badge/handler consumers). Byte-inert (null) for rows without the clause;
+// "trapped in a demiplane inside the Soul Tome" (different wording) never
+// matches. Reappearance placement stays GM-enforced §7.
+export function parseBanishTransportClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /transported to a harmless demiplane/i.test(saveEffect) ? { effect: 'banished_demiplane' } : null;
+}
+
+// MA-0107: authored failed-save dream-plane banishment clause (Adult Gold
+// Dragon lair action "Dream Plane Banishment" — "banished to a dream plane,
+// a different plane of existence the dragon has imagined into being"). Not a
+// condition, so extractConditionsFromSaveEffect can never see it; this parse
+// arms the lair_dream_plane te producer at the failed-save seam in
+// saveProcessing (MA-0104 parse shape). Distinct te from the MA-0104
+// `banished_demiplane` (Banish wording never matches) and from the PC spell
+// `banishment`. Byte-inert (null) for rows without the clause; the ancient
+// gold dragon's nameless lair dict has no save_effect so it never arms.
+export function parseDreamPlaneBanishClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /banished to a dream plane/i.test(saveEffect) ? { effect: 'lair_dream_plane' } : null;
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];

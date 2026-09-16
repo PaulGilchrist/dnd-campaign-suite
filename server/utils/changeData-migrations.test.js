@@ -671,7 +671,8 @@ describe('changeData - saveFile edge cases', () => {
     });
 
     it('should create nested directory structure for deeply nested campaign paths', () => {
-        vi.spyOn(fs, 'existsSync').mockReturnValue(false); // Force mkdir to be called
+        // Campaign root exists, but its data subdirectory does not (forces mkdir)
+        vi.spyOn(fs, 'existsSync').mockImplementation((p) => !String(p).endsWith('/data'));
         const mkdirSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => { /* no-op */ });
 
         characterChangeData.set('deep-campaign', { character1: { hp: 25 } });

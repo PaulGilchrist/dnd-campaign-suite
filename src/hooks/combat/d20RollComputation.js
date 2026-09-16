@@ -37,32 +37,54 @@ function applyPendingSkillCheckBonus(rollType, characterName, campaignName) {
     return { bonus: pendingRaw, detail: `(+${pendingRaw} [Pending Skill Check])` };
 }
 
-// Ray of Enfeeblement: STR-based d20 tests have disadvantage
-function hasRayOfEnfeeblementDisadvantage(rollType, name, characterName) {
+// STR-based d20 tests have disadvantage (MA-0102 generalization of the Ray
+// of Enfeeblement hook): any te on the roller carrying the generic
+// strCheckDisadvantage flag (ray_of_enfeeble_debuff, MA-0102
+// weakening_breath) forces Disadvantage on STR ability/skill checks. Ray te
+// already carries the flag, so ray behavior is byte-identical.
+function hasStrTestDisadvantage(rollType, name, characterName) {
     if (rollType !== 'check' && rollType !== 'skill') return false;
     const abilityAbbr = (name || '').substring(0, 3).toUpperCase();
     if (abilityAbbr !== 'STR' && name !== 'Strength' && name !== 'Athletics') return false;
     const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    return allTargetEffects.some(te => te.target === characterName && te.effect === 'ray_of_enfeeble_debuff' && te.strCheckDisadvantage);
+    return allTargetEffects.some(te => te.target === characterName && te.strCheckDisadvantage);
 }
 
-// Bane/Blade Ward: apply -1d4 penalty to attack rolls
-function computeBaneAttackPenalty(characterName, context, rollType) {
-    if (rollType !== 'attack') return { penalty: 0, roll: null, displayLabel: 'Bane' };
+// Roll-time subtract-die riders (generalized bane_penalty hook): Bane/Blade
+// Ward -1d4 on attack rolls only; any te carrying a subtractDie (MA-0093
+// giggling_magic_debuff 1d6) subtracts its die on attack rolls AND ability
+// checks, per its authored clause, until its expiration clock drains it.
+function computeSubtractDiePenalty(characterName, context, rollType) {
+    let subtractDie = null;
+    const empty = { banePenalty: 0, baneRoll: null, displayLabel: 'Bane', subtractPenalty: 0, subtractRoll: null, subtractLabel: null, subtractDie: null };
+    const isAttack = rollType === 'attack';
+    const isCheck = rollType === 'check' || rollType === 'skill';
+    if (!isAttack && !isCheck) return empty;
     const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const attackerEffects = allTargetEffects.filter(te => te.target === characterName && te.effect === 'bane_penalty');
-    const targetEffects = allTargetEffects.filter(te => te.target === context?.targetName && te.effect === 'bane_penalty' && te.source === context?.targetName);
-    let penalty = 0;
-    let roll = null;
+    const attackerEffects = allTargetEffects.filter(te => te.target === characterName && (te.effect === 'bane_penalty' || te.subtractDie));
+    const targetEffects = isAttack ? allTargetEffects.filter(te => te.target === context?.targetName && te.effect === 'bane_penalty' && te.source === context?.targetName) : [];
+    let banePenalty = 0;
+    let baneRoll = null;
     let displayLabel = 'Bane';
+    let subtractPenalty = 0;
+    let subtractRoll = null;
+    let subtractLabel = null;
     for (const te of [...attackerEffects, ...targetEffects]) {
-        const r = rollExpression('1d4');
+        if (te.effect === 'bane_penalty' && !isAttack) continue;
+        const r = rollExpression(te.subtractDie || '1d4');
         if (!r) continue;
-        penalty -= r.total;
-        roll = r.total;
-        displayLabel = te.displayLabel || 'Bane';
+        if (te.effect === 'bane_penalty') {
+            banePenalty -= r.total;
+            baneRoll = r.total;
+            displayLabel = te.displayLabel || 'Bane';
+        } else {
+            subtractPenalty -= r.total;
+            subtractRoll = (subtractRoll || 0) + r.total;
+            subtractLabel = te.displayLabel || 'Giggling Magic';
+            subtractDie = te.subtractDie;
+        }
     }
-    return { penalty, roll, displayLabel };
+    return { banePenalty, baneRoll, displayLabel, subtractPenalty, subtractRoll, subtractLabel, subtractDie };
 }
 
 // Bless: add 1d4 to attack rolls for blessed attackers
@@ -110,7 +132,7 @@ function applyTargetLuckyFeat({ rollType, forcedMode, context, campaignName, r1,
     return unchanged;
 }
 
-function buildBonusDetailParts({ bonus, sacredWeaponBonus, sunderingBlowBonus, cosmicOmenAppliedBonus, cosmicOmenDetail, pendingSkillCheckAppliedBonus, pendingSkillCheckDetail, baneAttackPenalty, baneDisplayLabel, blessAttackBonus }) {
+function buildBonusDetailParts({ bonus, sacredWeaponBonus, sunderingBlowBonus, cosmicOmenAppliedBonus, cosmicOmenDetail, pendingSkillCheckAppliedBonus, pendingSkillCheckDetail, baneAttackPenalty, baneDisplayLabel, subtractDiePenalty, subtractDieDisplayLabel, blessAttackBonus }) {
     const parts = [];
     if (sacredWeaponBonus > 0) {
         const baseBonus = bonus - sacredWeaponBonus;
@@ -125,6 +147,7 @@ function buildBonusDetailParts({ bonus, sacredWeaponBonus, sunderingBlowBonus, c
     if (cosmicOmenAppliedBonus !== 0 && cosmicOmenDetail) parts.push(cosmicOmenDetail);
     if (pendingSkillCheckAppliedBonus > 0 && pendingSkillCheckDetail) parts.push(pendingSkillCheckDetail);
     if (baneAttackPenalty < 0) parts.push(`${baneAttackPenalty} [${baneDisplayLabel}]`);
+    if (subtractDiePenalty < 0) parts.push(`${subtractDiePenalty} [${subtractDieDisplayLabel}]`);
     if (blessAttackBonus > 0) parts.push('+' + blessAttackBonus + ' [Bless]');
     return parts;
 }
@@ -195,7 +218,7 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
     const pendingSkillCheckAppliedBonus = pendingSkillCheck.bonus;
     const pendingSkillCheckDetail = pendingSkillCheck.detail;
 
-    const rayStrDisadvantage = hasRayOfEnfeeblementDisadvantage(rollType, name, characterName);
+    const rayStrDisadvantage = hasStrTestDisadvantage(rollType, name, characterName);
 
     if (rayStrDisadvantage) {
         forcedMode = 'disadvantage';
@@ -203,10 +226,14 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
 
     const sacredWeaponBonus = context?.sacredWeaponBonus || 0;
 
-    const bane = computeBaneAttackPenalty(characterName, context, rollType);
-    const baneAttackPenalty = bane.penalty;
-    const baneAttackRoll = bane.roll;
-    const baneDisplayLabel = bane.displayLabel;
+    const subtract = computeSubtractDiePenalty(characterName, context, rollType);
+    const baneAttackPenalty = subtract.banePenalty;
+    const baneAttackRoll = subtract.baneRoll;
+    const baneDisplayLabel = subtract.displayLabel;
+    const subtractDiePenalty = subtract.subtractPenalty;
+    const subtractDieRoll = subtract.subtractRoll;
+    const subtractDieDisplayLabel = subtract.subtractLabel;
+    const subtractDie = subtract.subtractDie;
 
     const bless = computeBlessAttackBonus(characterName, rollType);
     const blessAttackBonus = bless.bonus;
@@ -220,7 +247,7 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
     const luckyRerolled = rollResolution.luckyRerolled;
     const luckyRerollValue = rollResolution.luckyRerollValue;
 
-    const effectiveBonus = bonus + cosmicOmenAppliedBonus + pendingSkillCheckAppliedBonus + sunderingBlowBonus + baneAttackPenalty + blessAttackBonus;
+    const effectiveBonus = bonus + cosmicOmenAppliedBonus + pendingSkillCheckAppliedBonus + sunderingBlowBonus + baneAttackPenalty + subtractDiePenalty + blessAttackBonus;
 
     const bonusDetailParts = buildBonusDetailParts({
         bonus,
@@ -232,6 +259,8 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
         pendingSkillCheckDetail,
         baneAttackPenalty,
         baneDisplayLabel,
+        subtractDiePenalty,
+        subtractDieDisplayLabel,
         blessAttackBonus,
     });
     const finalBonusDetail = bonusDetailParts.length > 0 ? '(' + bonusDetailParts.join(', ') + ')' : undefined;
@@ -256,6 +285,10 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
         baneAttackPenalty,
         baneAttackRoll,
         baneDisplayLabel,
+        subtractDiePenalty,
+        subtractDieRoll,
+        subtractDieDisplayLabel,
+        subtractDie,
         blessAttackBonus,
         blessAttackRoll,
         sunderingBlowBonus,

@@ -291,6 +291,25 @@ describe('campaignsAdmin - DELETE /api/campaigns/:campaign', () => {
         expect(mockFsState.exists.has('/mock/campaigns/delete-test')).toBe(false);
     });
 
+    it('should purge in-memory maps so saveFile sweeps cannot resurrect the campaign', async () => {
+        const { characterChangeData, spellOverlayData, activeMaps } = await import('../utils/changeData.js');
+        const { logCache } = await import('./log.js');
+        const app = createTestApp();
+        ensureCampaign('delete-test');
+        characterChangeData.set('delete-test', { key: 'value' });
+        spellOverlayData.set('delete-test', [{ id: '1' }]);
+        activeMaps.set('delete-test', 'map-1');
+        logCache.set('delete-test', [{ id: 'entry' }]);
+
+        const res = await request(app).delete('/api/campaigns/delete-test');
+
+        expect(res.status).toBe(200);
+        expect(characterChangeData.has('delete-test')).toBe(false);
+        expect(spellOverlayData.has('delete-test')).toBe(false);
+        expect(activeMaps.has('delete-test')).toBe(false);
+        expect(logCache.has('delete-test')).toBe(false);
+    });
+
     it('should return 500 on filesystem error', async () => {
         const app = createTestApp();
         ensureCampaign('delete-test');

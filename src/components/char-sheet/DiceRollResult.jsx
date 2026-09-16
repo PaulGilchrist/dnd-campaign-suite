@@ -198,7 +198,7 @@ function FloorNotices({ props, state }) {
 }
 
 function RollAdjustmentNotices({ props, state }) {
-    const { rayOfEnfeebleReduction, rayOfEnfeebleRoll, resistanceReduction, resistanceRoll,
+    const { rayOfEnfeebleReduction, rayOfEnfeebleRoll, weakeningBreathReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll,
         healingRerollOriginalRolls, healingRerollDisplayRolls, elementalAdeptBonus, rolls,
         gwfApplied, gwfOriginalRolls, gwfDisplayRolls, tavernBrawlerRerolls } = props;
     const { safeRolls } = state;
@@ -212,6 +212,11 @@ function RollAdjustmentNotices({ props, state }) {
             {rayOfEnfeebleReduction > 0 && (
               <div className="dice-roll-ray-enfeeblement">
                 <i className="fa-solid fa-hand-fist"></i> -1d8 [Enfeeblement]: -{rayOfEnfeebleRoll}
+              </div>
+            )}
+            {weakeningBreathReduction > 0 && (
+              <div className="dice-roll-ray-enfeeblement">
+                <i className="fa-solid fa-hand-fist"></i> -1d6 [Weakening Breath]: -{weakeningBreathRoll}
               </div>
             )}
             {resistanceReduction > 0 && (

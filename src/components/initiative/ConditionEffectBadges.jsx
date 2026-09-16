@@ -176,6 +176,16 @@ const BADGE_SPECS = [
         guard: ctx => ctx.effects.speedReduction,
         build: ctx => ({ label: ctx.effects.speedReduction >= 1000 ? 'Speed 0' : `Speed -${ctx.effects.speedReduction}`, cls: 'effect-debuff', icon: 'fa-minus', removable: true, removeAction: 'target_effect', effectType: 'speed_reduction' }),
     },
+    // MA-0073: Scorching Sands failed-save speed_half te badge.
+    {
+        find: ctx => findDirect(ctx, 'speed_half'),
+        build: ctx => ({ label: 'Speed Halved', cls: 'effect-debuff', icon: 'fa-gauge-high', removable: true, removeAction: 'target_effect', effectType: 'speed_half', tooltip: `Speed halved by ${ctx.te.source || 'unknown'} until the end of the next turn` }),
+    },
+    // MA-0115: Noxious Miasma failed-save ac_penalty te badge.
+    {
+        find: ctx => findDirect(ctx, 'ac_penalty'),
+        build: ctx => ({ label: `AC \u2212${ctx.te.value || 2}`, cls: 'effect-debuff', icon: 'fa-shield-halved', removable: true, removeAction: 'target_effect', effectType: 'ac_penalty', tooltip: `AC reduced by ${ctx.te.value || 2} by ${ctx.te.source || 'unknown'} until the end of the next turn` }),
+    },
     {
         guard: ctx => ctx.effects.noAdvantageAgainst,
         build: () => ({ label: 'No Adv vs', cls: 'effect-buff', icon: 'fa-arrow-down', removable: true, removeAction: 'remove_derived', effectTypes: ['blur', 'foresight', 'escape_the_horde', 'protection', 'multiattack_defense'] }),
@@ -287,10 +297,21 @@ const BADGE_SPECS = [
         guard: ctx => ctx.effects.banePenalty,
         build: buildBaneBadge,
     },
+    // MA-0093: Giggling Magic failed-save subtract-1d6 debuff te badge.
+    {
+        find: ctx => findDirect(ctx, 'giggling_magic_debuff'),
+        build: ctx => ({ label: ctx.te?.displayLabel || 'Giggling Magic', cls: 'effect-debuff', icon: 'fa-face-laugh-squint', removable: true, removeAction: 'target_effect', effectType: 'giggling_magic_debuff', tooltip: `Rolls ${ctx.te?.subtractDie || '1d6'} and subtracts it from ability checks and attack rolls (from ${ctx.te?.source || 'unknown'}, until the end of the next turn)` }),
+    },
     {
         find: ctx => findDirect(ctx, 'ray_of_enfeeble_debuff'),
         guard: ctx => ctx.effects.rayOfEnfeebleDamageReduction,
         build: buildEnfeebleBadge,
+    },
+    // MA-0102: Adult Gold Dragon Weakening Breath failed-save te badge.
+    {
+        find: ctx => findDirect(ctx, 'weakening_breath'),
+        guard: ctx => ctx.effects.weakeningBreathDamageSubtract,
+        build: ctx => ({ label: 'Weakened', cls: 'effect-debuff', icon: 'fa-hand-fist', removable: true, removeAction: 'target_effect', effectType: 'weakening_breath', tooltip: `Weakening Breath from ${ctx.te?.source || 'unknown'}: Disadvantage on STR-based d20 tests, -${ctx.te?.damageSubtractDie || '1d6'} damage rolls; repeats the save at the end of each of its turns (auto-succeeds after 1 minute)` }),
     },
     {
         find: ctx => findDirect(ctx, 'resistance_damage_reduction'),
@@ -379,6 +400,19 @@ const BADGE_SPECS = [
     {
         find: ctx => findDirect(ctx, 'banishment'),
         build: ctx => ({ label: 'Banished', cls: 'effect-debuff', icon: 'fa-door-open', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'banishment', tooltip: `Banished by ${ctx.te.source || 'unknown'}: Incapacitated in demiplane. ${ctx.te.permanent ? 'Permanent banishment - target will not return.' : 'Concentration, up to 1 minute.'}` }),
+    },
+    {
+        // MA-0104: monster legendary Banish (Adult/Ancient Gold Dragon) —
+        // distinct te from the PC spell; honest non-concentration tooltip.
+        find: ctx => findDirect(ctx, 'banished_demiplane'),
+        build: ctx => ({ label: 'Banished (Demiplane)', cls: 'effect-debuff', icon: 'fa-door-open', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'banished_demiplane', tooltip: `Banished by ${ctx.te.source || 'unknown'}: Incapacitated in a harmless demiplane until the start of the dragon's next turn; reappears within 120 ft of the dragon (GM-enforced).` }),
+    },
+    {
+        // MA-0107: Adult Gold Dragon lair action Dream Plane Banishment —
+        // distinct te from banished_demiplane/PC banishment; the contested
+        // Charisma escape check and initiative-20 expiry are GM-enforced.
+        find: ctx => findDirect(ctx, 'lair_dream_plane'),
+        build: ctx => ({ label: 'Dream Plane', cls: 'effect-debuff', icon: 'fa-cloud-moon', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'lair_dream_plane', tooltip: `Banished to a dream plane by ${ctx.te.source || 'unknown'}'s lair action until initiative count 20 on the next round; escape requires a contested Charisma check action (GM-enforced).` }),
     },
     {
         find: ctx => findDirect(ctx, 'maze'),

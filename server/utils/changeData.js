@@ -102,15 +102,21 @@ export const readFile = () => {
  * Persist all in-memory change data to disk, only writing when content changed
  */
 export const saveFile = () => {
+    const campaignsRoot = path.join(process.cwd(), 'public', 'campaigns');
     for (const [campaign, data] of characterChangeData) {
-        const filePath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json');
+        const campaignDirPath = path.join(campaignsRoot, campaign);
+        const filePath = path.join(campaignDirPath, 'data', 'character-change-data.json');
         const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) {
+        if (!fs.existsSync(campaignDirPath)) {
             if (String(campaign) === '[object Object]' || campaign === undefined || campaign === null || campaign === '') {
                 console.error(`[changeData] Skipping persist for invalid campaign key "${campaign}" (corrupted client payload). Removing from memory.`, { stack: new Error().stack });
-                characterChangeData.delete(campaign);
-                continue;
+            } else {
+                console.error(`[changeData] Skipping persist for campaign "${campaign}" — its directory no longer exists on disk. Removing from memory to prevent phantom campaign regeneration.`);
             }
+            characterChangeData.delete(campaign);
+            continue;
+        }
+        if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
         try {

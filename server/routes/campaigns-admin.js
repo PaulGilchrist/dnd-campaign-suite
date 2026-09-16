@@ -204,6 +204,12 @@ router.delete('/api/campaigns/:campaign', asyncHandler((req, res) => {
     // Remove the entire campaign directory
     fs.rmSync(dir, { recursive: true, force: true });
 
+    // Purge in-memory maps so saveFile() sweeps cannot resurrect the deleted campaign
+    characterChangeData.delete(campaign);
+    spellOverlayData.delete(campaign);
+    activeMaps.delete(campaign);
+    logCache.delete(campaign);
+
     res.json({ message: 'Campaign deleted successfully' });
 }));
 

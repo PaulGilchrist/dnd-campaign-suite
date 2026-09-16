@@ -384,13 +384,38 @@ describe('changeData - saveFile', () => {
         characterChangeData.set('new-campaign', { character1: { hp: 25 } });
 
         const mkdirSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => { /* no-op */ });
-        vi.spyOn(fs, 'existsSync').mockImplementation(() => false);
+        // Campaign root exists, but its data subdirectory does not
+        vi.spyOn(fs, 'existsSync').mockImplementation((p) => !String(p).endsWith('/data'));
         saveFile();
 
         expect(mkdirSpy).toHaveBeenCalledWith(
             expect.stringContaining('new-campaign/data'),
             { recursive: true },
         );
+        mkdirSpy.mockRestore();
+    });
+
+    it('should NOT recreate a campaign directory that was deleted from disk', () => {
+        // Phantom campaign: key in memory, directory deleted from disk.
+        // saveFile must purge it from memory instead of resurrecting the folder.
+        characterChangeData.set('phantom-campaign', {});
+
+        const mkdirSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => { /* no-op */ });
+        const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { /* no-op */ });
+        vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => { /* no-op */ });
+
+        saveFile();
+
+        expect(mkdirSpy).not.toHaveBeenCalled();
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(characterChangeData.has('phantom-campaign')).toBe(false);
+        expect(errorSpy).toHaveBeenCalledWith(
+            expect.stringContaining('phantom-campaign'),
+        );
+
+        errorSpy.mockRestore();
+        writeSpy.mockRestore();
         mkdirSpy.mockRestore();
     });
 });

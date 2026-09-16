@@ -154,6 +154,7 @@ worth investigating (possible race condition, stale params, or genuine
 tool defect) — but the wrapping syntax alone is expected and safe.
 
 ## CRITICAL CORE RULES
+- **Campaign lockdown:** `test-campaign` is the ONLY campaign any agent or subagent may create into, join into, edit, clear, or delete. Every other campaign (`Frostfall`, `Testing G1/G2/G3`, and any others) is PRODUCTION — never select it in the UI, never POST/PUT/DELETE against its routes, never create new campaigns via the campaign wizard or `/api/campaigns`. Verify the campaign header reads `test-campaign` immediately after every campaign-select. If an off-target campaign is ever touched, stop and report — do not attempt to repair it.
 - **One subagent at a time** to conserve memory.
 - Debug logging: if the AI model added debug logging on its own initiative, it may also remove it once it judges the logging is no longer needed. If the user specifically asked for logging, it must remain until the user specifically asks for it to be removed.
 - Look for and re-use existing code and avoid duplicating code.

@@ -616,3 +616,622 @@ describe('MA-0058 Adult Blue Dragon legendary header + row classification', () =
     expect(e.description).toMatch(/casts invisibility on itself.*GM-enforced/s);
   });
 });
+
+// MA-0073: per-action once-per-turn cooldown (Scorching Sands "can't take
+// this action again until the start of its next turn"). The MA-0070 latch
+// is one-expend-per-boundary; the action-keyed map keeps the SAME row
+// unusable across every later boundary until the monster's own turn-start
+// regain clears it.
+import {
+  hasLegendaryCooldownClause,
+  legendaryActionSlug,
+  MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY,
+  buildLegendaryCooldownRefusalLog,
+  buildLegendaryCooldownRefusalPopup,
+} from './monsterLegendaryUses.js';
+
+const BRASS = monstersData.find(m => m.name === 'Adult Brass Dragon');
+const SANDS = BRASS.legendary_actions.find(a => a.name === 'Scorching Sands');
+
+describe('MA-0073 per-action cooldown clause parse', () => {
+  it('matches the Scorching Sands row text, not rows without the clause', () => {
+    expect(hasLegendaryCooldownClause(SANDS)).toBe(true);
+    expect(hasLegendaryCooldownClause(BRASS.legendary_actions.find(a => a.name === 'Pounce'))).toBe(false);
+    expect(hasLegendaryCooldownClause(null)).toBe(false);
+    expect(legendaryActionSlug('Scorching Sands')).toBe('scorching_sands');
+  });
+
+  it('refusal log is <action>_refused (once per turn); popup names the gate', () => {
+    const e = buildLegendaryCooldownRefusalLog({ monsterName: 'Adult Brass Dragon 1', actionName: 'Scorching Sands' });
+    expect(e.automationType).toBe('scorching_sands_refused (once per turn)');
+    expect(e.description).toMatch(/can't take this action again until the start of its next turn/);
+    expect(buildLegendaryCooldownRefusalPopup({ monsterName: 'Adult Brass Dragon 1', actionName: 'Scorching Sands' })).toMatch(/can't take Scorching Sands again/);
+  });
+});
+
+describe('MA-0073 expendLegendaryUse per-action cooldown gate', () => {
+  function brassMonster() {
+    return { legendary_actions: BRASS.legendary_actions };
+  }
+
+  it('first spend stamps the cooldown; later boundary re-click refused zero-spend; regain re-arms', async () => {
+    cs = { round: 1, activeCreatureName: 'Thug 1' };
+    const monster = brassMonster();
+    const first = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster, actionName: 'Scorching Sands', action: SANDS, campaignName: 'test-campaign', deps });
+    expect(first.spent).toBe(true);
+    expect(store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Adult Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ scorching_sands: { round: 1 } });
+
+    // New boundary, same round — MA-0070 boundary latch would allow, the
+    // row's own gate refuses: zero spend, refused (once per turn) log.
+    cs.activeCreatureName = 'AasimarTest';
+    const second = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster, actionName: 'Scorching Sands', action: SANDS, campaignName: 'test-campaign', deps });
+    expect(second.spent).toBe(false);
+    expect(second.reason).toBe('cooldown');
+    expect(store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'scorching_sands_refused (once per turn)')).toBe(true);
+
+    // Other legendary rows are unaffected by Scorching Sands' cooldown.
+    cs.activeCreatureName = 'HexWarlock';
+    const other = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster, actionName: 'Blazing Light', action: BRASS.legendary_actions.find(a => a.name === 'Blazing Light'), campaignName: 'test-campaign', deps });
+    expect(other.spent).toBe(true);
+    expect(store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 });
+
+    // Monster's own turn-start regain clears the cooldown — row re-fires.
+    cs.activeCreatureName = 'Adult Brass Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Adult Brass Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain.regained).toBe(true);
+    expect(store['Adult Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    cs.activeCreatureName = 'AberrantSorcerer';
+    const third = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster, actionName: 'Scorching Sands', action: SANDS, campaignName: 'test-campaign', deps });
+    expect(third.spent).toBe(true);
+  });
+
+  it('rows without the clause stamp no cooldown (byte-inert legacy semantics)', async () => {
+    cs = { round: 1, activeCreatureName: 'Thug 1' };
+    const pounce = BRASS.legendary_actions.find(a => a.name === 'Pounce');
+    const first = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster: brassMonster(), actionName: 'Pounce', action: pounce, campaignName: 'test-campaign', deps });
+    expect(first.spent).toBe(true);
+    expect(store['Adult Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeUndefined();
+    cs.activeCreatureName = 'AasimarTest';
+    const second = await expendLegendaryUse({ monsterName: 'Adult Brass Dragon 1', monster: brassMonster(), actionName: 'Pounce', action: pounce, campaignName: 'test-campaign', deps });
+    expect(second.spent).toBe(true);
+  });
+
+  it('cooldown-only clear at turn-start with no uses spent: no spurious writes', async () => {
+    cs = { round: 2, activeCreatureName: 'Adult Brass Dragon 1' };
+    const r = await regainLegendaryUses({ monsterName: 'Nobody Dragon 1', campaignName: 'test-campaign', deps });
+    expect(r).toEqual({ regained: false });
+    expect(deps.setRuntimeValue.mock.calls.some(c => String(c[1]).includes(MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY))).toBe(false);
+  });
+});
+
+// MA-0145: Adult White Dragon — data-only header fix (MA-0136 silver shape).
+// Header authors uses:3 (4-in-lair advisory), Freezing Burst/Frightful
+// Presence numerics untouched but now budget-gated with the MA-0073
+// per-action cooldown clause, Pounce delegates_to the +11 Rend row.
+describe('MA-0145 Adult White Dragon legendary economy (header uses:3)', () => {
+  const white = monstersData.find(m => m.index === 'adult-white-dragon');
+  const pounce = white.legendary_actions.find(a => a.name === 'Pounce');
+  const rend = white.actions.find(a => a.name === 'Rend');
+  const freezing = white.legendary_actions.find(a => a.name === 'Freezing Burst');
+  const frightful = white.legendary_actions.find(a => a.name === 'Frightful Presence');
+
+  it('header authors uses:3 + lair advisory; max resolves to 3 (gate engages)', () => {
+    const header = legendaryHeaderAction(white);
+    expect(header?.uses).toBe(3);
+    expect(header?.description).toMatch(/lair.*advisory/i);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+  });
+
+  it('Freezing Burst/Frightful Presence numerics untouched; cooldown clause live', () => {
+    expect(freezing.save_dc).toBe(14);
+    expect(freezing.save_type).toBe('Constitution');
+    expect(freezing.damage_dice_primary).toBe('2d6');
+    expect(frightful.save_dc).toBe(14);
+    expect(frightful.save_type).toBe('Charisma');
+    expect(hasLegendaryCooldownClause(freezing)).toBe(true);
+    expect(hasLegendaryCooldownClause(frightful)).toBe(true);
+  });
+
+  it('Pounce delegates_to the +11 Rend row with the verbatim advisory movement clause', () => {
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.uses == null).toBe(true);
+    expect(pounce.description).toBe('The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
+    expect(legendaryDelegateAction(white, pounce)).toBe(rend);
+    expect(legendaryDelegateAttackName(pounce, rend)).toBe('Pounce (Rend attack)');
+  });
+
+  it('economy is live: spend 3→2, turn latch, per-action cooldown refusal, exhaustion, turn-start regain', async () => {
+    const first = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Freezing Burst', action: freezing, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Adult White Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ freezing_burst: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Freezing Burst', action: freezing, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Freezing Burst', action: freezing, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'freezing_burst_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'HexWarlock';
+    const fp = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Frightful Presence', action: frightful, campaignName: 'test-campaign', deps });
+    expect(fp).toEqual({ spent: true, remaining: 1, max: 3 });
+    cs.activeCreatureName = 'ElderPaladin';
+    const pounceSpend = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: legendaryDelegateAttackName(pounce, rend), action: pounce, campaignName: 'test-campaign', deps });
+    expect(pounceSpend).toEqual({ spent: true, remaining: 0, max: 3 });
+
+    cs.activeCreatureName = 'LightfootHalfling';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Adult White Dragon 1', monster: white, actionName: 'Freezing Burst', action: freezing, campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+    expect(store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+
+    cs.activeCreatureName = 'Adult White Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Adult White Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Adult White Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Adult White Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+  });
+});
+
+// MA-0161: Ancient Black Dragon — data-only header fix (MA-0145 white shape).
+// Header authors uses:3 (4-in-lair advisory), Cloud of Insects numerics
+// untouched but now budget-gated with the MA-0073 per-action cooldown
+// clause; MA-0163 authored the FP save-cast shape; MA-0164 delegates Pounce.
+describe('MA-0161 Ancient Black Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-black-dragon');
+  const cloud = ancient.legendary_actions.find(a => a.name === 'Cloud of Insects');
+  const frightful = ancient.legendary_actions.find(a => a.name === 'Frightful Presence');
+  const pounce = ancient.legendary_actions.find(a => a.name === 'Pounce');
+  const rend = ancient.actions.find(a => a.name === 'Rend');
+
+  it('header authors uses:3 + lair advisory; max resolves to 3 (gate engages)', () => {
+    const header = legendaryHeaderAction(ancient);
+    expect(header?.uses).toBe(3);
+    expect(header?.description).toMatch(/lair.*advisory/i);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+  });
+
+  it('Cloud of Insects numerics untouched; cooldown clause live', () => {
+    expect(cloud.save_dc).toBe(21);
+    expect(cloud.save_type).toBe('Dexterity');
+    expect(cloud.damage_dice_primary).toBe('6d10');
+    expect(cloud.damage_type_primary).toBe('Poison');
+    expect(hasLegendaryCooldownClause(cloud)).toBe(true);
+  });
+
+  it('FP row MA-0163 save-cast shape; MA-0164 Pounce delegates_to the +15 Rend row with the verbatim advisory movement clause', () => {
+    expect(frightful.save_dc).toBe(21);
+    expect(frightful.save_type).toBe('Wisdom');
+    expect(frightful.repeat_save?.save_type).toBe('Wisdom');
+    expect(frightful.delegates_to == null && frightful.uses == null).toBe(true);
+    expect(frightful.description).toMatch(/can't take this action again until the start of its next turn/);
+    expect(hasLegendaryCooldownClause(frightful)).toBe(true);
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.uses == null).toBe(true);
+    expect(pounce.description).toBe('The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
+    expect(legendaryDelegateAction(ancient, pounce)).toBe(rend);
+    expect(legendaryDelegateAttackName(pounce, rend)).toBe('Pounce (Rend attack)');
+  });
+
+  it('economy is live: Cloud spend 3→2, turn latch, cooldown refusal, exhaustion, turn-start regain', async () => {
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Cloud of Insects', action: cloud, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Black Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ cloud_of_insects: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Cloud of Insects', action: cloud, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Cloud of Insects', action: cloud, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'cloud_of_insects_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'HexWarlock';
+    const fp = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Frightful Presence', action: frightful, campaignName: 'test-campaign', deps });
+    expect(fp).toEqual({ spent: true, remaining: 1, max: 3 });
+    cs.activeCreatureName = 'ElderPaladin';
+    const pounceSpend = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: legendaryDelegateAttackName(pounce, rend), action: pounce, campaignName: 'test-campaign', deps });
+    expect(pounceSpend).toEqual({ spent: true, remaining: 0, max: 3 });
+
+    cs.activeCreatureName = 'LightfootHalfling';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Ancient Black Dragon 1', monster: ancient, actionName: 'Cloud of Insects', action: cloud, campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+    expect(store['Ancient Black Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+
+    cs.activeCreatureName = 'Ancient Black Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Black Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Black Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Ancient Black Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+  });
+});
+
+// MA-0173: Ancient Blue Dragon "Cloaked Flight" — data fix byte-mirroring
+// the MA-0058 adult-blue advisory shape (advisory:"invisibility" + advisory
+// movement clause + once-per-turn clause). Gated chip click spends 1, stamps
+// the cloaked_flight cooldown, and lands the advisory popup + ability_use
+// adjudication record instead of burning the use into a console dead-end
+// (MA-0164 chip-burn pitfall).
+describe('MA-0173 Ancient Blue Dragon Cloaked Flight advisory row', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-blue-dragon');
+  const cloaked = ancient.legendary_actions.find(a => a.name === 'Cloaked Flight');
+
+  it('byte-mirrors the MA-0058 adult-blue advisory row shape verbatim', () => {
+    const adult = monstersData.find(m => m.index === 'adult-blue-dragon').legendary_actions.find(a => a.name === 'Cloaked Flight');
+    expect(JSON.stringify(cloaked)).toBe(JSON.stringify(adult));
+  });
+
+  it('advisory row, no own numeric mechanic, cooldown clause present', () => {
+    expect(cloaked.advisory).toBe('invisibility');
+    expect(cloaked.attack_bonus == null && cloaked.save_dc == null).toBe(true);
+    expect(cloaked.description).toMatch(/movement advisory/i);
+    expect(hasLegendaryCooldownClause(cloaked)).toBe(true);
+    expect(legendaryActionSlug(cloaked.name)).toBe('cloaked_flight');
+  });
+
+  it('advisory popup + ability_use log name the spell and the GM-enforced residual', () => {
+    const html = buildLegendaryAdvisoryPopup({ monsterName: 'Ancient Blue Dragon 1', action: cloaked });
+    expect(html).toMatch(/Legendary Action — Cloaked Flight/);
+    expect(html).toMatch(/casts invisibility on itself/);
+    expect(html).toMatch(/GM-enforced/);
+    const e = buildLegendaryAdvisoryLog({ monsterName: 'Ancient Blue Dragon 1', action: cloaked });
+    expect(e.type).toBe('ability_use');
+    expect(e.abilityName).toBe('Cloaked Flight');
+    expect(e.description).toMatch(/casts invisibility on itself.*GM-enforced/s);
+  });
+
+  it('economy: spend stamps cloaked_flight cooldown; later boundary refused once-per-turn; regain re-arms', async () => {
+    const monster = { legendary_actions: ancient.legendary_actions };
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Cloaked Flight', action: cloaked, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ cloaked_flight: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Cloaked Flight', action: cloaked, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Cloaked Flight', action: cloaked, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'cloaked_flight_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'Ancient Blue Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Blue Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    cs.activeCreatureName = 'HexWarlock';
+    const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Cloaked Flight', action: cloaked, campaignName: 'test-campaign', deps });
+    expect(rearmed.spent).toBe(true);
+  });
+});
+
+// MA-0174: Ancient Blue Dragon "Sonic Boom" — data fix mirrors the verified
+// MA-0058 adult-blue authored save-leg shape at level-3 Shatter values
+// (save_dc 22 Constitution, 4d8 Thunder, half on success; verbatim
+// "(level 3 version)" + once-per-turn clause). delegates_to cannot resolve
+// a Spellcasting row through the legendary seam (no spell name/dice), so
+// the numbers live on the row itself; the gated click spends 1, stamps the
+// sonic_boom cooldown, refuses once-per-turn, and regain re-arms.
+describe('MA-0174 Ancient Blue Dragon Sonic Boom authored save leg', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-blue-dragon');
+  const sonic = ancient.legendary_actions.find(a => a.name === 'Sonic Boom');
+
+  it('authored save leg: DC 22 Constitution, 4d8 Thunder, half on success', () => {
+    expect(sonic.save_dc).toBe(22);
+    expect(sonic.save_type).toBe('Constitution');
+    expect(sonic.damage_dice_primary).toBe('4d8');
+    expect(sonic.damage_type_primary).toBe('Thunder');
+    expect(sonic.dc_success).toBe('half');
+    expect(sonic.save_effect).toMatch(/4d8 Thunder damage.*Half damage/i);
+    expect(sonic.attack_bonus == null && sonic.delegates_to == null && sonic.advisory == null && sonic.uses == null).toBe(true);
+  });
+
+  it('description keeps the verbatim cast + once-per-turn clauses and authors the 10-ft sphere picker clause', () => {
+    expect(sonic.description).toMatch(/^The dragon uses Spellcasting to cast <em>Shatter<\/em> \(level 3 version\)\./);
+    expect(sonic.description).toMatch(/10-ft-radius sphere/);
+    expect(hasLegendaryCooldownClause(sonic)).toBe(true);
+    expect(legendaryActionSlug(sonic.name)).toBe('sonic_boom');
+  });
+
+  it('economy: spend stamps sonic_boom cooldown; later boundary refused once-per-turn; regain clears; re-arms', async () => {
+    const monster = { legendary_actions: ancient.legendary_actions };
+    cs.activeCreatureName = 'Thug 1';
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Sonic Boom', action: sonic, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ sonic_boom: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Sonic Boom', action: sonic, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Sonic Boom', action: sonic, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'sonic_boom_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'Ancient Blue Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Blue Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    cs.activeCreatureName = 'HexWarlock';
+    const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: 'Sonic Boom', action: sonic, campaignName: 'test-campaign', deps });
+    expect(rearmed.spent).toBe(true);
+  });
+});
+
+// MA-0175: Ancient Blue Dragon "Tail Swipe" legendary row was prose-only
+// inert (MA-0164/MA-0172 fingerprint). Fix byte-mirrors the adult-blue Tail
+// Swipe delegate shape — {name, delegates_to:"Rend", description} verbatim,
+// the MA-0164 ancient-black Pounce delegates_to convention sans movement
+// clause (this row's prose has none). Delegates resolve to the +16 Rend
+// row; no cooldown clause → economy governs via uses + MA-0021 turn latch.
+describe('MA-0175 Ancient Blue Dragon Tail Swipe delegate row', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-blue-dragon');
+  const tail = ancient.legendary_actions.find(a => a.name === 'Tail Swipe');
+  const rend = ancient.actions.find(a => a.name === 'Rend');
+
+  it('byte-mirrors the adult-blue Tail Swipe delegate row verbatim', () => {
+    const adultTail = monstersData.find(m => m.index === 'adult-blue-dragon').legendary_actions.find(a => a.name === 'Tail Swipe');
+    expect(JSON.stringify(tail)).toBe(JSON.stringify(adultTail));
+  });
+
+  it('delegates_to the +16 Rend row; no own numbers, no cooldown clause', () => {
+    expect(tail.delegates_to).toBe('Rend');
+    expect(tail.attack_bonus == null && tail.save_dc == null && tail.uses == null && tail.advisory == null).toBe(true);
+    expect(tail.description).toBe('The dragon makes one Rend attack.');
+    expect(hasLegendaryCooldownClause(tail)).toBe(false);
+    expect(legendaryDelegateAction(ancient, tail)).toBe(rend);
+    expect(legendaryDelegateAttackName(tail, rend)).toBe('Tail Swipe (Rend attack)');
+  });
+
+  it('economy: spend 3→2 stamps turn latch only (no tail_swipe cooldown); same-boundary refuses; regain re-arms', async () => {
+    const monster = { legendary_actions: ancient.legendary_actions };
+    cs.activeCreatureName = 'Thug 1';
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: legendaryDelegateAttackName(tail, rend), action: tail, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Blue Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY] == null).toBe(true);
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: legendaryDelegateAttackName(tail, rend), action: tail, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+
+    cs.activeCreatureName = 'Ancient Blue Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Blue Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Blue Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    cs.activeCreatureName = 'HexWarlock';
+    const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Blue Dragon 1', monster, actionName: legendaryDelegateAttackName(tail, rend), action: tail, campaignName: 'test-campaign', deps });
+    expect(rearmed.spent).toBe(true);
+  });
+});
+
+// MA-0184: Ancient Brass Dragon — data-only header fix (MA-0172/MA-0161
+// shape). Header row [0] gains uses:3 + the adult-brass "4 in Lair" advisory
+// tail byte-mirrored verbatim; rows [1] Blazing Light / [2] Pounce stay
+// prose-only (MA-0185/MA-0186 queued) and [3] Scorching Sands numerics are
+// untouched — gating the section (header.uses present) auto-routes its
+// save-chip through the legendaryGate spend (MA-0136 silver precedent).
+describe('MA-0184 Ancient Brass Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-brass-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-brass-dragon');
+  const header = ancient.legendary_actions[0];
+  const blazing = ancient.legendary_actions[1];
+  const pounce = ancient.legendary_actions[2];
+  const sands = ancient.legendary_actions[3];
+
+  it('header authors uses:3 and byte-mirrors the adult-brass header incl. advisory tail', () => {
+    expect(header.name).toBe('Legendary Action Uses: 3 (4 in Lair)');
+    expect(header.uses).toBe(3);
+    expect(JSON.stringify(header)).toBe(JSON.stringify(adult.legendary_actions[0]));
+    expect(header.description).toMatch(/lair.*advisory/i);
+    const gated = legendaryHeaderAction(ancient);
+    expect(gated).toBe(header);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+    expect(legendaryUsesRemaining(header, {})).toBe(3);
+  });
+
+  it('row [1] Blazing Light numeric via MA-0185; row [2] Pounce delegates Rend via MA-0186; [3] Scorching Sands numerics untouched, cooldown clause live', () => {
+    expect(blazing.attack_bonus).toBe(12);
+    expect(blazing.spell_attack_bonus).toBe(12);
+    expect(blazing.damage_dice_primary).toBe('2d6');
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.attack_bonus == null && pounce.save_dc == null && pounce.uses == null).toBe(true);
+    expect(sands.save_dc).toBe(20);
+    expect(sands.save_type).toBe('Dexterity');
+    expect(sands.dc_success).toBe('none');
+    expect(sands.damage_dice_primary).toBe('8d8');
+    expect(sands.damage_type_primary).toBe('Fire');
+    expect(sands.save_effect).toMatch(/Success: no damage/);
+    expect(sands.delegates_to == null && sands.advisory == null && sands.uses == null).toBe(true);
+    expect(hasLegendaryCooldownClause(sands)).toBe(true);
+    expect(legendaryActionSlug(sands.name)).toBe('scorching_sands');
+  });
+
+  it('economy is live: Scorching Sands spend 3→2 + cooldown stamp, turn latch, refusal legs, exhaustion, turn-start regain re-arms', async () => {
+    cs.activeCreatureName = 'Thug 1';
+    const monster = { legendary_actions: ancient.legendary_actions };
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ scorching_sands: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'scorching_sands_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'HexWarlock';
+    const blazingSpend = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Blazing Light', action: blazing, campaignName: 'test-campaign', deps });
+    expect(blazingSpend).toEqual({ spent: true, remaining: 1, max: 3 });
+    cs.activeCreatureName = 'ElderPaladin';
+    const pounceSpend = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Pounce', action: pounce, campaignName: 'test-campaign', deps });
+    expect(pounceSpend).toEqual({ spent: true, remaining: 0, max: 3 });
+
+    cs.activeCreatureName = 'LightfootHalfling';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+    expect(store['Ancient Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+
+    cs.activeCreatureName = 'Ancient Brass Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Brass Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Brass Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Ancient Brass Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    cs.activeCreatureName = 'HexWarlock';
+    const rearmed = await expendLegendaryUse({ monsterName: 'Ancient Brass Dragon 1', monster, actionName: 'Scorching Sands', action: sands, campaignName: 'test-campaign', deps });
+    expect(rearmed.spent).toBe(true);
+  });
+});
+
+// MA-0186: Ancient Brass Dragon Pounce — prose-only inert row burned uses
+// (MA-0164 fingerprint). Fix byte-mirrors the adult-brass Pounce delegate
+// row verbatim: delegates_to "Rend" + movement-advisory prose; delegated
+// +14 Rend (+ 2d10 + 8 Slashing / 2d6 Fire) resolves through the spend gate.
+describe('MA-0186 Ancient Brass Dragon Pounce delegates_to Rend', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-brass-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-brass-dragon');
+
+  it('row byte-matches the adult-brass Pounce delegate row', () => {
+    const pounce = ancient.legendary_actions.find(a => a.name === 'Pounce');
+    expect(JSON.stringify(pounce)).toBe(JSON.stringify(adult.legendary_actions.find(a => a.name === 'Pounce')));
+    expect(pounce.delegates_to).toBe('Rend');
+    expect(pounce.description).toMatch(/movement advisory/i);
+    const rend = ancient.actions.find(a => a.name === 'Rend');
+    expect(rend.attack_bonus).toBe(14);
+    expect(rend.damage_dice_primary).toBe('2d10 + 8');
+    expect(rend.damage_dice_secondary).toBe('2d6');
+  });
+});
+
+// MA-0195: Ancient Bronze Dragon header uses:3 (MA-0070/0184 pattern) —
+// byte-mirrors adult-bronze header; gating the section auto-routes the
+// numeric Thunderclap save chip through the spend gate (MA-0136/0184).
+describe('MA-0195 Ancient Bronze Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-bronze-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-bronze-dragon');
+
+  it('header byte-matches adult-bronze sibling; economy walk spends, latches, refuses, regains', async () => {
+    const header = ancient.legendary_actions[0];
+    expect(JSON.stringify(header)).toBe(JSON.stringify(adult.legendary_actions[0]));
+    expect(header.uses).toBe(3);
+    expect(ancient.legendary_actions[3].dc_success).toBe('none');
+    expect(ancient.legendary_actions[3].save_effect).toMatch(/Success: no damage/);
+    const gl = ancient.legendary_actions[1];
+    expect(Object.keys(gl).sort()).toEqual(Object.keys(adult.legendary_actions[1]).sort());
+    expect(gl.attack_bonus).toBe(14);
+    expect(gl.spell_attack_bonus).toBe(14);
+    expect(gl.range).toBe('120 ft.');
+    expect(gl.damage_dice_primary).toBe('5d6');
+    expect(gl.damage_type_primary).toBe('Radiant');
+    expect(gl.description).toMatch(/\+14 to hit/);
+    expect(gl.description).toMatch(/GM-enforced, CLA-325/);
+    const pounce = ancient.legendary_actions[2];
+    expect(JSON.stringify(pounce)).toBe(JSON.stringify(adult.legendary_actions[2]));
+    expect(pounce.delegates_to).toBe('Rend');
+    const cs = { activeCreatureName: 'Thug 1' };
+    const logs = [];
+    const store = {};
+    const deps = { getCombatContext: () => cs, addEntry: (_c, e) => logs.push(e), getRuntimeValue: (_m, k) => store[k] ?? null, setRuntimeValue: (_m, k, v) => { store[k] = v; return Promise.resolve(); } };
+    const tc = ancient.legendary_actions[3];
+    const monster = { legendary_actions: ancient.legendary_actions };
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Bronze Dragon 1', monster, actionName: 'Thunderclap', action: tc, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Bronze Dragon 1', monster, actionName: 'Thunderclap', action: tc, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+    cs.activeCreatureName = 'Ancient Bronze Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Bronze Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+  });
+});
+
+// MA-0206: Ancient Copper Dragon header uses:3 (MA-0070/0184/0195 pattern)
+// — byte-mirrors adult-copper header; gating auto-routes numeric rows
+// (Giggling Magic) through the spend gate (MA-0136/0184), killing the
+// ungated leak. Giggling Magic gains dc_success:"none" + honest success
+// wording per adult "no effect on a successful save" precedent.
+describe('MA-0206 Ancient Copper Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-copper-dragon');
+
+  it('header byte-matches adult-copper sibling; Giggling Magic dc_success none', () => {
+    expect(JSON.stringify(ancient.legendary_actions[0])).toBe(JSON.stringify(adult.legendary_actions[0]));
+    expect(ancient.legendary_actions[0].uses).toBe(3);
+    expect(ancient.legendary_actions[1].dc_success).toBe('none');
+    expect(ancient.legendary_actions[1].save_effect).toMatch(/Success: no damage and no debuff/);
+  });
+
+  it('economy walk: spend after other creature, turn latch refusal, turn-start regain', async () => {
+    const cs = { activeCreatureName: 'Thug 1' };
+    const store = {};
+    const logs = [];
+    const deps = { getCombatContext: () => cs, addEntry: (_c, e) => logs.push(e), getRuntimeValue: (_m, k) => store[k] ?? null, setRuntimeValue: (_m, k, v) => { store[k] = v; return Promise.resolve(); } };
+    const monster = { legendary_actions: ancient.legendary_actions };
+    const giggling = ancient.legendary_actions[1];
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Copper Dragon 1', monster, actionName: 'Giggling Magic', action: giggling, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Copper Dragon 1', monster, actionName: 'Giggling Magic', action: giggling, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+    cs.activeCreatureName = 'Ancient Copper Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Copper Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+  });
+});
+
+// MA-0208: Ancient Copper Mind Jolt was cast-prose inert (MA-0163 family;
+// delegates_to Spellcasting NOT resolvable at the legendary seam — MA-0174
+// proof). Fix = authored save legs mirroring the adult-copper Mind Jolt
+// shape at ancient lv5 values: DC 21 WIS 6d8 Psychic half (live control
+// Spellcasting Mind Spike lv5 = 6d8 per MA-0208 evidence).
+describe('MA-0208 Ancient Copper Mind Jolt authored save legs', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-copper-dragon');
+
+  it('row authors DC 21 WIS 6d8 Psychic half, adult-shape key parity, verbatim rider prose', () => {
+    const mj = ancient.legendary_actions[2];
+    expect(Object.keys(mj).sort()).toEqual(Object.keys(adult.legendary_actions[2]).sort());
+    expect(mj.save_dc).toBe(21);
+    expect(mj.save_type).toBe('Wisdom');
+    expect(mj.dc_success).toBe('half');
+    expect(mj.damage_dice_primary).toBe('6d8');
+    expect(mj.damage_type_primary).toBe('Psychic');
+    expect(mj.description).toMatch(/level 5 version/);
+    expect(mj.description).toMatch(/DC 21 Wisdom saving throw/);
+    expect(mj.description).toMatch(/can't take this action again/i);
+    expect(hasLegendaryCooldownClause(mj)).toBe(true);
+  });
+});
+
+// MA-0209: Ancient Copper Pounce — prose-only inert (family 5th instance);
+// byte-mirrors adult-copper delegates_to Rend row (movement advisory).
+describe('MA-0209 Ancient Copper Pounce delegates_to Rend', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-copper-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-copper-dragon');
+
+  it('byte-matches adult-copper Pounce delegate row', () => {
+    expect(JSON.stringify(ancient.legendary_actions.find(r => r.name === 'Pounce')))
+      .toBe(JSON.stringify(adult.legendary_actions.find(r => r.name === 'Pounce')));
+    expect(ancient.legendary_actions.find(r => r.name === 'Pounce').delegates_to).toBe('Rend');
+  });
+});

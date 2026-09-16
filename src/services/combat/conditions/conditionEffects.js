@@ -110,6 +110,8 @@ function buildBaseEffects() {
      strCheckAdvantage: false,
      acPenalty: 0,
     rayOfEnfeebleDamageReduction: false,
+    weakeningBreathDamageSubtract: false,
+    weakeningBreathDamageSubtractDie: null,
     resistanceDamageReduction: false,
     seeInvisibilityActive: false,
     wardingBondAcBonus: 0,
@@ -347,6 +349,13 @@ const EARLY_TARGET_EFFECT_HANDLERS = {
   speed_reduction: (effects, te) => {
     effects.speedReduction = (effects.speedReduction || 0) + (te.value || 10);
   },
+  // MA-0073: Scorching Sands failed-save clause — halved Speed until the
+  // end of the target's next turn. Consumed by charSummaryCalc (halved
+  // numeric Speed) + CharSummary attribution line.
+  speed_half: (effects, te) => {
+    effects.speedHalved = true;
+    if (te.source) effects.speedHalvedSource = te.source;
+  },
   push: (effects, te) => {
     effects.pushEffect = true;
     if (!effects.pushDistance) {
@@ -490,6 +499,17 @@ const LATE_TARGET_EFFECT_HANDLERS = {
     if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
     if (te.rayOfEnfeebleDamageReduction) effects.rayOfEnfeebleDamageReduction = true;
   },
+  // MA-0102: Weakening Breath (Adult Gold Dragon) — STR-test disadvantage
+  // rides the same generic strCheckDisadvantage flag the check/grapple
+  // consumers already read; damageSubtractDie names the die the damage-roll
+  // consumer (handlePlainDamage) subtracts.
+  weakening_breath: (effects, te) => {
+    if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
+    if (te.damageSubtractDie) {
+      effects.weakeningBreathDamageSubtract = true;
+      effects.weakeningBreathDamageSubtractDie = te.damageSubtractDie;
+    }
+  },
   // Handle Resistance — reduce damage of chosen type by 1d4 (once per turn)
   resistance_damage_reduction: (effects) => {
     effects.resistanceDamageReduction = true;
@@ -518,6 +538,10 @@ const LATE_TARGET_EFFECT_HANDLERS = {
   // Handle Slow — AC penalty and DEX save disadvantage
   ac_penalty: (effects, te) => {
     effects.acPenalty = (effects.acPenalty || 0) + (te.value || 2);
+    // MA-0115: source attribution (Noxious Miasma te) — CharSummary penalty
+    // line reads the source; the Slow path (condition 'slow', no te) keeps
+    // its byte-identical fallback label.
+    if (te.source) effects.acPenaltySource = te.source;
   },
   dodge: (effects) => {
     bumpCount(effects, 'targetDisadvantageCount');
