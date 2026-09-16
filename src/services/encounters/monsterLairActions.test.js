@@ -2778,7 +2778,90 @@ describe('MA-0231 ancient-green-dragon grasping roots and vines data lock', () =
     expect(adult.lair_actions[0].save_effect).toBe('The target is restrained by the roots and vines.');
     expect(young.lair_actions[0].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
-    expect(dragon.lair_actions[1].name).toBeUndefined();
+    // MA-0232 fixed [1] (Wall of Thorns) in a later pass — still nameless there.
+    expect(dragon.lair_actions[2].name).toBeUndefined();
+  });
+});
+
+// MA-0232: Ancient Green Dragon lair_actions[1] was a NAMELESS thorn-wall
+// save dict (save_dc 15 Dexterity, 4d8 Piercing, no name, no save_effect) —
+// MA-0222 name-gate fingerprint (isLairRowClickable !row.name → false,
+// monsterLairActions.js:26) rendered static <strong>.</strong>+prose with
+// zero affordance (live: click logged zero, no prompt). Data-only fix,
+// mirroring MA-0231/MA-0118: canonical "Wall of Thorns" name (adult-green sibling
+// vocabulary) + dc_success "half" + save_effect encoding fail damage,
+// half-on-success, push-5ft advisory — recurring contact-save cadence,
+// wall-section object stats, movement cost and sinks-back expiry stay
+// GM-advisory residuals inside save_effect (description byte-intact per
+// brief; §7 no zone/object/movement-cost/lair-cadence consumer).
+describe('MA-0232 ancient-green-dragon wall of thorns data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-green-dragon');
+  const wall = dragon.lair_actions[1];
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof wall).toBe('object');
+    expect(wall.name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(wall)).toBe(true);
+    expect(lairRowAffordance(wall)).toBe('save');
+  });
+
+  it('save fields: DC 15 Dexterity, 4d8 Piercing kept byte-intact, dc_success half', () => {
+    expect(wall.save_dc).toBe(15);
+    expect(wall.save_type).toBe('Dexterity');
+    expect(wall.damage_dice_primary).toBe('4d8');
+    expect(wall.damage_type_primary).toBe('Piercing');
+    expect(wall.dc_success).toBe('half');
+  });
+
+  it('description kept byte-intact canonical prose (advisories live in save_effect)', () => {
+    expect(wall.description).toMatch(/^A wall of tangled brush bristling with thorns springs into existence/);
+    expect(wall.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(wall.description).toMatch(/18 \(4d8\) piercing damage/i);
+    expect(wall.description).toMatch(/half as much damage on a successful one/i);
+    expect(wall.description).toMatch(/sinks back into the ground when the dragon uses this lair action again or when the dragon dies\.$/);
+  });
+
+  it('save_effect vocabulary: fail damage + half-on-success + push prose; NO canonical condition extracted (damage-only leg)', () => {
+    expect(wall.save_effect).toMatch(/^The target takes 18 \(4d8\) piercing damage and is pushed 5 feet out of the wall's space/);
+    expect(wall.save_effect).toMatch(/half as much damage on a successful save/);
+    expect(extractConditionsFromSaveEffect(wall.save_effect)).toEqual([]);
+  });
+
+  it('advisory residuals annotated in save_effect: recurring cadence, wall-section stats, movement cost, sinks-back expiry (GM-enforced, no consumers)', () => {
+    expect(wall.save_effect).toMatch(/recurring once-each-round contact-save cadence/i);
+    expect(wall.save_effect).toMatch(/AC 5, 15 hit points per 10-foot section/i);
+    expect(wall.save_effect).toMatch(/4-feet-of-movement-per-1-foot cost/i);
+    expect(wall.save_effect).toMatch(/GM-enforced/i);
+    expect(wall.save_effect).toMatch(/no zone\/object\/movement-cost\/lair-cadence consumer/i);
+  });
+
+  it('save row routes through handleSaveRoll with 4d8 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wall,
+      monsterName: 'Ancient Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '4d8',
+      saveConditions: extractConditionsFromSaveEffect(wall.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wall, '4d8', []);
+  });
+
+  it('push clause NOT falsified: canonical exact "pushed 5 feet" does not match the MA-0079 up-to regex (documented residual, no new engine)', () => {
+    expect(wall.save_effect).toMatch(/pushed 5 feet/);
+    expect(wall.save_effect).not.toMatch(/pushed up to \d+ feet/i);
+  });
+
+  it('scope guard: nameless young-green thorn-wall twin and ancient siblings untouched', () => {
+    const young = monstersData.find(m => m.index === 'young-green-dragon');
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(dragon.lair_actions[0].name).toBe('Grasping Roots and Vines');
     expect(dragon.lair_actions[2].name).toBeUndefined();
   });
 });
