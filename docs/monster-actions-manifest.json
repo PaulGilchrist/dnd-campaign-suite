@@ -3598,7 +3598,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon uses Spellcasting to cast Scorching Ray (level 3 version). The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0240-fiery-rays.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0241",
