@@ -211,7 +211,8 @@
       "ac": 22,
       "init": 12,
       "csIndex": 0,
-      "verifiedRow": "MA-0212 (FAIL replace-B die: te/logs 1d6 vs data 1d10 — bug-mon-MA-0212-multiattack.md; Rends+A exact; repeat-save consumer live; GuidingBolt rider inert) | MA-0213 (PASS Rend chip: 2 hits exact Slashing+Fire, 1 miss nat1 zero-dmg) | MA-0214 (PASS Fire Breath cone DC24: fail full 13d10, success floor-half; recharge refusal+d6 recovery@6 live)",
+      "verifiedRow": "MA-0212 (FAIL replace-B die: te/logs 1d6 vs data 1d10 — bug-mon-MA-0212-multiattack.md; Rends+A exact; repeat-save consumer live; GuidingBolt rider inert) | MA-0213 (PASS Rend chip: 2 hits exact Slashing+Fire, 1 miss nat1 zero-dmg) | MA-0214 (PASS Fire Breath cone DC24: fail full 13d10, success floor-half; recharge refusal+d6 recovery@6 live) | MA-0215 (PASS spellcasting: +16 to-hit via monsterSpellAttackBonus, Guiding Bolt lv4 7d6 app-data, Flame Strike DC24 DEX half-on-success, 1/Day monsterSpellUses gate+refusal live, At Will free; Shapechange/WoR/ZoT advisory CLA-325) | MA-0216 (PASS Weakening Breath standalone cone DC24 STR — producer die-fix live: te damageSubtractDie 1d10, rounds:10 auto-success clock, affected-excluded picker gate, turn-end repeat-save 2d20 disadv live, EP success→te stripped; EB re-join init 18, Admin-cleared after) | MA-0217 (FAIL legendary header no numeric uses → legendaryHeaderAction null → ungated branch, Banish fired 4× zero refusal, MA-0092 family root=DATA missing uses) | MA-0218 (FAIL Banish: fail leg exact 7d6 Force full + Incapacitated applied, banished_demiplane te live MA-0104; BUT success applies HALF damage (dcSuccess:'half' hardcode MV-20) + once-per-turn gate dead 8× ungated MA-0217 fingerprint; ElderPaladin lv20 CHA+11 reliable success victim, dragon init 14)",
+      "note": "legendary/lair inert family (MA-0217/0218/0219/0220/0221/0222): header lacks numeric uses → legendaryHeaderAction null → ungated/no-affordance; root = DATA authoring. Cast-prose legendaries (Guiding Light MA-0219, cf MA-0196/0208) + Pounce MA-0220 (cf MA-0164) inert text rows. Lair [0] MA-0221 = raw STRING (no name) → isLairRowClickable false by design; lair [1] MA-0222 = nameless dict w/ save_dc:15 CHA → name-gate (:26) precedes dc-branch → inert (consumer lair_dream_plane MA-0107 exists, unreached). Control live Rend chip located via .mc-action strong /^Rend/i → .mc-dice-link (chip text is just '+N').",
       "date": "2026-09-15"
     }
   },
@@ -237,6 +238,45 @@
       "init": 9,
       "csIndex": 0,
       "verifiedRow": "MA-0145 (FIXED: header uses:3 + Pounce delegates_to Rend; counter/spend/latch/refusal/regain live 2026-09-15)"
+    }
+  },
+  "Ancient Green Dragon": {
+    "monsterIndex": "ancient-green-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Green Dragon 1",
+      "hp": 402,
+      "ac": 21,
+      "init": 15,
+      "csIndex": 0,
+      "verifiedRow": "MA-0223 (PASS multiattack: 3× Rend +15 2d8+8 Slashing + 3d6 Poison exact vs AC12; replace→Spellcasting Mind Spike lv5 6d8 Psychic WIS DC21 live-scaled via MA-0087 spellCastLevelFromSpellcasting; count is GM-adjudicated header MA-0109/0098/0201 parity; target AasimarTest AC12) | MA-0224 (PASS Rend standalone: +15 vs AC12/AC19 flip exact, nat20 crit doubles BOTH dice sets 2d8*2+8 Slashing + 6d6 Poison, dual-type in breakdown; adv chip rig Add→Effects→Adv→Apply; miss boundary needs AC≥bonus+3, use ElderPaladin AC19) | MA-0225 (PASS Poison Breath cone DC22 CON: fail full 22d6, success exact floor-half (86→43), recharge refused 2nd-use `poison_breath_refused` + monsterRecharge{threshold:5} + recovery d6@turn-start live (6→recharged) — recharge gate fully enforced MA-0214 parity) | MA-0226 (PASS spellcasting: DC21 WIS enforced, Mind Spike lv5 6d8 Psychic full/half via spellCastLevelFromSpellcasting, 1/Day Geas monsterSpellUses gate + `automation blocked` refusal, At-Will Detect Magic ×2 free; Geas/DetMagic advisory-record CLA-325) | MA-0227 (FAIL legendary header no numeric uses → legendaryHeaderAction null → UNGATED: Noxious Miasma save chip fired 3× same window >max3, monsterLegendaryUses key never created, zero refusal/regain, MA-0217/0172/0184/0195/0206 family, root=DATA missing uses; control recharge live) | MA-0228 (FAIL Mind Invasion legendary cast-prose inert: bare {name,desc} no delegates_to/uses → no affordance, click zero-delta; CONTROL Spellcasting Mind Spike lv5 6d8 DC21 live; MA-0219/0196/0208 family, init 12) | MA-0229 (FAIL Noxious Miasma aoe DC21 CON: fail leg EXACT 5d6 Poison full + te ac_penalty:2 until_end_of_next_turn rounds:2 MA-0115 live; BUT success takes HALF damage (dcSuccess:half MV-20 leak, authors intended zero) + once-per-turn gate DEAD (2nd click same window fired, monsterLegendaryUses absent, MA-0184/0217/0227); root DATA no dc_success:none + no header uses; victims AberrantSorcerer CON+4 prof/ElderPaladin CON+10) | MA-0230 (FAIL Pounce legendary inert: bare prose, zero pounce consumers, no delegates_to → 0 affordance click zero-delta; CONTROL Rend +15 live (18-vs-19 miss, 30-vs-19 hit); fix=header uses+delegates_to:Rend MA-0145 template) | MA-0231 (FAIL lair grasping-roots nameless dict save_dc:15 STR no name → isLairRowClickable name-gate inert, no save/no restrained te, cf MA-0118/0221; fix=author named lair dict w/ save_effect; init varies per join) | MA-0232 (FAIL lair thornwall nameless dict save_dc:15 DEX 4d8 Piercing no name → name-gate inert, no save/damage, zero thorn/wall consumer + wall AC/HP unmodeled §7, cf MA-0222/0231; fix=name+save_effect) | MA-0233 (FAIL lair fog charm nameless dict DC15 WIS charmed no name → name-gate inert, no save/charmed, charmed consumer exists unreached, cf MA-0222/0231/0232; fix=name+save_effect charmed+dc_success:none)",
+      "date": "2026-09-15"
+    }
+  },
+  "Ancient Red Dragon": {
+    "monsterIndex": "ancient-red-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Red Dragon 1",
+      "hp": 507,
+      "ac": 22,
+      "init": 17,
+      "csIndex": 0,
+      "verifiedRow": "MA-0234 (PASS multiattack: 3× Rend +17 2d8+10 Slashing + 3d6 Fire exact vs AC19 all hit; replace→Spellcasting Scorching Ray lv3 +15 2d6 Fire live At-Will (single-ray app model MA-0065 parity); multiattack header no roll button; target ElderPaladin AC19) | MA-0235 (PASS Rend standalone: +17, nat1→18 MISS/nat2→19 HIT exact AC19 boundary, dual 2d8+10 Slashing + 3d6 Fire breakdown, crit nat20 doubles BOTH dice 2d8*2+10 + 6d6 (flat +10 NOT doubled; secondaryTotal=2×sum), 49 damage↔49 hp_change ts-paired) | MA-0236 (PASS Fire Breath cone DC24 DEX 26d6: fail×3 full (85/93/82), success exact floor-half (94→47), recharge refused `fire_breath_refused`+monsterRecharge threshold:5 + recovery d6@turn-start (6→open); hosts Sorcerer DEX−1/FeyRanger; init 4) | MA-0237 (FAIL spellcasting: row authored prose-only, NO numeric save_dc → save-leg Fireball lv6 dies at prompt 'DC Unknown' saveResult:null zero-damage (no prose-DC parser, MonsterCardModal.jsx:815 passes undefined); attack-leg +15 Scorching Ray lv3 2d6 LIVE, 1/Day Fireball/Scrying monsterSpellUses gate exact, At-Will free; fix=data add save_dc:23 save_type:Charisma; app Fireball lv6=12d6 not 12d8) | MA-0238 (FAIL legendary header no numeric uses → legendaryHeaderAction null → ungated/no-affordance; all 4 legendary rows plain mc-action 0 links, Fiery Rays 4× click 0 fires/0 refusal/monsterLegendaryUses never created, MA-0217/0227 family 3rd confirm; init 1) | MA-0239 (FAIL Commanding Presence legendary cast-prose inert: bare prose no delegates_to → no affordance, click zero-delta, once-per-turn gate unreachable; CONTROL Spellcasting→Command live different row, MA-0228/0219/0196/0208 family; init 6) | MA-0240 (FAIL Fiery Rays legendary cast-prose inert: bare prose no delegates_to → no affordance, click zero-delta; CONTROL Spellcasting→Scorching Ray lv3 +15 2d6 live d20+15=25 hit; MA-0239 family; init 15) | MA-0241 (FAIL Pounce legendary inert: bare prose no delegates_to, 0 affordance click zero-delta; CONTROL Rend +17 live; MA-0220/0230/0164 family; fix=uses:3+delegates_to:Rend; NOTE first subagent attempt CRASHED w/o verdict — retry w/ lean ≤8-call prompt succeeded) | MA-0242 (FAIL lair magma geyser nameless dict DC15 DEX 6d6 no name → name-gate inert 0-links click zero-delta, CONTROL Rend live, MA-0221/0222/0231/0232/0233 family; fix=name+save_effect; NOTE subagent mislabeled PASS — orchestrator converted to FAIL per evidence [inert+zero-delta+bug file]) | MA-0243 (FAIL lair tremor nameless dict DC15 DEX prone no name → name-gate inert 0-links click zero-delta no prone; CONTROL Rend live; family MA-0221-0242; fix=name+save_effect prone; init 2) | MA-0244 (FAIL lair volcanic gases nameless dict DC13 CON poisoned+incapacitated no name → name-gate inert 0-links zero-delta; CONTROL Rend live; turn-start zone seam absent §7; family MA-0221-0243)",
+      "date": "2026-09-15"
+    }
+  },
+  "Ancient Silver Dragon": {
+    "monsterIndex": "ancient-silver-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient Silver Dragon 1",
+      "hp": 468,
+      "ac": 22,
+      "init": 14,
+      "csIndex": 0,
+      "verifiedRow": "MA-0245 (FAIL multiattack replace-B: Rend×3 +17 2d8+10 Slashing+2d8 Cold PASS; (A) Paralyzing Breath cone DC24 CON fail→Paralyzed PASS no recharge authored correct; (B) Ice Knife lv2 DEAD — 'DC Unknown' (prose-only row DC MA-0237 family + 5e spells.json Ice Knife lacks attack_type so isSpellAttackSpell false→block-save misroute, spurious self-save logs); fix=attack_type:ranged 5e path + numeric save_dc:23; targets ElderPaladin AC19/HexWarlock CON+0) | MA-0246 (PASS Rend standalone: +17 vs AC19, nat20→37 HIT nat1→18 MISS flip, crit ×2 both dice doubled 2d8*2+10 + 2d8*2 (flat +10 never doubled), all ~25 rolls popup-Done+log-paired dual Slashing+Cold exact; init 10)",
+      "date": "2026-09-15"
     }
   }
 }
