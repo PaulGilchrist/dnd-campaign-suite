@@ -17,10 +17,23 @@ import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 import spells2024 from '../../../public/data/2024/spells.json';
+import { computeDamageAfterSave, computeDamageAfterEvasion } from '../../services/rules/combat/applyDamage.js';
 import {
   legendaryHeaderAction, legendaryMaxUses, legendaryUsesRemaining,
   legendaryDelegateAction, legendaryDelegateAttackName, hasLegendaryCooldownClause,
 } from '../../services/encounters/monsterLegendaryUses.js';
+
+const aoeProps = vi.hoisted(() => ({ current: null }));
+vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
+  default: (props) => {
+    aoeProps.current = props;
+    return (
+      <div className="sp-overlay sphere-picker-stub">
+        <div className="sp-body">{props.titleOverride}</div>
+      </div>
+    );
+  },
+}));
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
@@ -184,11 +197,41 @@ describe('MA-0227 monsters.json data: Pounce delegates to Rend', () => {
   });
 });
 
+// MA-0229: Noxious Miasma row authored NO half clause (failure-only: "Failure:
+// 17 (5d6) Poison damage, and ... −2 penalty to AC"; success prose repeats only
+// the once-per-turn restriction) — but the block-save seam defaulted
+// dcSuccess to 'half' (MonsterCardModal.jsx resolveBlockSaveDcSuccess), so a
+// SUCCESS leaked HALF damage (live: "takes 7 Poison damage (rolled 19, halved)").
+// Fix = DATA dc_success:"none" (MA-0218 Banish byte-shape: same key position
+// after save_type), consumed by getSaveDcSuccess/resolveBlockSaveDcSuccess →
+// computeDamageAfterSave returns ZERO on success.
+describe('MA-0229 monsters.json data: Noxious Miasma dc_success none — success is ZERO', () => {
+  it('Miasma row authors dc_success:"none" mirroring the ancient-gold Banish seam', () => {
+    const miasma = row('Noxious Miasma');
+    expect(miasma.save_dc).toBe(21);
+    expect(miasma.save_type).toBe('Constitution');
+    expect(miasma.dc_success).toBe('none');
+    expect(miasma.damage_dice_primary).toBe('5d6');
+    expect(miasma.damage_type_primary).toBe('Poison');
+    const banish = monstersData.find(m => m.name === 'Ancient Gold Dragon')
+      .legendary_actions.find(a => a.name === 'Banish');
+    expect(banish.dc_success).toBe('none');
+    expect(Object.keys(miasma)).toEqual(Object.keys(banish));
+  });
+
+  it('row prose authors no half clause anywhere (zero-on-success intent)', () => {
+    const miasma = row('Noxious Miasma');
+    expect(miasma.description).not.toMatch(/half/i);
+    expect(miasma.save_effect).not.toMatch(/half/i);
+  });
+});
+
 // MA-0227 live seam: counter mounts, gated spend/refusal economy runs.
 describe('MA-0227 MonsterCardModal ancient green dragon gated legendary economy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    aoeProps.current = null;
     ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
   });
 
@@ -231,6 +274,29 @@ describe('MA-0227 MonsterCardModal ancient green dragon gated legendary economy'
     fireEvent.click(chip);
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(runtime.store[KEY]).toEqual({ max: 3, used: 1 });
+  });
+
+  // MA-0229: gated Miasma click routes the Sphere row to the area picker —
+  // picker props must carry dcSuccess 'none' (NOT the 'half' default that
+  // leaked half damage on a success), and the consumer math must yield ZERO
+  // on success / full raw on failure (Banish MA-0218 / Thunderclap MA-0084
+  // picker shape).
+  it('MA-0229 Miasma picker seam: dcSuccess none — success ZERO, failure full 5d6', async () => {
+    renderAGreen({ max: 3, used: 0 });
+    fireEvent.click(greenRow('Noxious Miasma').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    const props = aoeProps.current;
+    expect(props.titleOverride).toMatch(/^30-ft Radius/);
+    expect(props.saveDc).toBe(21);
+    expect(props.saveType).toBe('Constitution');
+    expect(props.dcSuccess).toBe('none');
+    expect(props.damage).toBe('5d6');
+    expect(props.damageType).toBe('Poison');
+    expect(props.excludeNames).toEqual(['Ancient Green Dragon 1']);
+    expect(computeDamageAfterSave(17, true, props.dcSuccess)).toBe(0);
+    expect(computeDamageAfterSave(17, false, props.dcSuccess)).toBe(17);
+    expect(computeDamageAfterEvasion(17, true, props.dcSuccess, false)).toBe(0);
+    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 3, used: 1 }));
   });
 
   it('Mind Invasion gated click spends 1 and rolls the DC 21 WIS save-leg (6d8 Psychic, half-on-success, armed target)', async () => {
