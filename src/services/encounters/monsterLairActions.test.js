@@ -1492,9 +1492,9 @@ describe('MA-0129 adult-red-dragon tremor data lock', () => {
     expect(dragon.lair_actions[2].name).toBe('Volcanic Gases');
   });
 
-  it('ancient-red-dragon scope guard: its nameless tremor dict is NOT touched by this fix', () => {
+  it('ancient-red-dragon scope guard: its tremor dict structured later by MA-0243 (was nameless here)', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-red-dragon');
-    expect(ancient.lair_actions[1].name).toBeUndefined();
+    expect(ancient.lair_actions[1].name).toBe('Tremor');
   });
 });
 
@@ -3014,13 +3014,88 @@ describe('MA-0242 ancient-red-dragon magma geyser data lock', () => {
     expect(geyser.description).toBe(adultGeyser.description);
   });
 
-  it('scope guard: ancient-red [1] tremor and [2] volcanic-gases nameless rows untouched; young-red twin inert', () => {
-    expect(dragon.lair_actions[1].name).toBeUndefined();
-    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(false);
+  it('scope guard: ancient-red [1] tremor structured later by MA-0243; [2] volcanic-gases nameless row untouched; young-red twin inert', () => {
+    expect(dragon.lair_actions[1].name).toBe('Tremor');
+    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(true);
     expect(dragon.lair_actions[2].name).toBeUndefined();
     expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
     const young = monstersData.find(m => m.index === 'young-red-dragon');
     expect(young.lair_actions[0].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+  });
+});
+
+// MA-0243: Ancient Red Dragon lair_actions[1] was a NAMELESS tremor dict
+// (save_dc 15 Dexterity, "knocked prone" save_effect, no name) — MA-0222
+// name-gate fingerprint (isLairRowClickable !row.name → false,
+// monsterLairActions.js:26) rendered static <strong>.</strong>+prose with
+// zero affordance (live: forced click zero overlays, zero log lines).
+// Data-only fix mirroring the VERIFIED MA-0129 adult-red sibling: canonical
+// "Tremor" name + dc_success "none" armed on the row — save_dc/save_type/
+// save_effect kept byte-intact, no damage fields authored (damageless
+// failed-save prone lands via the MA-0017 seam; dc_success "none" suppresses
+// the MV-19/20 half-damage boilerplate on both surfaces — MA-0129 precedent).
+describe('MA-0243 ancient-red-dragon tremor data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-red-dragon');
+  const tremor = dragon.lair_actions[1];
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof tremor).toBe('object');
+    expect(tremor.name).toBe('Tremor');
+    expect(isLairRowClickable(tremor)).toBe(true);
+    expect(lairRowAffordance(tremor)).toBe('save');
+  });
+
+  it('save fields byte-intact: DC 15 Dexterity, dc_success none, no damage authored', () => {
+    expect(tremor.save_dc).toBe(15);
+    expect(tremor.save_type).toBe('Dexterity');
+    expect(tremor.dc_success).toBe('none');
+    expect(tremor.damage_dice_primary).toBeUndefined();
+    expect(tremor.damage_type_primary).toBeUndefined();
+  });
+
+  it('save_effect kept byte-intact — vocabulary extracts ONLY prone (MA-0017 damageless seam)', () => {
+    expect(tremor.save_effect).toBe('Failure: The target is knocked prone.');
+    expect(extractConditionsFromSaveEffect(tremor.save_effect)).toEqual(['prone']);
+  });
+
+  it('description kept byte-intact canonical prose', () => {
+    expect(tremor.description).toMatch(/^A tremor shakes the lair in a 60-foot radius around the dragon\./i);
+    expect(tremor.description).toMatch(/Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone\.$/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + prone', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: tremor,
+      monsterName: 'Ancient Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(tremor.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(tremor, null, ['prone']);
+  });
+
+  it('adult-red sibling parity (MA-0129 VERIFIED): same name + dc_success none, DC/type identical', () => {
+    const adult = monstersData.find(m => m.index === 'adult-red-dragon');
+    const adultTremor = adult.lair_actions[1];
+    expect(adultTremor.name).toBe('Tremor');
+    expect(tremor.name).toBe(adultTremor.name);
+    expect(tremor.dc_success).toBe(adultTremor.dc_success);
+    expect(tremor.save_dc).toBe(adultTremor.save_dc);
+    expect(tremor.save_type).toBe(adultTremor.save_type);
+  });
+
+  it('young-red twin guard: nameless tremor dict stays nameless and inert (MA-0222 name-gate)', () => {
+    const young = monstersData.find(m => m.index === 'young-red-dragon');
+    const twin = young.lair_actions[2];
+    expect(twin.description).toMatch(/^A tremor shakes the lair in a 60-foot radius/);
+    expect(twin.name).toBeUndefined();
+    expect(isLairRowClickable(twin)).toBe(false);
   });
 });
