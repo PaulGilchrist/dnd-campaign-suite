@@ -2707,3 +2707,78 @@ describe('MA-0222 ancient-gold-dragon dream plane banishment data lock', () => {
     expect(adult.lair_actions[0].advisory).toBe('glimpse_the_future');
   });
 });
+
+// MA-0231: Ancient Green Dragon lair_actions[0] was a NAMELESS save dict
+// (save_dc 15 Strength, no name, no save_effect) — MA-0222 name-gate
+// fingerprint (isLairRowClickable !row.name → false, monsterLairActions.js:26)
+// rendered static <strong>.</strong>+prose with zero affordance. Data-only fix:
+// canonical name + dc_success none + save_effect carrying the Restrained
+// condition (MA-0117 adult-green verified vocabulary) so the MA-0017
+// damageless save seam routes at DC 15 STR. Rescue/adjudication clauses
+// (DC 15 STR action to break free, wilt-on-reuse/on-death expiry) remain
+// GM-advisory residual annotated in save_effect (no rescue-engine or
+// lair-cadence consumer).
+describe('MA-0231 ancient-green-dragon grasping roots and vines data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-green-dragon');
+  const roots = dragon.lair_actions[0];
+
+  it('[0] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof roots).toBe('object');
+    expect(roots.name).toBe('Grasping Roots and Vines');
+    expect(isLairRowClickable(roots)).toBe(true);
+    expect(lairRowAffordance(roots)).toBe('save');
+  });
+
+  it('save fields: DC 15 Strength kept byte-intact, dc_success none (no damage authored)', () => {
+    expect(roots.save_dc).toBe(15);
+    expect(roots.save_type).toBe('Strength');
+    expect(roots.dc_success).toBe('none');
+    expect(roots.damage_dice_primary).toBeUndefined();
+    expect(roots.damage_type_primary).toBeUndefined();
+    expect(roots.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('description kept byte-intact canonical prose', () => {
+    expect(roots.description).toMatch(/^Grasping roots and vines erupt in a 20-foot radius/);
+    expect(roots.description).toMatch(/DC 15 Strength saving throw or be restrained/i);
+    expect(roots.description).toMatch(/wilt away when the dragon uses this lair action again or when the dragon dies\.$/);
+  });
+
+  it('save_effect vocabulary extracts ONLY restrained (MA-0017 damageless seam)', () => {
+    expect(extractConditionsFromSaveEffect(roots.save_effect)).toEqual(['restrained']);
+  });
+
+  it('rescue/adjudication residuals annotated as GM-enforced in save_effect', () => {
+    expect(roots.save_effect).toMatch(/DC 15 Strength action to break free/i);
+    expect(roots.save_effect).toMatch(/GM-enforced/i);
+    expect(roots.save_effect).toMatch(/no rescue-engine or lair-cadence consumer/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + restrained', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: roots,
+      monsterName: 'Ancient Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(roots.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
+  });
+
+  it('scope guard: adult-green sibling and young-green nameless rows untouched', () => {
+    const adult = monstersData.find(m => m.index === 'adult-green-dragon');
+    const young = monstersData.find(m => m.index === 'young-green-dragon');
+    expect(adult.lair_actions[0].name).toBe('Grasping Roots');
+    expect(adult.lair_actions[0].save_effect).toBe('The target is restrained by the roots and vines.');
+    expect(young.lair_actions[0].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+    expect(dragon.lair_actions[1].name).toBeUndefined();
+    expect(dragon.lair_actions[2].name).toBeUndefined();
+  });
+});
