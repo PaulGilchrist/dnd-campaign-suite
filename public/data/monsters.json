@@ -4783,7 +4783,8 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Freezing Burst",
@@ -4796,11 +4797,18 @@
       },
       {
         "name": "Frightful Presence",
-        "description": "The dragon uses Spellcasting to cast <em>Fear</em>. The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon casts *Fear*, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18). Each creature of the dragon's choice within 120 feet of it that can see and hear the dragon must succeed on a DC 18 Charisma saving throw or become Frightened for 1 minute. 120-ft selection advisory — single armed target resolves; GM picks targets (no zone consumer). A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to the dragon's Frightful Presence for the next 24 hours. The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 18,
+        "save_type": "Charisma",
+        "dc_success": "none",
+        "success_immunity": {"effect":"frightful_presence_immunity","duration":"24_hours","duration_minutes":1440},
+        "repeat_save": {"condition":"frightened","save_type":"Charisma","duration_minutes":1},
+        "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage."
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
