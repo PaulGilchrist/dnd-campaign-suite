@@ -27,7 +27,7 @@ import {
   legendaryDelegateAction, legendaryDelegateAttackName, hasLegendaryCooldownClause,
   regainLegendaryUses,
 } from '../../services/encounters/monsterLegendaryUses.js';
-import { extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect, parsePushFeetClause } from './MonsterCardHelpers.js';
 
 const aoeProps = vi.hoisted(() => ({ current: null }));
 vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
@@ -191,7 +191,8 @@ describe('MA-0250 monsters.json data: Chill numeric condition-save seam (Hold Mo
 });
 
 // MA-0250: Cold Gale keeps its already-authored numerics untouched — the
-// header uses:3 arms the gate around it (no row edits expected).
+// header uses:3 arms the gate around it. MA-0252 amended the save_effect
+// ONLY (push clause appended, byte-mirroring the MA-0138 verified adult row).
 describe('MA-0250 monsters.json data: Cold Gale numerics untouched', () => {
   it('Cold Gale still authors DC 23 DEX 4d6 Cold half, no new fields', () => {
     const cg = row('Cold Gale');
@@ -199,8 +200,36 @@ describe('MA-0250 monsters.json data: Cold Gale numerics untouched', () => {
     expect(cg.save_type).toBe('Dexterity');
     expect(cg.damage_dice_primary).toBe('4d6');
     expect(cg.damage_type_primary).toBe('Cold');
-    expect(cg.save_effect).toMatch(/Failure: 14 \(4d6\) Cold damage\. Success: Half damage\./);
+    expect(cg.dc_success).toBeUndefined();
     expect(hasLegendaryCooldownClause(cg).valueOf()).toBe(true);
+  });
+});
+
+// MA-0252: ancient silver Cold Gale save_effect carried NO push clause
+// ("Failure: 14 (4d6) Cold damage. Success: Half damage.") —
+// parsePushFeetClause returned null, pushFeet never reached the picker, and
+// the MA-0138 grantPushOnlyClause fail-only grant stayed inert (failed save
+// dealt 18 Cold with zero push te / zero push log, live-verified). Fix:
+// byte-mirror the MA-0138 VERIFIED adult silver row. dc_success stays
+// default half (damage row — do NOT set none). description byte-intact.
+describe('MA-0252 monsters.json data: ancient silver Cold Gale push clause', () => {
+  it('save_effect parses pushFeet 30 via parsePushFeetClause', () => {
+    expect(parsePushFeetClause(row('Cold Gale').save_effect)).toEqual({ feet: 30 });
+  });
+
+  it('save_effect is byte-identical to the MA-0138 verified adult silver row (parity)', () => {
+    const adult = monstersData.find(m => m.name === 'Adult Silver Dragon').legendary_actions.find(a => a.name === 'Cold Gale');
+    expect(row('Cold Gale').save_effect).toBe(adult.save_effect);
+    expect(parsePushFeetClause(adult.save_effect)).toEqual({ feet: 30 });
+  });
+
+  it('push is fail-only and damageless-condition-free: no canonical saveConditions (MA-0138 push-only seam is the producer), dc_success default half', () => {
+    const cg = row('Cold Gale');
+    expect(extractConditionsFromSaveEffect(cg.save_effect)).toEqual([]);
+    expect(cg.save_effect).toMatch(/pushed up to 30 feet straight away from the dragon/);
+    expect(cg.save_effect).toMatch(/Success: Half damage only/);
+    expect(cg.save_effect).not.toMatch(/Success.*push/i);
+    expect(cg.description).toMatch(/pushed up to 30 feet straight away from the dragon/);
   });
 });
 
@@ -309,6 +338,8 @@ describe('MA-0250 MonsterCardModal ancient silver dragon gated legendary economy
     expect(['DEX', 'Dexterity']).toContain(aoeProps.current.saveType);
     expect(aoeProps.current.dcSuccess).toBe('half');
     expect(String(aoeProps.current.titleOverride)).toContain('60-ft Line');
+    // MA-0252: parsed push clause reaches the picker (MA-0138 grant input).
+    expect(aoeProps.current.pushFeet).toBe(30);
   });
 
   it('Cold Gale repeat same-window refuses (turn latch): zero extra spend, one selection log — was: 2× fires', async () => {

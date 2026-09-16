@@ -4644,7 +4644,7 @@
         "save_type": "Dexterity",
         "damage_dice_primary": "4d6",
         "damage_type_primary": "Cold",
-        "save_effect": "Failure: 14 (4d6) Cold damage. Success: Half damage."
+        "save_effect": "14 (4d6) Cold damage, and the target is pushed up to 30 feet straight away from the dragon. Success: Half damage only"
       },
       {
         "name": "Pounce",
