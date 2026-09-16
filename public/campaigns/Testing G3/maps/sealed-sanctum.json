@@ -543,7 +543,7 @@
     {
       "id": "torch-2-12-12",
       "gridX": 12,
-      "gridY": 12,
+      "gridY": 13,
       "type": "torch",
       "visible": true,
       "rotation": 180
@@ -558,8 +558,8 @@
     },
     {
       "id": "bookshelf-2",
-      "gridX": 11,
-      "gridY": 11,
+      "gridX": 12,
+      "gridY": 10,
       "type": "bookshelf",
       "visible": true,
       "rotation": 90
@@ -574,7 +574,7 @@
     },
     {
       "id": "bookshelf-3",
-      "gridX": 3,
+      "gridX": 2,
       "gridY": 9,
       "type": "bookshelf",
       "visible": true,
@@ -700,7 +700,7 @@
     },
     {
       "id": "torch-10-21-17",
-      "gridX": 22,
+      "gridX": 24,
       "gridY": 19,
       "type": "torch",
       "visible": true,
@@ -896,5 +896,6 @@
   "zoom": 1,
   "panX": 0,
   "panY": 0,
-  "displayName": "Sealed Sanctum"
+  "displayName": "Sealed Sanctum",
+  "rooms": []
 }

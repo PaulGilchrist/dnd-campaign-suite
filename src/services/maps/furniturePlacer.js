@@ -231,8 +231,8 @@ function addLargeRoomTableChairs(room, placedItems, c, rng) {
     { dx: 1, dy: -1, rot: 0 },
     { dx: 0, dy: 1, rot: 180 },
     { dx: 1, dy: 1, rot: 180 },
-    { dx: -1, dy: 0, rot: 90 },
-    { dx: 2, dy: 0, rot: 270 },
+    { dx: -1, dy: 0, rot: 270 },
+    { dx: 2, dy: 0, rot: 90 },
   ];
   const numChairs = 2 + Math.floor(rng() * 3);
   const shuffled = chairDefs.slice().sort(function () { return rng() - 0.5; });
