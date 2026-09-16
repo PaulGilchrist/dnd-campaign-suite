@@ -1660,11 +1660,11 @@ describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
     expect(lairRowAffordance(dragon.lair_actions[2])).toBe('advisory');
   });
 
-  it('ancient-white-dragon scope guard: its nameless fog dict (with save_effect) is NOT touched by this fix', () => {
+  it('ancient-white-dragon scope guard: its fog dict was nameless at MA-0149 time; structured later by MA-0263', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-white-dragon');
-    expect(ancient.lair_actions[0].name).toBeUndefined();
+    expect(ancient.lair_actions[0].name).toBe('Freezing Fog');
     expect(ancient.lair_actions[0].save_effect).toBeDefined();
-    expect(ancient.lair_actions[0].dc_success).toBeUndefined();
+    expect(ancient.lair_actions[0].dc_success).toBe('half');
   });
 
   it('young-white-dragon scope guard: its fog rows (string + nameless dict) untouched', () => {
@@ -3353,5 +3353,91 @@ describe('MA-0255 ancient-silver-dragon cold wind data lock', () => {
     expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
     const wyrmling = monstersData.find(m => m.index === 'silver-dragon-wyrmling');
     expect(wyrmling.lair_actions).toEqual([]);
+  });
+});
+
+// MA-0263: Ancient White Dragon lair_actions[0] freezing fog was a NAMELESS
+// dict (MA-0222 name-gate fingerprint: isLairRowClickable !row.name hard gate
+// at monsterLairActions.js:26 evaluated BEFORE the save_dc branch) — its save
+// legs (DC 10 Constitution, 3d6 Cold, half-on-success) fully matched the
+// verbatim description prose, but the row rendered static
+// <strong>.</strong>+prose with zero chips (live inert, 2026-09-16: click →
+// zero overlays, zero log lines). Data-only fix mirroring the VERIFIED
+// MA-0255 cold-wind pattern (name + dc_success "half" + save_effect full/half
+// mirror — save_effect was already authored, untouched) plus the VERIFIED
+// MA-0254/MA-0085/MA-0199 fog zone dict keys (radius_ft 20, no_save, noun
+// fog, effect_key lair_fog_cloud, GM-enforced advisory + advisory duration)
+// so the picker confirm arms the lair_fog_cloud zone te. Save-row key shape
+// mirrors MA-0149 adult-white sibling (same monster, fixed dict). Turn-end
+// 10 (3d6) re-damage, heavily obscured area, wind dispersal and initiative-20
+// cadence stay GM-advisory prose residuals (no turn-end zone-damage consumer,
+// no initiative lair seam — MA-0024 residual).
+describe('MA-0263 ancient-white-dragon freezing fog nameless-dict data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-white-dragon');
+  const fog = dragon.lair_actions[0];
+
+  it('[0] is now a named clickable SAVE row (name-gate no longer kills it)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Freezing Fog');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('save');
+  });
+
+  it('canonical save legs untouched: DC 10 Constitution, 3d6 Cold, dc_success half (prose-agreed)', () => {
+    expect(fog.save_dc).toBe(10);
+    expect(fog.save_type).toBe('Constitution');
+    expect(fog.damage_dice_primary).toBe('3d6');
+    expect(fog.damage_type_primary).toBe('Cold');
+    expect(fog.dc_success).toBe('half');
+    expect(fog.description).toMatch(/DC 10 Constitution saving throw/i);
+    expect(fog.description).toMatch(/half as much damage on a successful one/i);
+    expect(fog.description).toMatch(/20-foot-radius sphere/i);
+  });
+
+  it('save_effect authored ONCE — full/half mirror MA-0255 vocabulary, zero condition over-extraction', () => {
+    expect(Object.keys(fog).filter(k => k === 'save_effect')).toHaveLength(1);
+    expect(fog.save_effect).toMatch(/Failure: 10 \(3d6\) Cold damage\. Success: Half damage\./);
+    expect(fog.save_effect).toMatch(/ends its turn in the fog takes 10 \(3d6\) cold damage/i);
+    expect(extractConditionsFromSaveEffect(fog.save_effect)).toEqual([]);
+  });
+
+  it('zone dict keys resolve MA-0254 fog pattern (radius 20, no_save, noun fog, lair_fog_cloud, advisory duration)', () => {
+    expect(fog.zone.radius_ft).toBe(20);
+    expect(fog.zone.no_save).toBe(true);
+    expect(fog.zone.noun).toBe('fog');
+    expect(fog.zone.effect_key).toBe('lair_fog_cloud');
+    expect(fog.zone.advisory).toMatch(/GM-enforced/i);
+    expect(fog.zone.advisory).toMatch(/heavily obscured/i);
+    expect(fog.duration).toMatch(/\(advisory\)$/);
+    const adult = monstersData.find(m => m.index === 'adult-bronze-dragon');
+    expect(Object.keys(fog.zone)).toEqual(Object.keys(adult.lair_actions[0].zone));
+  });
+
+  it('save row routes through handleSaveRoll with 3d6 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Ancient White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: '3d6',
+      saveConditions: extractConditionsFromSaveEffect(fog.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
+  });
+
+  it('scope guard: adult-white MA-0149 sibling byte-untouched; [1]/[2] raw strings stay inert', () => {
+    const adultWhite = monstersData.find(m => m.index === 'adult-white-dragon');
+    expect(adultWhite.lair_actions[0].name).toBe('Freezing Fog');
+    expect(adultWhite.lair_actions[0].save_dc).toBe(10);
+    expect(adultWhite.lair_actions[0].zone).toBeUndefined();
+    expect(typeof dragon.lair_actions[1]).toBe('string');
+    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
   });
 });
