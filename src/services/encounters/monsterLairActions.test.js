@@ -3196,3 +3196,76 @@ describe('MA-0244 ancient-red-dragon volcanic gases data lock', () => {
     expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
   });
 });
+
+// MA-0254: Ancient Silver Dragon lair_actions[0] was a RAW STRING fog row —
+// MA-0167 inert-raw-string fingerprint (no name token at all, static prose,
+// zero affordance; live: forced click zero overlays, zero log lines, fog zone
+// never armed). Data-only fix byte-mirroring the VERIFIED MA-0085/MA-0199
+// adult/ancient-bronze fog siblings: name "Fog Cloud" + save-less zone dict
+// (radius 20, no_save, noun fog, effect_key lair_fog_cloud, GM-enforced
+// advisory) + initiative-20 duration; canonical silver prose ("as if") kept
+// verbatim as description. lair_actions[1] cold wind stays UNTOUCHED
+// (separate MA-0255 scope, incl. its 1dlO letter-O typo).
+describe('MA-0254 ancient-silver-dragon fog cloud zone data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-silver-dragon');
+  const fog = dragon.lair_actions[0];
+
+  it('[0] is now a named clickable ZONE row (was inert raw string)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Fog Cloud');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('zone');
+  });
+
+  it('zone dict shape parity with VERIFIED bronze siblings (MA-0085/MA-0199)', () => {
+    expect(fog.zone.radius_ft).toBe(20);
+    expect(fog.zone.no_save).toBe(true);
+    expect(fog.zone.noun).toBe('fog');
+    expect(fog.zone.effect_key).toBe('lair_fog_cloud');
+    expect(fog.zone.advisory).toMatch(/no saving throw/i);
+    expect(fog.zone.advisory).toMatch(/GM-enforced/i);
+    expect(fog.duration).toBe('until initiative count 20 next round (advisory)');
+    const adult = monstersData.find(m => m.index === 'adult-bronze-dragon');
+    const ancientBronze = monstersData.find(m => m.index === 'ancient-bronze-dragon');
+    expect(JSON.stringify(fog.zone)).toBe(JSON.stringify(adult.lair_actions[0].zone));
+    expect(JSON.stringify(fog.zone)).toBe(JSON.stringify(ancientBronze.lair_actions[0].zone));
+    expect(fog.duration).toBe(adult.lair_actions[0].duration);
+  });
+
+  it('no save/damage fields authored; canonical silver prose kept verbatim as description', () => {
+    expect(fog.save_dc).toBeUndefined();
+    expect(fog.save_type).toBeUndefined();
+    expect(fog.damage_dice_primary).toBeUndefined();
+    expect(fog.damage_type_primary).toBeUndefined();
+    expect(fog.save_effect).toBeUndefined();
+    expect(fog.description).toBe('The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.');
+    expect(JSON.stringify(fog)).not.toMatch(/1dlO/);
+  });
+
+  it('[0] routes through handleZone with zero save/attack/damage handlers', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Ancient Silver Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(fog);
+  });
+
+  it('scope guard: [1] cold wind row untouched (MA-0255 scope — nameless dict + 1dlO typo intact)', () => {
+    const wind = dragon.lair_actions[1];
+    expect(wind.name).toBeUndefined();
+    expect(wind.save_dc).toBe(15);
+    expect(wind.save_type).toBe('Constitution');
+    expect(wind.damage_dice_primary).toBe('1d10');
+    expect(wind.damage_type_primary).toBe('Cold');
+    expect(wind.description).toMatch(/1dlO/);
+    expect(wind.description).toMatch(/blisteringly cold wind/i);
+  });
+});

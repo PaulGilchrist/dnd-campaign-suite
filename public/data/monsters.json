@@ -4653,7 +4653,18 @@
       }
     ],
     "lair_actions": [
-      "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
+      {
+        "name": "Fog Cloud",
+        "description": "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
+        "zone": {
+          "radius_ft": 20,
+          "no_save": true,
+          "noun": "fog",
+          "effect_key": "lair_fog_cloud",
+          "advisory": "No saving throw (canonical fog cloud lair action — lightly obscured area). Obscurement and line-of-sight adjudication is GM-enforced (no obscurement model in this engine). Persists until initiative count 20 on the next round."
+        },
+        "duration": "until initiative count 20 next round (advisory)"
+      },
       {
         "description": "A blisteringly cold wind blows through the lair near the dragon. Each creature within 120 feet of the dragon must succeed on a DC 15 Constitution saving throw or take 5 (1dlO) cold damage. Gases and vapors are dispersed by the wind, and unprotected flames are extinguished. Protected flames, such as lanterns, have a 50 percent chance of being extinguished.",
         "save_dc": 15,
