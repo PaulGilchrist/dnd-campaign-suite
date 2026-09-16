@@ -4991,15 +4991,25 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the sphinx can expend a use to take one of the following actions. The sphinx regains all expended uses at the start of each of its turns."
+      },
+      {
         "name": "Claw Attack",
+        "delegates_to": "Claw",
         "description": "The sphinx makes one claw attack."
       },
       {
         "name": "Teleport (Costs 2 Actions)",
+        "advisory": "sphinx_teleport",
+        "advisory_message": "magically teleports up to 120 feet to an unoccupied space it can see — advisory record: GM moves the token, no position consumer (CLA-320). Canonical cost is 2 legendary uses — the engine spends 1 per click; the extra cost is GM-enforced.",
         "description": "The sphinx magically teleports, along with any equipment it is wearing or carrying, up to 120 feet to an unoccupied space it can see."
       },
       {
         "name": "Cast a Spell (Costs 3 Actions)",
+        "advisory": "spellcast_adjudication",
+        "advisory_message": "casts a spell from its list of prepared spells — advisory record: GM adjudicates spell choice, no spell list authored for this monster (no Spellcasting container in app data). Canonical cost is 3 legendary uses — the engine spends 1 per click; the extra cost is GM-enforced.",
         "description": "The sphinx casts a spell from its list of prepared spells, using a spell slot as normal."
       }
     ],
