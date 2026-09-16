@@ -3562,7 +3562,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):At Will: Command (level 2 version), Detect Magic, Scorching Ray (level 3 version)1/Day Each: Fireball (level 6 version), Scrying",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0237-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0238",
