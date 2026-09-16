@@ -3796,7 +3796,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0254",
