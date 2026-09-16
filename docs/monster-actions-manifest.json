@@ -3627,7 +3627,7 @@
       "damageDicePrimary": "6d6",
       "damageTypePrimary": "Fire",
       "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak\u00ad ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0242-lair-geyser.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0243",

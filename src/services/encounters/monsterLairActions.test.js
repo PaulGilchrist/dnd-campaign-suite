@@ -2946,3 +2946,81 @@ describe('MA-0233 ancient-green-dragon fog charm data lock', () => {
     expect(dragon.lair_actions[1].name).toBe('Wall of Thorns');
   });
 });
+
+// MA-0242: Ancient Red Dragon lair_actions[0] was a NAMELESS magma-geyser
+// save dict (save_dc 15 Dexterity, 6d6 Fire half-on-success, no name) —
+// MA-0222 name-gate fingerprint (isLairRowClickable !row.name → false,
+// monsterLairActions.js:26) rendered static <strong>.</strong>+prose with
+// zero affordance (live: click logged zero, no prompt). Data-only fix,
+// mirroring the VERIFIED MA-0128 adult-red sibling: canonical "Magma Geyser"
+// name + dc_success "half" (damage leg already authored byte-intact).
+describe('MA-0242 ancient-red-dragon magma geyser data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-red-dragon');
+  const geyser = dragon.lair_actions[0];
+
+  it('[0] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof geyser).toBe('object');
+    expect(geyser.name).toBe('Magma Geyser');
+    expect(isLairRowClickable(geyser)).toBe(true);
+    expect(lairRowAffordance(geyser)).toBe('save');
+  });
+
+  it('save fields: DC 15 Dexterity, 6d6 Fire kept byte-intact, dc_success half', () => {
+    expect(geyser.save_dc).toBe(15);
+    expect(geyser.save_type).toBe('Dexterity');
+    expect(geyser.damage_dice_primary).toBe('6d6');
+    expect(geyser.damage_type_primary).toBe('Fire');
+    expect(geyser.dc_success).toBe('half');
+  });
+
+  it('description kept byte-intact canonical prose', () => {
+    expect(geyser.description).toMatch(/^Magma erupts from a point on the ground/);
+    expect(geyser.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(geyser.description).toMatch(/21 \(6d6\) fire damage on a failed save/i);
+    expect(geyser.description).toMatch(/half as much damage on a successful one\.$/);
+  });
+
+  it('save_effect vocabulary: damage-only leg — NO canonical condition extracted', () => {
+    expect(geyser.save_effect).toMatch(/^Failure: 21 \(6d6\) Fire damage\. Success: Half damage\.$/);
+    expect(extractConditionsFromSaveEffect(geyser.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with 6d6 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: geyser,
+      monsterName: 'Ancient Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '6d6',
+      saveConditions: extractConditionsFromSaveEffect(geyser.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
+  });
+
+  it('adult-red sibling parity: same canonical name + dc_success half, DC/type/dice identical', () => {
+    const adult = monstersData.find(m => m.index === 'adult-red-dragon');
+    const adultGeyser = adult.lair_actions[0];
+    expect(adultGeyser.name).toBe('Magma Geyser');
+    expect(adultGeyser.dc_success).toBe('half');
+    expect(geyser.save_dc).toBe(adultGeyser.save_dc);
+    expect(geyser.save_type).toBe(adultGeyser.save_type);
+    expect(geyser.damage_dice_primary).toBe(adultGeyser.damage_dice_primary);
+    expect(geyser.damage_type_primary).toBe(adultGeyser.damage_type_primary);
+    expect(geyser.description).toBe(adultGeyser.description);
+  });
+
+  it('scope guard: ancient-red [1] tremor and [2] volcanic-gases nameless rows untouched; young-red twin inert', () => {
+    expect(dragon.lair_actions[1].name).toBeUndefined();
+    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(false);
+    expect(dragon.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
+    const young = monstersData.find(m => m.index === 'young-red-dragon');
+    expect(young.lair_actions[0].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+  });
+});

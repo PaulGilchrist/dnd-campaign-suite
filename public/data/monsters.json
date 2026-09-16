@@ -4477,7 +4477,9 @@
         "save_type": "Dexterity",
         "save_effect": "Failure: 21 (6d6) Fire damage. Success: Half damage.",
         "damage_dice_primary": "6d6",
-        "damage_type_primary": "Fire"
+        "damage_type_primary": "Fire",
+        "name": "Magma Geyser",
+        "dc_success": "half"
       },
       {
         "description": "A tremor shakes the lair in a 60-foot radius around the dragon. Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone.",
