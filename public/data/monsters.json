@@ -4129,7 +4129,12 @@
       },
       {
         "name": "Guiding Light",
-        "description": "The dragon uses Spellcasting to cast <em>Guiding Bolt</em> (level 4 version)."
+        "attack_bonus": 16,
+        "spell_attack_bonus": 16,
+        "range": "120 ft.",
+        "damage_dice_primary": "7d6",
+        "damage_type_primary": "Radiant",
+        "description": "The dragon uses Spellcasting to cast <em>Guiding Bolt</em> (level 4 version): Ranged Spell Attack: +16 to hit. Hit: 7d6 Radiant damage (the granted-advantage-on-next-attack rider has no monster-spell consumer — GM-enforced, CLA-325)."
       },
       {
         "name": "Pounce",
