@@ -2778,8 +2778,8 @@ describe('MA-0231 ancient-green-dragon grasping roots and vines data lock', () =
     expect(adult.lair_actions[0].save_effect).toBe('The target is restrained by the roots and vines.');
     expect(young.lair_actions[0].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
-    // MA-0232 fixed [1] (Wall of Thorns) in a later pass — still nameless there.
-    expect(dragon.lair_actions[2].name).toBeUndefined();
+    // MA-0232 fixed [1] (Wall of Thorns), MA-0233 fixed [2] (Fog Charm) in later passes.
+    expect(dragon.lair_actions[2].name).toBe('Fog Charm');
   });
 });
 
@@ -2862,6 +2862,87 @@ describe('MA-0232 ancient-green-dragon wall of thorns data lock', () => {
     expect(young.lair_actions[2].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
     expect(dragon.lair_actions[0].name).toBe('Grasping Roots and Vines');
-    expect(dragon.lair_actions[2].name).toBeUndefined();
+    // MA-0233 fixed [2] (Fog Charm) in a later pass.
+    expect(dragon.lair_actions[2].name).toBe('Fog Charm');
+  });
+});
+
+// MA-0233: Ancient Green Dragon lair_actions[2] was a NAMELESS fog dict
+// (save_dc 15 Wisdom, no name, no save_effect) — MA-0222 name-gate
+// fingerprint (isLairRowClickable !row.name → false, monsterLairActions.js:26)
+// rendered static <strong>.</strong>+prose with zero affordance (live: click
+// logged zero, no prompt, no charmed grant). Data-only fix, mirroring
+// MA-0119 adult-green verified sibling vocabulary: canonical "Fog Charm"
+// name + dc_success "none" + save_effect carrying the Charmed condition
+// (MA-0017 damageless failed-save seam) so the chip "DC 15 Wisdom" routes
+// through handleSaveRoll and applySaveFailConditions grants charmed on fail,
+// zero grant + zero damage on success (no damage fields authored). The
+// "until initiative count 20 on the next round" expiry and fog-as-zone stay
+// GM-advisory residuals annotated in save_effect (description byte-intact
+// per brief; §7 no initiative lair seam / no zone consumer).
+describe('MA-0233 ancient-green-dragon fog charm data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-green-dragon');
+  const fog = dragon.lair_actions[2];
+
+  it('[2] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Fog Charm');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('save');
+  });
+
+  it('save fields: DC 15 Wisdom kept byte-intact, dc_success none (no damage authored)', () => {
+    expect(fog.save_dc).toBe(15);
+    expect(fog.save_type).toBe('Wisdom');
+    expect(fog.dc_success).toBe('none');
+    expect(fog.damage_dice_primary).toBeUndefined();
+    expect(fog.damage_type_primary).toBeUndefined();
+    expect(fog.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('description kept byte-intact canonical prose', () => {
+    expect(fog.description).toMatch(/^Magical fog billows around one creature/);
+    expect(fog.description).toMatch(/DC 15 Wisdom saving throw or be charmed/i);
+    expect(fog.description).toMatch(/until initiative count 20 on the next round\.$/);
+  });
+
+  it('save_effect vocabulary extracts ONLY charmed (MA-0017 damageless seam, fail-only)', () => {
+    expect(extractConditionsFromSaveEffect(fog.save_effect)).toEqual(['charmed']);
+  });
+
+  it('advisory residuals annotated in save_effect: init-count-20 expiry GM-enforced (no initiative lair seam, persists until manually cleared)', () => {
+    expect(fog.save_effect).toMatch(/^The target is charmed by the dragon\./);
+    expect(fog.save_effect).toMatch(/until initiative count 20 on the next round.*GM-enforced/i);
+    expect(fog.save_effect).toMatch(/no initiative lair seam/i);
+    expect(fog.save_effect).toMatch(/charmed condition persists until manually cleared/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + charmed', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Ancient Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(fog.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(fog, null, ['charmed']);
+  });
+
+  it('scope guard: adult-green sibling byte-identical fix shape, young-green twin and ancient [0]/[1] untouched', () => {
+    const adult = monstersData.find(m => m.index === 'adult-green-dragon');
+    const young = monstersData.find(m => m.index === 'young-green-dragon');
+    expect(adult.lair_actions[2].name).toBe('Fog Charm');
+    expect(adult.lair_actions[2].save_effect).toBe('The target is charmed by the dragon.');
+    expect(adult.lair_actions[2].dc_success).toBe('none');
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(dragon.lair_actions[0].name).toBe('Grasping Roots and Vines');
+    expect(dragon.lair_actions[1].name).toBe('Wall of Thorns');
   });
 });

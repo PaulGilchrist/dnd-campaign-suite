@@ -4327,9 +4327,12 @@
         "save_effect": "The target takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, or half as much damage on a successful save (dc_success half). The recurring once-each-round contact-save cadence, the 4-feet-of-movement-per-1-foot cost, the wall-section object stats (AC 5, 15 hit points per 10-foot section, vulnerability to fire, resistance to bludgeoning and piercing, immunity to psychic), and the sinks-back-when-reused/on-death expiry are GM-enforced (no zone/object/movement-cost/lair-cadence consumer)."
       },
       {
+        "name": "Fog Charm",
         "description": "Magical fog billows around one creature the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Wisdom saving throw or be charmed by the dragon until initiative count 20 on the next round.",
         "save_dc": 15,
-        "save_type": "Wisdom"
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "save_effect": "The target is charmed by the dragon. The \"until initiative count 20 on the next round\" expiry is GM-enforced (no initiative lair seam — the charmed condition persists until manually cleared; no lair-cadence consumer)."
       }
     ],
     "environments": [

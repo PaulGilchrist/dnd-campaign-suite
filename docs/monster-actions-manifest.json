@@ -3502,7 +3502,7 @@
         "charmed"
       ],
       "description": "Magical fog billows around one creature the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Wisdom saving throw or be charmed by the dragon until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0233-lair-fog.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0234",
