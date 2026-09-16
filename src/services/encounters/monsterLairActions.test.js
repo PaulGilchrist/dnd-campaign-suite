@@ -11,6 +11,7 @@ import {
   buildLairAdvisoryLog,
 } from './monsterLairActions.js';
 import { addEntry } from '../ui/logService.js';
+import { canRollExpression } from '../dice/diceRoller.js';
 import { extractConditionsFromSaveEffect, parseDreamPlaneBanishClause, parseBanishTransportClause } from '../../components/encounter/MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 
@@ -3258,14 +3259,99 @@ describe('MA-0254 ancient-silver-dragon fog cloud zone data lock', () => {
     expect(handleZone).toHaveBeenCalledWith(fog);
   });
 
-  it('scope guard: [1] cold wind row untouched (MA-0255 scope — nameless dict + 1dlO typo intact)', () => {
+  it('scope guard: [1] cold wind row structured by MA-0255 in a later pass (1dlO typo still intact)', () => {
     const wind = dragon.lair_actions[1];
-    expect(wind.name).toBeUndefined();
+    expect(wind.name).toBe('Cold Wind');
     expect(wind.save_dc).toBe(15);
     expect(wind.save_type).toBe('Constitution');
     expect(wind.damage_dice_primary).toBe('1d10');
     expect(wind.damage_type_primary).toBe('Cold');
     expect(wind.description).toMatch(/1dlO/);
     expect(wind.description).toMatch(/blisteringly cold wind/i);
+  });
+});
+
+// MA-0255: Ancient Silver Dragon lair_actions[1] was a NAMELESS cold-wind
+// save dict (save_dc 15 Constitution, 1d10 Cold, no name, no dc_success) —
+// MA-0222 name-gate fingerprint (isLairRowClickable !row.name → false,
+// monsterLairActions.js:26) rendered static <strong>.</strong>+prose with
+// zero affordance. Data-only fix, mirroring the VERIFIED adult-silver
+// MA-0136 sibling: canonical "Cold Wind" name + dc_success "half"
+// (canonical half-on-success) — save_dc/save_type/save_effect/damage fields
+// byte-intact. The description OCR typo "1dlO" (MA-0137/MA-0200 letter-O
+// family) stays byte-intact per brief: display-only, machine field
+// damage_dice_primary "1d10" is authoritative (MV-12). Gas/vapor dispersal
+// and flame-extinguishing clauses stay GM-advisory residuals (§7 no
+// gas/flame consumer).
+describe('MA-0255 ancient-silver-dragon cold wind data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-silver-dragon');
+  const wind = dragon.lair_actions[1];
+  const adult = monstersData.find(m => m.index === 'adult-silver-dragon');
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof wind).toBe('object');
+    expect(wind.name).toBe('Cold Wind');
+    expect(isLairRowClickable(wind)).toBe(true);
+    expect(lairRowAffordance(wind)).toBe('save');
+  });
+
+  it('save fields: DC 15 Constitution, 1d10 Cold kept byte-intact, dc_success half', () => {
+    expect(wind.save_dc).toBe(15);
+    expect(wind.save_type).toBe('Constitution');
+    expect(wind.damage_dice_primary).toBe('1d10');
+    expect(wind.damage_type_primary).toBe('Cold');
+    expect(wind.dc_success).toBe('half');
+    expect(wind.save_effect).toBe('Failure: 5 (1d10) Cold damage.');
+  });
+
+  it('description kept byte-intact incl. 1dlO OCR typo (display-only; machine field is 1d10)', () => {
+    expect(wind.description).toMatch(/^A blisteringly cold wind blows through the lair near the dragon\./);
+    expect(wind.description).toMatch(/DC 15 Constitution saving throw/i);
+    expect(wind.description).toMatch(/1dlO/);
+    expect(wind.damage_dice_primary).toBe('1d10');
+    expect(canRollExpression('1dlO')).toBe(false);
+    expect(canRollExpression(wind.damage_dice_primary)).toBe(true);
+  });
+
+  it('adult-silver MA-0136 parity: same name, DC, type, dice, damage type, dc_success', () => {
+    const adultWind = adult.lair_actions[1];
+    expect(adultWind.name).toBe('Cold Wind');
+    expect(wind.name).toBe(adultWind.name);
+    expect(wind.save_dc).toBe(adultWind.save_dc);
+    expect(wind.save_type).toBe(adultWind.save_type);
+    expect(wind.damage_dice_primary).toBe(adultWind.damage_dice_primary);
+    expect(wind.damage_type_primary).toBe(adultWind.damage_type_primary);
+    expect(wind.dc_success).toBe(adultWind.dc_success);
+  });
+
+  it('damage-only leg: no canonical condition extracted from save_effect', () => {
+    expect(extractConditionsFromSaveEffect(wind.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with 1d10 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wind,
+      monsterName: 'Ancient Silver Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '1d10',
+      saveConditions: extractConditionsFromSaveEffect(wind.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wind, '1d10', []);
+  });
+
+  it('scope guard: [0] fog zone and young-silver inert twins untouched; wyrmling lair empty', () => {
+    expect(dragon.lair_actions[0].name).toBe('Fog Cloud');
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('zone');
+    const young = monstersData.find(m => m.index === 'young-silver-dragon');
+    expect(typeof young.lair_actions[0]).toBe('string');
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    const wyrmling = monstersData.find(m => m.index === 'silver-dragon-wyrmling');
+    expect(wyrmling.lair_actions).toEqual([]);
   });
 });

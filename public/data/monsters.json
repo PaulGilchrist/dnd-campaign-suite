@@ -4666,12 +4666,14 @@
         "duration": "until initiative count 20 next round (advisory)"
       },
       {
+        "name": "Cold Wind",
         "description": "A blisteringly cold wind blows through the lair near the dragon. Each creature within 120 feet of the dragon must succeed on a DC 15 Constitution saving throw or take 5 (1dlO) cold damage. Gases and vapors are dispersed by the wind, and unprotected flames are extinguished. Protected flames, such as lanterns, have a 50 percent chance of being extinguished.",
         "save_dc": 15,
         "save_type": "Constitution",
         "save_effect": "Failure: 5 (1d10) Cold damage.",
         "damage_dice_primary": "1d10",
-        "damage_type_primary": "Cold"
+        "damage_type_primary": "Cold",
+        "dc_success": "half"
       }
     ],
     "environments": [
