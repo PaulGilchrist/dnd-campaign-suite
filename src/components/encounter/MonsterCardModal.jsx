@@ -24,6 +24,7 @@ import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRef
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
+import { resolveRoarStageAction } from '../../services/rules/features/roarService.js';
 import SaveAttackAoeModal from '../char-sheet/modals/shared/SaveAttackAoeModal.jsx';
 import './MonsterCardModal.css';
 
@@ -1189,8 +1190,17 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const prerequisite = gate.prerequisite;
     const { refused, usesGate } = resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, setPopupHtml });
     if (refused) return;
+    // MA-0268: staged_roar row (Androsphinx Roar) — the Nth click resolves
+    // ONLY the Nth roar's canonical legs (1 frightened / 2 deaf+frightened,
+    // both zero-damage WIS with turn-END repeat saves; 3 CON 8d10 thunder
+    // half-on-success + prone), swapped by the persisted MA-0020 spend
+    // counter. Byte-inert null for every other row.
+    const roarAction = resolveRoarStageAction({ action, usesGate });
+    const stageAction = roarAction || action;
+    const stageFormula = roarAction ? extractDamageDiceFromDescription(stageAction.description, stageAction.damage_dice_primary) : saveDamageFormula;
+    const stageConditions = roarAction ? extractConditionsFromSaveEffect(stageAction.save_effect) : saveConditions;
     // MA-0031: recharge gate + fire-spend + cone routing live downstream.
-    executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml });
+    executeBlockSaveRoll({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml });
   }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction, campaignName, setPopupHtml, allTargetEffects]);
 
   const handleSpellCast = useCallback(async (action, spellName) => {
