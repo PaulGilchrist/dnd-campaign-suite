@@ -1586,10 +1586,10 @@ describe('MA-0130 adult-red-dragon volcanic gases data lock', () => {
     expect(dragon.lair_actions[1].save_dc).toBe(15);
   });
 
-  it('ancient-red-dragon scope guard: its nameless volcanic-gases dict is NOT touched by this fix', () => {
+  it('ancient-red-dragon scope guard: its volcanic-gases dict structured later by MA-0244 (was nameless here)', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-red-dragon');
-    expect(ancient.lair_actions[2].name).toBeUndefined();
-    expect(ancient.lair_actions[2].zone).toBeUndefined();
+    expect(ancient.lair_actions[2].name).toBe('Volcanic Gases');
+    expect(ancient.lair_actions[2].zone.effect_key).toBe('lair_volcanic_gas');
   });
 });
 
@@ -3014,11 +3014,11 @@ describe('MA-0242 ancient-red-dragon magma geyser data lock', () => {
     expect(geyser.description).toBe(adultGeyser.description);
   });
 
-  it('scope guard: ancient-red [1] tremor structured later by MA-0243; [2] volcanic-gases nameless row untouched; young-red twin inert', () => {
+  it('scope guard: ancient-red [1] tremor structured by MA-0243; [2] volcanic-gases structured later by MA-0244; young-red twin inert', () => {
     expect(dragon.lair_actions[1].name).toBe('Tremor');
     expect(isLairRowClickable(dragon.lair_actions[1])).toBe(true);
-    expect(dragon.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(false);
+    expect(dragon.lair_actions[2].name).toBe('Volcanic Gases');
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(true);
     const young = monstersData.find(m => m.index === 'young-red-dragon');
     expect(young.lair_actions[0].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
@@ -3097,5 +3097,102 @@ describe('MA-0243 ancient-red-dragon tremor data lock', () => {
     expect(twin.description).toMatch(/^A tremor shakes the lair in a 60-foot radius/);
     expect(twin.name).toBeUndefined();
     expect(isLairRowClickable(twin)).toBe(false);
+  });
+});
+
+// MA-0244: Ancient Red Dragon lair_actions[2] was a NAMELESS volcanic-gases
+// save dict (save_dc 13 Constitution, "poisoned … incapacitated" save_effect,
+// no name) — MA-0222 name-gate fingerprint (isLairRowClickable !row.name →
+// false, monsterLairActions.js:26) rendered static <strong>.</strong>+prose
+// with zero affordance (live: forced click zero overlays, zero log lines).
+// Data-only fix byte-mirroring the VERIFIED MA-0130 adult-red sibling:
+// canonical "Volcanic Gases" name + dc_success "none" + normalized save_effect
+// (both canonical keywords in the Failure clause — extractConditionsFromSave-
+// Effect parses poisoned + incapacitated, fail-only via the MA-0017 damageless
+// seam) + zone dict arming lair_volcanic_gas te through the MA-0075 zone-cloud
+// shape (20-ft radius picker, repeat_save advisory). description/save_dc/
+// save_type kept byte-intact. Zone-until-initiative-20 cadence stays
+// GM-advisory (same MA-0130 residual precedent).
+describe('MA-0244 ancient-red-dragon volcanic gases data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-red-dragon');
+  const cloud = dragon.lair_actions[2];
+
+  it('[2] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof cloud).toBe('object');
+    expect(cloud.name).toBe('Volcanic Gases');
+    expect(isLairRowClickable(cloud)).toBe(true);
+    expect(lairRowAffordance(cloud)).toBe('save');
+  });
+
+  it('save fields byte-intact: DC 13 Constitution, dc_success none, no damage authored', () => {
+    expect(cloud.save_dc).toBe(13);
+    expect(cloud.save_type).toBe('Constitution');
+    expect(cloud.dc_success).toBe('none');
+    expect(cloud.damage_dice_primary).toBeUndefined();
+    expect(cloud.damage_type_primary).toBeUndefined();
+  });
+
+  it('save_effect normalized to adult vocabulary — extracts ONLY incapacitated + poisoned, fail-only', () => {
+    expect(cloud.save_effect).toBe('Failure: The target is poisoned until the end of its turn and is incapacitated while poisoned in this way. Success: unaffected. This effect deals no damage.');
+    expect(extractConditionsFromSaveEffect(cloud.save_effect)).toEqual(['incapacitated', 'poisoned']);
+  });
+
+  it('machine-readable persisting zone: 20-ft radius, lair_volcanic_gas key, repeat_save advisory', () => {
+    expect(cloud.zone.radius_ft).toBe(20);
+    expect(cloud.zone.effect_key).toBe('lair_volcanic_gas');
+    expect(cloud.zone.repeat_save).toBe(true);
+    expect(cloud.zone.advisory).toMatch(/GM-enforced/);
+    expect(cloud.duration).toMatch(/poisoned until end of turn/i);
+    expect(cloud.duration).toMatch(/incapacitated while poisoned/i);
+  });
+
+  it('description kept byte-intact canonical prose (20-ft sphere, DC 13 CON, initiative 20)', () => {
+    expect(cloud.description).toMatch(/^Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it\./i);
+    expect(cloud.description).toMatch(/lasts until initiative count 20 on the next round/i);
+    expect(cloud.description).toMatch(/starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn/i);
+    expect(cloud.description).toMatch(/While poisoned in this way, a creature is incapacitated/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + poisoned/incapacitated', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: cloud,
+      monsterName: 'Ancient Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(cloud.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(cloud, null, ['incapacitated', 'poisoned']);
+  });
+
+  it('adult-red sibling parity (MA-0130 VERIFIED): name/save_effect/zone/duration/dc_success byte-identical', () => {
+    const adult = monstersData.find(m => m.index === 'adult-red-dragon');
+    const adultCloud = adult.lair_actions[2];
+    expect(cloud.name).toBe(adultCloud.name);
+    expect(cloud.dc_success).toBe(adultCloud.dc_success);
+    expect(cloud.save_dc).toBe(adultCloud.save_dc);
+    expect(cloud.save_type).toBe(adultCloud.save_type);
+    expect(cloud.save_effect).toBe(adultCloud.save_effect);
+    expect(cloud.description).toBe(adultCloud.description);
+    expect(cloud.zone).toEqual(adultCloud.zone);
+    expect(cloud.duration).toBe(adultCloud.duration);
+  });
+
+  it('scope guard: ancient-red [0]/[1] fixed rows untouched; young-red twin rows stay nameless/inert (MA-0222 name-gate)', () => {
+    expect(dragon.lair_actions[0].name).toBe('Magma Geyser');
+    expect(dragon.lair_actions[0].dc_success).toBe('half');
+    expect(dragon.lair_actions[1].name).toBe('Tremor');
+    const young = monstersData.find(m => m.index === 'young-red-dragon');
+    expect(typeof young.lair_actions[0]).toBe('string');
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
   });
 });

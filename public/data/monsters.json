@@ -4493,7 +4493,16 @@
         "description": "Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The sphere spreads around corners, and its area is lightly obscured. It lasts until initiative count 20 on the next round. Each creature that starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn. While poisoned in this way, a creature is incapacitated.",
         "save_dc": 13,
         "save_type": "Constitution",
-        "save_effect": "Failure: The target is poisoned until the end of its turn. While poisoned in this way, the target is also incapacitated."
+        "dc_success": "none",
+        "save_effect": "Failure: The target is poisoned until the end of its turn and is incapacitated while poisoned in this way. Success: unaffected. This effect deals no damage.",
+        "name": "Volcanic Gases",
+        "zone": {
+          "radius_ft": 20,
+          "effect_key": "lair_volcanic_gas",
+          "repeat_save": true,
+          "advisory": "Poisoned lasts until the end of the target's turn (GM clears the poisoned/incapacitated markers — no end-of-turn condition-expiry registrant for these rows); the RAW turn-start repeat save and the cloud-until-initiative-count-20 cadence are GM-enforced (no turn-start zone-save consumer for lair clouds and no initiative-20 lair seam in this engine)."
+        },
+        "duration": "poisoned until end of turn (incapacitated while poisoned; repeat save ends early; advisory)"
       }
     ],
     "environments": [

@@ -3664,7 +3664,7 @@
         "poisoned"
       ],
       "description": "Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The sphere spreads around corners, and its area is lightly obscured. It lasts until initiative count 20 on the next round. Each creature that starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn. While poisoned in this way, a creature is incapacitated.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0244-lair-gases.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0245",
