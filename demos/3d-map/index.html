@@ -122,8 +122,9 @@ const EXAMPLES = [
 
 // ---- state -----------------------------------------------------------------
 let scene, camera, renderer, controls, mapGroup, half = 0;
-window.__dbg = { get mapGroup() { return mapGroup; }, get wallTex() { return wallTex; } };
+window.__dbg = { get mapGroup() { return mapGroup; }, get wallTex() { return wallTex; }, get camera() { return camera; }, get controls() { return controls; } };
 let currentMap = null;
+let wallMat = null;
 let currentMapPath = null;
 let showRooms = true, showLabels = true, showTorch = true;
 const assetCache = {};
@@ -155,6 +156,9 @@ function initScene() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  // Match the 2D map: left button pans, right button orbits.
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.5));
   scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x1c1c22, 0.55));
@@ -206,6 +210,14 @@ function makeLabel(text) {
 }
 
 // ---- assets ----------------------------------------------------------------
+let flameTex = null;
+function loadFlameTexture() {
+  if (flameTex) return Promise.resolve(flameTex);
+  return new Promise((resolve) => {
+    textureLoader.load('assets/flame_tex.png', (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; flameTex = t; resolve(t); }, undefined, () => resolve(null));
+  });
+}
+
 function loadAsset(type) {
   if (assetCache[type]) return assetCache[type];
   assetCache[type] = new Promise((resolve) => {
@@ -214,8 +226,14 @@ function loadAsset(type) {
         gltf.scene.traverse((o) => {
           if (!o.isMesh) return;
           o.castShadow = true; o.receiveShadow = true;
-          if (type === 'door' || type === 'secretDoor') {
-            for (const m of [].concat(o.material)) if (m && m.name === 'wallmatch') applyWallTexture(m);
+          if (type === 'torch') {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            for (const m of mats) {
+              if (m && m.name === 'flame') {
+                if (flameTex) { m.map = flameTex; m.emissiveMap = flameTex; m.emissive.set(0xffffff); }
+                m.emissiveIntensity = 1.5;
+              }
+            }
           }
         });
         resolve(gltf.scene);
@@ -260,6 +278,7 @@ function buildWalls(walls) {
   const geo = new THREE.BoxGeometry(CELL, WALL_H, CELL);
   const mat = new THREE.MeshStandardMaterial({ color: COLORS.wall, roughness: 0.92 });
   applyWallTexture(mat);
+  wallMat = mat;
   const inst = new THREE.InstancedMesh(geo, mat, unique.length);
   const m = new THREE.Matrix4();
   unique.forEach((key, i) => {
@@ -276,6 +295,11 @@ async function buildPlacedItems(items) {
     if (item.type === 'npc') continue; // NPCs are rendered as tokens
     const proto = await loadAsset(item.type);
     const mesh = proto ? proto.clone() : fallbackBox(item.type);
+    if ((item.type === 'door' || item.type === 'secretDoor') && wallMat) {
+      mesh.traverse((o) => {
+        if (o.isMesh && o.material && o.material.name === 'wallmatch') o.material = wallMat;
+      });
+    }
     mesh.scale.setScalar(CELL);
     const rot = (item.rotation || 0) * Math.PI / 180;
     let x = cellX(item.gridX), z = cellZ(item.gridY);
@@ -318,15 +342,15 @@ function setDimmed(obj) {
 
 function makeToken(name, color, stroke) {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(15, 17, 10, 24), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
-  body.position.y = 5; body.castShadow = true;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 48, 24), new THREE.MeshStandardMaterial({ color, roughness: 0.5, transparent: true, opacity: 0.5 }));
+  body.position.y = 24; body.castShadow = true;
   g.add(body);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(15, 19, 28), new THREE.MeshBasicMaterial({ color: stroke, side: THREE.DoubleSide }));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(18, 20, 28), new THREE.MeshBasicMaterial({ color: stroke, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.5;
   g.add(ring);
   if (showLabels) {
     const label = makeLabel(name);
-    label.position.y = 26;
+    label.position.y = 64;
     g.add(label);
   }
   return g;
@@ -381,11 +405,80 @@ function frameCamera(gs) {
   controls.update();
 }
 
+// ---- fog of war (mirrors the 2D GM view: 45% black over hidden cells) ------
+// Same line-of-sight math as src/services/maps/lineOfSight.js: a cell is
+// visible from a player when no wall or closed door sits between them.
+function bresenham(x0, y0, x1, y1) {
+  const cells = [];
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  let x = x0, y = y0;
+  const maxSteps = Math.max(dx, dy) * 2;
+  for (let i = 0; i <= maxSteps; i++) {
+    cells.push({ x, y });
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
+  return cells;
+}
+
+function computeFog(players, blockers, gridSize) {
+  const visible = new Set();
+  for (const p of players) {
+    for (let tx = 0; tx < gridSize; tx++) {
+      for (let ty = 0; ty < gridSize; ty++) {
+        if (tx === p.gridX && ty === p.gridY) continue;
+        const line = bresenham(p.gridX, p.gridY, tx, ty);
+        let blocked = false;
+        for (let i = 1; i < line.length - 1; i++) {
+          if (blockers.has(`${line[i].x},${line[i].y}`)) { blocked = true; break; }
+        }
+        if (!blocked) visible.add(`${tx},${ty}`);
+      }
+    }
+  }
+  const fog = new Set();
+  for (let x = 0; x < gridSize; x++)
+    for (let y = 0; y < gridSize; y++)
+      if (!visible.has(`${x},${y}`)) fog.add(`${x},${y}`);
+  return fog;
+}
+
+// One merged mesh: a top cap per fogged cell plus a side quad wherever a fog
+// cell meets a visible one, so the fog reads as a uniform volume from any
+// angle (no per-cell double blending) and always draws over tokens.
+function buildFog(fogSet) {
+  if (!fogSet.size) return;
+  const pos = [];
+  const H = WALL_H;
+  const quad = (a, b, c, d) => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); };
+  for (const key of fogSet) {
+    const [gx, gy] = key.split(',').map(Number);
+    const x0 = gx * CELL - half, z0 = gy * CELL - half;
+    const x1 = x0 + CELL, z1 = z0 + CELL;
+    quad([x0, H, z0], [x1, H, z0], [x1, H, z1], [x0, H, z1]);                    // top cap
+    const inFog = (dx, dy) => fogSet.has(`${gx + dx},${gy + dy}`);
+    if (!inFog(0, 1))  quad([x0, 0, z1], [x1, 0, z1], [x1, H, z1], [x0, H, z1]);
+    if (!inFog(0, -1)) quad([x0, 0, z0], [x1, 0, z0], [x1, H, z0], [x0, H, z0]);
+    if (!inFog(1, 0))  quad([x1, 0, z0], [x1, 0, z1], [x1, H, z1], [x1, H, z0]);
+    if (!inFog(-1, 0)) quad([x0, 0, z0], [x0, 0, z1], [x0, H, z1], [x0, H, z0]);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide }));
+  mesh.renderOrder = 1000; // after every other transparent object
+  mapGroup.add(mesh);
+}
+
 async function buildMap(mapData) {
   clearMap();
   const gs = mapData.gridSize || 30;
   half = (gs * CELL) / 2;
   await loadWallTextures();
+  await loadFlameTexture();
   buildFloorAndGrid(gs, mapData.bgFill);
   buildWalls(mapData.walls);
   buildRooms(mapData.rooms);
@@ -394,6 +487,9 @@ async function buildMap(mapData) {
   buildPlayers(mapData.players);
   buildNpcs(items);
   buildPointLights(items);
+  const blockers = new Set(mapData.walls || []);
+  for (const i of items) if (i.type === 'door' && !i.open) blockers.add(`${i.gridX},${i.gridY}`);
+  buildFog(computeFog(mapData.players || [], blockers, gs));
   frameCamera(gs);
   updateCounts(mapData);
 }
@@ -494,22 +590,36 @@ function loadWallTextures() {
 }
 
 // Apply the cached stone texture to a standard material (wall cells + door header).
-function applyWallTexture(mat) {
+// Clones the textures so each surface can pick a repeat that matches its face size:
+// wall cells tile 5ft (repeat 1,2); the slim 2ft door header needs repeat (1,0.4) so
+// its stones (and normal relief) are the same size as the adjacent wall instead of
+// reading as a denser, darker strip.
+function applyWallTexture(mat, repeat = [1, 2]) {
   if (!wallTex || !wallTex.diffuse) return;
-  mat.map = wallTex.diffuse;
+  const clone = (src) => {
+    if (!src) return null;
+    const c = src.clone();
+    c.wrapS = c.wrapT = THREE.RepeatWrapping;
+    c.repeat.set(repeat[0], repeat[1]);
+    c.needsUpdate = true;
+    return c;
+  };
+  mat.map = clone(wallTex.diffuse);
   mat.color.set(0xffffff);
-  if (wallTex.normal) { mat.normalMap = wallTex.normal; mat.normalScale = new THREE.Vector2(1, 1); }
-  if (wallTex.roughness) { mat.roughnessMap = wallTex.roughness; mat.roughness = 1.0; }
+  if (wallTex.normal) mat.normalMap = clone(wallTex.normal);
+  if (mat.normalMap) mat.normalScale.set(1, 1);
+  if (wallTex.roughness) mat.roughnessMap = clone(wallTex.roughness);
+  if (mat.roughnessMap) mat.roughness = 1.0;
   mat.needsUpdate = true;
 }
 
 // Circular portrait disc that sits on top of a token cylinder.
 function makeAvatar(texture) {
   const disc = new THREE.Mesh(
-    new THREE.CircleGeometry(13, 32),
-    new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide }));
+    new THREE.CircleGeometry(20, 32),
+    new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
   disc.rotation.x = -Math.PI / 2;
-  disc.position.y = 10.5;
+  disc.position.y = 48.5;
   return disc;
 }
 
@@ -517,9 +627,7 @@ function addAvatar(token, url) {
   if (!url) return;
   loadTexture(url).then((tex) => {
     if (!tex) return;
-    const disc = makeAvatar(tex);
-    if (token.userData.dimmed) disc.material.opacity = 0.5;
-    token.add(disc);
+    token.add(makeAvatar(tex));
   });
 }
 

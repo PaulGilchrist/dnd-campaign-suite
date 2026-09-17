@@ -15,6 +15,7 @@
 # units long along +X (east-west). Base of every model sits at Z=0, footprint
 # centered on the origin.
 import bpy
+import bmesh
 import math
 import os
 
@@ -73,6 +74,27 @@ M = {
     "wallmatch": mat("wallmatch", (0x69 / 255, 0x69 / 255, 0x69 / 255), 0.92, 0.0),
 }
 
+# Apply flame texture to the flame material
+_flame_mat = M["flame"]
+_flame_mat.use_nodes = True
+_nt = _flame_mat.node_tree
+# Remove existing nodes and rebuild with texture
+for _n in _nt.nodes: _nt.nodes.remove(_n)
+tex_img = _nt.nodes.new("ShaderNodeTexImage")
+tex_img.image = bpy.data.images.load(os.path.join(ASSETS_DIR, "flame_tex.png"))
+tex_img.location = (-400, 0)
+bsdf = _nt.nodes.new("ShaderNodeBsdfPrincipled")
+bsdf.location = (0, 0)
+bsdf.inputs["Base Color"].default_value = (0.6, 0.2, 0.05, 1)  # dark orange base
+bsdf.inputs["Emission Color"].default_value = (1.0, 0.5, 0.1, 1)
+bsdf.inputs["Emission Strength"].default_value = 1.0
+bsdf.inputs["Roughness"].default_value = 0.5
+bsdf.inputs["Metallic"].default_value = 0.0
+out = _nt.nodes.new("ShaderNodeOutputMaterial")
+out.location = (300, 0)
+_nt.links.new(tex_img.outputs["Color"], bsdf.inputs["Emission Color"])
+_nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+
 # ---------------------------------------------------------------- helpers
 def select_only(o):
     bpy.ops.object.select_all(action="DESELECT")
@@ -123,6 +145,56 @@ def cone(r1, r2, depth, loc, material, verts=24, rot=(0, 0, 0)):
     bpy.ops.mesh.primitive_cone_add(radius1=r1, radius2=r2, depth=depth, location=loc, vertices=verts)
     o = bpy.context.active_object
     o.rotation_euler = rot
+    return _finish(o, material, smooth=True)
+
+def flame(loc, material, lean=0.05, curl=0.012):
+    # Stylized teardrop flame (surface of revolution around Z): wider at the
+    # middle, pointed at the top, with a gentle side lean so it reads as fire
+    # rather than a cone / lamp shade. Base radius matches the sconce cup.
+    profile = [
+        (0.055, 0.000),   # base (nests into the cup opening)
+        (0.078, 0.030),
+        (0.082, 0.060),   # widest
+        (0.066, 0.095),
+        (0.042, 0.125),
+        (0.020, 0.150),
+        (0.000, 0.175),   # pointed tip
+    ]
+    n = 16
+    verts = []
+    for (r, z) in profile:
+        for j in range(n):
+            a = 2 * math.pi * j / n
+            verts.append((r * math.cos(a), r * math.sin(a), z))
+    faces = []
+    for i in range(len(profile) - 1):
+        for j in range(n):
+            faces.append((i * n + j, i * n + (j + 1) % n, (i + 1) * n + (j + 1) % n, (i + 1) * n + j))
+    me = bpy.data.meshes.new("flame")
+    o = bpy.data.objects.new("flame", me)
+    bpy.context.collection.objects.link(o)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    # UV: u wraps around the flame (angular), v runs base->tip. The plume
+    # texture is bright at its bottom and fades to black at the top, so v
+    # maps the base to the bright part. (Without UVs three.js samples the
+    # black corner texel and the flame renders black.)
+    uvl = me.uv_layers.new(name="UVMap")
+    for poly in me.polygons:
+        for loop in poly.loop_indices:
+            vi = me.loops[loop].vertex_index
+            uvl.data[loop].uv = (vi % n / n, profile[vi // n][1] / 0.175)
+    bm = bmesh.new(); bm.from_mesh(me)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)   # weld the collapsed tip to a point
+    bm.to_mesh(me); bm.free()
+    zs = [v.co.z for v in o.data.vertices]
+    maxz = max(zs)
+    for v in o.data.vertices:   # lean the upper part to one side, with a gentle curl
+        t = v.co.z / maxz
+        v.co.x += (t * t) * lean
+        v.co.y += math.sin(t * 4.0) * curl * t
+    me.update()
+    o.location = loc
     return _finish(o, material, smooth=True)
 
 def recenter(o):
@@ -216,17 +288,35 @@ def b_bookshelf():  # 2-cell along +X (east-west), 0.5 cell deep. 2D SVG rot=0:
     # back panel north, books' spines face south. glTF inverts Y, so flip180 the
     # built parts to match. The bookshelf back sits at the local 0.25-cell edge;
     # the viewer offsets it flush to the wall it faces (see index.html).
+    # Axes: X=width(east-west), Y=depth(front-back), Z=height(shelves).
     o = [cube((0.08, 0.5, 1.8), (-0.95, 0, 0.9), M["wood"])]
     o.append(cube((0.08, 0.5, 1.8), (0.95, 0, 0.9), M["wood"]))
     o.append(cube((1.9, 0.5, 0.08), (0, 0, 1.76), M["wood"]))
     o.append(cube((1.9, 0.5, 0.08), (0, 0, 0.12), M["wood"]))
     o.append(cube((1.84, 0.04, 1.6), (0, -0.22, 0.95), M["wood_dark"]))
     bookmats = [M["book_r"], M["book_b"], M["book_g"], M["book_y"]]
-    for sz in (0.5, 0.95, 1.4):
+    for si, sz in enumerate((0.5, 0.95, 1.4)):
         o.append(cube((1.82, 0.05, 0.46), (0, 0.02, sz), M["wood"]))
-        for i in range(5):
-            bx = -0.7 + i * 0.3
-            o.append(cube((0.18, 0.4, 0.34), (bx, 0.02, sz + 0.2), bookmats[(i + int(sz * 10)) % 4]))
+        # cap the max book height to each shelf's compartment so no book pokes
+        # above the shelf board (top shelf has the least room, up to frame top).
+        max_h = 0.40 if si < 2 else 0.31
+        # pack many thin books tightly across the shelf; vary spine width,
+        # height, and depth so the row reads as real books, not blocks.
+        x = -0.86
+        k = 0
+        while x < 0.82:
+            a = (k * 7 + si * 3) % 10
+            b = (k * 13 + si * 5) % 10
+            width = 0.06 + (a / 10) * 0.08
+            height = max_h * (0.6 + (b / 10) * 0.4)
+            depth = 0.26 + (a / 10) * 0.10
+            # shift down and forward by a quarter of the book's length so the
+            # rows sit lower on each board and lean toward the front.
+            o.append(cube((width, depth, height),
+                          (x + width / 2, -0.09 + height / 4, sz + 0.03 + height / 4),
+                          bookmats[(k + si) % 4]))
+            x += width + 0.004
+            k += 1
     return flip180(o)
 
 def b_altar():  # 2-cell along +X (east-west)
@@ -263,7 +353,6 @@ def b_secretdoor():  # runs north-south, stone. 8' leaf + square 2' lintel = ful
     o = [cube((0.1, 0.88, 1.6), (0, 0, 0.8), M["stone_dark"])]            # leaf (0-8ft)
     o.append(cube((0.12, 0.1, 1.6), (0, -0.45, 0.8), M["stone"]))         # side seam
     o.append(cube((0.12, 0.1, 1.6), (0, 0.45, 0.8), M["stone"]))          # side seam
-    o.append(cube((1.0, 1.0, 0.4), (0, 0, 1.8), M["wallmatch"]))          # square lintel (8-10ft)
     return o
 
 def b_firepit():
@@ -281,7 +370,7 @@ def b_torch():  # wall sconce, ~0.25 cell tall. Base (mount plate bottom) at Z=0
     o.append(cube((0.2, 0.05, 0.05), (-0.09, 0, 0.065), M["metal"]))       # bracket arm
     o.append(cube((0.12, 0.03, 0.03), (-0.09, 0, 0.015), M["metal_dark"])) # brace
     o.append(cyl(0.055, 0.08, (-0.01, 0, 0.11), M["metal"]))               # sconce cup
-    o.append(cone(0.06, 0.025, 0.12, (-0.01, 0, 0.19), M["flame"]))        # flame
+    o.append(flame((-0.01, 0, 0.13), M["flame"]))                          # flame
     return o
 
 def b_trap():
