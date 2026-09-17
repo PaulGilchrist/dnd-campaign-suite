@@ -4600,7 +4600,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The hag makes one Spectral Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0308",
@@ -4612,7 +4612,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The hag uses Spellcasting to cast Dimension Door or Hypnotic Pattern. The hag can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0309",
@@ -4624,7 +4624,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The archelon makes two Bite attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0310",
