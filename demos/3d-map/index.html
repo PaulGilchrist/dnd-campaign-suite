@@ -156,6 +156,9 @@ function initScene() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  // Match the 2D map: left button pans, right button orbits.
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.5));
   scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x1c1c22, 0.55));
@@ -339,15 +342,15 @@ function setDimmed(obj) {
 
 function makeToken(name, color, stroke) {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(15, 17, 10, 24), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
-  body.position.y = 5; body.castShadow = true;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 48, 24), new THREE.MeshStandardMaterial({ color, roughness: 0.5, transparent: true, opacity: 0.5 }));
+  body.position.y = 24; body.castShadow = true;
   g.add(body);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(15, 19, 28), new THREE.MeshBasicMaterial({ color: stroke, side: THREE.DoubleSide }));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(18, 20, 28), new THREE.MeshBasicMaterial({ color: stroke, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.5;
   g.add(ring);
   if (showLabels) {
     const label = makeLabel(name);
-    label.position.y = 26;
+    label.position.y = 64;
     g.add(label);
   }
   return g;
@@ -542,10 +545,10 @@ function applyWallTexture(mat, repeat = [1, 2]) {
 // Circular portrait disc that sits on top of a token cylinder.
 function makeAvatar(texture) {
   const disc = new THREE.Mesh(
-    new THREE.CircleGeometry(13, 32),
-    new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide }));
+    new THREE.CircleGeometry(20, 32),
+    new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
   disc.rotation.x = -Math.PI / 2;
-  disc.position.y = 10.5;
+  disc.position.y = 48.5;
   return disc;
 }
 
@@ -553,9 +556,7 @@ function addAvatar(token, url) {
   if (!url) return;
   loadTexture(url).then((tex) => {
     if (!tex) return;
-    const disc = makeAvatar(tex);
-    if (token.userData.dimmed) disc.material.opacity = 0.5;
-    token.add(disc);
+    token.add(makeAvatar(tex));
   });
 }
 
