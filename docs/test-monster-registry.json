@@ -1,4 +1,290 @@
 {
+  "Baboon": {
+    "monsterIndex": "baboon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Baboon 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0331 (PASS Bite +1 1d4-1 Piercing: boundary nat7/8 vs AC9, 6 hits dice-1 exact, zero-floor noted no clamp)",
+      "date": "2026-09-16"
+    }
+  },
+  "Azer Sentinel": {
+    "monsterIndex": "azer-sentinel",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Azer Sentinel 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0330 (PASS Burning Hammer +5: boundary nat4/5 vs AC9, 1d10+3 Blud + 1d6 Fire dual exact x5, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Azer Pyromancer": {
+    "monsterIndex": "azer-pyromancer",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Azer Pyromancer 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0326 (PASS multiattack header; Flame Burst +7 2d10+4 Fire exact x4 vs AC19 incl nat20 crit dice-only, miss-zero) | MA-0327 (PASS Flame Burst standalone chip +7, 2 hits 2d10+4 exact + 2 misses zero vs AC19) | MA-0328 (BROKEN Spellcasting: no save_dc disk+spells.json, Fireball DC-Unknown dead save-leg MA-0237 class; gate/links live; bug-mon-MA-0328) | MA-0329 (BROKEN Hellish Rebuke 2/Day reaction: bare row, no trigger/affordance/automation, zero-fire on damage; bug-mon-MA-0329)",
+      "date": "2026-09-16"
+    }
+  },
+  "Azer": {
+    "monsterIndex": "azer",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Azer 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0325 (BROKEN Warhammer: core 1d8+3 Blud + 1d6 Fire/hit exact, two-handed 1d10 variant inert MV-7 flavor-b; bug-mon-MA-0325)",
+      "date": "2026-09-16"
+    }
+  },
+  "Axe Beak": {
+    "monsterIndex": "axe-beak",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Axe Beak 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0324 (PASS Beak +4 1d8+2 Slashing: boundary nat4/5 vs AC9, 4 hits exact, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Awakened Tree": {
+    "monsterIndex": "awakened-tree",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Awakened Tree 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0323 (PASS Slam +6 3d6+4 Bludgeoning: boundary nat13/1 vs AC19, 4 hits dice exact, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Awakened Shrub": {
+    "monsterIndex": "awakened-shrub",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Awakened Shrub 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0322 (BROKEN Rake: +1 to-hit flip exact but flat-1 damage never applied (no-dice silent fallback MonsterCardModal:1027); bug-mon-MA-0322)",
+      "date": "2026-09-16"
+    }
+  },
+  "Assassin": {
+    "monsterIndex": "assassin",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Assassin 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0319 (PASS multiattack: Shortsword +7 Pier+Poison dual x2 hits exact vs AC19, Light Crossbow +7 miss zero; GM combo-count) | MA-0320 (BROKEN Shortsword: dual dmg 1d6+4 Pier+5d6 Poison exact 4 hits, Poisoned clause inert no hit_conditions authored; bug-mon-MA-0320) | MA-0321 (PASS Light Crossbow +7: boundary nat8/16 vs AC19, 1d8+4 Pier + 6d6 Poison dual exact x3, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Archpriest": {
+    "monsterIndex": "archpriest",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Archpriest 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0315 (PASS multiattack: Radiant Burst +9 4d10+5 x3 vs AC19, 2 hits exact (EP radiant-resist halve logged), miss-zero) | MA-0316 (PASS Radiant Burst standalone: +9 4d10+5 unhalved x5 clean AC9, resisted:false, hp chain exact) | MA-0317 (PASS-subset Holy Word DC17 WIS 6d6: fail full+Stunned meta exact, success floor-half NO condition, recharge threshold:4 refuse+d6 recover; emanation→single-target gap + no stun clock noted) | MA-0318 (BROKEN Spellcasting: disk lacks save_dc, Flame Strike DC-Unknown save-leg dead MA-0237 class; links/gates live; fix=save_dc:17 WIS; bug-mon-MA-0318)",
+      "date": "2026-09-16"
+    }
+  },
+  "Archmage": {
+    "monsterIndex": "archmage",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Archmage 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0311 (PASS multiattack: Arcane Burst +9 4d10+5 x4 vs AC19, 2 hits exact 29/23, 2 miss-zero; header text-row GM-count) | MA-0312 (PASS Arcane Burst standalone: +9 flip vs AC19, 4d10+5 Force exact 27/40, miss-zero, rolls genuine) | MA-0313 (PASS Spellcasting: 14 links tiers exact, DC17 live, LB lv7 12d6/CoC lv9 12d8 floor-half exact, 2Day+1Day gates + refusals, At-Will free) | MA-0314 (BROKEN Protective Magic 3/Day: bare name/desc reaction, zero affordance, inert MV-6; fix template MA-0300; bug-mon-MA-0314)",
+      "date": "2026-09-16"
+    }
+  },
+  "Archelon": {
+    "monsterIndex": "archelon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Archelon 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0310 (PASS Bite +6 3d6+4 Piercing: boundary nat13/11 vs AC19 exact, 5 hits dice-distinct total==finalDamage==hpΔ, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Arch-hag": {
+    "monsterIndex": "arch-hag",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Arch-hag 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0301 (PASS multiattack: Spectral Claw +14 3d6+7 Force prone-on-hit MA-0302 live, boundary nat4/5 AC19, Crackling Wave DC22 DEX full-on-fail + cursed/no_reactions te) | MA-0303 (BROKEN: cone math exact, cursed-on-SUCCESS inert fail-only seam SaveAttackAoeModal:159/:378; bug-mon-MA-0303) | MA-0304 (PASS Spellcasting: 7 links, DC22 CHA live, 2/Day gate exact Mass Suggestion, At-Will free; MV-20 half-hardcode + Hypnotic advisory noted)",
+      "date": "2026-09-16"
+    }
+  },
+  "Arcanaloth": {
+    "monsterIndex": "arcanaloth",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Arcanaloth 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0296 (PASS multiattack: Fiendish Burst +9 4d12+5 Nec exact, Banishing Claw +9 DC17 CHA dc_success none + banished_demiplane soulTome te + Incapacitated; replace GM-adjudicated) | MA-0297 (PASS Fiendish Burst standalone: +9 flip nat9/10 vs AC19, crit 8d12+5 flat-undoubled, EP necrotic-resist rig noted) | MA-0299 (PASS-subset Spellcasting: 9 links, DC17 INT save-leg live, 1/Day gate exact, At-Will free; untargeted-click-spend quirk logged in playbook)",
+      "date": "2026-09-16"
+    }
+  },
+  "Apprentice Wizard": {
+    "monsterIndex": "apprentice-wizard",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Apprentice Wizard 1",
+      "hp": 9,
+      "ac": 10,
+      "csIndex": 0,
+      "verifiedRow": "MA-0295 (PASS Dagger +2 1d4 Piercing no-mod: boundary nat7 hit/nat2 miss vs AC9, 6 hits exact, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Ape": {
+    "monsterIndex": "ape",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ape 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0292 (PASS multiattack: Fist +5 1d4+3 Bludgeoning x5, crit dice-only, misses zero vs AC19, hits vs AC9 exact) | MA-0293 (PASS Fist standalone: +5 x3 distinct dice, 1d4+3 exact, nat1 miss zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Ankylosaurus": {
+    "monsterIndex": "ankylosaurus",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ankylosaurus 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0290 (PASS multiattack: Tail +6 1d10+4 Bludgeoning x4 vs AC19 incl nat20 crit dice-only, miss zero; header text-row model) | MA-0291 (BROKEN: core +6 1d10+4 exact, prone inert — row lacks hit_conditions, data-only fix per MA-0302; bug-mon-MA-0291)",
+      "date": "2026-09-16"
+    }
+  },
+  "Ankheg": {
+    "monsterIndex": "ankheg",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ankheg 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0288 (BROKEN: Bite core +5 2d6+3 Sl +1d6 Acid exact vs AC12, grapple-on-hit+cond-adv inert no hit_conditions authored; bug-mon-MA-0288) | MA-0289 (PASS Acid Spray line DC12 DEX 4d6: 3 fails full, nat20 floor-half exact; recharge refused+threshold:6+turn-start d6 recovery live)",
+      "date": "2026-09-16"
+    }
+  },
+  "Animated Rug of Smothering": {
+    "monsterIndex": "animated-rug-of-smothering",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Animated Rug of Smothering 1",
+      "hp": 27,
+      "csIndex": 0,
+      "verifiedRow": "MA-0287 (BROKEN: attack core +5/2d6+3 Bludgeoning exact, but no hit_conditions authored — grapple/blinded/restrained, start-turn auto-dmg, halve/mirror, one-at-a-time all inert; bug-mon-MA-0287)",
+      "date": "2026-09-16"
+    }
+  },
+  "Animated Object (Medium)": {
+    "monsterIndex": "animated-object-medium",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Animated Object (Medium) 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0286 (BROKEN: Slam inert-by-design — null attack_bonus, chip suppressed attackRowMissingToHit, zero affordance; MA-0284/0285 family)",
+      "date": "2026-09-16"
+    }
+  },
+  "Animated Object (Large)": {
+    "monsterIndex": "animated-object-large",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Animated Object (Large) 1",
+      "init": 8,
+      "csIndex": 0,
+      "verifiedRow": "MA-0285 (BROKEN: Slam inert, MA-0284 twin fingerprint — attack_bonus null + token dice, zero affordance, forced click zero-delta)",
+      "date": "2026-09-16"
+    }
+  },
+  "Animated Object (Huge)": {
+    "monsterIndex": "animated-object-huge",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Animated Object (Huge) 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0284 (BROKEN: Slam inert — attack_bonus null + token dice, chip suppressed attackRowMissingToHit, forced click zero-delta; caster-context subsystem missing, see bug-mon-MA-0284)",
+      "date": "2026-09-16"
+    }
+  },
+  "Animated Flying Sword": {
+    "monsterIndex": "animated-flying-sword",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Animated Flying Sword 1",
+      "hp": 14,
+      "ac": 17,
+      "csIndex": 0,
+      "verifiedRow": "MA-0283 (PASS Slash +4 1d8+2 Slashing: 11 hits exact vs AC9 incl nat20 crit, nat2 miss zero-dmg, total==finalDamage==hpΔ)",
+      "date": "2026-09-16"
+    }
+  },
+  "Animated Broom": {
+    "monsterIndex": "animated-broom",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Animated Broom 1",
+      "hp": 14,
+      "ac": 15,
+      "csIndex": 0,
+      "verifiedRow": "MA-0282 (PASS Slam +5 1d4+3: 4 hits exact vs AC9, nat3 miss zero-dmg, total==finalDamage==hpΔ; re-join recipe standard)",
+      "date": "2026-09-16"
+    }
+  },
+  "Animated Armor": {
+    "monsterIndex": "animated-armor",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Animated Armor 1",
+      "hp": 33,
+      "ac": 18,
+      "csIndex": 0,
+      "verifiedRow": "MA-0280 (PASS multiattack: Slam +4 1d6+2 Bludgeoning live x6 vs AC9 hits exact, miss vs AC19 zero-dmg; header text-row model) | MA-0281 (PASS Slam standalone: +4 boundary nat2 miss/nat6 hit vs AC9, 1d6+2 exact, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Animal Lord": {
+    "monsterIndex": "animal-lord",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Animal Lord 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0272 (PASS multiattack: Rend +13 2d6+7 Sl+2d6 Force exact, Radiant Ray +12 4d6+6 exact, Animal Spirit DC20 save row live; variant clauses advisory; ElderPaladin radiant-resist rig noted) | MA-0273 (PASS Rend standalone: +13 double boundary nat5/6 vs AC19, 9 dual-dmg hits exact 224-34, miss zero-dmg) | MA-0274 (PASS Radiant Ray +12 4d6+6: boundary nat4/6 vs AC17, nat20 crit 8d6+6 flat-undoubled, 7 hits exact, miss-zero) | MA-0275 (BROKEN: core DC20 DEX 4d10+6 full/floor-half exact, but Fortify/Prey/Swarm variant clauses inert grep-zero no chooser — bug-mon-MA-0275)",
+      "date": "2026-09-16"
+    }
+  },
+  "Androsphinx": {
+    "monsterIndex": "androsphinx",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Androsphinx 1",
+      "hp": 199,
+      "ac": 17,
+      "init": 5,
+      "csIndex": 0,
+      "verifiedRow": "MA-0266 (PASS multiattack: header text-row, Claw +12 x2 vs AC19: nat17 HIT 2d10+6=14, nat20 CRIT (5+9)x2+6=34 flat undoubled; hp pairs 224-210-176; ElderPaladin armed; GM-adjudicated count MA-0223) | MA-0267 (PASS Claw standalone: +12 boundary nat4 miss/nat7 hit vs AC19, 2d10+6 exact x3, miss zero-dmg)",
+      "date": "2026-09-16"
+    }
+  },
+  "Ancient White Dragon": {
+    "monsterIndex": "ancient-white-dragon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Ancient White Dragon 1",
+      "hp": 333,
+      "ac": 20,
+      "init": 11,
+      "csIndex": 0,
+      "verifiedRow": "MA-0256 (PASS multiattack: header text-row model, Rend +14 chip x3 vs AC19 all hit (5/18/9 nat), 2d8+8 Slashing + 2d6 Cold dual breakdown exact, hp_change pairs exact; ElderPaladin armed target; 2026-09-16) | MA-0257 (PASS Rend standalone: +14 boundary flip nat4/5 vs AC19 exact, dual Sl+Cold exact, miss zero-dmg, crit not rolled in 6) | MA-0258 (PASS Cold Breath cone DC22 CON 14d8: fail full / floor-half exact; recharge refused+threshold:5+d6 recovery live)",
+      "date": "2026-09-16"
+    }
+  },
   "Ancient Black Dragon": {
     "monsterIndex": "ancient-black-dragon",
     "placedIn": "test-campaign initiative via EB Join Encounter",
@@ -275,7 +561,7 @@
       "ac": 22,
       "init": 14,
       "csIndex": 0,
-      "verifiedRow": "MA-0245 (FAIL multiattack replace-B: Rend×3 +17 2d8+10 Slashing+2d8 Cold PASS; (A) Paralyzing Breath cone DC24 CON fail→Paralyzed PASS no recharge authored correct; (B) Ice Knife lv2 DEAD — 'DC Unknown' (prose-only row DC MA-0237 family + 5e spells.json Ice Knife lacks attack_type so isSpellAttackSpell false→block-save misroute, spurious self-save logs); fix=attack_type:ranged 5e path + numeric save_dc:23; targets ElderPaladin AC19/HexWarlock CON+0) | MA-0246 (PASS Rend standalone: +17 vs AC19, nat20→37 HIT nat1→18 MISS flip, crit ×2 both dice doubled 2d8*2+10 + 2d8*2 (flat +10 never doubled), all ~25 rolls popup-Done+log-paired dual Slashing+Cold exact; init 10)",
+      "verifiedRow": "MA-0245 (FAIL multiattack replace-B: Rend×3 +17 2d8+10 Slashing+2d8 Cold PASS; (A) Paralyzing Breath cone DC24 CON fail→Paralyzed PASS no recharge authored correct; (B) Ice Knife lv2 DEAD — 'DC Unknown' (prose-only row DC MA-0237 family + 5e spells.json Ice Knife lacks attack_type so isSpellAttackSpell false→block-save misroute, spurious self-save logs); fix=attack_type:ranged 5e path + numeric save_dc:23; targets ElderPaladin AC19/HexWarlock CON+0) | MA-0246 (PASS Rend standalone: +17 vs AC19, nat20→37 HIT nat1→18 MISS flip, crit ×2 both dice doubled 2d8*2+10 + 2d8*2 (flat +10 never doubled), all ~25 rolls popup-Done+log-paired dual Slashing+Cold exact; init 10) | MA-0247 (PASS Cold Breath cone DC24 CON 15d8: fail full x3 / success exact floor-half; recharge refused `cold_breath_refused` + monsterRecharge threshold:5 + d6 recovery@turn-start live; 2026-09-16) | MA-0250 (PASS legendary header uses:3 counter/1-per-click spend/turn+exhausted+own-turn refusals/regain-all@turn-start exact)",
       "date": "2026-09-15"
     }
   }

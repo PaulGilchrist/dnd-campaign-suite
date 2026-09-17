@@ -3712,7 +3712,7 @@
       "damageTypePrimary": "Cold",
       "recharge": "5-6",
       "description": "Constitution Saving Throw: DC 24, each creature in a 90-foot Cone. Failure: 67 (15d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0248",
@@ -3755,7 +3755,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0251",
@@ -3837,7 +3837,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0257",
@@ -3855,7 +3855,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +14, reach 15 ft. Hit: 17 (2d8 + 8) Slashing damage plus 7 (2d6) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0258",
@@ -3873,7 +3873,7 @@
       "damageTypePrimary": "Cold",
       "recharge": "5-6",
       "description": "Constitution Saving Throw: DC 22, each creature in a 90-foot Cone. Failure: 63 (14d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0259",
@@ -3979,7 +3979,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The sphinx makes two claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0267",
@@ -3995,7 +3995,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +12 to hit, reach 5 ft., one target. Hit: 17 (2d10 + 6) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0268",
@@ -4066,7 +4066,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The animal lord makes two attacks, using Rend or Radiant Ray in any combination, and uses Animal Spirit.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0273",
@@ -4084,7 +4084,7 @@
       "damageTypeSecondary": "Force",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +13, reach 5 ft. Hit: 14 (2d6 + 7) Slashing damage plus 7 (2d6) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0274",
@@ -4100,7 +4100,7 @@
       "damageTypePrimary": "Radiant",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +12, range 120 ft. Hit: 20 (4d6 + 6) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0275",
@@ -4117,7 +4117,7 @@
       "damageDicePrimary": "4d10 + 6",
       "damageTypePrimary": "Radiant",
       "description": "Dexterity Saving Throw: DC 20, one creature the animal lord can see within 120 feet. Failure: 28 (4d10 + 6) Radiant damage. Success: Half damage. Failure or Success: One of the following effects occurs:Fortify (Forager Only). The animal lord gains 20 Temporary Hit Points.Marked as Prey (Hunter Only). The animal lord has Advantage on attack rolls against the target until the start of the animal lord's next turn.Pesky Swarm (Sage Only). The target has Disadvantage on attack rolls and ability checks until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0275-animal-spirit-variants-inert.md"
     },
     {
       "id": "MA-0276",
@@ -4177,7 +4177,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The armor makes two Slam attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0281",
@@ -4193,7 +4193,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0282",
@@ -4209,7 +4209,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 5 (1d4 + 3) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0283",
@@ -4225,7 +4225,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0284",
@@ -4240,7 +4240,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d12+3+spellcasting modifier Force damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0284-animated-object-huge-slam-inert.md"
     },
     {
       "id": "MA-0285",
@@ -4255,7 +4255,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d6+3+spellcasting modifier Force damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0285-animated-object-large-slam-inert.md"
     },
     {
       "id": "MA-0286",
@@ -4270,7 +4270,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d4+3 Force damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0286-animated-object-medium-slam-no-tohit.md"
     },
     {
       "id": "MA-0287",
@@ -4291,7 +4291,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Bludgeoning damage. If the target is a Medium or smaller creature, the rug can give it the Grappled condition (escape DC 13) instead of dealing damage. Until the grapple ends, the target has the Blinded and Restrained conditions, is suffocating, and takes 10 (2d6 + 3) Bludgeoning damage at the start of each of its turns. The rug can smother only one creature at a time. While grappling the target, the rug can't take this action, the rug halves the damage it takes (round down), and the target takes the same amount of damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0287-smother-grapple-subsystem-inert.md"
     },
     {
       "id": "MA-0288",
@@ -4312,7 +4312,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the ankheg), reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage plus 3 (1d6) Acid damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0288-ankheg-bite-grapple-clauses-inert.md"
     },
     {
       "id": "MA-0289",
@@ -4330,7 +4330,7 @@
       "damageTypePrimary": "Acid",
       "recharge": "6",
       "description": "Dexterity Saving Throw: DC 12, each creature in a 30-foot-long, 5-foot-wide Line. Failure: 14 (4d6) Acid damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0290",
@@ -4342,7 +4342,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The ankylosaurus makes two Tail attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0291",
@@ -4361,7 +4361,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 9 (1d10 + 4) Bludgeoning damage. If the target is a Huge or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0291-ankylosaurus-tail-prone-not-authored-hit-conditions.md"
     },
     {
       "id": "MA-0292",
@@ -4373,7 +4373,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The ape makes two Fist attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0293",
@@ -4389,7 +4389,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 5 (1d4 + 3) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0294",
@@ -4422,7 +4422,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +2 to hit , reach 5 ft. or range 20/60 ft., one target. Hit: 2 (1d4) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0296",
@@ -4434,7 +4434,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The arcanaloth makes three Fiendish Burst attacks. It can replace one attack with a Banishing Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0297",
@@ -4451,7 +4451,7 @@
       "reach": "5 ft.",
       "range": "120 ft.",
       "description": "Melee or Ranged Attack Roll: +9, reach 5 ft. or range 120 ft. Hit: 31 (4d12 + 5) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0298",
@@ -4489,7 +4489,7 @@
       "saveDc": 17,
       "saveType": "Intelligence",
       "description": "The arcanaloth casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 17):At Will: Alter Self, Detect Magic, Identify, Mage Hand, Prestidigitation1/Day Each: Contact Other Plane, Detect Thoughts, Dimension Door, Mind Blank",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0300",
@@ -4513,7 +4513,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The hag makes two Spectral Claw attacks and uses Crackling Wave.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0302",
@@ -4550,7 +4550,7 @@
       "damageDicePrimary": "5d12",
       "damageTypePrimary": "Lightning",
       "description": "Dexterity Saving Throw: DC 22, each creature in a 60-foot Cone. Failure: 32 (5d12) Lightning damage. Success: Half damage. Failure or Success: The target is cursed until the end of the hag's next turn. The target can't take Reactions until the curse ends.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0303-crackling-wave-cursed-on-success-inert.md"
     },
     {
       "id": "MA-0304",
@@ -4564,7 +4564,7 @@
       "saveDc": 22,
       "saveType": "Charisma",
       "description": "The hag casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 22):At Will: Detect Thoughts, Dimension Door, Dispel Magic, Hypnotic Pattern2/Day Each: Mass Suggestion, Modify Memory, Plane Shift",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0305",
@@ -4640,7 +4640,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 14 (3d6 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0311",
@@ -4652,7 +4652,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The archmage makes four Arcane Burst attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0312",
@@ -4669,7 +4669,7 @@
       "reach": "5 ft.",
       "range": "150 ft.",
       "description": "Melee or Ranged Attack Roll: +9, reach 5 ft. or range 150 ft. Hit: 27 (4d10 + 5) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0313",
@@ -4683,7 +4683,7 @@
       "saveDc": 17,
       "saveType": "Intelligence",
       "description": "The archmage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 17):At Will: Detect Magic, Detect Thoughts, Disguise Self, Invisibility, Light, Mage Armor (included in AC), Mage Hand, Prestidigitation2/Day Each: Fly, Lightning Bolt (level 7 version)1/Day Each: Cone of Cold (level 9 version), Mind Blank (cast before combat), Scrying, Teleport",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0314",
@@ -4695,7 +4695,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The archmage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0314-archmage-protective-magic-inert.md"
     },
     {
       "id": "MA-0315",
@@ -4707,7 +4707,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The archpriest makes three Radiant Burst attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0316",
@@ -4724,7 +4724,7 @@
       "reach": "5 ft.",
       "range": "60 ft.",
       "description": "Melee or Ranged Attack Roll: +9, reach 5 ft. or range 60 ft. Hit: 27 (4d10 + 5) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0317",
@@ -4745,7 +4745,7 @@
         "stunned"
       ],
       "description": "Wisdom Saving Throw: DC 17, each enemy in a 20-foot Emanation originating from the archpriest. Failure: 21 (6d6) Radiant damage, and the target has the Stunned condition until the end of the archpriest's next turn. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0318",
@@ -4757,7 +4757,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The archpriest casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17):At Will: Light, Thaumaturgy1/Day Each: Flame Strike (level 6 version), Greater Restoration, Raise Dead, Zone of Truth",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0318-prose-dc-save-leg.md"
     },
     {
       "id": "MA-0319",
@@ -4769,7 +4769,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The assassin makes three attacks, using Shortsword or Light Crossbow in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0320",
@@ -4790,7 +4790,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 7 (1d6 + 4) Piercing damage plus 17 (5d6) Poison damage, and the target has the Poisoned condition until the start of the assassin's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0320-assassin-shortsword-poisoned-inert.md"
     },
     {
       "id": "MA-0321",
@@ -4808,7 +4808,7 @@
       "damageTypeSecondary": "Poison",
       "range": "80/320 ft.",
       "description": "Ranged Attack Roll: +7, range 80/320 ft. Hit: 8 (1d8 + 4) Piercing damage plus 21 (6d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0322",
@@ -4823,7 +4823,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 Slashing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0322-rake-flat-damage-never-applied.md"
     },
     {
       "id": "MA-0323",
@@ -4839,7 +4839,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 14 (3d6 + 4) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0324",
@@ -4855,7 +4855,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0325",
@@ -4873,7 +4873,7 @@
       "damageTypeSecondary": "fire",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) bludgeoning damage, or 8 (1d10 + 3) bludgeoning damage if used with two hands to make a melee attack, plus 3 (1d6) fire damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0325-azer-warhammer-two-handed-variant-inert.md"
     },
     {
       "id": "MA-0326",
@@ -4885,7 +4885,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The azer makes two Flame Burst attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0327",
@@ -4902,7 +4902,7 @@
       "reach": "5 ft.",
       "range": "120 ft.",
       "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 120 ft. Hit: 15 (2d10 + 4) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0328",
@@ -4914,7 +4914,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The azer casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15):At Will: Elementalism, Mage Hand1/Day: Fireball",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0328-prose-dc-save-leg.md"
     },
     {
       "id": "MA-0329",
@@ -4926,7 +4926,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The azer casts Hellish Rebuke in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0329-hellish-rebuke-reaction-inert.md"
     },
     {
       "id": "MA-0330",
@@ -4944,7 +4944,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Bludgeoning damage plus 3 (1d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0331",
@@ -4960,7 +4960,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 \u2212 1) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0332",
