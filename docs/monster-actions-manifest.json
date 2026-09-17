@@ -4533,7 +4533,7 @@
         "prone"
       ],
       "description": "Melee or Ranged Attack Roll: +14, reach 10 ft. or range 60 ft. Hit: 17 (3d6 + 7) Force damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0303",
