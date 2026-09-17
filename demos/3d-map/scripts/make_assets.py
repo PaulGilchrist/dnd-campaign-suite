@@ -15,6 +15,7 @@
 # units long along +X (east-west). Base of every model sits at Z=0, footprint
 # centered on the origin.
 import bpy
+import bmesh
 import math
 import os
 
@@ -144,6 +145,56 @@ def cone(r1, r2, depth, loc, material, verts=24, rot=(0, 0, 0)):
     bpy.ops.mesh.primitive_cone_add(radius1=r1, radius2=r2, depth=depth, location=loc, vertices=verts)
     o = bpy.context.active_object
     o.rotation_euler = rot
+    return _finish(o, material, smooth=True)
+
+def flame(loc, material, lean=0.05, curl=0.012):
+    # Stylized teardrop flame (surface of revolution around Z): wider at the
+    # middle, pointed at the top, with a gentle side lean so it reads as fire
+    # rather than a cone / lamp shade. Base radius matches the sconce cup.
+    profile = [
+        (0.055, 0.000),   # base (nests into the cup opening)
+        (0.078, 0.030),
+        (0.082, 0.060),   # widest
+        (0.066, 0.095),
+        (0.042, 0.125),
+        (0.020, 0.150),
+        (0.000, 0.175),   # pointed tip
+    ]
+    n = 16
+    verts = []
+    for (r, z) in profile:
+        for j in range(n):
+            a = 2 * math.pi * j / n
+            verts.append((r * math.cos(a), r * math.sin(a), z))
+    faces = []
+    for i in range(len(profile) - 1):
+        for j in range(n):
+            faces.append((i * n + j, i * n + (j + 1) % n, (i + 1) * n + (j + 1) % n, (i + 1) * n + j))
+    me = bpy.data.meshes.new("flame")
+    o = bpy.data.objects.new("flame", me)
+    bpy.context.collection.objects.link(o)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    # UV: u wraps around the flame (angular), v runs base->tip. The plume
+    # texture is bright at its bottom and fades to black at the top, so v
+    # maps the base to the bright part. (Without UVs three.js samples the
+    # black corner texel and the flame renders black.)
+    uvl = me.uv_layers.new(name="UVMap")
+    for poly in me.polygons:
+        for loop in poly.loop_indices:
+            vi = me.loops[loop].vertex_index
+            uvl.data[loop].uv = (vi % n / n, profile[vi // n][1] / 0.175)
+    bm = bmesh.new(); bm.from_mesh(me)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)   # weld the collapsed tip to a point
+    bm.to_mesh(me); bm.free()
+    zs = [v.co.z for v in o.data.vertices]
+    maxz = max(zs)
+    for v in o.data.vertices:   # lean the upper part to one side, with a gentle curl
+        t = v.co.z / maxz
+        v.co.x += (t * t) * lean
+        v.co.y += math.sin(t * 4.0) * curl * t
+    me.update()
+    o.location = loc
     return _finish(o, material, smooth=True)
 
 def recenter(o):
@@ -319,7 +370,7 @@ def b_torch():  # wall sconce, ~0.25 cell tall. Base (mount plate bottom) at Z=0
     o.append(cube((0.2, 0.05, 0.05), (-0.09, 0, 0.065), M["metal"]))       # bracket arm
     o.append(cube((0.12, 0.03, 0.03), (-0.09, 0, 0.015), M["metal_dark"])) # brace
     o.append(cyl(0.055, 0.08, (-0.01, 0, 0.11), M["metal"]))               # sconce cup
-    o.append(cone(0.06, 0.025, 0.12, (-0.01, 0, 0.19), M["flame"]))        # flame
+    o.append(flame((-0.01, 0, 0.13), M["flame"]))                          # flame
     return o
 
 def b_trap():
