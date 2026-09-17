@@ -6289,7 +6289,8 @@
         "reach": "10 ft.",
         "range": "60 ft.",
         "damage_dice_primary": "3d6 + 7",
-        "damage_type_primary": "Force"
+        "damage_type_primary": "Force",
+        "hit_conditions": ["prone"]
       },
       {
         "name": "Crackling Wave",

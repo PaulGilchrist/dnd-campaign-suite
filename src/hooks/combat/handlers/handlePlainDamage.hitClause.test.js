@@ -397,3 +397,87 @@ describe('MA-0018 Aboleth Tentacle grapple-on-hit clause', () => {
         }));
     });
 });
+
+const ARCH_HAG = monsters.find(m => m.index === 'arch-hag');
+const SPECTRAL_CLAW_ACTION = ARCH_HAG.actions.find(a => a.name === 'Spectral Claw');
+
+describe('MA-0302 Arch-hag Spectral Claw prone hit-clause', () => {
+    const deps = {
+        characterName: 'Arch-hag 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Arch-hag 1', computedStats: { armorClass: 20 } },
+            { name: 'ElderPaladin', computedStats: { armorClass: 19 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 17, newHp: 207, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'ElderPaladin', type: 'player', size: 'Medium', ac: 19, currentHp: 224, maxHp: 224 }],
+        });
+    });
+
+    it('MA-0302 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Spectral Claw row', () => {
+        expect(SPECTRAL_CLAW_ACTION.attack_bonus).toBe(14);
+        expect(SPECTRAL_CLAW_ACTION.damage_dice_primary).toBe('3d6 + 7');
+        expect(SPECTRAL_CLAW_ACTION.damage_type_primary).toBe('Force');
+        expect(SPECTRAL_CLAW_ACTION.hit_conditions).toEqual(['prone']);
+        expect(SPECTRAL_CLAW_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(SPECTRAL_CLAW_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Spectral Claw',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Spectral Claw hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Spectral Claw', formula: '3d6 + 7', total: 17, rolls: [3, 4, 3], modifier: 7, context: {
+            targetName: 'ElderPaladin',
+            damageType: 'Force',
+            attackerName: 'Arch-hag 1',
+            hitClause: buildHitConditionClause(SPECTRAL_CLAW_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Arch-hag 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'ElderPaladin',
+            condition: 'Prone',
+            reason: 'Spectral Claw (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Spectral Claw attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Spectral Claw', formula: '3d6 + 7', total: 17, rolls: [3, 4, 3], modifier: 7, context: {
+            targetName: 'ElderPaladin',
+            damageType: 'Force',
+            attackerName: 'Arch-hag 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'ElderPaladin', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'ElderPaladin', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
