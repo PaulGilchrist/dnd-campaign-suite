@@ -4501,7 +4501,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The arcanaloth casts Counterspell in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0301",
