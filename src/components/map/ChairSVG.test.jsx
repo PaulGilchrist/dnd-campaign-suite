@@ -34,25 +34,25 @@ describe('ChairSVG', () => {
   });
 
   describe('backrest', () => {
-    it('renders the backrest main rect', () => {
+    it('renders the backrest main rect at the back edge', () => {
       const { container } = render(<ChairSVG />);
       const backrest = container.querySelector(
         'rect[fill="#5C3317"][stroke="#4A2810"][stroke-width="0.6"]',
       );
       expect(backrest).toBeInTheDocument();
       expect(backrest).toHaveAttribute('x', '7');
-      expect(backrest).toHaveAttribute('y', '4');
+      expect(backrest).toHaveAttribute('y', '3');
       expect(backrest).toHaveAttribute('width', '22');
       expect(backrest).toHaveAttribute('height', '7');
       expect(backrest).toHaveAttribute('rx', '0.8');
     });
 
-    it('renders the gold trim on the backrest top edge', () => {
+    it('renders the gold trim on the back edge', () => {
       const { container } = render(<ChairSVG />);
       const trim = container.querySelector('rect[fill="#D4AF37"][opacity="0.8"]');
       expect(trim).toBeInTheDocument();
       expect(trim).toHaveAttribute('x', '7');
-      expect(trim).toHaveAttribute('y', '4');
+      expect(trim).toHaveAttribute('y', '3');
       expect(trim).toHaveAttribute('width', '22');
       expect(trim).toHaveAttribute('height', '1');
     });
@@ -64,7 +64,7 @@ describe('ChairSVG', () => {
 
       const outer = circles[0];
       expect(outer).toHaveAttribute('cx', '18');
-      expect(outer).toHaveAttribute('cy', '7.5');
+      expect(outer).toHaveAttribute('cy', '6.5');
       expect(outer).toHaveAttribute('fill', 'none');
       expect(outer).toHaveAttribute('stroke-width', '0.5');
 
@@ -81,10 +81,17 @@ describe('ChairSVG', () => {
       const cushion = container.querySelector('rect[fill="#8B0000"][stroke="#6B0000"]');
       expect(cushion).toBeInTheDocument();
       expect(cushion).toHaveAttribute('x', '7');
-      expect(cushion).toHaveAttribute('y', '11');
+      expect(cushion).toHaveAttribute('y', '10');
       expect(cushion).toHaveAttribute('width', '22');
-      expect(cushion).toHaveAttribute('height', '14');
+      expect(cushion).toHaveAttribute('height', '25');
       expect(cushion).toHaveAttribute('rx', '1.2');
+    });
+
+    it('runs the red cushion to the front edge so the facing direction is obvious', () => {
+      const { container } = render(<ChairSVG />);
+      const cushion = container.querySelector('rect[fill="#8B0000"][stroke="#6B0000"]');
+      const frontY = Number(cushion.getAttribute('y')) + Number(cushion.getAttribute('height'));
+      expect(frontY).toBeGreaterThanOrEqual(34);
     });
 
     it('renders the cushion inner area highlight', () => {
@@ -92,17 +99,17 @@ describe('ChairSVG', () => {
       const inner = container.querySelector('rect[fill="#A00000"][opacity="0.25"]');
       expect(inner).toBeInTheDocument();
       expect(inner).toHaveAttribute('x', '9');
-      expect(inner).toHaveAttribute('y', '13');
+      expect(inner).toHaveAttribute('y', '12');
       expect(inner).toHaveAttribute('width', '18');
-      expect(inner).toHaveAttribute('height', '10');
+      expect(inner).toHaveAttribute('height', '21');
     });
 
-    it('renders the cushion top edge highlight', () => {
+    it('renders the cushion edge highlight next to the backrest', () => {
       const { container } = render(<ChairSVG />);
       const highlight = container.querySelector('rect[fill="#C00000"][opacity="0.3"]');
       expect(highlight).toBeInTheDocument();
       expect(highlight).toHaveAttribute('x', '8');
-      expect(highlight).toHaveAttribute('y', '11.5');
+      expect(highlight).toHaveAttribute('y', '10.5');
       expect(highlight).toHaveAttribute('width', '20');
       expect(highlight).toHaveAttribute('height', '0.6');
     });
@@ -115,9 +122,9 @@ describe('ChairSVG', () => {
         'rect[fill="#5C3317"][stroke="#4A2810"][stroke-width="0.4"][x="4"]',
       );
       expect(leftArmrest).toBeInTheDocument();
-      expect(leftArmrest).toHaveAttribute('y', '11');
+      expect(leftArmrest).toHaveAttribute('y', '10');
       expect(leftArmrest).toHaveAttribute('width', '3');
-      expect(leftArmrest).toHaveAttribute('height', '14');
+      expect(leftArmrest).toHaveAttribute('height', '22');
     });
 
     it('renders the right armrest with correct attributes', () => {
@@ -126,9 +133,9 @@ describe('ChairSVG', () => {
         'rect[fill="#5C3317"][stroke="#4A2810"][stroke-width="0.4"][x="29"]',
       );
       expect(rightArmrest).toBeInTheDocument();
-      expect(rightArmrest).toHaveAttribute('y', '11');
+      expect(rightArmrest).toHaveAttribute('y', '10');
       expect(rightArmrest).toHaveAttribute('width', '3');
-      expect(rightArmrest).toHaveAttribute('height', '14');
+      expect(rightArmrest).toHaveAttribute('height', '22');
     });
 
     it('renders the left armrest highlight', () => {
@@ -147,30 +154,27 @@ describe('ChairSVG', () => {
       expect(rightHighlight).toBeInTheDocument();
     });
 
-    it('renders gold tips on both armrests', () => {
+    it('renders gold tips on both armrests at the front ends', () => {
       const { container } = render(<ChairSVG />);
       const tips = container.querySelectorAll('circle[fill="#D4AF37"][stroke="#B8860B"]');
       expect(tips.length).toBe(2);
 
       expect(tips[0]).toHaveAttribute('cx', '5.5');
-      expect(tips[0]).toHaveAttribute('cy', '24.5');
+      expect(tips[0]).toHaveAttribute('cy', '30');
       expect(tips[0]).toHaveAttribute('r', '1.2');
 
       expect(tips[1]).toHaveAttribute('cx', '30.5');
-      expect(tips[1]).toHaveAttribute('cy', '24.5');
+      expect(tips[1]).toHaveAttribute('cy', '30');
     });
   });
 
-  describe('front frame', () => {
-    it('renders the front frame rect below the cushion', () => {
+  describe('front', () => {
+    it('has no wood band across the seat width in front of the cushion', () => {
       const { container } = render(<ChairSVG />);
-      const frame = container.querySelector(
-        'rect[fill="#5C3317"][stroke="#4A2810"][y="25"]',
-      );
-      expect(frame).toBeInTheDocument();
-      expect(frame).toHaveAttribute('x', '7');
-      expect(frame).toHaveAttribute('width', '22');
-      expect(frame).toHaveAttribute('height', '4');
+      const wideWoodRects = Array.from(container.querySelectorAll('rect[fill="#5C3317"]'))
+        .filter((r) => r.getAttribute('width') === '22');
+      expect(wideWoodRects).toHaveLength(1);
+      expect(wideWoodRects[0].getAttribute('y')).toBe('3');
     });
   });
 
@@ -182,10 +186,10 @@ describe('ChairSVG', () => {
       expect(legs.length).toBe(5);
 
       const legPositions = [
-        { x: '5', y: '5' },   // back left
-        { x: '28', y: '5' },  // back right
-        { x: '5', y: '27' },  // front left
-        { x: '28', y: '27' }, // front right
+        { x: '5', y: '4' },    // back left
+        { x: '28', y: '4' },   // back right
+        { x: '5', y: '29' },   // front left
+        { x: '28', y: '29' },  // front right
       ];
 
       legPositions.forEach(({ x, y }) => {

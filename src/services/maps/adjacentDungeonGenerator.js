@@ -340,7 +340,7 @@ function furnishPrivate(room, placedItems, rng) {
   const rightX = room.rect.x + room.rect.w - 1, bottomY = ry + room.rect.h - 1;
   placedItems.push({ id: 'bed-' + room.id, gridX: rx, gridY: ry, type: 'bed', visible: true, rotation: 0 });
   placedItems.push({ id: 'chest-' + room.id, gridX: rightX, gridY: ry, type: 'chest', visible: true });
-  placedItems.push({ id: 'bookshelf-' + room.id, gridX: rx, gridY: bottomY, type: 'bookshelf', visible: true, rotation: 0 });
+  placedItems.push({ id: 'bookshelf-' + room.id, gridX: rx, gridY: bottomY, type: 'bookshelf', visible: true, rotation: 180 });
   if (rng() < 0.4) placedItems.push({ id: 'chair-' + room.id, gridX: cx, gridY: cy, type: 'chair', visible: true });
   if (rng() < 0.4) placedItems.push({ id: 'barrel-' + room.id, gridX: rightX, gridY: ry + 1, type: 'barrel', visible: true });
 }
