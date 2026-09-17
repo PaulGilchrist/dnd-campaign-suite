@@ -6333,14 +6333,18 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the hag can expend a use to take one of the following actions. The hag regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the hag can expend a use to take one of the following actions. The hag regains all expended uses at the start of each of its turns. In its lair the hag has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Hag's Swipe",
+        "delegates_to": "Spectral Claw",
         "description": "The hag makes one Spectral Claw attack."
       },
       {
         "name": "Malicious Magic",
+        "advisory": "malicious_magic",
+        "advisory_message": "casts Dimension Door or Hypnotic Pattern — advisory record: GM adjudicates spell choice (spellcast choice has no per-row consumer); the once-per-turn clause is enforced by the legendary gate; no Spellcasting container authored on this row.",
         "description": "The hag uses Spellcasting to cast <em>Dimension Door</em> or <em>Hypnotic Pattern</em>. The hag can't take this action again until the start of its next turn."
       }
     ],
