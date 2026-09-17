@@ -6183,7 +6183,15 @@
     "reactions": [
       {
         "name": "Counterspell",
-        "description": "The arcanaloth casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The arcanaloth casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "enemy_spell_cast",
+          "effect": "counterspell"
+        }
       }
     ],
     "environments": [
