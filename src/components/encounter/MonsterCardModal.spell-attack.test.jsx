@@ -267,3 +267,102 @@ describe('MA-0033 MonsterCardModal — Melf\'s Acid Arrow casts as a spell attac
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });
+
+// MA-0245: Ancient Silver Dragon Multiattack replace-B leg (Spellcasting →
+// Ice Knife level 2). The 5e spells.json Ice Knife lacked attack_type, so
+// findMonsterSpell (5e-first) mis-routed this ATTACK spell to the block-save
+// path → "DC Unknown — no success or failure", saveResult:null, zero attack
+// roll/damage/cast log per click. Fix = attack_type:"ranged" on the 5e entry
+// (+ numeric save_dc/save_type on the Spellcasting row for save-leg spells,
+// MA-0237 precedent).
+const ICE_KNIFE_5E = {
+  name: 'Ice Knife', level: 1, attack_type: 'ranged', concentration: false, duration: 'Instantaneous', range: '60 feet',
+  damage: { damage_type: 'Piercing', damage_at_slot_level: { 1: '1d10 plus 1d6', 2: '1d10 plus 2d6' } },
+  dc: null,
+};
+
+const SILVER_SPELLCASTING = {
+  name: 'Spellcasting',
+  description: 'The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):<br><strong>At Will:</strong> <em>Ice Knife</em> (level 2 version)<br><strong>1/Day Each:</strong> <em>Ice Storm</em> (level 7 version)',
+  save_dc: 23,
+  save_type: 'Charisma',
+};
+
+function renderSilver(armed = true) {
+  const creatures = [
+    { name: 'Ancient Silver Dragon 1', type: 'npc', targetName: armed ? 'ElderPaladin' : null, ac: 22 },
+    { name: 'ElderPaladin', type: 'player', ac: 19 },
+  ];
+  const m = makeMonster({ name: 'Ancient Silver Dragon', actions: [SILVER_SPELLCASTING] });
+  const props = makeProps(m, { creatureName: 'Ancient Silver Dragon 1', creatures });
+  render(<MonsterCardModal {...props} />);
+}
+
+describe('MA-0245 disk data — 5e Ice Knife attack_type + Ancient Silver Spellcasting numeric DC', () => {
+  it('5e spells.json Ice Knife authors attack_type ranged (text says ranged spell attack; 2024 sibling agrees)', () => {
+    const spells = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
+    const ik = spells.find(s => s.name === 'Ice Knife');
+    expect(ik.description.join(' ')).toMatch(/Make a ranged spell attack against the target/i);
+    expect(ik.attack_type).toBe('ranged');
+    expect(isSpellAttackSpell(ik)).toBe(true);
+    expect(spellDamageFormulaAtLevel(ik, 2)).toBe('1d10 plus 2d6');
+    const spells2024 = JSON.parse(readFileSync('public/data/2024/spells.json', 'utf8'));
+    expect(spells2024.find(s => s.name === 'Ice Knife').attack_type).toBe('ranged');
+  });
+
+  it('ancient-silver-dragon Spellcasting row authors save_dc 23 + save_type Charisma (CHA 26 +8 + PB 7)', () => {
+    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+    const dragon = monsters.find(m => m.index === 'ancient-silver-dragon');
+    const row = dragon.actions.find(a => a.name === 'Spellcasting');
+    expect(row.save_dc).toBe(23);
+    expect(row.save_type).toBe('Charisma');
+    expect(8 + dragon.proficiency_bonus + dragon.ability_score_modifiers.cha).toBe(row.save_dc);
+    expect(monsterSpellAttackBonus(row)).toBe(15);
+    expect(extractSpellNamesFromSpellcasting(row.description)).toContain('Ice Knife');
+    expect(row.description).toMatch(/Ice Knife<\/em> \(level 2 version\)/);
+    expect(spellCastLevelFromSpellcasting(row.description, 'Ice Knife', { level: 1 })).toBe(2);
+  });
+});
+
+describe('MA-0245 MonsterCardModal — Ice Knife casts as spell attack +15 lv2, never the DC-Unknown save path', () => {
+  beforeEach(() => { SPELLS_5E.push(ICE_KNIFE_5E); });
+  afterEach(() => { const i = SPELLS_5E.indexOf(ICE_KNIFE_5E); if (i >= 0) SPELLS_5E.splice(i, 1); });
+
+  it('routes the spell-attack leg through the attack seam: +15 vs armed target, lv2 1d10 plus 2d6, isSpellDamage, no save roll', async () => {
+    renderSilver(true);
+    const link = linkByText('Ice Knife');
+    expect(link).toBeTruthy();
+    await act(async () => { fireEvent.click(link); });
+
+    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+    const [name, bonus, options] = rollAttack.mock.calls[0];
+    expect(name).toBe('Ice Knife');
+    expect(bonus).toBe(15);
+    expect(options.autoDamageFormula).toBe('1d10 plus 2d6');
+    expect(options.damageType).toBe('Piercing');
+    expect(options.targetName).toBe('ElderPaladin');
+    expect(options.attackerName).toBe('Ancient Silver Dragon 1');
+    expect(options.isSpellDamage).toBe(true);
+
+    expect(rollSavingThrow).not.toHaveBeenCalled();
+    const popups = setPopupHtml.mock.calls.map(c => String(c[0]));
+    expect(popups.some(p => /DC Unknown/i.test(p))).toBe(false);
+  });
+
+  it('logs a spell-named ability_use cast record with level 2, +15, formula, and no DC Unknown / half boilerplate', async () => {
+    renderSilver(true);
+    await act(async () => { fireEvent.click(linkByText('Ice Knife')); });
+
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    const entry = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && e.abilityName === 'Ice Knife');
+    expect(entry).toBeTruthy();
+    expect(entry.characterName).toBe('Ancient Silver Dragon 1');
+    expect(entry.description).toMatch(/casts Ice Knife via Spellcasting/);
+    expect(entry.description).toMatch(/level 2 ranged spell attack \+15 vs ElderPaladin/);
+    expect(entry.description).toMatch(/1d10 plus 2d6/);
+    expect(entry.description).toMatch(/GM-enforced for monsters/);
+    expect(entry.description).not.toMatch(/DC Unknown/i);
+    expect(entry.description).not.toMatch(/half damage/i);
+    expect(runtime.store['Ancient Silver Dragon 1.monsterSpellUses'] ?? null).toBeNull();
+  });
+});

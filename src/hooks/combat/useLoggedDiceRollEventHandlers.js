@@ -22,6 +22,7 @@ import { cleanupConcentrationEffects } from '../../services/combat/concentration
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { triggerViciousMockeryForGeneric } from '../../services/rules/features/viciousMockeryService.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, resolveAppliedDamage } from './handlers/damageHandlerUtils.js';
+import { grantSoulTomeTrap } from '../../services/rules/features/soulTomeTrapService.js';
 
 const SECONDARY_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 
@@ -342,6 +343,12 @@ function resolveShieldVsMagicMissile(detail, pending) {
 
 function computeInitialSaveDamage({ isSoulstitchProtected, isShieldActive, isMagicMissile, detail, pending, hasEvasion }) {
     if (isSoulstitchProtected || (isShieldActive && isMagicMissile)) return 0;
+    // MA-0298: Soul Tome combo (Arcanaloth Banishing Claw) — the attack's hit
+    // damage is UNCONDITIONAL (RAW: the CHA save gates only the demiplane
+    // trap), so a success pays the FULL rolled hit damage, unhalved. The
+    // MA-0218 save-damage rows (dc_success none, no trap arm) keep their
+    // zero-on-success semantics byte-identical.
+    if (pending.soulTomeTrap) return detail.rawDamage ?? pending.rawDamage;
     return computeDamageAfterEvasion(detail.rawDamage ?? pending.rawDamage, detail.success, detail.dcSuccess, hasEvasion);
 }
 
@@ -404,6 +411,23 @@ function findCreatureCurrentHp(combatSummary, targetName) {
 
 function resolvePendingAttacker(pending) {
     return pending.attackerName || pending.sourceAttackerName || null;
+}
+
+// MA-0298: Soul Tome trap (Arcanaloth Banishing Claw) — a failed save grants
+// the indefinite banished_demiplane te (soulTome flag) + Incapacitated + logs
+// via soulTomeTrapService; the turn-END repeat-save seam then drives escape.
+// Success grants nothing (zero-state). The MA-0104 Banish te (no soulTome
+// flag) is never touched here.
+async function maybeGrantSoulTomeTrap({ detail, pending, pendingTargetName, normalizedSaveType, characterName }) {
+    if (detail.success || !pending.soulTomeTrap) return;
+    await grantSoulTomeTrap({
+        campaignName: pending.campaignName,
+        attackerName: resolvePendingAttacker(pending) || characterName,
+        targetName: pendingTargetName,
+        saveDc: detail.saveDc ?? pending.saveDc,
+        saveType: normalizedSaveType || pending.saveType,
+        actionName: pending.name || pending.sourceName,
+    });
 }
 
 async function handleSaveResult(detail, { characterName, campaignName, logEntry, charactersRef }) {
@@ -478,6 +502,9 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
     if (!detail.success && pending.statusEffects?.length > 0) {
         applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName });
     }
+
+    // MA-0298: Soul Tome trap failed-save grant (fail-only, zero on success).
+    await maybeGrantSoulTomeTrap({ detail, pending, pendingTargetName, normalizedSaveType, characterName });
 
     // CLA-377: Vicious Mockery disadvantage is applied on the FAILED save only,
     // after the save resolves (mirrors the statusEffects-on-fail leg above).

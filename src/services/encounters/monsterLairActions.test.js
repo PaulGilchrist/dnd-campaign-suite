@@ -11,6 +11,7 @@ import {
   buildLairAdvisoryLog,
 } from './monsterLairActions.js';
 import { addEntry } from '../ui/logService.js';
+import { canRollExpression } from '../dice/diceRoller.js';
 import { extractConditionsFromSaveEffect, parseDreamPlaneBanishClause, parseBanishTransportClause } from '../../components/encounter/MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 
@@ -1111,11 +1112,10 @@ describe('MA-0107 adult-gold-dragon glimpse future + dream plane banishment data
     expect(def.description).toMatch(/initiative count 20/i);
   });
 
-  it('ancient-gold-dragon scope guard: its rows are NOT touched by this fix', () => {
+  it('ancient-gold-dragon scope guard: [0] structured as of MA-0221; [1] byte-mirror of this row as of MA-0222', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-gold-dragon');
-    expect(ancient.lair_actions[0]).toEqual(expect.any(String));
-    expect(ancient.lair_actions[1].name).toBeUndefined();
-    expect(ancient.lair_actions[1].save_effect).toBeUndefined();
+    expect(ancient.lair_actions[0]).toEqual(glimpse);
+    expect(ancient.lair_actions[1]).toEqual(banish);
   });
 });
 
@@ -1493,9 +1493,9 @@ describe('MA-0129 adult-red-dragon tremor data lock', () => {
     expect(dragon.lair_actions[2].name).toBe('Volcanic Gases');
   });
 
-  it('ancient-red-dragon scope guard: its nameless tremor dict is NOT touched by this fix', () => {
+  it('ancient-red-dragon scope guard: its tremor dict structured later by MA-0243 (was nameless here)', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-red-dragon');
-    expect(ancient.lair_actions[1].name).toBeUndefined();
+    expect(ancient.lair_actions[1].name).toBe('Tremor');
   });
 });
 
@@ -1587,10 +1587,10 @@ describe('MA-0130 adult-red-dragon volcanic gases data lock', () => {
     expect(dragon.lair_actions[1].save_dc).toBe(15);
   });
 
-  it('ancient-red-dragon scope guard: its nameless volcanic-gases dict is NOT touched by this fix', () => {
+  it('ancient-red-dragon scope guard: its volcanic-gases dict structured later by MA-0244 (was nameless here)', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-red-dragon');
-    expect(ancient.lair_actions[2].name).toBeUndefined();
-    expect(ancient.lair_actions[2].zone).toBeUndefined();
+    expect(ancient.lair_actions[2].name).toBe('Volcanic Gases');
+    expect(ancient.lair_actions[2].zone.effect_key).toBe('lair_volcanic_gas');
   });
 });
 
@@ -1660,11 +1660,11 @@ describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
     expect(lairRowAffordance(dragon.lair_actions[2])).toBe('advisory');
   });
 
-  it('ancient-white-dragon scope guard: its nameless fog dict (with save_effect) is NOT touched by this fix', () => {
+  it('ancient-white-dragon scope guard: its fog dict was nameless at MA-0149 time; structured later by MA-0263', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-white-dragon');
-    expect(ancient.lair_actions[0].name).toBeUndefined();
+    expect(ancient.lair_actions[0].name).toBe('Freezing Fog');
     expect(ancient.lair_actions[0].save_effect).toBeDefined();
-    expect(ancient.lair_actions[0].dc_success).toBeUndefined();
+    expect(ancient.lair_actions[0].dc_success).toBe('half');
   });
 
   it('young-white-dragon scope guard: its fog rows (string + nameless dict) untouched', () => {
@@ -1745,9 +1745,12 @@ describe('MA-0150 adult-white-dragon jagged ice shards data lock', () => {
     expect(lairRowAffordance(dragon.lair_actions[2])).toBe('advisory');
   });
 
-  it('ancient-white-dragon scope guard: its jagged-ice raw string is NOT touched by this fix', () => {
+  it('ancient-white-dragon scope guard: its jagged-ice row was raw at MA-0150 time; structured later by MA-0264 (adult numerics byte-mirrored)', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-white-dragon');
-    expect(typeof ancient.lair_actions[1]).toBe('string');
+    expect(typeof ancient.lair_actions[1]).toBe('object');
+    expect(ancient.lair_actions[1].name).toBe('Jagged Ice Shards');
+    expect(ancient.lair_actions[1].attack_bonus).toBe(7);
+    expect(ancient.lair_actions[1].description).toBe(shards.description);
   });
 
   it('young-white-dragon scope guard: its nameless jagged-ice dict is NOT touched by this fix', () => {
@@ -1839,10 +1842,12 @@ describe('MA-0151 adult-white-dragon wall of ice advisory data lock', () => {
     expect(getEffectDefinition('lair_wall_of_ice')).toBeFalsy();
   });
 
-  it('ancient-white-dragon scope guard: its wall of ice raw string is NOT touched by this fix', () => {
+  it('ancient-white-dragon scope guard: its wall of ice raw string was untouched by this fix; structured later by MA-0265', () => {
     const ancient = monstersData.find(m => m.index === 'ancient-white-dragon');
-    expect(typeof ancient.lair_actions[2]).toBe('string');
-    expect(isLairRowClickable(ancient.lair_actions[2])).toBe(false);
+    expect(typeof ancient.lair_actions[2]).toBe('object');
+    expect(ancient.lair_actions[2].name).toBe('Wall of Ice');
+    expect(ancient.lair_actions[2].advisory).toBe('wall_of_ice');
+    expect(isLairRowClickable(ancient.lair_actions[2])).toBe(true);
   });
 });
 
@@ -2536,5 +2541,1074 @@ describe('MA-0210/MA-0211 ancient copper dragon lair rows', () => {
     expect(mud.zone.effect_key).toBe('lair_mud');
     expect(isLairRowClickable(mud)).toBe(true);
     expect(lairRowAffordance(mud)).toBe('save');
+  });
+});
+
+// MA-0221: Ancient Gold Dragon lair_actions[0] was a RAW STRING (MV-24 inert
+// fingerprint) — behind the MonsterCardBody.jsx string short-circuit (:340) the
+// row rendered prose with zero affordance: no chip, zero click delta, zero logs
+// (live inert, 2026-09-15). Data-only fix byte-mirroring the VERIFIED MA-0107
+// adult-gold-dragon self-buff advisory row (same canonical text): named
+// "Glimpse the Future" advisory dict → affordance 'advisory' → clickable
+// .mc-dice-link-lair chip → advisory popup + spell-named ability_use record.
+// No monster-self advantage te consumer exists (§7) and no initiative-20 lair
+// seam — the advantage-until-init-20 clause is GM-enforced advisory, mirroring
+// the verified siblings' documented behavior. Sibling [1] dream-plane dict was
+// left untouched here (MA-0222 scope) — landed in MA-0222 byte-mirroring the
+// VERIFIED adult-gold "Dream Plane Banishment" row.
+describe('MA-0221 ancient-gold-dragon glimpse the future advisory data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-gold-dragon');
+  const glimpse = dragon.lair_actions[0];
+  const adult = monstersData.find(m => m.index === 'adult-gold-dragon');
+  const adultGlimpse = adult.lair_actions[0];
+
+  it('[0] is now a named clickable ADVISORY row (was inert raw string)', () => {
+    expect(typeof glimpse).toBe('object');
+    expect(glimpse.name).toBe('Glimpse the Future');
+    expect(glimpse.advisory).toBe('glimpse_the_future');
+    expect(isLairRowClickable(glimpse)).toBe(true);
+    expect(lairRowAffordance(glimpse)).toBe('advisory');
+  });
+
+  it('byte-mirrors the VERIFIED MA-0107 adult-gold-dragon row exactly', () => {
+    expect(glimpse).toEqual(adultGlimpse);
+    expect(Object.keys(glimpse)).toEqual(Object.keys(adultGlimpse));
+  });
+
+  it('description kept verbatim from the original string row (advantage until initiative count 20)', () => {
+    expect(glimpse.description).toBe('The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.');
+  });
+
+  it('no machine-readable enforcement keys — no fake save/attack/damage/zone authored', () => {
+    expect(glimpse.save_dc).toBeUndefined();
+    expect(glimpse.save_type).toBeUndefined();
+    expect(glimpse.save_effect).toBeUndefined();
+    expect(glimpse.attack_bonus).toBeUndefined();
+    expect(glimpse.damage_dice_primary).toBeUndefined();
+    expect(glimpse.zone).toBeUndefined();
+  });
+
+  it('advisory click logs ability_use record + popup, zero save/attack/damage/zone', async () => {
+    const logs = [];
+    const setPopupHtml = vi.fn();
+    const res = await resolveLairRow({
+      action: glimpse,
+      monsterName: 'Ancient Gold Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].characterName).toBe('Ancient Gold Dragon 1');
+    expect(logs[0].abilityName).toBe('Glimpse the Future');
+    expect(logs[0].description).toMatch(/casts glimpse the future/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(logs[0].description).not.toMatch(/save DC/i);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringMatching(/Lair Action — Glimpse the Future/));
+  });
+
+  it('no glimpse-the-future te registered (no self-advantage consumer — advisory model)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    expect(getEffectDefinition('lair_glimpse_the_future')).toBeFalsy();
+  });
+
+  it('sibling scope guard: [1] dream-plane row structured as of MA-0222 (byte-mirror of VERIFIED MA-0107)', () => {
+    const banish = dragon.lair_actions[1];
+    expect(banish.name).toBe('Dream Plane Banishment');
+    expect(banish.save_dc).toBe(15);
+    expect(banish.save_type).toBe('Charisma');
+    expect(isLairRowClickable(banish)).toBe(true);
+    expect(banish).toEqual(adult.lair_actions[1]);
+  });
+
+  it('template scope guard: adult-gold-dragon rows untouched by this fix (MA-0107 shape)', () => {
+    expect(adultGlimpse.name).toBe('Glimpse the Future');
+    expect(adult.lair_actions[1].name).toBe('Dream Plane Banishment');
+  });
+});
+
+// MA-0222: Ancient Gold Dragon lair_actions[1] was a NAMELESS dict (MV-24
+// name-gate fingerprint) — DC 15 Charisma save_dc/save_type present in data
+// yet the row rendered a static `<strong>.</strong>` + prose with zero
+// affordance (live inert, 2026-09-15): isLairRowClickable (:26) gates on
+// !row.name before the DC branch is ever consulted, and no save_effect meant
+// parseDreamPlaneBanishClause could never arm the lair_dream_plane te even
+// behind the gate. Data-only fix byte-mirroring the VERIFIED MA-0107
+// adult-gold-dragon "Dream Plane Banishment" row (identical canonical
+// description text): named SAVE row → affordance 'save' → "DC 15 Charisma"
+// chip → handleSaveRoll → failed save arms lair_dream_plane te + rounds:2
+// expiry clock + badge (saveProcessing grantDreamPlaneBanishment :618-643).
+// Contested-Charisma escape check and initiative-20 expiry/reappearance stay
+// GM-enforced advisory (no initiative lair seam §7).
+describe('MA-0222 ancient-gold-dragon dream plane banishment data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-gold-dragon');
+  const banish = dragon.lair_actions[1];
+  const adult = monstersData.find(m => m.index === 'adult-gold-dragon');
+  const adultBanish = adult.lair_actions[1];
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof banish).toBe('object');
+    expect(banish.name).toBe('Dream Plane Banishment');
+    expect(isLairRowClickable(banish)).toBe(true);
+    expect(lairRowAffordance(banish)).toBe('save');
+  });
+
+  it('byte-mirrors the VERIFIED MA-0107 adult-gold-dragon row exactly', () => {
+    expect(banish).toEqual(adultBanish);
+    expect(Object.keys(banish)).toEqual(Object.keys(adultBanish));
+  });
+
+  it('[1] save fields: DC 15 Charisma kept byte-intact, dc_success none (no damage authored)', () => {
+    expect(banish.save_dc).toBe(15);
+    expect(banish.save_type).toBe('Charisma');
+    expect(banish.dc_success).toBe('none');
+    expect(banish.damage_dice_primary).toBeUndefined();
+    expect(banish.damage_type_primary).toBeUndefined();
+  });
+
+  it('[1] description kept verbatim (soft hyphen preserved)', () => {
+    expect(banish.description).toMatch(/^One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane/i);
+    expect(banish.description).toMatch(/exis\xAD? tence the dragon has imagined into being/i);
+    expect(banish.description).toMatch(/If the creature wins, it escapes the dream plane/i);
+  });
+
+  it('[1] save_effect arms the lair_dream_plane te producer (MA-0104 parse shape)', () => {
+    expect(parseDreamPlaneBanishClause(banish.save_effect)).toEqual({ effect: 'lair_dream_plane' });
+  });
+
+  it('[1] dream-plane wording NEVER matches the MA-0104 demiplane parser (distinct te)', () => {
+    expect(parseBanishTransportClause(banish.save_effect)).toBeNull();
+  });
+
+  it('[1] save_effect has no canonical condition word — te is the sole enforcement (MA-0017 stays inert)', () => {
+    expect(extractConditionsFromSaveEffect(banish.save_effect)).toEqual([]);
+  });
+
+  it('[1] save row routes through handleSaveRoll, zero damage formula', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: banish,
+      monsterName: 'Ancient Gold Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(banish.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(banish, null, []);
+  });
+
+  it('scope guard: sibling [0] and adult-gold-dragon rows untouched by this fix', () => {
+    expect(dragon.lair_actions[0].advisory).toBe('glimpse_the_future');
+    expect(adultBanish.name).toBe('Dream Plane Banishment');
+    expect(adult.lair_actions[0].advisory).toBe('glimpse_the_future');
+  });
+});
+
+// MA-0231: Ancient Green Dragon lair_actions[0] was a NAMELESS save dict
+// (save_dc 15 Strength, no name, no save_effect) — MA-0222 name-gate
+// fingerprint (isLairRowClickable !row.name → false, monsterLairActions.js:26)
+// rendered static <strong>.</strong>+prose with zero affordance. Data-only fix:
+// canonical name + dc_success none + save_effect carrying the Restrained
+// condition (MA-0117 adult-green verified vocabulary) so the MA-0017
+// damageless save seam routes at DC 15 STR. Rescue/adjudication clauses
+// (DC 15 STR action to break free, wilt-on-reuse/on-death expiry) remain
+// GM-advisory residual annotated in save_effect (no rescue-engine or
+// lair-cadence consumer).
+describe('MA-0231 ancient-green-dragon grasping roots and vines data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-green-dragon');
+  const roots = dragon.lair_actions[0];
+
+  it('[0] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof roots).toBe('object');
+    expect(roots.name).toBe('Grasping Roots and Vines');
+    expect(isLairRowClickable(roots)).toBe(true);
+    expect(lairRowAffordance(roots)).toBe('save');
+  });
+
+  it('save fields: DC 15 Strength kept byte-intact, dc_success none (no damage authored)', () => {
+    expect(roots.save_dc).toBe(15);
+    expect(roots.save_type).toBe('Strength');
+    expect(roots.dc_success).toBe('none');
+    expect(roots.damage_dice_primary).toBeUndefined();
+    expect(roots.damage_type_primary).toBeUndefined();
+    expect(roots.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('description kept byte-intact canonical prose', () => {
+    expect(roots.description).toMatch(/^Grasping roots and vines erupt in a 20-foot radius/);
+    expect(roots.description).toMatch(/DC 15 Strength saving throw or be restrained/i);
+    expect(roots.description).toMatch(/wilt away when the dragon uses this lair action again or when the dragon dies\.$/);
+  });
+
+  it('save_effect vocabulary extracts ONLY restrained (MA-0017 damageless seam)', () => {
+    expect(extractConditionsFromSaveEffect(roots.save_effect)).toEqual(['restrained']);
+  });
+
+  it('rescue/adjudication residuals annotated as GM-enforced in save_effect', () => {
+    expect(roots.save_effect).toMatch(/DC 15 Strength action to break free/i);
+    expect(roots.save_effect).toMatch(/GM-enforced/i);
+    expect(roots.save_effect).toMatch(/no rescue-engine or lair-cadence consumer/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + restrained', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: roots,
+      monsterName: 'Ancient Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(roots.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
+  });
+
+  it('scope guard: adult-green sibling and young-green nameless rows untouched', () => {
+    const adult = monstersData.find(m => m.index === 'adult-green-dragon');
+    const young = monstersData.find(m => m.index === 'young-green-dragon');
+    expect(adult.lair_actions[0].name).toBe('Grasping Roots');
+    expect(adult.lair_actions[0].save_effect).toBe('The target is restrained by the roots and vines.');
+    expect(young.lair_actions[0].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+    // MA-0232 fixed [1] (Wall of Thorns), MA-0233 fixed [2] (Fog Charm) in later passes.
+    expect(dragon.lair_actions[2].name).toBe('Fog Charm');
+  });
+});
+
+// MA-0232: Ancient Green Dragon lair_actions[1] was a NAMELESS thorn-wall
+// save dict (save_dc 15 Dexterity, 4d8 Piercing, no name, no save_effect) —
+// MA-0222 name-gate fingerprint (isLairRowClickable !row.name → false,
+// monsterLairActions.js:26) rendered static <strong>.</strong>+prose with
+// zero affordance (live: click logged zero, no prompt). Data-only fix,
+// mirroring MA-0231/MA-0118: canonical "Wall of Thorns" name (adult-green sibling
+// vocabulary) + dc_success "half" + save_effect encoding fail damage,
+// half-on-success, push-5ft advisory — recurring contact-save cadence,
+// wall-section object stats, movement cost and sinks-back expiry stay
+// GM-advisory residuals inside save_effect (description byte-intact per
+// brief; §7 no zone/object/movement-cost/lair-cadence consumer).
+describe('MA-0232 ancient-green-dragon wall of thorns data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-green-dragon');
+  const wall = dragon.lair_actions[1];
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof wall).toBe('object');
+    expect(wall.name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(wall)).toBe(true);
+    expect(lairRowAffordance(wall)).toBe('save');
+  });
+
+  it('save fields: DC 15 Dexterity, 4d8 Piercing kept byte-intact, dc_success half', () => {
+    expect(wall.save_dc).toBe(15);
+    expect(wall.save_type).toBe('Dexterity');
+    expect(wall.damage_dice_primary).toBe('4d8');
+    expect(wall.damage_type_primary).toBe('Piercing');
+    expect(wall.dc_success).toBe('half');
+  });
+
+  it('description kept byte-intact canonical prose (advisories live in save_effect)', () => {
+    expect(wall.description).toMatch(/^A wall of tangled brush bristling with thorns springs into existence/);
+    expect(wall.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(wall.description).toMatch(/18 \(4d8\) piercing damage/i);
+    expect(wall.description).toMatch(/half as much damage on a successful one/i);
+    expect(wall.description).toMatch(/sinks back into the ground when the dragon uses this lair action again or when the dragon dies\.$/);
+  });
+
+  it('save_effect vocabulary: fail damage + half-on-success + push prose; NO canonical condition extracted (damage-only leg)', () => {
+    expect(wall.save_effect).toMatch(/^The target takes 18 \(4d8\) piercing damage and is pushed 5 feet out of the wall's space/);
+    expect(wall.save_effect).toMatch(/half as much damage on a successful save/);
+    expect(extractConditionsFromSaveEffect(wall.save_effect)).toEqual([]);
+  });
+
+  it('advisory residuals annotated in save_effect: recurring cadence, wall-section stats, movement cost, sinks-back expiry (GM-enforced, no consumers)', () => {
+    expect(wall.save_effect).toMatch(/recurring once-each-round contact-save cadence/i);
+    expect(wall.save_effect).toMatch(/AC 5, 15 hit points per 10-foot section/i);
+    expect(wall.save_effect).toMatch(/4-feet-of-movement-per-1-foot cost/i);
+    expect(wall.save_effect).toMatch(/GM-enforced/i);
+    expect(wall.save_effect).toMatch(/no zone\/object\/movement-cost\/lair-cadence consumer/i);
+  });
+
+  it('save row routes through handleSaveRoll with 4d8 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wall,
+      monsterName: 'Ancient Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '4d8',
+      saveConditions: extractConditionsFromSaveEffect(wall.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wall, '4d8', []);
+  });
+
+  it('push clause NOT falsified: canonical exact "pushed 5 feet" does not match the MA-0079 up-to regex (documented residual, no new engine)', () => {
+    expect(wall.save_effect).toMatch(/pushed 5 feet/);
+    expect(wall.save_effect).not.toMatch(/pushed up to \d+ feet/i);
+  });
+
+  it('scope guard: nameless young-green thorn-wall twin and ancient siblings untouched', () => {
+    const young = monstersData.find(m => m.index === 'young-green-dragon');
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(dragon.lair_actions[0].name).toBe('Grasping Roots and Vines');
+    // MA-0233 fixed [2] (Fog Charm) in a later pass.
+    expect(dragon.lair_actions[2].name).toBe('Fog Charm');
+  });
+});
+
+// MA-0233: Ancient Green Dragon lair_actions[2] was a NAMELESS fog dict
+// (save_dc 15 Wisdom, no name, no save_effect) — MA-0222 name-gate
+// fingerprint (isLairRowClickable !row.name → false, monsterLairActions.js:26)
+// rendered static <strong>.</strong>+prose with zero affordance (live: click
+// logged zero, no prompt, no charmed grant). Data-only fix, mirroring
+// MA-0119 adult-green verified sibling vocabulary: canonical "Fog Charm"
+// name + dc_success "none" + save_effect carrying the Charmed condition
+// (MA-0017 damageless failed-save seam) so the chip "DC 15 Wisdom" routes
+// through handleSaveRoll and applySaveFailConditions grants charmed on fail,
+// zero grant + zero damage on success (no damage fields authored). The
+// "until initiative count 20 on the next round" expiry and fog-as-zone stay
+// GM-advisory residuals annotated in save_effect (description byte-intact
+// per brief; §7 no initiative lair seam / no zone consumer).
+describe('MA-0233 ancient-green-dragon fog charm data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-green-dragon');
+  const fog = dragon.lair_actions[2];
+
+  it('[2] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Fog Charm');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('save');
+  });
+
+  it('save fields: DC 15 Wisdom kept byte-intact, dc_success none (no damage authored)', () => {
+    expect(fog.save_dc).toBe(15);
+    expect(fog.save_type).toBe('Wisdom');
+    expect(fog.dc_success).toBe('none');
+    expect(fog.damage_dice_primary).toBeUndefined();
+    expect(fog.damage_type_primary).toBeUndefined();
+    expect(fog.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('description kept byte-intact canonical prose', () => {
+    expect(fog.description).toMatch(/^Magical fog billows around one creature/);
+    expect(fog.description).toMatch(/DC 15 Wisdom saving throw or be charmed/i);
+    expect(fog.description).toMatch(/until initiative count 20 on the next round\.$/);
+  });
+
+  it('save_effect vocabulary extracts ONLY charmed (MA-0017 damageless seam, fail-only)', () => {
+    expect(extractConditionsFromSaveEffect(fog.save_effect)).toEqual(['charmed']);
+  });
+
+  it('advisory residuals annotated in save_effect: init-count-20 expiry GM-enforced (no initiative lair seam, persists until manually cleared)', () => {
+    expect(fog.save_effect).toMatch(/^The target is charmed by the dragon\./);
+    expect(fog.save_effect).toMatch(/until initiative count 20 on the next round.*GM-enforced/i);
+    expect(fog.save_effect).toMatch(/no initiative lair seam/i);
+    expect(fog.save_effect).toMatch(/charmed condition persists until manually cleared/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + charmed', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Ancient Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(fog.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(fog, null, ['charmed']);
+  });
+
+  it('scope guard: adult-green sibling byte-identical fix shape, young-green twin and ancient [0]/[1] untouched', () => {
+    const adult = monstersData.find(m => m.index === 'adult-green-dragon');
+    const young = monstersData.find(m => m.index === 'young-green-dragon');
+    expect(adult.lair_actions[2].name).toBe('Fog Charm');
+    expect(adult.lair_actions[2].save_effect).toBe('The target is charmed by the dragon.');
+    expect(adult.lair_actions[2].dc_success).toBe('none');
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(dragon.lair_actions[0].name).toBe('Grasping Roots and Vines');
+    expect(dragon.lair_actions[1].name).toBe('Wall of Thorns');
+  });
+});
+
+// MA-0242: Ancient Red Dragon lair_actions[0] was a NAMELESS magma-geyser
+// save dict (save_dc 15 Dexterity, 6d6 Fire half-on-success, no name) —
+// MA-0222 name-gate fingerprint (isLairRowClickable !row.name → false,
+// monsterLairActions.js:26) rendered static <strong>.</strong>+prose with
+// zero affordance (live: click logged zero, no prompt). Data-only fix,
+// mirroring the VERIFIED MA-0128 adult-red sibling: canonical "Magma Geyser"
+// name + dc_success "half" (damage leg already authored byte-intact).
+describe('MA-0242 ancient-red-dragon magma geyser data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-red-dragon');
+  const geyser = dragon.lair_actions[0];
+
+  it('[0] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof geyser).toBe('object');
+    expect(geyser.name).toBe('Magma Geyser');
+    expect(isLairRowClickable(geyser)).toBe(true);
+    expect(lairRowAffordance(geyser)).toBe('save');
+  });
+
+  it('save fields: DC 15 Dexterity, 6d6 Fire kept byte-intact, dc_success half', () => {
+    expect(geyser.save_dc).toBe(15);
+    expect(geyser.save_type).toBe('Dexterity');
+    expect(geyser.damage_dice_primary).toBe('6d6');
+    expect(geyser.damage_type_primary).toBe('Fire');
+    expect(geyser.dc_success).toBe('half');
+  });
+
+  it('description kept byte-intact canonical prose', () => {
+    expect(geyser.description).toMatch(/^Magma erupts from a point on the ground/);
+    expect(geyser.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(geyser.description).toMatch(/21 \(6d6\) fire damage on a failed save/i);
+    expect(geyser.description).toMatch(/half as much damage on a successful one\.$/);
+  });
+
+  it('save_effect vocabulary: damage-only leg — NO canonical condition extracted', () => {
+    expect(geyser.save_effect).toMatch(/^Failure: 21 \(6d6\) Fire damage\. Success: Half damage\.$/);
+    expect(extractConditionsFromSaveEffect(geyser.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with 6d6 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: geyser,
+      monsterName: 'Ancient Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '6d6',
+      saveConditions: extractConditionsFromSaveEffect(geyser.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
+  });
+
+  it('adult-red sibling parity: same canonical name + dc_success half, DC/type/dice identical', () => {
+    const adult = monstersData.find(m => m.index === 'adult-red-dragon');
+    const adultGeyser = adult.lair_actions[0];
+    expect(adultGeyser.name).toBe('Magma Geyser');
+    expect(adultGeyser.dc_success).toBe('half');
+    expect(geyser.save_dc).toBe(adultGeyser.save_dc);
+    expect(geyser.save_type).toBe(adultGeyser.save_type);
+    expect(geyser.damage_dice_primary).toBe(adultGeyser.damage_dice_primary);
+    expect(geyser.damage_type_primary).toBe(adultGeyser.damage_type_primary);
+    expect(geyser.description).toBe(adultGeyser.description);
+  });
+
+  it('scope guard: ancient-red [1] tremor structured by MA-0243; [2] volcanic-gases structured later by MA-0244; young-red twin inert', () => {
+    expect(dragon.lair_actions[1].name).toBe('Tremor');
+    expect(isLairRowClickable(dragon.lair_actions[1])).toBe(true);
+    expect(dragon.lair_actions[2].name).toBe('Volcanic Gases');
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(true);
+    const young = monstersData.find(m => m.index === 'young-red-dragon');
+    expect(young.lair_actions[0].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+  });
+});
+
+// MA-0243: Ancient Red Dragon lair_actions[1] was a NAMELESS tremor dict
+// (save_dc 15 Dexterity, "knocked prone" save_effect, no name) — MA-0222
+// name-gate fingerprint (isLairRowClickable !row.name → false,
+// monsterLairActions.js:26) rendered static <strong>.</strong>+prose with
+// zero affordance (live: forced click zero overlays, zero log lines).
+// Data-only fix mirroring the VERIFIED MA-0129 adult-red sibling: canonical
+// "Tremor" name + dc_success "none" armed on the row — save_dc/save_type/
+// save_effect kept byte-intact, no damage fields authored (damageless
+// failed-save prone lands via the MA-0017 seam; dc_success "none" suppresses
+// the MV-19/20 half-damage boilerplate on both surfaces — MA-0129 precedent).
+describe('MA-0243 ancient-red-dragon tremor data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-red-dragon');
+  const tremor = dragon.lair_actions[1];
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof tremor).toBe('object');
+    expect(tremor.name).toBe('Tremor');
+    expect(isLairRowClickable(tremor)).toBe(true);
+    expect(lairRowAffordance(tremor)).toBe('save');
+  });
+
+  it('save fields byte-intact: DC 15 Dexterity, dc_success none, no damage authored', () => {
+    expect(tremor.save_dc).toBe(15);
+    expect(tremor.save_type).toBe('Dexterity');
+    expect(tremor.dc_success).toBe('none');
+    expect(tremor.damage_dice_primary).toBeUndefined();
+    expect(tremor.damage_type_primary).toBeUndefined();
+  });
+
+  it('save_effect kept byte-intact — vocabulary extracts ONLY prone (MA-0017 damageless seam)', () => {
+    expect(tremor.save_effect).toBe('Failure: The target is knocked prone.');
+    expect(extractConditionsFromSaveEffect(tremor.save_effect)).toEqual(['prone']);
+  });
+
+  it('description kept byte-intact canonical prose', () => {
+    expect(tremor.description).toMatch(/^A tremor shakes the lair in a 60-foot radius around the dragon\./i);
+    expect(tremor.description).toMatch(/Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone\.$/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + prone', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: tremor,
+      monsterName: 'Ancient Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(tremor.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(tremor, null, ['prone']);
+  });
+
+  it('adult-red sibling parity (MA-0129 VERIFIED): same name + dc_success none, DC/type identical', () => {
+    const adult = monstersData.find(m => m.index === 'adult-red-dragon');
+    const adultTremor = adult.lair_actions[1];
+    expect(adultTremor.name).toBe('Tremor');
+    expect(tremor.name).toBe(adultTremor.name);
+    expect(tremor.dc_success).toBe(adultTremor.dc_success);
+    expect(tremor.save_dc).toBe(adultTremor.save_dc);
+    expect(tremor.save_type).toBe(adultTremor.save_type);
+  });
+
+  it('young-red twin guard: nameless tremor dict stays nameless and inert (MA-0222 name-gate)', () => {
+    const young = monstersData.find(m => m.index === 'young-red-dragon');
+    const twin = young.lair_actions[2];
+    expect(twin.description).toMatch(/^A tremor shakes the lair in a 60-foot radius/);
+    expect(twin.name).toBeUndefined();
+    expect(isLairRowClickable(twin)).toBe(false);
+  });
+});
+
+// MA-0244: Ancient Red Dragon lair_actions[2] was a NAMELESS volcanic-gases
+// save dict (save_dc 13 Constitution, "poisoned … incapacitated" save_effect,
+// no name) — MA-0222 name-gate fingerprint (isLairRowClickable !row.name →
+// false, monsterLairActions.js:26) rendered static <strong>.</strong>+prose
+// with zero affordance (live: forced click zero overlays, zero log lines).
+// Data-only fix byte-mirroring the VERIFIED MA-0130 adult-red sibling:
+// canonical "Volcanic Gases" name + dc_success "none" + normalized save_effect
+// (both canonical keywords in the Failure clause — extractConditionsFromSave-
+// Effect parses poisoned + incapacitated, fail-only via the MA-0017 damageless
+// seam) + zone dict arming lair_volcanic_gas te through the MA-0075 zone-cloud
+// shape (20-ft radius picker, repeat_save advisory). description/save_dc/
+// save_type kept byte-intact. Zone-until-initiative-20 cadence stays
+// GM-advisory (same MA-0130 residual precedent).
+describe('MA-0244 ancient-red-dragon volcanic gases data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-red-dragon');
+  const cloud = dragon.lair_actions[2];
+
+  it('[2] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof cloud).toBe('object');
+    expect(cloud.name).toBe('Volcanic Gases');
+    expect(isLairRowClickable(cloud)).toBe(true);
+    expect(lairRowAffordance(cloud)).toBe('save');
+  });
+
+  it('save fields byte-intact: DC 13 Constitution, dc_success none, no damage authored', () => {
+    expect(cloud.save_dc).toBe(13);
+    expect(cloud.save_type).toBe('Constitution');
+    expect(cloud.dc_success).toBe('none');
+    expect(cloud.damage_dice_primary).toBeUndefined();
+    expect(cloud.damage_type_primary).toBeUndefined();
+  });
+
+  it('save_effect normalized to adult vocabulary — extracts ONLY incapacitated + poisoned, fail-only', () => {
+    expect(cloud.save_effect).toBe('Failure: The target is poisoned until the end of its turn and is incapacitated while poisoned in this way. Success: unaffected. This effect deals no damage.');
+    expect(extractConditionsFromSaveEffect(cloud.save_effect)).toEqual(['incapacitated', 'poisoned']);
+  });
+
+  it('machine-readable persisting zone: 20-ft radius, lair_volcanic_gas key, repeat_save advisory', () => {
+    expect(cloud.zone.radius_ft).toBe(20);
+    expect(cloud.zone.effect_key).toBe('lair_volcanic_gas');
+    expect(cloud.zone.repeat_save).toBe(true);
+    expect(cloud.zone.advisory).toMatch(/GM-enforced/);
+    expect(cloud.duration).toMatch(/poisoned until end of turn/i);
+    expect(cloud.duration).toMatch(/incapacitated while poisoned/i);
+  });
+
+  it('description kept byte-intact canonical prose (20-ft sphere, DC 13 CON, initiative 20)', () => {
+    expect(cloud.description).toMatch(/^Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it\./i);
+    expect(cloud.description).toMatch(/lasts until initiative count 20 on the next round/i);
+    expect(cloud.description).toMatch(/starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn/i);
+    expect(cloud.description).toMatch(/While poisoned in this way, a creature is incapacitated/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + poisoned/incapacitated', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: cloud,
+      monsterName: 'Ancient Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(cloud.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(cloud, null, ['incapacitated', 'poisoned']);
+  });
+
+  it('adult-red sibling parity (MA-0130 VERIFIED): name/save_effect/zone/duration/dc_success byte-identical', () => {
+    const adult = monstersData.find(m => m.index === 'adult-red-dragon');
+    const adultCloud = adult.lair_actions[2];
+    expect(cloud.name).toBe(adultCloud.name);
+    expect(cloud.dc_success).toBe(adultCloud.dc_success);
+    expect(cloud.save_dc).toBe(adultCloud.save_dc);
+    expect(cloud.save_type).toBe(adultCloud.save_type);
+    expect(cloud.save_effect).toBe(adultCloud.save_effect);
+    expect(cloud.description).toBe(adultCloud.description);
+    expect(cloud.zone).toEqual(adultCloud.zone);
+    expect(cloud.duration).toBe(adultCloud.duration);
+  });
+
+  it('scope guard: ancient-red [0]/[1] fixed rows untouched; young-red twin rows stay nameless/inert (MA-0222 name-gate)', () => {
+    expect(dragon.lair_actions[0].name).toBe('Magma Geyser');
+    expect(dragon.lair_actions[0].dc_success).toBe('half');
+    expect(dragon.lair_actions[1].name).toBe('Tremor');
+    const young = monstersData.find(m => m.index === 'young-red-dragon');
+    expect(typeof young.lair_actions[0]).toBe('string');
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+  });
+});
+
+// MA-0254: Ancient Silver Dragon lair_actions[0] was a RAW STRING fog row —
+// MA-0167 inert-raw-string fingerprint (no name token at all, static prose,
+// zero affordance; live: forced click zero overlays, zero log lines, fog zone
+// never armed). Data-only fix byte-mirroring the VERIFIED MA-0085/MA-0199
+// adult/ancient-bronze fog siblings: name "Fog Cloud" + save-less zone dict
+// (radius 20, no_save, noun fog, effect_key lair_fog_cloud, GM-enforced
+// advisory) + initiative-20 duration; canonical silver prose ("as if") kept
+// verbatim as description. lair_actions[1] cold wind stays UNTOUCHED
+// (separate MA-0255 scope, incl. its 1dlO letter-O typo).
+describe('MA-0254 ancient-silver-dragon fog cloud zone data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-silver-dragon');
+  const fog = dragon.lair_actions[0];
+
+  it('[0] is now a named clickable ZONE row (was inert raw string)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Fog Cloud');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('zone');
+  });
+
+  it('zone dict shape parity with VERIFIED bronze siblings (MA-0085/MA-0199)', () => {
+    expect(fog.zone.radius_ft).toBe(20);
+    expect(fog.zone.no_save).toBe(true);
+    expect(fog.zone.noun).toBe('fog');
+    expect(fog.zone.effect_key).toBe('lair_fog_cloud');
+    expect(fog.zone.advisory).toMatch(/no saving throw/i);
+    expect(fog.zone.advisory).toMatch(/GM-enforced/i);
+    expect(fog.duration).toBe('until initiative count 20 next round (advisory)');
+    const adult = monstersData.find(m => m.index === 'adult-bronze-dragon');
+    const ancientBronze = monstersData.find(m => m.index === 'ancient-bronze-dragon');
+    expect(JSON.stringify(fog.zone)).toBe(JSON.stringify(adult.lair_actions[0].zone));
+    expect(JSON.stringify(fog.zone)).toBe(JSON.stringify(ancientBronze.lair_actions[0].zone));
+    expect(fog.duration).toBe(adult.lair_actions[0].duration);
+  });
+
+  it('no save/damage fields authored; canonical silver prose kept verbatim as description', () => {
+    expect(fog.save_dc).toBeUndefined();
+    expect(fog.save_type).toBeUndefined();
+    expect(fog.damage_dice_primary).toBeUndefined();
+    expect(fog.damage_type_primary).toBeUndefined();
+    expect(fog.save_effect).toBeUndefined();
+    expect(fog.description).toBe('The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.');
+    expect(JSON.stringify(fog)).not.toMatch(/1dlO/);
+  });
+
+  it('[0] routes through handleZone with zero save/attack/damage handlers', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Ancient Silver Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(fog);
+  });
+
+  it('scope guard: [1] cold wind row structured by MA-0255 in a later pass (1dlO typo still intact)', () => {
+    const wind = dragon.lair_actions[1];
+    expect(wind.name).toBe('Cold Wind');
+    expect(wind.save_dc).toBe(15);
+    expect(wind.save_type).toBe('Constitution');
+    expect(wind.damage_dice_primary).toBe('1d10');
+    expect(wind.damage_type_primary).toBe('Cold');
+    expect(wind.description).toMatch(/1dlO/);
+    expect(wind.description).toMatch(/blisteringly cold wind/i);
+  });
+});
+
+// MA-0255: Ancient Silver Dragon lair_actions[1] was a NAMELESS cold-wind
+// save dict (save_dc 15 Constitution, 1d10 Cold, no name, no dc_success) —
+// MA-0222 name-gate fingerprint (isLairRowClickable !row.name → false,
+// monsterLairActions.js:26) rendered static <strong>.</strong>+prose with
+// zero affordance. Data-only fix, mirroring the VERIFIED adult-silver
+// MA-0136 sibling: canonical "Cold Wind" name + dc_success "half"
+// (canonical half-on-success) — save_dc/save_type/save_effect/damage fields
+// byte-intact. The description OCR typo "1dlO" (MA-0137/MA-0200 letter-O
+// family) stays byte-intact per brief: display-only, machine field
+// damage_dice_primary "1d10" is authoritative (MV-12). Gas/vapor dispersal
+// and flame-extinguishing clauses stay GM-advisory residuals (§7 no
+// gas/flame consumer).
+describe('MA-0255 ancient-silver-dragon cold wind data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-silver-dragon');
+  const wind = dragon.lair_actions[1];
+  const adult = monstersData.find(m => m.index === 'adult-silver-dragon');
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof wind).toBe('object');
+    expect(wind.name).toBe('Cold Wind');
+    expect(isLairRowClickable(wind)).toBe(true);
+    expect(lairRowAffordance(wind)).toBe('save');
+  });
+
+  it('save fields: DC 15 Constitution, 1d10 Cold kept byte-intact, dc_success half', () => {
+    expect(wind.save_dc).toBe(15);
+    expect(wind.save_type).toBe('Constitution');
+    expect(wind.damage_dice_primary).toBe('1d10');
+    expect(wind.damage_type_primary).toBe('Cold');
+    expect(wind.dc_success).toBe('half');
+    expect(wind.save_effect).toBe('Failure: 5 (1d10) Cold damage.');
+  });
+
+  it('description kept byte-intact incl. 1dlO OCR typo (display-only; machine field is 1d10)', () => {
+    expect(wind.description).toMatch(/^A blisteringly cold wind blows through the lair near the dragon\./);
+    expect(wind.description).toMatch(/DC 15 Constitution saving throw/i);
+    expect(wind.description).toMatch(/1dlO/);
+    expect(wind.damage_dice_primary).toBe('1d10');
+    expect(canRollExpression('1dlO')).toBe(false);
+    expect(canRollExpression(wind.damage_dice_primary)).toBe(true);
+  });
+
+  it('adult-silver MA-0136 parity: same name, DC, type, dice, damage type, dc_success', () => {
+    const adultWind = adult.lair_actions[1];
+    expect(adultWind.name).toBe('Cold Wind');
+    expect(wind.name).toBe(adultWind.name);
+    expect(wind.save_dc).toBe(adultWind.save_dc);
+    expect(wind.save_type).toBe(adultWind.save_type);
+    expect(wind.damage_dice_primary).toBe(adultWind.damage_dice_primary);
+    expect(wind.damage_type_primary).toBe(adultWind.damage_type_primary);
+    expect(wind.dc_success).toBe(adultWind.dc_success);
+  });
+
+  it('damage-only leg: no canonical condition extracted from save_effect', () => {
+    expect(extractConditionsFromSaveEffect(wind.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with 1d10 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wind,
+      monsterName: 'Ancient Silver Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '1d10',
+      saveConditions: extractConditionsFromSaveEffect(wind.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wind, '1d10', []);
+  });
+
+  it('scope guard: [0] fog zone and young-silver inert twins untouched; wyrmling lair empty', () => {
+    expect(dragon.lair_actions[0].name).toBe('Fog Cloud');
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('zone');
+    const young = monstersData.find(m => m.index === 'young-silver-dragon');
+    expect(typeof young.lair_actions[0]).toBe('string');
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    const wyrmling = monstersData.find(m => m.index === 'silver-dragon-wyrmling');
+    expect(wyrmling.lair_actions).toEqual([]);
+  });
+});
+
+// MA-0263: Ancient White Dragon lair_actions[0] freezing fog was a NAMELESS
+// dict (MA-0222 name-gate fingerprint: isLairRowClickable !row.name hard gate
+// at monsterLairActions.js:26 evaluated BEFORE the save_dc branch) — its save
+// legs (DC 10 Constitution, 3d6 Cold, half-on-success) fully matched the
+// verbatim description prose, but the row rendered static
+// <strong>.</strong>+prose with zero chips (live inert, 2026-09-16: click →
+// zero overlays, zero log lines). Data-only fix mirroring the VERIFIED
+// MA-0255 cold-wind pattern (name + dc_success "half" + save_effect full/half
+// mirror — save_effect was already authored, untouched) plus the VERIFIED
+// MA-0254/MA-0085/MA-0199 fog zone dict keys (radius_ft 20, no_save, noun
+// fog, effect_key lair_fog_cloud, GM-enforced advisory + advisory duration)
+// so the picker confirm arms the lair_fog_cloud zone te. Save-row key shape
+// mirrors MA-0149 adult-white sibling (same monster, fixed dict). Turn-end
+// 10 (3d6) re-damage, heavily obscured area, wind dispersal and initiative-20
+// cadence stay GM-advisory prose residuals (no turn-end zone-damage consumer,
+// no initiative lair seam — MA-0024 residual).
+describe('MA-0263 ancient-white-dragon freezing fog nameless-dict data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-white-dragon');
+  const fog = dragon.lair_actions[0];
+
+  it('[0] is now a named clickable SAVE row (name-gate no longer kills it)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Freezing Fog');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('save');
+  });
+
+  it('canonical save legs untouched: DC 10 Constitution, 3d6 Cold, dc_success half (prose-agreed)', () => {
+    expect(fog.save_dc).toBe(10);
+    expect(fog.save_type).toBe('Constitution');
+    expect(fog.damage_dice_primary).toBe('3d6');
+    expect(fog.damage_type_primary).toBe('Cold');
+    expect(fog.dc_success).toBe('half');
+    expect(fog.description).toMatch(/DC 10 Constitution saving throw/i);
+    expect(fog.description).toMatch(/half as much damage on a successful one/i);
+    expect(fog.description).toMatch(/20-foot-radius sphere/i);
+  });
+
+  it('save_effect authored ONCE — full/half mirror MA-0255 vocabulary, zero condition over-extraction', () => {
+    expect(Object.keys(fog).filter(k => k === 'save_effect')).toHaveLength(1);
+    expect(fog.save_effect).toMatch(/Failure: 10 \(3d6\) Cold damage\. Success: Half damage\./);
+    expect(fog.save_effect).toMatch(/ends its turn in the fog takes 10 \(3d6\) cold damage/i);
+    expect(extractConditionsFromSaveEffect(fog.save_effect)).toEqual([]);
+  });
+
+  it('zone dict keys resolve MA-0254 fog pattern (radius 20, no_save, noun fog, lair_fog_cloud, advisory duration)', () => {
+    expect(fog.zone.radius_ft).toBe(20);
+    expect(fog.zone.no_save).toBe(true);
+    expect(fog.zone.noun).toBe('fog');
+    expect(fog.zone.effect_key).toBe('lair_fog_cloud');
+    expect(fog.zone.advisory).toMatch(/GM-enforced/i);
+    expect(fog.zone.advisory).toMatch(/heavily obscured/i);
+    expect(fog.duration).toMatch(/\(advisory\)$/);
+    const adult = monstersData.find(m => m.index === 'adult-bronze-dragon');
+    expect(Object.keys(fog.zone)).toEqual(Object.keys(adult.lair_actions[0].zone));
+  });
+
+  it('save row routes through handleSaveRoll with 3d6 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Ancient White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: '3d6',
+      saveConditions: extractConditionsFromSaveEffect(fog.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
+  });
+
+  it('scope guard: adult-white MA-0149 sibling byte-untouched; [1] structured later by MA-0264, [2] structured later by MA-0265', () => {
+    const adultWhite = monstersData.find(m => m.index === 'adult-white-dragon');
+    expect(adultWhite.lair_actions[0].name).toBe('Freezing Fog');
+    expect(adultWhite.lair_actions[0].save_dc).toBe(10);
+    expect(adultWhite.lair_actions[0].zone).toBeUndefined();
+    expect(typeof dragon.lair_actions[1]).toBe('object');
+    expect(dragon.lair_actions[1].name).toBe('Jagged Ice Shards');
+    expect(typeof dragon.lair_actions[2]).toBe('object');
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(true);
+  });
+});
+
+// MA-0264: Ancient White Dragon lair_actions[1] jagged ice shards was a
+// raw string (MA-0254/0221/0199 raw-string family fingerprint: bare
+// "Jagged ice shards fall…" scalar → static <div class="mc-action"><span>
+// row, no <strong> name, zero .mc-dice-link, unclickable; live inert
+// 2026-09-16: click → zero overlays, zero log lines, control DC 10 CON fog
+// chip alive). Data-only fix byte-mirroring the VERIFIED MA-0150 adult
+// white sibling structured attack dict (name "Jagged Ice Shards",
+// attack_bonus 7, range 120 ft., 3d6 Piercing, canonical prose incl. the
+// up-to-three-targets clause retained verbatim as GM-adjudicated residual —
+// multi-target leg has no multi-roll consumer, single-target resolution vs
+// armed target is the documented MA-0024 model). No dc/zone keys authored:
+// the adult sibling carries none (attack affordance routes via attack_bonus,
+// monsterLairActions.js:43 → handleAttack :99). [2] wall of ice was a raw
+// string at MA-0264 time; structured advisory dict later by MA-0265.
+describe('MA-0264 ancient-white-dragon jagged ice shards raw-string data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-white-dragon');
+  const shards = dragon.lair_actions[1];
+
+  it('[1] is now a structured clickable ATTACK row named Jagged Ice Shards (was raw string)', () => {
+    expect(typeof shards).toBe('object');
+    expect(shards.name).toBe('Jagged Ice Shards');
+    expect(isLairRowClickable(shards)).toBe(true);
+    expect(lairRowAffordance(shards)).toBe('attack');
+  });
+
+  it('attack fields byte-mirror VERIFIED adult sibling: +7 to hit, 120 ft range, 3d6 Piercing (prose-agreed)', () => {
+    const adult = monstersData.find(m => m.index === 'adult-white-dragon');
+    expect(shards.attack_bonus).toBe(7);
+    expect(shards.range).toBe('120 ft.');
+    expect(shards.damage_dice_primary).toBe('3d6');
+    expect(shards.damage_type_primary).toBe('Piercing');
+    expect(shards.description).toBe(adult.lair_actions[1].description);
+    expect(Object.keys(shards)).toEqual(Object.keys(adult.lair_actions[1]));
+    expect(shards.description).toMatch(/\+7 to hit/i);
+    expect(shards.description).toMatch(/up to three creatures/i);
+    expect(shards.description).toMatch(/within 120 feet/i);
+    expect(shards.description).toMatch(/10 \(3d6\) piercing damage/i);
+  });
+
+  it('no save/zone/advisory authored (adult sibling shape) — zero save-prompt or zone routing', () => {
+    expect(shards.save_dc).toBeUndefined();
+    expect(shards.save_effect).toBeUndefined();
+    expect(shards.zone).toBeUndefined();
+    expect(shards.advisory).toBeUndefined();
+    expect(extractConditionsFromSaveEffect(shards.save_effect)).toEqual([]);
+  });
+
+  it('attack row routes through the UNCHANGED monster attack seam: handleAttack(name, +7, row)', async () => {
+    const handleAttack = vi.fn();
+    const handleSaveRoll = vi.fn();
+    const handleDamage = vi.fn();
+    const res = await resolveLairRow({
+      action: shards,
+      monsterName: 'Ancient White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack,
+      handleDamage,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'attack' });
+    expect(handleAttack).toHaveBeenCalledWith('Jagged Ice Shards', 7, shards);
+    expect(handleSaveRoll).not.toHaveBeenCalled();
+    expect(handleDamage).not.toHaveBeenCalled();
+  });
+
+  it('scope guards: [0] MA-0263 fog dict byte-untouched; adult MA-0150 sibling byte-identical; young-white nameless dict still inert', () => {
+    expect(dragon.lair_actions[0].name).toBe('Freezing Fog');
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
+    expect(typeof dragon.lair_actions[2]).toBe('object');
+    expect(isLairRowClickable(dragon.lair_actions[2])).toBe(true);
+    const adult = monstersData.find(m => m.index === 'adult-white-dragon');
+    expect(JSON.stringify(adult.lair_actions[1])).toBe(JSON.stringify(shards));
+    const young = monstersData.find(m => m.index === 'young-white-dragon');
+    const jagged = (young.lair_actions || []).find(r => typeof r === 'object' && r?.description?.includes('Jagged ice shards'));
+    expect(jagged).toBeDefined();
+    expect(jagged.name).toBeUndefined();
+    expect(isLairRowClickable(jagged)).toBe(false);
+  });
+});
+
+// MA-0265: Ancient White Dragon lair_actions[2] wall of ice was a raw string
+// (MA-0254/0264 raw-string family fingerprint: bare "The dragon creates an
+// opaque wall of ice…" scalar → static <div class="mc-action"><span> row, no
+// <strong> name, zero .mc-dice-link, unclickable; live inert 2026-09-16:
+// trusted click → zero popups, zero log lines, control chips alive — DC 10
+// CON fog save chip + Jagged Ice Shards attack chip). Data-only fix
+// byte-mirroring the VERIFIED MA-0151 adult white sibling advisory dict
+// (name "Wall of Ice", advisory "wall_of_ice", canonical description verbatim
+// incl. AC 5 / 30 hp per 10-ft section, fire vulnerability, acid/cold/
+// necrotic/poison/psychic immunity, 5-ft push on appear, 120-ft placement
+// gate and keyed-replacement clauses retained as GM-advisory prose). Pure
+// terrain/object action — no save/attack/damage/zone leg — so it arms the
+// ADVISORY affordance: clickable .mc-dice-link-lair chip → advisory popup +
+// spell-named ability_use record, initiative-20 cadence GM-enforced. True
+// wall-object enforcement (per-section AC/HP, push-on-appear, keyed
+// replacement, lair_wall_of_ice te) is the documented §7 residual — NOT
+// built here (zero consumers app-wide).
+describe('MA-0265 ancient-white-dragon wall of ice advisory data lock', () => {
+  const dragon = monstersData.find(m => m.index === 'ancient-white-dragon');
+  const wall = dragon.lair_actions[2];
+  const VERBATIM = "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec\u00ad tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies.";
+
+  it('[2] is now a named clickable ADVISORY row (was inert raw string)', () => {
+    expect(typeof wall).toBe('object');
+    expect(wall.name).toBe('Wall of Ice');
+    expect(wall.advisory).toBe('wall_of_ice');
+    expect(isLairRowClickable(wall)).toBe(true);
+    expect(lairRowAffordance(wall)).toBe('advisory');
+  });
+
+  it('description kept verbatim (terrain-object clauses retained as GM-advisory prose, §7 residual)', () => {
+    expect(wall.description).toBe(VERBATIM);
+    expect(wall.description).toMatch(/AC 5, 30 hit points/i);
+    expect(wall.description).toMatch(/pushed 5 feet/i);
+    expect(wall.description).toMatch(/within 120 feet/i);
+    expect(wall.description).toMatch(/disappears when the dragon uses this lair action again/i);
+  });
+
+  it('adult MA-0151 sibling key-shape parity: keys [name, advisory, description] byte-identical dict', () => {
+    const adult = monstersData.find(m => m.index === 'adult-white-dragon');
+    expect(Object.keys(wall)).toEqual(Object.keys(adult.lair_actions[2]));
+    expect(JSON.stringify(wall)).toBe(JSON.stringify(adult.lair_actions[2]));
+  });
+
+  it('no machine-readable enforcement keys — no fake save/attack/damage/zone authored', () => {
+    expect(wall.save_dc).toBeUndefined();
+    expect(wall.save_type).toBeUndefined();
+    expect(wall.attack_bonus).toBeUndefined();
+    expect(wall.damage_dice_primary).toBeUndefined();
+    expect(wall.zone).toBeUndefined();
+  });
+
+  it('advisory click logs ability_use record, zero save/attack/damage/zone', async () => {
+    const logs = [];
+    const setPopupHtml = vi.fn();
+    const res = await resolveLairRow({
+      action: wall,
+      monsterName: 'Ancient White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].abilityName).toBe('Wall of Ice');
+    expect(logs[0].description).toMatch(/casts wall of ice/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(logs[0].description).not.toMatch(/save DC/i);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringMatching(/Lair Action — Wall of Ice/));
+  });
+
+  it('scope guards: [0] MA-0263 fog save row and [1] MA-0264 shards attack row byte-untouched; no lair_wall_of_ice te registered (§7 residual)', async () => {
+    expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
+    expect(lairRowAffordance(dragon.lair_actions[1])).toBe('attack');
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    expect(getEffectDefinition('lair_wall_of_ice')).toBeFalsy();
   });
 });

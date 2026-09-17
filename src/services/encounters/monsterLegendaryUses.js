@@ -248,17 +248,27 @@ export function buildLegendaryRefusalLog({ monsterName, actionName, reason }) {
 // record (popup + ability_use log) instead of a console.error dead-end —
 // invisibility/movement-distance have no engine consumer (GM-enforced).
 export function buildLegendaryAdvisoryPopup({ monsterName, action }) {
+  // MA-0270/0271: rows may carry their own honest advisory copy
+  // (`advisory_message`) — e.g. sphinx teleport has no position consumer
+  // (CLA-320) and "Cast a Spell" has no authored spell list. Rows without
+  // the field keep the MA-0058 invisibility fly-speed copy byte-identical.
+  if (action?.advisory_message) {
+    return `<div class="mc-prerequisite-refusal"><h3>Legendary Action — ${action.name}</h3><p>${monsterName} ${action.advisory_message}</p></div>`;
+  }
   const spell = String(action.advisory).replace(/_/g, ' ');
   return `<div class="mc-prerequisite-refusal"><h3>Legendary Action — ${action.name}</h3><p>${monsterName} casts ${spell} on itself via Spellcasting. Advisory record: the invisibility and half-Fly-Speed movement are GM-enforced (no invisibility/movement-distance consumer). ${monsterName} can't take this action again until the start of its next turn.</p></div>`;
 }
 
 export function buildLegendaryAdvisoryLog({ monsterName, action }) {
   const spell = String(action.advisory).replace(/_/g, ' ');
+  const record = action?.advisory_message
+    ? `${monsterName} legendary action ${action.name}: ${monsterName} ${action.advisory_message}`
+    : `${monsterName} legendary action ${action.name}: casts ${spell} on itself — advisory record: invisibility and half-Fly-Speed movement are GM-enforced (no invisibility/movement-distance consumer, CLA-325).`;
   return {
     type: 'ability_use',
     characterName: monsterName,
     abilityName: action.name,
-    description: `${monsterName} legendary action ${action.name}: casts ${spell} on itself — advisory record: invisibility and half-Fly-Speed movement are GM-enforced (no invisibility/movement-distance consumer, CLA-325).`,
+    description: record,
     timestamp: Date.now(),
   };
 }

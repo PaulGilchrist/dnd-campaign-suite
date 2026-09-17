@@ -854,6 +854,74 @@ describe('MA-0161 Ancient Black Dragon legendary economy (header uses:3)', () =>
   });
 });
 
+// MA-0217: Ancient Gold Dragon — data-only header fix (MA-0161 shape).
+// Header row authored name/description only → legendaryHeaderAction returned
+// null → children fired UNGATED with no counter. Header now authors uses:3
+// (4-in-lair advisory, CLA-325); economy + MA-0073 Banish once-per-turn
+// cooldown clause engage (MA-0218 child clause).
+describe('MA-0217 Ancient Gold Dragon legendary economy (header uses:3)', () => {
+  const ancient = monstersData.find(m => m.index === 'ancient-gold-dragon');
+  const banish = ancient.legendary_actions.find(a => a.name === 'Banish');
+  const guiding = ancient.legendary_actions.find(a => a.name === 'Guiding Light');
+
+  it('header authors uses:3 mirroring the Adult Gold Dragon sibling; gate engages (was no-uses)', () => {
+    const header = legendaryHeaderAction(ancient);
+    expect(header?.uses).toBe(3);
+    expect(header?.name).toBe('Legendary Action Uses: 3 (4 in Lair)');
+    expect(header?.description).toMatch(/Immediately after another creature's turn/);
+    expect(legendaryMaxUses(header, {})).toBe(3);
+    const adult = legendaryHeaderAction(monstersData.find(m => m.index === 'adult-gold-dragon'));
+    expect(adult?.uses).toBe(3);
+  });
+
+  it('Banish numerics untouched; MA-0218 once-per-turn cooldown clause live', () => {
+    expect(banish.save_dc).toBe(24);
+    expect(banish.save_type).toBe('Charisma');
+    expect(banish.damage_dice_primary).toBe('7d6');
+    expect(banish.damage_type_primary).toBe('Force');
+    expect(hasLegendaryCooldownClause(banish)).toBe(true);
+    expect(legendaryActionSlug(banish.name)).toBe('banish');
+  });
+
+  it('economy is live: Banish spend 3→2, turn latch, cooldown refusal, exhaustion, turn-start regain', async () => {
+    const first = await expendLegendaryUse({ monsterName: 'Ancient Gold Dragon 1', monster: ancient, actionName: 'Banish', action: banish, campaignName: 'test-campaign', deps });
+    expect(first).toEqual({ spent: true, remaining: 2, max: 3 });
+    expect(store['Ancient Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(store['Ancient Gold Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toMatchObject({ banish: { round: 1 } });
+
+    const sameTurn = await expendLegendaryUse({ monsterName: 'Ancient Gold Dragon 1', monster: ancient, actionName: 'Banish', action: banish, campaignName: 'test-campaign', deps });
+    expect(sameTurn.spent).toBe(false);
+    expect(sameTurn.reason).toBe('turn');
+    expect(store['Ancient Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+
+    cs.activeCreatureName = 'AasimarTest';
+    const cooldown = await expendLegendaryUse({ monsterName: 'Ancient Gold Dragon 1', monster: ancient, actionName: 'Banish', action: banish, campaignName: 'test-campaign', deps });
+    expect(cooldown.reason).toBe('cooldown');
+    expect(store['Ancient Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.automationType === 'banish_refused (once per turn)')).toBe(true);
+
+    cs.activeCreatureName = 'HexWarlock';
+    const guidingSpend = await expendLegendaryUse({ monsterName: 'Ancient Gold Dragon 1', monster: ancient, actionName: 'Guiding Light', action: guiding, campaignName: 'test-campaign', deps });
+    expect(guidingSpend).toEqual({ spent: true, remaining: 1, max: 3 });
+    cs.activeCreatureName = 'ElderPaladin';
+    const third = await expendLegendaryUse({ monsterName: 'Ancient Gold Dragon 1', monster: ancient, actionName: 'Guiding Light', action: guiding, campaignName: 'test-campaign', deps });
+    expect(third).toEqual({ spent: true, remaining: 0, max: 3 });
+
+    cs.activeCreatureName = 'LightfootHalfling';
+    const exhausted = await expendLegendaryUse({ monsterName: 'Ancient Gold Dragon 1', monster: ancient, actionName: 'Guiding Light', action: guiding, campaignName: 'test-campaign', deps });
+    expect(exhausted.reason).toBe('exhausted');
+    expect(logs.some(e => e.automationType === 'legendary_use_refused')).toBe(true);
+    expect(store['Ancient Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+
+    cs.activeCreatureName = 'Ancient Gold Dragon 1';
+    const regain = await regainLegendaryUses({ monsterName: 'Ancient Gold Dragon 1', campaignName: 'test-campaign', deps });
+    expect(regain).toEqual({ regained: true, max: 3 });
+    expect(store['Ancient Gold Dragon 1.monsterLegendaryUses'].used).toBe(0);
+    expect(store['Ancient Gold Dragon 1.' + MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY]).toBeNull();
+    expect(logs.some(e => e.abilityName === 'Legendary Action Uses' && /regains all expended/.test(e.description))).toBe(true);
+  });
+});
+
 // MA-0173: Ancient Blue Dragon "Cloaked Flight" — data fix byte-mirroring
 // the MA-0058 adult-blue advisory shape (advisory:"invisibility" + advisory
 // movement clause + once-per-turn clause). Gated chip click spends 1, stamps

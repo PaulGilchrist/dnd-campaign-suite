@@ -4114,6 +4114,7 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
+        "uses": 3,
         "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
       },
       {
@@ -4121,25 +4122,40 @@
         "description": "Charisma Saving Throw: DC 24, one creature the dragon can see within 120 feet. <strong>Failure:</strong> 24 (7d6) Force damage, and the target has the <strong>Incapacitated</strong> condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon. Failure or Success: The dragon can't take this action again until the start of its next turn.",
         "save_dc": 24,
         "save_type": "Charisma",
+        "dc_success": "none",
         "damage_dice_primary": "7d6",
         "damage_type_primary": "Force",
         "save_effect": "Failure: 24 (7d6) Force damage, and the target has the Incapacitated condition and is transported to a harmless demiplane until the start of the dragon's next turn, at which point it reappears in an unoccupied space of the dragon's choice within 120 feet of the dragon. Failure or Success: The dragon can't take this action again until the start of its next turn. Success: The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Guiding Light",
-        "description": "The dragon uses Spellcasting to cast <em>Guiding Bolt</em> (level 4 version)."
+        "attack_bonus": 16,
+        "spell_attack_bonus": 16,
+        "range": "120 ft.",
+        "damage_dice_primary": "7d6",
+        "damage_type_primary": "Radiant",
+        "description": "The dragon uses Spellcasting to cast <em>Guiding Bolt</em> (level 4 version): Ranged Spell Attack: +16 to hit. Hit: 7d6 Radiant damage (the granted-advantage-on-next-attack rider has no monster-spell consumer — GM-enforced, CLA-325)."
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
-      "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.",
       {
+        "name": "Glimpse the Future",
+        "advisory": "glimpse_the_future",
+        "description": "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round."
+      },
+      {
+        "name": "Dream Plane Banishment",
         "description": "One creature the dragon can see within 120 feet of it must succeed on a DC 15 Charisma saving throw or be banished to a dream plane, a different plane of exis­ tence the dragon has imagined into being. To escape, the creature must use its action to make a Charisma check contested by the dragon's. If the creature wins, it escapes the dream plane. Otherwise, the effect ends on initiative count 20 on the next round. When the effect ends, the creature reappears in the space it left or in the nearest unoccupied space if that one is occupied.",
         "save_dc": 15,
-        "save_type": "Charisma"
+        "save_type": "Charisma",
+        "dc_success": "none",
+        "save_effect": "The target is banished to a dream plane until the effect ends on initiative count 20 on the next round (lair_dream_plane te granted on a failed save). To escape, the target must use its action to make a Charisma check contested by the dragon's — escape contest, initiative-20 expiry, and reappearance placement are GM-enforced (no initiative lair seam).",
+        "duration": "until initiative count 20 on the next round (contested Charisma check to escape early — GM-enforced)"
       }
     ],
     "environments": [
@@ -4262,43 +4278,61 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory \u2014 no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Mind Invasion",
-        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 5 version)."
+        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 5 version) at one creature it can see within 120 feet. The target makes a DC 21 Wisdom saving throw, taking 27 (6d8) Psychic damage on a failed save or half as much on a successful one. The dragon always knows the target's location until the spell ends (no Invisible benefit against the dragon) \u2014 location tracking GM-enforced for monsters. The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 21,
+        "save_type": "Wisdom",
+        "dc_success": "half",
+        "damage_dice_primary": "6d8",
+        "damage_type_primary": "Psychic",
+        "save_effect": "6d8 Psychic damage. Success: Half damage. Location known to the dragon until the spell ends (advisory \u2014 GM-enforced for monsters)."
       },
       {
         "name": "Noxious Miasma",
         "description": "Constitution Saving Throw: DC 21, each creature in a 30-foot-radius <strong>Sphere</strong> centered on a point the dragon can see within 90 feet. <strong>Failure:</strong> 17 (5d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
         "save_dc": 21,
         "save_type": "Constitution",
+        "dc_success": "none",
         "damage_dice_primary": "5d6",
         "damage_type_primary": "Poison",
         "save_effect": "Failure: 17 (5d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn. Success: The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory \u2014 GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
       {
+        "name": "Grasping Roots and Vines",
         "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif­ficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
         "save_dc": 15,
-        "save_type": "Strength"
+        "save_type": "Strength",
+        "dc_success": "none",
+        "save_effect": "The target is restrained by the roots and vines. The DC 15 Strength action to break free and the wilt-when-reused/on-death expiry are GM-enforced (no rescue-engine or lair-cadence consumer)."
       },
       {
+        "name": "Wall of Thorns",
         "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec­ tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
         "save_dc": 15,
         "save_type": "Dexterity",
         "damage_dice_primary": "4d8",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "dc_success": "half",
+        "save_effect": "The target takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, or half as much damage on a successful save (dc_success half). The recurring once-each-round contact-save cadence, the 4-feet-of-movement-per-1-foot cost, the wall-section object stats (AC 5, 15 hit points per 10-foot section, vulnerability to fire, resistance to bludgeoning and piercing, immunity to psychic), and the sinks-back-when-reused/on-death expiry are GM-enforced (no zone/object/movement-cost/lair-cadence consumer)."
       },
       {
+        "name": "Fog Charm",
         "description": "Magical fog billows around one creature the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Wisdom saving throw or be charmed by the dragon until initiative count 20 on the next round.",
         "save_dc": 15,
-        "save_type": "Wisdom"
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "save_effect": "The target is charmed by the dragon. The \"until initiative count 20 on the next round\" expiry is GM-enforced (no initiative lair seam — the charmed condition persists until manually cleared; no lair-cadence consumer)."
       }
     ],
     "environments": [
@@ -4402,25 +4436,38 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):<br><strong>At Will:</strong> <em>Command</em> (level 2 version), <em>Detect Magic</em>, <em>Scorching Ray</em> (level 3 version)<br><strong>1/Day Each:</strong> <em>Fireball</em> (level 6 version), <em>Scrying</em>"
+        "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):<br><strong>At Will:</strong> <em>Command</em> (level 2 version), <em>Detect Magic</em>, <em>Scorching Ray</em> (level 3 version)<br><strong>1/Day Each:</strong> <em>Fireball</em> (level 6 version), <em>Scrying</em>",
+        "save_dc": 23,
+        "save_type": "Charisma"
       }
     ],
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Commanding Presence",
-        "description": "The dragon uses Spellcasting to cast <em>Command</em> (level 2 version). The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Command</em> (level 2 version). One creature it can see within 60 feet must succeed on a DC 23 Wisdom saving throw or obey a one-word command on its next turn (the target is charmed — command word, movement, and compliance are GM-enforced, no command-control subsystem consumer; charmed is the mechanical marker). No damage — a successful save has no effect. The level 2 version can affect a second creature within 30 feet of the first (advisory — no multi-target producer at the save leg; GM adjudicates the extra target). The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 23,
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "save_effect": "The target is charmed by the dragon and obeys its one-word command on its next turn — command word, movement, and compliance are GM-enforced (charmed is the mechanical marker). Command 1-round duration is advisory (GM clears the charmed marker after the target's next turn)."
       },
       {
         "name": "Fiery Rays",
-        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em> (level 3 version). The dragon can't take this action again until the start of its next turn."
+        "attack_bonus": 15,
+        "spell_attack_bonus": 15,
+        "range": "120 ft.",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Fire",
+        "description": "The dragon uses Spellcasting to cast <em>Scorching Ray</em>: Ranged Spell Attack: +15 to hit (Spellcasting spell attack bonus). Hit: 2d6 Fire damage per ray, nothing on a miss (single ray resolves per click — multi-ray extra-ray targeting is advisory, GM-enforced for monsters; three rays per spells.json). The dragon can't take this action again until the start of its next turn."
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
@@ -4430,19 +4477,32 @@
         "save_type": "Dexterity",
         "save_effect": "Failure: 21 (6d6) Fire damage. Success: Half damage.",
         "damage_dice_primary": "6d6",
-        "damage_type_primary": "Fire"
+        "damage_type_primary": "Fire",
+        "name": "Magma Geyser",
+        "dc_success": "half"
       },
       {
         "description": "A tremor shakes the lair in a 60-foot radius around the dragon. Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone.",
         "save_dc": 15,
         "save_type": "Dexterity",
-        "save_effect": "Failure: The target is knocked prone."
+        "save_effect": "Failure: The target is knocked prone.",
+        "name": "Tremor",
+        "dc_success": "none"
       },
       {
         "description": "Volcanic gases form a cloud in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The sphere spreads around corners, and its area is lightly obscured. It lasts until initiative count 20 on the next round. Each creature that starts its turn in the cloud must succeed on a DC 13 Constitution saving throw or be poisoned until the end of its turn. While poisoned in this way, a creature is incapacitated.",
         "save_dc": 13,
         "save_type": "Constitution",
-        "save_effect": "Failure: The target is poisoned until the end of its turn. While poisoned in this way, the target is also incapacitated."
+        "dc_success": "none",
+        "save_effect": "Failure: The target is poisoned until the end of its turn and is incapacitated while poisoned in this way. Success: unaffected. This effect deals no damage.",
+        "name": "Volcanic Gases",
+        "zone": {
+          "radius_ft": 20,
+          "effect_key": "lair_volcanic_gas",
+          "repeat_save": true,
+          "advisory": "Poisoned lasts until the end of the target's turn (GM clears the poisoned/incapacitated markers — no end-of-turn condition-expiry registrant for these rows); the RAW turn-start repeat save and the cloud-until-initiative-count-20 cadence are GM-enforced (no turn-start zone-save consumer for lair clouds and no initiative-20 lair seam in this engine)."
+        },
+        "duration": "poisoned until end of turn (incapacitated while poisoned; repeat save ends early; advisory)"
       }
     ],
     "environments": [
@@ -4550,21 +4610,32 @@
         "description": "Constitution Saving Throw: DC 24, each creature in a 90-foot <strong>Cone</strong>. First Failure: The target has the <strong>Incapacitated</strong> condition until the end of its next turn, when it repeats the save. Second Failure: The target has the <strong>Paralyzed</strong> condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
         "save_dc": 24,
         "save_type": "Constitution",
+        "dc_success": "none",
+        "staged_paralysis": {
+          "paralyzed_minutes": 1
+        },
         "save_effect": "First Failure: The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically."
       },
       {
         "name": "Spellcasting",
-        "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Hold Monster</em>, <em>Ice Knife</em> (level 2 version), <em>Shapechange</em> (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell)<br><strong>1/Day Each:</strong> <em>Control Weather</em>, <em>Ice Storm</em> (level 7 version), <em>Teleport</em>, <em>Zone of Truth</em>"
+        "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Hold Monster</em>, <em>Ice Knife</em> (level 2 version), <em>Shapechange</em> (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell)<br><strong>1/Day Each:</strong> <em>Control Weather</em>, <em>Ice Storm</em> (level 7 version), <em>Teleport</em>, <em>Zone of Truth</em>",
+        "save_dc": 23,
+        "save_type": "Charisma"
       }
     ],
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Chill",
-        "description": "The dragon uses Spellcasting to cast <em>Hold Monster</em>. The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon uses Spellcasting to cast <em>Hold Monster</em>. One creature it can see within 90 feet must succeed on a DC 23 Wisdom saving throw or have the Paralyzed condition for the duration (concentration, up to 1 minute); the spell has no effect on undead. No damage — a successful save has no effect. The target repeats the Wisdom save at the end of each of its turns, ending the spell on itself on a success (repeat-save cadence and concentration expiry are GM-enforced — no re-save consumer at the legendary seam). The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 23,
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "save_effect": "The target has the paralyzed condition for the spell's duration (concentration, up to 1 minute; no effect on undead). Success: No effect. The target repeats the Wisdom save at the end of each of its turns, ending the effect on itself on a success — repeat-save cadence is GM-enforced (no re-save consumer). No damage on either outcome."
       },
       {
         "name": "Cold Gale",
@@ -4573,22 +4644,36 @@
         "save_type": "Dexterity",
         "damage_dice_primary": "4d6",
         "damage_type_primary": "Cold",
-        "save_effect": "Failure: 14 (4d6) Cold damage. Success: Half damage."
+        "save_effect": "14 (4d6) Cold damage, and the target is pushed up to 30 feet straight away from the dragon. Success: Half damage only"
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
-      "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
       {
+        "name": "Fog Cloud",
+        "description": "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
+        "zone": {
+          "radius_ft": 20,
+          "no_save": true,
+          "noun": "fog",
+          "effect_key": "lair_fog_cloud",
+          "advisory": "No saving throw (canonical fog cloud lair action — lightly obscured area). Obscurement and line-of-sight adjudication is GM-enforced (no obscurement model in this engine). Persists until initiative count 20 on the next round."
+        },
+        "duration": "until initiative count 20 next round (advisory)"
+      },
+      {
+        "name": "Cold Wind",
         "description": "A blisteringly cold wind blows through the lair near the dragon. Each creature within 120 feet of the dragon must succeed on a DC 15 Constitution saving throw or take 5 (1dlO) cold damage. Gases and vapors are dispersed by the wind, and unprotected flames are extinguished. Protected flames, such as lanterns, have a 50 percent chance of being extinguished.",
         "save_dc": 15,
         "save_type": "Constitution",
         "save_effect": "Failure: 5 (1d10) Cold damage.",
         "damage_dice_primary": "1d10",
-        "damage_type_primary": "Cold"
+        "damage_type_primary": "Cold",
+        "dc_success": "half"
       }
     ],
     "environments": [
@@ -4698,7 +4783,8 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Freezing Burst",
@@ -4707,28 +4793,56 @@
         "save_type": "Constitution",
         "damage_dice_primary": "4d6",
         "damage_type_primary": "Cold",
-        "save_effect": "Failure: 17 (5d6) Cold damage. Success: Half damage."
+        "save_effect": "Failure: 14 (4d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Success: Half damage."
       },
       {
         "name": "Frightful Presence",
-        "description": "The dragon uses Spellcasting to cast <em>Fear</em>. The dragon can't take this action again until the start of its next turn."
+        "description": "The dragon casts *Fear*, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18). Each creature of the dragon's choice within 120 feet of it that can see and hear the dragon must succeed on a DC 18 Charisma saving throw or become Frightened for 1 minute. 120-ft selection advisory — single armed target resolves; GM picks targets (no zone consumer). A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to the dragon's Frightful Presence for the next 24 hours. The dragon can't take this action again until the start of its next turn.",
+        "save_dc": 18,
+        "save_type": "Charisma",
+        "dc_success": "none",
+        "success_immunity": {"effect":"frightful_presence_immunity","duration":"24_hours","duration_minutes":1440},
+        "repeat_save": {"condition":"frightened","save_type":"Charisma","duration_minutes":1},
+        "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage."
       },
       {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack."
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
       {
+        "name": "Freezing Fog",
         "description": "Freezing fog fills a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The fog spreads around corners, and its area is heavily obscured. Each creature in the fog when it appears must make a DC 10 Constitution saving throw, taking 10 (3d6) cold damage on a failed save, or half as much damage on a successful one. A creature that ends its turn in the fog takes 10 (3d6) cold damage. A wind of at least 20 miles per hour disperses the fog. The fog otherwise lasts until the dragon uses this lair action again or until the dragon dies.",
         "save_dc": 10,
         "save_type": "Constitution",
         "save_effect": "Failure: 10 (3d6) Cold damage. Success: Half damage. Additionally, a creature that ends its turn in the fog takes 10 (3d6) cold damage.",
         "damage_dice_primary": "3d6",
-        "damage_type_primary": "Cold"
+        "damage_type_primary": "Cold",
+        "dc_success": "half",
+        "zone": {
+          "radius_ft": 20,
+          "no_save": true,
+          "noun": "fog",
+          "effect_key": "lair_fog_cloud",
+          "advisory": "No saving throw for the persisting fog itself (heavily obscured area — obscurement and line-of-sight adjudication is GM-enforced, no obscurement model in this engine). The RAW turn-end 10 (3d6) cold damage clause and wind dispersal have no consumer and stay GM-enforced (no turn-end zone-damage seam). Persists until the dragon uses this lair action again or until the dragon dies."
+        },
+        "duration": "until the dragon uses this lair action again or until the dragon dies (advisory)"
       },
-      "Jagged ice shards fall from the ceiling, striking up to three creatures underneath that the dragon can see within 120 feet of it. The dragon makes one ranged attack roll (+7 to hit) against each target. On a hit, the target takes 10 (3d6) piercing damage.",
-      "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec­ tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies."
+      {
+        "name": "Jagged Ice Shards",
+        "description": "Jagged ice shards fall from the ceiling, striking up to three creatures underneath that the dragon can see within 120 feet of it. The dragon makes one ranged attack roll (+7 to hit) against each target. On a hit, the target takes 10 (3d6) piercing damage.",
+        "attack_bonus": 7,
+        "range": "120 ft.",
+        "damage_dice_primary": "3d6",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Wall of Ice",
+        "advisory": "wall_of_ice",
+        "description": "The dragon creates an opaque wall of ice on a solid surface it can see within 120 feet of it. The wall can be up to 30 feet long, 30 feet high, and 1 foot thick. When the wall appears, each creature within its area is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. Each 10-foot sec­ tion of the wall has AC 5, 30 hit points, vulnerability to fire damage, and immunity to acid, cold, necrotic, poison, and psychic damage. The wall disappears when the dragon uses this lair action again or when the dragon dies."
+      }
     ],
     "environments": [
       "coastal"
@@ -4848,6 +4962,8 @@
         "name": "Roar",
         "description": "The sphinx emits a magical roar. Each time it roars before finishing a long rest, the roar is louder and the effect is different, as detailed below. Each creature within 500 feet of the sphinx and able to hear the roar must make a saving throw.\n\nFirst Roar. Each creature that fails a DC 18 Wisdom saving throw is frightened for 1 minute. A frightened creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.\n\nSecond Roar. Each creature that fails a DC 18 Wisdom saving throw is deafened and frightened for 1 minute. A frightened creature is paralyzed and can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.\n\nThird Roar. Each creature makes a DC 18 Constitution saving throw. On a failed save, a creature takes 44 (8d10) thunder damage and is knocked prone. On a successful save, the creature takes half as much damage and isn't knocked prone.",
         "save_dc": 18,
+        "maxUses": 3,
+        "staged_roar": true,
         "usage": {
           "type": "per day",
           "times": 3
@@ -4875,15 +4991,25 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the sphinx can expend a use to take one of the following actions. The sphinx regains all expended uses at the start of each of its turns."
+      },
+      {
         "name": "Claw Attack",
+        "delegates_to": "Claw",
         "description": "The sphinx makes one claw attack."
       },
       {
         "name": "Teleport (Costs 2 Actions)",
+        "advisory": "sphinx_teleport",
+        "advisory_message": "magically teleports up to 120 feet to an unoccupied space it can see — advisory record: GM moves the token, no position consumer (CLA-320). Canonical cost is 2 legendary uses — the engine spends 1 per click; the extra cost is GM-enforced.",
         "description": "The sphinx magically teleports, along with any equipment it is wearing or carrying, up to 120 feet to an unoccupied space it can see."
       },
       {
         "name": "Cast a Spell (Costs 3 Actions)",
+        "advisory": "spellcast_adjudication",
+        "advisory_message": "casts a spell from its list of prepared spells — advisory record: GM adjudicates spell choice, no spell list authored for this monster (no Spellcasting container in app data). Canonical cost is 3 legendary uses — the engine spends 1 per click; the extra cost is GM-enforced.",
         "description": "The sphinx casts a spell from its list of prepared spells, using a spell slot as normal."
       }
     ],
@@ -5011,7 +5137,9 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The animal lord casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20):<br><strong>At Will:</strong> <em>Animal Friendship</em>, <em>Animal Messenger</em>, <em>Speak with Animals</em><br><strong>2/Day Each:</strong> <em>Awaken</em>, <em>Greater Restoration</em><br><strong>1/Day Each (Sage Only):</strong> <em>Animal Shapes</em>, <em>Sunburst</em>"
+        "description": "The animal lord casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20):<br><strong>At Will:</strong> <em>Animal Friendship</em>, <em>Animal Messenger</em>, <em>Speak with Animals</em><br><strong>2/Day Each:</strong> <em>Awaken</em>, <em>Greater Restoration</em><br><strong>1/Day Each:</strong> <em>Animal Shapes</em>, <em>Sunburst</em> (Sage Only - the animal lord represents a Forager, Hunter, or Sage; the Sage restriction on this tier is GM-enforced, no subclass consumer)",
+        "save_dc": 20,
+        "save_type": "Wisdom"
       }
     ],
     "bonus_actions": [
@@ -5023,14 +5151,17 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3",
+        "uses": 3,
         "description": "Immediately after another creature's turn, the animal lord can expend a use to take one of the following actions. The animal lord regains all expended uses at the start of each of its turns."
       },
       {
         "name": "Feral Strike",
+        "delegates_to": "Rend",
         "description": "The animal lord moves up to its Speed without provoking <strong>Opportunity Attacks</strong>, and it makes one Rend attack."
       },
       {
         "name": "Radiant Strike",
+        "delegates_to": "Radiant Ray",
         "description": "The animal lord makes one Radiant Ray attack."
       }
     ],
@@ -6028,6 +6159,8 @@
         "reach": "5 ft.",
         "save_dc": 17,
         "save_type": "Charisma",
+        "dc_success": "none",
+        "repeat_save": { "save_type": "Charisma" },
         "damage_dice_primary": "2d4 + 5",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "3d12",
@@ -6050,7 +6183,15 @@
     "reactions": [
       {
         "name": "Counterspell",
-        "description": "The arcanaloth casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The arcanaloth casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "enemy_spell_cast",
+          "effect": "counterspell"
+        }
       }
     ],
     "environments": [
@@ -6148,7 +6289,8 @@
         "reach": "10 ft.",
         "range": "60 ft.",
         "damage_dice_primary": "3d6 + 7",
-        "damage_type_primary": "Force"
+        "damage_type_primary": "Force",
+        "hit_conditions": ["prone"]
       },
       {
         "name": "Crackling Wave",
@@ -6177,20 +6319,32 @@
     "reactions": [
       {
         "name": "Tongue Twister",
-        "description": "The hag casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting. If the target fails its saving throw, it is <strong>cursed</strong> until the end of its next turn. Until the curse ends, the target can't cast spells with a Verbal component, and when it speaks, it says the opposite of what it means."
+        "description": "The hag casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting. If the target fails its saving throw, it is <strong>cursed</strong> until the end of its next turn. Until the curse ends, the target can't cast spells with a Verbal component, and when it speaks, it says the opposite of what it means.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "enemy_spell_cast",
+          "effect": "counterspell"
+        }
       }
     ],
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
-        "description": "Immediately after another creature's turn, the hag can expend a use to take one of the following actions. The hag regains all expended uses at the start of each of its turns."
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the hag can expend a use to take one of the following actions. The hag regains all expended uses at the start of each of its turns. In its lair the hag has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Hag's Swipe",
+        "delegates_to": "Spectral Claw",
         "description": "The hag makes one Spectral Claw attack."
       },
       {
         "name": "Malicious Magic",
+        "advisory": "malicious_magic",
+        "advisory_message": "casts Dimension Door or Hypnotic Pattern — advisory record: GM adjudicates spell choice (spellcast choice has no per-row consumer); the once-per-turn clause is enforced by the legendary gate; no Spellcasting container authored on this row.",
         "description": "The hag uses Spellcasting to cast <em>Dimension Door</em> or <em>Hypnotic Pattern</em>. The hag can't take this action again until the start of its next turn."
       }
     ],

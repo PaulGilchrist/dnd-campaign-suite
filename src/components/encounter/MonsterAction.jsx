@@ -2,7 +2,7 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { canRollExpression } from '../../services/dice/diceRoller.js';
 import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
-import { extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage } from './MonsterCardHelpers.js';
+import { attackRowMissingToHit, extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage } from './MonsterCardHelpers.js';
 import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
 import { legendaryCheckRow, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
 import { monsterRechargeGate, rechargeDisplayText } from '../../services/encounters/monsterRecharge.js';
@@ -13,6 +13,13 @@ function formatDamageTypeList(types) {
 
 function rechargeSpent(gateInfo) {
   return !!gateInfo && !gateInfo.available;
+}
+
+// MA-0294: a spent attack-row chip mirrors the save-chip precedent
+// (mc-dice-link-spell-spent) but stays clickable — the click routes to
+// handleAttack's honest refusal popup/log.
+function attackChipClass(rechargeOut) {
+  return `mc-dice-link${rechargeOut ? ' mc-dice-link-spell-spent' : ''}`;
 }
 
 // MA-0031: recharge label — a spent row reads "(Recharge 6 — unavailable)".
@@ -28,8 +35,10 @@ function RechargeNote({ action, rechargeOut }) {
 
 // MA-0014: unroll­able formulas (e.g. "1d8+3+spell level") must render as
 // plain description text only — never a clickable chip that dies silently.
+// MA-0286: attack rows with no authored attack_bonus must also render text
+// only — a damage chip on an attack row is an auto-hit (no to-hit roll).
 function ActionDamageLinks({ action, actionDamageFormula, actionDamageTypeLabel, onDamage }) {
-  if (action.save_dc != null || action.attack_bonus != null) return null;
+  if (action.save_dc != null || action.attack_bonus != null || attackRowMissingToHit(action)) return null;
   const rollablePrimary = actionDamageFormula && canRollExpression(actionDamageFormula);
   const rollableSecondary = action.damage_dice_secondary != null && canRollExpression(action.damage_dice_secondary);
   if (!rollablePrimary && !rollableSecondary) return null;
@@ -176,7 +185,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
-        <span className="mc-dice-link" onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
+        <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
         </span>
       )}

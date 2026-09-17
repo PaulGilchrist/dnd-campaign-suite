@@ -7,6 +7,8 @@ import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval
 import { applySleepTurnEnd } from '../../services/rules/features/sleepService.js'
 import { applyFrightfulPresenceTurnEnd } from '../../services/rules/features/frightfulPresenceService.js'
 import { applyWeakeningBreathTurnEnd } from '../../services/rules/features/weakeningBreathService.js'
+import { applyParalyzingBreathTurnEnd } from '../../services/rules/features/paralyzingBreathService.js'
+import { applySoulTomeTrapTurnEnd } from '../../services/rules/features/soulTomeTrapService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
@@ -122,6 +124,20 @@ function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters
     // turn; success ends the effect (10-round clock auto-succeeds after 1 min).
     applyWeakeningBreathTurnEnd(campaignName, activeCreatureName)
         .catch((e) => { console.error('[navigationHandlers] MA-0102 weakening breath turn-end save failed:', e) })
+    // MA-0248: Paralyzing Breath (Ancient Silver Dragon) — the OUTGOING
+    // creature repeats its CON save at the end of its own staged turn;
+    // a first fail escalates Incapacitated → Paralyzed (10-round
+    // auto-success clock, CLA-334), every repeat save ends the effect on
+    // a success (paralyzingBreathService MA-0068/MA-0102 shapes).
+    applyParalyzingBreathTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] MA-0248 paralyzing breath turn-end save failed:', e) })
+    // MA-0298: Soul Tome trap (Arcanaloth Banishing Claw) — the OUTGOING
+    // trapped creature repeats its CHA save at the end of its own turn;
+    // success strips the indefinite te + Incapacitated and it escapes into
+    // the space it left (placement GM-enforced); a fail keeps the trap
+    // (bound-at-3 stays GM-adjudicated — no fail-counter consumer).
+    applySoulTomeTrapTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] MA-0298 soul tome turn-end save failed:', e) })
 }
 
 /**

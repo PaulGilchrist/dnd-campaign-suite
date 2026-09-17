@@ -18,12 +18,13 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
+import { resolveRoarStageAction } from '../../services/rules/features/roarService.js';
 import SaveAttackAoeModal from '../char-sheet/modals/shared/SaveAttackAoeModal.jsx';
 import './MonsterCardModal.css';
 
@@ -109,6 +110,17 @@ function zoneTeForAction(action) {
 // MA-0031: recharge gate at row click — a spent breath weapon refuses with a
 // popup + `<action-slug>_refused (not recharged)` log, zero save prompts.
 // Returns { refused, gate } (gate null when refused or row not rechargeable).
+// MA-0298: combo trap arms (Soul Tome te parse + fail conditions + the
+// MA-0048 repeat-save clause) ride the auto-damage context to the player
+// save-result seam. Byte-inert nulls for every other row.
+function comboTrapArmsFrom(autoDamage) {
+  return {
+    saveConditions: autoDamage.saveConditions || null,
+    soulTomeTrap: autoDamage.soulTomeTrap || null,
+    repeatSave: autoDamage.repeatSave || null,
+  };
+}
+
 function rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml }) {
   const gate = spellInfo ? null : monsterRechargeGate(action, getRuntimeValue(monsterName, MONSTER_RECHARGE_KEY));
   if (gate && !gate.available) {
@@ -141,6 +153,18 @@ function resolveBlockSaveDcSuccess(spellInfo, action) {
 function sleepStagingForAction(spellInfo, action) {
   if (spellInfo || !action?.staged_sleep) return null;
   return { unconsciousRounds: (Number(action.staged_sleep.unconscious_minutes) || 10) * 10 };
+}
+
+// MA-0248: authored staged paralysis row (Ancient Silver Dragon Paralyzing
+// Breath) — failed saves stage the ladder inside the picker (MA-0068 staged
+// shape: Incapacitated → turn-END repeat save → Paralyzed, repeating each
+// turn with auto-success after paralyzed_minutes×10 rounds, CLA-334). NOT
+// sleep staging — paralysis never wakes on damage, so it rides its own
+// paralyzing_staged te (paralyzingBreathService, MA-0102 sibling shape).
+// Byte-inert flag default.
+function stagedParalysisForAction(spellInfo, action) {
+  if (spellInfo || !action?.staged_paralysis) return null;
+  return { paralyzedRounds: (Number(action.staged_paralysis.paralyzed_minutes) || 1) * 10 };
 }
 
 // MA-0079: authored push clause (Adult Bronze Dragon Repulsion Breath —
@@ -225,6 +249,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     }));
   };
   const sleepStaging = sleepStagingForAction(spellInfo, action);
+  const stagedParalysis = stagedParalysisForAction(spellInfo, action);
   // MA-0079: authored push clause (Repulsion Breath "pushed up to 60 feet")
   // rides the picker as an instant marker te on failed saves (MA-0073 parse
   // shape). Null for every row without the clause — byte-inert.
@@ -237,7 +262,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -525,6 +550,12 @@ function buildSaveOptions(action) {
     saveType: action?.save_type ? toAbbr(action.save_type) : null,
     dcSuccess: action?.save_dc != null ? (action?.dc_success ?? 'half') : null,
     saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
+    // MA-0298: Soul Tome trap arm rides the attack+save combo context to the
+    // player-save-result fail seam (soulTomeTrapService). Byte-inert null for
+    // every non-trap row; MA-0104 "transported" wording never matches here.
+    soulTomeTrap: parseSoulTomeTrapClause(action?.save_effect),
+    // MA-0048 repeat_save seam: arm the turn-END repeat save on a fail.
+    repeatSave: action?.repeat_save || null,
   };
 }
 
@@ -723,17 +754,22 @@ async function refuseMonsterSpellAttack({ monsterName, spellName, reason, campai
   }).catch((e) => { console.error('[MonsterCardModal] Error logging spell-attack refusal:', e); });
 }
 
-async function spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName }) {
+// MA-0276: advisory-path casts (no save, no attack) log their own richer
+// ability_use record downstream (buildMonsterSpellCastEntry carries the same
+// usesNote) — skipLog prevents the double ability_use pair per spend.
+async function spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName, skipLog = false }) {
   if (gate.usesMax == null) return null;
   const usesNote = ` ${gate.usesMax}/Day use spent — ${gate.usesMax - gate.used - 1} remaining today (resets at a long rest, GM-enforced for monsters).`;
   await setRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, { ...gate.storedUses, [spellName]: gate.used + 1 }, campaignName);
-  await addEntry(campaignName, {
-    type: 'ability_use',
-    characterName: monsterName,
-    abilityName: spellName,
-    description: `${monsterName} casts ${spellName} via Spellcasting.${usesNote}`,
-    timestamp: Date.now(),
-  }).catch((e) => { console.error('[MonsterCardModal] Error logging monster spell use spend:', e); });
+  if (!skipLog) {
+    await addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: monsterName,
+      abilityName: spellName,
+      description: `${monsterName} casts ${spellName} via Spellcasting.${usesNote}`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[MonsterCardModal] Error logging monster spell use spend:', e); });
+  }
   return usesNote;
 }
 
@@ -1007,6 +1043,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               context.saveType = autoDamage.saveType;
               context.dcSuccess = autoDamage.dcSuccess;
             }
+            // MA-0298: combo attack+save legs carry the trap arm + fail
+            // conditions + repeat-save clause to the save-result seam.
+            Object.assign(context, comboTrapArmsFrom(autoDamage));
             if (autoDamage.secondaryFormula) {
               context.autoDamageSecondaryFormula = autoDamage.secondaryFormula;
               context.autoDamageSecondaryName = autoDamage.secondaryName || autoDamage.name;
@@ -1063,6 +1102,15 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   }, []);
 
   const handleAttack = (name, bonus, action) => {
+    // MA-0294: recharge gate on ATTACK-roll rows (Ape Rock Recharge 6) —
+    // mirrors the block-save seam exactly: a spent row refuses with popup +
+    // `<action-slug>_refused (not recharged)` log, zero roll zero spend;
+    // gate-bearing rows spend the recharge on fire (same MONSTER_RECHARGE_KEY
+    // semantics; turn-start d6 recovery already rides rollMonsterRecharges
+    // via the turnStartEffects seam for spent markers). Gateless rows and
+    // synthesized spell-attack actions (no recharge) are byte-inert.
+    const recharge = rechargeRefusalOnSpent({ action, spellInfo: null, monsterName, campaignName, setPopupHtml });
+    if (recharge.refused) return;
     const target = getTarget();
     if (psychicStrikePreconditionFailed(name, target, allTargetEffects)) return;
 
@@ -1092,6 +1140,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
     const { isAutoMiss, rangeReason, rangeForcedMode } = computeMapRangeState(mapData, target, monsterName, attackRange);
     const { coverAcBonus, coverLevel, coverReason } = computeCoverState(isAutoMiss, target, characters, mapData, campaignName);
+
+    // MA-0294: recharge fire-spend, mirroring the save-path picker-open
+    // spend (CLA-384) — same map-write recipe, only for gate rows.
+    if (recharge.gate) {
+      spendMonsterRecharge({ monsterName, action, campaignName })
+        .catch((e) => { console.error('[MonsterCardModal] Error spending attack recharge:', e); });
+    }
 
     rollAttack(name, effectiveBonus, buildAttackRollOptions({
       action,
@@ -1176,8 +1231,17 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const prerequisite = gate.prerequisite;
     const { refused, usesGate } = resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, setPopupHtml });
     if (refused) return;
+    // MA-0268: staged_roar row (Androsphinx Roar) — the Nth click resolves
+    // ONLY the Nth roar's canonical legs (1 frightened / 2 deaf+frightened,
+    // both zero-damage WIS with turn-END repeat saves; 3 CON 8d10 thunder
+    // half-on-success + prone), swapped by the persisted MA-0020 spend
+    // counter. Byte-inert null for every other row.
+    const roarAction = resolveRoarStageAction({ action, usesGate });
+    const stageAction = roarAction || action;
+    const stageFormula = roarAction ? extractDamageDiceFromDescription(stageAction.description, stageAction.damage_dice_primary) : saveDamageFormula;
+    const stageConditions = roarAction ? extractConditionsFromSaveEffect(stageAction.save_effect) : saveConditions;
     // MA-0031: recharge gate + fire-spend + cone routing live downstream.
-    executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml });
+    executeBlockSaveRoll({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml });
   }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction, campaignName, setPopupHtml, allTargetEffects]);
 
   const handleSpellCast = useCallback(async (action, spellName) => {
@@ -1200,7 +1264,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       await refuseMonsterSpellAttack({ monsterName, spellName, reason: attackPlan.reason, campaignName, setPopupHtml });
       return;
     }
-    const usesNote = await spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName });
+    // MA-0276: attack and advisory paths emit their own ability_use cast log
+    // carrying the usesNote — only the block-save path needs the spend log.
+    const skipSpendLog = Boolean(attackPlan) || !spellHasDamage(spell);
+    const usesNote = await spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName, skipLog: skipSpendLog });
     if (attackPlan) {
       await executeMonsterSpellAttackCast({ monsterName, spellName, plan: attackPlan, usesNote, campaignName, handleAttack: rollHandlerRef.current });
       return;
@@ -1448,6 +1515,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           zoneOnly={conePicker.zoneOnly === true}
           saveConditions={conePicker.saveConditions}
           sleepStaging={conePicker.sleepStaging}
+          stagedParalysis={conePicker.stagedParalysis}
           pushFeet={conePicker.pushFeet}
           slowedClauses={conePicker.slowedClauses}
           weakeningBreath={conePicker.weakeningBreath}

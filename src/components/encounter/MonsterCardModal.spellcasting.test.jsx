@@ -429,3 +429,126 @@ describe('MonsterCardModal - MA-0012 Aberrant Cultist per-spell links', () => {
     expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
   });
 });
+
+// ── MA-0276: Animal Lord Spellcasting — prose-only DC + tier gates + double log ─
+
+const ANIMAL_LORD_SPELLS_5E = [
+  { name: 'Animal Friendship', level: 1, concentration: false, duration: '24 hours', damage: null, dc: { dc_type: 'WIS', dc_success: 'none' }, range: '30 feet' },
+  { name: 'Animal Messenger', level: 2, concentration: false, duration: '24 hours', damage: null, dc: null, range: '30 feet' },
+  { name: 'Speak with Animals', level: 1, concentration: false, duration: '10 minutes', damage: null, dc: null, range: 'Self' },
+  { name: 'Awaken', level: 5, concentration: false, duration: 'Instantaneous', damage: null, dc: null, range: 'Touch' },
+  { name: 'Greater Restoration', level: 5, concentration: false, duration: 'Instantaneous', damage: null, dc: null, range: 'Touch' },
+  { name: 'Animal Shapes', level: 8, concentration: true, duration: 'Up to 24 hours', damage: null, dc: null, range: '30 feet' },
+  { name: 'Sunburst', level: 8, concentration: false, duration: 'Instantaneous', damage: { damage_type: 'Radiant', damage_at_slot_level: { 8: '12d6', 9: '12d6' } }, dc: { dc_type: 'CON', dc_success: 'half' }, range: '150 feet' },
+];
+
+function renderAnimalLord() {
+  const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+  const row = monsters.find(m => m.index === 'animal-lord').actions.find(a => a.name === 'Spellcasting');
+  const m = makeMonster({ name: 'Animal Lord', actions: [row] });
+  const creatures = [
+    { name: 'Animal Lord 1', type: 'npc', monsterType: 'celestial', targetName: 'TestPC', currentHp: 323, maxHp: 323, conditions: [] },
+    { name: 'TestPC', type: 'player', currentHp: 90, maxHp: 90, conditions: [], computedStats: {} },
+  ];
+  loadSpells.mockImplementation((version) => Promise.resolve(version === '2024' ? [] : ANIMAL_LORD_SPELLS_5E));
+  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Animal Lord 1', creatures })} />);
+  return row;
+}
+
+function abilityUseEntries(name) {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use' && e.abilityName === name);
+}
+
+describe('MA-0276 Animal Lord Spellcasting row (data)', () => {
+  const row = JSON.parse(readFileSync('public/data/monsters.json', 'utf8')).find(m => m.index === 'animal-lord').actions.find(a => a.name === 'Spellcasting');
+
+  it('authors numeric save_dc 20 + save_type Wisdom (MA-0215 ancient-gold template shape)', () => {
+    const monster = JSON.parse(readFileSync('public/data/monsters.json', 'utf8')).find(m => m.index === 'animal-lord');
+    expect(row.save_dc).toBe(20);
+    expect(row.save_type).toBe('Wisdom');
+    expect(8 + monster.ability_score_modifiers.wis + monster.proficiency_bonus).toBe(20);
+  });
+
+  it('parses all three usage tiers (At Will ungated, 2/Day, 1/Day) with sage-only honest in prose', () => {
+    expect(extractSpellcastingSpellUses(row.description)).toEqual({
+      'Awaken': 2, 'Greater Restoration': 2, 'Animal Shapes': 1, 'Sunburst': 1,
+    });
+    expect(row.description).toMatch(/Sage Only/);
+  });
+
+  it('extracts all seven prose spells as links with no tier-header artifacts', () => {
+    expect(extractSpellNamesFromSpellcasting(row.description)).toEqual([
+      'Animal Friendship', 'Animal Messenger', 'Speak with Animals',
+      'Awaken', 'Greater Restoration', 'Animal Shapes', 'Sunburst',
+    ]);
+  });
+});
+
+describe('MA-0276 Animal Lord Spellcasting (modal)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('Sunburst routes an enforced save at the row DC 20 — CON half-on-success 12d6 Radiant (no dc:None phantom)', async () => {
+    renderAnimalLord();
+    await act(async () => { fireEvent.click(linkByText('Sunburst')); });
+
+    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
+    const context = rollSavingThrow.mock.calls[0][2];
+    expect(context.spellName).toBe('Sunburst');
+    expect(context.saveDc).toBe(20);
+    expect(context.saveType).toBe('CON');
+    expect(context.dcSuccess).toBe('half');
+    expect(context.autoDamageFormula).toBe('12d6');
+    expect(context.autoDamageDamageType).toBe('Radiant');
+    expect(context.isSpellDamage).toBe(true);
+  });
+
+  it('Awaken spends 2/Day with a SINGLE ability_use log per spend, refuses the 3rd cast', async () => {
+    renderAnimalLord();
+    await act(async () => { fireEvent.click(linkByText('Awaken')); });
+    await waitFor(() => expect(abilityUseEntries('Awaken').length).toBe(1));
+    expect(runtime.store['Animal Lord 1.monsterSpellUses']).toEqual({ 'Awaken': 1 });
+    expect(abilityUseEntries('Awaken')[0].description).toMatch(/2\/Day use spent — 1 remaining today/);
+    expect(abilityUseEntries('Awaken')[0].description).toMatch(/GM-enforced for monsters/);
+
+    await act(async () => { fireEvent.click(linkByText('Awaken')); });
+    await waitFor(() => expect(abilityUseEntries('Awaken').length).toBe(2));
+    expect(runtime.store['Animal Lord 1.monsterSpellUses']).toEqual({ 'Awaken': 2 });
+
+    await act(async () => { fireEvent.click(linkByText('Awaken')); });
+    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'automation blocked');
+    expect(refusal).toBeTruthy();
+    expect(refusal.description).toMatch(/already cast Awaken today \(2\/Day\)/);
+    expect(runtime.store['Animal Lord 1.monsterSpellUses']).toEqual({ 'Awaken': 2 });
+    expect(abilityUseEntries('Awaken').length).toBe(2);
+  });
+
+  it('Animal Shapes is gated 1/Day: first cast records once, refire refuses', async () => {
+    renderAnimalLord();
+    await act(async () => { fireEvent.click(linkByText('Animal Shapes')); });
+    await waitFor(() => expect(abilityUseEntries('Animal Shapes').length).toBe(1));
+    expect(runtime.store['Animal Lord 1.monsterSpellUses']).toEqual({ 'Animal Shapes': 1 });
+    expect(abilityUseEntries('Animal Shapes')[0].description).toMatch(/1\/Day use spent — 0 remaining today/);
+
+    await act(async () => { fireEvent.click(linkByText('Animal Shapes')); });
+    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'automation blocked');
+    expect(refusal).toBeTruthy();
+    expect(refusal.description).toMatch(/already cast Animal Shapes today \(1\/Day\)/);
+    expect(abilityUseEntries('Animal Shapes').length).toBe(1);
+  });
+
+  it('At Will spells stay advisory record-only — no spend, no refusal, ungated', async () => {
+    renderAnimalLord();
+    await act(async () => { fireEvent.click(linkByText('Animal Friendship')); });
+    await act(async () => { fireEvent.click(linkByText('Speak with Animals')); });
+
+    await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(2));
+    expect(abilityUseEntries('Animal Friendship').length).toBe(1);
+    expect(abilityUseEntries('Speak with Animals').length).toBe(1);
+    expect(addEntry.mock.calls.map(c => c[1]).every(e => e.description.match(/GM-enforced for monsters/))).toBe(true);
+    expect(runtime.store['Animal Lord 1.monsterSpellUses'] ?? null).toBeNull();
+    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
+  });
+});

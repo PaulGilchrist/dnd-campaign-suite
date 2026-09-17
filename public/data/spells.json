@@ -5601,6 +5601,7 @@
         "concentration": false,
         "casting_time": "1 action",
         "level": 1,
+        "attack_type": "ranged",
         "damage": {
             "damage_type": "Piercing",
             "damage_at_slot_level": {

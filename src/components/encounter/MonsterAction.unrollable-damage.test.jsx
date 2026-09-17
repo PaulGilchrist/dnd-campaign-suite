@@ -68,7 +68,26 @@ describe('MA-0014 MonsterAction damage chip gating', () => {
     expect(chips.some(el => el.textContent.includes('1d4'))).toBe(false);
   });
 
-  it('still renders and rolls parseable numeric damage chips', () => {
+  // MA-0286 flip (same-pass): the original MA-0014 fixture here was an
+  // ATTACK row ("Melee Weapon Attack") with null attack_bonus and a rollable
+  // formula — the very auto-hit defect MA-0286 suppresses. Damage-only rows
+  // (no attack wording) keep rolling; attack rows without a to-hit bonus
+  // render text only.
+  it('still renders and rolls parseable numeric damage chips on damage-only rows', () => {
+    const { container, onDamage } = renderRow({
+      name: 'Heat Aura',
+      description: 'At the end of each of its turns, each creature nearby takes 11 (1d6+2) fire damage.',
+      attack_bonus: null,
+      damage_dice_primary: '1d6+2',
+      damage_type_primary: 'Fire',
+    });
+    const chip = [...container.querySelectorAll('.mc-dice-link')].find(el => el.textContent.includes('1d6+2'));
+    expect(chip).toBeTruthy();
+    fireEvent.click(chip);
+    expect(onDamage).toHaveBeenCalledWith('Heat Aura', '1d6+2', 'Fire', expect.objectContaining({ name: 'Heat Aura' }));
+  });
+
+  it('MA-0286: attack row with null attack_bonus and rollable formula renders text only — no auto-hit chip', () => {
     const { container, onDamage } = renderRow({
       name: 'Club',
       description: 'Melee Weapon Attack. Hit: 1 (1d6+2) bludgeoning damage.',
@@ -76,10 +95,9 @@ describe('MA-0014 MonsterAction damage chip gating', () => {
       damage_dice_primary: '1d6+2',
       damage_type_primary: 'Bludgeoning',
     });
-    const chip = [...container.querySelectorAll('.mc-dice-link')].find(el => el.textContent.includes('1d6+2'));
-    expect(chip).toBeTruthy();
-    fireEvent.click(chip);
-    expect(onDamage).toHaveBeenCalledWith('Club', '1d6+2', 'Bludgeoning', expect.objectContaining({ name: 'Club' }));
+    expect(container.querySelectorAll('.mc-dice-link').length).toBe(0);
+    expect(container.textContent).toContain('1d6+2');
+    expect(onDamage).not.toHaveBeenCalled();
   });
 });
 
