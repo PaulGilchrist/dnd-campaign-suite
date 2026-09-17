@@ -68,6 +68,9 @@ M = {
     "book_b": mat("book_b", (0.15, 0.25, 0.55), 0.8),
     "book_g": mat("book_g", (0.2, 0.5, 0.2), 0.8),
     "book_y": mat("book_y", (0.75, 0.6, 0.15), 0.8),
+    # Door lintel, tuned to the viewer's wall material (COLORS.wall = 0x696969,
+    # roughness 0.92) so the header above a door is indistinguishable from the wall.
+    "wallmatch": mat("wallmatch", (0x69 / 255, 0x69 / 255, 0x69 / 255), 0.92, 0.0),
 }
 
 # ---------------------------------------------------------------- helpers
@@ -136,6 +139,17 @@ def recenter(o):
         v.co.z -= dz
     o.location = (0, 0, 0)
 
+def flip180(parts):
+    """Rotate a list of built objects 180 deg about the up (Z) axis through the
+    origin. Because the primitives have their transform applied (world-space
+    verts), negating X and Y is a pure 180 deg turn: it flips front<->back AND
+    left<->right without mirroring (winding is preserved)."""
+    for p in parts:
+        for v in p.data.vertices:
+            v.co.x = -v.co.x
+            v.co.y = -v.co.y
+    return parts
+
 def clear_scene():
     bpy.ops.object.select_all(action="DESELECT")
     for obj in list(bpy.data.objects):
@@ -182,13 +196,14 @@ def b_table():  # 2-cell along +X (east-west)
             o.append(cube((0.08, 0.08, 0.72), (sx * 0.85, sy * 0.32, 0.36), M["wood_dark"]))
     return o
 
-def b_chair():  # seat, back toward -Y (north)
+def b_chair():  # 2D SVG rot=0: backrest north, seat faces south. glTF inverts Y,
+    # so flip180 the built parts to match (backrest -> three.js -Z = north).
     o = [cube((0.5, 0.5, 0.06), (0, 0, 0.45), M["wood"])]
     o.append(cube((0.5, 0.06, 0.5), (0, -0.22, 0.7), M["wood"]))
     for sx in (-1, 1):
         for sy in (-1, 1):
             o.append(cube((0.05, 0.05, 0.45), (sx * 0.2, sy * 0.2, 0.225), M["wood_dark"]))
-    return o
+    return flip180(o)
 
 def b_bed():  # 2-cell along +X (east-west), head / pillow on -X (west)
     o = [cube((1.9, 0.9, 0.15), (0, 0, 0.075), M["wood"])]
@@ -197,7 +212,10 @@ def b_bed():  # 2-cell along +X (east-west), head / pillow on -X (west)
     o.append(cube((0.1, 0.9, 0.9), (-0.95, 0, 0.45), M["wood_dark"]))
     return o
 
-def b_bookshelf():  # 2-cell along +X (east-west), back on -Y (north)
+def b_bookshelf():  # 2-cell along +X (east-west), 0.5 cell deep. 2D SVG rot=0:
+    # back panel north, books' spines face south. glTF inverts Y, so flip180 the
+    # built parts to match. The bookshelf back sits at the local 0.25-cell edge;
+    # the viewer offsets it flush to the wall it faces (see index.html).
     o = [cube((0.08, 0.5, 1.8), (-0.95, 0, 0.9), M["wood"])]
     o.append(cube((0.08, 0.5, 1.8), (0.95, 0, 0.9), M["wood"]))
     o.append(cube((1.9, 0.5, 0.08), (0, 0, 1.76), M["wood"]))
@@ -209,7 +227,7 @@ def b_bookshelf():  # 2-cell along +X (east-west), back on -Y (north)
         for i in range(5):
             bx = -0.7 + i * 0.3
             o.append(cube((0.18, 0.4, 0.34), (bx, 0.02, sz + 0.2), bookmats[(i + int(sz * 10)) % 4]))
-    return o
+    return flip180(o)
 
 def b_altar():  # 2-cell along +X (east-west)
     o = [cube((1.6, 0.8, 0.5), (0, 0, 0.25), M["stone"])]
@@ -230,18 +248,22 @@ def b_stairs():  # tread along +X (east-west); steps rise toward +Y, so descent 
         o.append(cube((0.9, 0.225, h), (0, y, h / 2), M["stone"]))
     return o
 
-def b_door():  # runs north-south: leaf long axis along +Y, thin along X
-    o = [cube((0.1, 0.86, 0.84), (0, 0, 0.42), M["wood"])]
-    o.append(cube((0.14, 0.9, 0.08), (0, 0, 0.88), M["wood_dark"]))
-    o.append(cube((0.14, 0.08, 0.9), (0, -0.46, 0.45), M["wood_dark"]))
-    o.append(cube((0.14, 0.08, 0.9), (0, 0.46, 0.45), M["wood_dark"]))
-    o.append(cyl(0.025, 0.04, (0.07, 0.2, 0.45), M["metal"], rot=(0, math.pi / 2, 0)))
+def b_door():  # runs north-south: leaf long axis along +Y, thin along X. 8' leaf
+    # (room for dragonborn/goliath) + a square 2' stone lintel above so the doorway
+    # reads as a full 10' wall. The lintel is square and centered on the cell, so it
+    # is invariant to the 90-deg increments the door rotates through when opened.
+    o = [cube((0.1, 0.86, 1.6), (0, 0, 0.8), M["wood"])]                  # leaf (0-8ft)
+    o.append(cube((0.14, 0.08, 1.6), (0, -0.46, 0.8), M["wood_dark"]))    # side rail
+    o.append(cube((0.14, 0.08, 1.6), (0, 0.46, 0.8), M["wood_dark"]))     # side rail
+    o.append(cube((1.0, 1.0, 0.4), (0, 0, 1.8), M["wallmatch"]))          # square lintel (8-10ft)
+    o.append(cyl(0.025, 0.04, (0.07, 0.2, 0.6), M["metal"], rot=(0, math.pi / 2, 0)))  # knob
     return o
 
-def b_secretdoor():  # runs north-south, stone
-    o = [cube((0.08, 0.88, 0.86), (0, 0, 0.43), M["stone_dark"])]
-    o.append(cube((0.1, 0.1, 0.9), (0, -0.45, 0.45), M["stone"]))
-    o.append(cube((0.1, 0.1, 0.9), (0, 0.45, 0.45), M["stone"]))
+def b_secretdoor():  # runs north-south, stone. 8' leaf + square 2' lintel = full 10' wall
+    o = [cube((0.1, 0.88, 1.6), (0, 0, 0.8), M["stone_dark"])]            # leaf (0-8ft)
+    o.append(cube((0.12, 0.1, 1.6), (0, -0.45, 0.8), M["stone"]))         # side seam
+    o.append(cube((0.12, 0.1, 1.6), (0, 0.45, 0.8), M["stone"]))          # side seam
+    o.append(cube((1.0, 1.0, 0.4), (0, 0, 1.8), M["wallmatch"]))          # square lintel (8-10ft)
     return o
 
 def b_firepit():
@@ -252,11 +274,14 @@ def b_firepit():
     o.append(cone(0.18, 0.05, 0.26, (0, 0, 0.16), M["flame"]))
     return o
 
-def b_torch():  # wall sconce: mount on -X (west) wall, flame faces +X (east)
-    o = [cube((0.06, 0.16, 0.16), (-0.42, 0, 0.9), M["metal"])]
-    o.append(cube((0.35, 0.05, 0.05), (-0.2, 0, 0.9), M["metal"]))
-    o.append(cyl(0.03, 0.3, (0.0, 0, 1.02), M["wood"]))
-    o.append(cone(0.08, 0.02, 0.2, (0.0, 0, 1.28), M["flame"]))
+def b_torch():  # wall sconce, ~0.25 cell tall. Base (mount plate bottom) at Z=0,
+    # mount on the -X (west) wall, flame faces +X (east). The viewer lifts it to
+    # eye height (~5ft) and pushes it flush to the wall it faces.
+    o = [cube((0.05, 0.13, 0.13), (-0.2, 0, 0.065), M["metal"])]           # mount plate on wall
+    o.append(cube((0.2, 0.05, 0.05), (-0.09, 0, 0.065), M["metal"]))       # bracket arm
+    o.append(cube((0.12, 0.03, 0.03), (-0.09, 0, 0.015), M["metal_dark"])) # brace
+    o.append(cyl(0.055, 0.08, (-0.01, 0, 0.11), M["metal"]))               # sconce cup
+    o.append(cone(0.06, 0.025, 0.12, (-0.01, 0, 0.19), M["flame"]))        # flame
     return o
 
 def b_trap():

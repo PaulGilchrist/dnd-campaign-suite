@@ -103,8 +103,13 @@ try {
 }
 
 // ---- constants -------------------------------------------------------------
-const CELL = 40;            // 1 grid cell in world units (matches SVG CELL_SIZE)
-const WALL_H = 36;
+const CELL = 40;            // 1 grid cell in world units = exactly 5' (matches SVG CELL_SIZE)
+const WALL_H = 80;          // 10' = 2 cells tall (a realistic dungeon wall)
+// Wall-flush offset (fraction of a cell) that pushes a wall-mounted prop's back
+// edge onto the wall it faces, driven by rotation exactly like the 2D map.
+const BOOKSHELF_WALL_OFFSET = 0.25;  // bookshelf is 0.5 cell deep; back sits 0.25 cell out
+const TORCH_WALL_OFFSET = 0.36;      // sconce mount is ~0.14 cell out; push it to the wall
+const TORCH_MOUNT_Y = 40;            // mount at 5' (eye height); flame lands ~6'
 const COLORS = { wall: 0x696969, player: 0x4a90d9, playerStroke: 0x2c5f8a, npc: 0xc0392b, npcStroke: 0xe74c3c };
 const ROOM_COLORS = { entrance: 0x4caf50, common: 0x4a90d9, utility: 0xff9800, private: 0xce93d8, grand: 0xffd700, hall: 0x4dd0e1 };
 const TWO_CELL = new Set(['table', 'bed', 'bookshelf', 'altar']);
@@ -117,6 +122,7 @@ const EXAMPLES = [
 
 // ---- state -----------------------------------------------------------------
 let scene, camera, renderer, controls, mapGroup, half = 0;
+window.__dbg = { get mapGroup() { return mapGroup; }, get wallTex() { return wallTex; } };
 let currentMap = null;
 let currentMapPath = null;
 let showRooms = true, showLabels = true, showTorch = true;
@@ -205,7 +211,13 @@ function loadAsset(type) {
   assetCache[type] = new Promise((resolve) => {
     gltfLoader.load(`assets/${type}.glb`,
       (gltf) => {
-        gltf.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        gltf.scene.traverse((o) => {
+          if (!o.isMesh) return;
+          o.castShadow = true; o.receiveShadow = true;
+          if (type === 'door' || type === 'secretDoor') {
+            for (const m of [].concat(o.material)) if (m && m.name === 'wallmatch') applyWallTexture(m);
+          }
+        });
         resolve(gltf.scene);
       },
       undefined,
@@ -247,6 +259,7 @@ function buildWalls(walls) {
   if (!unique.length) return;
   const geo = new THREE.BoxGeometry(CELL, WALL_H, CELL);
   const mat = new THREE.MeshStandardMaterial({ color: COLORS.wall, roughness: 0.92 });
+  applyWallTexture(mat);
   const inst = new THREE.InstancedMesh(geo, mat, unique.length);
   const m = new THREE.Matrix4();
   unique.forEach((key, i) => {
@@ -273,7 +286,18 @@ async function buildPlacedItems(items) {
       if (isVertical) z += 0.5 * CELL;
       else x += 0.5 * CELL;
     }
-    mesh.position.set(x, 0, z);
+    // Wall-mounted props (torch sconce, bookshelf) sit flush against the wall
+    // their back faces — 0 gap — and move to a new wall as they rotate, exactly
+    // like the 2D map (rotation about the cell center). The back direction is the
+    // local "back" axis of each asset carried by the -rot grid rotation.
+    if (item.type === 'torch' || item.type === 'bookshelf') {
+      const offset = (item.type === 'torch' ? TORCH_WALL_OFFSET : BOOKSHELF_WALL_OFFSET) * CELL;
+      const bx = item.type === 'torch' ? -Math.cos(rot) : Math.sin(rot);
+      const bz = item.type === 'torch' ? -Math.sin(rot) : -Math.cos(rot);
+      x += bx * offset;
+      z += bz * offset;
+    }
+    mesh.position.set(x, item.type === 'torch' ? TORCH_MOUNT_Y : 0, z);
     mesh.rotation.y = -rot + (item.open ? Math.PI / 2 : 0);
     if (item.visible === false) setDimmed(mesh);
     mapGroup.add(mesh);
@@ -361,6 +385,7 @@ async function buildMap(mapData) {
   clearMap();
   const gs = mapData.gridSize || 30;
   half = (gs * CELL) / 2;
+  await loadWallTextures();
   buildFloorAndGrid(gs, mapData.bgFill);
   buildWalls(mapData.walls);
   buildRooms(mapData.rooms);
@@ -443,6 +468,39 @@ function loadTexture(url) {
       () => resolve(null));
   });
   return textureCache[key];
+}
+
+// ---- dungeon stone wall texture (rock_wall, PolyHaven CC0) ------------------
+// diffuse drives colour, nor_gl gives the rough surface relief, roughness keeps
+// it matte. Loaded once and cached; applied to the wall cells and the door
+// header (lintel) so both read as the same stone.
+let wallTex = null;
+function loadWallTextures() {
+  if (wallTex) return Promise.resolve(wallTex);
+  const load = (url, srgb) => new Promise((res) => {
+    textureLoader.load(url, (t) => {
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(1, 2);
+      res(t);
+    }, undefined, () => res(null));
+  });
+  return Promise.all([
+    load('assets/rock_wall_diffuse.jpg', true),
+    load('assets/rock_wall_normal.png', false),
+    load('assets/rock_wall_roughness.jpg', false),
+  ]).then(([diffuse, normal, roughness]) => { wallTex = { diffuse, normal, roughness }; return wallTex; });
+}
+
+// Apply the cached stone texture to a standard material (wall cells + door header).
+function applyWallTexture(mat) {
+  if (!wallTex || !wallTex.diffuse) return;
+  mat.map = wallTex.diffuse;
+  mat.color.set(0xffffff);
+  if (wallTex.normal) { mat.normalMap = wallTex.normal; mat.normalScale = new THREE.Vector2(1, 1); }
+  if (wallTex.roughness) { mat.roughnessMap = wallTex.roughness; mat.roughness = 1.0; }
+  mat.needsUpdate = true;
 }
 
 // Circular portrait disc that sits on top of a token cylinder.
