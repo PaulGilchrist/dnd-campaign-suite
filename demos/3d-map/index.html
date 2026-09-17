@@ -122,8 +122,9 @@ const EXAMPLES = [
 
 // ---- state -----------------------------------------------------------------
 let scene, camera, renderer, controls, mapGroup, half = 0;
-window.__dbg = { get mapGroup() { return mapGroup; }, get wallTex() { return wallTex; } };
+window.__dbg = { get mapGroup() { return mapGroup; }, get wallTex() { return wallTex; }, get camera() { return camera; }, get controls() { return controls; } };
 let currentMap = null;
+let wallMat = null;
 let currentMapPath = null;
 let showRooms = true, showLabels = true, showTorch = true;
 const assetCache = {};
@@ -206,6 +207,14 @@ function makeLabel(text) {
 }
 
 // ---- assets ----------------------------------------------------------------
+let flameTex = null;
+function loadFlameTexture() {
+  if (flameTex) return Promise.resolve(flameTex);
+  return new Promise((resolve) => {
+    textureLoader.load('assets/flame_tex.png', (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; flameTex = t; resolve(t); }, undefined, () => resolve(null));
+  });
+}
+
 function loadAsset(type) {
   if (assetCache[type]) return assetCache[type];
   assetCache[type] = new Promise((resolve) => {
@@ -214,8 +223,14 @@ function loadAsset(type) {
         gltf.scene.traverse((o) => {
           if (!o.isMesh) return;
           o.castShadow = true; o.receiveShadow = true;
-          if (type === 'door' || type === 'secretDoor') {
-            for (const m of [].concat(o.material)) if (m && m.name === 'wallmatch') applyWallTexture(m);
+          if (type === 'torch') {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            for (const m of mats) {
+              if (m && m.name === 'flame') {
+                if (flameTex) { m.map = flameTex; m.emissiveMap = flameTex; m.emissive.set(0xffffff); }
+                m.emissiveIntensity = 1.5;
+              }
+            }
           }
         });
         resolve(gltf.scene);
@@ -260,6 +275,7 @@ function buildWalls(walls) {
   const geo = new THREE.BoxGeometry(CELL, WALL_H, CELL);
   const mat = new THREE.MeshStandardMaterial({ color: COLORS.wall, roughness: 0.92 });
   applyWallTexture(mat);
+  wallMat = mat;
   const inst = new THREE.InstancedMesh(geo, mat, unique.length);
   const m = new THREE.Matrix4();
   unique.forEach((key, i) => {
@@ -276,6 +292,11 @@ async function buildPlacedItems(items) {
     if (item.type === 'npc') continue; // NPCs are rendered as tokens
     const proto = await loadAsset(item.type);
     const mesh = proto ? proto.clone() : fallbackBox(item.type);
+    if ((item.type === 'door' || item.type === 'secretDoor') && wallMat) {
+      mesh.traverse((o) => {
+        if (o.isMesh && o.material && o.material.name === 'wallmatch') o.material = wallMat;
+      });
+    }
     mesh.scale.setScalar(CELL);
     const rot = (item.rotation || 0) * Math.PI / 180;
     let x = cellX(item.gridX), z = cellZ(item.gridY);
@@ -386,6 +407,7 @@ async function buildMap(mapData) {
   const gs = mapData.gridSize || 30;
   half = (gs * CELL) / 2;
   await loadWallTextures();
+  await loadFlameTexture();
   buildFloorAndGrid(gs, mapData.bgFill);
   buildWalls(mapData.walls);
   buildRooms(mapData.rooms);
@@ -494,12 +516,26 @@ function loadWallTextures() {
 }
 
 // Apply the cached stone texture to a standard material (wall cells + door header).
-function applyWallTexture(mat) {
+// Clones the textures so each surface can pick a repeat that matches its face size:
+// wall cells tile 5ft (repeat 1,2); the slim 2ft door header needs repeat (1,0.4) so
+// its stones (and normal relief) are the same size as the adjacent wall instead of
+// reading as a denser, darker strip.
+function applyWallTexture(mat, repeat = [1, 2]) {
   if (!wallTex || !wallTex.diffuse) return;
-  mat.map = wallTex.diffuse;
+  const clone = (src) => {
+    if (!src) return null;
+    const c = src.clone();
+    c.wrapS = c.wrapT = THREE.RepeatWrapping;
+    c.repeat.set(repeat[0], repeat[1]);
+    c.needsUpdate = true;
+    return c;
+  };
+  mat.map = clone(wallTex.diffuse);
   mat.color.set(0xffffff);
-  if (wallTex.normal) { mat.normalMap = wallTex.normal; mat.normalScale = new THREE.Vector2(1, 1); }
-  if (wallTex.roughness) { mat.roughnessMap = wallTex.roughness; mat.roughness = 1.0; }
+  if (wallTex.normal) mat.normalMap = clone(wallTex.normal);
+  if (mat.normalMap) mat.normalScale.set(1, 1);
+  if (wallTex.roughness) mat.roughnessMap = clone(wallTex.roughness);
+  if (mat.roughnessMap) mat.roughness = 1.0;
   mat.needsUpdate = true;
 }
 
