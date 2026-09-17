@@ -6319,7 +6319,15 @@
     "reactions": [
       {
         "name": "Tongue Twister",
-        "description": "The hag casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting. If the target fails its saving throw, it is <strong>cursed</strong> until the end of its next turn. Until the curse ends, the target can't cast spells with a Verbal component, and when it speaks, it says the opposite of what it means."
+        "description": "The hag casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting. If the target fails its saving throw, it is <strong>cursed</strong> until the end of its next turn. Until the curse ends, the target can't cast spells with a Verbal component, and when it speaks, it says the opposite of what it means.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "enemy_spell_cast",
+          "effect": "counterspell"
+        }
       }
     ],
     "legendary_actions": [
