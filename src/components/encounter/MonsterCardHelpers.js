@@ -247,6 +247,21 @@ export function isSpellAttackSpell(spell) {
   return spell?.attack_type === 'ranged' || spell?.attack_type === 'melee';
 }
 
+// MA-0286: an attack row (Melee/Ranged Spell|Weapon Attack wording or an
+// attack-type indicator) with NO authored numeric attack_bonus must never
+// expose a clickable damage chip — that rolls damage with no to-hit roll /
+// AC check (auto-hit). Caster-dependent bonuses ("+spell attack modifier")
+// are unresolvable without caster context (MA-0284), so honest suppression
+// renders the row as plain text, like the Huge/Large Animated Object
+// siblings. Damage-only rows (breath, auras, swallow) keep their chips.
+const ATTACK_ROW_WORDING = /\b(?:melee|ranged)\s+(?:spell|weapon)\s+attack\b/i;
+export function attackRowMissingToHit(action) {
+  if (!action || typeof action !== 'object') return false;
+  if (action.attack_bonus != null) return false;
+  if (/attack/i.test(String(action.attackType || ''))) return true;
+  return ATTACK_ROW_WORDING.test(String(action.description || ''));
+}
+
 export function spellDamageFormulaAtLevel(spell, level) {
   if (!spellHasDamage(spell)) return null;
   const atLevel = spell.damage.damage_at_slot_level?.[String(level)];

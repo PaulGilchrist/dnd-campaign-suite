@@ -15,6 +15,7 @@ import { describe, it, expect, vi } from 'vitest';
 import monstersData from '../../../../../public/data/monsters.json' with { type: 'json' };
 import spells2024 from '../../../../../public/data/2024/spells.json' with { type: 'json' };
 import { canRollExpression } from '../../../dice/diceRoller.js';
+import { attackRowMissingToHit } from '../../../../components/encounter/MonsterCardHelpers.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -75,6 +76,57 @@ describe('MA-0284 data lock: Animated Object (Huge) Slam stays byte-clean', () =
         const spell = spells2024.find(s => s.index === 'animate-objects');
         expect(spell.automation.type).toBe('summon_spirit');
         expect(spell.automation.variants.map(v => v.monsterIndex)).toContain('animated-object-huge');
+    });
+});
+
+// MA-0285 guard (byte-clean skip): Animated Object (Large) Slam is the same
+// MA-0284 fingerprint — unparseable "+spellcasting modifier" legs, fully
+// inert at EB direct-join, honest. The MA-0286 suppression gate
+// (attackRowMissingToHit) additionally arms here, so even if the formula
+// ever became parseable the null-attack_bonus attack row could not regain
+// an auto-hit damage chip. No data change.
+describe('MA-0285 data lock: Animated Object (Large) Slam sibling stays byte-clean', () => {
+    const large = monstersData.find(m => m.index === 'animated-object-large');
+    const largeSlam = large.actions[0];
+
+    it('row carries NO fabricated numeric — caster-dependent legs byte-identical', () => {
+        expect(largeSlam.name).toBe('Slam');
+        expect(largeSlam.attack_bonus).toBeNull();
+        expect(largeSlam.damage_dice_primary).toBe('2d6+3+spellcasting modifier');
+        expect(largeSlam.damage_type_primary).toBe('force');
+        expect(largeSlam.description).toBe('Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d6+3+spellcasting modifier Force damage.');
+        expect(large.proficiency_bonus).toBeNull();
+    });
+
+    it('unrollable formula keeps the MA-0014 plain-text gate — fully inert, no affordance', () => {
+        expect(canRollExpression(largeSlam.damage_dice_primary)).toBe(false);
+    });
+
+    it('MA-0286 suppression gate arms the null-bonus attack row — no auto-hit route even if formula became rollable', () => {
+        expect(attackRowMissingToHit(largeSlam)).toBe(true);
+    });
+
+    it('NO advisory / spell_attack_bonus authored — neither routes on regular action rows', () => {
+        expect(largeSlam.advisory).toBeUndefined();
+        expect(largeSlam.advisory_message).toBeUndefined();
+        expect(largeSlam.spell_attack_bonus).toBeUndefined();
+    });
+
+    it('large variant stays reachable through the 2024 animate-objects summon automation', () => {
+        const spell = spells2024.find(s => s.index === 'animate-objects');
+        expect(spell.automation.variants.map(v => v.monsterIndex)).toContain('animated-object-large');
+    });
+});
+
+describe('MA-0285 caster-context consumer: Large resolves honestly on the summon path', () => {
+    it('resolveMonsterActions folds caster modifiers into the Large authored text', () => {
+        const large = monstersData.find(m => m.index === 'animated-object-large');
+        const [resolved] = resolveMonsterActions(large, {
+            slotLevel: 3, spellAttackMod: 10, spellSaveDc: 18, spellcastingModifier: 4,
+        });
+        expect(resolved.attack_bonus).toBe(10);
+        expect(resolved.damage_dice_primary).toBe('2d6+3+4');
+        expect(canRollExpression(resolved.damage_dice_primary)).toBe(true);
     });
 });
 
