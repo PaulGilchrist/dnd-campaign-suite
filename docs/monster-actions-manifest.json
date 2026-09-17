@@ -4975,7 +4975,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 1 Piercing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0332-badger-bite-flat-damage-never-applied.md"
     },
     {
       "id": "MA-0333",
@@ -4987,7 +4987,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The balor makes one Flame Whip attack and one Lightning Blade attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0334",
@@ -5008,7 +5008,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +14, reach 30 ft. Hit: 18 (3d6 + 8) Force damage plus 17 (5d6) Fire damage. If the target is a Huge or smaller creature, the balor pulls the target up to 25 feet straight toward itself, and the target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0334-flame-whip-prone-pull-inert.md"
     },
     {
       "id": "MA-0335",
@@ -5026,7 +5026,7 @@
       "damageTypeSecondary": "Lightning",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 21 (3d8 + 8) Force damage plus 22 (4d10) Lightning damage, and the target can't take Reactions until the start of the balor's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0335-lightning-blade-no-reactions-clause-inert.md"
     },
     {
       "id": "MA-0336",
@@ -5042,7 +5042,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 4 (1d6 + 1) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0337",
@@ -5058,7 +5058,7 @@
       "damageTypePrimary": "Piercing",
       "range": "80/320 ft.",
       "description": "Ranged Attack Roll: +3, range 80/320 ft. Hit: 5 (1d8 + 1) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0338",
@@ -5070,7 +5070,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The bandit makes two attacks, using Scimitar and Pistol in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0339",
@@ -5086,7 +5086,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0340",
@@ -5102,7 +5102,7 @@
       "damageTypePrimary": "Piercing",
       "range": "30/90 ft.",
       "description": "Ranged Attack Roll: +5, range 30/90 ft. Hit: 8 (1d10 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0341",
@@ -5114,7 +5114,7 @@
       "category": "reactions",
       "actionType": "attack",
       "description": "Trigger: The bandit is hit by a melee attack roll while holding a weapon. Response: The bandit adds 2 to its AC against that attack, possibly causing it to miss.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0341-parry-reaction-inert.md"
     },
     {
       "id": "MA-0342",
@@ -5126,7 +5126,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The bandit makes three attacks, using Scimitar or Pistol in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0343",
@@ -5144,7 +5144,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 12 (2d6 + 5) Slashing damage plus 14 (4d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0344",
@@ -5162,7 +5162,7 @@
       "damageTypeSecondary": "Poison",
       "range": "30/90 ft.",
       "description": "Ranged Attack Roll: +9, range 30/90 ft. Hit: 10 (1d10 + 5) Piercing damage plus 14 (4d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0345",
@@ -5174,7 +5174,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The bandit makes three Dagger attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0346",
@@ -5193,7 +5193,7 @@
       "reach": "5 ft.",
       "range": "20/60 ft.",
       "description": "Melee or Ranged Attack Roll: +6, reach 5 ft. or range 20/60 ft. Hit: 8 (2d4 + 3) Piercing damage plus 10 (3d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0347",
@@ -5214,7 +5214,7 @@
         "blinded"
       ],
       "description": "Constitution Saving Throw: DC 14, each creature in a 10-foot-radius Sphere centered on a point the bandit can see within 120 feet. Failure: 13 (3d6 + 3) Radiant damage, and the target has the Blinded condition until the start of the bandit's next turn. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0348",
@@ -5226,7 +5226,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The bandit casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):At Will: Disguise Self, Mage Hand, Minor Illusion1/Day Each: Hold Person (level 4 version), Mage Armor (included in AC), Major Image",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0348-hold-person-save-leg-dead.md"
     },
     {
       "id": "MA-0349",
@@ -5238,7 +5238,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The banshee makes two Corrupting Touch attacks and uses Horrify.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0350",
@@ -5254,7 +5254,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0351",
@@ -5272,7 +5272,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 13, one creature the banshee can see within 60 feet that can see the banshee. Failure: The target has the Frightened condition until the start of the banshee's next turn. Success: The target is immune to this banshee's Horrify for 24 hours.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0352",
@@ -5289,7 +5289,7 @@
       "damageDicePrimary": "3d6",
       "damageTypePrimary": "Psychic",
       "description": "The banshee releases a mournful wail if it isn't in sunlight. Constitution Saving Throw: DC 13, each creature within 30 feet that can hear the wail and isn't a Construct or an Undead. Failure: If the target has 25 Hit Points or fewer, it drops to 0 Hit Points. Otherwise, the target takes 10 (3d6) Psychic damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0352-deathly-wail-threshold-kill-inert.md"
     },
     {
       "id": "MA-0353",
@@ -5301,7 +5301,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The devil makes one Claws attack and one Tail attack, or it makes two Hurl Flame attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0354",
@@ -5320,7 +5320,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 10 (2d6 + 3) Piercing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13) from both claws.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0354-claws-grapple-clause-inert.md"
     },
     {
       "id": "MA-0355",
@@ -5336,7 +5336,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 14 (2d10 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0356",
@@ -5352,7 +5352,7 @@
       "damageTypePrimary": "Fire",
       "range": "150 ft.",
       "description": "Ranged Attack Roll: +5, range 150 ft. Hit: 17 (5d6) Fire damage. If the target is a flammable object that isn't being worn or carried, it starts burning.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0357",
@@ -5368,7 +5368,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: S (1d6 + 2} piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0358",
@@ -5383,7 +5383,7 @@
       "damageDicePrimary": "1d6 + 2",
       "damageTypePrimary": "Piercing",
       "description": "Ranged Weapon Attack:+4 to hit, range 80/ 320 ft., one target. Hit: 5 (1d6 + 2} piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0359",
@@ -5395,7 +5395,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The barlgura makes one Tormenting Bite attack and two Thrash attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0360",
@@ -5413,7 +5413,7 @@
       "damageTypeSecondary": "Psychic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage plus 13 (2d12) Psychic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0361",
@@ -5432,7 +5432,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 9 (1d10 + 4) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0361-thrash-prone-clause-inert.md"
     },
     {
       "id": "MA-0362",
@@ -5444,7 +5444,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The barlgura casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 13):2/Day Each: Disguise Self, Invisibility (self only)1/Day Each: Entangle, Phantasmal Killer (level 6 version)",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0362-prose-dc-save-leg.md"
     },
     {
       "id": "MA-0363",
@@ -5462,7 +5462,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Piercing damage plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0364",
@@ -5477,7 +5477,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 1 Piercing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0364-bat-bite-flat-damage-never-applied.md"
     },
     {
       "id": "MA-0365",
@@ -5489,7 +5489,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The devil makes one Beard attack and one Infernal Glaive attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0366",
@@ -5508,7 +5508,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage, and the target has the Poisoned condition until the start of the devil's next turn. Until this poison ends, the target can't regain Hit Points.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0366-beard-poison-clauses-inert.md"
     },
     {
       "id": "MA-0367",
@@ -5527,7 +5527,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 8 (1d10 + 3) Slashing damage. If the target is a creature and doesn't already have an infernal wound, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target receives an infernal wound. While wounded, the target loses 5 (1d10) Hit Points at the start of each of its turns. The wound closes after 1 minute, after a spell restores Hit Points to the target, or after the target or a creature within 5 feet of it takes an action to stanch the wound, doing so by succeeding on a DC 12 Wisdom (Medicine) check.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0367-infernal-wound-inert.md"
     },
     {
       "id": "MA-0368",
@@ -5539,7 +5539,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The behir makes one Bite attack and uses Constrict.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0369",
@@ -5557,7 +5557,7 @@
       "damageTypeSecondary": "Lightning",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 19 (2d12 + 6) Piercing damage plus 11 (2d10) Lightning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0370",
@@ -5578,7 +5578,7 @@
         "restrained"
       ],
       "description": "Strength Saving Throw: DC 18, one Large or smaller creature the behir can see within 5 feet. Failure: 28 (5d8 + 6) Bludgeoning damage. The target has the Grappled condition (escape DC 16), and it has the Restrained condition until the grapple ends.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0371",
@@ -5596,7 +5596,7 @@
       "damageTypePrimary": "Lightning",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 16, each creature in a 90-foot-long, 5-foot-wide Line. Failure: 66 (12d10) Lightning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0372",
@@ -5608,7 +5608,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The beholder uses Eye Rays three times.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0373",
@@ -5624,7 +5624,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 13 (3d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0374",
@@ -5651,7 +5651,7 @@
         "unconscious"
       ],
       "description": "The beholder randomly shoots one of the following magical rays at a target it can see within 120 feet of itself (roll 1d10; reroll if the beholder has already used that ray during this turn):Charm Ray. Wisdom Saving Throw: DC 16. Failure: 13 (3d8) Psychic damage, and the target has the Charmed condition for 1 hour or until it takes damage. Success: Half damage only.Paralyzing Ray. Constitution Saving Throw: DC 16. Failure: The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.Fear Ray. Wisdom Saving Throw: DC 16. Failure: 14 (4d6) Psychic damage, and the target has the Frightened condition until the end of its next turn. Success: Half damage only.Slowing Ray. Constitution Saving Throw: DC 16. Failure: 18 (4d8) Necrotic damage. Until the end of the target's next turn, the target's Speed is halved; the target can't take Reactions; and it can take either an action or a Bonus Action on its turn, not both. Success: Half damage only.Enervation Ray. Constitution Saving Throw: DC 16. Failure: 13 (3d8) Poison damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only.Telekinetic Ray. Strength Saving Throw: DC 16 (the target succeeds automatically if it is Gargantuan). Failure: The beholder moves the target up to 30 feet in any direction. The target has the Restrained condition until the start of the beholder's next turn or until the beholder has the Incapacitated condition. The beholder can also exert fine control on objects with this ray, such as manipulating a tool or opening a door or container.Sleep Ray. Wisdom Saving Throw: DC 16 (the target succeeds automatically if it is a Construct or an Undead). Failure: The target has the Unconscious condition for 1 minute. The condition ends if the target takes damage or a creature within 5 feet of it takes an action to wake it.Petrification Ray. Constitution Saving Throw: DC 16. First Failure: The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure: The target has the Petrified condition instead of the Restrained condition.Disintegration Ray. Dexterity Saving Throw: DC 16. Failure: 36 (8d8) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust.Death Ray. Dexterity Saving Throw: DC 16. Failure: 55 (10d10) Necrotic damage. Success: Half damage. Failure or Success: The target dies if the ray reduces it to 0 Hit Points.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0374-eye-rays-unparseable-shell.md"
     },
     {
       "id": "MA-0375",
@@ -5663,7 +5663,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the beholder can expend a use to take one of the following actions. The beholder regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0375-beholder-legendary-header-no-uses-field-economy-dead.md"
     },
     {
       "id": "MA-0376",
@@ -5675,7 +5675,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The beholder makes two Bite attacks.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0376-chomp-legendary-inert.md"
     },
     {
       "id": "MA-0377",
@@ -5687,7 +5687,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The beholder uses Eye Rays.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0377-glare-legendary-inert.md"
     },
     {
       "id": "MA-0378",
@@ -5699,7 +5699,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "A 50-foot square area of ground within 120 feet of the beholder becomes slimy; that area is difficult terrain until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0378-beholder-lair-action-inert.md"
     },
     {
       "id": "MA-0379",
@@ -5716,7 +5716,7 @@
         "grappled"
       ],
       "description": "Walls within 120 feet of the beholder sprout grasping appendages until initiative count 20 on the round after next. Each creature of the beholder's choice that starts its turn within 10 feet of such a wall must succeed on a DC 15 Dexterity saving throw or be grappled. Escaping requires a successful DC 15 Strength (Athletics) or Dexterity (Acrobatics) check.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0379-grasping-walls-lair-inert.md"
     },
     {
       "id": "MA-0380",
@@ -5733,7 +5733,7 @@
         "grappled"
       ],
       "description": "An eye opens on a solid surface within 60 feet of the beholder. One random eye ray of the beholder shoots from that eye at a target of the beholder's choice that it can see. The eye then closes and disappears.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0380-surfaced-eye-lair-action-inert.md"
     },
     {
       "id": "MA-0381",
@@ -5745,7 +5745,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The zombie uses Eye Rays twice.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0382",
@@ -5761,7 +5761,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 16 (4d6 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0383",
@@ -5783,7 +5783,7 @@
         "poisoned"
       ],
       "description": "The zombie randomly shoots one of the following magical rays at a target it can see within 120 feet of itself (roll 1d4; reroll if the zombie has already used that ray during this turn):Paralyzing Ray. Constitution Saving Throw: DC 14. Failure: The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.Fear Ray. Wisdom Saving Throw: DC 14. Failure: 13 (3d8) Psychic damage, and the target has the Frightened condition until the end of its next turn.Enervation Ray. Constitution Saving Throw: DC 14. Failure: 10 (3d6) Necrotic damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only.Disintegration Ray. Dexterity Saving Throw: DC 14. Failure: 27 (5d10) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0383-eye-rays-unparseable-shell.md"
     },
     {
       "id": "MA-0384",
@@ -5799,7 +5799,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 9 (1d12 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0385",
@@ -5811,7 +5811,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The berserker makes three attacks, using Greataxe or Javelin in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0386",
@@ -5829,7 +5829,7 @@
       "damageTypeSecondary": "Thunder",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 10 (1d12 + 4) Slashing damage, plus 10 (3d6) Thunder damage to the target or another creature within 5 feet of the target.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0387",
@@ -5846,7 +5846,7 @@
       "reach": "5 ft.",
       "range": "30/120 ft.",
       "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 30/120 ft. Hit: 18 (4d6 + 4) Piercing damage, and the target's Speed decreases by 5 feet until the start of the berserker's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0388",
@@ -5861,7 +5861,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+2+WIS modifier Piercing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0388-beasts-strike-dynamic-formula-inert.md"
     },
     {
       "id": "MA-0389",
@@ -5876,7 +5876,7 @@
       "damageTypePrimary": "bludgeoning/piercing/slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+2+WIS modifier Bludgeoning/Piercing/Slashing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0389-beasts-strike-dynamic-formula-inert.md"
     },
     {
       "id": "MA-0390",
@@ -5894,7 +5894,7 @@
         "prone"
       ],
       "description": "The beast charges forward 20 ft. The target must succeed on a DC 20 Strength saving throw or be knocked prone.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0391",
@@ -5909,7 +5909,7 @@
       "damageTypePrimary": "bludgeoning/piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +spell attack modifier, reach 5 ft. Hit: 1d6+2+WIS modifier Bludgeoning/Piercing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0391-beasts-strike-dynamic-formula-inert.md"
     },
     {
       "id": "MA-0392",
@@ -5927,7 +5927,7 @@
         "grappled"
       ],
       "description": "The beast lunges to grapple the target. The target must succeed on a DC 20 Wisdom saving throw or become grappled.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0393",
@@ -5939,7 +5939,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The bear makes two Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0394",
@@ -5955,7 +5955,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0395",
@@ -5967,7 +5967,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes two Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0396",
@@ -5985,7 +5985,7 @@
       "damageTypeSecondary": "Acid",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage plus 2 (1d4) Acid damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0397",
@@ -6003,7 +6003,7 @@
       "damageTypePrimary": "Acid",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 11, each creature in a 15-foot-long, 5-foot-wide Line. Failure: 22 (5d8) Acid damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0398",
@@ -6019,7 +6019,7 @@
       "damageTypePrimary": "Acid",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 17 (4d6 + 3) Acid damage. Nonmagical armor worn by the target takes a \u22121 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the Mending spell on the armor.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0399",
@@ -6031,7 +6031,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "Trigger: While the pudding is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or Slashing damage. Response: The pudding splits into two new Black Puddings. Each new pudding is one size smaller than the original pudding and acts on its Initiative. The original pudding's Hit Points are divided evenly between the new puddings (round down).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0399-split-reaction-inert.md"
     },
     {
       "id": "MA-0400",
@@ -6047,7 +6047,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 5 (1d4 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0401",
@@ -6059,7 +6059,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The blob makes two Pseudopod attacks and uses Engulf. It can replace one attack with a use of Restraining Glob.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0402",
@@ -6075,7 +6075,7 @@
       "damageTypePrimary": "Force",
       "reach": "30 ft.",
       "description": "Melee Attack Roll: +15, reach 30 ft. Hit: 24 (3d10 + 8) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0403",
@@ -6095,7 +6095,7 @@
         "restrained"
       ],
       "description": "The blob moves up to its Speed and can move through the spaces of Huge or smaller creatures and objects. Strength Saving Throw: DC 23, each creature or object whose space the blob enters for the first time during this move. Failure: The target is engulfed. While engulfed, a target has Total Cover against attacks and other effects outside the blob, and when the blob moves, the engulfed target moves with it. A nonmagical object is destroyed after spending 1 minute engulfed. While engulfed, a creature takes 21 (6d6) Force damage at the start of each of its turns, is suffocating, has the Restrained condition, and repeats the save at the end of each of its turns. An engulfed creature that is reduced to 0 Hit Points dissolves into ash, which is ejected into the Astral Sea. Success: The target escapes and enters the nearest unoccupied space.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0404",
@@ -6115,7 +6115,7 @@
         "restrained"
       ],
       "description": "The blob lobs a slimy glob at one Large or smaller creature it can see within 600 feet of itself. Dexterity Saving Throw: DC 23, the targeted creature. Failure: 18 (3d6 + 8) Acid damage. The glob rolls the target 60 feet straight toward the blob, and the target has the Restrained condition until the end of its next turn, when the glob harmlessly dissolves. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0405",
@@ -6127,7 +6127,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the blob can expend a use to take one of the following actions. The blob regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0405-legendary-uses-key-missing-dead-economy.md"
     },
     {
       "id": "MA-0406",
@@ -6141,7 +6141,7 @@
       "damageDicePrimary": "4d6",
       "damageTypePrimary": "Necrotic",
       "description": "The blob deals 14 (4d6) Necrotic damage to each creature engulfed by it. The blob can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0406-decay-ungated-zero-spend-unrefused-repeat-fire.md"
     },
     {
       "id": "MA-0407",
@@ -6153,7 +6153,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The blob uses Restraining Glob. The blob can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0407-grasping-glob-zero-affordance-inert-alias.md"
     },
     {
       "id": "MA-0408",

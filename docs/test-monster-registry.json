@@ -1,4 +1,264 @@
 {
+  "Blob of Annihilation": {
+    "monsterIndex": "blob-of-annihilation",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Blob of Annihilation 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0401 (PASS multiattack header; Pseudopod +15 3d10+8 Force x2 exact + Engulf/Glob DC23 rows render, Glob save live) | MA-0402 (PASS Pseudopod standalone +15: 3d10+8 Force x3 exact vs AC9) | MA-0403 (PASS-subset Engulf DC23 STR: fail Restrained+6d6=18 lands, tick/engulf/suffocate ungated gaps) | MA-0404 (PASS-subset Glob DC23 DEX: fails 14/23 Acid+Restrained x2, success half10 exact, pull-gap honest) | MA-0405 (BROKEN legendary header: no uses key dead economy MA-0375 twin, children ungated; bug-mon-MA-0405) | MA-0406 (BROKEN Decay legendary: chip fires ungated x2 unrefused 12+9 landed, zero spend/cooldown; bug-mon-MA-0406) | MA-0407 (BROKEN Grasping Glob legendary: zero-affordance inert alias, no forwarding seam; bug-mon-MA-0407)",
+      "date": "2026-09-16"
+    }
+  },
+  "Blink Dog": {
+    "monsterIndex": "blink-dog",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Blink Dog 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0400 (PASS Bite +5 1d4+3 Piercing: boundary nat3/4 vs AC9, 4 hits exact, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Black Pudding": {
+    "monsterIndex": "black-pudding",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Black Pudding 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0398 (PASS-subset Dissolving Pseudopod +5: 4d6+3 Acid x4 exact vs AC9, armor-degradation gap objects-only) | MA-0399 (BROKEN Split reaction: no trigger/affordance/duplication automation; triggers fired zero split; bug-mon-MA-0399)",
+      "date": "2026-09-16"
+    }
+  },
+  "Black Dragon Wyrmling": {
+    "monsterIndex": "black-dragon-wyrmling",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Black Dragon Wyrmling 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0395 (PASS multiattack header; Rend +4 1d6+2 Slashing+1d4 Acid dual x2 exact vs AC9, 2 misses zero) | MA-0396 (PASS Rend standalone +4 own chip: x15 hits dual Slashing+Acid exact incl crit 18, miss-zero) | MA-0397 (PASS-subset Acid Breath DC11 DEX: recharge refuse + full20/floor-half6 exact, rolls-echo gap)",
+      "date": "2026-09-16"
+    }
+  },
+  "Black Bear": {
+    "monsterIndex": "black-bear",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Black Bear 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0393 (PASS multiattack header; Rend +4 1d6+2 Slashing incl nat20 crit 2d6+2 exact vs AC9, miss-zero) | MA-0394 (PASS Rend standalone +4: 1d6+2 Slashing exact hits, miss-zero vs AC9)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bestial Spirit (Water)": {
+    "monsterIndex": "bestial-spirit-water",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bestial Spirit (Water) 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0391 (BROKEN Beast's Strike: dynamic tokens chip-suppressed MA-0388 twin; bug-mon-MA-0391) | MA-0392 (PASS Grapple DC20 WIS chip: fail Grappled lands meta+log, success clean, zero-damage)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bestial Spirit (Land)": {
+    "monsterIndex": "bestial-spirit-land",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bestial Spirit (Land) 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0389 (BROKEN Beast's Strike: dynamic tokens unresolved chip-suppressed MA-0388 twin; bug-mon-MA-0389) | MA-0390 (PASS Charge DC20 STR chip live: fail Prone lands meta+log, success clean, zero-damage)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bestial Spirit (Air)": {
+    "monsterIndex": "bestial-spirit-air",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bestial Spirit (Air) 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0388 (BROKEN Beast's Strike: dynamic tokens unresolved, attack_bonus null -> chip suppressed MA-0014; bug-mon-MA-0388)",
+      "date": "2026-09-16"
+    }
+  },
+  "Berserker Commander": {
+    "monsterIndex": "berserker-commander",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Berserker Commander 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0385 (PASS multiattack header; Greataxe +7 1d12+4+3d6 Thunder + Javelin +7 4d6+4 exact, 2 misses zero) | MA-0386 (PASS-subset Greataxe +7 own chip: dual Slashing+Thunder x3 exact to primary, splash-choice gap noted, miss-zero x2) | MA-0387 (PASS-subset Javelin +7: crit 8d6+4=36 + 18 Piercing exact, speed-5 ungated gap)",
+      "date": "2026-09-16"
+    }
+  },
+  "Berserker": {
+    "monsterIndex": "berserker",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Berserker 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0384 (PASS Greataxe +5 1d12+3 Slashing: boundary nat3/4 vs AC9, 6 hits exact, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Beholder Zombie": {
+    "monsterIndex": "beholder-zombie",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Beholder Zombie 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0381 (PASS multiattack header; Eye Rays DC14 Varies chip live save x2, picker absent GM-adjudicated) | MA-0382 (PASS Bite +5 4d6+2 Piercing: boundary nat3/4 vs AC9, 3 hits exact, miss-zero) | MA-0383 (BROKEN Eye Rays: Varies-shell mod-0 aura-only, zero ray effects x2 legs MA-0374 twin; bug-mon-MA-0383)",
+      "date": "2026-09-16"
+    }
+  },
+  "Beholder": {
+    "monsterIndex": "beholder",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Beholder 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0372 (PASS multiattack header; Eye Rays DC16 chip live save x2, Varies-damage GM-adjudicated) | MA-0373 (PASS Bite +8: boundary nat10/11 vs AC19, 3d6+3 Piercing x2 exact, miss-zero) | MA-0374 (BROKEN Eye Rays: Varies-type mod-0 shell, no picker, zero ray damage/conditions ever; bug-mon-MA-0374) | MA-0375 (BROKEN legendary header: no uses field -> counter/gate/children all dead MA-0217 class; bug-mon-MA-0375) | MA-0376 (BROKEN Chomp legendary child: 0 clickables economy-dead same class; bug-mon-MA-0376) | MA-0377 (BROKEN Glare legendary child: zero-affordance economy-dead same class; bug-mon-MA-0377) | MA-0378 (BROKEN lair action: bare string, zero affordance/scheduler; bug-mon-MA-0378) | MA-0379 (BROKEN lair grasping-walls: name-gate false no save_dc, static zero-affordance; bug-mon-MA-0379) | MA-0380 (BROKEN surfaced-eye lair action: name-gate false inert same class; bug-mon-MA-0380)",
+      "date": "2026-09-16"
+    }
+  },
+  "Behir": {
+    "monsterIndex": "behir",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Behir 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0368 (PASS multiattack header; Bite +10 2d12+6+2d10 Ltn exact x2, Constrict DC18 STR fail 5d8+6 + Grappled/Restrained LAND) | MA-0369 (PASS Bite standalone +10: crit 4d12+6+4d10=68 dice-only, dual exact, miss-zero) | MA-0370 (PASS-subset Constrict DC18 STR: fail 5d8+6 + Grappled/Restrained LAND x2, success half-mislabel + escapeDC16 gap) | MA-0371 (PASS Lightning Breath DC16 DEX: recharge 5-6 economy live x6, 90ft Line picker, half x4 full x2 exact)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bearded Devil": {
+    "monsterIndex": "bearded-devil",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bearded Devil 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0365 (PASS multiattack header; Beard 1d8+3 Pier x2 + Infernal Glaive 1d10+3 w/ DC12 save-half seam exact vs AC19) | MA-0366 (BROKEN Beard: dmg+crit exact, Poisoned+no-heal prose-inert MA-0320 class; bug-mon-MA-0366) | MA-0367 (BROKEN Infernal Glaive: attack+save seam live dmg exact, infernal-wound state+tick ungated no consumer; bug-mon-MA-0367)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bat": {
+    "monsterIndex": "bat",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bat 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0364 (BROKEN Bite: +4 flip exact, flat-1 never applied MA-0322 fingerprint x3rd; bug-mon-MA-0364)",
+      "date": "2026-09-16"
+    }
+  },
+  "Basilisk": {
+    "monsterIndex": "basilisk",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Basilisk 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0363 (PASS Bite +5: boundary nat4 vs AC9, 2d6+3 Pier + 2d6 Poison x4 exact, HW to 0HP, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Barlgura": {
+    "monsterIndex": "barlgura",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Barlgura 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0359 (PASS multiattack header; Tormenting Bite +7 2d6+4+2d12 Psychic halved + Thrash 1d10+4 exact vs AC19) | MA-0360 (PASS Tormenting Bite standalone +7: 3 hits dual exact, psychic-half-only resisted marker, nat11 miss zero) | MA-0361 (BROKEN Thrash: dmg exact x2, prone clause keys-absent inert MA-0288 class; bug-mon-MA-0361) | MA-0362 (BROKEN Spellcasting: prose-DC two-layer save-legs dead MA-0348 class, links+gates live; bug-mon-MA-0362)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bard": {
+    "monsterIndex": "bard",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bard 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0357 (PASS-subset Shortsword +4: structured dice wins over malformed prose typo, 3 hits exact, miss-zero) | MA-0358 (PASS-subset Shortbow +4 own chip: 3 hits 1d6+2 exact, 2 misses zero, prose typo cosmetic)",
+      "date": "2026-09-16"
+    }
+  },
+  "Barbed Devil": {
+    "monsterIndex": "barbed-devil",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Barbed Devil 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0353 (PASS multiattack header; Claws 2d6+3 Pier + Tail + Hurl Flame 5d6 Fire all live exact vs AC19, miss-zero) | MA-0354 (BROKEN Claws: dmg exact x2, grapple escape-DC13 prose-only never lands MA-0288 class; bug-mon-MA-0354) | MA-0355 (PASS Tail standalone +6: boundary nat13 hit, 2d10+3 Slashing x2 exact, 3 crit/miss zero) | MA-0356 (PASS-subset Hurl Flame +5: crit 10d6=42 + 5d6=25 exact, object-burning gap; + MA rows complete)",
+      "date": "2026-09-16"
+    }
+  },
+  "Banshee": {
+    "monsterIndex": "banshee",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Banshee 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0349 (PASS multiattack header; Corrupting Touch +5 1d8+3 Necrotic exact incl crit + Horrify DC13 WIS chip live) | MA-0350 (PASS Corrupting Touch standalone +5: 10 hits 1d8+3 Necrotic exact, nat2 sole miss zero) | MA-0351 (PASS-subset Horrify DC13 WIS: fail Frightened lands meta+log, success clean, 24h-immunity gap) | MA-0352 (BROKEN Deathly Wail: threshold-kill ungated, success deals half-dmg no dc_success key, 1/Day ungated; bug-mon-MA-0352)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bandit Deceiver": {
+    "monsterIndex": "bandit-deceiver",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bandit Deceiver 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0345 (PASS multiattack header; Dagger +6 2d4+3 Pier + 3d6 Poison x2 hits exact boundary AC19, 3 misses zero) | MA-0346 (PASS Dagger standalone +6 own chip: 2 hits dual 2d4+3+3d6 Poison exact, 3 misses zero) | MA-0347 (PASS Blinding Flash DC14 CON: recharge 4-6 refuse d6<4 + round6 recover, floor-half success, Blinded lands on fail GM-clock) | MA-0348 (BROKEN Spellcasting: no save_dc + damageless-save advisory routing gap, Hold Person save never adjudicated; bug-mon-MA-0348)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bandit Crime Lord": {
+    "monsterIndex": "bandit-crime-lord",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bandit Crime Lord 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0342 (PASS multiattack header; Scimitar +9 2d6+5+4d6 Poison + Pistol +9 1d10+5+4d6 Poison exact incl crit, miss-zero) | MA-0343 (PASS Scimitar standalone +9: boundary nat5/15, dual 2d6+5+4d6 Poison x3 exact, miss-zero) | MA-0344 (PASS Pistol standalone +9: boundary nat9/10, 1d10+5 Pier + 4d6 Poison x2 exact, crit-miss zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bandit Captain": {
+    "monsterIndex": "bandit-captain",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bandit Captain 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0338 (PASS multiattack header; Scimitar +5 1d6+3 Slashing + Pistol +5 1d10+3 Piercing exact, miss-zero) | MA-0339 (PASS Scimitar standalone +5, 2 hits 1d6+3 exact + 4 misses zero vs AC19) | MA-0340 (PASS Pistol standalone +5: boundary nat13/14, 1d10+3 x2 exact, 5 misses zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Bandit": {
+    "monsterIndex": "bandit",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bandit 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0336 (PASS Scimitar +3 1d6+1 Slashing: boundary nat5/6 vs AC9, crit 2d6+1 flat-mod x1, miss-zero) | MA-0337 (PASS Light Crossbow +3: boundary nat15/16 vs AC19, 1d8+1 Piercing x2 exact, miss-zero)",
+      "date": "2026-09-16"
+    }
+  },
+  "Balor": {
+    "monsterIndex": "balor",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Balor 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0333 (PASS multiattack header; Flame Whip 3d6+8 Force+5d6 Fire + Lightning Blade 3d8+8+4d10 Ltn exact vs AC19, miss-zero) | MA-0334 (BROKEN Flame Whip: dual dmg exact 3 hits, prose Prone+pull keys-absent inert MA-0288 class; bug-mon-MA-0334) | MA-0335 (BROKEN Lightning Blade: dmg exact x2 hits, no-Reactions clause inert no save_effect producer; bug-mon-MA-0335) | MA-0341 (BROKEN Parry reaction: ungated no consumer, hit probe AC unmodified; bug-mon-MA-0341)",
+      "date": "2026-09-16"
+    }
+  },
+  "Badger": {
+    "monsterIndex": "badger",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Badger 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0332 (BROKEN Bite: +2 boundary exact, flat-1 Piercing never applied MA-0322 fingerprint; bug-mon-MA-0332)",
+      "date": "2026-09-16"
+    }
+  },
   "Baboon": {
     "monsterIndex": "baboon",
     "placedIn": "test-campaign initiative via EB Join Encounter",
