@@ -4406,7 +4406,7 @@
       "range": "25/50 ft.",
       "recharge": "6",
       "description": "Ranged Attack Roll: +5, range 25/50 ft. Hit: 10 (2d6 + 3) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0295",

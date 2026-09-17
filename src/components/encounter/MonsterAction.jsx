@@ -15,6 +15,13 @@ function rechargeSpent(gateInfo) {
   return !!gateInfo && !gateInfo.available;
 }
 
+// MA-0294: a spent attack-row chip mirrors the save-chip precedent
+// (mc-dice-link-spell-spent) but stays clickable — the click routes to
+// handleAttack's honest refusal popup/log.
+function attackChipClass(rechargeOut) {
+  return `mc-dice-link${rechargeOut ? ' mc-dice-link-spell-spent' : ''}`;
+}
+
 // MA-0031: recharge label — a spent row reads "(Recharge 6 — unavailable)".
 // MA-0049: structured usage {recharge on roll, min_value 5} reads
 // "(Recharge 5+)" — the rechargeDisplayText helper covers both shapes.
@@ -178,7 +185,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
-        <span className="mc-dice-link" onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
+        <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
         </span>
       )}

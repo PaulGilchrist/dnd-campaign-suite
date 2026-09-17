@@ -1082,6 +1082,15 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   }, []);
 
   const handleAttack = (name, bonus, action) => {
+    // MA-0294: recharge gate on ATTACK-roll rows (Ape Rock Recharge 6) —
+    // mirrors the block-save seam exactly: a spent row refuses with popup +
+    // `<action-slug>_refused (not recharged)` log, zero roll zero spend;
+    // gate-bearing rows spend the recharge on fire (same MONSTER_RECHARGE_KEY
+    // semantics; turn-start d6 recovery already rides rollMonsterRecharges
+    // via the turnStartEffects seam for spent markers). Gateless rows and
+    // synthesized spell-attack actions (no recharge) are byte-inert.
+    const recharge = rechargeRefusalOnSpent({ action, spellInfo: null, monsterName, campaignName, setPopupHtml });
+    if (recharge.refused) return;
     const target = getTarget();
     if (psychicStrikePreconditionFailed(name, target, allTargetEffects)) return;
 
@@ -1111,6 +1120,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
     const { isAutoMiss, rangeReason, rangeForcedMode } = computeMapRangeState(mapData, target, monsterName, attackRange);
     const { coverAcBonus, coverLevel, coverReason } = computeCoverState(isAutoMiss, target, characters, mapData, campaignName);
+
+    // MA-0294: recharge fire-spend, mirroring the save-path picker-open
+    // spend (CLA-384) — same map-write recipe, only for gate rows.
+    if (recharge.gate) {
+      spendMonsterRecharge({ monsterName, action, campaignName })
+        .catch((e) => { console.error('[MonsterCardModal] Error spending attack recharge:', e); });
+    }
 
     rollAttack(name, effectiveBonus, buildAttackRollOptions({
       action,
