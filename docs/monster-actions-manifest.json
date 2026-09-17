@@ -4576,7 +4576,7 @@
       "category": "reactions",
       "actionType": "save",
       "description": "The hag casts Counterspell in response to that spell's trigger, using the same spellcasting ability as Spellcasting. If the target fails its saving throw, it is cursed until the end of its next turn. Until the curse ends, the target can't cast spells with a Verbal component, and when it speaks, it says the opposite of what it means.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0306",
