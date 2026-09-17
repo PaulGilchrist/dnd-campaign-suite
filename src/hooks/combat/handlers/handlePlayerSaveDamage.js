@@ -131,6 +131,20 @@ function computePlayerSaveAdvantage({ targetConditionEffects, saveType, target, 
         hasBuffEffect(target.name, 'advantage_attacks_and_saves', campaignName));
 }
 
+// MA-0298: combo attack+save crit — the attack popup's crit flag rides the
+// pending prompt so computeSecondaryRoll doubles the secondary dice via the
+// SAME rollExpressionDoubled consumer plain attacks use (the primary total
+// arrives pre-doubled from autoDamageRoll). Plus the Soul Tome trap arms —
+// consumed at the save-result fail seam. Byte-inert for every other row.
+function comboCritAndTrapArms(context) {
+    return {
+        isAutoCrit: context?.isAutoCrit || false,
+        saveConditions: context?.saveConditions || null,
+        soulTomeTrap: context?.soulTomeTrap || null,
+        repeatSave: context?.repeatSave || null,
+    };
+}
+
 function buildPendingData({ context, target, campaignName, characterName, setPopupHtml, name, formula, modifier, rolls, adjustedTotal, saveDc, saveType, dcSuccess, damageType, saveDisadvantage, saveAdvantage }) {
     const { attackerName, isCantrip, overchannelActive, overchannelUseCount, overchannelSpellLevel, statusEffects, playerStats, viciousMockerySpell, viciousMockeryMapName, autoDamageSecondaryFormula, autoDamageSecondaryName, autoDamageSecondaryDamageType } = context || {};
     return {
@@ -150,6 +164,7 @@ function buildPendingData({ context, target, campaignName, characterName, setPop
         autoDamageSecondaryFormula: autoDamageSecondaryFormula || null,
         autoDamageSecondaryName: autoDamageSecondaryName || null,
         autoDamageSecondaryDamageType: autoDamageSecondaryDamageType || null,
+        ...comboCritAndTrapArms(context),
         // CLA-324: this seam is player-cast save-spell damage — spell-origin.
         isSpellDamage: true,
     };

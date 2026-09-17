@@ -322,7 +322,10 @@ export function createSaves(deps) {
 
         const normalizedSaveType = normalizeSaveType(saveType);
         const evasionFlags = resolveEvasionFlags({ pending, targetChar, normalizedSaveType, selectedAllies, allCharacters: charactersRef.current || [], campaignName });
-        let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, evasionFlags.hasEvasion);
+        // MA-0298: Soul Tome combo hit damage is unconditional — full damage on
+        // a successful save (the save gates only the trap). MA-0218 semantics
+        // (no trap arm) stay byte-identical.
+        let finalDamage = pending.soulTomeTrap ? pending.rawDamage : computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, evasionFlags.hasEvasion);
 
         if (evasionFlags.hasEvasion) {
             logQuickRollEvasion({ pending, saveResult, saveType, evasionFlags, circleOfPowerAdvantage, logEntry });

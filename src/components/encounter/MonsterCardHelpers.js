@@ -173,6 +173,19 @@ export function parseBanishTransportClause(saveEffect) {
 // `banished_demiplane` (Banish wording never matches) and from the PC spell
 // `banishment`. Byte-inert (null) for rows without the clause; the ancient
 // gold dragon's lair dict gained the clause in MA-0222 (byte-mirror here).
+// MA-0298: authored failed-save Soul Tome trap clause (Arcanaloth Banishing
+// Claw — "the target is trapped in a demiplane inside the Soul Tome ... the
+// target repeats the save, escaping the tome on a success"). RAW byte stays
+// "trapped" (parseBanishTransportClause MA-0104 matches "transported to a
+// harmless demiplane" ONLY — its wording never matches here and vice versa).
+// Distinct soulTome flag arms the INDEFINITE trap producer (soulTomeTrapService
+// — no expiry clock until a repeat save ends it), per the MA-0104 te shape with
+// duration honest. Byte-inert (null) for every other row.
+export function parseSoulTomeTrapClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  return /trapped in a demiplane/i.test(saveEffect) ? { effect: 'banished_demiplane', soulTome: true } : null;
+}
+
 export function parseDreamPlaneBanishClause(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return null;
   return /banished to a dream plane/i.test(saveEffect) ? { effect: 'lair_dream_plane' } : null;

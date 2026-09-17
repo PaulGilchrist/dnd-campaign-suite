@@ -6159,6 +6159,8 @@
         "reach": "5 ft.",
         "save_dc": 17,
         "save_type": "Charisma",
+        "dc_success": "none",
+        "repeat_save": { "save_type": "Charisma" },
         "damage_dice_primary": "2d4 + 5",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "3d12",

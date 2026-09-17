@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -110,6 +110,17 @@ function zoneTeForAction(action) {
 // MA-0031: recharge gate at row click — a spent breath weapon refuses with a
 // popup + `<action-slug>_refused (not recharged)` log, zero save prompts.
 // Returns { refused, gate } (gate null when refused or row not rechargeable).
+// MA-0298: combo trap arms (Soul Tome te parse + fail conditions + the
+// MA-0048 repeat-save clause) ride the auto-damage context to the player
+// save-result seam. Byte-inert nulls for every other row.
+function comboTrapArmsFrom(autoDamage) {
+  return {
+    saveConditions: autoDamage.saveConditions || null,
+    soulTomeTrap: autoDamage.soulTomeTrap || null,
+    repeatSave: autoDamage.repeatSave || null,
+  };
+}
+
 function rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml }) {
   const gate = spellInfo ? null : monsterRechargeGate(action, getRuntimeValue(monsterName, MONSTER_RECHARGE_KEY));
   if (gate && !gate.available) {
@@ -539,6 +550,12 @@ function buildSaveOptions(action) {
     saveType: action?.save_type ? toAbbr(action.save_type) : null,
     dcSuccess: action?.save_dc != null ? (action?.dc_success ?? 'half') : null,
     saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
+    // MA-0298: Soul Tome trap arm rides the attack+save combo context to the
+    // player-save-result fail seam (soulTomeTrapService). Byte-inert null for
+    // every non-trap row; MA-0104 "transported" wording never matches here.
+    soulTomeTrap: parseSoulTomeTrapClause(action?.save_effect),
+    // MA-0048 repeat_save seam: arm the turn-END repeat save on a fail.
+    repeatSave: action?.repeat_save || null,
   };
 }
 
@@ -1026,6 +1043,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               context.saveType = autoDamage.saveType;
               context.dcSuccess = autoDamage.dcSuccess;
             }
+            // MA-0298: combo attack+save legs carry the trap arm + fail
+            // conditions + repeat-save clause to the save-result seam.
+            Object.assign(context, comboTrapArmsFrom(autoDamage));
             if (autoDamage.secondaryFormula) {
               context.autoDamageSecondaryFormula = autoDamage.secondaryFormula;
               context.autoDamageSecondaryName = autoDamage.secondaryName || autoDamage.name;

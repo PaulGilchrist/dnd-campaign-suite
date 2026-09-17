@@ -131,6 +131,16 @@ function buildRollLogEntry({ characterName, rollType, name, ctx, context, target
     };
 }
 
+// MA-0298: combo attack+save arms (trap te + fail conditions + repeat-save
+// clause) ride the auto-damage to the save seam. Byte-inert nulls elsewhere.
+function comboTrapArmsFromContext(context) {
+    return {
+        saveConditions: context?.saveConditions || null,
+        soulTomeTrap: context?.soulTomeTrap || null,
+        repeatSave: context?.repeatSave || null,
+    };
+}
+
 function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName }) {
     if (!context?.autoDamageFormula) return undefined;
     return {
@@ -158,6 +168,7 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         sneakAttackDice: context?.sneakAttackDice || 0,
         d20Roll: ctx.effectiveD20Roll,
         hitClause: context?.hitClause || null,
+        ...comboTrapArmsFromContext(context),
     };
 }
 
