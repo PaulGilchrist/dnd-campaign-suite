@@ -4141,7 +4141,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the animal lord can expend a use to take one of the following actions. The animal lord regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0278",
@@ -4153,7 +4153,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The animal lord moves up to its Speed without provoking Opportunity Attacks, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0279",
@@ -4165,7 +4165,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The animal lord makes one Radiant Ray attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0280",
