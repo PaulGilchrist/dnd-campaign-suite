@@ -5432,7 +5432,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 9 (1d10 + 4) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0361-thrash-prone-clause-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0362",

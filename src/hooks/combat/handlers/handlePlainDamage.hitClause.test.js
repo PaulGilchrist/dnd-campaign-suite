@@ -711,6 +711,93 @@ describe('MA-0291 Ankylosaurus Tail prone-on-hit hit-clause', () => {
     });
 });
 
+const BARLGURA = monsters.find(m => m.index === 'barlgura');
+const BARLGURA_THRASH_ACTION = BARLGURA.actions[2];
+
+describe('MA-0361 Barlgura Thrash prone-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Barlgura 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Barlgura 1', computedStats: { armorClass: 15 } },
+            { name: 'AberrantSorcerer', computedStats: { armorClass: 9 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 33, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'AberrantSorcerer', type: 'player', size: 'Medium', ac: 9, currentHp: 41, maxHp: 41 }],
+        });
+    });
+
+    it('MA-0361 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Thrash row', () => {
+        expect(BARLGURA_THRASH_ACTION.name).toBe('Thrash');
+        expect(BARLGURA_THRASH_ACTION.attack_bonus).toBe(7);
+        expect(BARLGURA_THRASH_ACTION.reach).toBe('5 ft.');
+        expect(BARLGURA_THRASH_ACTION.damage_dice_primary).toBe('1d10 + 4');
+        expect(BARLGURA_THRASH_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(BARLGURA_THRASH_ACTION.hit_conditions).toEqual(['prone']);
+        expect(BARLGURA_THRASH_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(BARLGURA_THRASH_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Thrash',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Thrash hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Thrash', formula: '1d10 + 4', total: 8, rolls: [4], modifier: 4, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Bludgeoning',
+            attackerName: 'Barlgura 1',
+            hitClause: buildHitConditionClause(BARLGURA_THRASH_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Barlgura 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'AberrantSorcerer',
+            condition: 'Prone',
+            reason: 'Thrash (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Thrash attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Thrash', formula: '1d10 + 4', total: 8, rolls: [4], modifier: 4, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Bludgeoning',
+            attackerName: 'Barlgura 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AberrantSorcerer', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AberrantSorcerer', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+
 const ASSASSIN = monsters.find(m => m.index === 'assassin');
 const ASSASSIN_SHORTSWORD_ACTION = ASSASSIN.actions[1];
 
