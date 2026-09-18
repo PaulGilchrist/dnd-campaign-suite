@@ -5675,7 +5675,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The beholder makes two Bite attacks.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0376-chomp-legendary-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0377",
