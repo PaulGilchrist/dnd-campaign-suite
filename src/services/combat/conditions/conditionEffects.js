@@ -321,6 +321,28 @@ const EARLY_TARGET_EFFECT_HANDLERS = {
   disadvantage_next_attack: (effects) => {
     bumpCount(effects, 'attackDisadvantageCount');
   },
+  // MA-0275: Animal Lord Marked as Prey — the lord's attacks against the
+  // marked target have Advantage until the start of the lord's next turn.
+  // Rides the verified vexTarget channel (next_attack_advantage / CLA-341
+  // Studied Attacks shape): combineAttackModes folds adv only when the
+  // current attack names the vexTarget.
+  marked_as_prey: (effects, te) => {
+    if (te.vexTarget) {
+      effects.vexAdvantageTargets = [...(effects.vexAdvantageTargets || []), te.vexTarget];
+    } else {
+      bumpCount(effects, 'attackAdvantageCount');
+      effects.attackAdvantageReasons.push(te.source || 'Marked as Prey');
+    }
+  },
+  // MA-0275: Animal Lord Pesky Swarm — Disadvantage on attack rolls AND
+  // ability checks until the end of the holder's next turn. attackDisadvantage
+  // feeds combineAttackModes (monster + PC attack modes); abilityCheckDisadvantage
+  // feeds CharAbilities/useCharActionsBaseActions check rolls (verified
+  // disadvantage_perception_checks consumer chain).
+  pesky_swarm: (effects) => {
+    bumpCount(effects, 'attackDisadvantageCount');
+    effects.abilityCheckDisadvantage = true;
+  },
   reckless_attack: (effects) => {
     bumpCount(effects, 'targetAdvantageCount');
     effects.targetAdvantageReasons.push('Reckless Attack');

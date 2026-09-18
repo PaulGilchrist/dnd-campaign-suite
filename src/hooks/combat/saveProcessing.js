@@ -12,6 +12,7 @@ import { registerTargetEffect, getActiveTargetEffect } from '../../services/comb
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
 import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
+import { setTempHp } from '../../services/automation/handlers/buffs/tempHpService.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -313,6 +314,12 @@ async function applyAuthoredClauseGrants({ context, saveSuccess, campaignName, a
     if (saveSuccess === false) {
         await applyFailedSaveClauseGrants({ context, campaignName, attackerName, applyTarget });
     }
+    // MA-0275: Animal Lord variant trio — the GM-chosen clause lands on
+    // EITHER outcome (the save gates only the damage). Variant key armed at
+    // the chip-click chooser, rides the save context.
+    if (context?.animalSpiritVariant) {
+        await applyAnimalSpiritVariantGrant({ context, saveSuccess, campaignName, attackerName, applyTarget });
+    }
 }
 
 // Failed-save te clause grants (MA-0038/0073/0093/0104) — split from the
@@ -540,6 +547,88 @@ async function grantAcPenaltyClause({ context, campaignName, attackerName, apply
         description: `${applyTarget} failed ${attackerName}'s ${actionName} save — takes a \u2212${value} penalty to AC until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:ac-penalty-granted]', e); });
+}
+
+// MA-0275: Animal Spirit variant grant. The GM picked a form variant at the
+// chip-click chooser; the clause lands on EITHER save outcome (the save
+// gates only the 4d10+6 Radiant damage). Fortify (Forager): the lord gains
+// temp HP (replace-if-larger, tempHpService semantics; MonsterCardModal
+// reads tempHp for display). Marked as Prey (Hunter): registry te
+// (marked_as_prey) on the LORD with vexTarget = the save target —
+// computeConditionEffects folds Advantage via the verified vexTarget channel
+// (CLA-341), rounds:2 clock anchored to the lord (MA-0104 shape,
+// until_start_of_attacker_next_turn). Pesky Swarm (Sage): registry te
+// (pesky_swarm) on the target — Disadvantage on attack rolls AND ability
+// checks until the end of its next turn (rounds:2 clock, MA-0073 shape).
+async function applyAnimalSpiritVariantGrant({ context, saveSuccess, campaignName, attackerName, applyTarget }) {
+    const variant = context.animalSpiritVariant;
+    const actionName = context?.actionName || context?.name || 'Animal Spirit';
+    const outcomeNote = saveSuccess ? 'succeeded' : 'failed';
+    if (variant === 'fortify') {
+        const amount = Number(context.animalSpiritFortifyHp) || 20;
+        setTempHp(attackerName, amount, campaignName);
+        const granted = Number(getRuntimeValue(attackerName, 'tempHp', campaignName)) || 0;
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'animal_spirit_fortify_granted',
+            characterName: attackerName,
+            sourceName: attackerName,
+            abilityName: actionName,
+            description: `Animal Spirit (Fortify, Forager form) — ${applyTarget} ${outcomeNote} the save; ${attackerName} gains ${amount} Temporary Hit Points.${granted >= amount ? '' : ` (tempHp write unconfirmed, now ${granted})`}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[saveProcessing:animal-spirit-fortify-granted]', e); });
+        return;
+    }
+    if (variant === 'marked_as_prey') {
+        registerTargetEffect(campaignName, attackerName, 'marked_as_prey', attackerName, {
+            duration: 'until_start_of_attacker_next_turn',
+            vexTarget: applyTarget,
+            actionName,
+        });
+        addExpiration({
+            attackerName,
+            targetName: attackerName,
+            campaignName,
+            rounds: 2,
+            effects: [{ type: 'remove_target_effect', effectKey: 'marked_as_prey', source: attackerName, target: attackerName }],
+        });
+        const granted = getActiveTargetEffect(campaignName, attackerName, 'marked_as_prey');
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'marked_as_prey_granted',
+            characterName: attackerName,
+            sourceName: attackerName,
+            abilityName: actionName,
+            description: `Animal Spirit (Marked as Prey, Hunter form) — ${applyTarget} ${outcomeNote} the save; ${attackerName} has Advantage on attack rolls against ${applyTarget} until the start of ${attackerName}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[saveProcessing:marked-as-prey-granted]', e); });
+        return;
+    }
+    if (variant === 'pesky_swarm') {
+        registerTargetEffect(campaignName, applyTarget, 'pesky_swarm', attackerName, {
+            duration: 'until_end_of_next_turn',
+            actionName,
+        });
+        addExpiration({
+            attackerName,
+            targetName: applyTarget,
+            campaignName,
+            rounds: 2,
+            effects: [{ type: 'remove_target_effect', effectKey: 'pesky_swarm', source: attackerName, target: applyTarget }],
+        });
+        const granted = getActiveTargetEffect(campaignName, applyTarget, 'pesky_swarm');
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'pesky_swarm_granted',
+            characterName: applyTarget,
+            sourceName: attackerName,
+            abilityName: actionName,
+            description: `${applyTarget} ${outcomeNote} ${attackerName}'s Animal Spirit save (Pesky Swarm, Sage form) — Disadvantage on attack rolls and ability checks until the end of ${applyTarget}'s next turn.${granted ? '' : ' (te write unconfirmed)'}`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[saveProcessing:pesky-swarm-granted]', e); });
+        return;
+    }
+    console.error(`[saveProcessing] unknown animalSpiritVariant: ${variant}`);
 }
 
 // MA-0146: failed-save speed-zero grant (Adult White Dragon Freezing Burst).

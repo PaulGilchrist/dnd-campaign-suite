@@ -186,6 +186,16 @@ const BADGE_SPECS = [
         find: ctx => findDirect(ctx, 'ac_penalty'),
         build: ctx => ({ label: `AC \u2212${ctx.te.value || 2}`, cls: 'effect-debuff', icon: 'fa-shield-halved', removable: true, removeAction: 'target_effect', effectType: 'ac_penalty', tooltip: `AC reduced by ${ctx.te.value || 2} by ${ctx.te.source || 'unknown'} until the end of the next turn` }),
     },
+    // MA-0275: Animal Spirit Pesky Swarm failed-save te badge.
+    {
+        find: ctx => findDirect(ctx, 'pesky_swarm'),
+        build: ctx => ({ label: 'Pesky Swarm', cls: 'effect-debuff', icon: 'fa-bugs', removable: true, removeAction: 'target_effect', effectType: 'pesky_swarm', tooltip: `Disadvantage on attack rolls and ability checks by ${ctx.te.source || 'unknown'} until the end of the next turn` }),
+    },
+    // MA-0275: Animal Spirit Marked as Prey lord-side te badge.
+    {
+        find: ctx => findDirect(ctx, 'marked_as_prey'),
+        build: ctx => ({ label: 'Marked as Prey', cls: 'effect-buff', icon: 'fa-crosshairs', removable: true, removeAction: 'target_effect', effectType: 'marked_as_prey', tooltip: `Advantage on attack rolls against ${ctx.te.vexTarget || 'marked target'} until the start of the next turn` }),
+    },
     {
         guard: ctx => ctx.effects.noAdvantageAgainst,
         build: () => ({ label: 'No Adv vs', cls: 'effect-buff', icon: 'fa-arrow-down', removable: true, removeAction: 'remove_derived', effectTypes: ['blur', 'foresight', 'escape_the_horde', 'protection', 'multiattack_defense'] }),

@@ -9,7 +9,7 @@ import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT
 import { isProtectionFromEvilAndGoodActive, isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import { resolveCreatureType } from '../../services/combat/creatureTypeResolver.js';
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
-import { isDistanceInRange } from '../../services/rules/combat/rangeCheck.js';
+import { isDistanceInRange, isWithinRange } from '../../services/rules/combat/rangeCheck.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import AttackResultPopup from '../common/AttackResultPopup.jsx';
@@ -18,7 +18,8 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants } from './MonsterCardHelpers.js';
+import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -219,7 +220,7 @@ function speedZeroClauseForAction(spellInfo, action) {
   return parseSpeedZeroClause(action?.save_effect);
 }
 
-function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
+function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml, animalSpiritVariant = null, animalSpiritFortifyHp = null }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
   const spellName = spellInfo?.spellName || null;
@@ -245,7 +246,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     });
     const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
     rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
-      monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType,
+      monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType, animalSpiritVariant, animalSpiritFortifyHp,
     }));
   };
   const sleepStaging = sleepStagingForAction(spellInfo, action);
@@ -267,6 +268,41 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     }
     fire();
   })().catch((e) => { console.error('[MonsterCardModal] Error resolving recharge/cone save leg:', e); });
+}
+
+// MA-0275: Animal Spirit chooser seam — confirm applies an advisory 120 ft
+// range gate (isWithinRange, lenient gridless §7: refusal popup + log, zero
+// roll) then runs the block-save seam with the chosen variant threaded onto
+// the save context; decline (variant null) logs the core-only resolution.
+async function resolveAnimalSpiritSelection({ chooser, variant, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser }) {
+  setChooser(null);
+  if (!chooser) return;
+  const target = chooser.target;
+  if (variant && chooser.rangeFt != null && target?.name) {
+    const inRange = await isWithinRange(monsterName, target.name, chooser.rangeFt);
+    if (!inRange) {
+      setPopupHtml(`<strong>${monsterName}</strong> — Animal Spirit requires a creature it can see within ${chooser.rangeFt} feet. Target <strong>${target.name}</strong> is out of range — no save was rolled.`);
+      addEntry(campaignName, {
+        type: 'automation blocked',
+        characterName: monsterName,
+        abilityName: 'Animal Spirit',
+        description: `${monsterName}'s Animal Spirit refused — ${target.name} is not within ${chooser.rangeFt} feet. No save rolled, no effect applied.`,
+        timestamp: Date.now(),
+      }).catch((e) => { console.error('[MonsterCardModal] Error logging animal spirit range refusal:', e); });
+      return;
+    }
+  }
+  if (!variant) {
+    addEntry(campaignName, {
+      type: 'automation',
+      automationType: 'animal_spirit_variant_declined',
+      characterName: monsterName,
+      abilityName: 'Animal Spirit',
+      description: `${monsterName} casts Animal Spirit with no variant form selected — save resolves core damage only; no Fortify/Marked as Prey/Pesky Swarm effect applied.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[MonsterCardModal] Error logging animal spirit decline:', e); });
+  }
+  executeBlockSaveRoll({ action: chooser.action, spellInfo: chooser.spellInfo, saveDamageFormula: chooser.saveDamageFormula, saveConditions: chooser.saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite: chooser.prerequisite, usesGate: chooser.usesGate, setPopupHtml, animalSpiritVariant: variant?.key ?? null, animalSpiritFortifyHp: variant?.tempHp ?? null });
 }
 
 function getDamageTypeChoices(action) {
@@ -839,7 +875,7 @@ function savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction)
   return spellDamageType || getDamageTypesForAction(action)[0] || null;
 }
 
-function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType }) {
+function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
   const actionName = spellName || action.name;
   const saveEffect = action?.save_effect ?? null;
@@ -892,6 +928,11 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     // (MA-0073 shape; the sphere row normally routes through the radius
     // picker, which carries its own speedZeroClause seam).
     speedZeroClause: parseSpeedZeroClause(saveEffect),
+    // MA-0275: Animal Spirit GM-chosen variant (chooser at chip-click;
+    // 'fortify' | 'marked_as_prey' | 'pesky_swarm' | null) — producer arm
+    // for the EITHER-outcome grant in saveProcessing.
+    animalSpiritVariant,
+    animalSpiritFortifyHp,
   };
 }
 
@@ -971,6 +1012,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   // MA-0031: recharge map + cone picker overlay state (breath-weapon AoE).
   const monsterRecharge = useRuntimeValue(monsterName, MONSTER_RECHARGE_KEY, campaignName);
   const [conePicker, setConePicker] = useState(null);
+  const [animalSpiritChooser, setAnimalSpiritChooser] = useState(null);
 
   const monsterSensesArray = useMemo(() => {
     if (!monster?.senses) return null;
@@ -1240,6 +1282,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const stageAction = roarAction || action;
     const stageFormula = roarAction ? extractDamageDiceFromDescription(stageAction.description, stageAction.damage_dice_primary) : saveDamageFormula;
     const stageConditions = roarAction ? extractConditionsFromSaveEffect(stageAction.save_effect) : saveConditions;
+    // MA-0275: Animal Spirit variant trio — open the form chooser before any
+    // save prompt; the chooser confirmation runs the same block-save seam
+    // with the chosen variant threaded onto the save context.
+    const spiritVariants = parseAnimalSpiritVariants(stageAction);
+    if (spiritVariants) {
+      setAnimalSpiritChooser({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, prerequisite, usesGate, target, ...spiritVariants });
+      return;
+    }
     // MA-0031: recharge gate + fire-spend + cone routing live downstream.
     executeBlockSaveRoll({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml });
   }, [getTarget, characters, creatures, rollSavingThrow, monsterName, getDamageTypesForAction, campaignName, setPopupHtml, allTargetEffects]);
@@ -1526,6 +1576,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           onClose={() => setConePicker(null)}
         />
       )}
+      <AnimalSpiritVariantModal
+        chooser={animalSpiritChooser}
+        monsterName={monsterName}
+        onResolve={(variant) => resolveAnimalSpiritSelection({ chooser: animalSpiritChooser, variant, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser: setAnimalSpiritChooser })}
+        onSkip={() => resolveAnimalSpiritSelection({ chooser: animalSpiritChooser, variant: null, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser: setAnimalSpiritChooser })}
+      />
     </>
   );
 }

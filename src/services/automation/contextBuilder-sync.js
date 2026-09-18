@@ -96,6 +96,12 @@ function accumulateStoredEffectCounts(playerName, targetName, hasSaveAdvantage, 
     if (storedEffects.some(te => te.effect === 'disadvantage_next_attack' && te.target === playerName)) {
         dis++;
     }
+    // MA-0275: Animal Lord Pesky Swarm — Disadvantage on attack rolls (and
+    // ability checks via computeConditionEffects) until the end of the
+    // holder's next turn; drains via the rounds:2 te expiry clock.
+    if (storedEffects.some(te => te.effect === 'pesky_swarm' && te.target === playerName)) {
+        dis++;
+    }
     if (storedEffects.some(te => te.effect === 'slasher_enhanced_critical' && te.target === playerName)) {
         dis++;
     }

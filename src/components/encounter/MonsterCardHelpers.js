@@ -191,6 +191,35 @@ export function parseDreamPlaneBanishClause(saveEffect) {
   return /banished to a dream plane/i.test(saveEffect) ? { effect: 'lair_dream_plane' } : null;
 }
 
+// MA-0275: Animal Lord "Animal Spirit" authored variant trio ("Failure or
+// Success: One of the following effects occurs: Fortify (Forager Only) —
+// 20 Temporary Hit Points / Marked as Prey (Hunter Only) — Advantage on
+// attack rolls against the target until the start of the animal lord's next
+// turn / Pesky Swarm (Sage Only) — Disadvantage on attack rolls and ability
+// checks until the end of its next turn"). The lord represents ONE form
+// (DM's choice), so the GM picks the variant at the chip-click chooser
+// (MonsterCardModal); the chosen clause lands state + log at the save
+// outcome seam (saveProcessing). Byte-inert (null) for every row that does
+// not carry ALL three named variant headers — no other wording matches.
+export function parseAnimalSpiritVariants(action) {
+  const saveEffect = action?.save_effect;
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const fortify = /fortify\s*\(\s*forager only\s*\)/i.test(saveEffect);
+  const prey = /marked as prey\s*\(\s*hunter only\s*\)/i.test(saveEffect);
+  const swarm = /pesky swarm\s*\(\s*sage only\s*\)/i.test(saveEffect);
+  if (!fortify || !prey || !swarm) return null;
+  const thpMatch = saveEffect.match(/gains\s+(\d+)\s+temporary hit points/i);
+  const rangeMatch = String(action.description || '').match(/within\s+(\d+)\s*feet/i);
+  return {
+    rangeFt: rangeMatch ? Number(rangeMatch[1]) : null,
+    variants: [
+      { key: 'fortify', label: 'Fortify', form: 'Forager', tempHp: Number(thpMatch?.[1]) || 20 },
+      { key: 'marked_as_prey', label: 'Marked as Prey', form: 'Hunter' },
+      { key: 'pesky_swarm', label: 'Pesky Swarm', form: 'Sage' },
+    ],
+  };
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];

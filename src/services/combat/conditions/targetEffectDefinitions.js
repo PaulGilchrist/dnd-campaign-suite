@@ -86,6 +86,33 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-0275: Animal Lord "Marked as Prey (Hunter Only)" variant clause —
+    // the LORD carries this te (sourced from itself) with vexTarget = the
+    // save target; computeConditionEffects folds Advantage via the verified
+    // vexTarget channel (CLA-341 Studied Attacks shape) only against that
+    // target, until the start of the lord's next turn (rounds:2 clock).
+    effect: 'marked_as_prey',
+    label: 'Marked as Prey',
+    description: 'Advantage on attack rolls against the marked target until the start of its next turn.',
+    icon: 'fa-crosshairs',
+    cls: 'effect-buff',
+    group: 'Attack',
+    fields: ['source'],
+  },
+  {
+    // MA-0275: Animal Lord "Pesky Swarm (Sage Only)" variant clause — the
+    // target has Disadvantage on attack rolls AND ability checks until the
+    // end of its next turn. Distinct from disadvantage_next_attack (one-shot
+    // next-attack-only, consumed on use) — the swarm persists on the clock.
+    effect: 'pesky_swarm',
+    label: 'Pesky Swarm',
+    description: 'Disadvantage on attack rolls and ability checks until the end of its next turn.',
+    icon: 'fa-bug',
+    cls: 'effect-disadvantage',
+    group: 'Attack',
+    fields: ['source'],
+  },
+  {
     effect: 'reckless_attack',
     label: 'Reckless Attack',
     description: 'Attacks have Advantage, but attack rolls against the creature also have Advantage.',

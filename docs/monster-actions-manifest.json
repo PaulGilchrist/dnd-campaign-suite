@@ -4117,7 +4117,7 @@
       "damageDicePrimary": "4d10 + 6",
       "damageTypePrimary": "Radiant",
       "description": "Dexterity Saving Throw: DC 20, one creature the animal lord can see within 120 feet. Failure: 28 (4d10 + 6) Radiant damage. Success: Half damage. Failure or Success: One of the following effects occurs:Fortify (Forager Only). The animal lord gains 20 Temporary Hit Points.Marked as Prey (Hunter Only). The animal lord has Advantage on attack rolls against the target until the start of the animal lord's next turn.Pesky Swarm (Sage Only). The target has Disadvantage on attack rolls and ability checks until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0275-animal-spirit-variants-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0276",
