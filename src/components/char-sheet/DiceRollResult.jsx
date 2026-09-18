@@ -887,11 +887,23 @@ function TwoHandedVariantOffer({ props, state }) {
     );
 }
 
+// AC modifier labels for the popup "vs AC" line (MA-0341 added Parry).
+// Module helper keeps DiceRollResult under the complexity ceiling.
+function buildAcBuffLabels({ shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, parryAcBonus, slowAcPenalty }) {
+    const labels = [];
+    if (shieldOfFaithAcBonus > 0) labels.push(`+${shieldOfFaithAcBonus} Shield of Faith`);
+    if (wardingBondAcBonus > 0) labels.push(`+${wardingBondAcBonus} Warding Bond`);
+    if (parryAcBonus > 0) labels.push(`+${parryAcBonus} Parry`);
+    if (shieldAcBonus > 0) labels.push(`+${shieldAcBonus} Shield`);
+    if (slowAcPenalty > 0) labels.push(`−${slowAcPenalty} Slow`);
+    return labels;
+}
+
 function DiceRollResult(props) {
     const {
         bonus = 0, modifier = 0,
         targetAc,
-        shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, slowAcPenalty,
+        shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, slowAcPenalty, parryAcBonus,
         success,
         autoDamage,
         luckyRerolled, luckyRerollValue,
@@ -914,11 +926,7 @@ function DiceRollResult(props) {
     } = state;
 
     const hitMissTotal = homingStrikesApplied ? finalTotal : displayTotal;
-    const acBuffLabels = [];
-    if (shieldOfFaithAcBonus > 0) acBuffLabels.push(`+${shieldOfFaithAcBonus} Shield of Faith`);
-    if (wardingBondAcBonus > 0) acBuffLabels.push(`+${wardingBondAcBonus} Warding Bond`);
-    if (shieldAcBonus > 0) acBuffLabels.push(`+${shieldAcBonus} Shield`);
-    if (slowAcPenalty > 0) acBuffLabels.push(`−${slowAcPenalty} Slow`);
+    const acBuffLabels = buildAcBuffLabels({ shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, parryAcBonus, slowAcPenalty });
     const acDisplay = `${effectiveAc ?? targetAc ?? '—'}${acBuffLabels.length ? ` (${acBuffLabels.join(', ')})` : ''}`;
 
     const handlePsiKnackClick = () => {

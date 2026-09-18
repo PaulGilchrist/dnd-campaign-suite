@@ -9,6 +9,7 @@ import {
     getShieldOfFaithAcBonus,
     getSlowAcPenalty,
     getWardingBondAcBonus,
+    getParryAcBonus,
 } from './loggedDiceRollUtils.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { endSanctuary } from '../../services/automation/handlers/spells/sanctuaryHandler.js';
@@ -124,6 +125,7 @@ function buildRollLogEntry({ characterName, rollType, name, ctx, context, target
         shieldOfFaithAcBonus: ctx._shieldOfFaithAcBonus || 0,
         wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
         slowAcPenalty: ctx._slowAcPenalty || 0,
+        parryAcBonus: ctx._parryAcBonus || 0,
         hit: ctx.hit,
         isAutoMiss: ctx.isAutoMiss,
         isCrit: ctx.isCrit,
@@ -238,6 +240,8 @@ function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) 
         // MA-0325: GM-adjudicated two-handed damage-dice choice
         // (monsters.json damage_dice_two_handed) — HIT popup only.
         twoHandedVariantOffer: context?.twoHandedVariantOffer || null,
+        // MA-0341: defender Parry +2 AC riding the popup AC flags (target-side).
+        parryAcBonus: ctx._parryAcBonus || 0,
     };
 }
 
@@ -432,6 +436,7 @@ export function createLogAndShow(deps) {
         ctx._shieldOfFaithAcBonus = getShieldOfFaithAcBonus(acTargetName, campaignName);
         ctx._wardingBondAcBonus = getWardingBondAcBonus(acTargetName, campaignName);
         ctx._slowAcPenalty = getSlowAcPenalty(acTargetName, campaignName);
+        ctx._parryAcBonus = getParryAcBonus(acTargetName, campaignName);
 
         // Bi die size for bardic inspiration defense (attack-only)
         ctx._biDieSize = resolveBiDieSize(rollType, target, campaignName, characters);

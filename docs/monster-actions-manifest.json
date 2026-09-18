@@ -5114,7 +5114,7 @@
       "category": "reactions",
       "actionType": "attack",
       "description": "Trigger: The bandit is hit by a melee attack roll while holding a weapon. Response: The bandit adds 2 to its AC against that attack, possibly causing it to miss.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0341-parry-reaction-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0342",

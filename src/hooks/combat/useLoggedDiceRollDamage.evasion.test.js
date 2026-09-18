@@ -54,6 +54,7 @@ vi.mock('../../services/rules/combat/aoeService.js', () => ({
 }));
 
 vi.mock('./loggedDiceRollUtils.js', () => ({
+    getParryAcBonus: vi.fn(() => 0),
     readAoeContext: vi.fn(),
     hasPotentCantrip: vi.fn(),
     isMagicMissileImmune: vi.fn(),

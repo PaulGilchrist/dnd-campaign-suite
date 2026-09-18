@@ -613,6 +613,17 @@ const GATED_MONSTER_REACTIONS = {
   // consumers gate on); DEX save vs the authored spell DC (15, MA-0328
   // lineage), 2d10 fire half on save, 2/Day spend + round latch.
   hellish_rebuke: { effect: 'hellish_rebuke', trigger: 'takes_damage', label: 'Hellish Rebuke', icon: 'fa-fire' },
+  // MA-0341: Bandit Captain Parry — reactive defense reaction. RAW trigger:
+  // hit by a melee attack roll while wielding a weapon (equip precondition is
+  // GM-enforced advisory, CLA-325); response +2 AC against THAT attack.
+  // Gate keys off the campaign lastAttack identity: melee weaponType, this
+  // monster as target, hit, and damage NOT yet applied via Done (abandoned
+  // popup window). Press stamps _parry_ac_bonus on the target's activeBuffs
+  // (getParryAcBonus channel — mirrors SP-125 warding_bond acBonus), consumed
+  // by the next resolved attack in attackPostProcessing. At Will sentinel
+  // (usage:'At Will'+uses:999) — RAW unlimited, no uses/day; 1/round latch
+  // (_parry_usedRound, MA-0013 counterspell shape).
+  parry: { effect: 'parry', trigger: 'melee_hit', label: 'Parry', icon: 'fa-shield-halved' },
 };
 
 export function isSpellOriginLastAttack(lastAttack) {
@@ -716,6 +727,113 @@ export function hellishRebukeSpec(action) {
   return { spec: { saveDc, formula, saveType: auto.saveType || 'DEX', damageType: auto.damageType || 'Fire', dcSuccess: auto.dcSuccess || 'half', rangeFt: rangeToFeet(auto.range ?? action?.range) ?? 60 } };
 }
 
+// MA-0341: event-identity probe (mirrors hellishRebukeIdentityRefusal) — the
+// parry must answer the ONE melee attack that hit this monster and whose
+// damage is not yet committed (popup abandoned, Done not pressed). Returns a
+// refusal reason token or null.
+export function parryIdentityRefusal(lastAttack, monsterName) {
+  if (!lastAttack || lastAttack.rollType !== 'attack') return 'trigger';
+  // Spell-origin stamp guard (MA-0245 lineage: storeCampaignLastAttack falls
+  // back weaponType:'melee' for spells) — Parry answers WEAPON melee attacks.
+  if (isSpellOriginLastAttack(lastAttack)) return 'spell';
+  if (lastAttack.weaponType !== 'melee') return 'melee';
+  if (lastAttack.targetName !== monsterName) return 'trigger';
+  if (lastAttack.hit !== true) return 'miss';
+  if (lastAttack.damageApplied === true || Number(lastAttack.actualDamage ?? 0) > 0) return 'resolved';
+  if (lastAttack.parryResolved === true) return 'reacted';
+  if (!lastAttack.attackerName || lastAttack.attackerName === monsterName) return 'attacker';
+  return null;
+}
+
+const PARRY_REFUSAL_MESSAGES = {
+  trigger: (m) => `Parry: no melee attack has targeted ${m} — refused.`,
+  melee: (m) => `Parry: the last attack against ${m} was not a melee attack — refused.`,
+  spell: (m) => `Parry: the last attack against ${m} was a spell attack — Parry answers melee weapon attacks only.`,
+  miss: (m) => `Parry: the melee attack against ${m} missed — nothing to parry.`,
+  resolved: () => 'Parry: damage is already applied on that attack — too late to parry.',
+  reacted: () => 'Parry: already responded to that attack — one parry per attack.',
+  attacker: () => 'Parry: no identifiable attacker to parry against — refused.',
+  round: () => 'Parry: Reaction already used this round — refused.',
+  uses: (limit) => `Parry: ${limit} uses already spent today — refused.`,
+};
+
+export function parryGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action }) {
+  const identity = parryIdentityRefusal(lastAttack, monsterName);
+  if (identity) {
+    return { ok: false, reason: identity, message: PARRY_REFUSAL_MESSAGES[identity](monsterName) };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: PARRY_REFUSAL_MESSAGES.round() };
+  }
+  const used = Number((storedUses && storedUses.parry) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: PARRY_REFUSAL_MESSAGES.uses(limit) };
+  }
+  return { ok: true, used, limit, attackerName: lastAttack.attackerName };
+}
+
+// MA-0341: At Will sentinel — never spends MONSTER_REACTION_USES (RAW
+// unlimited, uses:999 is an honest sentinel, MA-0006/0300/0305). The
+// _parry_usedRound round-latch + lastAttack.parryResolved identity stamp
+// are the only fire limits; the +2 AC rides activeBuffs until the next
+// resolved attack consumes it.
+function buildParryBuff(action, lastAttack) {
+  const acBonus = Number(action?.automation?.acBonus) || 2;
+  return {
+    effect: 'parry',
+    acBonus,
+    source: 'Parry',
+    vsAttack: `${lastAttack.attackerName}:${lastAttack.attackName || 'melee attack'}`,
+    appliedRoundContext: { d20: lastAttack.d20, total: lastAttack.total, targetAc: lastAttack.targetAc },
+    timestamp: Date.now(),
+  };
+}
+
+function buildParrySpendLog({ monsterName, lastAttack, buff }) {
+  const newAc = (Number(lastAttack.targetAc) || 0) + buff.acBonus;
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Parry',
+    description: `${monsterName} uses Parry — +${buff.acBonus} AC against ${lastAttack.attackerName}'s ${lastAttack.attackName || 'melee attack'} (AC ${lastAttack.targetAc} → ${newAc}). Dismiss the pending attack popup WITHOUT Done, then re-click the attacker's ${lastAttack.attackName || 'attack'} chip to re-resolve vs AC ${newAc}. Wielding a melee weapon is GM-enforced (no equip model). At Will — unlimited uses, 1 Reaction per round.`,
+    timestamp: Date.now(),
+  };
+}
+
+export async function resolveMonsterParry({ action, monsterName, campaignName, lastAttack, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const gate = parryGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action });
+  if (!gate.ok) {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: 'parry_refused',
+      name: 'Parry',
+      description: `Parry refused (${gate.reason}): ${gate.message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message: gate.message };
+  }
+  const buff = buildParryBuff(action, lastAttack);
+  const getRV = deps.getRuntimeValue || getRuntimeValue;
+  const buffs = getRV(monsterName, 'activeBuffs') || [];
+  const newBuffs = [...(Array.isArray(buffs) ? buffs : []), buff];
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, 'activeBuffs', newBuffs, campaignName);
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    parryResolved: true,
+    parriedBy: monsterName,
+    parryAcBonus: buff.acBonus,
+  }, campaignName);
+  const entry = buildParrySpendLog({ monsterName, lastAttack, buff });
+  await log(campaignName, entry);
+  return { ok: true, message: entry.description, acBonus: buff.acBonus, newAc: (Number(lastAttack.targetAc) || 0) + buff.acBonus };
+}
+
 export function getGatedMonsterReaction(action) {
   const effect = action?.automation?.effect;
   return effect ? GATED_MONSTER_REACTIONS[effect] || null : null;
@@ -793,6 +911,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'hellish_rebuke') {
     return resolveMonsterHellishRebuke({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps });
+  }
+
+  if (def.effect === 'parry') {
+    return resolveMonsterParry({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV } });
   }
 
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });

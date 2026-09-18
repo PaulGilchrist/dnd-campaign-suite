@@ -67,6 +67,18 @@ export function getWardingBondAcBonus(characterName, campaignName) {
     return wardBuff ? Number(wardBuff.acBonus) || 0 : 0;
 }
 
+// MA-0341: Bandit Captain Parry grants +2 AC against the triggering attack —
+// the stamp rides the defender's activeBuffs (same channel as shield /
+// Shield of Faith / SP-125 warding_bond acBonus) and is consumed by the next
+// resolved attack in attackPostProcessing.
+export function getParryAcBonus(characterName, campaignName) {
+    if (!characterName) return 0;
+    const activeBuffs = getRuntimeValue(characterName, 'activeBuffs', campaignName) || [];
+    if (!Array.isArray(activeBuffs)) return 0;
+    const parryBuff = activeBuffs.find(b => b && b.effect === 'parry');
+    return parryBuff ? Number(parryBuff.acBonus) || 0 : 0;
+}
+
 // SP-109: Slow imposes a -2 AC penalty on the target until the spell ends.
 export function getSlowAcPenalty(characterName, campaignName) {
     if (!characterName) return 0;

@@ -12,6 +12,8 @@ import {
   isSpellOriginLastAttack,
   resolveCounterspellCheck,
   counterspellGate,
+  parryGate,
+  parryIdentityRefusal,
 } from './MonsterCardHelpers.js';
 import monsters from '../../../public/data/monsters.json';
 
@@ -301,5 +303,151 @@ describe('MA-0013 resolveMonsterGatedReaction — Counterspell', () => {
     expect(logs[0].automationType).toBe('counterspell_refused');
     expect(logs[0].description).toMatch(/2\/Day/);
     expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 2 });
+  });
+});
+
+// MA-0341: Bandit Captain Parry — gated melee-defense reaction. RAW trigger:
+// hit by a melee attack roll while wielding a weapon (equip GM-enforced);
+// response +2 AC vs THAT attack. Gate keys off campaign lastAttack identity
+// (melee weaponType, this monster as target, hit:true, damage NOT applied,
+// not already parried) + 1/round latch. At Will sentinel (uses:999) — press
+// stamps an activeBuffs +2 AC entry (never spends MONSTER_REACTION_USES) and
+// marks the lastAttack parryResolved; refusals log parry_refused zero-write.
+const PARRY_ACTION = monsters.find(m => m.index === 'bandit-captain').reactions[0];
+const CAPTAIN = 'Bandit Captain 1';
+const SLASHER = 'ElderPaladin';
+
+function meleeHitOnCaptain(overrides = {}) {
+  return { attackerName: SLASHER, targetName: CAPTAIN, attackName: 'Longsword', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 5, total: 22, targetAc: 15, effectiveAc: 15, damageApplied: undefined, ...overrides };
+}
+
+function csWithCaptain(round = 1) {
+  return { round, creatures: [{ name: SLASHER, type: 'player' }, { name: CAPTAIN, type: 'npc' }] };
+}
+
+function makeParryDeps({ lastAttack = meleeHitOnCaptain(), round = 1, store = {} } = {}) {
+  const state = { ...store };
+  const logs = [];
+  const campaignWrites = [];
+  return {
+    state,
+    logs,
+    campaignWrites,
+    deps: {
+      findLastAttack: vi.fn(async () => lastAttack),
+      getCombatContext: vi.fn(async () => csWithCaptain(round)),
+      getRuntimeValue: vi.fn((key, prop) => state[`${key}.${prop}`] ?? null),
+      setRuntimeValue: vi.fn(async (key, prop, value) => {
+        if (key === 'campaign' && prop === 'lastAttack') campaignWrites.push(value);
+        state[`${key}.${prop}`] = value;
+      }),
+      addEntry: vi.fn(async (c, e) => { logs.push(e); }),
+    },
+  };
+}
+
+describe('MA-0341 Parry registry + row shape', () => {
+  it('monsters.json bandit-captain reactions[0] carries the automation + At Will sentinel', () => {
+    expect(PARRY_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
+    expect(PARRY_ACTION.usage).toBe('At Will');
+    expect(PARRY_ACTION.uses).toBe(999);
+    expect(PARRY_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(PARRY_ACTION)?.effect).toBe('parry');
+    expect(getGatedMonsterReaction({ name: 'Scimitar', description: 'Hit: 1d6+5 slashing.' })).toBeNull();
+  });
+});
+
+describe('MA-0341 parryGate RAW identity refusals', () => {
+  it('refuses no lastAttack (trigger) and non-melee attacks (melee)', () => {
+    expect(parryIdentityRefusal(null, CAPTAIN)).toBe('trigger');
+    expect(parryIdentityRefusal({ ...meleeHitOnCaptain(), rollType: 'save' }, CAPTAIN)).toBe('trigger');
+    expect(parryIdentityRefusal({ ...meleeHitOnCaptain(), weaponType: 'ranged' }, CAPTAIN)).toBe('melee');
+    const g = parryGate({ lastAttack: meleeHitOnCaptain({ weaponType: 'ranged' }), monsterName: CAPTAIN, currentRound: 1, storedUses: {}, usedRound: 0, action: PARRY_ACTION });
+    expect(g.ok).toBe(false);
+    expect(g.reason).toBe('melee');
+  });
+
+  it('refuses spell-origin attacks even when weaponType falls back to melee (MA-0245 stamp guard)', () => {
+    expect(parryIdentityRefusal({ ...meleeHitOnCaptain(), damageSchool: 'Evocation', isCantrip: true }, CAPTAIN)).toBe('spell');
+    expect(parryIdentityRefusal({ ...meleeHitOnCaptain(), attackType: 'spell' }, CAPTAIN)).toBe('spell');
+    const g = parryGate({ lastAttack: { ...meleeHitOnCaptain(), damageSchool: 'Evocation' }, monsterName: CAPTAIN, currentRound: 1, storedUses: {}, usedRound: 0, action: PARRY_ACTION });
+    expect(g.ok).toBe(false);
+    expect(g.reason).toBe('spell');
+  });
+
+  it('refuses wrong target, a miss, committed damage, and an already-parried attack', () => {
+    expect(parryIdentityRefusal(meleeHitOnCaptain({ targetName: 'Thug 1' }), CAPTAIN)).toBe('trigger');
+    expect(parryIdentityRefusal(meleeHitOnCaptain({ hit: false }), CAPTAIN)).toBe('miss');
+    expect(parryIdentityRefusal(meleeHitOnCaptain({ damageApplied: true, actualDamage: 8 }), CAPTAIN)).toBe('resolved');
+    expect(parryIdentityRefusal(meleeHitOnCaptain({ parryResolved: true }), CAPTAIN)).toBe('reacted');
+    expect(parryIdentityRefusal(meleeHitOnCaptain({ attackerName: CAPTAIN }), CAPTAIN)).toBe('attacker');
+  });
+
+  it('accepts the unresolved melee hit and reports the attacker', () => {
+    const g = parryGate({ lastAttack: meleeHitOnCaptain(), monsterName: CAPTAIN, currentRound: 4, storedUses: {}, usedRound: 0, action: PARRY_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.attackerName).toBe(SLASHER);
+    expect(g.limit).toBe(999);
+  });
+
+  it('1/round latch: refuses a second press in the same round, re-arms next round', () => {
+    const same = parryGate({ lastAttack: meleeHitOnCaptain(), monsterName: CAPTAIN, currentRound: 4, storedUses: {}, usedRound: 4, action: PARRY_ACTION });
+    expect(same.ok).toBe(false);
+    expect(same.reason).toBe('round');
+    const next = parryGate({ lastAttack: meleeHitOnCaptain(), monsterName: CAPTAIN, currentRound: 5, storedUses: {}, usedRound: 4, action: PARRY_ACTION });
+    expect(next.ok).toBe(true);
+  });
+});
+
+describe('MA-0341 resolveMonsterGatedReaction — Parry', () => {
+  it('refusal (no melee hit): parry_refused logged, zero writes', async () => {
+    const { state, logs, deps } = makeParryDeps({ lastAttack: null });
+    const result = await resolveMonsterGatedReaction({ action: PARRY_ACTION, monsterName: CAPTAIN, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].automationType).toBe('parry_refused');
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(state[`${CAPTAIN}.activeBuffs`]).toBeUndefined();
+    expect(state[`${CAPTAIN}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+  });
+
+  it('refusal (damage already applied): parry_refused (resolved), zero writes', async () => {
+    const { logs, deps } = makeParryDeps({ lastAttack: meleeHitOnCaptain({ damageApplied: true, actualDamage: 8 }) });
+    const result = await resolveMonsterGatedReaction({ action: PARRY_ACTION, monsterName: CAPTAIN, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs[0].automationType).toBe('parry_refused');
+    expect(logs[0].description).toMatch(/resolved/);
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('success: activeBuffs +2 AC stamp + round latch + lastAttack parryResolved + ability_use log, At Will never spends MONSTER_REACTION_USES', async () => {
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ round: 6 });
+    const result = await resolveMonsterGatedReaction({ action: PARRY_ACTION, monsterName: CAPTAIN, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(2);
+    expect(result.newAc).toBe(17);
+    const buffs = state[`${CAPTAIN}.activeBuffs`];
+    expect(Array.isArray(buffs)).toBe(true);
+    expect(buffs.some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(true);
+    expect(state[`${CAPTAIN}._parry_usedRound`]).toBe(6);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: CAPTAIN, parryAcBonus: 2 });
+    expect(state[`${CAPTAIN}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    const spend = logs.find(l => l.type === 'ability_use');
+    expect(spend.abilityName).toBe('Parry');
+    expect(spend.description).toMatch(/AC 15 → 17/);
+    expect(spend.description).toMatch(/At Will/);
+    expect(spend.description).toMatch(/GM-enforced/);
+  });
+
+  it('same-round second press on the same attack: parry_refused (round/reacted), zero additional writes', async () => {
+    const { logs, deps } = makeParryDeps({
+      round: 6,
+      lastAttack: meleeHitOnCaptain({ parryResolved: true, parriedBy: CAPTAIN }),
+      store: { [`${CAPTAIN}._parry_usedRound`]: 6, [`${CAPTAIN}.activeBuffs`]: [{ effect: 'parry', acBonus: 2 }] },
+    });
+    const result = await resolveMonsterGatedReaction({ action: PARRY_ACTION, monsterName: CAPTAIN, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs[0].automationType).toBe('parry_refused');
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
   });
 });

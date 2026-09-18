@@ -32,6 +32,11 @@ export async function processAttackAfterResult({ hit, isAutoMiss: _isAutoMiss, t
     // granted by this same miss (Vex-style triggers) is not self-consumed.
     consumeOneShotAdvantage({ characterName, campaignName, finalAutoMiss });
 
+    // MA-0341: Bandit Captain Parry's +2 AC defends exactly ONE attack — the
+    // activeBuffs stamp is consumed once the next attack against the parrying
+    // defender resolves (hit or miss), mirroring the CLA-320 one-shot consume.
+    consumeParryAcBonus({ targetName, characterName, campaignName });
+
     // Miss effects (vex, etc.)
     grantMissAdvantageEffects({ finalHit, finalAutoMiss, targetName, context, characterName, campaignName });
 
@@ -186,6 +191,21 @@ function storeRollContextAndSuperiorityPrompt({ characterName, campaignName, con
         },
         timestamp: Date.now(),
     }, campaignName);
+}
+
+function consumeParryAcBonus({ targetName, characterName, campaignName }) {
+    if (!targetName) return;
+    const buffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    if (!Array.isArray(buffs) || !buffs.some(b => b && b.effect === 'parry')) return;
+    setRuntimeValue(targetName, 'activeBuffs', buffs.filter(b => !(b && b.effect === 'parry')), campaignName);
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'parry_consumed',
+        characterName: targetName,
+        description: `${targetName}'s Parry +2 AC was consumed by ${characterName}'s resolved attack — AC returns to base for further attacks.`,
+        targetName: targetName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[MA-0341 Parry] Error logging consume:', e); });
 }
 
 function consumeOneShotAdvantage({ characterName, campaignName, finalAutoMiss }) {

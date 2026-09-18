@@ -53,6 +53,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 }));
 
 vi.mock('./loggedDiceRollUtils.js', () => ({
+    getParryAcBonus: vi.fn(() => 0),
     hasPotentCantrip: vi.fn(),
 }));
 

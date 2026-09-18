@@ -29,6 +29,7 @@ vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({
 }));
 
 vi.mock('./loggedDiceRollUtils.js', () => ({
+    getParryAcBonus: vi.fn(() => 0),
     dispatchUnbreakableMajestySave: vi.fn(),
 }));
 
