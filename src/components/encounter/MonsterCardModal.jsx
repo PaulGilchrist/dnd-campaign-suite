@@ -650,14 +650,32 @@ function buildAutoDamageOptions(action, name) {
     // the auto-damage seam resolves dice-less.
     autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || extractFlatHitDamage(action) || null,
     autoDamageName: name,
-    autoDamageSecondaryFormula: action?.damage_dice_secondary || null,
-    autoDamageSecondaryName: name,
-    autoDamageSecondaryDamageType: action?.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
+    // MA-0427: MA-0426 secondary keys now produced by the shared transport
+    // helper (name falls back to the chip name for synthesized actions).
+    ...buildSecondaryDamageTransport(action, name),
     hitClause: buildHitConditionClause(action),
   };
 }
 
-function buildSaveOptions(action) {
+// MA-0427: authored secondary damage (monsters.json damage_dice_secondary /
+// damage_type_secondary) as the transport triple — the MA-0426 attack-path
+// keys, now shared by both save seams (block-save context + attack+save combo)
+// so one producer serves every secondary-damage consumer. Byte-inert nulls
+// for every row without a secondary.
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildSecondaryDamageTransport(action, fallbackName = null) {
+  if (!action?.damage_dice_secondary) {
+    return { autoDamageSecondaryFormula: null, autoDamageSecondaryName: null, autoDamageSecondaryDamageType: null };
+  }
+  return {
+    autoDamageSecondaryFormula: action.damage_dice_secondary,
+    autoDamageSecondaryName: fallbackName || action.name || null,
+    autoDamageSecondaryDamageType: action.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildSaveOptions(action) {
   return {
     saveDc: action?.save_dc || null,
     saveType: action?.save_type ? toAbbr(action.save_type) : null,
@@ -673,6 +691,8 @@ function buildSaveOptions(action) {
     // auto-damage to the save-result fail seam (infernalWoundService).
     // Byte-inert null for every row without the structured wound key.
     infernalWound: parseInfernalWoundClause(action),
+    // MA-0427: secondary damage rides the save transport (see helper).
+    ...buildSecondaryDamageTransport(action),
   };
 }
 
@@ -974,7 +994,8 @@ function savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction)
   return spellDamageType || getDamageTypesForAction(action)[0] || null;
 }
 
-function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null }) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
   const actionName = spellName || action.name;
   const saveEffect = action?.save_effect ?? null;
@@ -989,6 +1010,12 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     autoDamageFormula: saveDamageFormula,
     autoDamageDamageType: saveDamageFormula && primaryDamageType ? formatDamageTypes([primaryDamageType]) : null,
     autoDamageName: actionName,
+    // MA-0427: dual-damage block-save rows (Brazen Gorgon Smelting Charge
+    // "Failure: 2d8 + 4 Piercing damage plus 3d8 Fire damage") — the authored
+    // secondary rides the save context to saveProcessing.applySaveDamage,
+    // which rolls it as its own save-damage leg and halves it on a successful
+    // save exactly like the primary (dc_success semantics apply to both legs).
+    ...buildSecondaryDamageTransport(action, actionName),
     saveConditions,
     isSpellDamage: !!spellName,
     consumeMemoriesClause: !!prerequisite,

@@ -113,6 +113,7 @@ function buildPlayerSaveLogData({ targetName, characterName, actionName, effecti
 }
 
 async function processPlayerSave({ target, characterName, campaignName, context, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName }) {
+    const hasSecondaryDamage = !!context?.autoDamageSecondaryFormula;
     const { promise } = createSaveListener(campaignName, {
         targetName,
         saveType: saveType || 'CON',
@@ -122,6 +123,13 @@ async function processPlayerSave({ target, characterName, campaignName, context,
         // CLA-324: monster-card save-based attacks are spell-like save attacks (eye rays,
         // magical rays) — flag spell-origin so against_spell gates can discriminate.
         isSpellDamage: true,
+        // MA-0427: dual-damage rows (Brazen Gorgon Smelting Charge) surface BOTH
+        // formulas in the prompt copy honestly; single-formula rows keep every damage
+        // field null exactly as before (prompt payload + reroll log byte-identical).
+        damageFormula: hasSecondaryDamage ? (context?.autoDamageFormula || null) : null,
+        damageType: hasSecondaryDamage ? (context?.autoDamageDamageType || null) : null,
+        secondaryFormula: context?.autoDamageSecondaryFormula || null,
+        secondaryDamageType: context?.autoDamageSecondaryDamageType || null,
     });
 
     const saveResult = await promise;
@@ -892,6 +900,67 @@ function buildSaveDamagePopupData({ context, damageFormula, damageResult, finalD
     };
 }
 
+// MA-0427: authored secondary damage on a monster SAVE row (Brazen Gorgon
+// Smelting Charge — "Failure: 13 (2d8 + 4) Piercing damage plus 13 (3d8) Fire
+// damage"). Rolled SEPARATELY from the primary, each leg passes the SAME
+// dc_success/evasion adjudication (computeDamageAfterEvasion — 'half' floors
+// each leg independently, matching the MA-0426 attack-path secondary recipe),
+// applied against its own damage type, and logged as its own save-damage
+// entry. Byte-inert null return for every row without autoDamageSecondaryFormula.
+async function applySecondarySaveDamageLeg({ context, combatSummary, attackerName, applyTarget, saveSuccess, hasEvasion, characters, campaignName, logEntry }) {
+    const secondaryFormula = context?.autoDamageSecondaryFormula;
+    if (!secondaryFormula) return null;
+    const secondaryDamageType = context?.autoDamageSecondaryDamageType || null;
+    if (!secondaryDamageType) console.error(`[saveProcessing] MA-0427 secondary formula "${secondaryFormula}" has no authored damage_type_secondary — applying typeless.`);
+    const secondaryRollResult = rollExpression(secondaryFormula);
+    if (!secondaryRollResult) {
+        console.error(`[saveProcessing] MA-0427 unparseable secondary formula "${secondaryFormula}" — GM adjudicate manually.`);
+        return null;
+    }
+    const secondarySaveDamage = computeDamageAfterEvasion(secondaryRollResult.total, saveSuccess, context?.dcSuccess, hasEvasion);
+    const attackerChar = (characters || []).find(c => c.name === attackerName);
+    const secondaryIgnoreResistance = (attackerChar?.computedStats && hasIgnoreResistance(attackerChar.computedStats, secondaryDamageType)) || false;
+    const secondaryApplyResult = await applyDamageToTarget(combatSummary, applyTarget, secondarySaveDamage, [secondaryDamageType].filter(Boolean), { campaignName, characters, ignoreResistance: secondaryIgnoreResistance, attackerName, suppressHpLog: false, ...{ isSpellDamage: true } });
+    logEntry(buildSaveDamageLogData({
+        attackerName,
+        context,
+        damageFormula: secondaryFormula,
+        damageResult: secondaryRollResult,
+        finalDamage: secondarySaveDamage,
+        damageType: secondaryDamageType,
+        applyTarget,
+        applyResult: secondaryApplyResult,
+        saveSuccess,
+    }));
+    return {
+        formula: secondaryFormula,
+        rolls: secondaryRollResult.rolls,
+        modifier: secondaryRollResult.modifier,
+        total: secondaryRollResult.total,
+        finalDamage: secondaryApplyResult?.finalDamage ?? secondarySaveDamage,
+        damageType: secondaryDamageType,
+        applyResult: secondaryApplyResult,
+    };
+}
+
+// MA-0427 popup fields for the secondary save-damage leg — merged over the
+// primary save-damage popup so the DiceRollResult SecondaryDamageSection names
+// both dice, both halves, and the after-both-legs HP. {} for single-damage
+// rows (popup byte-identical).
+function buildSecondarySaveDamagePopupFields({ secondaryOutcome, effectiveD20ForSave, saveTotal, saveSuccess }) {
+    if (!secondaryOutcome) return {};
+    return {
+        targetCurrentHp: secondaryOutcome.applyResult?.newHp,
+        secondaryFormula: secondaryOutcome.formula,
+        secondaryRolls: secondaryOutcome.rolls,
+        secondaryModifier: secondaryOutcome.modifier,
+        secondaryTotal: secondaryOutcome.total,
+        secondaryFinalDamage: secondaryOutcome.finalDamage,
+        secondaryDamageType: secondaryOutcome.damageType,
+        secondarySaveResult: { roll: effectiveD20ForSave, total: saveTotal, bonus: 0, success: saveSuccess },
+    };
+}
+
 // MA-0352: authored HP-threshold kill clause (Banshee Deathly Wail — "If the
 // target has 25 Hit Points or fewer, it drops to 0 Hit Points"). Failed-save
 // seam ONLY (success takes ZERO — dc_success:"none"): victim currentHp ≤
@@ -992,7 +1061,20 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
 
     logEntry(buildSaveDamageLogData({ attackerName, context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, saveSuccess }));
 
-    setPopupHtml(buildSaveDamagePopupData({ context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, targetName, effectiveD20ForSave, saveTotal, saveSuccess, saveDc, saveType }));
+    // MA-0427: authored secondary damage on a SAVE row (Brazen Gorgon Smelting
+    // Charge "Failure: 2d8 + 4 Piercing damage plus 3d8 Fire damage") rolls as a
+    // SECOND save-damage leg with its own half-on-success pass — dc_success
+    // semantics apply to both legs identically via computeDamageAfterEvasion,
+    // each leg floor-halved independently. Byte-inert null for every row without
+    // damage_dice_secondary (all existing single-damage suites byte-identical).
+    const secondaryOutcome = await applySecondarySaveDamageLeg({ context, combatSummary: combatSummaryForSave, attackerName, applyTarget, saveSuccess, hasEvasion, characters, campaignName, logEntry });
+
+    setPopupHtml({
+        ...buildSaveDamagePopupData({ context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, targetName, effectiveD20ForSave, saveTotal, saveSuccess, saveDc, saveType }),
+        // MA-0427: dual-damage rows surface BOTH legs honestly in the popup
+        // (DiceRollResult SecondaryDamageSection); single-damage popups byte-identical.
+        ...buildSecondarySaveDamagePopupFields({ secondaryOutcome, effectiveD20ForSave, saveTotal, saveSuccess }),
+    });
 
     applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
     maybeLogMemoryGainAtZeroHp({ context, combatSummary: combatSummaryForSave, applyTarget, attackerName, applyResult, saveSuccess, campaignName });

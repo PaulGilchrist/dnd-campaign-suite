@@ -635,6 +635,20 @@ function EvasionSelectionOverlay({ prompts, evasionSelection, onSelectionChange,
   );
 }
 
+// MA-0427: dual-damage save prompts (Brazen Gorgon Smelting Charge —
+// "2d8 + 4 Piercing plus 3d8 Fire") name BOTH formulas honestly in the DC
+// prompt copy; renders null for every single-damage prompt (byte-inert).
+function DualDamageNotice({ current }) {
+  if (!current.secondaryFormula) return null;
+  const primary = current.damageFormula ? `${current.damageFormula} ${current.damageType || ''}`.trim() : 'Primary';
+  const secondary = `${current.secondaryFormula} ${current.secondaryDamageType || ''}`.trim();
+  return (
+    <p className="sp-note">
+      {primary} + {secondary} damage{current.dcSuccess === 'half' ? ', half on a successful save' : ''}
+    </p>
+  );
+}
+
 function SavePromptDialog({
   current, prompts, dimmed, characters, campaignName, display, hasResult,
   rerollUsedForSave, rerollAvailability, handlers,
@@ -660,6 +674,7 @@ function SavePromptDialog({
             <EvasionNote current={current} characters={characters} campaignName={campaignName} />
           )}
           {current.dcSuccess === 'none' && <p className="sp-note">No damage on successful save</p>}
+          <DualDamageNotice current={current} />
           {/* MA-0367: dc_success 'full' — the save gates only a non-damage
               clause (the Infernal Wound); the attack damage stands regardless. */}
           {current.dcSuccess === 'full' && <p className="sp-note">Full damage regardless — this save determines any additional effect only</p>}
