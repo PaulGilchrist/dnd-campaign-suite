@@ -888,3 +888,120 @@ describe('MA-0334 Balor Flame Whip prone-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const LIGHTNING_BLADE_ACTION = BALOR.actions[2];
+
+describe('MA-0335 Balor Lightning Blade no_reactions hit-target-effect clause', () => {
+    const deps = {
+        characterName: 'Balor 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Balor 1', computedStats: { armorClass: 19 } },
+            { name: 'AberrantSorcerer', computedStats: { armorClass: 9 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 43, newHp: 3, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'AberrantSorcerer', type: 'player', size: 'Medium', ac: 9, currentHp: 46, maxHp: 46 }],
+        });
+    });
+
+    it('MA-0335 data-lock: authors hit_target_effect:"no_reactions" on the Lightning Blade row', () => {
+        expect(LIGHTNING_BLADE_ACTION.name).toBe('Lightning Blade');
+        expect(LIGHTNING_BLADE_ACTION.attack_bonus).toBe(14);
+        expect(LIGHTNING_BLADE_ACTION.reach).toBe('10 ft.');
+        expect(LIGHTNING_BLADE_ACTION.damage_dice_primary).toBe('3d8 + 8');
+        expect(LIGHTNING_BLADE_ACTION.damage_type_primary).toBe('Force');
+        expect(LIGHTNING_BLADE_ACTION.damage_dice_secondary).toBe('4d10');
+        expect(LIGHTNING_BLADE_ACTION.damage_type_secondary).toBe('Lightning');
+        expect(LIGHTNING_BLADE_ACTION.hit_target_effect).toBe('no_reactions');
+        expect(LIGHTNING_BLADE_ACTION.hit_conditions).toBeUndefined();
+        expect(LIGHTNING_BLADE_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a targetEffect-only clause from the Lightning Blade row', () => {
+        expect(buildHitConditionClause(LIGHTNING_BLADE_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Lightning Blade',
+            targetEffect: 'no_reactions',
+        });
+    });
+
+    it('registers the no_reactions te on the target, sourced from the balor, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Lightning Blade', formula: '3d8 + 8', total: 21, rolls: [6, 4, 3], modifier: 8, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Force',
+            attackerName: 'Balor 1',
+            hitClause: buildHitConditionClause(LIGHTNING_BLADE_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'AberrantSorcerer',
+            'no_reactions',
+            'Balor 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('expires the te anchored on the balor (until its next turn start)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Lightning Blade', formula: '3d8 + 8', total: 21, rolls: [6, 4, 3], modifier: 8, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Force',
+            attackerName: 'Balor 1',
+            hitClause: buildHitConditionClause(LIGHTNING_BLADE_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Balor 1',
+            targetName: 'AberrantSorcerer',
+            effects: [{ type: 'remove_target_effect', effectKey: 'no_reactions', source: 'Balor 1', target: 'AberrantSorcerer' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Balor 1',
+        });
+    });
+
+    it('logs a condition-applied entry naming the clause duration and writes no grapple conditions', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Lightning Blade', formula: '3d8 + 8', total: 21, rolls: [6, 4, 3], modifier: 8, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Force',
+            attackerName: 'Balor 1',
+            hitClause: buildHitConditionClause(LIGHTNING_BLADE_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'AberrantSorcerer',
+            reason: "Lightning Blade — until the start of Balor 1's next turn",
+        }));
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AberrantSorcerer', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+    });
+
+    it('grants nothing when the Lightning Blade attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Lightning Blade', formula: '3d8 + 8', total: 21, rolls: [6, 4, 3], modifier: 8, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Force',
+            attackerName: 'Balor 1',
+        } });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

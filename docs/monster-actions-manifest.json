@@ -5026,7 +5026,7 @@
       "damageTypeSecondary": "Lightning",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 21 (3d8 + 8) Force damage plus 22 (4d10) Lightning damage, and the target can't take Reactions until the start of the balor's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0335-lightning-blade-no-reactions-clause-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0336",

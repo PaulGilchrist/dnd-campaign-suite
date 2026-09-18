@@ -7408,7 +7408,8 @@
         "damage_dice_primary": "3d8 + 8",
         "damage_type_primary": "Force",
         "damage_dice_secondary": "4d10",
-        "damage_type_secondary": "Lightning"
+        "damage_type_secondary": "Lightning",
+        "hit_target_effect": "no_reactions"
       }
     ],
     "bonus_actions": [
