@@ -5527,7 +5527,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 8 (1d10 + 3) Slashing damage. If the target is a creature and doesn't already have an infernal wound, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target receives an infernal wound. While wounded, the target loses 5 (1d10) Hit Points at the start of each of its turns. The wound closes after 1 minute, after a spell restores Hit Points to the target, or after the target or a creature within 5 feet of it takes an action to stanch the wound, doing so by succeeding on a DC 12 Wisdom (Medicine) check.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0367-infernal-wound-inert.md"
+      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0367-infernal-wound-inert.md"
     },
     {
       "id": "MA-0368",
@@ -5651,7 +5651,7 @@
         "unconscious"
       ],
       "description": "The beholder randomly shoots one of the following magical rays at a target it can see within 120 feet of itself (roll 1d10; reroll if the beholder has already used that ray during this turn):Charm Ray. Wisdom Saving Throw: DC 16. Failure: 13 (3d8) Psychic damage, and the target has the Charmed condition for 1 hour or until it takes damage. Success: Half damage only.Paralyzing Ray. Constitution Saving Throw: DC 16. Failure: The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.Fear Ray. Wisdom Saving Throw: DC 16. Failure: 14 (4d6) Psychic damage, and the target has the Frightened condition until the end of its next turn. Success: Half damage only.Slowing Ray. Constitution Saving Throw: DC 16. Failure: 18 (4d8) Necrotic damage. Until the end of the target's next turn, the target's Speed is halved; the target can't take Reactions; and it can take either an action or a Bonus Action on its turn, not both. Success: Half damage only.Enervation Ray. Constitution Saving Throw: DC 16. Failure: 13 (3d8) Poison damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only.Telekinetic Ray. Strength Saving Throw: DC 16 (the target succeeds automatically if it is Gargantuan). Failure: The beholder moves the target up to 30 feet in any direction. The target has the Restrained condition until the start of the beholder's next turn or until the beholder has the Incapacitated condition. The beholder can also exert fine control on objects with this ray, such as manipulating a tool or opening a door or container.Sleep Ray. Wisdom Saving Throw: DC 16 (the target succeeds automatically if it is a Construct or an Undead). Failure: The target has the Unconscious condition for 1 minute. The condition ends if the target takes damage or a creature within 5 feet of it takes an action to wake it.Petrification Ray. Constitution Saving Throw: DC 16. First Failure: The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure: The target has the Petrified condition instead of the Restrained condition.Disintegration Ray. Dexterity Saving Throw: DC 16. Failure: 36 (8d8) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust.Death Ray. Dexterity Saving Throw: DC 16. Failure: 55 (10d10) Necrotic damage. Success: Half damage. Failure or Success: The target dies if the ray reduces it to 0 Hit Points.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0374-eye-rays-unparseable-shell.md"
+      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0374-eye-rays-unparseable-shell.md"
     },
     {
       "id": "MA-0375",
@@ -5663,7 +5663,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the beholder can expend a use to take one of the following actions. The beholder regains all expended uses at the start of each of its turns.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0375-beholder-legendary-header-no-uses-field-economy-dead.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0376",

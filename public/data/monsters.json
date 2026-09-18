@@ -8664,14 +8664,18 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
+        "uses": 3,
         "description": "Immediately after another creature's turn, the beholder can expend a use to take one of the following actions. The beholder regains all expended uses at the start of each of its turns."
       },
       {
         "name": "Chomp",
+        "delegates_to": "Bite",
         "description": "The beholder makes two Bite attacks."
       },
       {
         "name": "Glare",
+        "advisory": "eye_rays",
+        "advisory_message": "uses Eye Rays \u2014 advisory record: GM picks one eye ray and adjudicates its save/damage (Eye Rays multi-ray d10 block unparseable, MA-0374 pending subsystem; no ray picker consumer). Canonical cost is 1 legendary use \u2014 the engine spends 1 per click.",
         "description": "The beholder uses Eye Rays."
       }
     ],
