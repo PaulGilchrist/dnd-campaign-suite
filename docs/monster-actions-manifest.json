@@ -4873,7 +4873,7 @@
       "damageTypeSecondary": "fire",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) bludgeoning damage, or 8 (1d10 + 3) bludgeoning damage if used with two hands to make a melee attack, plus 3 (1d6) fire damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0325-azer-warhammer-two-handed-variant-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0326",

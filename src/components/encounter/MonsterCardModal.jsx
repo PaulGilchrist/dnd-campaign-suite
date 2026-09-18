@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
@@ -641,6 +641,8 @@ function buildAttackRollOptions(v) {
     ...buildSaveOptions(v.action),
     isSpellDamage: isSpellOriginAction(v.action),
     chargeBonusOffer: buildChargeBonusOffer(v.action, v.name),
+    // MA-0325: two-handed versatile-damage choice (HIT popup offer).
+    twoHandedVariantOffer: buildTwoHandedVariantOffer(v.action, v.name),
   };
 }
 
@@ -975,7 +977,30 @@ function buildMonsterSpellRefusalEntry({ monsterName, spellName, usesMax }) {
   };
 }
 
-function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll, onChargeBonus, onChargeBonusDecline }) {
+function resolveTwoHandedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml }) {
+  const offer = popupHtml?.twoHandedVariantOffer;
+  if (!offer || popupHtml?.twoHandedVariantResolved) return;
+  const attackPopupSnapshot = popupHtml;
+  if (decision === 'two-handed') {
+    const autoDamage = attackPopupSnapshot.autoDamage
+      ? { ...attackPopupSnapshot.autoDamage, formula: offer.formula, twoHandedChoice: 'two-handed' }
+      : attackPopupSnapshot.autoDamage;
+    addEntry(campaignName, buildTwoHandedVariantSelectLog({ monsterName, offer, hands: 'two-handed' }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging two-handed variant selection:', e); });
+    setPopupHtml({ ...attackPopupSnapshot, autoDamage, twoHandedVariantResolved: 'two-handed' });
+    return;
+  }
+  if (decision === 'one-handed') {
+    const autoDamage = attackPopupSnapshot.autoDamage
+      ? { ...attackPopupSnapshot.autoDamage, twoHandedChoice: 'one-handed' }
+      : attackPopupSnapshot.autoDamage;
+    addEntry(campaignName, buildTwoHandedVariantSelectLog({ monsterName, offer, hands: 'one-handed' }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging one-handed variant selection:', e); });
+    setPopupHtml({ ...attackPopupSnapshot, autoDamage, twoHandedVariantResolved: 'one-handed' });
+  }
+}
+
+function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll, onChargeBonus, onChargeBonusDecline, onTwoHandedVariant }) {
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <AttackResultPopup
@@ -987,6 +1012,7 @@ function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml
         onQuickRoll={popupHtml.waitingForPlayerSave ? () => onQuickRoll(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined}
         onChargeBonus={onChargeBonus}
         onChargeBonusDecline={onChargeBonusDecline}
+        onTwoHandedVariant={onTwoHandedVariant}
       />
     </div>
   );
@@ -1130,6 +1156,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
             }
             if (autoDamage.hitClause) {
               context.hitClause = autoDamage.hitClause;
+            }
+            // MA-0325: an unpicked two-handed-popup Done records the
+            // one-handed default so every variant resolution logs its choice.
+            if (autoDamage.twoHandedVariantOffer && autoDamage.twoHandedChoice === 'one-handed-default') {
+              addEntry(campaignName, buildTwoHandedVariantSelectLog({ monsterName, offer: autoDamage.twoHandedVariantOffer, hands: 'one-handed', defaulted: true }))
+                .catch((e) => { console.error('[MonsterCardModal] Error logging two-handed default:', e); });
             }
             rollDamage({ name: autoDamage.name, formula: autoDamage.formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
           } else {
@@ -1556,6 +1588,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           onQuickRoll={handleQuickRollWithEvasion}
           onChargeBonus={() => resolveChargeBonus('granted')}
           onChargeBonusDecline={() => resolveChargeBonus('declined')}
+          onTwoHandedVariant={(decision) => resolveTwoHandedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml })}
         />
       )}
     </div>

@@ -168,6 +168,12 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         sneakAttackDice: context?.sneakAttackDice || 0,
         d20Roll: ctx.effectiveD20Roll,
         hitClause: context?.hitClause || null,
+        // MA-0325: two-handed variant rows carry the offer + a default
+        // marker on the auto-damage so the Done resolution can record the
+        // one-handed default when the GM makes no popup choice (the modal
+        // flips twoHandedChoice on an explicit pick). Byte-inert undefined.
+        twoHandedVariantOffer: context?.twoHandedVariantOffer || undefined,
+        twoHandedChoice: context?.twoHandedVariantOffer ? 'one-handed-default' : undefined,
         ...comboTrapArmsFromContext(context),
     };
 }
@@ -229,6 +235,9 @@ function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) 
         // MA-0007: GM-adjudication offer for conditional charge-damage clauses
         // (monsters.json conditional_damage) — surfaced on HIT popups only.
         chargeBonusOffer: context?.chargeBonusOffer || null,
+        // MA-0325: GM-adjudicated two-handed damage-dice choice
+        // (monsters.json damage_dice_two_handed) — HIT popup only.
+        twoHandedVariantOffer: context?.twoHandedVariantOffer || null,
     };
 }
 

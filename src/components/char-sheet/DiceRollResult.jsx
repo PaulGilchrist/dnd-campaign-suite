@@ -856,6 +856,37 @@ function ChargeBonusOffer({ props, state }) {
     );
 }
 
+// MA-0325: GM-adjudicated two-handed damage-dice choice (monsters.json
+// damage_dice_two_handed, e.g. Azer Warhammer "1d8 + 3, or 1d10 + 3 if used
+// with two hands"). ALTERNATIVE primary dice (MA-0007 offer-on-result shape):
+// choosing two-handed swaps the Done auto-damage formula in the modal before
+// damage is applied. Offered on HIT only — never on misses or after a pick.
+function TwoHandedVariantOffer({ props, state }) {
+    const offer = props.twoHandedVariantOffer;
+    if (!offer) return null;
+    if (props.twoHandedVariantResolved) {
+        return (
+            <div className="dice-roll-reroll-result">
+                <i className={`fa-solid ${props.twoHandedVariantResolved === 'two-handed' ? 'fa-hand-fist' : 'fa-hand'}`}></i>
+                {props.twoHandedVariantResolved === 'two-handed'
+                    ? `Two-Handed applied (${offer.formula} ${offer.damageType}).`
+                    : `One-Handed applied (${offer.baseFormula} ${offer.damageType}).`}
+            </div>
+        );
+    }
+    if (state.computedHit !== true) return null;
+    return (
+        <div className="dice-roll-reroll">
+            <button className="dice-roll-reroll-btn" onClick={() => props.onTwoHandedVariant?.('two-handed')} type="button">
+                <i className="fa-solid fa-hand-fist"></i> Two-Handed: {offer.formula} {offer.damageType}
+            </button>
+            <button className="dice-roll-reroll-btn" onClick={() => props.onTwoHandedVariant?.('one-handed')} type="button">
+                <i className="fa-solid fa-hand"></i> One-Handed: {offer.baseFormula} {offer.damageType}
+            </button>
+        </div>
+    );
+}
+
 function DiceRollResult(props) {
     const {
         bonus = 0, modifier = 0,
@@ -987,6 +1018,8 @@ function DiceRollResult(props) {
             <DamageFeatureTriggers props={props} state={state} handlers={handlers} />
 
             <ChargeBonusOffer props={props} state={state} />
+
+            <TwoHandedVariantOffer props={props} state={state} />
 
             <FeatureResultSummary props={props} state={state} handlers={handlers} />
 

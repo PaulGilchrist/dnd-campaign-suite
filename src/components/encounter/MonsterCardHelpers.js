@@ -559,6 +559,39 @@ export function buildChargeBonusDeclineLog({ monsterName, offer }) {
   };
 }
 
+// MA-0325: authored two-handed versatile-damage variant (monsters.json
+// damage_dice_two_handed, e.g. Azer Warhammer "1d8 + 3, or 1d10 + 3 if used
+// with two hands"). ALTERNATIVE primary dice (unlike MA-0007's ADDITIVE
+// conditional_damage): the HIT popup offers a GM-adjudicated choice
+// (MA-0007 offer-on-result shape); picking two-handed swaps the auto-damage
+// formula before Done, so the variant leg can actually surface. Rows without
+// the key are byte-inert (null).
+export function buildTwoHandedVariantOffer(action, name) {
+  const variant = action?.damage_dice_two_handed;
+  const base = action?.damage_dice_primary;
+  if (!variant || !base || variant === base) return null;
+  const damageType = action?.damage_type_primary || '';
+  return {
+    formula: variant,
+    baseFormula: base,
+    damageType,
+    label: `Two-Handed: ${variant} ${damageType}?`,
+    attackName: name || action?.name || 'Attack',
+  };
+}
+
+export function buildTwoHandedVariantSelectLog({ monsterName, offer, hands, defaulted = false }) {
+  const formula = hands === 'two-handed' ? offer.formula : offer.baseFormula;
+  return {
+    type: 'automation',
+    automationType: hands === 'two-handed' ? 'two_handed_variant_selected' : 'one_handed_variant_selected',
+    characterName: monsterName,
+    abilityName: offer.attackName,
+    description: `${monsterName} ${offer.attackName} ${hands === 'two-handed' ? 'TWO-HANDED' : 'one-handed'} variant selected${defaulted ? ' (default — no popup choice made)' : ''} — ${formula} ${offer.damageType} applied on Done.`,
+    timestamp: Date.now(),
+  };
+}
+
 const GATED_MONSTER_REACTIONS = {
   feather_fall: { effect: 'feather_fall', trigger: 'falling', label: 'Feather Fall', icon: 'fa-feather' },
   // MA-0013: Aberrant Cultist Counterspell (2/Day) — reactive spell-cast
