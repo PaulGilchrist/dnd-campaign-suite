@@ -1,6 +1,11 @@
 import { getAbilitySaveModifier } from '../../services/shared/abilityLookup.js';
 import { findLastAttack } from '../../services/automation/common/damageRollback.js';
+import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { applyDamageToTarget, computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
+import { isWithinRange } from '../../services/rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
+import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 
@@ -600,6 +605,14 @@ const GATED_MONSTER_REACTIONS = {
   // spell level <3 auto-countered; ≥3 ability check d20+spellcasting mod
   // vs DC 10+spellLevel (CLA-322 dispel shape, single ability mod — no PB).
   counterspell: { effect: 'counterspell', trigger: 'enemy_spell_cast', label: 'Counterspell', icon: 'fa-shield' },
+  // MA-0329: Azer Pyromancer Hellish Rebuke (2/Day) — reactive spell-damage
+  // reaction. RAW trigger: takes damage from a creature it can see within
+  // 60 ft (no vision model in-app — seen is GM-enforced advisory, CLA-325).
+  // Gate reads the campaign lastAttack the monster as damaged target with
+  // damage dealt (same identity/damage fields the PC-side reactionDamage
+  // consumers gate on); DEX save vs the authored spell DC (15, MA-0328
+  // lineage), 2d10 fire half on save, 2/Day spend + round latch.
+  hellish_rebuke: { effect: 'hellish_rebuke', trigger: 'takes_damage', label: 'Hellish Rebuke', icon: 'fa-fire' },
 };
 
 export function isSpellOriginLastAttack(lastAttack) {
@@ -652,6 +665,57 @@ export function resolveCounterspellCheck({ spellLevel, abilityMod, rollD20 }) {
   return { auto: false, countered: total >= targetDC, d20, mod, total, targetDC, spellLevel: level };
 }
 
+// MA-0329: event-identity refusal probe — no trigger-string stamp exists on
+// ordinary attacks, so like counterspell (MA-0013) the gate keys off event
+// identity: monster must be the damaged target with damage actually dealt
+// (actualDamage merged by handlePlainDamage on weapon hits; primaryDamage /
+// targetResults totals on spell legs). Returns a refusal reason or null.
+export function hellishRebukeIdentityRefusal(lastAttack, monsterName) {
+  if (!lastAttack || lastAttack.targetName !== monsterName) return 'trigger';
+  const dealt = Number(lastAttack.actualDamage ?? ((lastAttack.primaryDamage || 0) + (lastAttack.secondaryDamage || 0)));
+  if (!(dealt > 0)) return 'damage';
+  if (lastAttack.hellishRebukeResolved === true) return 'reacted';
+  if (!lastAttack.attackerName || lastAttack.attackerName === monsterName) return 'attacker';
+  return null;
+}
+
+const HELLISH_REBULE_REFUSAL_MESSAGES = {
+  trigger: (m) => `Hellish Rebuke: ${m} was not the damaged target of the last attack — refused.`,
+  damage: (m) => `Hellish Rebuke: the last attack dealt ${m} no damage — refused.`,
+  reacted: () => 'Hellish Rebuke: already responded to that attack — a single hit provokes one rebuke.',
+  attacker: () => 'Hellish Rebuke: no identifiable attacker to rebuke — refused.',
+  round: () => 'Hellish Rebuke: Reaction already used this round — refused.',
+  uses: (limit) => `Hellish Rebuke: ${limit}/Day uses already spent today — refused. Uses reset at a long rest; GM-enforced for monsters.`,
+};
+
+export function hellishRebukeGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action }) {
+  const identity = hellishRebukeIdentityRefusal(lastAttack, monsterName);
+  if (identity) {
+    return { ok: false, reason: identity, message: HELLISH_REBULE_REFUSAL_MESSAGES[identity](monsterName) };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: HELLISH_REBULE_REFUSAL_MESSAGES.round() };
+  }
+  const used = Number((storedUses && storedUses.hellish_rebuke) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: HELLISH_REBULE_REFUSAL_MESSAGES.uses(limit) };
+  }
+  return { ok: true, used, limit, attackerName: lastAttack.attackerName };
+}
+
+// Numeric spec read from the authored row — never a baked default before the
+// row exists (DC 15 authored via the MA-0328 Spellcasting lineage).
+export function hellishRebukeSpec(action) {
+  const auto = action?.automation || {};
+  const saveDc = Number(auto.saveDc ?? action?.save_dc);
+  if (!Number.isFinite(saveDc) || saveDc <= 0) return { reason: 'dc', message: 'Hellish Rebuke: no authored numeric spell save DC on the row — no save rolled, nothing spent.' };
+  const formula = auto.damageExpression;
+  if (!formula) return { reason: 'formula', message: 'Hellish Rebuke: no authored damage formula on the row — nothing rolled, nothing spent.' };
+  return { spec: { saveDc, formula, saveType: auto.saveType || 'DEX', damageType: auto.damageType || 'Fire', dcSuccess: auto.dcSuccess || 'half', rangeFt: rangeToFeet(auto.range ?? action?.range) ?? 60 } };
+}
+
 export function getGatedMonsterReaction(action) {
   const effect = action?.automation?.effect;
   return effect ? GATED_MONSTER_REACTIONS[effect] || null : null;
@@ -700,9 +764,7 @@ export function monsterReactionGate({ def, action, monsterName, lastAttack, curr
   return { ok: true, used, limit };
 }
 
-export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, deps = {} }) {
-  const def = getGatedMonsterReaction(action);
-  if (!def) return null;
+async function readGatedReactionContext({ def, campaignName, monsterName, deps }) {
   const findLast = deps.findLastAttack || findLastAttack;
   const getCombat = deps.getCombatContext || getCombatContext;
   const getRV = deps.getRuntimeValue || getRuntimeValue;
@@ -714,14 +776,32 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
   const currentRound = Number(cs?.round ?? 1);
   const storedUses = getRV(monsterName, MONSTER_REACTION_USES_KEY) || {};
   const usedRound = Number(getRV(monsterName, latchKey) ?? 0);
+  // RAW campaign lastAttack (not findLastAttack's normalized wrapper, which
+  // drops spell-origin fields like rollType/damageSchool).
+  const rawLastAttack = await getRV('campaign', 'lastAttack') || lastAttack;
+  return { getRV, setRV, log, latchKey, lastAttack, rawLastAttack, cs, currentRound, storedUses, usedRound };
+}
+
+export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, deps = {} }) {
+  const def = getGatedMonsterReaction(action);
+  if (!def) return null;
+  const ctx = await readGatedReactionContext({ def, campaignName, monsterName, deps });
 
   if (def.effect === 'counterspell') {
-    // Read the RAW campaign lastAttack (not findLastAttack's normalized
-    // wrapper, which drops spell-origin fields like rollType/damageSchool).
-    const rawLastAttack = await getRV('campaign', 'lastAttack') || lastAttack;
-    return resolveMonsterCounterspell({ action, monsterName, campaignName, lastAttack: rawLastAttack, cs, currentRound, storedUses, usedRound, latchKey, deps });
+    return resolveMonsterCounterspell({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps });
   }
 
+  if (def.effect === 'hellish_rebuke') {
+    return resolveMonsterHellishRebuke({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps });
+  }
+
+  return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });
+}
+
+// MA-0006: record-only gated reactions (Feather Fall) — the app has no
+// fall-damage pipeline, so a resolved use is an advisory negation record
+// (CLA-325) after the round-latch + uses gate.
+async function resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack, currentRound, storedUses, usedRound, latchKey, setRV, log }) {
   const gate = monsterReactionGate({ def, action, monsterName, lastAttack, currentRound, storedUses, usedRound });
   if (!gate.ok) {
     await log(campaignName, {
@@ -803,6 +883,134 @@ async function resolveMonsterCounterspell({ action, monsterName, campaignName, l
     timestamp: Date.now(),
   });
   return { ok: true, countered: outcome.countered, message, remaining };
+}
+
+// MA-0329: reactive Hellish Rebuke for monsters (Azer Pyromancer 2/Day).
+// Mirrors MA-0013 gated-reaction economy (round latch + MONSTER_REACTION_USES
+// spend + zero-spend refusals) and the PC-side reactionDamage seam
+// (createSaveListener → save-result → computeDamageAfterSave half →
+// applyDamageToTarget hp_change). Save is the ATTACKER's DEX save vs the
+// monster's authored spell DC; damage is 2d10 Fire, half on save success.
+// The triggering lastAttack is stamped hellishRebukeResolved so a second
+// click on the same hit cannot refire even before the round latch differs.
+function hellishRebukeAttackerActive(cs, attackerName) {
+  const attacker = (cs?.creatures || []).find(c => c.name === attackerName);
+  return Boolean(attacker) && Number(attacker.currentHp ?? attacker.currentHitPoints ?? 0) > 0;
+}
+
+async function runHellishRebukeSave({ impl, campaignName, monsterName, attackerName, spec }) {
+  const { promise } = impl.createSave(campaignName, {
+    targetName: attackerName,
+    attackerName: monsterName,
+    saveType: spec.saveType,
+    saveDc: spec.saveDc,
+    dcSuccess: spec.dcSuccess,
+    damageFormula: spec.formula,
+    damageType: spec.damageType,
+    sourceName: 'Hellish Rebuke',
+  });
+  const detail = await promise;
+  return detail?.success === true;
+}
+
+async function rollAndApplyHellishDamage({ impl, log, cs, monsterName, attackerName, campaignName, spec, success }) {
+  const rolled = impl.rollDamage(spec.formula);
+  const rawDamage = rolled?.total ?? 0;
+  const finalDamage = computeDamageAfterSave(rawDamage, success, spec.dcSuccess);
+  await log(campaignName, {
+    type: 'roll',
+    characterName: monsterName,
+    rollType: 'damage',
+    name: 'Hellish Rebuke Damage',
+    formula: spec.formula,
+    rolls: rolled?.rolls || [],
+    total: rawDamage,
+    damageType: spec.damageType,
+    targetName: attackerName,
+    finalDamage,
+    description: `Hellish Rebuke: ${spec.formula} ${spec.damageType} = ${rawDamage} vs ${attackerName} — DEX save vs DC ${spec.saveDc} ${success ? 'SUCCEEDED — half' : 'FAILED — full'} = ${finalDamage} applied.`,
+    timestamp: Date.now(),
+  });
+  if (finalDamage > 0) {
+    const characters = (cs?.creatures || []).filter(c => c.type === 'player');
+    const applyResult = await impl.applyDamage(cs, attackerName, finalDamage, [spec.damageType], { campaignName, characters, attackerName: monsterName });
+    if (!applyResult) {
+      console.error('[MA-0329] applyDamageToTarget failed — Hellish Rebuke damage not applied:', { monsterName, attackerName, finalDamage });
+    }
+  }
+  return finalDamage;
+}
+
+function buildHellishRebukeSpendLog({ monsterName, attackerName, saveDc, success, finalDamage, rangeFt, limit, remaining }) {
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Hellish Rebuke',
+    description: `${monsterName} uses Hellish Rebuke against ${attackerName} — ${attackerName} ${success ? 'succeeded' : 'failed'} their DEX save (DC ${saveDc}) and took ${finalDamage} Fire damage. Seen within ${rangeFt} ft is GM-enforced (no vision model). ${limit}/Day · ${remaining} left today.`,
+    timestamp: Date.now(),
+  };
+}
+
+async function resolveMonsterHellishRebuke({ action, monsterName, campaignName, lastAttack, cs, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const impl = {
+    rollDamage: deps.rollExpression || rollExpression,
+    createSave: deps.createSaveListener || createSaveListener,
+    applyDamage: deps.applyDamageToTarget || applyDamageToTarget,
+    inRange: deps.isWithinRange || isWithinRange,
+  };
+  const refuse = async (reason, message) => {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: 'hellish_rebuke_refused',
+      name: 'Hellish Rebuke',
+      description: `Hellish Rebuke refused (${reason}): ${message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message };
+  };
+
+  const gate = hellishRebukeGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action });
+  if (!gate.ok) return refuse(gate.reason, gate.message);
+
+  const specRead = hellishRebukeSpec(action);
+  if (specRead.reason) {
+    console.error(`[MA-0329] hellish_rebuke row refused (${specRead.reason})`, action);
+    return refuse(specRead.reason, specRead.message);
+  }
+  const spec = specRead.spec;
+
+  const attackerName = gate.attackerName;
+  if (!hellishRebukeAttackerActive(cs, attackerName)) {
+    return refuse('attacker', `Hellish Rebuke: attacker ${attackerName} is not an active combatant — refused.`);
+  }
+  const within = await impl.inRange(attackerName, monsterName, spec.rangeFt);
+  if (!within) {
+    return refuse('range', `Hellish Rebuke: ${attackerName} is not within ${spec.rangeFt} feet — refused.`);
+  }
+
+  // Stamp the latch + spend BEFORE resolving (CLA-361 precedent) so a thrown
+  // save/damage step cannot leave the Reaction refirable within the round.
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, hellish_rebuke: gate.used + 1 }, campaignName);
+
+  const success = await runHellishRebukeSave({ impl, campaignName, monsterName, attackerName, spec });
+  const finalDamage = await rollAndApplyHellishDamage({ impl, log, cs, monsterName, attackerName, campaignName, spec, success });
+
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    hellishRebukeResolved: true,
+    rebukedBy: monsterName,
+    rebukeTarget: attackerName,
+    rebukeDamage: finalDamage,
+  }, campaignName);
+
+  const remaining = Math.max(0, gate.limit - gate.used - 1);
+  const entry = buildHellishRebukeSpendLog({ monsterName, attackerName, saveDc: spec.saveDc, success, finalDamage, rangeFt: spec.rangeFt, limit: gate.limit, remaining });
+  await log(campaignName, entry);
+  return { ok: true, message: entry.description, remaining, finalDamage, saveSuccess: success };
 }
 
 function buildCounterspellMessage({ monsterName, spellName, outcome, limit, remaining }) {

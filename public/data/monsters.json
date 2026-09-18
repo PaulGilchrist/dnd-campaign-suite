@@ -7093,7 +7093,21 @@
     "reactions": [
       {
         "name": "Hellish Rebuke (2/Day)",
-        "description": "The azer casts <em>Hellish Rebuke</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The azer casts <em>Hellish Rebuke</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "2/Day",
+        "uses": 2,
+        "maxUses": 2,
+        "range": "60 ft.",
+        "automation": {
+          "type": "reaction",
+          "trigger": "takes_damage",
+          "effect": "hellish_rebuke",
+          "saveType": "DEX",
+          "saveDc": 15,
+          "dcSuccess": "half",
+          "damageExpression": "2d10",
+          "damageType": "Fire"
+        }
       }
     ],
     "environments": [

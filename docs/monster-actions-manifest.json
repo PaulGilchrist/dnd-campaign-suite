@@ -4926,7 +4926,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The azer casts Hellish Rebuke in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0329-hellish-rebuke-reaction-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0330",
