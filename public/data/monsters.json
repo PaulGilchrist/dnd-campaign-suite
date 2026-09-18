@@ -6617,7 +6617,9 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The archpriest casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17):<br><strong>At Will:</strong> <em>Light</em>, <em>Thaumaturgy</em><br><strong>1/Day Each:</strong> <em>Flame Strike</em> (level 6 version), <em>Greater Restoration</em>, <em>Raise Dead</em>, <em>Zone of Truth</em>"
+        "description": "The archpriest casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17):<br><strong>At Will:</strong> <em>Light</em>, <em>Thaumaturgy</em><br><strong>1/Day Each:</strong> <em>Flame Strike</em> (level 6 version), <em>Greater Restoration</em>, <em>Raise Dead</em>, <em>Zone of Truth</em>",
+        "save_dc": 17,
+        "save_type": "Wisdom"
       }
     ],
     "bonus_actions": [

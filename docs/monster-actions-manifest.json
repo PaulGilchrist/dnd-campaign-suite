@@ -4757,7 +4757,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The archpriest casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17):At Will: Light, Thaumaturgy1/Day Each: Flame Strike (level 6 version), Greater Restoration, Raise Dead, Zone of Truth",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0318-prose-dc-save-leg.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0319",
