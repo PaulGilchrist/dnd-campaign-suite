@@ -9708,6 +9708,7 @@
     "legendary_actions": [
       {
         "name": "Legendary Action Uses: 3",
+        "uses": 3,
         "description": "Immediately after another creature's turn, the blob can expend a use to take one of the following actions. The blob regains all expended uses at the start of each of its turns."
       },
       {
@@ -9718,10 +9719,12 @@
       },
       {
         "name": "Grasping Glob",
+        "delegates_to": "Restraining Glob",
         "description": "The blob uses Restraining Glob. The blob can't take this action again until the start of its next turn."
       },
       {
         "name": "Lashing Goo",
+        "delegates_to": "Pseudopod",
         "description": "The blob makes one Pseudopod attack."
       }
     ],

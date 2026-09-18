@@ -4270,7 +4270,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d4+3 Force damage.",
-      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0286-animated-object-medium-slam-no-tohit.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0287",
@@ -6127,7 +6127,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Immediately after another creature's turn, the blob can expend a use to take one of the following actions. The blob regains all expended uses at the start of each of its turns.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0405-legendary-uses-key-missing-dead-economy.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0406",
