@@ -6384,7 +6384,7 @@
       "actionType": "spellcasting",
       "saveDc": 13,
       "description": "The naga casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 13): At Will: Mage Hand, Thaumaturgy 1/Day Each: Command, Detect Thoughts, Lightning Bolt",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0421-bone-naga-spellcasting-no-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0422",

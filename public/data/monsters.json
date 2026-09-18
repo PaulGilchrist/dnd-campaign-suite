@@ -10306,9 +10306,11 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The naga casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 13):\n<strong>At Will:</strong> Mage Hand, Thaumaturgy\n<strong>1/Day Each:</strong> Command, Detect Thoughts, Lightning Bolt",
+        "description": "The naga casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 13):<br><strong>At Will:</strong> <strong>Mage Hand</strong>, <strong>Thaumaturgy</strong><br><strong>1/Day Each:</strong> <strong>Command</strong>, <strong>Detect Thoughts</strong>, <strong>Lightning Bolt</strong>",
         "spell_save_dc": 13,
-        "spellcasting_ability": "Intelligence"
+        "spellcasting_ability": "Intelligence",
+        "save_dc": 13,
+        "save_type": "Intelligence"
       }
     ],
     "bonus_actions": [],
@@ -55707,7 +55709,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The naga casts one of the following spells, requiring no Somatic or Material components and using Intelligence as the spellcasting ability (spell save DC 14): At Will: Detect Magic, Mage Hand, Minor Illusion, Water Breathing; 2/Day Each: Detect Thoughts, Dimension Door, Hold Person (level 3 version), Lightning Bolt (level 4 version)",
+        "description": "The naga casts one of the following spells, requiring no Somatic or Material components and using Intelligence as the spellcasting ability (spell save DC 14): <strong>At Will:</strong> <strong>Detect Magic</strong>, <strong>Mage Hand</strong>, <strong>Minor Illusion</strong>, <strong>Water Breathing</strong>; <strong>2/Day Each:</strong> <strong>Detect Thoughts</strong>, <strong>Dimension Door</strong>, <strong>Hold Person</strong> (level 3 version), <strong>Lightning Bolt</strong> (level 4 version)",
         "save_dc": 14,
         "save_type": "Intelligence"
       }
