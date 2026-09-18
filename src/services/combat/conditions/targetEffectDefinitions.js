@@ -622,6 +622,32 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { ability: 'STR' },
   },
   {
+    // MA-0374: Beholder Paralyzing Ray ladder — failed CON save Paralyzes,
+    // the target repeats the save at the end of each of its turns ending on
+    // a success; auto-succeeds after 1 minute (10-round clock, CLA-334).
+    // Own te key (NOT paralyzing_staged — MA-0248's Silver Dragon ladder
+    // stages Incapacitated first; the ray Paralyzes immediately).
+    effect: 'eye_ray_paralyzed',
+    label: 'Eye Ray: Paralyzed',
+    description: 'Beholder Paralyzing Ray (MA-0374): Paralyzed — repeats the CON save (DC indicated) at the end of each of its turns, ending the effect on itself on a success; after 1 minute it succeeds automatically.',
+    icon: 'fa-bolt',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source', 'dc', 'saveType'],
+  },
+  {
+    // MA-0374: Beholder Petrification Ray two-stage ladder — first failed
+    // CON save Restrains, a repeat save at the end of the target's next turn
+    // ends it on a success; a second failure Petrifies instead.
+    effect: 'eye_ray_petrifying',
+    label: 'Eye Ray: Petrifying',
+    description: 'Beholder Petrification Ray (MA-0374): first failed CON save — Restrained, repeats the save (DC indicated) at the end of its next turn; a second failure Petrifies it instead of Restrained.',
+    icon: 'fa-hand',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source', 'dc', 'saveType'],
+  },
+  {
     effect: 'faerie_fire',
     label: 'Faerie Fire',
     description: 'Affected creature sheds Dim Light in a 10-foot radius, can\'t benefit from the Invisible condition, and attack rolls against it have Advantage if the attacker can see it. Concentration, up to 1 minute.',

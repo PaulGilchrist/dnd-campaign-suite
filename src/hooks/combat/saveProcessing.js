@@ -14,6 +14,7 @@ import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelp
 import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
 import { setTempHp } from '../../services/automation/handlers/buffs/tempHpService.js';
 import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
+import { applyEyeRayFailedGrants } from '../../services/rules/features/beholderEyeRayService.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -361,6 +362,14 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
             actionName: context?.actionName || context?.name || 'Infernal Glaive',
             bleedDie: context.infernalWound.bleedDie,
         });
+    }
+    // MA-0374: Beholder Eye Rays per-ray failed-save grants — te grants
+    // (Slowing trio / Enervation no_healing / Telekinetic move marker) with
+    // ONE rounds clock, plus the Paralyzed and Petrification repeat-save
+    // ladders (beholderEyeRayService; turn-end consumer in
+    // navigationHandlers). Byte-inert for every row without context.eyeRay.
+    if (context?.eyeRay) {
+        await applyEyeRayFailedGrants({ campaignName, attackerName, targetName: applyTarget, ray: context.eyeRay });
     }
 }
 
@@ -987,6 +996,27 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
 
     applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
     maybeLogMemoryGainAtZeroHp({ context, combatSummary: combatSummaryForSave, applyTarget, attackerName, applyResult, saveSuccess, campaignName });
+    maybeNoteEyeRayZeroHp({ context, applyResult, applyTarget, attackerName, campaignName });
+}
+
+// MA-0374: Disintegration/Death Ray — "Failure or Success: the target dies
+// / disintegrates into dust if this damage reduces it to 0 Hit Points."
+// No 0-HP instakill subsystem app-wide (§7), so the clause lands as a
+// named advisory record the moment the ray's damage actually zeroes the
+// target — on EITHER save outcome. Byte-inert without zero_hp_clause.
+function maybeNoteEyeRayZeroHp({ context, applyResult, applyTarget, attackerName, campaignName }) {
+    const clause = context?.eyeRay?.zero_hp_clause;
+    if (!clause || !applyResult || !(Number(applyResult.newHp) <= 0)) return;
+    const actionName = context?.actionName || context?.autoDamageName || context?.name || 'Eye Rays';
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'eye_ray_zero_hp_advisory',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} was reduced to 0 Hit Points by ${attackerName}'s ${actionName} — ${applyTarget} ${clause} (GM-enforced; no 0-HP instakill consumer in this engine).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:eye-ray-zero-hp]', e); });
 }
 
 // MA-0019: "The aboleth gains the target's memories if the target is a

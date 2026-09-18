@@ -1421,3 +1421,119 @@ export function extractFlatHitDamage(action) {
   const m = stripped.match(/Hit:\s*(\d+)\s+(?:[A-Za-z-]+\s+)*?damage\b/i);
   return m ? m[1] : null;
 }
+
+// ── MA-0374: Beholder Eye Rays d10 picker ─────────────────────────────
+// Beholder actions[2] "Eye Rays" was a save-only shell: save_type
+// "Varies (WIS, CON, STR, DEX)" + multi-string damage ("3d8, 4d6, …") —
+// unparseable, zero ray resolution ("VAR"/"var" mod-0 fallback, playbook §6
+// MA-0374/0383 family). Fix (Option A): structured per-ray data on the row
+// (rays[]) + this pure picker + per-ray legs through the existing
+// executeBlockSaveRoll → saveProcessing seams. Byte-inert null for every
+// row without an authored rays[] array.
+
+const EYE_RAY_SAVE_ABILITIES = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+
+export function parseEyeRayGrant(action) {
+  return action?.eyeRay ?? null;
+}
+
+export function parseEyeRays(action) {
+  const rays = action?.rays;
+  if (!Array.isArray(rays) || rays.length !== 10) return null;
+  const valid = rays.every(r =>
+    r && typeof r.key === 'string' && typeof r.name === 'string'
+    && EYE_RAY_SAVE_ABILITIES.includes(r.save_ability)
+    && (r.damage_dice === null || /^\d+d\d+(\s*[+-]\s*\d+)?$/.test(String(r.damage_dice)))
+    && (r.dc_success === 'half' || r.dc_success === 'none')
+    && Array.isArray(r.conditions));
+  return valid ? rays : null;
+}
+
+// RAW: "roll 1d10; reroll if the beholder has already used that ray during
+// this turn" — usedKeys carries the rays already fired this round (runtime
+// key eyeRaysUsed, round-stamped). rollD10 injected for deterministic tests.
+export function pickEyeRay({ rays, usedKeys = [], rollD10 }) {
+  const rerolls = [];
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const roll = Math.trunc(Number(rollD10()));
+    if (!(roll >= 1 && roll <= 10)) continue;
+    const candidate = rays[roll - 1];
+    if (candidate && !usedKeys.includes(candidate.key)) return { ray: candidate, roll, rerolls };
+    rerolls.push(roll);
+  }
+  return { ray: null, roll: null, rerolls };
+}
+
+// Synthesized single-ray row fed to the existing block-save seam: one
+// save_type, one dice formula, one dc_success — everything already parseable
+// byte-inert for every other monster. eyeRay rides the save context so
+// saveProcessing grants the ray's te/ladder/zero-HP clauses.
+export function buildEyeRayAction(rowAction, ray) {
+  return {
+    name: `${ray.name} (Eye Rays)`,
+    save_dc: rowAction.save_dc ?? 16,
+    save_type: ray.save_ability,
+    dc_success: ray.dc_success,
+    save_effect: null,
+    eyeRay: ray,
+    damage_dice_primary: ray.damage_dice ?? undefined,
+    damage_type_primary: ray.damage_type ?? undefined,
+    description: null,
+  };
+}
+
+export function eyeRayAutoSuccessReason(ray, csCreature) {
+  if (!ray || !csCreature) return null;
+  const size = String(csCreature.size || '');
+  if (ray.auto_success_size && size.toLowerCase() === String(ray.auto_success_size).toLowerCase()) {
+    return `${size} creatures succeed automatically`;
+  }
+  const type = String(csCreature.monsterType || csCreature.type || '');
+  const hit = (ray.auto_success_types || []).find(t => String(t).toLowerCase() === type.toLowerCase());
+  if (hit) return `${hit} creatures succeed automatically`;
+  return null;
+}
+
+export function buildEyeRayPickerPopup({ monsterName, ray, roll, rerolls = [], targetName }) {
+  const rerollNote = rerolls.length > 0
+    ? ` (rerolled ${rerolls.join(', ')} — already used this turn)`
+    : '';
+  return `<div class="mc-eye-ray-picked"><h3><i class="fa-solid fa-eye"></i> ${ray.name}</h3><p>${monsterName} rolls ${roll}${rerollNote} on the Eye Rays d10 — <strong>${ray.name}</strong> at ${targetName} (DC 16 ${ray.save_ability} save).</p></div>`;
+}
+
+export function buildEyeRayPickerRollLog({ monsterName, ray, roll, rerolls = [], targetName }) {
+  const rerollNote = rerolls.length > 0 ? ` (rerolled ${rerolls.join(', ')})` : '';
+  return {
+    type: 'roll',
+    rollType: 'd10',
+    characterName: monsterName,
+    name: 'Eye Rays (d10 ray picker)',
+    rolls: [roll],
+    total: roll,
+    targetName,
+    description: `${monsterName} rolled ${roll}${rerollNote} on the Eye Rays d10 — ${ray.name}.`,
+    timestamp: Date.now(),
+  };
+}
+
+export function buildEyeRayAbilityUseLog({ monsterName, ray, targetName }) {
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: `${ray.name} (Eye Rays)`,
+    description: `${monsterName} fires ${ray.name} from Eye Rays at ${targetName} — DC 16 ${ray.save_ability} save${ray.damage_dice ? `, ${ray.damage_dice} ${ray.damage_type} damage (half on a successful save)` : ' — no damage, condition save'} .`.replace(' .', '.'),
+    timestamp: Date.now(),
+  };
+}
+
+export function buildEyeRayAutoSuccessLog({ monsterName, ray, targetName, reason }) {
+  return {
+    type: 'automation',
+    automationType: 'eye_ray_auto_success',
+    characterName: targetName,
+    abilityName: `${ray.name} (Eye Rays)`,
+    sourceName: monsterName,
+    description: `${targetName} succeeds automatically against ${monsterName}'s ${ray.name} (${reason}) — no save rolled, no effect applied.`,
+    timestamp: Date.now(),
+  };
+}

@@ -8,6 +8,7 @@ import { applySleepTurnEnd } from '../../services/rules/features/sleepService.js
 import { applyFrightfulPresenceTurnEnd } from '../../services/rules/features/frightfulPresenceService.js'
 import { applyWeakeningBreathTurnEnd } from '../../services/rules/features/weakeningBreathService.js'
 import { applyParalyzingBreathTurnEnd } from '../../services/rules/features/paralyzingBreathService.js'
+import { applyEyeRaysTurnEnd } from '../../services/rules/features/beholderEyeRayService.js'
 import { applySoulTomeTrapTurnEnd } from '../../services/rules/features/soulTomeTrapService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
@@ -131,6 +132,13 @@ function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters
     // a success (paralyzingBreathService MA-0068/MA-0102 shapes).
     applyParalyzingBreathTurnEnd(campaignName, activeCreatureName)
         .catch((e) => { console.error('[navigationHandlers] MA-0248 paralyzing breath turn-end save failed:', e) })
+    // MA-0374: Beholder Eye Rays ladders — the OUTGOING target repeats its
+    // CON save at the end of its own turn while eye_ray_paralyzed /
+    // eye_ray_petrifying te exists: Paralyzing Ray repeat (auto-success
+    // after 1 min rides the rounds:10 expiration clock); Petrification Ray
+    // second fail → Petrified (beholderEyeRayService).
+    applyEyeRaysTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] MA-0374 eye ray turn-end save failed:', e) })
     // MA-0298: Soul Tome trap (Arcanaloth Banishing Claw) — the OUTGOING
     // trapped creature repeats its CHA save at the end of its own turn;
     // success strips the indefinite te + Incapacitated and it escapes into

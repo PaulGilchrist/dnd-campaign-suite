@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
@@ -288,6 +288,58 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     }
     fire();
   })().catch((e) => { console.error('[MonsterCardModal] Error resolving recharge/cone save leg:', e); });
+}
+
+// MA-0374: Beholder Eye Rays picker — RAW "roll 1d10; reroll if the
+// beholder has already used that ray during this turn". The old row was a
+// save-only shell ("Varies (WIS, CON, STR, DEX)" + multi-dice, playbook §6
+// VAR family): no ray ever resolved. rays[] (monsters.json) carries one
+// single-ability save leg per ray; this picker rolls the d10, rerolling any
+// ray already fired this round (round-stamped runtime key eyeRaysUsed —
+// self-resets, no initiative clear-list latch needed §5 monster-latch rule),
+// names the ray in popup + d10 roll log, honors the Gargantuan/Construct/
+// Undead auto-success clauses, then routes THAT ray's own save through the
+// existing block-save seam (half-damage/condition/threshold legs intact).
+const EYE_RAYS_USED_KEY = 'eyeRaysUsed';
+
+async function resolveEyeRayFire({ action, monsterName, campaignName, target, characters, creatures, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
+  const rays = parseEyeRays(action);
+  if (!rays) return;
+  if (!target?.name) {
+    setPopupHtml(buildNoTargetRefusalPopup({ monsterName, actionName: action.name }));
+    addEntry(campaignName, buildNoTargetRefusalLog({ monsterName, actionName: action.name }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging Eye Rays no-target refusal:', e); });
+    return;
+  }
+  const cs = await getCombatContext(campaignName);
+  const round = Number(cs?.round ?? 1);
+  const stored = getRuntimeValue(monsterName, EYE_RAYS_USED_KEY) || {};
+  const usedKeys = Number(stored.round) === round && Array.isArray(stored.rays) ? [...stored.rays] : [];
+  const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys, rollD10: () => Math.floor(Math.random() * 10) + 1 });
+  if (!ray) {
+    console.error(`[MonsterCardModal] Eye Rays picker on ${monsterName} could not resolve a fresh ray after 100 rolls — refusing.`);
+    return;
+  }
+  // Latch stamp awaited BEFORE the save leg (playbook §5 runtime writes).
+  await setRuntimeValue(monsterName, EYE_RAYS_USED_KEY, { round, rays: [...usedKeys, ray.key] }, campaignName);
+  addEntry(campaignName, buildEyeRayPickerRollLog({ monsterName, ray, roll, rerolls, targetName: target.name }))
+    .catch((e) => { console.error('[MonsterCardModal] Error logging Eye Rays picker roll:', e); });
+  const autoReason = eyeRayAutoSuccessReason(ray, (cs?.creatures || []).find(c => c.name === target.name));
+  setPopupHtml(buildEyeRayPickerPopup({ monsterName, ray, roll, rerolls, targetName: target.name }));
+  if (autoReason) {
+    addEntry(campaignName, buildEyeRayAutoSuccessLog({ monsterName, ray, targetName: target.name, reason: autoReason }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging Eye Rays auto-success:', e); });
+    return;
+  }
+  addEntry(campaignName, buildEyeRayAbilityUseLog({ monsterName, ray, targetName: target.name }))
+    .catch((e) => { console.error('[MonsterCardModal] Error logging Eye Rays ability_use:', e); });
+  executeBlockSaveRoll({
+    action: buildEyeRayAction(action, ray),
+    spellInfo: { damageType: ray.damage_type, conditionDurationNote: ray.duration_note, dcSuccess: ray.dc_success },
+    saveDamageFormula: ray.damage_dice || null,
+    saveConditions: ray.conditions || [],
+    monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml,
+  });
 }
 
 // MA-0275: Animal Spirit chooser seam — confirm applies an advisory 120 ft
@@ -987,6 +1039,11 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     // producer arm for the saveProcessing/save-result failed-save seams
     // (block-save path; combo attack+save rides buildSaveOptions).
     infernalWound: parseInfernalWoundClause(action),
+    // MA-0374: Beholder Eye Rays — the picked ray's structured grant spec
+    // (te_grants/clock_rounds/ladder/zero_hp_clause) rides the save context
+    // for the saveProcessing failed-save dispatcher + zero-HP advisory.
+    // Byte-inert null for every row without an authored rays[] picker.
+    eyeRay: parseEyeRayGrant(action),
   };
 }
 
@@ -1373,6 +1430,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const spiritVariants = parseAnimalSpiritVariants(stageAction);
     if (spiritVariants) {
       setAnimalSpiritChooser({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, prerequisite, usesGate, target, ...spiritVariants });
+      return;
+    }
+    // MA-0374: Beholder Eye Rays — structured rays[] + d10 picker (RAW
+    // random ray, reroll-if-used-this-turn) — the picked ray's own
+    // single-ability save leg runs downstream; never the "VARIES" shell.
+    if (Array.isArray(stageAction.rays) && stageAction.rays.length > 0) {
+      resolveEyeRayFire({ action: stageAction, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml })
+        .catch((e) => { console.error('[MonsterCardModal] Error resolving Eye Rays picker:', e); });
       return;
     }
     // MA-0031: recharge gate + fire-spend + cone routing live downstream.
