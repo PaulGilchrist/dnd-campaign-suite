@@ -8693,9 +8693,12 @@
         "duration": "until initiative count 20 next round (advisory)"
       },
       {
+        "name": "Grasping Walls",
         "description": "Walls within 120 feet of the beholder sprout grasping appendages until initiative count 20 on the round after next. Each creature of the beholder's choice that starts its turn within 10 feet of such a wall must succeed on a DC 15 Dexterity saving throw or be grappled. Escaping requires a successful DC 15 Strength (Athletics) or Dexterity (Acrobatics) check.",
+        "save_dc": 15,
         "save_type": "Dexterity",
-        "save_effect": "DC 15 Dexterity saving throw or be grappled. Escaping requires a successful DC 15 Strength (Athletics) or Dexterity (Acrobatics) check."
+        "dc_success": "none",
+        "save_effect": "The target is grappled by the wall. The DC 15 Strength (Athletics) or Dexterity (Acrobatics) escape check and the initiative count 20 round-after-next expiry are GM-enforced (no grapple state-machine or initiative-20 lair seam consumer)."
       },
       {
         "description": "An eye opens on a solid surface within 60 feet of the beholder. One random eye ray of the beholder shoots from that eye at a target of the beholder's choice that it can see. The eye then closes and disappears.",

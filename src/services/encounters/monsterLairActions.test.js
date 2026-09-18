@@ -3684,9 +3684,84 @@ describe('MA-0378 beholder slimy ground data lock', () => {
     expect(handleZone).toHaveBeenCalledWith(slime);
   });
 
-  it('siblings untouched: [1] grasping walls and [2] wandering eye ray rows keep their inert dicts', () => {
-    expect(beholder.lair_actions[1].save_type).toBe('Dexterity');
-    expect(beholder.lair_actions[1].zone).toBeUndefined();
+  it('siblings untouched: [2] wandering eye ray row keeps its inert dict', () => {
     expect(beholder.lair_actions[2].save_type).toBe('Dexterity');
+  });
+});
+
+// MA-0379: Beholder lair_actions[1] was a NAMELESS dict (MA-0222 name-gate
+// fingerprint — isLairRowClickable !row.name short-circuit, monsterLairActions.js:26)
+// with save_type/save_effect prose but NO numeric save_dc: rendered static
+// <strong>.</strong>+prose, zero affordance, forced clicks zero delta (live
+// 2026-09-18). Data-only fix byte-copying the VERIFIED MA-0231 grasping
+// roots save-row shape (name + save_dc + dc_success "none" + save_effect
+// carrying the canonical condition word + GM-enforced residual advisory):
+// chip "DC 15 Dexterity" → handleSaveRoll (buildSaveOptions save leg) →
+// MA-0017 damageless failed-save seam grants grappled activeCondition +
+// meta stamp + condition log (save leg grapple live per MA-0368). The DC 15
+// Athletics/Acrobatics escape and the initiative count 20 round-after-next
+// expiry have no consumers (§7 grapple state-machine / initiative lair
+// seam) — advisory documented in save_effect; escape_dc is the ATTACK-hit
+// clause seam (MA-0010, buildHitConditionClause) and must NOT appear here.
+describe('MA-0379 beholder grasping walls data lock', () => {
+  const beholder = monstersData.find(m => m.index === 'beholder');
+  const walls = beholder.lair_actions[1];
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof walls).toBe('object');
+    expect(walls.name).toBe('Grasping Walls');
+    expect(isLairRowClickable(walls)).toBe(true);
+    expect(lairRowAffordance(walls)).toBe('save');
+  });
+
+  it('save fields: DC 15 Dexterity authored numerically, dc_success none (no damage authored)', () => {
+    expect(walls.save_dc).toBe(15);
+    expect(walls.save_type).toBe('Dexterity');
+    expect(walls.dc_success).toBe('none');
+    expect(walls.damage_dice_primary).toBeUndefined();
+    expect(walls.damage_type_primary).toBeUndefined();
+    expect(walls.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('description kept byte-identical to the original row', () => {
+    expect(walls.description).toBe('Walls within 120 feet of the beholder sprout grasping appendages until initiative count 20 on the round after next. Each creature of the beholder\'s choice that starts its turn within 10 feet of such a wall must succeed on a DC 15 Dexterity saving throw or be grappled. Escaping requires a successful DC 15 Strength (Athletics) or Dexterity (Acrobatics) check.');
+  });
+
+  it('save_effect vocabulary extracts ONLY grappled (MA-0017 damageless seam, MA-0368 save-leg grapple)', () => {
+    expect(extractConditionsFromSaveEffect(walls.save_effect)).toEqual(['grappled']);
+  });
+
+  it('escape/expiry residuals annotated GM-enforced; attack-path escape_dc seam NOT authored on a save row', () => {
+    expect(walls.save_effect).toMatch(/DC 15 Strength \(Athletics\) or Dexterity \(Acrobatics\) escape check/i);
+    expect(walls.save_effect).toMatch(/GM-enforced/i);
+    expect(walls.save_effect).toMatch(/no grapple state-machine or initiative-20 lair seam consumer/i);
+    expect(walls.escape_dc).toBeUndefined();
+    expect(walls.hit_conditions).toBeUndefined();
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + grappled', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: walls,
+      monsterName: 'Beholder 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(walls.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(walls, null, ['grappled']);
+  });
+
+  it('scope guard: [0] MA-0378 zone row and [2] nameless eye-ray dict untouched', () => {
+    expect(beholder.lair_actions[0].name).toBe('Slimy Ground');
+    expect(lairRowAffordance(beholder.lair_actions[0])).toBe('zone');
+    expect(beholder.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(beholder.lair_actions[2])).toBe(false);
+    expect(beholder.lair_actions[2].save_dc).toBeUndefined();
   });
 });

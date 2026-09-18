@@ -5716,7 +5716,7 @@
         "grappled"
       ],
       "description": "Walls within 120 feet of the beholder sprout grasping appendages until initiative count 20 on the round after next. Each creature of the beholder's choice that starts its turn within 10 feet of such a wall must succeed on a DC 15 Dexterity saving throw or be grappled. Escaping requires a successful DC 15 Strength (Athletics) or Dexterity (Acrobatics) check.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0379-grasping-walls-lair-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0380",
