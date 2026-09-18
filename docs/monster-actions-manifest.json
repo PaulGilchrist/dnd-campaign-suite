@@ -5320,7 +5320,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 10 (2d6 + 3) Piercing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13) from both claws.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0354-claws-grapple-clause-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0355",

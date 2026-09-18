@@ -1005,3 +1005,91 @@ describe('MA-0335 Balor Lightning Blade no_reactions hit-target-effect clause', 
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const BARBED_DEVIL = monsters.find(m => m.index === 'barbed-devil');
+const BARBED_DEVIL_CLAWS_ACTION = BARBED_DEVIL.actions[1];
+
+describe('MA-0354 Barbed Devil Claws grapple-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Barbed Devil 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Barbed Devil 1', computedStats: { armorClass: 15 } },
+            { name: 'HexWarlock', computedStats: { armorClass: 9 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 63, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'HexWarlock', type: 'player', size: 'Medium', ac: 9, currentHp: 73, maxHp: 73 }],
+        });
+    });
+
+    it('MA-0354 data-lock: authors hit_conditions:["grappled"] + escape_dc:13 on the Claws row', () => {
+        expect(BARBED_DEVIL_CLAWS_ACTION.name).toBe('Claws');
+        expect(BARBED_DEVIL_CLAWS_ACTION.attack_bonus).toBe(6);
+        expect(BARBED_DEVIL_CLAWS_ACTION.reach).toBe('5 ft.');
+        expect(BARBED_DEVIL_CLAWS_ACTION.damage_dice_primary).toBe('2d6 + 3');
+        expect(BARBED_DEVIL_CLAWS_ACTION.damage_type_primary).toBe('Piercing');
+        expect(BARBED_DEVIL_CLAWS_ACTION.hit_conditions).toEqual(['grappled']);
+        expect(BARBED_DEVIL_CLAWS_ACTION.escape_dc).toBe(13);
+    });
+
+    it('builds the grappled clause with escape DC 13', () => {
+        expect(buildHitConditionClause(BARBED_DEVIL_CLAWS_ACTION)).toEqual({
+            conditions: ['grappled'],
+            escapeDc: 13,
+            attackName: 'Claws',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + escape-meta + condition log on a resolved Claws hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claws', formula: '2d6 + 3', total: 10, rolls: [4, 3], modifier: 3, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Barbed Devil 1',
+            hitClause: buildHitConditionClause(BARBED_DEVIL_CLAWS_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 13, ability: 'str', source: 'Barbed Devil 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'HexWarlock',
+            condition: 'Grappled',
+            reason: 'Claws (escape DC 13)',
+        }));
+    });
+
+    it('writes no condition when the Claws attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claws', formula: '2d6 + 3', total: 10, rolls: [4, 3], modifier: 3, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Barbed Devil 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'HexWarlock', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'HexWarlock', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
