@@ -1429,13 +1429,16 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleGatedReaction = useCallback(async (action) => {
     if (!getGatedMonsterReaction(action)) return;
-    await resolveMonsterGatedReaction({
+    const result = await resolveMonsterGatedReaction({
       action,
       monsterName,
       campaignName,
       deps: { resolveSpellLevel: resolveGatedSpellLevel, spellAbilityMod },
     });
-  }, [campaignName, monsterName, spellAbilityMod]);
+    // MA-0399: Split — the resolver's popupHtml carries the trigger verdict
+    // plus the GM duplication instruction; refusals surface the honest message.
+    if (result?.popupHtml) setPopupHtml(result.popupHtml);
+  }, [campaignName, monsterName, spellAbilityMod, setPopupHtml]);
 
   // MA-0021: legendary-row gated click — expend 1 use (round+turn latch,
   // refusal popup + legendary_use_refused zero-spend log) then resolve the

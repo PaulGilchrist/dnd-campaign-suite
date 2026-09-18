@@ -9510,7 +9510,17 @@
     "reactions": [
       {
         "name": "Split",
-        "description": "Trigger: While the pudding is Large or Medium and has 10+ Hit Points, it becomes <strong>Bloodied</strong> or is subjected to Lightning or Slashing damage. Response: The pudding splits into two new <strong>Black Puddings</strong>. Each new pudding is one size smaller than the original pudding and acts on its Initiative. The original pudding's Hit Points are divided evenly between the new puddings (round down)."
+        "description": "Trigger: While the pudding is Large or Medium and has 10+ Hit Points, it becomes <strong>Bloodied</strong> or is subjected to Lightning or Slashing damage. Response: The pudding splits into two new <strong>Black Puddings</strong>. Each new pudding is one size smaller than the original pudding and acts on its Initiative. The original pudding's Hit Points are divided evenly between the new puddings (round down).",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "bloodied_or_lightning_slashing",
+          "effect": "split",
+          "minHp": 10,
+          "damageTypes": ["Lightning", "Slashing"]
+        }
       }
     ],
     "environments": [

@@ -6031,7 +6031,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "Trigger: While the pudding is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or Slashing damage. Response: The pudding splits into two new Black Puddings. Each new pudding is one size smaller than the original pudding and acts on its Initiative. The original pudding's Hit Points are divided evenly between the new puddings (round down).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0399-split-reaction-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0400",

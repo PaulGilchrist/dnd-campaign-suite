@@ -699,7 +699,30 @@ const GATED_MONSTER_REACTIONS = {
   // (usage:'At Will'+uses:999) — RAW unlimited, no uses/day; 1/round latch
   // (_parry_usedRound, MA-0013 counterspell shape).
   parry: { effect: 'parry', trigger: 'melee_hit', label: 'Parry', icon: 'fa-shield-halved' },
+  // MA-0399: Black Pudding Split — reactive self-duplication reaction. RAW
+  // trigger: while Large/Medium with 10+ HP, becomes Bloodied OR is subjected
+  // to Lightning/Slashing damage. The gate reads live combatSummary HP
+  // (bloodied: currentHp <= floor(maxHp/2), applyDamage.js threshold math)
+  // and the campaign lastAttack damageTypes (handlePlainDamage stamp) —
+  // "subjected to" is satisfied even when immunity zeroes the damage.
+  // No monster-duplication subsystem exists (§7 no-consumer family), so the
+  // response is a GM-executed advisory record (CLA-325, MA-0006 record-only
+  // precedent): popup + ability_use log carry the exact duplication
+  // instruction (one size smaller, floor(hp/2) each, own initiative).
+  // At Will sentinel (usage:'At Will'+uses:999, MA-0341 shape) — RAW
+  // unlimited; 1/round latch (_split_usedRound) + lastAttack.splitResolved
+  // event stamp are the only fire limits.
+  split: { effect: 'split', trigger: 'bloodied_or_lightning_slashing', label: 'Split', icon: 'fa-droplet' },
 };
+
+const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
+
+export function oneSizeSmaller(size) {
+  const idx = SIZE_LADDER.indexOf(String(size || '').toLowerCase());
+  if (idx === -1 || idx === SIZE_LADDER.length - 1) return null;
+  const smaller = SIZE_LADDER[idx + 1];
+  return smaller.charAt(0).toUpperCase() + smaller.slice(1);
+}
 
 export function isSpellOriginLastAttack(lastAttack) {
   if (!lastAttack) return false;
@@ -909,6 +932,115 @@ export async function resolveMonsterParry({ action, monsterName, campaignName, l
   return { ok: true, message: entry.description, acBonus: buff.acBonus, newAc: (Number(lastAttack.targetAc) || 0) + buff.acBonus };
 }
 
+// MA-0399: event-identity + live-state probe (mirrors hellishRebukeIdentityRefusal).
+// Bloodied reads the combatSummary snapshot (monster HP truth = cs currentHp);
+// lightning/slashing reads the campaign lastAttack damageTypes stamp — an
+// immune hit still counts as "subjected to" per the row's RAW wording.
+function splitAttackDamageTypes(lastAttack) {
+  if (Array.isArray(lastAttack?.damageTypes)) return lastAttack.damageTypes;
+  return lastAttack?.primaryDamageType ? [lastAttack.primaryDamageType] : [];
+}
+
+function splitElementalType(lastAttack, monsterName, damageTypes) {
+  if (!lastAttack || lastAttack.targetName !== monsterName) return null;
+  return splitAttackDamageTypes(lastAttack).find(t => damageTypes.some(d => String(t).toLowerCase() === String(d).toLowerCase())) || null;
+}
+
+function splitBloodied(monster, minHp) {
+  const hp = Number(monster.currentHp ?? 0);
+  const maxHp = Number(monster.maxHp ?? 0);
+  return hp >= minHp && hp > 0 && maxHp > 0 && hp <= Math.floor(maxHp / 2);
+}
+
+export function splitTriggerEvidence({ lastAttack, monster, auto }) {
+  if (!monster) return { satisfied: false, reason: 'combatant' };
+  const minHp = Number(auto?.minHp) || 10;
+  const damageTypes = Array.isArray(auto?.damageTypes) && auto.damageTypes.length > 0 ? auto.damageTypes : ['Lightning', 'Slashing'];
+  const size = String(monster.size || '').toLowerCase();
+  if (size !== 'large' && size !== 'medium') return { satisfied: false, reason: 'size', size: size || null };
+  const hp = Number(monster.currentHp ?? 0);
+  const maxHp = Number(monster.maxHp ?? 0);
+  if (splitBloodied(monster, minHp)) return { satisfied: true, via: 'bloodied', hp, maxHp };
+  const elemental = splitElementalType(lastAttack, monster.name, damageTypes);
+  if (elemental) return { satisfied: true, via: 'damage_type', hp, maxHp, damageType: elemental };
+  return { satisfied: false, reason: 'trigger', hp, maxHp };
+}
+
+const SPLIT_REFUSAL_MESSAGES = {
+  combatant: (m) => `Split: ${m} is not an active combatant in the current encounter — refused.`,
+  size: (m, t) => `Split: ${m} is ${t.size || 'size-unknown'} — Split only triggers while Large or Medium. Refused.`,
+  trigger: (m, t) => `Split: ${m} is not Bloodied (${t.hp}/${t.maxHp}, needs ≤ half with 10+ HP) and no Lightning/Slashing damage targeted it — refused.`,
+  reacted: () => 'Split: already responded to that damage event — refused.',
+  round: () => 'Split: already used this round — refused.',
+};
+
+export function splitGate({ lastAttack, monster, monsterName, currentRound, usedRound, auto }) {
+  const trigger = splitTriggerEvidence({ lastAttack, monster, auto });
+  if (!trigger.satisfied) {
+    return { ok: false, reason: trigger.reason, message: SPLIT_REFUSAL_MESSAGES[trigger.reason](monsterName, trigger) };
+  }
+  if (lastAttack && lastAttack.targetName === monsterName && lastAttack.splitResolved === true) {
+    return { ok: false, reason: 'reacted', message: SPLIT_REFUSAL_MESSAGES.reacted() };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: SPLIT_REFUSAL_MESSAGES.round() };
+  }
+  return { ok: true, ...trigger, eachHp: Math.floor(trigger.hp / 2) };
+}
+
+function buildSplitAdvisoryPopup({ monsterName, gate, newSize, eachHp }) {
+  const triggerText = gate.via === 'bloodied'
+    ? `Bloodied at ${gate.hp}/${gate.maxHp} HP`
+    : `subjected to ${gate.damageType} damage (at ${gate.hp}/${gate.maxHp} HP)`;
+  return `<div class="mc-prerequisite-refusal"><h3>Split — GM-Executed Duplication</h3><p>${monsterName} Split trigger confirmed (${triggerText}). Response: replace ${monsterName} with <strong>two ${newSize} Black Puddings</strong>, Hit Points divided evenly — <strong>${eachHp}/${eachHp} HP each</strong> — each on its own Initiative. No monster-duplication subsystem exists: add the two puddings via the Encounter Builder and stamp ${eachHp} HP on each card (GM-enforced, advisory record).</p></div>`;
+}
+
+function buildSplitSpendLog({ monsterName, gate, newSize, eachHp }) {
+  const triggerText = gate.via === 'bloodied'
+    ? `Bloodied at ${gate.hp}/${gate.maxHp} HP`
+    : `subjected to ${gate.damageType} damage (at ${gate.hp}/${gate.maxHp} HP)`;
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Split',
+    description: `${monsterName} uses Split (${triggerText}) — GM duplication instruction: replace ${monsterName} with two ${newSize} Black Puddings at ${eachHp}/${eachHp} HP each (floor(${gate.hp}/2)), each on its own Initiative. No monster-duplication subsystem — add via Encounter Builder + stamp HP (GM-enforced, advisory record). At Will — unlimited, 1 Reaction per round.`,
+    timestamp: Date.now(),
+  };
+}
+
+export async function resolveMonsterSplit({ action, monsterName, campaignName, lastAttack, cs, currentRound, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const monster = (cs?.creatures || []).find(c => c.name === monsterName) || null;
+  const gate = splitGate({ lastAttack, monster, monsterName, currentRound, usedRound, auto: action?.automation });
+  if (!gate.ok) {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: 'split_refused',
+      name: 'Split',
+      description: `Split refused (${gate.reason}): ${gate.message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message: gate.message, popupHtml: `<div class="mc-prerequisite-refusal"><h3>Split Refused</h3><p>${gate.message} Nothing spent, no duplication.</p></div>` };
+  }
+  const newSize = oneSizeSmaller(monster.size) || 'one size smaller';
+  // Stamp the round latch BEFORE the advisory write (CLA-361 precedent).
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  if (lastAttack && lastAttack.targetName === monsterName) {
+    await setRV('campaign', 'lastAttack', {
+      ...lastAttack,
+      splitResolved: true,
+      splitBy: monsterName,
+      splitIntoHp: gate.eachHp,
+    }, campaignName);
+  }
+  const entry = buildSplitSpendLog({ monsterName, gate, newSize, eachHp: gate.eachHp });
+  await log(campaignName, entry);
+  return { ok: true, message: entry.description, eachHp: gate.eachHp, newSize, popupHtml: buildSplitAdvisoryPopup({ monsterName, gate, newSize, eachHp: gate.eachHp }) };
+}
+
 export function getGatedMonsterReaction(action) {
   const effect = action?.automation?.effect;
   return effect ? GATED_MONSTER_REACTIONS[effect] || null : null;
@@ -990,6 +1122,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'parry') {
     return resolveMonsterParry({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV } });
+  }
+
+  if (def.effect === 'split') {
+    return resolveMonsterSplit({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, setRuntimeValue: ctx.setRV } });
   }
 
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });
