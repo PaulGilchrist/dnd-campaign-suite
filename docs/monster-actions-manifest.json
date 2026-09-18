@@ -6141,7 +6141,7 @@
       "damageDicePrimary": "4d6",
       "damageTypePrimary": "Necrotic",
       "description": "The blob deals 14 (4d6) Necrotic damage to each creature engulfed by it. The blob can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0406-decay-ungated-zero-spend-unrefused-repeat-fire.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0407",
