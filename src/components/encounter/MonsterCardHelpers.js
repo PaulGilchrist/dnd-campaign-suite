@@ -315,6 +315,25 @@ export function spellDamagelessSaveCondition(spell) {
   return CONDITIONS.includes(condition) ? condition : null;
 }
 
+// MA-0362: damage-bearing save spells (Phantasmal Killer) carry their fail
+// condition in the spell's own text ("The target must make a wisdom saving
+// throw. On a failed save, the target becomes frightened"), not in a row
+// save_effect. Sourced only when save_effect yields nothing, the clause
+// ability agrees with dc_type, and the tail is a canonical CONDITIONS word
+// (MV-31); every spell without the clause stays byte-identical.
+const SPELL_MUST_MAKE_SAVE_ABILITY = /must (?:make|succeed on) an? (strength|dexterity|constitution|intelligence|wisdom|charisma) saving throw/i;
+const SPELL_FAILED_SAVE_BECOMES_CLAUSE = /on a failed save[,.]?[^.]*?\b(?:becomes?|is|are|remains)\s+([a-z]+)/i;
+export function spellDamageLegFailCondition(spell) {
+  if (!spell?.dc?.dc_type) return null;
+  const text = [spell?.save_effect, ...(Array.isArray(spell?.description) ? spell.description : [spell?.description])].filter(Boolean).join(' ');
+  const ability = text.match(SPELL_MUST_MAKE_SAVE_ABILITY);
+  if (!ability || SPELL_ABILITY_ABBR[ability[1].toLowerCase()] !== spell.dc.dc_type.toUpperCase()) return null;
+  const match = text.match(SPELL_FAILED_SAVE_BECOMES_CLAUSE);
+  if (!match) return null;
+  const condition = match[1].toLowerCase();
+  return CONDITIONS.includes(condition) ? condition : null;
+}
+
 // MA-0348: honest duration note for damageless spell save legs — the spell's
 // own duration/concentration rides the condition meta as a GM-enforced note
 // (MA-0020 until-clause shape; no auto-expiry/Repeat-save consumer exists).
@@ -324,10 +343,18 @@ export function spellConditionDurationNote(spell) {
 }
 
 // MA-0348: fail-leg resolver — damage legs parse save_effect exactly as
-// before (byte-unchanged); damageless save legs grant the spell-text
-// condition with an honest duration note.
+// before; MA-0362: a damage leg with no save_effect sources its canonical
+// failed-save condition from the spell's own text (Phantasmal Killer
+// frightened), else stays byte-identical empty; damageless save legs grant
+// the spell-text condition with an honest duration note.
 export function spellSaveLegOutcome(spell, formula, saveLegCondition) {
-  if (formula) return { saveConditions: extractConditionsFromSaveEffect(spell?.save_effect), conditionDurationNote: null };
+  if (formula) {
+    const saveConditions = extractConditionsFromSaveEffect(spell?.save_effect);
+    if (saveConditions.length > 0) return { saveConditions, conditionDurationNote: null };
+    const failCondition = spellDamageLegFailCondition(spell);
+    if (failCondition) return { saveConditions: [failCondition], conditionDurationNote: spellConditionDurationNote(spell) };
+    return { saveConditions, conditionDurationNote: null };
+  }
   return {
     saveConditions: saveLegCondition ? [saveLegCondition] : [],
     conditionDurationNote: spellConditionDurationNote(spell),

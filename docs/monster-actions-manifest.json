@@ -5444,7 +5444,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The barlgura casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 13):2/Day Each: Disguise Self, Invisibility (self only)1/Day Each: Entangle, Phantasmal Killer (level 6 version)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0362-prose-dc-save-leg.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0363",

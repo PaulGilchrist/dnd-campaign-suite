@@ -7305,7 +7305,8 @@
         "damage": {
             "damage_type": "Psychic",
             "damage_at_slot_level": {
-                "4": "4d10"
+                "4": "4d10",
+                "6": "6d10"
             }
         },
         "dc": {
