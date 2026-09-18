@@ -58,7 +58,7 @@ describe('targetEffectDefinitions', () => {
         if (def.fields) {
           expect(Array.isArray(def.fields)).toBe(true);
           for (const field of def.fields) {
-            expect(['value', 'ability', 'source', 'dc', 'constellation', 'beastName', 'mode', 'objectType', 'displayLabel', 'formName', 'saveType', 'damageSubtractDie']).toContain(field);
+            expect(['value', 'ability', 'source', 'dc', 'constellation', 'beastName', 'mode', 'objectType', 'displayLabel', 'formName', 'saveType', 'damageSubtractDie', 'bleedDie']).toContain(field);
           }
         }
         if (def.defaults) {

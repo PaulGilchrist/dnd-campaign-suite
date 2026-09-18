@@ -5527,7 +5527,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 8 (1d10 + 3) Slashing damage. If the target is a creature and doesn't already have an infernal wound, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target receives an infernal wound. While wounded, the target loses 5 (1d10) Hit Points at the start of each of its turns. The wound closes after 1 minute, after a spell restores Hit Points to the target, or after the target or a creature within 5 feet of it takes an action to stanch the wound, doing so by succeeding on a DC 12 Wisdom (Medicine) check.",
-      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0367-infernal-wound-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0368",

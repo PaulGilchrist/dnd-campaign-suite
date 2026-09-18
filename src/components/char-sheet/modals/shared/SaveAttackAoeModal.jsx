@@ -853,12 +853,17 @@ function stagedPickerCopy(head, sleepStaging, stagedParalysis, metamagicHeighten
     return null;
 }
 
+// MA-0084: dc_success 'none' rows (Thunderclap) never print the half-on-
+// success sentence. MA-0367: dc_success 'full' rows (Infernal Glaive family) —
+// the save gates a NON-damage clause, damage stands in full on either outcome.
+function successSaveSentence(dcSuccess) {
+    if (dcSuccess === 'none') return 'On a successful save, target takes no damage.';
+    if (dcSuccess === 'full') return 'Full damage regardless — this save determines any additional effect only.';
+    return 'On a successful save, target takes half damage.';
+}
+
 function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, slowedClauses, weakeningBreath, dcSuccess }) {
-    // MA-0084: dc_success 'none' rows (Thunderclap) never print the
-    // half-on-success sentence — byte-identical copy for every other row.
-    const successSentence = dcSuccess === 'none'
-        ? 'On a successful save, target takes no damage.'
-        : 'On a successful save, target takes half damage.';
+    const successSentence = successSaveSentence(dcSuccess);
     if (!zoneOnly) {
         const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
         const stagedCopy = stagedPickerCopy(head, sleepStaging, stagedParalysis, metamagicHeighten);
@@ -940,7 +945,7 @@ function ZoneArmedNote({ zoneOnly, zoneTe, selected }) {
 // MA-0084: dc_success 'none' rows state "no damage" on a successful save.
 function DamageNote({ damage, damageType, dcSuccess }) {
     if (!damage) return null;
-    const successText = dcSuccess === 'none' ? 'no damage' : 'half damage';
+    const successText = dcSuccess === 'none' ? 'no damage' : dcSuccess === 'full' ? 'full damage (the save gates any additional effect only)' : 'half damage';
     return <p className="sp-note">On a failed save, target takes {damage} {damageType} damage. On a successful save, target takes {successText}.</p>;
 }
 

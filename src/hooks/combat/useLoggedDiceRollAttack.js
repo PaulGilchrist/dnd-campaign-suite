@@ -140,6 +140,9 @@ function comboTrapArmsFromContext(context) {
         saveConditions: context?.saveConditions || null,
         soulTomeTrap: context?.soulTomeTrap || null,
         repeatSave: context?.repeatSave || null,
+        // MA-0367: Infernal Wound arm rides the combo auto-damage to the
+        // save-result seam. Byte-inert null elsewhere.
+        infernalWound: context?.infernalWound || null,
     };
 }
 

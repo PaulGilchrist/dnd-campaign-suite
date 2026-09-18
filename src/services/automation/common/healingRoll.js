@@ -4,6 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
 import { isHealingBlocked } from '../../rules/combat/healingBlock.js';
+import { removeInfernalWoundOnHeal } from '../../rules/features/infernalWoundService.js';
 import { addEntry } from '../../ui/logService.js';
 
 
@@ -58,6 +59,12 @@ export function applyHealingDirectly(playerStats, targetName, amount, campaignNa
     const actualHeal = newHp - currentHp;
 
     setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
+
+    // MA-0367: any HP restored closes the Infernal Wound + cancels its clock
+    // (MA-0016 heal choke point; no-op when unwounded).
+    if (actualHeal > 0) {
+        removeInfernalWoundOnHeal(targetName, campaignName).catch((e) => { console.error('[healingRoll:infernal-wound-close]', e); });
+    }
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

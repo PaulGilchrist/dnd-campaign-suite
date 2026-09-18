@@ -8,6 +8,7 @@ import { applyAuraDamage, applyHolyNimbusDamage } from './auraDamageService.js';
 import { cleanUpToppleConditions } from './toppleCleanup.js';
 import { regainLegendaryUses } from '../../encounters/monsterLegendaryUses.js';
 import { rollMonsterRecharges } from '../../encounters/monsterRecharge.js';
+import { applyInfernalWoundBleedTurnStart } from '../../rules/features/infernalWoundService.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
 
@@ -177,6 +178,13 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         // MA-0031: monster breath-weapon recharge d6 at the owner's own turn
         // start (same seam; no-op without a monsterRecharge map entry spent).
         await rollMonsterRecharges({ monsterName: activeName, campaignName });
+        // MA-0367: Infernal Wound turn-start bleed — te-keyed recurring HP
+        // loss tick at the ACTIVE creature's turn start, before the playerStats
+        // guard so it fires for PC AND monster victims alike (clearResistanceUsedThisTurnFlags
+        // te-scan + applyHolyNimbusDamage pre-guard shape; untyped HP loss
+        // via infernalWoundService — computeDamageAfterResistances throws on
+        // empty damageTypes).
+        await applyInfernalWoundBleedTurnStart(activeName, campaignName);
     }
 
     if (!activeName || !playerStats) {

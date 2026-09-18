@@ -17,6 +17,7 @@ import { getPendingPopupSetter } from '../../services/combat/auras/pendingPopupR
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasBuffEffect } from '../../services/automation/common/buffToggle.js';
 import { useSaveRerollHandlers } from './useSaveRerollHandlers.js';
+import { cancelInfernalWoundAfterSaveSuccess } from '../../services/rules/features/infernalWoundService.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 
 const GUARDED_MIND_SAVE_TYPES = ['Intelligence', 'Wisdom', 'Charisma', 'INT', 'WIS', 'CHA'];
@@ -437,7 +438,14 @@ function createSubmitSaveResult(campaignName, setPrompts) {
     applyRerollToCombatSummary(campaignName, saveData);
 
     if (success && rawDamage > 0) {
-      restoreHpAfterSuccessfulReroll(campaignName, { targetName, rawDamage, dcSuccess, healingName, healingNote });
+      // MA-0367: dc_success 'full' rows — the attack damage stands in FULL on
+      // the rerolled success (nothing to restore); instead the successful save
+      // closes any Infernal Wound the pre-reroll failure inflicted.
+      if (dcSuccess === 'full') {
+        cancelInfernalWoundAfterSaveSuccess(targetName, campaignName).catch((e) => { console.error('[SavePromptModal:infernal-wound-cancel]', e); });
+      } else {
+        restoreHpAfterSuccessfulReroll(campaignName, { targetName, rawDamage, dcSuccess, healingName, healingNote });
+      }
     }
 
     clearSavePrompt(campaignName, targetName);
@@ -652,6 +660,9 @@ function SavePromptDialog({
             <EvasionNote current={current} characters={characters} campaignName={campaignName} />
           )}
           {current.dcSuccess === 'none' && <p className="sp-note">No damage on successful save</p>}
+          {/* MA-0367: dc_success 'full' — the save gates only a non-damage
+              clause (the Infernal Wound); the attack damage stands regardless. */}
+          {current.dcSuccess === 'full' && <p className="sp-note">Full damage regardless — this save determines any additional effect only</p>}
           {current.sourceName && <p className="sp-source">Source: {current.sourceName}</p>}
           {hasResult && (
             <SaveResultPanel

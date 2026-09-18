@@ -196,6 +196,13 @@ const BADGE_SPECS = [
         find: ctx => findDirect(ctx, 'marked_as_prey'),
         build: ctx => ({ label: 'Marked as Prey', cls: 'effect-buff', icon: 'fa-crosshairs', removable: true, removeAction: 'target_effect', effectType: 'marked_as_prey', tooltip: `Advantage on attack rolls against ${ctx.te.vexTarget || 'marked target'} until the start of the next turn` }),
     },
+    // MA-0367: Infernal Glaive failed-save Infernal Wound badge — removable
+    // by the GM (DC 12 Wisdom (Medicine) action close; the tick/clock stay
+    // engine-driven until × removes it).
+    {
+        find: ctx => findDirect(ctx, 'infernal_wound'),
+        build: ctx => ({ label: 'Infernal Wound', cls: 'effect-debuff', icon: 'fa-droplet', removable: true, removeAction: 'target_effect', effectType: 'infernal_wound', tooltip: `Infernal Wound from ${ctx.te.source || 'unknown'} — loses ${ctx.te.bleedDie || '1d10'} Hit Points at the start of each of its turns; closes after 1 minute, on any healing, or after a DC 12 Wisdom (Medicine) action (GM-enforced)` }),
+    },
     {
         guard: ctx => ctx.effects.noAdvantageAgainst,
         build: () => ({ label: 'No Adv vs', cls: 'effect-buff', icon: 'fa-arrow-down', removable: true, removeAction: 'remove_derived', effectTypes: ['blur', 'foresight', 'escape_the_horde', 'protection', 'multiattack_defense'] }),

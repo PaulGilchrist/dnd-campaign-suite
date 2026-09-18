@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
@@ -119,6 +119,9 @@ function comboTrapArmsFrom(autoDamage) {
     saveConditions: autoDamage.saveConditions || null,
     soulTomeTrap: autoDamage.soulTomeTrap || null,
     repeatSave: autoDamage.repeatSave || null,
+    // MA-0367: Infernal Wound arm rides the combo auto-damage to the
+    // save-result fail seam. Byte-inert null elsewhere.
+    infernalWound: autoDamage.infernalWound || null,
   };
 }
 
@@ -612,6 +615,10 @@ function buildSaveOptions(action) {
     soulTomeTrap: parseSoulTomeTrapClause(action?.save_effect),
     // MA-0048 repeat_save seam: arm the turn-END repeat save on a fail.
     repeatSave: action?.repeat_save || null,
+    // MA-0367: Infernal Glaive combo attack+save — the wound arm rides the
+    // auto-damage to the save-result fail seam (infernalWoundService).
+    // Byte-inert null for every row without the structured wound key.
+    infernalWound: parseInfernalWoundClause(action),
   };
 }
 
@@ -976,6 +983,10 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     // — numeric threshold arm for the failed-save threshold-kill seam in
     // saveProcessing.applySaveDamage. Byte-inert null for every clauseless row.
     hpThresholdKill: parseHpThresholdKillClause(action),
+    // MA-0367: Infernal Glaive structured wound key — infernal_wound te
+    // producer arm for the saveProcessing/save-result failed-save seams
+    // (block-save path; combo attack+save rides buildSaveOptions).
+    infernalWound: parseInfernalWoundClause(action),
   };
 }
 

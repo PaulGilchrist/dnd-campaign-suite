@@ -186,6 +186,22 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-0367: Bearded Devil Infernal Glaive failed-save wound — the target
+    // loses bleedDie (1d10) untyped Hit Points at the start of each of its
+    // turns (turn-start tick consumer: infernalWoundService via
+    // applyTurnStartEffects). Closes after 1 minute (rounds:10 clock), on any
+    // healing (heal choke point strips te), or a DC 12 WIS (Medicine) action
+    // (GM-advisory — removable badge).
+    effect: 'infernal_wound',
+    label: 'Infernal Wound',
+    description: 'The wounded target loses 1d10 Hit Points at the start of each of its turns. The wound closes after 1 minute, after any Hit Points are restored to it, or after a DC 12 Wisdom (Medicine) action (GM-enforced).',
+    icon: 'fa-droplet',
+    cls: 'effect-debuff',
+    group: 'Defensive',
+    fields: ['source', 'dc', 'bleedDie'],
+    defaults: { bleedDie: '1d10' },
+  },
+  {
     effect: 'multiattack_defense',
     label: 'Multiattack Defense',
     description: 'Attacks against the target have Disadvantage (Multiattack Defense).',

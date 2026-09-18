@@ -13,6 +13,7 @@ import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
 import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
 import { setTempHp } from '../../services/automation/handlers/buffs/tempHpService.js';
+import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -344,26 +345,46 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     if (context?.subtractDebuff) {
         await grantSubtractDieDebuff({ context, campaignName, attackerName, applyTarget });
     }
-    // MA-0104: Adult Gold Dragon Banish — "transported to a harmless
-    // demiplane until the start of the dragon's next turn". Distinct te from
-    // the PC spell banishment (concentration/permanent semantics); badge +
-    // honest advisory display, reappearance placement GM-enforced (§7).
+    // MA-0104/0107/0115/0146: banishment + movement-penalty clause arms
+    // (demiplane transport, dream-plane banishment, AC penalty, speed-zero)
+    // extracted to a sibling helper to keep this dispatcher under the
+    // complexity ceiling (playbook §5 — split by clause family, MA-0087 model).
+    await applyTransportAndMovementClauseGrants({ context, campaignName, attackerName, applyTarget });
+    // MA-0367: Bearded Devil Infernal Glaive — failed DC 12 CON save inflicts
+    // the infernal_wound te + ONE rounds:10 clock (1 minute, CLA-334) via
+    // infernalWoundService (RAW skips targets already carrying a wound).
+    if (context?.infernalWound) {
+        await grantInfernalWound({
+            campaignName,
+            attackerName,
+            targetName: applyTarget,
+            actionName: context?.actionName || context?.name || 'Infernal Glaive',
+            bleedDie: context.infernalWound.bleedDie,
+        });
+    }
+}
+
+// Banishment-family + movement-penalty te grants (MA-0104/0107/0115/0146),
+// split out of applyFailedSaveClauseGrants (complexity ceiling §5).
+async function applyTransportAndMovementClauseGrants({ context, campaignName, attackerName, applyTarget }) {
+    // MA-0104: Adult Gold Dragon Banish — "transported to a harmless demiplane
+    // until the start of the dragon's next turn". Distinct te from the PC spell
+    // banishment (concentration/permanent semantics); badge + honest advisory
+    // display, reappearance placement GM-enforced (§7).
     if (context?.demiplaneTransport) {
         await grantDemiplaneTransport({ context, campaignName, attackerName, applyTarget });
     }
     // MA-0107: Adult Gold Dragon lair action Dream Plane Banishment —
-    // "banished to a dream plane ... the effect ends on initiative count 20
-    // on the next round". Distinct te from banished_demiplane (MA-0104 —
-    // the Banish wording never matches, and vice versa); rounds:2 clock
-    // mirrors the verified MA-0104 shape (initiative-20 cadence stays
-    // GM-enforced — no initiative lair seam §7). The escape clause
-    // (contested Charisma check action) stays advisory prose (§7).
+    // "banished to a dream plane ... the effect ends on initiative count 20 on
+    // the next round". Distinct te from banished_demiplane (MA-0104 — the
+    // Banish wording never matches, and vice versa); rounds:2 clock mirrors the
+    // verified MA-0104 shape (initiative-20 cadence stays GM-enforced §7).
     if (context?.dreamPlaneBanishment) {
         await grantDreamPlaneBanishment({ context, campaignName, attackerName, applyTarget });
     }
     // MA-0115: Adult Green Dragon Noxious Miasma — "the target takes a −2
-    // penalty to AC until the end of its next turn". te producer mirror of
-    // the MA-0073 shape; the parsed value rides the te to the live consumer
+    // penalty to AC until the end of its next turn". te producer mirror of the
+    // MA-0073 shape; the parsed value rides the te to the live consumer
     // (conditionEffects acPenalty → CharSummary AC fold + penalty line).
     if (context?.acPenaltyClause) {
         await grantAcPenaltyClause({ context, campaignName, attackerName, applyTarget });

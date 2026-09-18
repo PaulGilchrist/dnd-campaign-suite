@@ -142,6 +142,9 @@ function comboCritAndTrapArms(context) {
         saveConditions: context?.saveConditions || null,
         soulTomeTrap: context?.soulTomeTrap || null,
         repeatSave: context?.repeatSave || null,
+        // MA-0367: Infernal Wound arm rides the pending prompt to the
+        // save-result fail seam. Byte-inert null elsewhere.
+        infernalWound: context?.infernalWound || null,
     };
 }
 

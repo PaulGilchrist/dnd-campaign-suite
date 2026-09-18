@@ -251,6 +251,25 @@ export function parseAnimalSpiritVariants(action) {
   };
 }
 
+// MA-0367: authored infernal-wound row (Bearded Devil Infernal Glaive —
+// "If the target is a creature and doesn't already have an infernal wound,
+// it is subjected to ... loses 1d10 Hit Points at the start of each of its
+// turns ... closes after 1 minute / healing / DC 12 Wisdom (Medicine)").
+// "Infernal wound" is not a canonical condition, so extractConditionsFromSaveEffect
+// can never see it; the parser arms the registered infernal_wound te producer
+// at the save fail seams (saveProcessing + save-result + NPC save-damage) from
+// the MA-0367 structured keys — rows without hit_target_effect stay byte-inert
+// (null), so no other monster's wound prose can double-arm.
+export function parseInfernalWoundClause(action) {
+  if (!action || action.hit_target_effect !== 'infernal_wound') return null;
+  return {
+    effect: 'infernal_wound',
+    bleedDie: String(action.wound_bleed_die || '1d10').toLowerCase(),
+    expiresMinutes: Number(action.wound_expires_minutes) || 1,
+    medicineDc: Number(action.wound_medicine_dc) || 12,
+  };
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];

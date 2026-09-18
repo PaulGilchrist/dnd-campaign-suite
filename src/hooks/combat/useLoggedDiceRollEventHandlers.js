@@ -23,6 +23,7 @@ import { isResilientSphereActive } from '../../services/combat/automation/automa
 import { triggerViciousMockeryForGeneric } from '../../services/rules/features/viciousMockeryService.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, resolveAppliedDamage } from './handlers/damageHandlerUtils.js';
 import { grantSoulTomeTrap } from '../../services/rules/features/soulTomeTrapService.js';
+import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
 
 const SECONDARY_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 
@@ -418,6 +419,21 @@ function resolvePendingAttacker(pending) {
 // via soulTomeTrapService; the turn-END repeat-save seam then drives escape.
 // Success grants nothing (zero-state). The MA-0104 Banish te (no soulTome
 // flag) is never touched here.
+// MA-0367: Infernal Glaive combo attack+save — a failed DC 12 CON save
+// inflicts the infernal_wound te + rounds:10 clock via infernalWoundService
+// (skips targets already wounded). Success grants nothing — dc_success:"full"
+// keeps the attack damage unhalved, the save gates only the wound.
+async function maybeGrantInfernalWound({ detail, pending, pendingTargetName, characterName }) {
+    if (detail.success || !pending.infernalWound) return;
+    await grantInfernalWound({
+        campaignName: pending.campaignName,
+        attackerName: resolvePendingAttacker(pending) || characterName,
+        targetName: pendingTargetName,
+        actionName: pending.name || pending.sourceName || 'Infernal Glaive',
+        bleedDie: pending.infernalWound.bleedDie,
+    });
+}
+
 async function maybeGrantSoulTomeTrap({ detail, pending, pendingTargetName, normalizedSaveType, characterName }) {
     if (detail.success || !pending.soulTomeTrap) return;
     await grantSoulTomeTrap({
@@ -505,6 +521,9 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
 
     // MA-0298: Soul Tome trap failed-save grant (fail-only, zero on success).
     await maybeGrantSoulTomeTrap({ detail, pending, pendingTargetName, normalizedSaveType, characterName });
+
+    // MA-0367: Infernal Glaive failed-save wound grant (fail-only).
+    await maybeGrantInfernalWound({ detail, pending, pendingTargetName, characterName });
 
     // CLA-377: Vicious Mockery disadvantage is applied on the FAILED save only,
     // after the save resolves (mirrors the statusEffects-on-fail leg above).

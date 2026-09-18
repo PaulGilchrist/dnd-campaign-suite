@@ -88,6 +88,12 @@ export function computeDamageAfterResistancesWithDetails({ rawDamage, damageType
 export function computeDamageAfterSave(rawDamage, saveSuccess, dcSuccess) {
   if (!saveSuccess) return rawDamage;
   if (dcSuccess === 'half') return Math.floor(rawDamage / 2);
+  // MA-0367: dc_success 'full' — the save gates a NON-damage clause only (the
+  // Infernal Glaive wound), so a successful save still pays the FULL attack
+  // damage. Byte-identical for every 'half'/'none' row (MA-0298 soulTome
+  // discriminator stays upstream on the combo seam; MA-0218 'none' zero-on-
+  // success semantics unchanged).
+  if (dcSuccess === 'full') return rawDamage;
   return 0;
 }
 
