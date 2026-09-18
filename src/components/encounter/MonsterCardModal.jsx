@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
-import { rollExpression, rollExpressionDoubled, canRollExpression } from '../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled, canRollExpression, parseConstant } from '../../services/dice/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/combat/damageUtils.js';
@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
@@ -585,7 +585,10 @@ function resolveForcedMode(forcedMode, rangeForcedMode) {
 
 function buildAutoDamageOptions(action, name) {
   return {
-    autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || null,
+    // MA-0322: dice rows resolve first (byte-inert); flat prose-only hit
+    // damage ("Hit: 1 Slashing damage.") falls back to a constant formula
+    // the auto-damage seam resolves dice-less.
+    autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || extractFlatHitDamage(action) || null,
     autoDamageName: name,
     autoDamageSecondaryFormula: action?.damage_dice_secondary || null,
     autoDamageSecondaryName: name,
@@ -697,6 +700,18 @@ function blockStinkingCloudAction(campaignName, monsterName, name) {
     description: `${monsterName} is Poisoned by Stinking Cloud and can't take an Action or Bonus Action — ${name} refused.`,
     timestamp: Date.now(),
   }).catch((e) => { console.error('[MonsterCardModal] Error:', e); });
+}
+
+// MA-0322: roll an auto-damage formula — dice rows roll as always; a flat
+// constant ("1", parsed from dice-less "Hit: N <type> damage." prose) has no
+// dice to roll and resolves verbatim, dice-less. Flat NEVER doubles on crit
+// (dice-only doubling, playbook §4). Null when nothing resolves (MA-0014
+// blocked-refusal then fires at the caller).
+function resolveAutoDamageResult(formula, wasCrit) {
+  const rolled = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);
+  if (rolled) return rolled;
+  const flat = parseConstant(formula);
+  return flat != null ? { total: flat, rolls: [], modifier: 0 } : null;
 }
 
 // MA-0014: never die silently on an unparseable damage formula — log the refusal.
@@ -1081,12 +1096,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         autoDamageSource: monsterName,
         autoDamageRoll: async (autoDamage, isCrit) => {
           if (!autoDamage) {
+            logBlockedDamageRoll(campaignName, monsterName, monsterName, null);
             setPopupHtml(null);
             return;
           }
           const target = getTarget();
           const wasCrit = isCrit || autoDamage.isAutoCrit;
-          const result = wasCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
+          const result = resolveAutoDamageResult(autoDamage.formula, wasCrit);
           if (result) {
             const context = {
               damageType: autoDamage.damageType,

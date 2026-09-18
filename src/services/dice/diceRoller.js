@@ -200,4 +200,4 @@ function applyHealingRerollOnes(rolls, expression) {
   return { displayRolls: rolls, originalRolls: null };
 }
 
-export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, canRollExpression, rollExpression, rollExpressionDoubled, rollExpressionMaximized, formatDamageFormula, applyHealingRerollOnes };
+export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, parseConstant, canRollExpression, rollExpression, rollExpressionDoubled, rollExpressionMaximized, formatDamageFormula, applyHealingRerollOnes };

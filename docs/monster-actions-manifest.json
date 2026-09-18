@@ -4823,7 +4823,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 Slashing damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0322-rake-flat-damage-never-applied.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0323",

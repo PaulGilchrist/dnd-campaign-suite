@@ -810,3 +810,21 @@ export function buildNoTargetRefusalLog({ monsterName, actionName }) {
     timestamp: Date.now(),
   };
 }
+
+// MA-0322: flat integer hit damage ("Hit: 1 Slashing damage.") authored as
+// prose with NO dice (no damage_dice_primary, no parenthesized formula) —
+// extractDamageDiceFromDescription can never see it, so the auto-damage chain
+// silently dealt zero. This parses the constant back out for the attack-row
+// auto-damage seam ONLY: every dice-bearing row ("Hit: 7 (2d8+4) …") returns
+// null byte-inert, and non-hit-clause prose returns null. Rows matched live:
+// Awakened Shrub Rake, Badger Bite, Bat Bite, Cat Scratch … (23 total).
+// Returns the fixed amount as a numeric string; the roller resolves it
+// dice-less via parseConstant (flat never doubles on crit — dice-only rule).
+export function extractFlatHitDamage(action) {
+  const description = String(action?.description || '');
+  if (!description) return null;
+  if (/\(\s*\d+d\d+/.test(description)) return null;
+  const stripped = description.replace(/<[^>]+>/g, '');
+  const m = stripped.match(/Hit:\s*(\d+)\s+(?:[A-Za-z-]+\s+)*?damage\b/i);
+  return m ? m[1] : null;
+}
