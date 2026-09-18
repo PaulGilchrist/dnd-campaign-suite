@@ -481,3 +481,74 @@ describe('MA-0302 Arch-hag Spectral Claw prone hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const RUG = monsters.find(m => m.index === 'animated-rug-of-smothering');
+const SMOTHER_ACTION = RUG.actions[0];
+
+describe('MA-0287 Animated Rug of Smothering Smother hit-clause', () => {
+    const deps = {
+        characterName: 'Animated Rug of Smothering 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Animated Rug of Smothering 1', computedStats: { armorClass: 12 } },
+            { name: 'LightfootHalfling', computedStats: { armorClass: 14 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 11, newHp: 1, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'LightfootHalfling', type: 'player', size: 'Small', ac: 14, currentHp: 12, maxHp: 12 }],
+        });
+    });
+
+    it('MA-0287 data-lock: authors hit_conditions:["blinded","grappled","restrained"] + escape_dc:13 on the Smother row', () => {
+        expect(SMOTHER_ACTION.name).toBe('Smother');
+        expect(SMOTHER_ACTION.attack_bonus).toBe(5);
+        expect(SMOTHER_ACTION.damage_dice_primary).toBe('2d6 + 3');
+        expect(SMOTHER_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(SMOTHER_ACTION.hit_conditions).toEqual(['blinded', 'grappled', 'restrained']);
+        expect(SMOTHER_ACTION.escape_dc).toBe(13);
+    });
+
+    it('builds the full trio clause with escape DC 13', () => {
+        expect(buildHitConditionClause(SMOTHER_ACTION)).toEqual({
+            conditions: ['blinded', 'grappled', 'restrained'],
+            escapeDc: 13,
+            attackName: 'Smother',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Blinded+Grappled+Restrained + escape-meta + condition log on a resolved Smother hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Smother', formula: '2d6 + 3', total: 11, rolls: [5, 3], modifier: 3, context: {
+            targetName: 'LightfootHalfling',
+            damageType: 'Bludgeoning',
+            attackerName: 'Animated Rug of Smothering 1',
+            hitClause: buildHitConditionClause(SMOTHER_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['blinded', 'grappled', 'restrained']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({
+            blinded: { dc: 13, ability: 'str', source: 'Animated Rug of Smothering 1' },
+            grappled: { dc: 13, ability: 'str', source: 'Animated Rug of Smothering 1' },
+            restrained: { dc: 13, ability: 'str', source: 'Animated Rug of Smothering 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'LightfootHalfling',
+            condition: 'Blinded, Grappled, Restrained',
+            reason: 'Smother (escape DC 13)',
+        }));
+    });
+});

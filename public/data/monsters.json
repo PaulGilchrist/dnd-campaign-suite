@@ -5756,7 +5756,9 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 3",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["blinded", "grappled", "restrained"],
+        "escape_dc": 13
       }
     ],
     "environments": [

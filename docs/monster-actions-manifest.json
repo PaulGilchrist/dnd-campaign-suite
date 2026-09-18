@@ -4240,7 +4240,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d12+3+spellcasting modifier Force damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0284-animated-object-huge-slam-inert.md"
+      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0284-animated-object-huge-slam-inert.md"
     },
     {
       "id": "MA-0285",
@@ -4255,7 +4255,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d6+3+spellcasting modifier Force damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0285-animated-object-large-slam-inert.md"
+      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0285-animated-object-large-slam-inert.md"
     },
     {
       "id": "MA-0286",
@@ -4270,7 +4270,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d4+3 Force damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0286-animated-object-medium-slam-no-tohit.md"
+      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0286-animated-object-medium-slam-no-tohit.md"
     },
     {
       "id": "MA-0287",
@@ -4291,7 +4291,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Bludgeoning damage. If the target is a Medium or smaller creature, the rug can give it the Grappled condition (escape DC 13) instead of dealing damage. Until the grapple ends, the target has the Blinded and Restrained conditions, is suffocating, and takes 10 (2d6 + 3) Bludgeoning damage at the start of each of its turns. The rug can smother only one creature at a time. While grappling the target, the rug can't take this action, the rug halves the damage it takes (round down), and the target takes the same amount of damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0287-smother-grapple-subsystem-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0288",
