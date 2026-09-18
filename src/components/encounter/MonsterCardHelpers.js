@@ -1422,7 +1422,8 @@ export function extractFlatHitDamage(action) {
   return m ? m[1] : null;
 }
 
-// ── MA-0374: Beholder Eye Rays d10 picker ─────────────────────────────
+// ── MA-0374/MA-0383: Eye Rays picker (die = len(rays): d10 Beholder,
+// d4 Beholder Zombie) ────────────────────────────────────────────────────
 // Beholder actions[2] "Eye Rays" was a save-only shell: save_type
 // "Varies (WIS, CON, STR, DEX)" + multi-string damage ("3d8, 4d6, …") —
 // unparseable, zero ray resolution ("VAR"/"var" mod-0 fallback, playbook §6
@@ -1439,7 +1440,9 @@ export function parseEyeRayGrant(action) {
 
 export function parseEyeRays(action) {
   const rays = action?.rays;
-  if (!Array.isArray(rays) || rays.length !== 10) return null;
+  // MA-0383: die size is len(rays) — Beholder 10 rays/d10, Beholder
+  // Zombie 4 rays/d4 (RAW "roll 1d4"). Any authored 2..N ray array arms.
+  if (!Array.isArray(rays) || rays.length < 2) return null;
   const valid = rays.every(r =>
     r && typeof r.key === 'string' && typeof r.name === 'string'
     && EYE_RAY_SAVE_ABILITIES.includes(r.save_ability)
@@ -1449,14 +1452,16 @@ export function parseEyeRays(action) {
   return valid ? rays : null;
 }
 
-// RAW: "roll 1d10; reroll if the beholder has already used that ray during
-// this turn" — usedKeys carries the rays already fired this round (runtime
-// key eyeRaysUsed, round-stamped). rollD10 injected for deterministic tests.
-export function pickEyeRay({ rays, usedKeys = [], rollD10 }) {
+// RAW: "roll 1d10 (Beholder) / 1d4 (Beholder Zombie); reroll if already
+// used that ray during this turn" — the picker die is len(rays); usedKeys
+// carries the rays already fired this round (runtime key eyeRaysUsed,
+// round-stamped). rollDie injected for deterministic tests.
+export function pickEyeRay({ rays, usedKeys = [], rollDie }) {
+  const die = Array.isArray(rays) ? rays.length : 0;
   const rerolls = [];
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    const roll = Math.trunc(Number(rollD10()));
-    if (!(roll >= 1 && roll <= 10)) continue;
+    const roll = Math.trunc(Number(rollDie()));
+    if (!(roll >= 1 && roll <= die)) continue;
     const candidate = rays[roll - 1];
     if (candidate && !usedKeys.includes(candidate.key)) return { ray: candidate, roll, rerolls };
     rerolls.push(roll);
@@ -1475,7 +1480,9 @@ export function buildEyeRayAction(rowAction, ray) {
     save_type: ray.save_ability,
     dc_success: ray.dc_success,
     save_effect: null,
-    eyeRay: ray,
+    // MA-0383: row DC stamped onto the ray so the repeat-save ladder
+    // (beholderEyeRayService) honors per-monster DCs (Zombie 14).
+    eyeRay: { ...ray, save_dc: ray.save_dc ?? rowAction.save_dc ?? 16 },
     damage_dice_primary: ray.damage_dice ?? undefined,
     damage_type_primary: ray.damage_type ?? undefined,
     description: null,
@@ -1494,34 +1501,34 @@ export function eyeRayAutoSuccessReason(ray, csCreature) {
   return null;
 }
 
-export function buildEyeRayPickerPopup({ monsterName, ray, roll, rerolls = [], targetName }) {
+export function buildEyeRayPickerPopup({ monsterName, ray, roll, rerolls = [], targetName, die = 10, dc = 16 }) {
   const rerollNote = rerolls.length > 0
     ? ` (rerolled ${rerolls.join(', ')} — already used this turn)`
     : '';
-  return `<div class="mc-eye-ray-picked"><h3><i class="fa-solid fa-eye"></i> ${ray.name}</h3><p>${monsterName} rolls ${roll}${rerollNote} on the Eye Rays d10 — <strong>${ray.name}</strong> at ${targetName} (DC 16 ${ray.save_ability} save).</p></div>`;
+  return `<div class="mc-eye-ray-picked"><h3><i class="fa-solid fa-eye"></i> ${ray.name}</h3><p>${monsterName} rolls ${roll}${rerollNote} on the Eye Rays d${die} — <strong>${ray.name}</strong> at ${targetName} (DC ${dc} ${ray.save_ability} save).</p></div>`;
 }
 
-export function buildEyeRayPickerRollLog({ monsterName, ray, roll, rerolls = [], targetName }) {
+export function buildEyeRayPickerRollLog({ monsterName, ray, roll, rerolls = [], targetName, die = 10 }) {
   const rerollNote = rerolls.length > 0 ? ` (rerolled ${rerolls.join(', ')})` : '';
   return {
     type: 'roll',
-    rollType: 'd10',
+    rollType: `d${die}`,
     characterName: monsterName,
-    name: 'Eye Rays (d10 ray picker)',
+    name: `Eye Rays (d${die} ray picker)`,
     rolls: [roll],
     total: roll,
     targetName,
-    description: `${monsterName} rolled ${roll}${rerollNote} on the Eye Rays d10 — ${ray.name}.`,
+    description: `${monsterName} rolled ${roll}${rerollNote} on the Eye Rays d${die} — ${ray.name}.`,
     timestamp: Date.now(),
   };
 }
 
-export function buildEyeRayAbilityUseLog({ monsterName, ray, targetName }) {
+export function buildEyeRayAbilityUseLog({ monsterName, ray, targetName, dc = 16 }) {
   return {
     type: 'ability_use',
     characterName: monsterName,
     abilityName: `${ray.name} (Eye Rays)`,
-    description: `${monsterName} fires ${ray.name} from Eye Rays at ${targetName} — DC 16 ${ray.save_ability} save${ray.damage_dice ? `, ${ray.damage_dice} ${ray.damage_type} damage (half on a successful save)` : ' — no damage, condition save'} .`.replace(' .', '.'),
+    description: `${monsterName} fires ${ray.name} from Eye Rays at ${targetName} — DC ${dc} ${ray.save_ability} save${ray.damage_dice ? `, ${ray.damage_dice} ${ray.damage_type} damage (half on a successful save)` : ' — no damage, condition save'} .`.replace(' .', '.'),
     timestamp: Date.now(),
   };
 }

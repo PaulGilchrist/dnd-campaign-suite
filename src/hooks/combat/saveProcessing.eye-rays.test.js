@@ -161,3 +161,40 @@ describe('MA-0374 saveProcessing Eye Rays dispatcher', () => {
         expect(addEntryLogs.some(e => e.automationType === 'eye_ray_zero_hp_advisory')).toBe(false);
     });
 });
+
+// ── MA-0383: Beholder Zombie rays ride the identical dispatcher (d4 row) ──
+describe('MA-0383 saveProcessing Beholder Zombie legs', () => {
+    const zEnervation = { key: 'enervation', name: 'Enervation Ray', save_ability: 'Constitution', save_dc: 14, damage_dice: '3d6', damage_type: 'Necrotic', dc_success: 'half', conditions: ['poisoned'], te_grants: ['no_healing'], clock_rounds: 2 };
+    const zParalyzing = { key: 'paralyzing', name: 'Paralyzing Ray', save_ability: 'Constitution', save_dc: 14, damage_dice: null, damage_type: null, dc_success: 'none', conditions: [], ladder: 'paralyzed' };
+    const zDisintegration = { key: 'disintegration', name: 'Disintegration Ray', save_ability: 'Dexterity', save_dc: 14, damage_dice: '5d10', damage_type: 'Force', dc_success: 'half', conditions: [], zero_hp_clause: 'disintegrates into dust' };
+
+    it('enervation fail: full 3d6-equivalent damage, Poisoned condition + no_healing grant delegated', async () => {
+        await resolveSave(rayContext(zEnervation, { saveDc: 14 }), false, 5);
+        expect(applyEyeRayFailedGrants).toHaveBeenCalledTimes(1);
+        expect(applyEyeRayFailedGrants.mock.calls[0][0].ray).toMatchObject({ key: 'enervation', te_grants: ['no_healing'], save_dc: 14 });
+        expect(runtimeStore[`${T}.activeConditions`]).toContain('poisoned');
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(32);
+    });
+
+    it('paralyzing fail: ladder delegated once with DC 14, zero damage rolled', async () => {
+        await resolveSave(rayContext(zParalyzing, { saveDc: 14 }), false, 2);
+        expect(applyEyeRayFailedGrants).toHaveBeenCalledTimes(1);
+        expect(applyEyeRayFailedGrants.mock.calls[0][0].ray).toMatchObject({ ladder: 'paralyzed', save_dc: 14 });
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+    });
+
+    it('disintegration at 0 HP: dust advisory on EITHER outcome, half damage on success', async () => {
+        applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 0 }));
+        await resolveSave(rayContext(zDisintegration, { saveDc: 14 }), true, 20);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(16);
+        const adv = addEntryLogs.find(e => e.automationType === 'eye_ray_zero_hp_advisory');
+        expect(adv).toBeTruthy();
+        expect(adv.description).toMatch(/disintegrates into dust \(GM-enforced/);
+
+        addEntryLogs.length = 0;
+        applyDamageToTarget.mock.calls.length = 0;
+        await resolveSave(rayContext(zDisintegration, { saveDc: 14 }), false, 3);
+        expect(addEntryLogs.some(e => e.automationType === 'eye_ray_zero_hp_advisory')).toBe(true);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(32);
+    });
+});

@@ -290,16 +290,17 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   })().catch((e) => { console.error('[MonsterCardModal] Error resolving recharge/cone save leg:', e); });
 }
 
-// MA-0374: Beholder Eye Rays picker — RAW "roll 1d10; reroll if the
-// beholder has already used that ray during this turn". The old row was a
-// save-only shell ("Varies (WIS, CON, STR, DEX)" + multi-dice, playbook §6
-// VAR family): no ray ever resolved. rays[] (monsters.json) carries one
-// single-ability save leg per ray; this picker rolls the d10, rerolling any
-// ray already fired this round (round-stamped runtime key eyeRaysUsed —
-// self-resets, no initiative clear-list latch needed §5 monster-latch rule),
-// names the ray in popup + d10 roll log, honors the Gargantuan/Construct/
-// Undead auto-success clauses, then routes THAT ray's own save through the
-// existing block-save seam (half-damage/condition/threshold legs intact).
+// MA-0374/MA-0383: Eye Rays picker — RAW "roll 1d10 (Beholder) / 1d4
+// (Beholder Zombie); reroll if already used that ray this turn" — the picker
+// die is len(rays), monster-agnostic. The old rows were save-only shells
+// ("Varies (WIS, CON, STR, DEX)" + multi-dice, playbook §6 VAR family): no
+// ray ever resolved. rays[] (monsters.json) carries one single-ability save
+// leg per ray; this picker rolls the die, rerolling any ray already fired
+// this round (round-stamped runtime key eyeRaysUsed — self-resets, no
+// initiative clear-list latch needed §5 monster-latch rule), names the ray
+// in popup + picker roll log, honors the Gargantuan/Construct/Undead
+// auto-success clauses, then routes THAT ray's own save through the existing
+// block-save seam (half-damage/condition/threshold legs intact).
 const EYE_RAYS_USED_KEY = 'eyeRaysUsed';
 
 async function resolveEyeRayFire({ action, monsterName, campaignName, target, characters, creatures, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml }) {
@@ -315,23 +316,24 @@ async function resolveEyeRayFire({ action, monsterName, campaignName, target, ch
   const round = Number(cs?.round ?? 1);
   const stored = getRuntimeValue(monsterName, EYE_RAYS_USED_KEY) || {};
   const usedKeys = Number(stored.round) === round && Array.isArray(stored.rays) ? [...stored.rays] : [];
-  const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys, rollD10: () => Math.floor(Math.random() * 10) + 1 });
+  const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys, rollDie: () => Math.floor(Math.random() * rays.length) + 1 });
   if (!ray) {
     console.error(`[MonsterCardModal] Eye Rays picker on ${monsterName} could not resolve a fresh ray after 100 rolls — refusing.`);
     return;
   }
   // Latch stamp awaited BEFORE the save leg (playbook §5 runtime writes).
   await setRuntimeValue(monsterName, EYE_RAYS_USED_KEY, { round, rays: [...usedKeys, ray.key] }, campaignName);
-  addEntry(campaignName, buildEyeRayPickerRollLog({ monsterName, ray, roll, rerolls, targetName: target.name }))
+  addEntry(campaignName, buildEyeRayPickerRollLog({ monsterName, ray, roll, rerolls, targetName: target.name, die: rays.length }))
     .catch((e) => { console.error('[MonsterCardModal] Error logging Eye Rays picker roll:', e); });
   const autoReason = eyeRayAutoSuccessReason(ray, (cs?.creatures || []).find(c => c.name === target.name));
-  setPopupHtml(buildEyeRayPickerPopup({ monsterName, ray, roll, rerolls, targetName: target.name }));
+  const pickerDc = action.save_dc;
+  setPopupHtml(buildEyeRayPickerPopup({ monsterName, ray, roll, rerolls, targetName: target.name, die: rays.length, dc: pickerDc }));
   if (autoReason) {
     addEntry(campaignName, buildEyeRayAutoSuccessLog({ monsterName, ray, targetName: target.name, reason: autoReason }))
       .catch((e) => { console.error('[MonsterCardModal] Error logging Eye Rays auto-success:', e); });
     return;
   }
-  addEntry(campaignName, buildEyeRayAbilityUseLog({ monsterName, ray, targetName: target.name }))
+  addEntry(campaignName, buildEyeRayAbilityUseLog({ monsterName, ray, targetName: target.name, dc: pickerDc }))
     .catch((e) => { console.error('[MonsterCardModal] Error logging Eye Rays ability_use:', e); });
   executeBlockSaveRoll({
     action: buildEyeRayAction(action, ray),
@@ -1432,9 +1434,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       setAnimalSpiritChooser({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, prerequisite, usesGate, target, ...spiritVariants });
       return;
     }
-    // MA-0374: Beholder Eye Rays — structured rays[] + d10 picker (RAW
-    // random ray, reroll-if-used-this-turn) — the picked ray's own
-    // single-ability save leg runs downstream; never the "VARIES" shell.
+    // MA-0374/MA-0383: Eye Rays — structured rays[] + len(rays) picker
+    // (RAW random ray, reroll-if-used-this-turn; d10 Beholder, d4 Beholder
+    // Zombie) — the picked ray's own single-ability save leg runs
+    // downstream; never the "VARIES" shell.
     if (Array.isArray(stageAction.rays) && stageAction.rays.length > 0) {
       resolveEyeRayFire({ action: stageAction, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml })
         .catch((e) => { console.error('[MonsterCardModal] Error resolving Eye Rays picker:', e); });

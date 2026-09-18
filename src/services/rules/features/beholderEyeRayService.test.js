@@ -174,3 +174,35 @@ describe('MA-0374 applyEyeRaysTurnEnd ladders', () => {
         expect(logs.some(e => e.type === 'ability_use' && /repeats its Constitution save/.test(e.description))).toBe(true);
     });
 });
+
+// ── MA-0383: Beholder Zombie rows ride the identical service (DC 14) ────
+describe('MA-0383 zombie DC propagation through the shared ladder', () => {
+    it('zombie paralyzing ray (save_dc 14): te + repeat ladder register with DC 14, ONE rounds:10 clock', async () => {
+        await applyEyeRayFailedGrants({ campaignName: C, attackerName: 'Beholder Zombie 1', targetName: T, ray: { ...ray('paralyzing'), save_dc: 14, ladder: 'paralyzed' } });
+        const te = tes().find(e => e.effect === EYE_RAY_PARALYZED_TE);
+        expect(te).toMatchObject({ target: T, source: 'Beholder Zombie 1', dc: 14, saveType: 'CON', stage: 'paralyzed' });
+        expect(runtimeStore[`${T}.activeConditions`]).toContain('paralyzed');
+        expect(expirations).toHaveLength(1);
+        expect(expirations[0]).toMatchObject({ attackerName: 'Beholder Zombie 1', targetName: T, rounds: 10 });
+    });
+
+    it('zombie turn-end repeat save: fail vs DC 14 keeps Paralyzed, logs the DC 14 ladder roll', async () => {
+        await applyEyeRayFailedGrants({ campaignName: C, attackerName: 'Beholder Zombie 1', targetName: T, ray: { ...ray('paralyzing'), save_dc: 14, ladder: 'paralyzed' } });
+        csCreatures = [{ name: T, type: 'player' }];
+        logs.length = 0;
+        const promise = applyEyeRaysTurnEnd(C, T);
+        nextSaveResolve({ roll: 3, saveBonus: 0, success: false });
+        const res = await promise;
+        expect(res).toMatchObject({ handled: true, success: false, total: 3 });
+        const saveRow = logs.find(e => e.type === 'save_result' && e.rollType === 'save-paralyzing-repeat');
+        expect(saveRow).toMatchObject({ saveDc: 14, saveType: 'CON', success: false });
+    });
+
+    it('zombie enervation ray: no_healing te with rounds:2 clock (same shape as beholder)', async () => {
+        await applyEyeRayFailedGrants({ campaignName: C, attackerName: 'Beholder Zombie 1', targetName: T, ray: { ...ray('enervation'), save_dc: 14 } });
+        const te = tes().find(e => e.effect === 'no_healing');
+        expect(te).toMatchObject({ target: T, source: 'Beholder Zombie 1', saveType: 'CONSTITUTION' });
+        expect(expirations).toHaveLength(1);
+        expect(expirations[0].rounds).toBe(2);
+    });
+});
