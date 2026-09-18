@@ -7397,7 +7397,8 @@
         "damage_dice_primary": "3d6 + 8",
         "damage_type_primary": "Force",
         "damage_dice_secondary": "5d6",
-        "damage_type_secondary": "Fire"
+        "damage_type_secondary": "Fire",
+        "hit_conditions": ["prone"]
       },
       {
         "name": "Lightning Blade",

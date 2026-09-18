@@ -5008,7 +5008,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +14, reach 30 ft. Hit: 18 (3d6 + 8) Force damage plus 17 (5d6) Fire damage. If the target is a Huge or smaller creature, the balor pulls the target up to 25 feet straight toward itself, and the target has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0334-flame-whip-prone-pull-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0335",

@@ -799,3 +799,92 @@ describe('MA-0320 Assassin Shortsword poisoned-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const BALOR = monsters.find(m => m.index === 'balor');
+const FLAME_WHIP_ACTION = BALOR.actions[1];
+
+describe('MA-0334 Balor Flame Whip prone-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Balor 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Balor 1', computedStats: { armorClass: 19 } },
+            { name: 'AberrantSorcerer', computedStats: { armorClass: 9 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 45, newHp: 1, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'AberrantSorcerer', type: 'player', size: 'Medium', ac: 9, currentHp: 46, maxHp: 46 }],
+        });
+    });
+
+    it('MA-0334 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Flame Whip row', () => {
+        expect(FLAME_WHIP_ACTION.name).toBe('Flame Whip');
+        expect(FLAME_WHIP_ACTION.attack_bonus).toBe(14);
+        expect(FLAME_WHIP_ACTION.reach).toBe('30 ft.');
+        expect(FLAME_WHIP_ACTION.damage_dice_primary).toBe('3d6 + 8');
+        expect(FLAME_WHIP_ACTION.damage_type_primary).toBe('Force');
+        expect(FLAME_WHIP_ACTION.damage_dice_secondary).toBe('5d6');
+        expect(FLAME_WHIP_ACTION.damage_type_secondary).toBe('Fire');
+        expect(FLAME_WHIP_ACTION.hit_conditions).toEqual(['prone']);
+        expect(FLAME_WHIP_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(FLAME_WHIP_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Flame Whip',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Flame Whip hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Flame Whip', formula: '3d6 + 8', total: 25, rolls: [6, 5, 6], modifier: 8, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Force',
+            attackerName: 'Balor 1',
+            hitClause: buildHitConditionClause(FLAME_WHIP_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Balor 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'AberrantSorcerer',
+            condition: 'Prone',
+            reason: 'Flame Whip (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Flame Whip attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Flame Whip', formula: '3d6 + 8', total: 25, rolls: [6, 5, 6], modifier: 8, context: {
+            targetName: 'AberrantSorcerer',
+            damageType: 'Force',
+            attackerName: 'Balor 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AberrantSorcerer', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AberrantSorcerer', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
