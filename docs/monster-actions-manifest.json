@@ -6153,7 +6153,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The blob uses Restraining Glob. The blob can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0407-grasping-glob-zero-affordance-inert-alias.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0408",
