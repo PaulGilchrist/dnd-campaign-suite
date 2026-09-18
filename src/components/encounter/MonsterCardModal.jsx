@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
@@ -260,6 +260,9 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
     rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType, animalSpiritVariant, animalSpiritFortifyHp,
+      // MA-0348: row save_effect until-clause wins; else the damageless spell
+      // leg's honest concentration note from the spell itself.
+      conditionDurationNote: extractConditionDurationNote(action?.save_effect) || spellInfo?.conditionDurationNote || null,
     }));
   };
   const sleepStaging = sleepStagingForAction(spellInfo, action);
@@ -842,7 +845,7 @@ async function spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, camp
 
 // Save-attack spells keep the MA-0003 spell-attributed save routing
 // (own dc_type/dc_success); hoisted to keep handleSpellCast branch-free.
-function executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll }) {
+function executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll, saveLegCondition = null }) {
   const dcSuccess = spell?.dc?.dc_success === 'none' ? 'none' : 'half';
   // MA-0087: honor the row's authored "(level N version)" upcast on the SAVE
   // leg too (Adult Copper Mind Spike lv4 = 5d8, not the base lv2 3d8) — the
@@ -850,12 +853,16 @@ function executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll 
   // when the row author no level clause, so every clauseless row is unchanged.
   const castLevel = spellCastLevelFromSpellcasting(action?.description, spellName, spell);
   const formula = spellDamageFormulaAtLevel(spell, castLevel) || spellDamageFormulaAtBaseLevel(spell);
-  handleSaveRoll(action, formula, extractConditionsFromSaveEffect(spell?.save_effect), {
+  // MA-0348: damageless save legs (Hold Person) grant the condition parsed
+  // off the spell's own text; damage legs stay byte-identical.
+  const { saveConditions, conditionDurationNote } = spellSaveLegOutcome(spell, formula, saveLegCondition);
+  handleSaveRoll(action, formula, saveConditions, {
     spellName, saveType: spell?.dc?.dc_type || action.save_type, dcSuccess,
     castLevel,
     // MA-0054: Spellcasting rows carry no damage_type_primary, so without the
     // spell's own spells.json damage type the save-damage log defaults Slashing.
     damageType: spell?.damage?.damage_type || null,
+    conditionDurationNote,
   });
 }
 
@@ -906,7 +913,7 @@ function savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction)
   return spellDamageType || getDamageTypesForAction(action)[0] || null;
 }
 
-function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null }) {
+function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
   const actionName = spellName || action.name;
   const saveEffect = action?.save_effect ?? null;
@@ -927,7 +934,7 @@ function buildAbilitySaveRollContext({ monsterName, target, spellName, action, s
     // MA-0020: spend marker lands at prompt-confirm (saveProcessing); the
     // until-clause rides the condition meta as a GM-enforced durationNote.
     monsterAbilityUse: usesGate ? { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName } : undefined,
-    conditionDurationNote: extractConditionDurationNote(saveEffect),
+    conditionDurationNote,
     // MA-0030: authored success-immunity clause (granted at save success in saveProcessing).
     successImmunity: action?.success_immunity || null,
     // MA-0048: authored repeat-save clause (Frightful Presence) — arm the
@@ -1376,16 +1383,24 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       await refuseMonsterSpellAttack({ monsterName, spellName, reason: attackPlan.reason, campaignName, setPopupHtml });
       return;
     }
+    // MA-0348: damageless single-target save spells (Hold Person: own dc_type,
+    // no area_of_effect, "must succeed … or be paralyzed" in the spell text)
+    // route through the save-prompt seam too — the DC is authored on the row
+    // (MA-0237/0318/0328 data pattern) and the condition lands via the
+    // MA-0017 applyFailedSaveConditions leg. Zone/utility spells without a
+    // damage-or-condition save clause stay advisory (CLA-325).
+    const saveLegCondition = spellHasDamage(spell) ? null : spellDamagelessSaveCondition(spell);
+    const routesToSave = spellHasDamage(spell) || Boolean(saveLegCondition);
     // MA-0276: attack and advisory paths emit their own ability_use cast log
     // carrying the usesNote — only the block-save path needs the spend log.
-    const skipSpendLog = Boolean(attackPlan) || !spellHasDamage(spell);
+    const skipSpendLog = Boolean(attackPlan) || !routesToSave;
     const usesNote = await spendMonsterSpellUseIfNeeded({ gate, monsterName, spellName, campaignName, skipLog: skipSpendLog });
     if (attackPlan) {
       await executeMonsterSpellAttackCast({ monsterName, spellName, plan: attackPlan, usesNote, campaignName, handleAttack: rollHandlerRef.current });
       return;
     }
-    if (spellHasDamage(spell)) {
-      executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll });
+    if (routesToSave) {
+      executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll, saveLegCondition });
       return;
     }
     // CLA-325 advisory model (GM-enforced for monsters): a non-damage utility spell

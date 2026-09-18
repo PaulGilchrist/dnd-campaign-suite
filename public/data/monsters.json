@@ -7793,7 +7793,9 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The bandit casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):<br><strong>At Will:</strong> <em>Disguise Self</em>, <em>Mage Hand</em>, <em>Minor Illusion</em><br><strong>1/Day Each:</strong> <em>Hold Person</em> (level 4 version), <em>Mage Armor</em> (included in AC), <em>Major Image</em>"
+        "description": "The bandit casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):<br><strong>At Will:</strong> <em>Disguise Self</em>, <em>Mage Hand</em>, <em>Minor Illusion</em><br><strong>1/Day Each:</strong> <em>Hold Person</em> (level 4 version), <em>Mage Armor</em> (included in AC), <em>Major Image</em>",
+        "save_dc": 14,
+        "save_type": "Intelligence"
       }
     ],
     "environments": [

@@ -5226,7 +5226,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The bandit casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):At Will: Disguise Self, Mage Hand, Minor Illusion1/Day Each: Hold Person (level 4 version), Mage Armor (included in AC), Major Image",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0348-hold-person-save-leg-dead.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0349",

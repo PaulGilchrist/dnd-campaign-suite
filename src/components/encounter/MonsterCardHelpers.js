@@ -296,6 +296,44 @@ export function extractSpellcastingSpellUses(description) {
   return uses;
 }
 
+// MA-0348: damageless save spells (Bandit Deceiver Hold Person) live on the
+// spells.json text, not the monster row — "The target must succeed on a
+// wisdom saving throw or be paralyzed". Spells with damage keep routing via
+// spellHasDamage; zone spells stay advisory (CLA-325: no zone/movement
+// engine consumer, MA-0003 Gust of Wind precedent); dc_type must agree with
+// the clause ability so a mismatched spell never prompts. The extracted
+// condition rides saveConditions to applyFailedSaveConditions (MA-0017 seam).
+const SPELL_SAVE_CONDITION_CLAUSE = /must succeed on an? (strength|dexterity|constitution|intelligence|wisdom|charisma) saving throw or be ([a-z]+)/i;
+const SPELL_ABILITY_ABBR = { strength: 'STR', dexterity: 'DEX', constitution: 'CON', intelligence: 'INT', wisdom: 'WIS', charisma: 'CHA' };
+export function spellDamagelessSaveCondition(spell) {
+  if (!spell?.dc?.dc_type || spell?.area_of_effect) return null;
+  const text = [spell?.save_effect, ...(Array.isArray(spell?.description) ? spell.description : [spell?.description])].filter(Boolean).join(' ');
+  const match = text.match(SPELL_SAVE_CONDITION_CLAUSE);
+  if (!match) return null;
+  if (SPELL_ABILITY_ABBR[match[1].toLowerCase()] !== spell.dc.dc_type.toUpperCase()) return null;
+  const condition = match[2].toLowerCase();
+  return CONDITIONS.includes(condition) ? condition : null;
+}
+
+// MA-0348: honest duration note for damageless spell save legs — the spell's
+// own duration/concentration rides the condition meta as a GM-enforced note
+// (MA-0020 until-clause shape; no auto-expiry/Repeat-save consumer exists).
+export function spellConditionDurationNote(spell) {
+  if (!spell?.duration) return null;
+  return `for the spell's duration — ${spell.concentration ? 'Concentration, ' : ''}${spell.duration} (GM-enforced)`;
+}
+
+// MA-0348: fail-leg resolver — damage legs parse save_effect exactly as
+// before (byte-unchanged); damageless save legs grant the spell-text
+// condition with an honest duration note.
+export function spellSaveLegOutcome(spell, formula, saveLegCondition) {
+  if (formula) return { saveConditions: extractConditionsFromSaveEffect(spell?.save_effect), conditionDurationNote: null };
+  return {
+    saveConditions: saveLegCondition ? [saveLegCondition] : [],
+    conditionDurationNote: spellConditionDurationNote(spell),
+  };
+}
+
 export function spellHasDamage(spell) {
   if (!spell) return false;
   const damage = spell.damage;
