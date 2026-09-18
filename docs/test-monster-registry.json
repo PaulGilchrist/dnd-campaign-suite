@@ -1,11 +1,111 @@
 {
+  "Brown Bear": {
+    "monsterIndex": "brown-bear",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Brown Bear 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0432 (PASS multiattack header; Bite +5 1d8+3 Piercing hit exact, Claw miss-zero)",
+      "date": "2026-09-17"
+    }
+  },
+  "Bronze Dragon Wyrmling": {
+    "monsterIndex": "bronze-dragon-wyrmling",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bronze Dragon Wyrmling 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0428 (PASS multiattack header; Rend +5 1d10+3 Slashing x2 exact vs AC9) | MA-0429 (PASS Rend standalone +5: 1d10+3 x4 hits exact, HP chain verified) | MA-0430 (PASS Lightning Breath DC12 DEX line: fail-full 17/success-half 11 exact, recharge economy live) | MA-0431 (PASS-subset Repulsion Breath DC12 STR cone: Prone structured-lands fail, unaffected success, push-marker-only no token-move MA-0404 family)",
+      "date": "2026-09-17"
+    }
+  },
+  "Brazen Gorgon": {
+    "monsterIndex": "brazen-gorgon",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Brazen Gorgon 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0425 (PASS multiattack header; Gore +8 2d6+4 Piercing +3d6 Fire x2 exact vs AC9) | MA-0426 (PASS Gore standalone +8: 2d6+4 Piercing + 3d6 Fire x2 legs x3 exact)",
+      "date": "2026-09-17"
+    }
+  },
+  "Brass Dragon Wyrmling": {
+    "monsterIndex": "brass-dragon-wyrmling",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Brass Dragon Wyrmling 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0422 (PASS Rend +4 1d10+2 Slashing: boundary nat4/5 vs AC9, 3 hits exact, miss-zero) | MA-0423 (PASS Fire Breath DC11 DEX line: fail-full 13/success-half 5 exact, recharge consume+refuse+recover live) | MA-0424 (PASS-subset Sleep Breath DC11 CON cone: fail lands conditions structured zero-dmg, staged-sleep machine inert MA-0351 flat-grant premature-Unconscious) | MA-0427 (BROKEN Smelting Charge DC16 DEX: save-path drops secondary 3d8 Fire, buildSaveOptions:547 no secondary field; grapple/restrain+recharge worked; bug-mon-MA-0427)",
+      "date": "2026-09-17"
+    }
+  },
+  "Bone Naga": {
+    "monsterIndex": "bone-naga",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bone Naga 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0418 (PASS-subset multiattack header; Bite +5 Piercing+Nec x2 exact, Serpentine Gaze DC13 WIS save live Charmed structured-landed MA-0390) | MA-0419 (PASS Bite standalone +5: 2d6+3 Piercing + 2d6 Necrotic x2 legs x3 exact, 2 misses zero) | MA-0420 (PASS-subset Serpentine Gaze DC13 WIS: fail 3d6+3 Psychic exact+Charmed structured-lands, silent-success-half quirk, MA-0418 half-flag resolved=Aura of Warding) | MA-0421 (BROKEN Spellcasting: unmarked spell names -> extractSpellNamesFromSpellcasting null, zero chips; bug-mon-MA-0421)",
+      "date": "2026-09-17"
+    }
+  },
+  "Bone Devil": {
+    "monsterIndex": "bone-devil",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Bone Devil 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0415 (PASS-subset multiattack header; Claw +8 2d8+4 Slashing x2 + Infernal Sting 2d10+4 Piercing+4d8 Poison exact; stinger poison-clause inert MA-0288) | MA-0416 (PASS Claw standalone +8: 2d8+4 Slashing x3 exact vs AC9) | MA-0417 (PASS-subset Infernal Sting standalone +8: 2d10+4 Piercing + 4d8 Poison x2 legs exact x3, Poisoned-on-hit+no-heal inert MA-0288/0352)",
+      "date": "2026-09-17"
+    }
+  },
+  "Boar": {
+    "monsterIndex": "boar",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Boar 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0414 (PASS-subset Gore +3 1d6+1 Piercing: boundary nat5/6 vs AC9, crit dice-only; charge extra-dmg+Prone inert MA-0288/0361)",
+      "date": "2026-09-17"
+    }
+  },
+  "Blue Slaad": {
+    "monsterIndex": "blue-slaad",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Blue Slaad 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0412 (PASS-subset multiattack header; Mutating Claw +8 2d6+5 Slashing +1d6 Poison x3 exact, CON15 save live, mutation-clause inert MA-0288) | MA-0413 (PASS-subset Mutating Claw standalone: dual-damage exact + CON15 save live x4, curse inert MA-0288/0352)",
+      "date": "2026-09-17"
+    }
+  },
+  "Blue Dragon Wyrmling": {
+    "monsterIndex": "blue-dragon-wyrmling",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Blue Dragon Wyrmling 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0410 (PASS Rend +5: dual 1d10+3 Slashing + 1d6 Lightning both legs exact to KO, miss-zero) | MA-0411 (PASS Lightning Breath DC12 DEX: line 6d6 fail-full/success-half exact, recharge consume+refuse+recover live)",
+      "date": "2026-09-17"
+    }
+  },
+  "Blood Hawk": {
+    "monsterIndex": "blood-hawk",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Blood Hawk 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-0409 (PASS-subset Beak +4 1d4+2 Piercing: boundary nat4/5 vs AC9, 4 hits exact; Bloodied 1d8 bonus inert MA-0325 family)",
+      "date": "2026-09-17"
+    }
+  },
   "Blob of Annihilation": {
     "monsterIndex": "blob-of-annihilation",
     "placedIn": "test-campaign initiative via EB Join Encounter",
     "config": {
       "name": "Blob of Annihilation 1",
       "csIndex": 0,
-      "verifiedRow": "MA-0401 (PASS multiattack header; Pseudopod +15 3d10+8 Force x2 exact + Engulf/Glob DC23 rows render, Glob save live) | MA-0402 (PASS Pseudopod standalone +15: 3d10+8 Force x3 exact vs AC9) | MA-0403 (PASS-subset Engulf DC23 STR: fail Restrained+6d6=18 lands, tick/engulf/suffocate ungated gaps) | MA-0404 (PASS-subset Glob DC23 DEX: fails 14/23 Acid+Restrained x2, success half10 exact, pull-gap honest) | MA-0405 (BROKEN legendary header: no uses key dead economy MA-0375 twin, children ungated; bug-mon-MA-0405) | MA-0406 (BROKEN Decay legendary: chip fires ungated x2 unrefused 12+9 landed, zero spend/cooldown; bug-mon-MA-0406) | MA-0407 (BROKEN Grasping Glob legendary: zero-affordance inert alias, no forwarding seam; bug-mon-MA-0407)",
+      "verifiedRow": "MA-0401 (PASS multiattack header; Pseudopod +15 3d10+8 Force x2 exact + Engulf/Glob DC23 rows render, Glob save live) | MA-0402 (PASS Pseudopod standalone +15: 3d10+8 Force x3 exact vs AC9) | MA-0403 (PASS-subset Engulf DC23 STR: fail Restrained+6d6=18 lands, tick/engulf/suffocate ungated gaps) | MA-0404 (PASS-subset Glob DC23 DEX: fails 14/23 Acid+Restrained x2, success half10 exact, pull-gap honest) | MA-0405 (BROKEN legendary header: no uses key dead economy MA-0375 twin, children ungated; bug-mon-MA-0405) | MA-0406 (BROKEN Decay legendary: chip fires ungated x2 unrefused 12+9 landed, zero spend/cooldown; bug-mon-MA-0406) | MA-0407 (BROKEN Grasping Glob legendary: zero-affordance inert alias, no forwarding seam; bug-mon-MA-0407) | MA-0408 (BROKEN Lashing Goo legendary: zero-affordance inert forward, no delegates_to/no prose resolver; bug-mon-MA-0408)",
       "date": "2026-09-16"
     }
   },

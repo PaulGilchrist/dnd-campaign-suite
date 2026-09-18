@@ -6165,7 +6165,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The blob makes one Pseudopod attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0408-lashing-goo-zero-affordance-inert-forward.md"
     },
     {
       "id": "MA-0409",
@@ -6181,7 +6181,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Piercing damage, or 6 (1d8 + 2) Piercing damage if the target is Bloodied.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0410",
@@ -6199,7 +6199,7 @@
       "damageTypeSecondary": "Lightning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Slashing damage plus 3 (1d6) Lightning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0411",
@@ -6218,7 +6218,7 @@
       "range": "30-foot-long, 5-foot-wide Line",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 12, each creature in a 30-foot-long, 5-foot-wide Line. Failure: 21 (6d6) Lightning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0412",
@@ -6230,7 +6230,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The slaad makes three Mutating Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0413",
@@ -6251,7 +6251,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 12 (2d6 + 5) Slashing damage plus 3 (1d6) Poison damage. If the target is a Humanoid not cursed by a slaad, it is subjected to the following effect. Constitution Saving Throw: DC 15. Failure: The target is cursed. The cursed target can't regain Hit Points, and its Hit Point maximum decreases by 10 (3d6) after every 24 hours and doesn't return to normal after finishing a Long Rest. If the curse reduces the target's Hit Point maximum to 0, the curse ends, and instead of dying, the target instantly transforms into a Red Slaad or, if it can cast spells of level 3 or higher, a Green Slaad. Only a Wish spell can reverse this transformation.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0414",
@@ -6270,7 +6270,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 4 (1d6 + 1) Piercing damage. If the target is a Medium or smaller creature and the boar moved 20+ feet straight toward it immediately before the hit, the target takes an extra 3 (1d6) Piercing damage and has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0415",
@@ -6282,7 +6282,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The devil makes two Claw attacks and one Infernal Sting attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0416",
@@ -6298,7 +6298,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 13 (2d8 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0417",
@@ -6320,7 +6320,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 15 (2d10 + 4) Piercing damage plus 18 (4d8) Poison damage, and the target has the Poisoned condition until the start of the devil's next turn. While Poisoned, the target can't regain Hit Points.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0418",
@@ -6332,7 +6332,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The naga makes two Bite attacks. It can replace any attack with a use of Serpentine Gaze.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0419",
@@ -6350,7 +6350,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 10 (2d6 + 3) Piercing damage plus 7 (2d6) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0420",
@@ -6371,7 +6371,7 @@
         "charmed"
       ],
       "description": "Wisdom Saving Throw: DC 13, one creature the naga can see within 60 feet. Failure: 13 (3d6 + 3) Psychic damage, and the target has the Charmed condition until the start of the naga's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0421",
@@ -6384,7 +6384,7 @@
       "actionType": "spellcasting",
       "saveDc": 13,
       "description": "The naga casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 13): At Will: Mage Hand, Thaumaturgy 1/Day Each: Command, Detect Thoughts, Lightning Bolt",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0421-bone-naga-spellcasting-no-chips.md"
     },
     {
       "id": "MA-0422",
@@ -6400,7 +6400,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 7 (1d10 + 2) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0423",
@@ -6419,7 +6419,7 @@
       "range": "20-foot-long, 5-foot-wide Line",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 11, each creature in a 20-foot-long, 5-foot-wide Line. Failure: 14 (4d6) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0424",
@@ -6439,7 +6439,7 @@
         "unconscious"
       ],
       "description": "Constitution Saving Throw: DC 11, each creature in a 15-foot Cone. Failure: The target has the Incapacitated condition until the end of its next turn, at which point it repeats the save. Second Failure: The target has the Unconscious condition for 1 minute. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0425",
@@ -6451,7 +6451,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The gorgon makes two Gore attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0426",
@@ -6469,7 +6469,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage plus 10 (3d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0427",
@@ -6494,7 +6494,7 @@
         "restrained"
       ],
       "description": "The gorgon moves up to its Speed without provoking Opportunity Attacks and can move through the spaces of Medium or smaller creatures. Each time the gorgon enters a creature's space for the first time during this move, that target is subjected to the following effect. Dexterity Saving Throw: DC 16. Failure: 13 (2d8 + 4) Piercing damage plus 13 (3d8) Fire damage, and the target is pulled into the gorgon's space and has the Grappled condition (escape DC 14); if the gorgon already has a creature Grappled, the target has the Prone condition instead. Until the grapple ends, the target has the Restrained condition. When the gorgon moves, the Grappled target moves with it, costing no extra movement.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0427-save-path-secondary-damage-inert.md"
     },
     {
       "id": "MA-0428",
@@ -6506,7 +6506,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes two Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0429",
@@ -6522,7 +6522,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0430",
@@ -6541,7 +6541,7 @@
       "range": "40-foot-long, 5-foot-wide Line",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 12, each creature in a 40-foot-long, 5-foot-wide Line. Failure: 16 (3d10) Lightning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0431",
@@ -6560,7 +6560,7 @@
         "prone"
       ],
       "description": "Strength Saving Throw: DC 12, each creature in a 30-foot Cone. Failure: The target is pushed up to 30 feet straight away from the dragon and has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0432",
@@ -6572,7 +6572,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The bear makes one Bite attack and one Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0433",
