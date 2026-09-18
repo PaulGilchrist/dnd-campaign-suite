@@ -49,18 +49,38 @@ async function loadMonsterData(monsterIndex) {
     return monster;
 }
 
+// Negative caster modifiers fold tokens like "2d12+3+spellcasting modifier"
+// to "2d12+3+-1" — parseExpression's ([+-]\d+)+ tail rejects the "+-"
+// collision, canRollExpression goes false and the damage chip dies silently.
+// Collapse double-sign runs to their arithmetic total ("+3+-1" → "+2";
+// lone "+-3" → "-3"; "+0" folds are kept).
+function normalizeSigns(text) {
+    let out = String(text);
+    out = out.replace(/([+-]\d+)((?:\+-\d+)+)/g, (run) => {
+        const sum = (run.match(/[+-]\d+/g) || []).reduce((acc, seg) => acc + parseInt(seg, 10), 0);
+        return sum < 0 ? `-${Math.abs(sum)}` : `+${sum}`;
+    });
+    out = out.replace(/\+-(\d+)/g, '-$1');
+    return out;
+}
+
 function resolveMonsterActions(monster, { slotLevel, spellAttackMod, spellSaveDc, wisModifier, spellcastingModifier }) {
     return (monster.actions || []).map(action => {
         const resolved = { ...action };
-        resolved.damage_dice_primary = String(resolved.damage_dice_primary || '')
+        resolved.damage_dice_primary = normalizeSigns(String(resolved.damage_dice_primary || '')
             .replace(/WIS modifier/gi, String(wisModifier))
-            .replace(/spellcasting modifier/gi, String(spellcastingModifier));
+            .replace(/spellcasting modifier/gi, String(spellcastingModifier)));
+        if (resolved.damage_dice_secondary != null) {
+            resolved.damage_dice_secondary = normalizeSigns(String(resolved.damage_dice_secondary)
+                .replace(/WIS modifier/gi, String(wisModifier))
+                .replace(/spellcasting modifier/gi, String(spellcastingModifier)));
+        }
         let desc = String(resolved.description || '');
         desc = desc.replace(/WIS modifier/gi, String(wisModifier));
-        desc = desc.replace(/spell attack modifier/gi, `+${spellAttackMod}`);
+        desc = desc.replace(/\+?spell attack modifier/gi, () => (spellAttackMod < 0 ? `-${Math.abs(spellAttackMod)}` : `+${spellAttackMod}`));
         desc = desc.replace(/spell level/gi, String(slotLevel));
         desc = desc.replace(/spellcasting modifier/gi, String(spellcastingModifier));
-        resolved.description = desc;
+        resolved.description = normalizeSigns(desc);
         if (resolved.attack_bonus === null || resolved.attack_bonus === undefined) {
             resolved.attack_bonus = spellAttackMod;
         }

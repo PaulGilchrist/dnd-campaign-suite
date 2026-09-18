@@ -143,12 +143,73 @@ describe('MA-0284 caster-context consumer: spellcast-summon path resolves both l
         expect(resolved.description).not.toMatch(/spellcasting modifier/);
     });
 
-    it('negative caster spellcasting modifier folds to "2d12+3+-1" (documented consumer quirk: double-sign string fails canRollExpression — sanitizer lives in the summon-path consumer, separate subsystem)', () => {
+    it('negative caster spellcasting modifier folds sign-normalized to "2d12+2" — chip stays rollable', () => {
         const [resolved] = resolveMonsterActions(huge, {
             slotLevel: 5, spellAttackMod: 9, spellSaveDc: 17, wisModifier: -4, spellcastingModifier: -1,
         });
         expect(resolved.attack_bonus).toBe(9);
-        expect(resolved.damage_dice_primary).toBe('2d12+3+-1');
-        expect(canRollExpression(resolved.damage_dice_primary)).toBe(false);
+        expect(resolved.damage_dice_primary).toBe('2d12+2');
+        expect(canRollExpression(resolved.damage_dice_primary)).toBe(true);
+        expect(resolved.description).toContain('+9');
+        expect(resolved.description).toContain('Hit: 2d12+2 Force');
+    });
+
+    it('negative spell attack modifier folds "+-3" to "-3" in description', () => {
+        const [resolved] = resolveMonsterActions(huge, {
+            slotLevel: 5, spellAttackMod: -3, spellSaveDc: 13, wisModifier: 0, spellcastingModifier: 0,
+        });
+        expect(resolved.attack_bonus).toBe(-3);
+        expect(resolved.description).toContain('Attack: -3,');
+        expect(resolved.description).not.toContain('+-3');
+        expect(resolved.damage_dice_primary).toBe('2d12+3+0');
+        expect(canRollExpression(resolved.damage_dice_primary)).toBe(true);
+    });
+
+    it('negative modifier with no authored tail folds "1d8+-1" to "1d8-1"', () => {
+        const [resolved] = resolveMonsterActions({ actions: [{ name: 'Strike', damage_dice_primary: '1d8+WIS modifier', description: 'Hit: 1d8+WIS modifier Piercing damage.' }] }, {
+            slotLevel: 2, spellAttackMod: 7, spellSaveDc: 15, wisModifier: -1, spellcastingModifier: 0,
+        });
+        expect(resolved.damage_dice_primary).toBe('1d8-1');
+        expect(canRollExpression(resolved.damage_dice_primary)).toBe(true);
+        expect(resolved.description).toContain('Hit: 1d8-1 Piercing');
+    });
+
+    it('sign-fold matrix: negative/zero/positive tails all rollable with correct arithmetic', () => {
+        const fold = (spellcastingModifier) => resolveMonsterActions(huge, {
+            slotLevel: 5, spellAttackMod: 8, spellSaveDc: 16, wisModifier: spellcastingModifier, spellcastingModifier,
+        })[0];
+        const pos = fold(5);
+        expect(pos.damage_dice_primary).toBe('2d12+3+5');
+        expect(canRollExpression(pos.damage_dice_primary)).toBe(true);
+        const zero = fold(0);
+        expect(zero.damage_dice_primary).toBe('2d12+3+0');
+        expect(canRollExpression(zero.damage_dice_primary)).toBe(true);
+        const neg = fold(-7);
+        expect(neg.damage_dice_primary).toBe('2d12-4');
+        expect(canRollExpression(neg.damage_dice_primary)).toBe(true);
+    });
+});
+
+describe('summon path sign normalization: Bestial Spirit (Air) caster legs', () => {
+    const air = monstersData.find(m => m.index === 'bestial-spirit-air');
+
+    it('positive WIS folds to numeric rollable damage and numeric attack_bonus', () => {
+        const [resolved] = resolveMonsterActions(air, {
+            slotLevel: 2, spellAttackMod: 9, spellSaveDc: 17, wisModifier: 3, spellcastingModifier: 3,
+        });
+        expect(resolved.attack_bonus).toBe(9);
+        expect(resolved.damage_dice_primary).toBe('1d8+2+3');
+        expect(canRollExpression(resolved.damage_dice_primary)).toBe(true);
+        expect(resolved.description).toContain('+9');
+        expect(resolved.description).toContain('1d8+2+3');
+    });
+
+    it('negative WIS collapses "1d8+2+-1" to "1d8+1" — chip stays rollable', () => {
+        const [resolved] = resolveMonsterActions(air, {
+            slotLevel: 2, spellAttackMod: 5, spellSaveDc: 13, wisModifier: -1, spellcastingModifier: -1,
+        });
+        expect(resolved.damage_dice_primary).toBe('1d8+1');
+        expect(canRollExpression(resolved.damage_dice_primary)).toBe(true);
+        expect(resolved.description).toContain('1d8+1 Piercing');
     });
 });

@@ -4240,7 +4240,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d12+3+spellcasting modifier Force damage.",
-      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0284-animated-object-huge-slam-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0285",
@@ -4255,7 +4255,7 @@
       "damageTypePrimary": "force",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 2d6+3+spellcasting modifier Force damage.",
-      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0285-animated-object-large-slam-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0286",
@@ -5783,7 +5783,7 @@
         "poisoned"
       ],
       "description": "The zombie randomly shoots one of the following magical rays at a target it can see within 120 feet of itself (roll 1d4; reroll if the zombie has already used that ray during this turn):Paralyzing Ray. Constitution Saving Throw: DC 14. Failure: The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.Fear Ray. Wisdom Saving Throw: DC 14. Failure: 13 (3d8) Psychic damage, and the target has the Frightened condition until the end of its next turn.Enervation Ray. Constitution Saving Throw: DC 14. Failure: 10 (3d6) Necrotic damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only.Disintegration Ray. Dexterity Saving Throw: DC 14. Failure: 27 (5d10) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0383-eye-rays-unparseable-shell.md"
+      "verified": "needs manual decision — see .opencode/plans/bug-mon-MA-0383-eye-rays-unparseable-shell.md"
     },
     {
       "id": "MA-0384",
@@ -5861,7 +5861,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+2+WIS modifier Piercing damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0388-beasts-strike-dynamic-formula-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0389",
@@ -5876,7 +5876,7 @@
       "damageTypePrimary": "bludgeoning/piercing/slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+2+WIS modifier Bludgeoning/Piercing/Slashing damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0389-beasts-strike-dynamic-formula-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0390",
@@ -5909,7 +5909,7 @@
       "damageTypePrimary": "bludgeoning/piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +spell attack modifier, reach 5 ft. Hit: 1d6+2+WIS modifier Bludgeoning/Piercing damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0391-beasts-strike-dynamic-formula-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0392",
