@@ -624,3 +624,89 @@ describe('MA-0288 Ankheg Bite grapple-on-hit hit-clause', () => {
         }));
     });
 });
+
+const ANKYLOSAURUS = monsters.find(m => m.index === 'ankylosaurus');
+const TAIL_ACTION = ANKYLOSAURUS.actions.find(a => a.name === 'Tail');
+
+describe('MA-0291 Ankylosaurus Tail prone-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Ankylosaurus 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Ankylosaurus 1', computedStats: { armorClass: 15 } },
+            { name: 'ElderPaladin', computedStats: { armorClass: 19 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 9, newHp: 215, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'ElderPaladin', type: 'player', size: 'Medium', ac: 19, currentHp: 224, maxHp: 224 }],
+        });
+    });
+
+    it('MA-0291 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Tail row', () => {
+        expect(TAIL_ACTION.attack_bonus).toBe(6);
+        expect(TAIL_ACTION.reach).toBe('10 ft.');
+        expect(TAIL_ACTION.damage_dice_primary).toBe('1d10 + 4');
+        expect(TAIL_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(TAIL_ACTION.hit_conditions).toEqual(['prone']);
+        expect(TAIL_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(TAIL_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Tail',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Tail hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Tail', formula: '1d10 + 4', total: 9, rolls: [5], modifier: 4, context: {
+            targetName: 'ElderPaladin',
+            damageType: 'Bludgeoning',
+            attackerName: 'Ankylosaurus 1',
+            hitClause: buildHitConditionClause(TAIL_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Ankylosaurus 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'ElderPaladin',
+            condition: 'Prone',
+            reason: 'Tail (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Tail attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Tail', formula: '1d10 + 4', total: 9, rolls: [5], modifier: 4, context: {
+            targetName: 'ElderPaladin',
+            damageType: 'Bludgeoning',
+            attackerName: 'Ankylosaurus 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'ElderPaladin', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'ElderPaladin', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

@@ -5890,7 +5890,8 @@
         "attack_bonus": 6,
         "reach": "10 ft.",
         "damage_dice_primary": "1d10 + 4",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["prone"]
       }
     ],
     "environments": [
