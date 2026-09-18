@@ -7085,7 +7085,9 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The azer casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <em>Elementalism</em>, <em>Mage Hand</em><br><strong>1/Day:</strong> <em>Fireball</em>"
+        "description": "The azer casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <em>Elementalism</em>, <em>Mage Hand</em><br><strong>1/Day:</strong> <em>Fireball</em>",
+        "save_dc": 15,
+        "save_type": "Wisdom"
       }
     ],
     "reactions": [

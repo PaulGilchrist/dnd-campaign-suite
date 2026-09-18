@@ -4914,7 +4914,7 @@
       "category": "actions",
       "actionType": "spellcasting",
       "description": "The azer casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15):At Will: Elementalism, Mage Hand1/Day: Fireball",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0328-prose-dc-save-leg.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0329",
