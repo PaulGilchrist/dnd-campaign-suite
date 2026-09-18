@@ -5687,7 +5687,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The beholder uses Eye Rays.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0377-glare-legendary-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0378",
