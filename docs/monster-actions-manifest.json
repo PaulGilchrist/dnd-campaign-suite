@@ -5699,7 +5699,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "A 50-foot square area of ground within 120 feet of the beholder becomes slimy; that area is difficult terrain until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0378-beholder-lair-action-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0379",

@@ -3612,3 +3612,81 @@ describe('MA-0265 ancient-white-dragon wall of ice advisory data lock', () => {
     expect(getEffectDefinition('lair_wall_of_ice')).toBeFalsy();
   });
 });
+
+// MA-0378: Beholder lair_actions[0] was a bare STRING (MV-24 fingerprint —
+// raw string short-circuits to the static span branch in MonsterCardBody,
+// isLairRowClickable never reached → "Unnamed lair actions 1", zero chip,
+// forced clicks silent, zero log). Now a named save-less ZONE row mirroring
+// the VERIFIED MA-0043/MA-0085 zone shape with the MA-0097 square→radius
+// advisory precedent (Copper Liquid Mud): chip → area picker in zoneOnly mode
+// (arm lair_slimy_ground te + tracking + zone_armed log, NO save roll).
+// Difficult-terrain movement cost and the initiative-20 expiry have no
+// consumers in this engine (§7) — GM-enforced advisory, zero fabricated
+// enforcement; expiry residual: armed te persists until GM clears.
+describe('MA-0378 beholder slimy ground data lock', () => {
+  const beholder = monstersData.find(m => m.index === 'beholder');
+  const slime = beholder.lair_actions[0];
+
+  it('[0] is now a structured clickable ZONE row named Slimy Ground', () => {
+    expect(typeof slime).toBe('object');
+    expect(slime.name).toBe('Slimy Ground');
+    expect(isLairRowClickable(slime)).toBe(true);
+    expect(lairRowAffordance(slime)).toBe('zone');
+  });
+
+  it('description byte-identical to the original bare string row', () => {
+    expect(slime.description).toBe('A 50-foot square area of ground within 120 feet of the beholder becomes slimy; that area is difficult terrain until initiative count 20 on the next round.');
+  });
+
+  it('canonical slimy ground is save-less zone: 25-ft radius, no_save, slimy ground noun', () => {
+    expect(slime.save_dc).toBeUndefined();
+    expect(slime.save_type).toBeUndefined();
+    expect(slime.damage_dice_primary).toBeUndefined();
+    expect(slime.zone.radius_ft).toBe(25);
+    expect(slime.zone.no_save).toBe(true);
+    expect(slime.zone.noun).toBe('slimy ground');
+    expect(slime.zone.effect_key).toBe('lair_slimy_ground');
+  });
+
+  it('zone advisory locks square→radius approximation + GM-enforced terrain/expiry residuals', () => {
+    expect(slime.zone.advisory).toMatch(/50-foot square/i);
+    expect(slime.zone.advisory).toMatch(/25-ft radius/i);
+    expect(slime.zone.advisory).toMatch(/square→radius approximation/i);
+    expect(slime.zone.advisory).toMatch(/difficult terrain/i);
+    expect(slime.zone.advisory).toMatch(/no movement-cost consumer/i);
+    expect(slime.zone.advisory).toMatch(/initiative count 20 on the next round — GM-enforced/i);
+    expect(slime.duration).toBe('until initiative count 20 next round (advisory)');
+  });
+
+  it('lair_slimy_ground te is registered in the target-effect registry (Lair group)', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_slimy_ground');
+    expect(def).toBeTruthy();
+    expect(def.label).toBe('Slimy Ground (Lair)');
+    expect(def.group).toBe('Lair');
+    expect(def.description).toMatch(/difficult terrain/i);
+    expect(def.description).toMatch(/GM-enforced/i);
+  });
+
+  it('zone row routes through handleZone, zero save/attack/damage handlers', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: slime,
+      monsterName: 'Beholder 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(slime);
+  });
+
+  it('siblings untouched: [1] grasping walls and [2] wandering eye ray rows keep their inert dicts', () => {
+    expect(beholder.lair_actions[1].save_type).toBe('Dexterity');
+    expect(beholder.lair_actions[1].zone).toBeUndefined();
+    expect(beholder.lair_actions[2].save_type).toBe('Dexterity');
+  });
+});

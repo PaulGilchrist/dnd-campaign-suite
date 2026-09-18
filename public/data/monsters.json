@@ -8680,7 +8680,18 @@
       }
     ],
     "lair_actions": [
-      "A 50-foot square area of ground within 120 feet of the beholder becomes slimy; that area is difficult terrain until initiative count 20 on the next round.",
+      {
+        "name": "Slimy Ground",
+        "description": "A 50-foot square area of ground within 120 feet of the beholder becomes slimy; that area is difficult terrain until initiative count 20 on the next round.",
+        "zone": {
+          "radius_ft": 25,
+          "no_save": true,
+          "noun": "slimy ground",
+          "effect_key": "lair_slimy_ground",
+          "advisory": "Canonical shape is a 50-foot square — modeled as a 25-ft radius picker (square→radius approximation; GM positions the area). Difficult terrain (1 ft costs 2 ft) has no movement-cost consumer in this engine — GM-enforced. No saving throw. Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam)."
+        },
+        "duration": "until initiative count 20 next round (advisory)"
+      },
       {
         "description": "Walls within 120 feet of the beholder sprout grasping appendages until initiative count 20 on the round after next. Each creature of the beholder's choice that starts its turn within 10 feet of such a wall must succeed on a DC 15 Dexterity saving throw or be grappled. Escaping requires a successful DC 15 Strength (Athletics) or Dexterity (Acrobatics) check.",
         "save_type": "Dexterity",
