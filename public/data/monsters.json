@@ -6518,7 +6518,15 @@
     "reactions": [
       {
         "name": "Protective Magic (3/Day)",
-        "description": "The archmage casts <em>Counterspell</em> or <em>Shield</em> in response to the spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The archmage casts <em>Counterspell</em> or <em>Shield</em> in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "3/Day",
+        "uses": 3,
+        "maxUses": 3,
+        "automation": {
+          "type": "reaction",
+          "trigger": "enemy_spell_cast",
+          "effect": "counterspell"
+        }
       }
     ],
     "environments": [

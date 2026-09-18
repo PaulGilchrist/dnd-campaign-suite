@@ -4695,7 +4695,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The archmage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0314-archmage-protective-magic-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0315",
