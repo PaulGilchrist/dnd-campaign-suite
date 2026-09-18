@@ -136,6 +136,32 @@ export function parseSlowedClauses(saveEffect) {
   return clauses.length > 0 ? { effects: clauses } : null;
 }
 
+// MA-0303: authored both-outcomes tail clause (Arch-hag Crackling Wave —
+// "Failure or Success: The target is cursed until the end of the hag's next
+// turn. The target can't take Reactions until the curse ends."). Every AoE
+// picker seam is fail-only (applySaveFailConditions early-returns on
+// saveSuccess), so the tail clauses never landed on a successful save. This
+// parse arms a success-leg grant of ONLY what the tail after
+// "Failure or Success:" itself names: canonical conditions (MA-0063
+// extraction scoped to the tail) + the registered no_reactions te (MA-0087
+// key), drained by ONE rounds:2 clock (MA-0073 shape). Every other
+// "Failure or Success:" row — caster recharge restrictions ("can't take this
+// action again", Kraken/Lich/Solar/Cataclysm/dragon legendaries), 0-HP
+// thresholds (Colossus Divine Beam, Juvenile Shadow Shadow Breath), Animal
+// Lord variant lists, Steam Mephit resistance notes, Succubus HP-max
+// drain — names no canonical condition and no Reactions clause in its tail →
+// null (byte-inert outside this row family). MA-0087 parse shape.
+export function parseBothOutcomesClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/failure or success:\s*([\s\S]*)/i);
+  if (!m) return null;
+  const tail = m[1];
+  const conditions = extractConditionsFromSaveEffect(tail);
+  const effects = /can[’']?t take Reactions/i.test(tail) ? ['no_reactions'] : [];
+  if (conditions.length === 0 && effects.length === 0) return null;
+  return { conditions, effects };
+}
+
 // MA-0115: authored failed-save AC-penalty clause (Adult Green Dragon
 // Noxious Miasma — "the target takes a −2 penalty to AC until the end of
 // its next turn"). Not a condition, so extractConditionsFromSaveEffect can

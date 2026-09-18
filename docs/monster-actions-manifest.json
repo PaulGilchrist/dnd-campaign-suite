@@ -4550,7 +4550,7 @@
       "damageDicePrimary": "5d12",
       "damageTypePrimary": "Lightning",
       "description": "Dexterity Saving Throw: DC 22, each creature in a 60-foot Cone. Failure: 32 (5d12) Lightning damage. Success: Half damage. Failure or Success: The target is cursed until the end of the hag's next turn. The target can't take Reactions until the curse ends.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0303-crackling-wave-cursed-on-success-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0304",

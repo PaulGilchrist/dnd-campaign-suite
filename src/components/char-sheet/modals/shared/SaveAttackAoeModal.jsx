@@ -85,7 +85,7 @@ function npcSaveBonus(target, saveType) {
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
-    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses } = ctx;
+    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, bothOutcomesClause } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -156,7 +156,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, conditionDurationNote: ctx.conditionDurationNote });
+    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, bothOutcomesClause, conditionDurationNote: ctx.conditionDurationNote });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -511,7 +511,7 @@ function applyStagedParalysisSave({ stagedParalysis, success, saveDc, saveType, 
 // Failed-save dispatch: MA-0068 staged sleep / MA-0248 staged paralysis rows
 // route through their staging seams; everything else keeps the MA-0063
 // one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote }) {
+function resolveSaveFailGrant({ sleepStaging, stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
@@ -519,6 +519,12 @@ function resolveSaveFailGrant({ sleepStaging, stagedParalysis, success, saveDc, 
     if (stagedParalysis) {
         applyStagedParalysisSave({ stagedParalysis, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
+    }
+    // MA-0303: "Failure or Success:" both-outcomes SUCCESS leg (byte-inert
+    // when null) — every fail-only seam above/below skips successful saves,
+    // so the clause (Arch-hag: cursed + can't take Reactions) lands here.
+    if (success === true && bothOutcomesClause) {
+        grantBothOutcomesClause({ bothOutcomesClause, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
     }
     // Authored failed-save te clause legs (MA-0087/0102/0115/0138/0146) —
     // split from the dispatcher to keep both functions under the lint
@@ -567,6 +573,68 @@ function applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, play
     if (!success && speedZeroClause) {
         grantSpeedZeroClause({ campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
     }
+}
+
+// MA-0303: both-outcomes clause success-leg grant (Arch-hag Crackling Wave —
+// "Failure or Success: The target is cursed until the end of the hag's next
+// turn. The target can't take Reactions until the curse ends."). Registered
+// te (MA-0087 no_reactions key) + cursed activeCondition/meta (MA-0063
+// shape) + ONE rounds:2 clock removing te and condition at the end of the
+// caster's next turn (MA-0073/MA-0146 expiry recipe; 'condition' clear type
+// is registered in clearExpirationEffects) + named Cursed condition log with
+// source meta. The fail legs stay byte-identical (mutually exclusive by the
+// success flag). Byte-inert when null.
+// Both-outcomes condition stamp (MA-0063 applySaveFailConditions shape,
+// success-leg copy): merge activeConditions + {dc, ability, source} meta.
+function stampBothOutcomesConditions({ conditions, campaignName, targetName, casterName, saveType, saveDc }) {
+    if (conditions.length === 0) return;
+    const ability = String(saveType || '').toLowerCase().slice(0, 3) || 'con';
+    const existing = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const merged = Array.isArray(existing) ? [...existing] : [];
+    for (const cond of conditions) {
+        if (!merged.some(c => String(c).toLowerCase() === cond)) merged.push(cond);
+    }
+    setRuntimeValue(targetName, 'activeConditions', merged, campaignName);
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    const nextMeta = { ...existingMeta };
+    for (const cond of conditions) {
+        nextMeta[cond] = { ...(existingMeta[cond] || {}), dc: saveDc, ability, source: casterName };
+    }
+    setRuntimeValue(targetName, 'activeConditionMeta', nextMeta, campaignName);
+}
+
+function grantBothOutcomesClause({ bothOutcomesClause, campaignName, targetName, casterName, actionName, saveType, saveDc }) {
+    const teEffects = bothOutcomesClause.effects || [];
+    const conditions = bothOutcomesClause.conditions || [];
+    for (const effectKey of teEffects) {
+        registerTargetEffect(campaignName, targetName, effectKey, casterName, {
+            duration: 'until_end_of_next_turn',
+            actionName,
+        });
+    }
+    stampBothOutcomesConditions({ conditions, campaignName, targetName, casterName, saveType, saveDc });
+    addExpiration({
+        attackerName: casterName,
+        targetName,
+        campaignName,
+        rounds: 2,
+        effects: [
+            ...teEffects.map(effectKey => ({ type: 'remove_target_effect', effectKey, source: casterName, target: targetName })),
+            ...conditions.map(condition => ({ type: 'condition', condition })),
+        ],
+    });
+    const label = conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ') || 'No Reactions';
+    const reactionsNote = teEffects.includes('no_reactions') ? " and can't take Reactions" : '';
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: label,
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} succeeded the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — ${label}${reactionsNote} until the end of ${casterName}'s next turn (Failure or Success clause).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging both-outcomes grant:', e); });
 }
 
 // MA-0138: push-only failed-save grant (Cold Gale registry push te, value 30,
@@ -955,6 +1023,14 @@ function SaveAttackAoeModal({
     // activeCondition (until_end_of_next_turn, rounds:2 clock) on each failed
     // save; live consumer conditionEffects speedZero → sheet Speed 0.
     speedZeroClause,
+    // MA-0303 optional both-outcomes clause (byte-inert undefined default):
+    // Arch-hag Crackling Wave — "Failure or Success: The target is cursed
+    // until the end of the hag's next turn. The target can't take Reactions
+    // until the curse ends." Grants cursed condition + registered
+    // no_reactions te on SUCCESSFUL saves with one rounds:2 clock
+    // (MA-0073/MA-0087 shape); failed saves keep the fail legs
+    // byte-identical.
+    bothOutcomesClause,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -1016,7 +1092,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -1047,7 +1123,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote]);
+    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -1175,7 +1251,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote });
+        resolveSaveFailGrant({ sleepStaging, stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -1204,7 +1280,7 @@ function SaveAttackAoeModal({
         };
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, conditionDurationNote]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
