@@ -4790,7 +4790,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 7 (1d6 + 4) Piercing damage plus 17 (5d6) Poison damage, and the target has the Poisoned condition until the start of the assassin's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0320-assassin-shortsword-poisoned-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0321",

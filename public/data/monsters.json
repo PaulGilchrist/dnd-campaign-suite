@@ -6706,7 +6706,8 @@
         "damage_dice_primary": "1d6 + 4",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "5d6",
-        "damage_type_secondary": "Poison"
+        "damage_type_secondary": "Poison",
+        "hit_conditions": ["poisoned"]
       },
       {
         "name": "Light Crossbow",

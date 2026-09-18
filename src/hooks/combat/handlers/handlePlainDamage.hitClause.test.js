@@ -710,3 +710,92 @@ describe('MA-0291 Ankylosaurus Tail prone-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const ASSASSIN = monsters.find(m => m.index === 'assassin');
+const ASSASSIN_SHORTSWORD_ACTION = ASSASSIN.actions[1];
+
+describe('MA-0320 Assassin Shortsword poisoned-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Assassin 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Assassin 1', computedStats: { armorClass: 16 } },
+            { name: 'HexWarlock', computedStats: { armorClass: 9 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 28, newHp: 32, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'HexWarlock', type: 'player', size: 'Medium', ac: 9, currentHp: 60, maxHp: 73 }],
+        });
+    });
+
+    it('MA-0320 data-lock: authors hit_conditions:["poisoned"] with no escape_dc on the Shortsword row', () => {
+        expect(ASSASSIN_SHORTSWORD_ACTION.name).toBe('Shortsword');
+        expect(ASSASSIN_SHORTSWORD_ACTION.attack_bonus).toBe(7);
+        expect(ASSASSIN_SHORTSWORD_ACTION.reach).toBe('5 ft.');
+        expect(ASSASSIN_SHORTSWORD_ACTION.damage_dice_primary).toBe('1d6 + 4');
+        expect(ASSASSIN_SHORTSWORD_ACTION.damage_type_primary).toBe('Piercing');
+        expect(ASSASSIN_SHORTSWORD_ACTION.damage_dice_secondary).toBe('5d6');
+        expect(ASSASSIN_SHORTSWORD_ACTION.damage_type_secondary).toBe('Poison');
+        expect(ASSASSIN_SHORTSWORD_ACTION.hit_conditions).toEqual(['poisoned']);
+        expect(ASSASSIN_SHORTSWORD_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a poisoned-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(ASSASSIN_SHORTSWORD_ACTION)).toEqual({
+            conditions: ['poisoned'],
+            escapeDc: null,
+            attackName: 'Shortsword',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Poisoned + attacker-source meta + condition log on a resolved Shortsword hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Shortsword', formula: '1d6 + 4', total: 10, rolls: [6], modifier: 4, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Assassin 1',
+            hitClause: buildHitConditionClause(ASSASSIN_SHORTSWORD_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['poisoned']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ poisoned: { source: 'Assassin 1' } });
+        expect(metaCall[2].poisoned.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'HexWarlock',
+            condition: 'Poisoned',
+            reason: 'Shortsword (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Shortsword attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Shortsword', formula: '1d6 + 4', total: 10, rolls: [6], modifier: 4, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Assassin 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'HexWarlock', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'HexWarlock', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
