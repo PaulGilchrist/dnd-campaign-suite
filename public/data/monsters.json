@@ -5819,7 +5819,9 @@
         "damage_dice_primary": "2d6 + 3",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "1d6",
-        "damage_type_secondary": "Acid"
+        "damage_type_secondary": "Acid",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 13
       },
       {
         "name": "Acid Spray (Recharge 6)",

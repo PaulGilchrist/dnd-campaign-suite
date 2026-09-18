@@ -4312,7 +4312,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the ankheg), reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage plus 3 (1d6) Acid damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0288-ankheg-bite-grapple-clauses-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0289",
