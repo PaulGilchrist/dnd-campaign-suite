@@ -6165,7 +6165,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The blob makes one Pseudopod attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0408-lashing-goo-zero-affordance-inert-forward.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0409",
