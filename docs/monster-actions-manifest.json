@@ -5508,7 +5508,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage, and the target has the Poisoned condition until the start of the devil's next turn. Until this poison ends, the target can't regain Hit Points.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0366-beard-poison-clauses-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0367",

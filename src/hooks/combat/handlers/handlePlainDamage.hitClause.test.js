@@ -1180,3 +1180,147 @@ describe('MA-0354 Barbed Devil Claws grapple-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const BEARDED_DEVIL = monsters.find(m => m.index === 'bearded-devil');
+const BEARDED_DEVIL_BEARD_ACTION = BEARDED_DEVIL.actions[1];
+
+describe('MA-0366 Bearded Devil Beard poisoned + no_healing hit-clause', () => {
+    const deps = {
+        characterName: 'Bearded Devil 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Bearded Devil 1', computedStats: { armorClass: 13 } },
+            { name: 'HexWarlock', computedStats: { armorClass: 9 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 63, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'HexWarlock', type: 'player', size: 'Medium', ac: 9, currentHp: 73, maxHp: 73 }],
+        });
+    });
+
+    it('MA-0366 data-lock: authors hit_conditions:["poisoned"] + hit_target_effect:"no_healing" on the Beard row', () => {
+        expect(BEARDED_DEVIL_BEARD_ACTION.name).toBe('Beard');
+        expect(BEARDED_DEVIL_BEARD_ACTION.attack_bonus).toBe(5);
+        expect(BEARDED_DEVIL_BEARD_ACTION.reach).toBe('5 ft.');
+        expect(BEARDED_DEVIL_BEARD_ACTION.damage_dice_primary).toBe('1d8 + 3');
+        expect(BEARDED_DEVIL_BEARD_ACTION.damage_type_primary).toBe('Piercing');
+        expect(BEARDED_DEVIL_BEARD_ACTION.hit_conditions).toEqual(['poisoned']);
+        expect(BEARDED_DEVIL_BEARD_ACTION.hit_target_effect).toBe('no_healing');
+        expect(BEARDED_DEVIL_BEARD_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds the combined poisoned + no_healing clause from the Beard row', () => {
+        expect(buildHitConditionClause(BEARDED_DEVIL_BEARD_ACTION)).toEqual({
+            conditions: ['poisoned'],
+            escapeDc: null,
+            attackName: 'Beard',
+            targetEffect: 'no_healing',
+        });
+    });
+
+    it('applies Poisoned + attacker-source meta on a resolved Beard hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beard', formula: '1d8 + 3', total: 10, rolls: [7], modifier: 3, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Bearded Devil 1',
+            hitClause: buildHitConditionClause(BEARDED_DEVIL_BEARD_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['poisoned']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ poisoned: { source: 'Bearded Devil 1' } });
+        expect(metaCall[2].poisoned.dc).toBeUndefined();
+    });
+
+    it('registers the no_healing te on the target, sourced from the devil, on a resolved Beard hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beard', formula: '1d8 + 3', total: 10, rolls: [7], modifier: 3, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Bearded Devil 1',
+            hitClause: buildHitConditionClause(BEARDED_DEVIL_BEARD_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'HexWarlock',
+            'no_healing',
+            'Bearded Devil 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('expires the te anchored on the devil (until its next turn start, MA-0016 clock)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beard', formula: '1d8 + 3', total: 10, rolls: [7], modifier: 3, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Bearded Devil 1',
+            hitClause: buildHitConditionClause(BEARDED_DEVIL_BEARD_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Bearded Devil 1',
+            targetName: 'HexWarlock',
+            effects: [{ type: 'remove_target_effect', effectKey: 'no_healing', source: 'Bearded Devil 1', target: 'HexWarlock' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Bearded Devil 1',
+        });
+    });
+
+    it('logs condition-applied entries for both the Poisoned grant and the heal-block te', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beard', formula: '1d8 + 3', total: 10, rolls: [7], modifier: 3, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Bearded Devil 1',
+            hitClause: buildHitConditionClause(BEARDED_DEVIL_BEARD_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'HexWarlock',
+            condition: 'Poisoned',
+            reason: 'Beard (escape DC —)',
+        }));
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'HexWarlock',
+            reason: "Beard — until the start of Bearded Devil 1's next turn",
+        }));
+    });
+
+    it('grants nothing when the Beard attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beard', formula: '1d8 + 3', total: 10, rolls: [7], modifier: 3, context: {
+            targetName: 'HexWarlock',
+            damageType: 'Piercing',
+            attackerName: 'Bearded Devil 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'HexWarlock', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'HexWarlock', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

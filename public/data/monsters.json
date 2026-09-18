@@ -8455,7 +8455,9 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "1d8 + 3",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["poisoned"],
+        "hit_target_effect": "no_healing"
       },
       {
         "name": "Infernal Glaive",
