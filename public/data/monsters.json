@@ -7916,6 +7916,11 @@
         "save_type": "Constitution",
         "damage_dice_primary": "3d6",
         "damage_type_primary": "Psychic",
+        "dc_success": "none",
+        "hp_threshold_kill": 25,
+        "usage": "1/Day",
+        "uses": 1,
+        "maxUses": 1,
         "save_effect": "Failure: If the target has 25 Hit Points or fewer, it drops to 0 Hit Points. Otherwise, the target takes 10 (3d6) Psychic damage. Success: The target takes no damage."
       }
     ],

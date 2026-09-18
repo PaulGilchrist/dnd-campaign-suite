@@ -421,6 +421,11 @@ function HitOutcomeDetails({ props, state }) {
                 <i className="fa-solid fa-shield-halved"></i> {interceptedFeature}: damage intercepted, {targetName} survives!
               </div>
             )}
+            {props.thresholdKill && (
+              <div className="dice-roll-damage-applied">
+                <i className="fa-solid fa-skull"></i> <strong>{targetName}</strong> {props.thresholdNote}
+              </div>
+            )}
         </>
     );
 }

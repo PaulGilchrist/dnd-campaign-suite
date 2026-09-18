@@ -545,6 +545,16 @@ export function buildTargetPrerequisiteRefusalLog({ monsterName, actionName, tar
   };
 }
 
+// MA-0352: authored HP-threshold kill clause (Banshee Deathly Wail —
+// "Failure: If the target has 25 Hit Points or fewer, it drops to 0 Hit
+// Points"). Numeric threshold arm threaded onto the save context for the
+// failed-save threshold-kill seam in saveProcessing. Byte-inert null for
+// every row without the authored numeric key.
+export function parseHpThresholdKillClause(action) {
+  const value = Number(action?.hp_threshold_kill);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 // MA-0030: authored success-immunity (e.g. Abominable Yeti Chilling Gaze —
 // "Success: immune to this yeti's Chilling Gaze for 1 hour"). A target that
 // already carries the te sourced from this monster refuses the row click:

@@ -385,7 +385,9 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
     }
     await applyAuthoredClauseGrants({ context, saveSuccess, campaignName, attackerName, applyTarget: targetName || characterName });
     if (context?.autoDamageFormula && saveDc != null) {
-        await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
+        if (!await maybeApplyThresholdKillLeg({ context, characterName, campaignName, attackerName, targetName, saveSuccess, effectiveD20ForSave, saveTotal, saveType, saveDc, setPopupHtml, characters: context._characters })) {
+            await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
+        }
     } else {
         applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget: targetName || characterName, attackerName, campaignName });
     }
@@ -858,6 +860,80 @@ function buildSaveDamagePopupData({ context, damageFormula, damageResult, finalD
         damageApplied: true,
         damageReduced: applyResult?.damageReduced,
     };
+}
+
+// MA-0352: authored HP-threshold kill clause (Banshee Deathly Wail — "If the
+// target has 25 Hit Points or fewer, it drops to 0 Hit Points"). Failed-save
+// seam ONLY (success takes ZERO — dc_success:"none"): victim currentHp ≤
+// threshold → lethal clamp to 0 via the canonical applyDamageToTarget choke
+// point (death-clamp family), clause logged, normal 3d6 damage skipped;
+// above threshold the row falls through to its normal damage roll unchanged.
+// Byte-inert for every row without the authored numeric key.
+// HP truth (§2): PC = runtime currentHitPoints, monster = cs currentHp ONLY.
+function resolveThresholdVictimHp(csCreature, applyTarget, campaignName) {
+    if (csCreature.type === 'player') {
+        return Number(getRuntimeValue(applyTarget, 'currentHitPoints', campaignName) ?? 0);
+    }
+    return Number(csCreature.currentHp ?? 0);
+}
+
+async function applyHpThresholdKill({ context, campaignName, attackerName, applyTarget, damageType, characters }) {
+    const threshold = Number(context?.hpThresholdKill);
+    if (!Number.isFinite(threshold) || threshold <= 0) return false;
+    const combatSummary = await loadCombatSummary(campaignName);
+    const csCreature = combatSummary?.creatures?.find(c => c.name === applyTarget);
+    if (!csCreature) return false;
+    const currentHp = resolveThresholdVictimHp(csCreature, applyTarget, campaignName);
+    if (!(currentHp > 0) || currentHp > threshold) return false;
+    const actionName = context?.actionName || context?.autoDamageName || context?.name || 'the action';
+    await applyDamageToTarget(combatSummary, applyTarget, currentHp, [damageType], { campaignName, characters: characters, ignoreResistance: true, attackerName: attackerName, suppressHpLog: false, ...{ isSpellDamage: true } });
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'hp_threshold_kill',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save at ${currentHp} Hit Points (${currentHp} ≤ ${threshold}) — ${applyTarget} drops to 0 Hit Points (HP threshold kill; no damage rolled).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:hp-threshold-kill]', e); });
+    return true;
+}
+
+function buildThresholdKillPopupData({ context, damageType, applyTarget, effectiveD20ForSave, saveTotal, saveDc, saveType, newHp }) {
+    return {
+        type: 'save-damage',
+        name: context?.actionName || context.name,
+        formula: '',
+        rolls: [],
+        total: 0,
+        bonus: 0,
+        modifier: 0,
+        damageType: damageType,
+        targetName: applyTarget,
+        targetCurrentHp: newHp,
+        targetMaxHp: undefined,
+        saveDc,
+        saveType,
+        dcSuccess: context?.dcSuccess,
+        saveResult: { roll: effectiveD20ForSave, total: saveTotal, bonus: context?._saveResultData?.saveBonus ?? 0, success: false },
+        finalDamage: 0,
+        damageApplied: false,
+        thresholdKill: true,
+        thresholdNote: `Drops to 0 Hit Points — HP threshold kill (${context?.hpThresholdKill} HP or fewer).`,
+    };
+}
+
+// MA-0352 damage-skip wrapper: the threshold leg is consulted BEFORE the
+// normal damage roll; a completed kill short-circuits the leg and owns its
+// own popup. All other rows fall through to applySaveDamage unchanged.
+async function maybeApplyThresholdKillLeg({ context, characterName, campaignName, attackerName, targetName, saveSuccess, effectiveD20ForSave, saveTotal, saveType, saveDc, setPopupHtml, characters }) {
+    if (saveSuccess !== false || context?.hpThresholdKill == null) return false;
+    const damageType = context.autoDamageDamageType || 'Psychic';
+    const applyTarget = targetName || characterName;
+    const killed = await applyHpThresholdKill({ context, campaignName, attackerName, applyTarget, damageType, characters });
+    if (!killed) return false;
+    setPopupHtml(buildThresholdKillPopupData({ context, damageType, applyTarget, effectiveD20ForSave, saveTotal, saveDc, saveType, newHp: 0 }));
+    return true;
 }
 
 async function applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters }) {
