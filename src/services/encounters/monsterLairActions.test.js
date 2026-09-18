@@ -3684,8 +3684,8 @@ describe('MA-0378 beholder slimy ground data lock', () => {
     expect(handleZone).toHaveBeenCalledWith(slime);
   });
 
-  it('siblings untouched: [2] wandering eye ray row keeps its inert dict', () => {
-    expect(beholder.lair_actions[2].save_type).toBe('Dexterity');
+  it('siblings untouched: [2] description byte-unchanged (structured as of MA-0380)', () => {
+    expect(beholder.lair_actions[2].description).toBe('An eye opens on a solid surface within 60 feet of the beholder. One random eye ray of the beholder shoots from that eye at a target of the beholder\'s choice that it can see. The eye then closes and disappears.');
   });
 });
 
@@ -3757,11 +3757,107 @@ describe('MA-0379 beholder grasping walls data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(walls, null, ['grappled']);
   });
 
-  it('scope guard: [0] MA-0378 zone row and [2] nameless eye-ray dict untouched', () => {
+  it('scope guard: [0] MA-0378 zone row untouched; [2] structured as of MA-0380', () => {
     expect(beholder.lair_actions[0].name).toBe('Slimy Ground');
     expect(lairRowAffordance(beholder.lair_actions[0])).toBe('zone');
-    expect(beholder.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(beholder.lair_actions[2])).toBe(false);
+    expect(beholder.lair_actions[2].name).toBe('Surfaced Eye');
+    expect(isLairRowClickable(beholder.lair_actions[2])).toBe(true);
     expect(beholder.lair_actions[2].save_dc).toBeUndefined();
+  });
+});
+
+// MA-0380: Beholder lair_actions[2] was a NAMELESS dict (MA-0222 name-gate
+// fingerprint — isLairRowClickable !row.name short-circuit, monsterLairActions
+// .js:26) rendered static <strong>.</strong>+prose, zero affordance, forced
+// clicks zero delta. Its save_type "Dexterity" + grapple save_effect prose
+// were MISFILED from sibling [1] (Grasping Walls) — the row's own mechanic
+// (one random eye ray, d10) is unparseable (MA-0374 codified skip: no d10 ray
+// picker subsystem). Honest floor fix: named ADVISORY row — "Surfaced Eye" +
+// advisory "eye_rays" (matches the MA-0375 Glare legendary key) + honest
+// advisory_message (GM rolls d10, rerolls repeats, picks ray, adjudicates
+// save/damage). Advisory affordance (monsterLairActions.js:27/41, proven live
+// this session family) → .mc-dice-link-lair chip → resolveLairRow advisory arm
+// → popup + ability_use record, ZERO fabricated enforcement (no save rolled, no
+// damage, no grapple — MA-0300/CLA-325 precedent). Mismatched save_type/
+// save_effect STRIPPED as an authoring error: the advisory arm never reads
+// them (monsterLairActions.js:41 routes advisory BEFORE the save leg :91;
+// MonsterCardBody labels save_type only for affordance==='save'). Description
+// byte-unchanged. No initiative-20 scheduler remains a family residual (§7).
+describe('MA-0380 beholder surfaced eye advisory data lock', () => {
+  const beholder = monstersData.find(m => m.index === 'beholder');
+  const eye = beholder.lair_actions[2];
+
+  it('[2] is now a named clickable ADVISORY row (was nameless inert dict)', () => {
+    expect(typeof eye).toBe('object');
+    expect(eye.name).toBe('Surfaced Eye');
+    expect(isLairRowClickable(eye)).toBe(true);
+    expect(lairRowAffordance(eye)).toBe('advisory');
+  });
+
+  it('advisory key matches the MA-0375 Glare legendary eye_rays key', () => {
+    expect(eye.advisory).toBe('eye_rays');
+    expect(beholder.legendary_actions[2].advisory).toBe('eye_rays');
+  });
+
+  it('misfiled grapple save metadata STRIPPED (belongs to sibling [1] Grasping Walls)', () => {
+    expect(eye.save_dc).toBeUndefined();
+    expect(eye.save_type).toBeUndefined();
+    expect(eye.save_effect).toBeUndefined();
+    expect(eye.damage_dice_primary).toBeUndefined();
+  });
+
+  it('description byte-identical to the original row', () => {
+    expect(eye.description).toBe('An eye opens on a solid surface within 60 feet of the beholder. One random eye ray of the beholder shoots from that eye at a target of the beholder\'s choice that it can see. The eye then closes and disappears.');
+  });
+
+  it('advisory_message honestly carries d10 picker + GM adjudication + MA-0374 residual', () => {
+    expect(eye.advisory_message).toMatch(/ONE random eye ray/i);
+    expect(eye.advisory_message).toMatch(/GM rolls d10/i);
+    expect(eye.advisory_message).toMatch(/reroll/i);
+    expect(eye.advisory_message).toMatch(/adjudicates its save\/damage/i);
+    expect(eye.advisory_message).toMatch(/MA-0374 pending subsystem/i);
+    expect(eye.advisory_message).toMatch(/No saving throw or grapple is enforced/i);
+  });
+
+  it('advisory click logs ability_use record, zero save/attack/damage/zone handlers', async () => {
+    const logs = [];
+    const setPopupHtml = vi.fn();
+    const res = await resolveLairRow({
+      action: eye,
+      monsterName: 'Beholder 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].abilityName).toBe('Surfaced Eye');
+    expect(logs[0].description).toMatch(/lair action Surfaced Eye/i);
+    expect(logs[0].description).toMatch(/GM rolls d10/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(setPopupHtml).toHaveBeenCalled();
+    expect(String(setPopupHtml.mock.calls[0][0])).toMatch(/Lair Action — Surfaced Eye/);
+    expect(String(setPopupHtml.mock.calls[0][0])).toMatch(/GM rolls d10/i);
+    expect(String(setPopupHtml.mock.calls[0][0])).not.toMatch(/no components required, concentration/i);
+  });
+
+  it('rows without advisory_message keep the MA-0024 illusion copy byte-identical', () => {
+    const legacy = { ...PHANTASMAL };
+    expect(buildLairAdvisoryLog({ monsterName: 'Aboleth 1', action: legacy }).description)
+      .toContain('casts phantasmal force (save DC 16 Intelligence) — advisory record');
+    const phantasmalLog = buildLairAdvisoryLog({ monsterName: 'Aboleth 1', action: PHANTASMAL });
+    expect(phantasmalLog.description).toMatch(/illusion-engine consumer/);
+  });
+
+  it('scope guard: [0] zone and [1] save rows untouched by this fix', () => {
+    expect(beholder.lair_actions[0].zone.effect_key).toBe('lair_slimy_ground');
+    expect(beholder.lair_actions[1].name).toBe('Grasping Walls');
+    expect(beholder.lair_actions[1].save_dc).toBe(15);
+    expect(lairRowAffordance(beholder.lair_actions[1])).toBe('save');
   });
 });

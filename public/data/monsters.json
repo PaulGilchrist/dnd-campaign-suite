@@ -8701,9 +8701,10 @@
         "save_effect": "The target is grappled by the wall. The DC 15 Strength (Athletics) or Dexterity (Acrobatics) escape check and the initiative count 20 round-after-next expiry are GM-enforced (no grapple state-machine or initiative-20 lair seam consumer)."
       },
       {
-        "description": "An eye opens on a solid surface within 60 feet of the beholder. One random eye ray of the beholder shoots from that eye at a target of the beholder's choice that it can see. The eye then closes and disappears.",
-        "save_type": "Dexterity",
-        "save_effect": "DC 15 Dexterity saving throw or be grappled. Escaping requires a successful DC 15 Strength (Athletics) or Dexterity (Acrobatics) check."
+        "name": "Surfaced Eye",
+        "advisory": "eye_rays",
+        "advisory_message": "opens a surfaced eye and shoots ONE random eye ray — advisory record: GM rolls d10 (rerolling any ray already used this turn), picks the ray, and adjudicates its save/damage (Eye Rays d10 block unparseable, MA-0374 pending subsystem; no ray picker consumer). The surfaced eye then closes and disappears. No saving throw or grapple is enforced by this row.",
+        "description": "An eye opens on a solid surface within 60 feet of the beholder. One random eye ray of the beholder shoots from that eye at a target of the beholder's choice that it can see. The eye then closes and disappears."
       }
     ],
     "environments": [

@@ -63,11 +63,18 @@ export function buildLairRefusalLog({ monsterName, actionName }) {
 export function buildLairAdvisoryLog({ monsterName, action }) {
   const spell = String(action.advisory).replace(/_/g, ' ');
   const dcNote = action.save_dc != null ? ` (save DC ${action.save_dc} ${action.save_type || 'ability'})` : '';
+  // MA-0380: rows may carry their own honest advisory copy
+  // (`advisory_message`) — mirrors the legendary advisory seam
+  // (monsterLegendaryUses.js MA-0270/0271). Rows without the field keep the
+  // MA-0024 illusion-engine copy byte-identical.
+  const record = action.advisory_message
+    ? `${monsterName} lair action ${action.name}: ${monsterName} ${action.advisory_message} ${LAIR_ADVISORY_NOTE}`
+    : `${monsterName} lair action ${action.name}: casts ${spell}${dcNote} — advisory record: concentration/exclusivity and 24-hour immunity on a successful save or when the effect ends are GM-enforced (no illusion-engine consumer). ${LAIR_ADVISORY_NOTE}`;
   return {
     type: 'ability_use',
     characterName: monsterName,
     abilityName: action.name,
-    description: `${monsterName} lair action ${action.name}: casts ${spell}${dcNote} — advisory record: concentration/exclusivity and 24-hour immunity on a successful save or when the effect ends are GM-enforced (no illusion-engine consumer). ${LAIR_ADVISORY_NOTE}`,
+    description: record,
     timestamp: Date.now(),
   };
 }
@@ -75,6 +82,9 @@ export function buildLairAdvisoryLog({ monsterName, action }) {
 export function buildLairAdvisoryPopup({ monsterName, action }) {
   const spell = String(action.advisory).replace(/_/g, ' ');
   const dcNote = action.save_dc != null ? ` (save DC ${action.save_dc} ${action.save_type || 'ability'})` : '';
+  if (action.advisory_message) {
+    return `<div class="mc-prerequisite-refusal"><h3>Lair Action — ${action.name}</h3><p>${monsterName} ${action.advisory_message} ${LAIR_ADVISORY_NOTE}</p></div>`;
+  }
   return `<div class="mc-prerequisite-refusal"><h3>Lair Action — ${action.name}</h3><p>${monsterName} casts ${spell}${dcNote}, no components required, concentration. ${LAIR_ADVISORY_NOTE}</p></div>`;
 }
 

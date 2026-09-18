@@ -5733,7 +5733,7 @@
         "grappled"
       ],
       "description": "An eye opens on a solid surface within 60 feet of the beholder. One random eye ray of the beholder shoots from that eye at a target of the beholder's choice that it can see. The eye then closes and disappears.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0380-surfaced-eye-lair-action-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0381",
