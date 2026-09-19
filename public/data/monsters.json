@@ -11580,7 +11580,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The bullywug casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 13, +5 to hit with spell attacks):\n<strong>At Will:</strong> Dancing Lights, Druidcraft, Ray of Sickness\n<strong>1/Day Each:</strong> Speak with Plants, <strong>Vitriolic Sphere</strong>",
+        "description": "The bullywug casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 13, +5 to hit with spell attacks):\n<strong>At Will:</strong> <em>Dancing Lights</em>, <em>Druidcraft</em>, <em>Ray of Sickness</em>\n<strong>1/Day Each:</strong> <em>Speak with Plants</em>, <strong>Vitriolic Sphere</strong>",
         "spell_save_dc": 13,
         "spell_attack_bonus": 5,
         "spellcasting_ability": "Wisdom"

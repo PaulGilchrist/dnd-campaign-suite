@@ -6892,7 +6892,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The bullywug makes two Bog Staff attacks. It can replace any attack with a use of Spellcasting to cast Ray of Sickness.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0452-ray-of-sickness-replace-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0453",
