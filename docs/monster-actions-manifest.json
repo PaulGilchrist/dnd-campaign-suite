@@ -8260,7 +8260,7 @@
       "saveDc": 17,
       "saveType": "Charisma",
       "description": "The cultist casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 17): At Will: Mage Armor (included in AC), Thaumaturgy 1/Day Each: Jallarsi's Storm of Radiance (level 7 version), Mass Suggestion",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0536-hierophant-spellcasting-unmarked-spell-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0537",

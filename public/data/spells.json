@@ -6023,6 +6023,20 @@
         ]
     },
     {
+        "index": "jallarsis-storm-of-radiance",
+        "name": "Jallarsi's Storm of Radiance",
+        "description": [
+            "Homebrew spell attested only on the Cultist Hierophant statblock: the cultist calls down a storm of radiance, casting it as the 7th-level version using Charisma as the spellcasting ability (spell save DC 17). RAW area, damage and duration numerics are unattested; the effect is adjudicated by the GM."
+        ],
+        "range": "Self",
+        "casting_time": "1 action",
+        "level": 7,
+        "dc": {
+            "dc_type": "CHA",
+            "dc_success": "none"
+        }
+    },
+    {
         "index": "knock",
         "name": "Knock",
         "description": [

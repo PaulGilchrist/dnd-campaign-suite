@@ -15425,7 +15425,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The cultist casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 17):\n<strong>At Will:</strong> Mage Armor (included in AC), Thaumaturgy\n<strong>1/Day Each:</strong> Jallarsi's Storm of Radiance (level 7 version), Mass Suggestion",
+        "description": "The cultist casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 17):\n<strong>At Will:</strong> <em>Mage Armor</em> (included in AC), <em>Thaumaturgy</em>\n<strong>1/Day Each:</strong> <em>Jallarsi's Storm of Radiance</em> (level 7 version), <em>Mass Suggestion</em>",
         "spell_save_dc": 17,
         "spellcasting_ability": "Charisma",
         "save_dc": 17,
