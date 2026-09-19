@@ -69,11 +69,13 @@ function resolveMonsterActions(monster, { slotLevel, spellAttackMod, spellSaveDc
         const resolved = { ...action };
         resolved.damage_dice_primary = normalizeSigns(String(resolved.damage_dice_primary || '')
             .replace(/WIS modifier/gi, String(wisModifier))
-            .replace(/spellcasting modifier/gi, String(spellcastingModifier)));
+            .replace(/spellcasting modifier/gi, String(spellcastingModifier))
+            .replace(/spell level/gi, String(slotLevel)));
         if (resolved.damage_dice_secondary != null) {
             resolved.damage_dice_secondary = normalizeSigns(String(resolved.damage_dice_secondary)
                 .replace(/WIS modifier/gi, String(wisModifier))
-                .replace(/spellcasting modifier/gi, String(spellcastingModifier)));
+                .replace(/spellcasting modifier/gi, String(spellcastingModifier))
+                .replace(/spell level/gi, String(slotLevel)));
         }
         let desc = String(resolved.description || '');
         desc = desc.replace(/WIS modifier/gi, String(wisModifier));

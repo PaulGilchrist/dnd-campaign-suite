@@ -3,7 +3,7 @@
 // @cleaned-by-ai
 // @improved-by-ai
 // @cleaned-by-ai
-import { handle, confirmSummonSpirit } from './summonSpiritHandler.js';
+import { handle, confirmSummonSpirit, resolveMonsterActions } from './summonSpiritHandler.js';
 import summonFeySpells from '../../../../../public/data/2024/spells.json' with { type: 'json' };
 import summonFeyMonsters from '../../../../../public/data/monsters.json' with { type: 'json' };
 
@@ -554,6 +554,83 @@ describe('summonSpiritHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toBe('No summon variant selected.');
+        });
+    });
+
+    describe('MA-0465 "spell level" damage-token fold', () => {
+        const avenger = summonFeyMonsters.find(m => m.index === 'celestial-spirit-avenger');
+        const lv17Mods = { slotLevel: 5, spellAttackMod: 9, spellSaveDc: 17, wisModifier: 3, spellcastingModifier: 3 };
+
+        it('folds "spell level" in damage_dice_primary to the slot level (disk row)', () => {
+            expect(avenger.actions[0].damage_dice_primary).toBe('2d6+2+spell level');
+            const [action] = resolveMonsterActions(avenger, lv17Mods);
+            expect(action.damage_dice_primary).toBe('2d6+2+5');
+            expect(action.description).toContain('2d6+2+5');
+        });
+
+        it('folds "spell level" at an upcast slot level', () => {
+            const [action] = resolveMonsterActions(avenger, { ...lv17Mods, slotLevel: 6 });
+            expect(action.damage_dice_primary).toBe('2d6+2+6');
+        });
+
+        it('folds "spell level" in damage_dice_secondary too', () => {
+            const monster = { actions: [{
+                name: 'Twin Strike',
+                description: 'Hit: 2d6+2+spell level Radiant plus 1d6+spell level Fire damage.',
+                attack_bonus: 9,
+                damage_dice_primary: '2d6+spell level',
+                damage_dice_secondary: '1d6+spell level',
+            }] };
+            const [action] = resolveMonsterActions(monster, lv17Mods);
+            expect(action.damage_dice_primary).toBe('2d6+5');
+            expect(action.damage_dice_secondary).toBe('1d6+5');
+        });
+
+        it('leaves token-free damage rows byte-unchanged', () => {
+            const monster = { actions: [{
+                name: 'Slam',
+                description: 'Melee Weapon Attack: reach 5 ft. Hit: 1d8+2 bludgeoning damage.',
+                attack_bonus: 5,
+                damage_dice_primary: '1d8+2',
+                damage_dice_secondary: null,
+            }] };
+            const [action] = resolveMonsterActions(monster, lv17Mods);
+            expect(action.damage_dice_primary).toBe('1d8+2');
+            expect(action.description).toBe('Melee Weapon Attack: reach 5 ft. Hit: 1d8+2 bludgeoning damage.');
+        });
+
+        it('still folds null attack_bonus to the caster spell attack modifier (+9 lv17 WIS+3 PB+6)', () => {
+            const [action] = resolveMonsterActions(avenger, lv17Mods);
+            expect(avenger.actions[0].attack_bonus).toBeNull();
+            expect(action.attack_bonus).toBe(9);
+        });
+
+        it('end-to-end: summoned Avenger combatant carries rolled damage formula', async () => {
+            loadMonsters.mockResolvedValue(summonFeyMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+            const lv17Cleric = {
+                ...mockPlayerStats,
+                level: 17,
+                proficiency: 6,
+                spellAbilities: { toHit: 9, saveDc: 17, modifier: 3 },
+            };
+            const action = {
+                name: 'Summon Celestial',
+                automation: {
+                    type: 'summon_spirit',
+                    typeLabel: 'Celestial Spirit',
+                    baseLevel: 5,
+                    hpPerLevelAbove: 10,
+                    variants: [{ name: 'Celestial Spirit (Avenger)', monsterIndex: 'celestial-spirit-avenger' }],
+                },
+                spell: { level: 5, duration: 'Concentration, up to 1 hour', concentration: true },
+            };
+
+            await confirmSummonSpirit(action, lv17Cleric, mockCampaignName, 'Celestial Spirit (Avenger)');
+
+            const added = combatSummary.creatures.find(c => c.name === 'Celestial Spirit (Avenger)');
+            expect(added.actions[0].damage_dice_primary).toBe('2d6+2+5');
+            expect(added.actions[0].attack_bonus).toBe(9);
         });
     });
 });

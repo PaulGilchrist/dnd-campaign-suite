@@ -7101,7 +7101,7 @@
       "reach": null,
       "range": "600 ft.",
       "description": "Ranged Spell Attack: +spell attack modifier, range 600 ft. Hit: 2d6+2+spell level Radiant damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0465-spell-level-token-damage-not-folded.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0466",
