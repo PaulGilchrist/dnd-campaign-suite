@@ -8566,7 +8566,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 9 (1d10 + 4) Slashing damage plus 11 (2d10) Necrotic damage, and the target can't regain Hit Points until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0556-death-cultist-scythe-no-heal-rider-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0557",

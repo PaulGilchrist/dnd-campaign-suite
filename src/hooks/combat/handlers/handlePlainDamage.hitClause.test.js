@@ -1488,6 +1488,134 @@ describe('MA-0366 Bearded Devil Beard poisoned + no_healing hit-clause', () => {
     });
 });
 
+const DEATH_CULTIST = monsters.find(m => m.index === 'death-cultist');
+const DEATH_CULTIST_SCYTHE_ACTION = DEATH_CULTIST.actions.find(a => a.name === 'Dread Scythe');
+
+describe('MA-0556 Death Cultist Dread Scythe no_healing hit-clause', () => {
+    const deps = {
+        characterName: 'Death Cultist 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Death Cultist 1', computedStats: { armorClass: 17 } },
+            { name: 'Knight 1', computedStats: { armorClass: 18 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: 979, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Knight 1', type: 'monster', size: 'Medium', ac: 18, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0556 data-lock: authors hit_target_effect:"no_healing" on the Dread Scythe row', () => {
+        expect(DEATH_CULTIST_SCYTHE_ACTION.attack_bonus).toBe(7);
+        expect(DEATH_CULTIST_SCYTHE_ACTION.reach).toBe('10 ft.');
+        expect(DEATH_CULTIST_SCYTHE_ACTION.damage_dice_primary).toBe('1d10 + 4');
+        expect(DEATH_CULTIST_SCYTHE_ACTION.damage_type_primary).toBe('Slashing');
+        expect(DEATH_CULTIST_SCYTHE_ACTION.damage_dice_secondary).toBe('2d10');
+        expect(DEATH_CULTIST_SCYTHE_ACTION.damage_type_secondary).toBe('Necrotic');
+        expect(DEATH_CULTIST_SCYTHE_ACTION.hit_target_effect).toBe('no_healing');
+        expect(DEATH_CULTIST_SCYTHE_ACTION.hit_conditions).toBeUndefined();
+        expect(DEATH_CULTIST_SCYTHE_ACTION.save_dc).toBeUndefined();
+    });
+
+    it('builds the target-effect-only clause from the Dread Scythe row', () => {
+        expect(buildHitConditionClause(DEATH_CULTIST_SCYTHE_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Dread Scythe',
+            targetEffect: 'no_healing',
+        });
+    });
+
+    it('registers the no_healing te on the target, sourced from the cultist, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Dread Scythe', formula: '1d10 + 4', total: 9, rolls: [5], modifier: 4, context: {
+            targetName: 'Knight 1',
+            damageType: 'Slashing',
+            attackerName: 'Death Cultist 1',
+            hitClause: buildHitConditionClause(DEATH_CULTIST_SCYTHE_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledTimes(1);
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Knight 1',
+            'no_healing',
+            'Death Cultist 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('expires the te with ONE clock anchored on the cultist (MA-0016 single-clock rule)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Dread Scythe', formula: '1d10 + 4', total: 9, rolls: [5], modifier: 4, context: {
+            targetName: 'Knight 1',
+            damageType: 'Slashing',
+            attackerName: 'Death Cultist 1',
+            hitClause: buildHitConditionClause(DEATH_CULTIST_SCYTHE_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Death Cultist 1',
+            targetName: 'Knight 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'no_healing', source: 'Death Cultist 1', target: 'Knight 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Death Cultist 1',
+        });
+    });
+
+    it('logs the heal-block condition-applied entry with the cultist-anchored reason', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Dread Scythe', formula: '1d10 + 4', total: 9, rolls: [5], modifier: 4, context: {
+            targetName: 'Knight 1',
+            damageType: 'Slashing',
+            attackerName: 'Death Cultist 1',
+            hitClause: buildHitConditionClause(DEATH_CULTIST_SCYTHE_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Knight 1',
+            reason: "Dread Scythe — until the start of Death Cultist 1's next turn",
+        }));
+    });
+
+    it('heal-block consumer context: the granted te shape is the shape isHealingBlocked reads', async () => {
+        getRuntimeValue.mockImplementation((char, key) => {
+            if (char === 'campaign' && key === 'targetEffects') {
+                return [{ target: 'Knight 1', effect: 'no_healing', source: 'Death Cultist 1', duration: 'until_start_of_next_turn' }];
+            }
+            return null;
+        });
+        const { getHealingBlockEffect, isHealingBlocked } = await import('../../../services/rules/combat/healingBlock.js');
+        expect(getHealingBlockEffect('Knight 1', 'test-campaign')).toMatchObject({ effect: 'no_healing', source: 'Death Cultist 1' });
+        expect(isHealingBlocked('Knight 1', 'test-campaign', 5)).toMatchObject({ effect: 'no_healing' });
+    });
+
+    it('grants nothing when the Dread Scythe attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Dread Scythe', formula: '1d10 + 4', total: 9, rolls: [5], modifier: 4, context: {
+            targetName: 'Knight 1',
+            damageType: 'Slashing',
+            attackerName: 'Death Cultist 1',
+        } });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+
 const BROWN_BEAR = monsters.find(m => m.index === 'brown-bear');
 const BROWN_BEAR_CLAW_ACTION = BROWN_BEAR.actions[2];
 

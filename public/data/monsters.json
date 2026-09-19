@@ -16061,6 +16061,7 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "save_effect": "The target can't regain Hit Points until the end of its next turn.",
+        "hit_target_effect": "no_healing",
         "damage_dice_primary": "1d10 + 4",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "2d10",
