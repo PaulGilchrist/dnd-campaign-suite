@@ -12602,7 +12602,8 @@
         "range": "90 ft.",
         "save_effect": "The target has the Blinded condition until the start of the centaur's next turn.",
         "damage_dice_primary": "3d6 + 4",
-        "damage_type_primary": "Radiant"
+        "damage_type_primary": "Radiant",
+        "hit_conditions": ["blinded"]
       },
       {
         "name": "Spellcasting",

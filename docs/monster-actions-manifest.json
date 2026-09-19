@@ -7284,7 +7284,7 @@
         "blinded"
       ],
       "description": "Ranged Attack Roll: +7, range 90 ft. Hit: 14 (3d6 + 4) Radiant damage, and the target has the Blinded condition until the start of the centaur's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0477-sun-ray-blinded-hit-clause-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0478",

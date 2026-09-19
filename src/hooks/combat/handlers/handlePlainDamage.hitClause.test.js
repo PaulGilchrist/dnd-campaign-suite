@@ -1573,3 +1573,90 @@ describe('MA-0434 Brown Bear Claw prone-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const CENTAUR_WARDEN = monsters.find(m => m.index === 'centaur-warden');
+const SUN_RAY_ACTION = CENTAUR_WARDEN.actions[2];
+
+describe('MA-0477 Centaur Warden Sun Ray blinded-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Centaur Warden 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Centaur Warden 1', computedStats: { armorClass: 16 } },
+            { name: 'AasimarTest', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 14, newHp: 129, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'AasimarTest', type: 'player', size: 'Medium', ac: 12, currentHp: 143, maxHp: 143 }],
+        });
+    });
+
+    it('MA-0477 data-lock: authors hit_conditions:["blinded"] with no escape_dc on the Sun Ray row', () => {
+        expect(SUN_RAY_ACTION.name).toBe('Sun Ray');
+        expect(SUN_RAY_ACTION.attack_bonus).toBe(7);
+        expect(SUN_RAY_ACTION.range).toBe('90 ft.');
+        expect(SUN_RAY_ACTION.damage_dice_primary).toBe('3d6 + 4');
+        expect(SUN_RAY_ACTION.damage_type_primary).toBe('Radiant');
+        expect(SUN_RAY_ACTION.hit_conditions).toEqual(['blinded']);
+        expect(SUN_RAY_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a blinded-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(SUN_RAY_ACTION)).toEqual({
+            conditions: ['blinded'],
+            escapeDc: null,
+            attackName: 'Sun Ray',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Blinded + attacker-source meta + condition log on a resolved Sun Ray hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Sun Ray', formula: '3d6 + 4', total: 14, rolls: [4, 3, 3], modifier: 4, context: {
+            targetName: 'AasimarTest',
+            damageType: 'Radiant',
+            attackerName: 'Centaur Warden 1',
+            hitClause: buildHitConditionClause(SUN_RAY_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['blinded']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ blinded: { source: 'Centaur Warden 1' } });
+        expect(metaCall[2].blinded.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'AasimarTest',
+            condition: 'Blinded',
+            reason: 'Sun Ray (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Sun Ray attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Sun Ray', formula: '3d6 + 4', total: 14, rolls: [4, 3, 3], modifier: 4, context: {
+            targetName: 'AasimarTest',
+            damageType: 'Radiant',
+            attackerName: 'Centaur Warden 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AasimarTest', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AasimarTest', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
