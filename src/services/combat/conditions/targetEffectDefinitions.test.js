@@ -95,6 +95,7 @@ describe('targetEffectDefinitions', () => {
         expect(effectKeys).toContain('distracting_strike_advantage');
         expect(effectKeys).toContain('reckless_attack');
         expect(effectKeys).toContain('taunting_step');
+        expect(effectKeys).toContain('disadvantage_attack_rolls');
       });
 
       it('Attack effects have appropriate icon classes', () => {

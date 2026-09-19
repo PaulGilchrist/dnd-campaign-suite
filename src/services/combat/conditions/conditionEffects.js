@@ -343,6 +343,13 @@ const EARLY_TARGET_EFFECT_HANDLERS = {
     bumpCount(effects, 'attackDisadvantageCount');
     effects.abilityCheckDisadvantage = true;
   },
+  // MA-0542: Cyclops Oracle Flash of Light hit-clause — Disadvantage on
+  // attack rolls only (no ability-check leg). Same verified pesky_swarm /
+  // disadvantage_next_attack channel: attackDisadvantageCount feeds
+  // combineAttackModes for the holder's own attack rolls.
+  disadvantage_attack_rolls: (effects) => {
+    bumpCount(effects, 'attackDisadvantageCount');
+  },
   reckless_attack: (effects) => {
     bumpCount(effects, 'targetAdvantageCount');
     effects.targetAdvantageReasons.push('Reckless Attack');

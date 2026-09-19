@@ -93,8 +93,9 @@ import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
-import { registerTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
+import { registerTargetEffect, getEffectDefinition } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
+import { computeConditionEffects, combineAttackModes } from '../../../services/combat/conditions/conditionEffects.js';
 import monsters from '../../../../public/data/monsters.json';
 
 const TENTACLE_LASH_ACTION = {
@@ -2277,5 +2278,125 @@ describe('MA-0527 Crocodile Bite grapple/restrain hit-clause rider', () => {
             condition: 'Grappled, Restrained',
             reason: 'Bite (escape DC 12)',
         }));
+    });
+});
+
+const CYCLOPS_ORACLE = monsters.find(m => m.index === 'cyclops-oracle');
+const FLASH_OF_LIGHT_ACTION = CYCLOPS_ORACLE.actions.find(a => a.name === 'Flash of Light');
+
+describe('MA-0542 Cyclops Oracle Flash of Light disadvantage_attack_rolls hit-clause', () => {
+    const deps = {
+        characterName: 'Cyclops Oracle 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Cyclops Oracle 1', computedStats: { armorClass: 16 } },
+            { name: 'Knight 1', computedStats: { armorClass: 18 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getEffectDefinition.mockImplementation((key) => ({
+            effect: key,
+            label: 'Attack Disadvantage',
+            description: 'Disadvantage on attack rolls until the end of the source\'s next turn.',
+            group: 'Attack',
+        }));
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 11, newHp: 189, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Knight 1', type: 'player', size: 'Medium', ac: 18, currentHp: 200, maxHp: 200 }],
+        });
+    });
+
+    it('MA-0542 data-lock: Flash of Light row authors hit_target_effect:"disadvantage_attack_rolls" (+10 ranged 120 ft., 2d10 + 6 Radiant)', () => {
+        expect(FLASH_OF_LIGHT_ACTION.attack_bonus).toBe(10);
+        expect(FLASH_OF_LIGHT_ACTION.range).toBe('120 ft.');
+        expect(FLASH_OF_LIGHT_ACTION.damage_dice_primary).toBe('2d10 + 6');
+        expect(FLASH_OF_LIGHT_ACTION.damage_type_primary).toBe('Radiant');
+        expect(FLASH_OF_LIGHT_ACTION.hit_target_effect).toBe('disadvantage_attack_rolls');
+        expect(FLASH_OF_LIGHT_ACTION.hit_conditions).toBeUndefined();
+        expect(FLASH_OF_LIGHT_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a targetEffect-only clause from the Flash of Light row', () => {
+        expect(buildHitConditionClause(FLASH_OF_LIGHT_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Flash of Light',
+            targetEffect: 'disadvantage_attack_rolls',
+        });
+    });
+
+    it('registers the disadvantage_attack_rolls te on the victim, sourced from the cyclops, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Flash of Light', formula: '2d10 + 6', total: 11, rolls: [5], modifier: 6, context: {
+            targetName: 'Knight 1',
+            damageType: 'Radiant',
+            attackerName: 'Cyclops Oracle 1',
+            hitClause: buildHitConditionClause(FLASH_OF_LIGHT_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Knight 1',
+            'disadvantage_attack_rolls',
+            'Cyclops Oracle 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('MA-0542 clock-lock: grants ONE addExpiration clock anchored on the cyclops (MA-0030/§38 anchor leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Flash of Light', formula: '2d10 + 6', total: 11, rolls: [5], modifier: 6, context: {
+            targetName: 'Knight 1',
+            damageType: 'Radiant',
+            attackerName: 'Cyclops Oracle 1',
+            hitClause: buildHitConditionClause(FLASH_OF_LIGHT_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Cyclops Oracle 1',
+            targetName: 'Knight 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'disadvantage_attack_rolls', source: 'Cyclops Oracle 1', target: 'Knight 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Cyclops Oracle 1',
+        });
+    });
+
+    it('logs condition-applied with the registry label and writes no raw activeConditions', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Flash of Light', formula: '2d10 + 6', total: 11, rolls: [5], modifier: 6, context: {
+            targetName: 'Knight 1',
+            damageType: 'Radiant',
+            attackerName: 'Cyclops Oracle 1',
+            hitClause: buildHitConditionClause(FLASH_OF_LIGHT_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Knight 1',
+            condition: 'Attack Disadvantage',
+        }));
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Knight 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+    });
+});
+
+describe('MA-0542 disadvantage_attack_rolls te consumer', () => {
+    it('bumps attackDisadvantageCount for the holder via the pesky_swarm channel (no ability-check leg)', () => {
+        const effects = computeConditionEffects({
+            targetEffects: [{ effect: 'disadvantage_attack_rolls', target: 'Knight 1', source: 'Cyclops Oracle 1' }],
+        });
+        expect(effects.attackDisadvantageCount).toBeGreaterThanOrEqual(1);
+        expect(effects.abilityCheckDisadvantage).toBe(false);
+        expect(combineAttackModes(effects, computeConditionEffects({}), null, 'Cyclops Oracle 1')).toBe('disadvantage');
     });
 });

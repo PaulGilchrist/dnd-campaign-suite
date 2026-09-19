@@ -113,6 +113,21 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-0542: Cyclops Oracle "Flash of Light" hit-clause — the target has
+    // Disadvantage on attack rolls until the end of the cyclops's next turn.
+    // Attack-only analogue of pesky_swarm (no ability-check leg); granted by
+    // the hit_target_effect producer (applyHitClauseTargetEffect) anchored on
+    // the cyclops (MA-0030/§38 anchor leg fires at its next turn start —
+    // expiry-vs-RAW-end-of-turn is the accepted advisory residual).
+    effect: 'disadvantage_attack_rolls',
+    label: 'Attack Disadvantage',
+    description: 'Disadvantage on attack rolls until the end of the source\'s next turn.',
+    icon: 'fa-arrow-down',
+    cls: 'effect-disadvantage',
+    group: 'Attack',
+    fields: ['source'],
+  },
+  {
     effect: 'reckless_attack',
     label: 'Reckless Attack',
     description: 'Attacks have Advantage, but attack rolls against the creature also have Advantage.',

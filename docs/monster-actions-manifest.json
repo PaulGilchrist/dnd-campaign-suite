@@ -8348,7 +8348,7 @@
       "damageTypePrimary": "Radiant",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +10, range 120 ft. Hit: 17 (2d10 + 6) Radiant damage, and the target has Disadvantage on attack rolls until the end of the cyclops's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0542-flash-of-light-disadvantage-rider-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0543",

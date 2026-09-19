@@ -15627,6 +15627,7 @@
         "attack_bonus": 10,
         "range": "120 ft.",
         "save_effect": "The target has Disadvantage on attack rolls until the end of the cyclops's next turn.",
+        "hit_target_effect": "disadvantage_attack_rolls",
         "damage_dice_primary": "2d10 + 6",
         "damage_type_primary": "Radiant"
       },

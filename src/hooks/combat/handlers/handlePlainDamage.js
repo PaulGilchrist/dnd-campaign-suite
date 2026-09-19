@@ -573,7 +573,9 @@ function applyHitClauseTargetEffect({ hitClause, target, attackerName, campaignN
         characterName: target.name,
         condition: def?.label || hitClause.targetEffect,
         reason: `${hitClause.attackName} — until the start of ${attackerName}'s next turn`,
-        note: `Healing blocked for ${target.name} (GM-enforced for direct-HP writes: turn-start ticks, rests, initiative-card HP edits).`,
+        note: hitClause.targetEffect === 'no_healing'
+            ? `Healing blocked for ${target.name} (GM-enforced for direct-HP writes: turn-start ticks, rests, initiative-card HP edits).`
+            : `${def?.description || hitClause.targetEffect} applied to ${target.name} (anchor expiry fires at ${attackerName}'s next turn start; RAW end-of-turn anchor is advisory).`,
         timestamp: Date.now(),
     });
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
