@@ -8595,7 +8595,7 @@
       "actionType": "spellcasting",
       "saveDc": 14,
       "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 14): At Will: Speak with Dead, Thaumaturgy",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0558-death-cultist-spellcasting-unmarked-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0559",

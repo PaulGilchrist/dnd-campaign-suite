@@ -16077,8 +16077,8 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 14):\n<strong>At Will:</strong> Speak with Dead, Thaumaturgy",
-        "spell_save_dc": 14,
+        "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 14):\n<strong>At Will:</strong> <em>Speak with Dead</em>, <em>Thaumaturgy</em>",
+        "spell_save_dc": 14, "save_dc": 14, "save_type": "Wisdom",
         "spellcasting_ability": "Wisdom"
       }
     ],
