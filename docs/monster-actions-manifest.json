@@ -8719,7 +8719,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The death knight uses Spellcasting to cast Command. The death knight can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0566-death-knight-dread-authority-header-swallow-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0567",
@@ -8750,7 +8750,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The death knight moves up to half its Speed, and it makes one Dread Blade attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0568-death-knight-lunge-silent-burn.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0569",

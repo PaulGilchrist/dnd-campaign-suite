@@ -16334,9 +16334,15 @@
     ],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "The death knight takes 2 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The death knight regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Dread Authority",
         "description": "The death knight uses Spellcasting to cast Command. The death knight can't take this action again until the start of its next turn.",
-        "uses": 1
+        "advisory": "command",
+        "advisory_message": "uses Spellcasting to cast Command (Charisma save DC 18) at one creature it can see within range — advisory record: GM adjudicates the command word and the target's response (no command-word-to-condition consumer; MA-0058/MA-0270 advisory template). The can't-repeat clause is enforced by the legendary row cooldown latch."
       },
       {
         "name": "Fell Word",
@@ -16350,8 +16356,8 @@
       },
       {
         "name": "Lunge",
-        "description": "The death knight moves up to half its Speed, and it makes one Dread Blade attack.",
-        "uses": 1
+        "delegates_to": "Dread Blade",
+        "description": "The death knight moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Dread Blade attack."
       }
     ],
     "lair_actions": [],

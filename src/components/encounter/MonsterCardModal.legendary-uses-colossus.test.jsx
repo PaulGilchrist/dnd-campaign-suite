@@ -10,7 +10,7 @@
 // weapon rows (Smite → Radiant Ray +18 4d10 Radiant; Stomp → Slam +18
 // 4d10+10 Bludgeoning).
 import { render, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
@@ -177,6 +177,126 @@ describe('MA-0510 MonsterCardModal colossus legendary gated rows', () => {
     expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(runtime.store['Colossus 1.monsterLegendaryUses']).toEqual({ max: 2, used: 2 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+  });
+});
+
+// MA-0566: Death Knight had NO legendary header — legendary_actions[0] was the
+// Dread Authority CHILD with uses:1, swallowed by legendaryHeaderAction(): the
+// card rendered "Dread Authority (1 left)" as inert header text with ZERO
+// affordance (MonsterCardBody slice(1)) and the rendered Lunge sibling
+// SILENT-BURNED the shared counter with console.error "no resolvable mechanic"
+// (MA-0510/MA-0511 fingerprint). Fix is the same DATA-only one-pass template:
+// header "Legendary Action Uses: 2" + numeric uses:2 (RAW two legendary
+// actions), Dread Authority authored as the canonical MA-0058/MA-0270
+// advisory cast-row (Command has no word→condition consumer — honest
+// record-only adjudication), Lunge authored delegates_to:"Dread Blade".
+const deathKnight = () => monstersData.find(m => m.name === 'Death Knight');
+const DREAD_BLADE = () => deathKnight().actions.find(a => a.name === 'Dread Blade');
+
+describe('MA-0566 monsters.json data: death knight legendary header+children shape', () => {
+  it('legendary_actions[0] is the header with numeric uses 2 (no longer the Dread Authority child)', () => {
+    const la = deathKnight().legendary_actions;
+    expect(la[0].name).toBe('Legendary Action Uses: 2');
+    expect(la[0].uses).toBe(2);
+    expect(la[0].name).not.toMatch(/Dread Authority|Fell Word|Lunge/);
+  });
+
+  it('Dread Authority child rides the canonical advisory cast-row shape, no swallowed uses', () => {
+    const da = deathKnight().legendary_actions.find(a => a.name === 'Dread Authority');
+    expect(da.uses).toBeUndefined();
+    expect(da.advisory).toBe('command');
+    expect(da.advisory_message).toMatch(/Command/);
+    expect(da.advisory_message).toMatch(/advisory record/);
+    expect(da.description).toMatch(/can't take this action again until the start of its next turn/);
+  });
+
+  it('Lunge child delegates_to the byte-existing Dread Blade row (+11, 2d6+5 Slashing)', () => {
+    const lunge = deathKnight().legendary_actions.find(a => a.name === 'Lunge');
+    expect(lunge.delegates_to).toBe('Dread Blade');
+    expect(lunge.uses).toBeUndefined();
+    const blade = DREAD_BLADE();
+    expect(blade.attack_bonus).toBe(11);
+    expect(blade.damage_dice_primary).toBe('2d6 + 5');
+    expect(blade.damage_type_primary).toBe('Slashing');
+  });
+});
+
+describe('MA-0566 MonsterCardModal death knight legendary gated rows', () => {
+  const DK_CREATURES = [
+    { name: 'Death Knight 1', type: 'npc', targetName: 'Bandit 1', currentHp: 180, maxHp: 180, ac: 20, conditions: [] },
+    { name: 'Bandit 1', type: 'npc', currentHp: 11, maxHp: 11, ac: 12, conditions: [] },
+  ];
+
+  let consoleSpy;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: DK_CREATURES };
+    consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => { consoleSpy.mockRestore(); });
+
+  function renderDeathKnight(uses) {
+    if (uses !== undefined) runtime.store['Death Knight 1.monsterLegendaryUses'] = uses;
+    const m = makeMonster({
+      name: 'Death Knight',
+      actions: [DREAD_BLADE()],
+      legendary_actions: deathKnight().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Death Knight 1', creatures: DK_CREATURES })} />);
+  }
+  function legendaryRowLink(name) {
+    return Array.from(document.querySelectorAll('.mc-action'))
+      .find(r => r.textContent.trim().startsWith(name))?.querySelector('.mc-dice-link') || null;
+  }
+
+  it('header shows (2 left); Dread Authority renders a gated chip, spends 1, lands advisory adjudication with NO console.error', async () => {
+    renderDeathKnight({ max: 2, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(2 left)');
+    const link = legendaryRowLink('Dread Authority');
+    expect(link).not.toBeNull();
+    fireEvent.click(link);
+    await waitFor(() => expect(runtime.store['Death Knight 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 }));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Dread Authority');
+    expect(String(setPopupHtml.mock.calls[0][0])).toMatch(/Command/);
+    const record = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && e.abilityName === 'Dread Authority' && !/expends/.test(e.description));
+    expect(record).toBeTruthy();
+    expect(record.description).toMatch(/Command/);
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it('Dread Authority once-per-turn clause refuses later boundaries with zero spend', async () => {
+    renderDeathKnight({ max: 2, used: 0 });
+    runtime.store['Death Knight 1.monsterLegendaryActionCooldowns'] = { dread_authority: { round: 1, usedBefore: 0 } };
+    fireEvent.click(legendaryRowLink('Dread Authority'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain("can't take Dread Authority again");
+    expect(runtime.store['Death Knight 1.monsterLegendaryUses']).toEqual({ max: 2, used: 0 });
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it('Lunge spends 1 and delegates to Dread Blade (+11), no silent-burn console.error', async () => {
+    renderDeathKnight({ max: 2, used: 0 });
+    const link = legendaryRowLink('Lunge');
+    expect(link).not.toBeNull();
+    fireEvent.click(link);
+    await waitFor(() => expect(runtime.store['Death Knight 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Lunge (Dread Blade attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(11);
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (2/2): Lunge click refuses honestly, zero spend, zero roll', async () => {
+    renderDeathKnight({ max: 2, used: 2 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(legendaryRowLink('Lunge'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Death Knight 1.monsterLegendaryUses']).toEqual({ max: 2, used: 2 });
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
 });
