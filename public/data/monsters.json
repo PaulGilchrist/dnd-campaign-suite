@@ -328,7 +328,10 @@
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "4d6",
         "damage_type_secondary": "Psychic",
-        "hit_conditions": ["grappled", "restrained"],
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
         "escape_dc": 14
       },
       {
@@ -354,7 +357,11 @@
         "usage": "2/Day",
         "uses": 2,
         "maxUses": 2,
-        "automation": { "type": "reaction", "trigger": "enemy_spell_cast", "effect": "counterspell" }
+        "automation": {
+          "type": "reaction",
+          "trigger": "enemy_spell_cast",
+          "effect": "counterspell"
+        }
       }
     ],
     "environments": [
@@ -743,7 +750,9 @@
         "reach": "15 ft.",
         "damage_dice_primary": "2d6 + 5",
         "damage_type_primary": "Bludgeoning",
-        "hit_conditions": ["grappled"],
+        "hit_conditions": [
+          "grappled"
+        ],
         "escape_dc": 14
       },
       {
@@ -755,7 +764,10 @@
         "damage_type_primary": "Psychic",
         "save_effect": "Failure: 10 (3d6) Psychic damage. Success: Half damage",
         "target_prerequisite": {
-          "conditions": ["charmed", "grappled"],
+          "conditions": [
+            "charmed",
+            "grappled"
+          ],
           "by_attacker": true
         }
       },
@@ -923,7 +935,11 @@
         "dc_success": "none",
         "damage_dice_primary": "6d6",
         "damage_type_primary": "Cold",
-        "success_immunity": { "effect": "gaze_immunity", "duration": "1_hour", "duration_minutes": 60 },
+        "success_immunity": {
+          "effect": "gaze_immunity",
+          "duration": "1_hour",
+          "duration_minutes": 60
+        },
         "save_effect": "Failure: 21 (6d6) Cold damage, and the target has the Paralyzed condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. Success: The target is immune to this yeti's Chilling Gaze for 1 hour."
       },
       {
@@ -1339,8 +1355,16 @@
         "save_dc": 18,
         "save_type": "Wisdom",
         "dc_success": "none",
-        "success_immunity": { "effect": "frightful_presence_immunity", "duration": "24_hours", "duration_minutes": 1440 },
-        "repeat_save": { "condition": "frightened", "save_type": "Wisdom", "duration_minutes": 1 },
+        "success_immunity": {
+          "effect": "frightful_presence_immunity",
+          "duration": "24_hours",
+          "duration_minutes": 1440
+        },
+        "repeat_save": {
+          "condition": "frightened",
+          "save_type": "Wisdom",
+          "duration_minutes": 1
+        },
         "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage."
       },
       {
@@ -1535,8 +1559,13 @@
         "damage_type_primary": "Bludgeoning",
         "dc_success": "half",
         "save_effect": "Failure: 10 (3d6) Bludgeoning damage and knocked prone and buried. The buried target is restrained and unable to breathe or stand up. Success: Half damage.",
-        "rescue_check": { "ability": "Strength", "dc": 10, "ends": "buried", "advisory": "DC 10 Strength check (action) ends the buried state on a success — GM-enforced (no rescue-engine consumer)." }
-    },
+        "rescue_check": {
+          "ability": "Strength",
+          "dc": 10,
+          "ends": "buried",
+          "advisory": "DC 10 Strength check (action) ends the buried state on a success — GM-enforced (no rescue-engine consumer)."
+        }
+      },
       {
         "name": "Sand Cloud",
         "description": "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
@@ -3429,7 +3458,12 @@
         "damage_type_primary": "Bludgeoning",
         "dc_success": "half",
         "save_effect": "Failure: 10 (3d6) Bludgeoning damage and knocked prone and buried. The buried target is restrained and unable to breathe or stand up. Success: Half damage.",
-        "rescue_check": { "ability": "Strength", "dc": 10, "ends": "buried", "advisory": "DC 10 Strength check (action) ends the buried state on a success — GM-enforced (no rescue-engine consumer)." }
+        "rescue_check": {
+          "ability": "Strength",
+          "dc": 10,
+          "ends": "buried",
+          "advisory": "DC 10 Strength check (action) ends the buried state on a success — GM-enforced (no rescue-engine consumer)."
+        }
       },
       {
         "name": "Sand Cloud",
@@ -3585,7 +3619,7 @@
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
         "uses": 3,
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory \u2014 no lair flag consumer; GM-enforced)."
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Blazing Light",
@@ -4279,17 +4313,17 @@
       {
         "name": "Legendary Action Uses: 3 (4 in Lair)",
         "uses": 3,
-        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory \u2014 no lair flag consumer; GM-enforced)."
+        "description": "Immediately after another creature's turn, the dragon can expend a use to take one of the following actions. The dragon regains all expended uses at the start of each of its turns. In its lair the dragon has 4 uses (advisory — no lair flag consumer; GM-enforced)."
       },
       {
         "name": "Mind Invasion",
-        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 5 version) at one creature it can see within 120 feet. The target makes a DC 21 Wisdom saving throw, taking 27 (6d8) Psychic damage on a failed save or half as much on a successful one. The dragon always knows the target's location until the spell ends (no Invisible benefit against the dragon) \u2014 location tracking GM-enforced for monsters. The dragon can't take this action again until the start of its next turn.",
+        "description": "The dragon uses Spellcasting to cast <em>Mind Spike</em> (level 5 version) at one creature it can see within 120 feet. The target makes a DC 21 Wisdom saving throw, taking 27 (6d8) Psychic damage on a failed save or half as much on a successful one. The dragon always knows the target's location until the spell ends (no Invisible benefit against the dragon) — location tracking GM-enforced for monsters. The dragon can't take this action again until the start of its next turn.",
         "save_dc": 21,
         "save_type": "Wisdom",
         "dc_success": "half",
         "damage_dice_primary": "6d8",
         "damage_type_primary": "Psychic",
-        "save_effect": "6d8 Psychic damage. Success: Half damage. Location known to the dragon until the spell ends (advisory \u2014 GM-enforced for monsters)."
+        "save_effect": "6d8 Psychic damage. Success: Half damage. Location known to the dragon until the spell ends (advisory — GM-enforced for monsters)."
       },
       {
         "name": "Noxious Miasma",
@@ -4304,7 +4338,7 @@
       {
         "name": "Pounce",
         "delegates_to": "Rend",
-        "description": "The dragon moves up to half its Speed (movement advisory \u2014 GM moves the token; no movement-distance consumer), and it makes one Rend attack."
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       }
     ],
     "lair_actions": [
@@ -4801,8 +4835,16 @@
         "save_dc": 18,
         "save_type": "Charisma",
         "dc_success": "none",
-        "success_immunity": {"effect":"frightful_presence_immunity","duration":"24_hours","duration_minutes":1440},
-        "repeat_save": {"condition":"frightened","save_type":"Charisma","duration_minutes":1},
+        "success_immunity": {
+          "effect": "frightful_presence_immunity",
+          "duration": "24_hours",
+          "duration_minutes": 1440
+        },
+        "repeat_save": {
+          "condition": "frightened",
+          "save_type": "Charisma",
+          "duration_minutes": 1
+        },
         "save_effect": "The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage."
       },
       {
@@ -5757,7 +5799,11 @@
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 3",
         "damage_type_primary": "Bludgeoning",
-        "hit_conditions": ["blinded", "grappled", "restrained"],
+        "hit_conditions": [
+          "blinded",
+          "grappled",
+          "restrained"
+        ],
         "escape_dc": 13
       }
     ],
@@ -5820,7 +5866,9 @@
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "1d6",
         "damage_type_secondary": "Acid",
-        "hit_conditions": ["grappled"],
+        "hit_conditions": [
+          "grappled"
+        ],
         "escape_dc": 13
       },
       {
@@ -5891,7 +5939,9 @@
         "reach": "10 ft.",
         "damage_dice_primary": "1d10 + 4",
         "damage_type_primary": "Bludgeoning",
-        "hit_conditions": ["prone"]
+        "hit_conditions": [
+          "prone"
+        ]
       }
     ],
     "environments": [
@@ -6165,7 +6215,9 @@
         "save_dc": 17,
         "save_type": "Charisma",
         "dc_success": "none",
-        "repeat_save": { "save_type": "Charisma" },
+        "repeat_save": {
+          "save_type": "Charisma"
+        },
         "damage_dice_primary": "2d4 + 5",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "3d12",
@@ -6295,7 +6347,9 @@
         "range": "60 ft.",
         "damage_dice_primary": "3d6 + 7",
         "damage_type_primary": "Force",
-        "hit_conditions": ["prone"]
+        "hit_conditions": [
+          "prone"
+        ]
       },
       {
         "name": "Crackling Wave",
@@ -6707,7 +6761,9 @@
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "5d6",
         "damage_type_secondary": "Poison",
-        "hit_conditions": ["poisoned"]
+        "hit_conditions": [
+          "poisoned"
+        ]
       },
       {
         "name": "Light Crossbow",
@@ -7398,7 +7454,9 @@
         "damage_type_primary": "Force",
         "damage_dice_secondary": "5d6",
         "damage_type_secondary": "Fire",
-        "hit_conditions": ["prone"]
+        "hit_conditions": [
+          "prone"
+        ]
       },
       {
         "name": "Lightning Blade",
@@ -8015,7 +8073,9 @@
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 3",
         "damage_type_primary": "Piercing",
-        "hit_conditions": ["grappled"],
+        "hit_conditions": [
+          "grappled"
+        ],
         "escape_dc": 13
       },
       {
@@ -8251,7 +8311,9 @@
         "reach": "5 ft.",
         "damage_dice_primary": "1d10 + 4",
         "damage_type_primary": "Bludgeoning",
-        "hit_conditions": ["prone"]
+        "hit_conditions": [
+          "prone"
+        ]
       },
       {
         "name": "Spellcasting",
@@ -8456,7 +8518,9 @@
         "reach": "5 ft.",
         "damage_dice_primary": "1d8 + 3",
         "damage_type_primary": "Piercing",
-        "hit_conditions": ["poisoned"],
+        "hit_conditions": [
+          "poisoned"
+        ],
         "hit_target_effect": "no_healing"
       },
       {
@@ -8656,17 +8720,153 @@
         "save_dc": 16,
         "save_effect": "Charm Ray: 13 (3d8) Psychic damage and Charmed condition. Paralyzing Ray: Paralyzed condition, repeats save at end of each turn. Fear Ray: 14 (4d6) Psychic damage and Frightened condition. Slowing Ray: 18 (4d8) Necrotic damage, Speed halved, no Reactions. Enervation Ray: 13 (3d8) Poison damage and Poisoned condition (can't regain HP). Telekinetic Ray: Target moved up to 30 feet, Restrained and Incapacitated. Sleep Ray: Unconscious for 1 minute. Petrification Ray: First failure - Restrained, second failure - Petrified. Disintegration Ray: 36 (8d8) Force damage, disintegrates at 0 HP. Death Ray: 55 (10d10) Necrotic damage, kills at 0 HP. Success on damage rays: Half damage.",
         "rays": [
-        {"key": "charm", "name": "Charm Ray", "save_ability": "Wisdom", "damage_dice": "3d8", "damage_type": "Psychic", "dc_success": "half", "conditions": ["charmed"], "clock_rounds": 600, "duration_note": "for 1 hour or until it takes damage — damage-wake is GM-enforced (no charmed-wake consumer).", "save_effect": "13 (3d8) Psychic damage, and the target has the Charmed condition for 1 hour or until it takes damage. Success: Half damage only."},
-        {"key": "paralyzing", "name": "Paralyzing Ray", "save_ability": "Constitution", "damage_dice": null, "damage_type": null, "dc_success": "none", "conditions": [], "ladder": "paralyzed", "duration_note": "Paralyzed — repeats the CON save at the end of each of its turns, ending on a success; auto-succeeds after 1 minute (10-round clock).", "save_effect": "The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically."},
-        {"key": "fear", "name": "Fear Ray", "save_ability": "Wisdom", "damage_dice": "4d6", "damage_type": "Psychic", "dc_success": "half", "conditions": ["frightened"], "clock_rounds": 2, "duration_note": "until the end of its next turn (rounds:2 clock).", "save_effect": "14 (4d6) Psychic damage, and the target has the Frightened condition until the end of its next turn. Success: Half damage only."},
-        {"key": "slowing", "name": "Slowing Ray", "save_ability": "Constitution", "damage_dice": "4d8", "damage_type": "Necrotic", "dc_success": "half", "conditions": [], "te_grants": ["speed_half", "no_reactions", "no_action_and_bonus_action"], "clock_rounds": 2, "duration_note": "Speed halved, no Reactions, and either an Action or a Bonus Action (not both) until the end of its next turn (rounds:2 clock — MA-0087 slowed trio te).", "save_effect": "18 (4d8) Necrotic damage. Until the end of the target's next turn, the target's Speed is halved; the target can't take Reactions; and it can take either an Action or a Bonus Action on its turn, not both. Success: Half damage only."},
-        {"key": "enervation", "name": "Enervation Ray", "save_ability": "Constitution", "damage_dice": "3d8", "damage_type": "Poison", "dc_success": "half", "conditions": ["poisoned"], "te_grants": ["no_healing"], "clock_rounds": 2, "duration_note": "Poisoned until the end of its next turn; while Poisoned it can't regain Hit Points (no_healing te, rounds:2 clock).", "save_effect": "13 (3d8) Poison damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only."},
-        {"key": "telekinetic", "name": "Telekinetic Ray", "save_ability": "Strength", "damage_dice": null, "damage_type": null, "dc_success": "none", "conditions": ["restrained"], "te_grants": ["telekinetic_movement"], "clock_rounds": 2, "auto_success_size": "Gargantuan", "duration_note": "Restrained until the start of the beholder's next turn (rounds:2 clock); the 30-foot movement placement is GM-enforced (no grid-move consumer).", "save_effect": "The beholder moves the target up to 30 feet in any direction. The target has the Restrained condition until the start of the beholder's next turn or until the beholder has the Incapacitated condition. Success: none — the ray deals no damage."},
-        {"key": "sleep", "name": "Sleep Ray", "save_ability": "Wisdom", "damage_dice": null, "damage_type": null, "dc_success": "none", "conditions": ["unconscious"], "clock_rounds": 10, "auto_success_types": ["Construct", "Undead"], "duration_note": "Unconscious for 1 minute (rounds:10 clock); waking on damage or a 5-foot wake action is GM-enforced.", "save_effect": "The target has the Unconscious condition for 1 minute. The condition ends if the target takes damage or a creature within 5 feet of it takes an action to wake it. Success: none — the ray deals no damage."},
-        {"key": "petrification", "name": "Petrification Ray", "save_ability": "Constitution", "damage_dice": null, "damage_type": null, "dc_success": "none", "conditions": [], "ladder": "petrification", "duration_note": "First fail: Restrained, repeats the CON save at the end of its next turn; second fail: Petrified (two-stage eye_ray_petrifying ladder).", "save_effect": "First failure: The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second failure: The target has the Petrified condition instead of the Restrained condition."},
-        {"key": "disintegration", "name": "Disintegration Ray", "save_ability": "Dexterity", "damage_dice": "8d8", "damage_type": "Force", "dc_success": "half", "conditions": [], "zero_hp_clause": "disintegrates into dust", "duration_note": "If this damage reduces the target to 0 Hit Points it disintegrates into dust — 0-HP kill is GM-enforced (no instakill consumer).", "save_effect": "36 (8d8) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust."},
-        {"key": "death", "name": "Death Ray", "save_ability": "Dexterity", "damage_dice": "10d10", "damage_type": "Necrotic", "dc_success": "half", "conditions": [], "zero_hp_clause": "dies", "duration_note": "The target dies if the ray reduces it to 0 Hit Points — 0-HP kill is GM-enforced (no instakill consumer).", "save_effect": "55 (10d10) Necrotic damage. Success: Half damage. Failure or Success: The target dies if the ray reduces it to 0 Hit Points."}
-      ]
+          {
+            "key": "charm",
+            "name": "Charm Ray",
+            "save_ability": "Wisdom",
+            "damage_dice": "3d8",
+            "damage_type": "Psychic",
+            "dc_success": "half",
+            "conditions": [
+              "charmed"
+            ],
+            "clock_rounds": 600,
+            "duration_note": "for 1 hour or until it takes damage — damage-wake is GM-enforced (no charmed-wake consumer).",
+            "save_effect": "13 (3d8) Psychic damage, and the target has the Charmed condition for 1 hour or until it takes damage. Success: Half damage only."
+          },
+          {
+            "key": "paralyzing",
+            "name": "Paralyzing Ray",
+            "save_ability": "Constitution",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": [],
+            "ladder": "paralyzed",
+            "duration_note": "Paralyzed — repeats the CON save at the end of each of its turns, ending on a success; auto-succeeds after 1 minute (10-round clock).",
+            "save_effect": "The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically."
+          },
+          {
+            "key": "fear",
+            "name": "Fear Ray",
+            "save_ability": "Wisdom",
+            "damage_dice": "4d6",
+            "damage_type": "Psychic",
+            "dc_success": "half",
+            "conditions": [
+              "frightened"
+            ],
+            "clock_rounds": 2,
+            "duration_note": "until the end of its next turn (rounds:2 clock).",
+            "save_effect": "14 (4d6) Psychic damage, and the target has the Frightened condition until the end of its next turn. Success: Half damage only."
+          },
+          {
+            "key": "slowing",
+            "name": "Slowing Ray",
+            "save_ability": "Constitution",
+            "damage_dice": "4d8",
+            "damage_type": "Necrotic",
+            "dc_success": "half",
+            "conditions": [],
+            "te_grants": [
+              "speed_half",
+              "no_reactions",
+              "no_action_and_bonus_action"
+            ],
+            "clock_rounds": 2,
+            "duration_note": "Speed halved, no Reactions, and either an Action or a Bonus Action (not both) until the end of its next turn (rounds:2 clock — MA-0087 slowed trio te).",
+            "save_effect": "18 (4d8) Necrotic damage. Until the end of the target's next turn, the target's Speed is halved; the target can't take Reactions; and it can take either an Action or a Bonus Action on its turn, not both. Success: Half damage only."
+          },
+          {
+            "key": "enervation",
+            "name": "Enervation Ray",
+            "save_ability": "Constitution",
+            "damage_dice": "3d8",
+            "damage_type": "Poison",
+            "dc_success": "half",
+            "conditions": [
+              "poisoned"
+            ],
+            "te_grants": [
+              "no_healing"
+            ],
+            "clock_rounds": 2,
+            "duration_note": "Poisoned until the end of its next turn; while Poisoned it can't regain Hit Points (no_healing te, rounds:2 clock).",
+            "save_effect": "13 (3d8) Poison damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only."
+          },
+          {
+            "key": "telekinetic",
+            "name": "Telekinetic Ray",
+            "save_ability": "Strength",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": [
+              "restrained"
+            ],
+            "te_grants": [
+              "telekinetic_movement"
+            ],
+            "clock_rounds": 2,
+            "auto_success_size": "Gargantuan",
+            "duration_note": "Restrained until the start of the beholder's next turn (rounds:2 clock); the 30-foot movement placement is GM-enforced (no grid-move consumer).",
+            "save_effect": "The beholder moves the target up to 30 feet in any direction. The target has the Restrained condition until the start of the beholder's next turn or until the beholder has the Incapacitated condition. Success: none — the ray deals no damage."
+          },
+          {
+            "key": "sleep",
+            "name": "Sleep Ray",
+            "save_ability": "Wisdom",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": [
+              "unconscious"
+            ],
+            "clock_rounds": 10,
+            "auto_success_types": [
+              "Construct",
+              "Undead"
+            ],
+            "duration_note": "Unconscious for 1 minute (rounds:10 clock); waking on damage or a 5-foot wake action is GM-enforced.",
+            "save_effect": "The target has the Unconscious condition for 1 minute. The condition ends if the target takes damage or a creature within 5 feet of it takes an action to wake it. Success: none — the ray deals no damage."
+          },
+          {
+            "key": "petrification",
+            "name": "Petrification Ray",
+            "save_ability": "Constitution",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": [],
+            "ladder": "petrification",
+            "duration_note": "First fail: Restrained, repeats the CON save at the end of its next turn; second fail: Petrified (two-stage eye_ray_petrifying ladder).",
+            "save_effect": "First failure: The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second failure: The target has the Petrified condition instead of the Restrained condition."
+          },
+          {
+            "key": "disintegration",
+            "name": "Disintegration Ray",
+            "save_ability": "Dexterity",
+            "damage_dice": "8d8",
+            "damage_type": "Force",
+            "dc_success": "half",
+            "conditions": [],
+            "zero_hp_clause": "disintegrates into dust",
+            "duration_note": "If this damage reduces the target to 0 Hit Points it disintegrates into dust — 0-HP kill is GM-enforced (no instakill consumer).",
+            "save_effect": "36 (8d8) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust."
+          },
+          {
+            "key": "death",
+            "name": "Death Ray",
+            "save_ability": "Dexterity",
+            "damage_dice": "10d10",
+            "damage_type": "Necrotic",
+            "dc_success": "half",
+            "conditions": [],
+            "zero_hp_clause": "dies",
+            "duration_note": "The target dies if the ray reduces it to 0 Hit Points — 0-HP kill is GM-enforced (no instakill consumer).",
+            "save_effect": "55 (10d10) Necrotic damage. Success: Half damage. Failure or Success: The target dies if the ray reduces it to 0 Hit Points."
+          }
+        ]
       }
     ],
     "bonus_actions": [
@@ -8689,7 +8889,7 @@
       {
         "name": "Glare",
         "advisory": "eye_rays",
-        "advisory_message": "uses Eye Rays \u2014 advisory record: GM picks one eye ray and adjudicates its save/damage (Eye Rays multi-ray d10 block unparseable, MA-0374 pending subsystem; no ray picker consumer). Canonical cost is 1 legendary use \u2014 the engine spends 1 per click.",
+        "advisory_message": "uses Eye Rays — advisory record: GM picks one eye ray and adjudicates its save/damage (Eye Rays multi-ray d10 block unparseable, MA-0374 pending subsystem; no ray picker consumer). Canonical cost is 1 legendary use — the engine spends 1 per click.",
         "description": "The beholder uses Eye Rays."
       }
     ],
@@ -8804,11 +9004,62 @@
         "save_dc": 14,
         "save_effect": "Paralyzing Ray: Paralyzed condition, repeats save at end of each turn. Fear Ray: 13 (3d8) Psychic damage and Frightened condition. Enervation Ray: 10 (3d6) Necrotic damage and Poisoned condition (can't regain HP). Disintegration Ray: 27 (5d10) Force damage, disintegrates at 0 HP. Success on damage rays: Half damage.",
         "rays": [
-        {"key": "paralyzing", "name": "Paralyzing Ray", "save_ability": "Constitution", "damage_dice": null, "damage_type": null, "dc_success": "none", "conditions": [], "ladder": "paralyzed", "duration_note": "Paralyzed — repeats the CON save at the end of each of its turns, ending on a success; auto-succeeds after 1 minute (10-round clock).", "save_effect": "The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically."},
-        {"key": "fear", "name": "Fear Ray", "save_ability": "Wisdom", "damage_dice": "3d8", "damage_type": "Psychic", "dc_success": "half", "conditions": ["frightened"], "clock_rounds": 2, "duration_note": "until the end of its next turn (rounds:2 clock).", "save_effect": "13 (3d8) Psychic damage, and the target has the Frightened condition until the end of its next turn. Success: Half damage only."},
-        {"key": "enervation", "name": "Enervation Ray", "save_ability": "Constitution", "damage_dice": "3d6", "damage_type": "Necrotic", "dc_success": "half", "conditions": ["poisoned"], "te_grants": ["no_healing"], "clock_rounds": 2, "duration_note": "Poisoned until the end of its next turn; while Poisoned it can't regain Hit Points (no_healing te, rounds:2 clock).", "save_effect": "10 (3d6) Necrotic damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only."},
-        {"key": "disintegration", "name": "Disintegration Ray", "save_ability": "Dexterity", "damage_dice": "5d10", "damage_type": "Force", "dc_success": "half", "conditions": [], "zero_hp_clause": "disintegrates into dust", "duration_note": "If this damage reduces the target to 0 Hit Points it disintegrates into dust — 0-HP kill is GM-enforced (no instakill consumer).", "save_effect": "27 (5d10) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust."}
-      ]
+          {
+            "key": "paralyzing",
+            "name": "Paralyzing Ray",
+            "save_ability": "Constitution",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": [],
+            "ladder": "paralyzed",
+            "duration_note": "Paralyzed — repeats the CON save at the end of each of its turns, ending on a success; auto-succeeds after 1 minute (10-round clock).",
+            "save_effect": "The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically."
+          },
+          {
+            "key": "fear",
+            "name": "Fear Ray",
+            "save_ability": "Wisdom",
+            "damage_dice": "3d8",
+            "damage_type": "Psychic",
+            "dc_success": "half",
+            "conditions": [
+              "frightened"
+            ],
+            "clock_rounds": 2,
+            "duration_note": "until the end of its next turn (rounds:2 clock).",
+            "save_effect": "13 (3d8) Psychic damage, and the target has the Frightened condition until the end of its next turn. Success: Half damage only."
+          },
+          {
+            "key": "enervation",
+            "name": "Enervation Ray",
+            "save_ability": "Constitution",
+            "damage_dice": "3d6",
+            "damage_type": "Necrotic",
+            "dc_success": "half",
+            "conditions": [
+              "poisoned"
+            ],
+            "te_grants": [
+              "no_healing"
+            ],
+            "clock_rounds": 2,
+            "duration_note": "Poisoned until the end of its next turn; while Poisoned it can't regain Hit Points (no_healing te, rounds:2 clock).",
+            "save_effect": "10 (3d6) Necrotic damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only."
+          },
+          {
+            "key": "disintegration",
+            "name": "Disintegration Ray",
+            "save_ability": "Dexterity",
+            "damage_dice": "5d10",
+            "damage_type": "Force",
+            "dc_success": "half",
+            "conditions": [],
+            "zero_hp_clause": "disintegrates into dust",
+            "duration_note": "If this damage reduces the target to 0 Hit Points it disintegrates into dust — 0-HP kill is GM-enforced (no instakill consumer).",
+            "save_effect": "27 (5d10) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust."
+          }
+        ]
       }
     ],
     "environments": [
@@ -9536,7 +9787,10 @@
           "trigger": "bloodied_or_lightning_slashing",
           "effect": "split",
           "minHp": 10,
-          "damageTypes": ["Lightning", "Slashing"]
+          "damageTypes": [
+            "Lightning",
+            "Slashing"
+          ]
         }
       }
     ],
@@ -10731,7 +10985,9 @@
         "reach": "5 ft.",
         "damage_dice_primary": "1d4 + 3",
         "damage_type_primary": "Slashing",
-        "hit_conditions": ["prone"]
+        "hit_conditions": [
+          "prone"
+        ]
       }
     ],
     "bonus_actions": [],
@@ -11067,7 +11323,9 @@
         "reach": "10 ft.",
         "damage_dice_primary": "2d8 + 3",
         "damage_type_primary": "Piercing",
-        "hit_conditions": ["grappled"],
+        "hit_conditions": [
+          "grappled"
+        ],
         "escape_dc": 13
       }
     ],
@@ -11168,7 +11426,9 @@
         "save_effect": "The target has the Grappled condition (escape DC 12).",
         "damage_dice_primary": "2d6 + 2",
         "damage_type_primary": "Bludgeoning",
-        "hit_conditions": ["grappled"],
+        "hit_conditions": [
+          "grappled"
+        ],
         "escape_dc": 12
       },
       {
@@ -12603,7 +12863,9 @@
         "save_effect": "The target has the Blinded condition until the start of the centaur's next turn.",
         "damage_dice_primary": "3d6 + 4",
         "damage_type_primary": "Radiant",
-        "hit_conditions": ["blinded"]
+        "hit_conditions": [
+          "blinded"
+        ]
       },
       {
         "name": "Spellcasting",
@@ -12964,7 +13226,9 @@
         "reach": "5 ft.",
         "damage_dice_primary": "1d12 + 4",
         "damage_type_primary": "Bludgeoning",
-        "hit_conditions": ["prone"]
+        "hit_conditions": [
+          "prone"
+        ]
       },
       {
         "name": "Fire Breath",
@@ -13073,7 +13337,9 @@
         "attack_bonus": 6,
         "reach": "10 ft.",
         "save_effect": "If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from one of two pincers.",
-        "hit_conditions": ["grappled"],
+        "hit_conditions": [
+          "grappled"
+        ],
         "escape_dc": 14,
         "damage_dice_primary": "1d10 + 4",
         "damage_type_primary": "Bludgeoning"
@@ -13410,7 +13676,9 @@
         "description": "Ranged Attack Roll: +12, range 240 ft. <strong>Hit:</strong> 18 (3d6 + 8) Thunder damage, and the target has the <strong>Incapacitated</strong> condition until the end of its next turn.",
         "attack_bonus": 12,
         "range": "240 ft.",
-        "hit_conditions": ["incapacitated"],
+        "hit_conditions": [
+          "incapacitated"
+        ],
         "save_effect": "The target has the Incapacitated condition until the end of its next turn.",
         "damage_dice_primary": "3d6 + 8",
         "damage_type_primary": "Thunder"
@@ -13747,7 +14015,9 @@
         "save_effect": "If the target is a Large or smaller creature, it has the Prone condition.",
         "damage_dice_primary": "4d10",
         "damage_type_primary": "Radiant",
-        "hit_conditions": ["prone"]
+        "hit_conditions": [
+          "prone"
+        ]
       },
       {
         "name": "Divine Beam",
@@ -14466,7 +14736,9 @@
         "save_effect": "The target has the Poisoned condition until the end of the couatl's next turn.",
         "damage_dice_primary": "1d12 + 5",
         "damage_type_primary": "Piercing",
-        "hit_conditions": ["poisoned"]
+        "hit_conditions": [
+          "poisoned"
+        ]
       },
       {
         "name": "Constrict",
@@ -14741,7 +15013,12 @@
         "reach": "5 ft.",
         "save_effect": "If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 12). While Grappled, the target has the Restrained condition.",
         "damage_dice_primary": "1d8 + 2",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 12
       }
     ],
     "bonus_actions": [],
@@ -36553,7 +36830,6 @@
       "underwater"
     ]
   },
-
   {
     "index": "lacedon-ghoul",
     "name": "Lacedon Ghoul",

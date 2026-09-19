@@ -2207,3 +2207,75 @@ describe('MA-0522 Couatl Bite poisoned-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const CROCODILE = monsters.find(m => m.index === 'crocodile');
+const CROCODILE_BITE_ACTION = CROCODILE.actions[0];
+
+describe('MA-0527 Crocodile Bite grapple/restrain hit-clause rider', () => {
+    const deps = {
+        characterName: 'Crocodile 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Crocodile 1', computedStats: { armorClass: 12 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 991, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('authors hit_conditions:["grappled","restrained"] + escape_dc:12 on the Bite row', () => {
+        expect(CROCODILE_BITE_ACTION.name).toBe('Bite');
+        expect(CROCODILE_BITE_ACTION.attack_bonus).toBe(4);
+        expect(CROCODILE_BITE_ACTION.damage_dice_primary).toBe('1d8 + 2');
+        expect(CROCODILE_BITE_ACTION.damage_type_primary).toBe('Piercing');
+        expect(CROCODILE_BITE_ACTION.hit_conditions).toEqual(['grappled', 'restrained']);
+        expect(CROCODILE_BITE_ACTION.escape_dc).toBe(12);
+        // escape_dc derivation: 8 + STR mod (15 -> +2) + PB (+2) = 12
+        expect(CROCODILE.ability_score_modifiers.str + CROCODILE.proficiency_bonus + 8).toBe(12);
+    });
+
+    it('builds a grappled+restrained clause with escape DC 12', () => {
+        expect(buildHitConditionClause(CROCODILE_BITE_ACTION)).toEqual({
+            conditions: ['grappled', 'restrained'],
+            escapeDc: 12,
+            attackName: 'Bite',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + Restrained with escape-meta and condition log on a resolved Bite hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d8 + 2', total: 8, rolls: [6], modifier: 2, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Crocodile 1',
+            hitClause: buildHitConditionClause(CROCODILE_BITE_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled', 'restrained']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 12, ability: 'str', source: 'Crocodile 1' },
+            restrained: { dc: 12, ability: 'str', source: 'Crocodile 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Grappled, Restrained',
+            reason: 'Bite (escape DC 12)',
+        }));
+    });
+});
