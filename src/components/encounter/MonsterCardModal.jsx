@@ -22,6 +22,7 @@ import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSa
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
+import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
@@ -1857,6 +1858,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         handleGatedReaction={handleGatedReaction}
         handleLegendaryRow={handleLegendaryRow}
         handleLairRow={handleLairRow}
+        // MA-0554: self-origin zone row (Darkmantle Darkness Aura) — arms the
+        // authored te on the monster itself (the zone picker excludes the
+        // caster), spends the row's 1/Day via the MA-0020 monsterSpellUses
+        // map, refuses when exhausted with zero te/zero spend. Light/vision
+        // legs stay advisory (§70 no illumination model) on log + popup.
+        handleZoneAuraRow={(action) => resolveSelfAuraRow({ action, monsterName, campaignName, setPopupHtml, storedUses: monsterSpellUses || {} })}
       />
       {popupHtml && (
         <MonsterAttackPopup

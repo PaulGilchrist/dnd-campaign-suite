@@ -8535,7 +8535,7 @@
       "range": "15-foot Emanation",
       "uses": "1/Day",
       "description": "Magical Darkness fills a 15-foot Emanation originating from the darkmantle. This effect lasts while the darkmantle maintains Concentration on it, up to 10 minutes. Darkvision can't penetrate this area, and no light can illuminate it.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0554-darkmantle-darkness-aura-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0555",

@@ -15959,7 +15959,17 @@
         "name": "Darkness Aura",
         "description": "Magical <strong>Darkness</strong> fills a 15-foot <strong>Emanation</strong> originating from the darkmantle. This effect lasts while the darkmantle maintains <strong>Concentration</strong> on it, up to 10 minutes. <strong>Darkvision</strong> can't penetrate this area, and no light can illuminate it.",
         "uses": "1/Day",
-        "range": "15-foot Emanation"
+        "range": "15-foot Emanation",
+        "maxUses": 1,
+        "duration": "Concentration, up to 10 minutes",
+        "zone": {
+          "self": true,
+          "radius_ft": 15,
+          "no_save": true,
+          "effect_key": "lair_darkness",
+          "noun": "darkness",
+          "advisory": "No illumination model (§70): darkvision suppression and light immunity are not computed in-engine — GM-enforced."
+        }
       }
     ],
     "bonus_actions": [],

@@ -9,7 +9,7 @@ import { legendaryHeaderAction, legendaryUsesRemaining, legendaryCheckRow, legen
 import { isLairRowClickable, lairRowAffordance } from '../../services/encounters/monsterLairActions.js';
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses } from './MonsterCardHelpers.js';
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, monsterRecharge = {} }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, monsterRecharge = {} }) {
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -52,9 +52,9 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
           {actionSections.map(s => (
             s.key === 'legendary_actions' && legendaryHeader ? (
-              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1).map(a => legendaryCheckRow(a) ? { ...a, checkBonus: legendaryCheckBonus(monster, a) } : a)} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1).map(a => legendaryCheckRow(a) ? { ...a, checkBonus: legendaryCheckBonus(monster, a) } : a)} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
             ) : (
-              <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} rechargeState={monsterRecharge} />
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} />
             )
           ))}
           {lairActions && (
@@ -72,7 +72,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         </div>
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, handleGatedReaction, handleLegendaryRow, handleLairRow]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow]);
 
   return content;
 }
@@ -205,7 +205,7 @@ function MonsterCardAbilities({ monster, handleAbilityCheck }) {
   );
 }
 
-function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, spellUsesUsed, reactionUsesUsed, onGatedReaction, legendaryGate, headerRow, rechargeState = {} }) {
+function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, spellUsesUsed, reactionUsesUsed, onGatedReaction, legendaryGate, headerRow, rechargeState = {}, handleZoneAuraRow }) {
   const atk = legendaryGate ? (name, bonus, action) => legendaryGate(action) : handleAttack;
   const dmg = legendaryGate ? (_name, _formula, _type, action) => legendaryGate(action) : handleDamage;
   const save = legendaryGate ? (action) => legendaryGate(action) : handleSaveRoll;
@@ -217,7 +217,7 @@ function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack,
       <div className="mc-section">
         {headerRow}
         {actions.map((a, i) => (
-          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={atk} onDamage={dmg} onSaveRoll={save} onSpellCast={cast} spellUsesUsed={spellUsesUsed} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} legendaryGate={legendaryGate} rechargeState={rechargeState} />
+          <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={atk} onDamage={dmg} onSaveRoll={save} onSpellCast={cast} spellUsesUsed={spellUsesUsed} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} legendaryGate={legendaryGate} rechargeState={rechargeState} onZoneAuraRow={handleZoneAuraRow} />
         ))}
       </div>
     </>

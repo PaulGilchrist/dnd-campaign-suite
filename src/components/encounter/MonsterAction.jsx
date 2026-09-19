@@ -6,6 +6,7 @@ import { attackRowMissingToHit, extractConditionsFromSaveEffect, extractSpellNam
 import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
 import { legendaryCheckRow, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
 import { monsterRechargeGate, rechargeDisplayText } from '../../services/encounters/monsterRecharge.js';
+import { isSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -167,7 +168,26 @@ function LegendarySpendLink({ action, attackerCannotAct, legendaryGate }) {
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {} }) {
+// MA-0554: save-less self-origin zone row (Darkmantle Darkness Aura) arms a
+// te on the monster itself via resolveSelfAuraRow — the lair zone picker
+// excludes the caster so it can never model self-auras. 1/Day counter rides
+// the monsterSpellUses map (same note shape as SpellCastLinks); exhausted
+// chips stay clickable and route the honest refusal.
+function ZoneAuraLink({ action, spellUsesUsed, attackerCannotAct, onZoneAuraRow }) {
+  if (!isSelfAuraRow(action)) return null;
+  const radiusFt = Number(action.zone.radius_ft);
+  const gate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
+  const usesNote = gate ? <em> ({gate.maxUses}/Day · {gate.remaining} left)</em> : null;
+  const spentClass = gate && gate.remaining === 0 ? ' mc-dice-link-spell-spent' : '';
+  const clickable = !attackerCannotAct && !!onZoneAuraRow;
+  return (
+    <span className={`mc-dice-link mc-dice-link-aura${spentClass}`} onClick={clickable ? () => onZoneAuraRow(action) : undefined} role="button" tabIndex={0} title={`Self aura — ${action.name}: ${action.zone.effect_key || 'lair_darkness'} on self, radius ${radiusFt} ft, no save`}>
+      <i className="fa-solid fa-moon" /> {radiusFt}-ft Aura{usesNote}
+    </span>
+  );
+}
+
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
@@ -183,6 +203,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
     <div key={index} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
       <strong>{action.name}.</strong>{' '}
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
+      <ZoneAuraLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onZoneAuraRow={onZoneAuraRow} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
         <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
