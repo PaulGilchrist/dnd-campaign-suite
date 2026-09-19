@@ -573,6 +573,15 @@ describe('summonSpiritHandler', () => {
             expect(action.damage_dice_primary).toBe('2d6+2+6');
         });
 
+        it('MA-0466: folds "spell level" on Defender Radiant Mace disk row to the slot level', () => {
+            const defender = summonFeyMonsters.find(m => m.index === 'celestial-spirit-defender');
+            expect(defender.actions[0].damage_dice_primary).toBe('1d10+3+spell level');
+            const [action] = resolveMonsterActions(defender, lv17Mods);
+            expect(action.damage_dice_primary).toBe('1d10+3+5');
+            expect(action.description).toContain('1d10+3+5');
+            expect(action.attack_bonus).toBe(9);
+        });
+
         it('folds "spell level" in damage_dice_secondary too', () => {
             const monster = { actions: [{
                 name: 'Twin Strike',

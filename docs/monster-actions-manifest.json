@@ -7116,7 +7116,7 @@
       "damageTypePrimary": "radiant",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d10+3+spell level Radiant damage, and the spirit can choose itself or another creature it can see within 10 ft. of the target. The chosen creature gains 1d10 Temporary Hit Points.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0466-spell-level-token-damage-not-folded.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0467",
