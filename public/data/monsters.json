@@ -13417,7 +13417,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The giant casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> Detect Magic, Fog Cloud, Light\n<strong>1/Day Each:</strong> Control Weather, Gaseous Form, Telekinesis",
+        "description": "The giant casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> <em>Detect Magic</em>, <em>Fog Cloud</em>, <em>Light</em>\n<strong>1/Day Each:</strong> <em>Control Weather</em>, <em>Gaseous Form</em>, <em>Telekinesis</em>",
         "spell_save_dc": 15,
         "spellcasting_ability": "Charisma",
         "save_dc": 15,

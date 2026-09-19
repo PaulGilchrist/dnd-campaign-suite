@@ -7665,7 +7665,7 @@
       "saveDc": 15,
       "saveType": "Charisma",
       "description": "The giant casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15): At Will: Detect Magic, Fog Cloud, Light 1/Day Each: Control Weather, Gaseous Form, Telekinesis",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0500-spellcasting-zero-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0501",

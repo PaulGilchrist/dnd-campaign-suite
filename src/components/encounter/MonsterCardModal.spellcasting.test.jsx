@@ -562,3 +562,111 @@ describe('MA-0276 Animal Lord Spellcasting (modal)', () => {
     expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
   });
 });
+
+// ── MA-0500: Cloud Giant Spellcasting — six plain-text names once = zero chips
+// (MA-0421 markup gap). Data fix = <em>-wrap all six names; numeric
+// save_dc 15 / save_type Charisma were already authored. 1/Day Each gating
+// binds uses ONLY to MARKED names (extractSpellcastingSpellUses §120);
+// unmarked 1/Day names were invisible AND ungated.
+
+const CLOUD_GIANT_SPELLCASTING = {
+  name: 'Spellcasting',
+  description: 'The giant casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <em>Detect Magic</em>, <em>Fog Cloud</em>, <em>Light</em><br><strong>1/Day Each:</strong> <em>Control Weather</em>, <em>Gaseous Form</em>, <em>Telekinesis</em>',
+  save_dc: 15,
+  save_type: 'Charisma',
+};
+
+const CLOUD_GIANT_SPELLS_5E = [
+  { name: 'Detect Magic', level: 1, concentration: true, duration: 'Up to 10 minutes', damage: null, dc: null },
+  { name: 'Fog Cloud', level: 1, concentration: true, duration: 'Up to 1 hour', damage: null, dc: null },
+  { name: 'Light', level: 0, concentration: false, duration: '1 hour', damage: null, dc: null },
+  { name: 'Control Weather', level: 5, concentration: true, duration: 'Up to 8 hours', damage: null, dc: null },
+  { name: 'Gaseous Form', level: 2, concentration: true, duration: 'Up to 1 hour', damage: null, dc: null },
+  { name: 'Telekinesis', level: 5, concentration: true, duration: 'Up to 10 minutes', damage: null, dc: null },
+];
+
+describe('MA-0500 Cloud Giant Spellcasting row (data)', () => {
+  const diskRow = () => {
+    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+    const giant = monsters.find(m => m.index === 'cloud-giant');
+    return giant.actions.find(a => a.name === 'Spellcasting');
+  };
+
+  it('all six spell names are em-marked — extraction yields six chips (plain-text once = zero)', () => {
+    expect(extractSpellNamesFromSpellcasting(diskRow().description)).toEqual([
+      'Detect Magic', 'Fog Cloud', 'Light', 'Control Weather', 'Gaseous Form', 'Telekinesis',
+    ]);
+    expect(diskRow().save_dc).toBe(15);
+    expect(diskRow().save_type).toBe('Charisma');
+    expect(8 + 3 + 4).toBe(15);
+  });
+
+  it('1/Day Each gate binds uses to MARKED names only; At Will tier ungated', () => {
+    expect(extractSpellcastingSpellUses(diskRow().description)).toEqual({
+      'Control Weather': 1, 'Gaseous Form': 1, 'Telekinesis': 1,
+    });
+  });
+});
+
+describe('MonsterCardModal - MA-0500 Cloud Giant per-spell links + 1/Day gate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    loadSpells.mockImplementation((version) => Promise.resolve(version === '2024' ? [] : CLOUD_GIANT_SPELLS_5E));
+  });
+
+  function renderCloudGiant() {
+    const m = makeMonster({ name: 'Cloud Giant', actions: [CLOUD_GIANT_SPELLCASTING] });
+    const creatures = [
+      { name: 'Cloud Giant 1', type: 'npc', monsterType: 'giant', targetName: 'TestPC', currentHp: 200, maxHp: 200, conditions: [] },
+      { name: 'TestPC', type: 'player', currentHp: 60, maxHp: 60, conditions: [] },
+    ];
+    const props = makeProps(m, { creatureName: 'Cloud Giant 1', creatures });
+    render(<MonsterCardModal {...props} />);
+  }
+
+  it('renders six clickable spell chips with counters on the 1/Day Each trio only', () => {
+    renderCloudGiant();
+    const names = spellLinks().map(el => el.textContent.trim());
+    expect(names.length).toBe(6);
+    for (const n of ['Detect Magic', 'Fog Cloud', 'Light', 'Control Weather', 'Gaseous Form', 'Telekinesis']) {
+      expect(names.some(t => t.includes(n))).toBe(true);
+    }
+    expect(linkByText('Control Weather').textContent).toMatch(/\(1\/Day · 1 left\)/);
+    expect(linkByText('Fog Cloud').textContent).not.toMatch(/\/Day/);
+  });
+
+  it('At Will Fog Cloud logs spell-attributable casts repeatedly, ungated', async () => {
+    renderCloudGiant();
+    await act(async () => { fireEvent.click(linkByText('Fog Cloud')); });
+    await act(async () => { fireEvent.click(linkByText('Fog Cloud')); });
+
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    const casts = addEntry.mock.calls.map(c => c[1]).filter(e => e.abilityName === 'Fog Cloud');
+    expect(casts.length).toBe(2);
+    expect(casts.every(e => e.type === 'ability_use')).toBe(true);
+    expect(casts[0].characterName).toBe('Cloud Giant 1');
+    expect(runtime.store['Cloud Giant 1.monsterSpellUses'] ?? null).toBeNull();
+    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
+  });
+
+  it('Control Weather spends 1/Day with ability_use log; second same-day cast refused', async () => {
+    renderCloudGiant();
+    const cw = linkByText('Control Weather');
+    await act(async () => { fireEvent.click(cw); });
+
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && e.abilityName === 'Control Weather');
+    expect(spend).toBeTruthy();
+    expect(spend.description).toMatch(/1\/Day use spent — 0 remaining today/);
+    expect(runtime.store['Cloud Giant 1.monsterSpellUses']).toEqual({ 'Control Weather': 1 });
+
+    await act(async () => { fireEvent.click(linkByText('Control Weather')); });
+    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'automation blocked');
+    expect(refusal).toBeTruthy();
+    expect(refusal.abilityName).toBe('Control Weather');
+    expect(refusal.characterName).toBe('Cloud Giant 1');
+    expect(refusal.description).toMatch(/already cast Control Weather today \(1\/Day\)/);
+    expect(addEntry.mock.calls.map(c => c[1]).filter(e => e.abilityName === 'Control Weather' && e.type === 'ability_use').length).toBe(1);
+  });
+});
