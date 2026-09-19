@@ -15861,6 +15861,9 @@
         "save_type": "Dexterity",
         "range_save": "10-foot Emanation originating from and including the target",
         "save_effect": "Failure: 10 (3d6) Thunder damage.",
+        "dc_success": "none",
+        "damage_dice_secondary": "3d6",
+        "damage_type_secondary": "Thunder",
         "damage_dice_primary": "2d8 + 6",
         "damage_type_primary": "Bludgeoning"
       },

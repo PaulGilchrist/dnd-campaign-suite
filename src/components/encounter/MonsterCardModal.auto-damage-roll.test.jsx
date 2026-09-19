@@ -207,10 +207,32 @@ describe('MonsterCardModal - autoDamageRoll callback integration', () => {
         desc: 'passes autoDamageSecondaryFormula from damage_dice_secondary to rollAttack',
       },
       {
+        // MA-0551: composite attack+save — the attack chip must NOT arm save
+        // adjudication (fixed damage pays full; no npcSaveDamage hijack).
         action: { name: 'Hex Attack', attack_bonus: 5, save_dc: 13, save_type: 'Wisdom', damage_type_primary: 'psychic', description: 'Attack with save.' },
         linkText: '+5',
-        expected: { saveDc: 13, saveType: 'wis', dcSuccess: 'half' },
-        desc: 'passes saveDc, saveType, and dcSuccess when action has save_dc on an attack',
+        expected: { saveDc: null, saveType: null, dcSuccess: null },
+        desc: 'MA-0551: composite attack chip strips saveDc/saveType/dcSuccess (fixed damage pays full)',
+      },
+      {
+        // MA-0551: save-leg rider secondary (dice inside save_effect) never
+        // rides the attack chip — fixed primary only on hit.
+        action: {
+          name: 'Earth Burst',
+          attack_bonus: 10,
+          save_dc: 16,
+          save_type: 'Dexterity',
+          dc_success: 'none',
+          save_effect: 'Failure: 10 (3d6) Thunder damage.',
+          damage_dice_primary: '2d8 + 6',
+          damage_type_primary: 'Bludgeoning',
+          damage_dice_secondary: '3d6',
+          damage_type_secondary: 'Thunder',
+          description: 'Ranged Attack Roll: +10, range 120 ft. Hit: 15 (2d8 + 6) Bludgeoning damage. Hit or Miss: 10-foot Emanation, DC 16 Dexterity. Failure: 10 (3d6) Thunder damage.',
+        },
+        linkText: '+10',
+        expected: { saveDc: null, saveType: null, dcSuccess: null, autoDamageFormula: '2d8 + 6', autoDamageSecondaryFormula: null },
+        desc: 'MA-0551: Dao Earth Burst attack chip pays fixed 2d8+6 with no save hijack and no secondary pre-pay',
       },
     ])('$desc', ({ action, linkText, expected }) => {
       damageUtils.__setFindCreatureReturn({

@@ -3,7 +3,25 @@
 // from the save chip through buildSaveOptions + buildAbilitySaveRollContext
 // to saveProcessing. Rows without a secondary keep every secondary field null.
 import { describe, it, expect } from 'vitest';
-import { buildSaveOptions, buildAbilitySaveRollContext } from './MonsterCardModal.jsx';
+import { buildSaveOptions, buildAbilitySaveRollContext, isCompositeAttackSaveRow, saveLegCarriesSecondaryDamage } from './MonsterCardModal.jsx';
+
+// MA-0551: Dao Earth Burst — composite attack+save row whose save_effect
+// Failure clause carries its own dice ("Failure: 10 (3d6) Thunder damage.").
+const daoRow = {
+    name: 'Earth Burst',
+    description: 'Ranged Attack Roll: +10, range 120 ft. <strong>Hit:</strong> 15 (2d8 + 6) Bludgeoning damage. Hit or Miss: Earth explodes from the target\'s space, creating the following effect. Dexterity Saving Throw: DC 16, each creature in a 10-foot <strong>Emanation</strong> originating from and including the target. <strong>Failure:</strong> 10 (3d6) Thunder damage.',
+    attack_bonus: 10,
+    range: '120 ft.',
+    save_dc: 16,
+    save_type: 'Dexterity',
+    range_save: '10-foot Emanation originating from and including the target',
+    save_effect: 'Failure: 10 (3d6) Thunder damage.',
+    dc_success: 'none',
+    damage_dice_primary: '2d8 + 6',
+    damage_type_primary: 'Bludgeoning',
+    damage_dice_secondary: '3d6',
+    damage_type_secondary: 'Thunder',
+};
 
 const brazenRow = {
     name: 'Smelting Charge',
@@ -82,5 +100,61 @@ describe('MA-0427 save transport — secondary damage fields', () => {
         });
         expect(ctx.autoDamageSecondaryFormula).toBeNull();
         expect(ctx.autoDamageSecondaryDamageType).toBeNull();
+    });
+});
+
+// MA-0551: composite attack+save — attack chip context carries NO saveDc,
+// the SAVE chip adjudicates the save_effect secondary dice (3d6 Thunder) with
+// dc_success:'none' zero-on-success. Pure-save twins stay byte-identical.
+describe('MA-0551 — Dao Earth Burst composite attack+save fork', () => {
+    it('isCompositeAttackSaveRow: attack_bonus + numeric save_dc only', () => {
+        expect(isCompositeAttackSaveRow(daoRow)).toBe(true);
+        expect(isCompositeAttackSaveRow(brazenRow)).toBe(false); // pure save
+        expect(isCompositeAttackSaveRow({ name: 'Club', attack_bonus: 4 })).toBe(false);
+        expect(isCompositeAttackSaveRow({ name: 'Multiattack', attack_bonus: 5, save_dc: 0 })).toBe(false);
+    });
+
+    it('saveLegCarriesSecondaryDamage: secondary dice inside save_effect only', () => {
+        expect(saveLegCarriesSecondaryDamage(daoRow)).toBe(true);
+        // Banishing-claw style: secondary rides the HIT clause, save gates a
+        // condition only — the secondary must keep riding the attack chip.
+        expect(saveLegCarriesSecondaryDamage({
+            name: 'Banishing Claw', attack_bonus: 9, save_dc: 17, save_type: 'Charisma',
+            save_effect: 'Failure: The target is trapped in a demiplane.',
+            damage_dice_secondary: '3d12',
+        })).toBe(false);
+        expect(saveLegCarriesSecondaryDamage(brazenRow)).toBe(false);
+    });
+
+    it('save chip context pays 3d6 Thunder full-on-fail, no save hijack keys dropped', () => {
+        const ctx = buildAbilitySaveRollContext({
+            monsterName: 'Dao 1',
+            target: { name: 'Bandit 1', type: 'npc' },
+            spellName: null,
+            action: daoRow,
+            saveType: 'DEX',
+            dcSuccess: 'none',
+            saveDamageFormula: '2d8 + 6',
+            saveConditions: [],
+            usesGate: null,
+            prerequisite: null,
+            getDamageTypesForAction,
+        });
+        expect(ctx.saveDc).toBe(16);
+        expect(ctx.saveType).toBe('DEX');
+        expect(ctx.dcSuccess).toBe('none');
+        // save leg rides the secondary dice, NOT the fixed attack primary
+        expect(ctx.autoDamageFormula).toBe('3d6');
+        expect(ctx.autoDamageDamageType).toBe('Thunder');
+        // promoted to primary — transport suppressed so it rolls exactly once
+        expect(ctx.autoDamageSecondaryFormula).toBeNull();
+        expect(ctx.autoDamageSecondaryDamageType).toBeNull();
+    });
+
+    it('buildSaveOptions keeps saveDc/saveType/dc_success for the save affordance', () => {
+        const opts = buildSaveOptions(daoRow);
+        expect(opts.saveDc).toBe(16);
+        expect(opts.saveType).toBe('dex');
+        expect(opts.dcSuccess).toBe('none');
     });
 });

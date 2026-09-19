@@ -655,6 +655,8 @@ function buildAutoDamageOptions(action, name) {
     autoDamageName: name,
     // MA-0427: MA-0426 secondary keys now produced by the shared transport
     // helper (name falls back to the chip name for synthesized actions).
+    // MA-0551: save-leg-rider composites are stripped downstream in
+    // buildAttackChipSaveOptions (spread order re-injects otherwise).
     ...buildSecondaryDamageTransport(action, name),
     hitClause: buildHitConditionClause(action),
   };
@@ -684,6 +686,45 @@ export function buildSecondaryDamageTransport(action, fallbackName = null) {
     autoDamageSecondaryName: fallbackName || action.name || null,
     autoDamageSecondaryDamageType: action.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
   };
+}
+
+// MA-0551: composite attack+save fork — a save_dc riding an attack_bonus row
+// gates a post-hit rider (Dao Earth Burst "Hit or Miss … DC 16 … Failure:
+// 3d6 Thunder"), NEVER the fixed attack-hit damage. The attack chip must not
+// arm saveDc/saveType on its auto-damage: useLoggedDiceRollDamage.js:139
+// routes any NPC damage context with saveDc+saveType into
+// npcSaveDamageHandler, adjudicating fixed hit damage as save damage
+// (default-half leak on success). Pure-save rows (no attack_bonus) and
+// save_dc-less attack rows are byte-identical.
+// eslint-disable-next-line react-refresh/only-export-components
+export function isCompositeAttackSaveRow(action) {
+  return action?.attack_bonus != null && Number(action?.save_dc) > 0;
+}
+
+// MA-0551: save-leg rider damage — the authored damage_dice_secondary appears
+// INSIDE the save_effect failure clause ("Failure: 10 (3d6) Thunder damage."),
+// so the SAVE chip adjudicates it (fail full / dc_success success) while the
+// attack chip pays fixed primary only. Hit-clause secondaries (Arcanaloth
+// Banishing Claw "Hit: X plus 3d12", MA-0298/MA-0426) never match — their
+// secondary keeps riding the attack chip byte-identical.
+// eslint-disable-next-line react-refresh/only-export-components
+export function saveLegCarriesSecondaryDamage(action) {
+  if (!isCompositeAttackSaveRow(action) || action?.damage_dice_secondary == null) return false;
+  return String(action?.save_effect || '').includes(String(action.damage_dice_secondary));
+}
+
+// MA-0551: attack-chip save-ride — composite rows keep the rider arms
+// (saveConditions/trap/wound transports) but drop the save adjudication keys,
+// so the auto-damage lands via plainDamageHandler at FULL fixed value.
+function buildAttackChipSaveOptions(action) {
+  const opts = buildSaveOptions(action);
+  if (!isCompositeAttackSaveRow(action)) return opts;
+  // MA-0551: save-leg-rider secondaries belong to the SAVE chip only —
+  // the emanation rider must never pre-pay fixed on attack hit.
+  if (saveLegCarriesSecondaryDamage(action)) {
+    return { ...opts, saveDc: null, saveType: null, dcSuccess: null, autoDamageSecondaryFormula: null, autoDamageSecondaryName: null, autoDamageSecondaryDamageType: null };
+  }
+  return { ...opts, saveDc: null, saveType: null, dcSuccess: null };
 }
 
 // MA-0501: authored staged petrify ladder key (Cockatrice Petrifying Bite) —
@@ -747,7 +788,9 @@ function buildAttackRollOptions(v) {
     grazeDamage: v.grazeDamage,
     grazeAbilityMod: v.grazeAbilityMod,
     grazeAbilityName: 'STR',
-    ...buildSaveOptions(v.action),
+    // MA-0551: composite fork — the attack chip never arms save adjudication
+    // on a row that also has an attack_bonus (fixed damage pays full).
+    ...buildAttackChipSaveOptions(v.action),
     isSpellDamage: isSpellOriginAction(v.action),
     chargeBonusOffer: buildChargeBonusOffer(v.action, v.name),
     // MA-0325: two-handed versatile-damage choice (HIT popup offer).
@@ -1021,6 +1064,32 @@ function savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction)
   return spellDamageType || getDamageTypesForAction(action)[0] || null;
 }
 
+// MA-0551: composite save-leg rider fork — on an attack+save row whose
+// authored secondary dice live inside the save_effect failure clause (Dao
+// Earth Burst "Failure: 10 (3d6) Thunder damage."), the SAVE leg adjudicates
+// the secondary formula/type — never the fixed attack-hit primary — and the
+// secondary transport is suppressed so the save leg rolls it exactly once.
+// Non-matching rows (pure-save dual-damage MA-0427, hit-clause secondaries
+// MA-0298, cockatrice twins) keep the legacy fields byte-identical.
+function resolveSaveLegDamageFields(action, saveDamageFormula, primaryDamageType, actionName) {
+  if (!saveLegCarriesSecondaryDamage(action)) {
+    return {
+      autoDamageFormula: saveDamageFormula,
+      autoDamageDamageType: saveDamageFormula && primaryDamageType ? formatDamageTypes([primaryDamageType]) : null,
+      ...buildSecondaryDamageTransport(action, actionName),
+    };
+  }
+  const saveFormula = String(action.damage_dice_secondary);
+  const saveType = action.damage_type_secondary || primaryDamageType;
+  return {
+    autoDamageFormula: saveFormula,
+    autoDamageDamageType: saveFormula && saveType ? formatDamageTypes([saveType]) : null,
+    autoDamageSecondaryFormula: null,
+    autoDamageSecondaryName: null,
+    autoDamageSecondaryDamageType: null,
+  };
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
@@ -1034,15 +1103,14 @@ export function buildAbilitySaveRollContext({ monsterName, target, spellName, ac
     saveDc: action.save_dc,
     saveType,
     dcSuccess,
-    autoDamageFormula: saveDamageFormula,
-    autoDamageDamageType: saveDamageFormula && primaryDamageType ? formatDamageTypes([primaryDamageType]) : null,
-    autoDamageName: actionName,
     // MA-0427: dual-damage block-save rows (Brazen Gorgon Smelting Charge
     // "Failure: 2d8 + 4 Piercing damage plus 3d8 Fire damage") — the authored
     // secondary rides the save context to saveProcessing.applySaveDamage,
     // which rolls it as its own save-damage leg and halves it on a successful
     // save exactly like the primary (dc_success semantics apply to both legs).
-    ...buildSecondaryDamageTransport(action, actionName),
+    // MA-0551: composite save-leg riders resolved in the shared helper above.
+    ...resolveSaveLegDamageFields(action, saveDamageFormula, primaryDamageType, actionName),
+    autoDamageName: actionName,
     saveConditions,
     isSpellDamage: !!spellName,
     consumeMemoriesClause: !!prerequisite,

@@ -8489,7 +8489,7 @@
       "damageTypePrimary": "Bludgeoning",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +10, range 120 ft. Hit: 15 (2d8 + 6) Bludgeoning damage. Hit or Miss: Earth explodes from the target's space, creating the following effect. Dexterity Saving Throw: DC 16, each creature in a 10-foot Emanation originating from and including the target. Failure: 10 (3d6) Thunder damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0551-dao-earth-burst-save-misroute-half-leak-no-emanation.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0552",
