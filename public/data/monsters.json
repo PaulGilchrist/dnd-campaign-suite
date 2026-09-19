@@ -16308,9 +16308,11 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The death knight casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):\n<strong>At Will:</strong> Command, Phantom Steed\n<strong>2/Day Each:</strong> Destructive Wave (Necrotic), Dispel Magic",
+        "description": "The death knight casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):\n<strong>At Will:</strong> <em>Command</em>, <em>Phantom Steed</em>\n<strong>2/Day Each:</strong> <em>Destructive Wave</em> (Necrotic), <em>Dispel Magic</em>",
         "spell_save_dc": 18,
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "save_dc": 18,
+        "save_type": "Charisma"
       }
     ],
     "bonus_actions": [],

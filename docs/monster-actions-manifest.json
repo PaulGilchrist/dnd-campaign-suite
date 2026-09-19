@@ -8693,7 +8693,7 @@
       "actionType": "spellcasting",
       "saveDc": 18,
       "description": "The death knight casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18): At Will: Command, Phantom Steed 2/Day Each: Destructive Wave (Necrotic), Dispel Magic",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0564-death-knight-spellcasting-unmarked-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0565",
