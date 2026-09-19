@@ -2034,3 +2034,90 @@ describe('MA-0499 Cloud Giant Thundercloud incapacitated-on-hit hit-clause', () 
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const COLOSSUS = monsters.find(m => m.index === 'colossus');
+const RADIANT_RAY_ACTION = COLOSSUS.actions[2];
+
+describe('MA-0508 Colossus Radiant Ray prone-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Colossus 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Colossus 1', computedStats: { armorClass: 23 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 22, newHp: 977, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0508 data-lock: authors hit_conditions:["prone"] on the Radiant Ray row (byte-mirrors Brown Bear Claw)', () => {
+        expect(RADIANT_RAY_ACTION.name).toBe('Radiant Ray');
+        expect(RADIANT_RAY_ACTION.attack_bonus).toBe(18);
+        expect(RADIANT_RAY_ACTION.range).toBe('300 ft.');
+        expect(RADIANT_RAY_ACTION.damage_dice_primary).toBe('4d10');
+        expect(RADIANT_RAY_ACTION.damage_type_primary).toBe('Radiant');
+        expect(RADIANT_RAY_ACTION.hit_conditions).toEqual(['prone']);
+        expect(RADIANT_RAY_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds the prone clause with no escape DC (Radiant Ray prose has no escape save)', () => {
+        expect(buildHitConditionClause(RADIANT_RAY_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Radiant Ray',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + provenance-meta + condition log on a resolved Radiant Ray hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Radiant Ray', formula: '4d10', total: 22, rolls: [7], modifier: 0, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Radiant',
+            attackerName: 'Colossus 1',
+            hitClause: buildHitConditionClause(RADIANT_RAY_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Colossus 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Prone',
+            reason: 'Radiant Ray (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Radiant Ray attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Radiant Ray', formula: '4d10', total: 22, rolls: [7], modifier: 0, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Radiant',
+            attackerName: 'Colossus 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

@@ -13746,7 +13746,8 @@
         "range": "300 ft.",
         "save_effect": "If the target is a Large or smaller creature, it has the Prone condition.",
         "damage_dice_primary": "4d10",
-        "damage_type_primary": "Radiant"
+        "damage_type_primary": "Radiant",
+        "hit_conditions": ["prone"]
       },
       {
         "name": "Divine Beam",
