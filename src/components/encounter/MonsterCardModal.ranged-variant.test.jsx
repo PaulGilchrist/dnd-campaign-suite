@@ -7,7 +7,8 @@
 // forwarded to rollAttack context; ranged pick swaps the Done auto-damage
 // formula to 1d6 + 2 and logs the mode + band advisory; melee pick and
 // unpicked Done keep 2d6 + 2 and log; resolved decisions cannot re-fire;
-// rows without the fields are byte-inert.
+// rows without the fields are byte-inert. MA-0439 extends the same locks to
+// the Bugbear Chief twin row (+5, 2d6 + 3 <-> 1d6 + 3, "30/120").
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -138,6 +139,29 @@ const BUGBEAR_JAVELIN_ACTION = {
   damage_type_primary: 'Piercing',
 };
 
+// MA-0439: Bugbear Chief twin row (attack_bonus 5, 2d6 + 3 <-> 1d6 + 3)
+const BUGBEAR_CHIEF_JAVELIN_ACTION = {
+  name: 'Javelin',
+  description: 'Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 10 (2d6 + 3) piercing damage in melee or 6 (1d6 + 3) piercing damage at range.',
+  attack_bonus: 5,
+  reach: '5 ft.',
+  range: '30/120',
+  damage_dice_primary: '2d6 + 3',
+  damage_dice_ranged: '1d6 + 3',
+  damage_type_primary: 'Piercing',
+};
+
+const CHIEF_JAVELIN_OFFER = {
+  formula: '1d6 + 3',
+  baseFormula: '2d6 + 3',
+  damageType: 'Piercing',
+  label: 'Ranged: 1d6 + 3 Piercing?',
+  attackName: 'Javelin',
+  range: '30/120',
+  normalFt: 30,
+  longFt: 120,
+};
+
 const CREATURES = [
   { name: 'Bugbear 1', targetName: 'AasimarTest' },
   { name: 'AasimarTest', type: 'player' },
@@ -171,6 +195,29 @@ function renderBugbear(popupHtml = null) {
   const m = makeMonster({ name: 'Bugbear', actions: [BUGBEAR_JAVELIN_ACTION] });
   damageUtils.__setFindCreatureReturn({ name: 'Bugbear 1', targetName: 'AasimarTest', conditions: [] });
   return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Bugbear 1' })} />);
+}
+
+function chiefHitPopupHtml(overrides = {}) {
+  return hitPopupHtml({
+    bonus: 5,
+    autoDamage: {
+      name: 'Javelin',
+      formula: '2d6 + 3',
+      damageType: 'Piercing',
+      rangedVariantOffer: CHIEF_JAVELIN_OFFER,
+      rangedChoice: 'melee-default',
+      source: 'Bugbear Chief 1',
+    },
+    rangedVariantOffer: CHIEF_JAVELIN_OFFER,
+    ...overrides,
+  });
+}
+
+function renderChief(popupHtml = null) {
+  _setPopupHtml(popupHtml);
+  const m = makeMonster({ name: 'Bugbear Chief', actions: [BUGBEAR_CHIEF_JAVELIN_ACTION] });
+  damageUtils.__setFindCreatureReturn({ name: 'Bugbear Chief 1', targetName: 'AasimarTest', conditions: [] });
+  return render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Bugbear Chief 1', targetName: 'AasimarTest' }, { name: 'AasimarTest', type: 'player' }], creatureName: 'Bugbear Chief 1' })} />);
 }
 
 function clickChipLink(text = '+4') {
@@ -210,6 +257,18 @@ describe('MA-0436 data lock (monsters.json)', () => {
     expect(javelin.range).toBe('30/120');
     expect(javelin.reach).toBe('5 ft.');
   });
+
+  // MA-0439: Bugbear Chief twin row byte-mirrors the MA-0436 shape.
+  it('the Bugbear Chief Javelin row authors damage_dice_ranged "1d6 + 3" + range "30/120"', () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const chief = monsters.find((m) => m.name === 'Bugbear Chief');
+    const javelin = chief.actions.find((a) => a.name === 'Javelin');
+    expect(javelin.attack_bonus).toBe(5);
+    expect(javelin.damage_dice_primary).toBe('2d6 + 3');
+    expect(javelin.damage_dice_ranged).toBe('1d6 + 3');
+    expect(javelin.range).toBe('30/120');
+    expect(javelin.reach).toBe('5 ft.');
+  });
 });
 
 describe('MA-0436 parseRangedBand + buildRangedVariantOffer', () => {
@@ -223,6 +282,12 @@ describe('MA-0436 parseRangedBand + buildRangedVariantOffer', () => {
     const offer = buildRangedVariantOffer(BUGBEAR_JAVELIN_ACTION, 'Javelin');
     expect(offer).toMatchObject({ formula: '1d6 + 2', baseFormula: '2d6 + 2', damageType: 'Piercing', attackName: 'Javelin', normalFt: 30, longFt: 120 });
     expect(offer.label).toContain('1d6 + 2');
+  });
+
+  it('builds the Bugbear Chief offer from its authored ranged variant metadata (MA-0439)', () => {
+    const offer = buildRangedVariantOffer(BUGBEAR_CHIEF_JAVELIN_ACTION, 'Javelin');
+    expect(offer).toMatchObject({ formula: '1d6 + 3', baseFormula: '2d6 + 3', damageType: 'Piercing', attackName: 'Javelin', range: '30/120', normalFt: 30, longFt: 120 });
+    expect(offer.label).toBe('Ranged: 1d6 + 3 Piercing?');
   });
 
   it('returns null unless the row is an authored melee-or-ranged variant (byte-inert guardrail)', () => {
@@ -347,5 +412,57 @@ describe('MA-0436 Done auto-damage resolution', () => {
     expect(rollExpression).toHaveBeenCalledWith('2d6 + 2');
     expect(findLogEntry('melee_variant_selected')).toBeFalsy();
     expect(findLogEntry('ranged_variant_selected')).toBeFalsy();
+  });
+});
+
+describe('MA-0439 Bugbear Chief dual-mode resolution on HIT popup', () => {
+  it('forwards the Chief rangedVariantOffer to the attack roll context', () => {
+    renderChief();
+    clickChipLink('+5');
+    expect(rollAttack).toHaveBeenCalled();
+    const ctx = rollAttack.mock.calls[0][2];
+    expect(ctx.rangedVariantOffer).toMatchObject({ formula: '1d6 + 3', baseFormula: '2d6 + 3', normalFt: 30, longFt: 120 });
+  });
+
+  it('ranged pick: swaps Done auto-damage to 1d6 + 3, logs mode + band advisory, marks resolved', async () => {
+    renderChief(chiefHitPopupHtml());
+    clickButton('ranged');
+    await vi.waitFor(() => {
+      expect(useLoggedDiceRoll.__getPopupHtml().rangedVariantResolved).toBe('ranged');
+    });
+    const popup = useLoggedDiceRoll.__getPopupHtml();
+    expect(popup.autoDamage.formula).toBe('1d6 + 3');
+    expect(popup.autoDamage.rangedChoice).toBe('ranged');
+    const pick = findLogEntry('ranged_variant_selected');
+    expect(pick).toBeTruthy();
+    expect(pick.description).toContain('RANGED');
+    expect(pick.description).toContain('1d6 + 3');
+    expect(pick.description).toContain('advisory');
+    expect(findLogEntry('melee_variant_selected')).toBeFalsy();
+  });
+
+  it('ranged pick then Done rolls 1d6 + 3 exactly once with no default log', async () => {
+    renderChief(chiefHitPopupHtml());
+    clickButton('ranged');
+    await vi.waitFor(() => {
+      expect(useLoggedDiceRoll.__getPopupHtml().rangedVariantResolved).toBe('ranged');
+    });
+    await doneWith({ ...useLoggedDiceRoll.__getPopupHtml().autoDamage });
+    expect(rollExpression).toHaveBeenCalledWith('1d6 + 3');
+    expect(rollExpressionDoubled).not.toHaveBeenCalled();
+    expect(rollDamage.mock.calls[0][0].formula).toBe('1d6 + 3');
+    expect(findLogEntry('ranged_variant_selected')).toBeTruthy();
+    expect(findLogEntry('melee_variant_selected')).toBeFalsy();
+  });
+
+  it('unpicked Done applies the melee base 2d6 + 3 and logs the melee default', async () => {
+    renderChief(chiefHitPopupHtml());
+    await doneWith({ ...chiefHitPopupHtml().autoDamage });
+    expect(rollExpression).toHaveBeenCalledWith('2d6 + 3');
+    expect(rollDamage.mock.calls[0][0].formula).toBe('2d6 + 3');
+    const dflt = findLogEntry('melee_variant_selected');
+    expect(dflt).toBeTruthy();
+    expect(dflt.description).toContain('default');
+    expect(dflt.description).toContain('2d6 + 3');
   });
 });
