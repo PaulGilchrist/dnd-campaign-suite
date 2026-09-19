@@ -81,6 +81,11 @@ const CREATURES = [
   { name: 'ElderPaladin', type: 'player', currentHp: 224, maxHp: 224, conditions: [] },
 ];
 
+const CHAIN_CREATURES = [
+  { name: 'Chain Devil 1', type: 'npc', targetName: 'Bandit 1', currentHp: 85, maxHp: 85, ac: 15, conditions: [] },
+  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+];
+
 const ancient = () => monstersData.find(m => m.name === 'Ancient Gold Dragon');
 const ancientRow = () => ancient().legendary_actions.find(a => a.name === 'Banish');
 const ancientActions = () => [{ name: 'Rend', attack_bonus: 16, damage_dice_primary: '2d8 + 9', damage_type_primary: 'Slashing', damage_dice_secondary: '2d8', damage_type_secondary: 'Lightning', reach: '15 ft.' }];
@@ -146,5 +151,60 @@ describe('MA-0218 MonsterCardModal Banish save: zero damage on success', () => {
     const refusal = addEntry.mock.calls.find(([, e]) => e.automationType === 'legendary_use_refused');
     expect(refusal).toBeTruthy();
     expect(refusal[1].description).toMatch(/Banish legendary action refused/);
+  });
+});
+
+// MA-0481: Chain Devil Conjure Infernal Chain — prose "Success: The chain
+// disappears." = ZERO on a successful save; the absent dc_success field let
+// resolveBlockSaveDcSuccess default the success leg to 'half' (live proof:
+// nat 19 vs DC 15 paid finalDamage 3, hp 951→948). Same MA-0218 byte-shape
+// data fix rides the same block-save seam: dc_success:"none" threaded onto
+// the save context → computeDamageAfterSave(…, 'none') = 0 on success, full
+// raw on failure (fail leg byte-identical: 2d4+4 + Restrained).
+const chainDevil = () => monstersData.find(m => m.index === 'chain-devil');
+const chainRow = () => chainDevil().actions.find(a => a.name === 'Conjure Infernal Chain');
+
+function renderChainDevil() {
+  const m = makeMonster({ name: 'Chain Devil', armor_class: 15, hit_points: 85, actions: chainDevil().actions });
+  ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CHAIN_CREATURES };
+  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Chain Devil 1', creatures: CHAIN_CREATURES })} />);
+}
+
+// MA-0481 gotcha: the Multiattack row text also mentions the action —
+// scope straight to the labelled save chip, not the first row match.
+function conjureSaveChip() {
+  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 15 Dexterity')) || null;
+}
+
+describe('MA-0481 monsters.json data lock: Chain Devil Conjure Infernal Chain row', () => {
+  it('authors dc_success none (success = chain disappears) with DC 15 Dexterity 2d4 + 4 Fire', () => {
+    const row = chainRow();
+    expect(row.save_dc).toBe(15);
+    expect(row.save_type).toBe('Dexterity');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary).toBe('2d4 + 4');
+    expect(row.damage_type_primary).toBe('Fire');
+    expect(row.range).toBe('60 feet');
+    expect(row.save_effect).toMatch(/Restrained/);
+    expect(row.description).toMatch(/Success:\s*<\/strong>?\s*The chain disappears/i);
+  });
+});
+
+describe('MA-0481 MonsterCardModal Conjure Infernal Chain save: zero damage on success', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('save chip context carries dcSuccess none: success = 0 damage, failure = full raw', async () => {
+    renderChainDevil();
+    fireEvent.click(conjureSaveChip());
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(context.saveDc).toBe(15);
+    expect(context.dcSuccess).toBe('none');
+    expect(context.saveConditions).toContain('restrained');
+    expect(computeDamageAfterSave(24, true, context.dcSuccess)).toBe(0);
+    expect(computeDamageAfterSave(24, false, context.dcSuccess)).toBe(24);
   });
 });
