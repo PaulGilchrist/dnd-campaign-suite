@@ -12722,7 +12722,12 @@
         "reach": "10 ft.",
         "save_effect": "If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from one of two chains, and it has the Restrained condition until the grapple ends.",
         "damage_dice_primary": "2d6 + 4",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 14
       },
       {
         "name": "Conjure Infernal Chain",

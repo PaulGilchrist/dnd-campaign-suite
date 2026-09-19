@@ -1660,3 +1660,95 @@ describe('MA-0477 Centaur Warden Sun Ray blinded-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const CHAIN_DEVIL = monsters.find(m => m.index === 'chain-devil');
+const CHAIN_ACTION = CHAIN_DEVIL.actions[1];
+
+describe('MA-0480 Chain Devil Chain grappled+restrained-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Chain Devil 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Chain Devil 1', computedStats: { armorClass: 15 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 11, newHp: 988, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0480 data-lock: authors hit_conditions:["grappled","restrained"] + escape_dc:14 on the Chain row', () => {
+        expect(CHAIN_ACTION.name).toBe('Chain');
+        expect(CHAIN_ACTION.attack_bonus).toBe(7);
+        expect(CHAIN_ACTION.reach).toBe('10 ft.');
+        expect(CHAIN_ACTION.damage_dice_primary).toBe('2d6 + 4');
+        expect(CHAIN_ACTION.damage_type_primary).toBe('Slashing');
+        expect(CHAIN_ACTION.hit_conditions).toEqual(['grappled', 'restrained']);
+        expect(CHAIN_ACTION.escape_dc).toBe(14);
+        expect(CHAIN_ACTION.save_effect).toContain('Grappled');
+    });
+
+    it('builds the dual-condition clause with escape DC 14 (statblock STR 18/+4 + PB 3 — MA-0522: save_effect decoy inert, hit_conditions arms path)', () => {
+        expect(CHAIN_DEVIL.ability_score_modifiers.str).toBe(4);
+        expect(CHAIN_DEVIL.proficiency_bonus).toBe(3);
+        expect(buildHitConditionClause(CHAIN_ACTION)).toEqual({
+            conditions: ['grappled', 'restrained'],
+            escapeDc: 14,
+            attackName: 'Chain',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled+Restrained + escape-meta dc14 STR + condition log on a resolved Chain hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Chain', formula: '2d6 + 4', total: 11, rolls: [6, 5], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Slashing',
+            attackerName: 'Chain Devil 1',
+            hitClause: buildHitConditionClause(CHAIN_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled', 'restrained']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 14, ability: 'str', source: 'Chain Devil 1' },
+            restrained: { dc: 14, ability: 'str', source: 'Chain Devil 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Grappled, Restrained',
+            reason: 'Chain (escape DC 14)',
+        }));
+    });
+
+    it('writes no condition when the Chain attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Chain', formula: '2d6 + 4', total: 11, rolls: [6, 5], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Slashing',
+            attackerName: 'Chain Devil 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
