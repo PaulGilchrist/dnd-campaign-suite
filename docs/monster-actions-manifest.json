@@ -6924,7 +6924,7 @@
       "attackBonus": 5,
       "saveDc": 13,
       "description": "The bullywug casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 13, +5 to hit with spell attacks): At Will: Dancing Lights, Druidcraft, Ray of Sickness 1/Day Each: Speak with Plants, Vitriolic Sphere",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0454-spellcasting-dc-unknown-unmarked-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0455",
