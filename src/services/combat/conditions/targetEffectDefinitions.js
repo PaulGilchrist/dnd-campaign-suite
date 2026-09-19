@@ -1020,6 +1020,22 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { value: 2 },
   },
   {
+    // MA-0553: Darkmantle "Crush" hit-clause (MA-0016/MA-0542 te route) —
+    // a hit attaches the darkmantle. STATE STAMP ONLY: RAW Blinded +
+    // suffocation gates on advantage-cover (Medium-or-smaller), and the
+    // attach/detach/suffocation state machine is unbuilt (§69 grapple-family
+    // advisory) — no fabricated Blinded grant. Attach consequences (speed 0,
+    // moves with target, DC 13 Athletics action to detach) ride the
+    // description as GM-enforced advisory; MA-0434 advisory-duration family.
+    effect: 'attached',
+    label: 'Attached (Darkmantle)',
+    description: 'A darkmantle is attached: Speed 0, moves with the target, attacks only it with Advantage. Blinded + suffocating only while covering on an Advantage hit; detach with a DC 13 Strength (Athletics) action — GM-enforced.',
+    icon: 'fa-circle-dot',
+    cls: 'effect-debuff',
+    group: 'Movement',
+    fields: ['source'],
+  },
+  {
     effect: 'push',
     label: 'Pushed',
     description: 'The creature was pushed N feet straight away from the source.',

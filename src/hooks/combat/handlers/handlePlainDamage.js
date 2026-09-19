@@ -482,10 +482,25 @@ async function handleMultiPlainTarget({ combatSummary, context, target, campaign
     }));
 }
 
+// MA-0553: monsters.json sizes include ranges ("Medium or Small" — Bandit);
+// a plain includes() silently swallowed every hit-clause on such victims.
+// Gate on the LARGEST size named; unknown sizes stay lenient.
+function isLargeOrSmallerTarget(size) {
+    if (!size) return true;
+    const order = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
+    const parts = String(size).split(/\s+or\s+/i).map(s => s.trim());
+    let largest = 0;
+    for (const part of parts) {
+        const idx = order.indexOf(part);
+        if (idx === -1) return false;
+        if (idx > largest) largest = idx;
+    }
+    return largest <= order.indexOf('Large');
+}
+
 function maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry }) {
     if (!(context?.ramActive && context?.isMelee && target && applyResult)) return;
-    const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
-    if (!isLargeOrSmaller) return;
+    if (!isLargeOrSmallerTarget(target.size)) return;
     applyRamProneCondition(target, campaignName, logEntry);
 }
 
@@ -537,8 +552,7 @@ function maybeApplyHitClause({ context, target, applyResult, campaignName, logEn
     if (!hitClause || !target || !applyResult) return;
     const hasConditions = Array.isArray(hitClause.conditions) && hitClause.conditions.length > 0;
     if (!hasConditions && !hitClause.targetEffect) return;
-    const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
-    if (!isLargeOrSmaller) return;
+    if (!isLargeOrSmallerTarget(target.size)) return;
     if (hasConditions) {
         applyHitClauseConditions({ hitClause, target, campaignName, logEntry, attackerName: characterName });
     }

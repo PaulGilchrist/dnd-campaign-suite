@@ -527,4 +527,17 @@ describe('targetEffectDefinitions', () => {
       expect(getActiveTargetEffect(campaignName, 'Ally1', 'concentration_disadvantage')).toBeNull();
     });
   });
+
+  describe('MA-0553 attached (Darkmantle) registry entry', () => {
+    it('registers attached in Movement with the DC 13 detach advisory', () => {
+      const def = getEffectDefinition('attached');
+      expect(def).toBeTruthy();
+      expect(def.effect).toBe('attached');
+      expect(def.label).toBe('Attached (Darkmantle)');
+      expect(def.group).toBe('Movement');
+      expect(def.description).toMatch(/DC 13 Strength \(Athletics\)/);
+      expect(def.description).toMatch(/GM-enforced/);
+      expect(def.fields).toContain('source');
+    });
+  });
 });

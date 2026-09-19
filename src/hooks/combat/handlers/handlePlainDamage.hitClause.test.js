@@ -2390,6 +2390,121 @@ describe('MA-0542 Cyclops Oracle Flash of Light disadvantage_attack_rolls hit-cl
     });
 });
 
+const DARKMANTLE = monsters.find(m => m.index === 'darkmantle');
+const CRUSH_ACTION = DARKMANTLE.actions[0];
+
+describe('MA-0553 Darkmantle Crush attached hit-clause (stamp + advisory, no fabricated Blinded)', () => {
+    const deps = {
+        characterName: 'Darkmantle 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Darkmantle 1', computedStats: { armorClass: 11 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getEffectDefinition.mockImplementation((key) => ({
+            effect: key,
+            label: 'Attached (Darkmantle)',
+            description: 'A darkmantle is attached: Speed 0, moves with the target, attacks only it with Advantage. Blinded + suffocating only while covering on an Advantage hit; detach with a DC 13 Strength (Athletics) action — GM-enforced.',
+            group: 'Movement',
+        }));
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 991, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0553 data-lock: Crush row authors hit_target_effect:"attached", damage legs exact, NO hit_conditions (no blinded fabrication)', () => {
+        expect(CRUSH_ACTION.name).toBe('Crush');
+        expect(CRUSH_ACTION.attack_bonus).toBe(5);
+        expect(CRUSH_ACTION.reach).toBe('5 ft.');
+        expect(CRUSH_ACTION.damage_dice_primary).toBe('1d6 + 3');
+        expect(CRUSH_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(CRUSH_ACTION.hit_target_effect).toBe('attached');
+        expect(CRUSH_ACTION.hit_conditions).toBeUndefined();
+        expect(CRUSH_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a targetEffect-only clause from the Crush row', () => {
+        expect(buildHitConditionClause(CRUSH_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Crush',
+            targetEffect: 'attached',
+        });
+    });
+
+    it('registers the attached te on the victim, sourced from the darkmantle, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Crush', formula: '1d6 + 3', total: 8, rolls: [5], modifier: 3, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Darkmantle 1',
+            hitClause: buildHitConditionClause(CRUSH_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'attached',
+            'Darkmantle 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('MA-0553 clock-lock: grants ONE addExpiration anchored on the darkmantle (MA-0016/MA-0542 anchor leg; attach-until-detached RAW is advisory per MA-0434)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Crush', formula: '1d6 + 3', total: 8, rolls: [5], modifier: 3, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Darkmantle 1',
+            hitClause: buildHitConditionClause(CRUSH_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Darkmantle 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'attached', source: 'Darkmantle 1', target: 'Bandit 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Darkmantle 1',
+        });
+    });
+
+    it('logs condition-applied with registry label + DC 13 detach advisory; never fabricates a blinded activeConditions write', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Crush', formula: '1d6 + 3', total: 8, rolls: [5], modifier: 3, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Darkmantle 1',
+            hitClause: buildHitConditionClause(CRUSH_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Attached (Darkmantle)',
+        }));
+        const conditionLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied');
+        expect(conditionLog.note).toMatch(/DC 13/);
+        expect(conditionLog.note).toMatch(/GM-enforced/);
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        const condWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
+        expect(JSON.stringify(condWrites)).not.toMatch(/blinded/i);
+    });
+});
+
 const CYCLOPS_SENTRY = monsters.find(m => m.index === 'cyclops-sentry');
 const STONE_CLUB_ACTION = CYCLOPS_SENTRY.actions[1];
 

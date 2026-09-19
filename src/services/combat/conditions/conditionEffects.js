@@ -350,6 +350,14 @@ const EARLY_TARGET_EFFECT_HANDLERS = {
   disadvantage_attack_rolls: (effects) => {
     bumpCount(effects, 'attackDisadvantageCount');
   },
+  // MA-0553: Darkmantle Crush attach-clause — attach STATE stamp on hit.
+  // The te standing is the machine truth (badge + source via registry);
+  // Blinded/suffocation/speed-0/DC13-detach are GM-enforced advisory
+  // (§69 unbuilt attach state machine, MA-0434 advisory-duration family) —
+  // no fabricated Blinded grant, no numeric legs here.
+  attached: (effects, te) => {
+    effects.attachedBy = te.source || 'Attacher';
+  },
   reckless_attack: (effects) => {
     bumpCount(effects, 'targetAdvantageCount');
     effects.targetAdvantageReasons.push('Reckless Attack');
