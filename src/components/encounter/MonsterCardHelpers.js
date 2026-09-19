@@ -9,6 +9,7 @@ import { rollExpression, canRollExpression } from '../../services/dice/diceRolle
 import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, rechargeActionKey, parseRechargeThreshold, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -825,6 +826,16 @@ const GATED_MONSTER_REACTIONS = {
   // (usage:'At Will'+uses:999, MA-0341 shape) — RAW unlimited; 1/round latch
   // (_attack_usedRound) + lastAttack.berserkLashingResolved identity stamp.
   attack: { effect: 'attack', trigger: 'damage_taken', label: 'Berserk Lashing', icon: 'fa-hand-fist' },
+  // MA-0544: Cyclops Oracle Portent — d20-replacement pool reaction. No
+  // D20-Test event dispatch exists app-wide (advisory-pool floor, CLA-325):
+  // GM-click when a D20 Test happens, the app rolls the 1d20 and STORES it
+  // on the monster's runtime `portentRolls` pool; replacement-application
+  // stays GM-enforced, logged clearly. The authored recharge "4-6" is the
+  // real economy: fire spends MONSTER_RECHARGE_KEY[Portent] via
+  // spendMonsterRecharge (MA-0031) — second press refuses honestly until a
+  // d6 4+ at the monster's own turn-start regains it (rollMonsterRecharges,
+  // turnStartEffects seam; the spent stamp IS the regain registration).
+  portent: { effect: 'portent', trigger: 'd20_test_seen', label: 'Portent', icon: 'fa-dice-d20' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -1246,6 +1257,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'attack') {
     return resolveMonsterAttackReaction({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, setRuntimeValue: ctx.setRV } });
+  }
+
+  if (def.effect === 'portent') {
+    return resolveMonsterPortentReaction({ action, monsterName, campaignName, currentRound: ctx.currentRound, getRV: ctx.getRV, setRV: ctx.setRV, log: ctx.log, deps });
   }
 
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });
@@ -1912,4 +1927,68 @@ export function buildEyeRayAutoSuccessLog({ monsterName, ray, targetName, reason
     description: `${targetName} succeeds automatically against ${monsterName}'s ${ray.name} (${reason}) — no save rolled, no effect applied.`,
     timestamp: Date.now(),
   };
+}
+
+// MA-0544: Cyclops Oracle Portent — d20-replacement pool (advisory-pool
+// floor). Pool lives on the MONSTER-name runtime store under `portentRolls`
+// (distinct from the PC DivinationWizard `portentDice` key). Full-store-safe:
+// always spread a NEW array (in-place push skips the dirty-check POST, §39).
+export const PORTENT_POOL_KEY = 'portentRolls';
+
+function portentPoolOf(stored) {
+  return Array.isArray(stored) ? stored : [];
+}
+
+function buildPortentRefusalLog({ monsterName, reason, message }) {
+  return {
+    type: 'automation',
+    characterName: monsterName,
+    automationType: 'portent_refused',
+    name: 'Portent',
+    description: `Portent refused (${reason}): ${message}`,
+    timestamp: Date.now(),
+  };
+}
+
+function buildPortentSpendLog({ monsterName, roll, poolSize, rechargeThreshold }) {
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Portent',
+    description: `${monsterName} uses Portent — rolled ${roll.total} (GM applies ${roll.total} in place of a D20 Test made by ${monsterName} or an ally it can see — replacement is GM-enforced advisory, no d20-replacement consumer). Pool holds ${poolSize} portent roll(s). Recharge ${rechargeThreshold}-6: unavailable until a d6 ${rechargeThreshold}+ at the start of ${monsterName}'s next turn.`,
+    timestamp: Date.now(),
+  };
+}
+
+function buildPortentPopupHtml({ monsterName, roll, poolSize }) {
+  return `<div class="mc-prerequisite-refusal"><h3>Portent</h3><p>${monsterName} rolls a Portent d20: <strong>${roll.total}</strong> — stored in the portent pool (${poolSize} held). GM applies it in place of the d20 rolled for a D20 Test made by ${monsterName} or an ally it can see (GM-enforced, advisory — no d20-replacement chooser consumer exists). Recharge 4-6 spent.</p></div>`;
+}
+
+export function portentGate({ action, monsterName, rechargeMap }) {
+  const gate = monsterRechargeGate(action, rechargeMap || {});
+  if (gate && !gate.available) {
+    return { ok: false, reason: 'recharge', message: `Portent: not recharged — ${monsterName} must roll a d6 ${gate.threshold}+ at the start of its next turn before Portent can roll again.` };
+  }
+  return { ok: true, threshold: gate ? gate.threshold : null };
+}
+
+async function resolveMonsterPortentReaction({ action, monsterName, campaignName, currentRound, getRV, setRV, log, deps }) {
+  const rollDice = deps.rollExpression || rollExpression;
+  const gate = portentGate({ action, monsterName, rechargeMap: getRV(monsterName, MONSTER_RECHARGE_KEY) });
+  if (!gate.ok) {
+    await log(campaignName, buildRechargeRefusalLog({ monsterName, actionName: action?.name || 'Portent', rechargeKey: rechargeActionKey(action), threshold: parseRechargeThreshold(action?.recharge) }));
+    return { ok: false, message: gate.message, popupHtml: buildRechargeRefusalPopup({ monsterName, actionName: action?.name || 'Portent', threshold: parseRechargeThreshold(action?.recharge) }) };
+  }
+  const roll = rollDice('1d20');
+  if (!roll) {
+    const message = 'Portent: 1d20 did not resolve — nothing rolled, nothing spent.';
+    await log(campaignName, buildPortentRefusalLog({ monsterName, reason: 'dice', message }));
+    return { ok: false, message };
+  }
+  const pool = [...portentPoolOf(getRV(monsterName, PORTENT_POOL_KEY)), { roll: roll.total, round: Number(currentRound) || 1, timestamp: Date.now() }];
+  await setRV(monsterName, PORTENT_POOL_KEY, pool, campaignName);
+  const entry = buildPortentSpendLog({ monsterName, roll, poolSize: pool.length, rechargeThreshold: gate.threshold || 4 });
+  await log(campaignName, entry);
+  await spendMonsterRecharge({ monsterName, action, campaignName, deps: { getRuntimeValue: getRV, setRuntimeValue: setRV, addEntry: log } });
+  return { ok: true, message: entry.description, rollTotal: roll.total, pool, popupHtml: buildPortentPopupHtml({ monsterName, roll, poolSize: pool.length }) };
 }

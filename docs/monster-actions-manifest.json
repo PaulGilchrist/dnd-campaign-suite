@@ -8376,7 +8376,7 @@
       "recharge": "4-6",
       "trigger": "The cyclops or an ally it can see makes a <strong>D20 Test</strong>.",
       "description": "The cyclops rolls 1d20 and chooses whether to use that roll in place of the d20 rolled for the D20 Test.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0544-cyclops-oracle-portent-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0545",

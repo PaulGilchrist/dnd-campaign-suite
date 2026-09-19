@@ -15646,7 +15646,12 @@
         "name": "Portent",
         "trigger": "The cyclops or an ally it can see makes a <strong>D20 Test</strong>.",
         "description": "The cyclops rolls 1d20 and chooses whether to use that roll in place of the d20 rolled for the D20 Test.",
-        "recharge": "4-6"
+        "recharge": "4-6",
+        "automation": {
+          "type": "reaction",
+          "trigger": "d20_test_seen",
+          "effect": "portent"
+        }
       }
     ],
     "legendary_actions": [],
