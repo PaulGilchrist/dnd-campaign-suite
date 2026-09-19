@@ -714,6 +714,36 @@ export function saveLegCarriesSecondaryDamage(action) {
   return String(action?.save_effect || '').includes(String(action.damage_dice_secondary));
 }
 
+// MA-0560: rider-only composite save chip — Death Dog Bite ("Hit: 4 (1d4 + 2)
+// Piercing … Constitution Saving Throw: DC 12. First Failure: The target has the
+// Poisoned condition.") rides a CONDITION rider on an attack row; the fixed
+// attack primary pays on the attack chip (MA-0551 fork), so the DC chip must
+// never re-roll it — save_effect prose carries no "damage" clause and no
+// damage_dice_secondary → the save adjudicates the rider alone (zero extra on
+// success, Poisoned + source meta on fail via applyDamagelessSaveConditions).
+// Composites whose save leg DOES carry damage (Salamander/Marilith save-effect
+// dice, Dao MA-0551 secondary) and pure-save rows stay byte-identical.
+// eslint-disable-next-line react-refresh/only-export-components
+export function saveLegIsConditionRider(action) {
+  if (!isCompositeAttackSaveRow(action)) return false;
+  if (saveLegCarriesSecondaryDamage(action)) return false;
+  return !/\bdamage\b/i.test(String(action?.save_effect || ''));
+}
+
+// MA-0560: save-chip plan (complexity hoist, playbook §5) — the rider-only
+// composite fork + rollability/clickable shape for ActionSaveRoll.
+// eslint-disable-next-line react-refresh/only-export-components
+export function saveChipPlan(action, attackerCannotAct) {
+  const riderOnly = saveLegIsConditionRider(action);
+  const formula = riderOnly ? null : extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
+  return {
+    riderOnly,
+    formula,
+    rollable: formula != null && canRollExpression(formula),
+    clickable: (!action.attack_bonus || riderOnly) && !attackerCannotAct,
+  };
+}
+
 // MA-0551: attack-chip save-ride — composite rows keep the rider arms
 // (saveConditions/trap/wound transports) but drop the save adjudication keys,
 // so the auto-damage lands via plainDamageHandler at FULL fixed value.

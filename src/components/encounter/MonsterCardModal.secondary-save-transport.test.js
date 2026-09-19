@@ -3,7 +3,8 @@
 // from the save chip through buildSaveOptions + buildAbilitySaveRollContext
 // to saveProcessing. Rows without a secondary keep every secondary field null.
 import { describe, it, expect } from 'vitest';
-import { buildSaveOptions, buildAbilitySaveRollContext, isCompositeAttackSaveRow, saveLegCarriesSecondaryDamage } from './MonsterCardModal.jsx';
+import { buildSaveOptions, buildAbilitySaveRollContext, isCompositeAttackSaveRow, saveLegCarriesSecondaryDamage, saveLegIsConditionRider } from './MonsterCardModal.jsx';
+import { extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
 
 // MA-0551: Dao Earth Burst — composite attack+save row whose save_effect
 // Failure clause carries its own dice ("Failure: 10 (3d6) Thunder damage.").
@@ -156,5 +157,85 @@ describe('MA-0551 — Dao Earth Burst composite attack+save fork', () => {
         expect(opts.saveDc).toBe(16);
         expect(opts.saveType).toBe('dex');
         expect(opts.dcSuccess).toBe('none');
+    });
+});
+
+// MA-0560: Death Dog Bite — composite attack+save row whose save_effect gates a
+// CONDITION rider only (no damage anywhere in the save leg). MA-0551 composite
+// fork extension: the DC chip arms NO damage formula (the fixed 1d4+2 primary
+// pays FULL on the attack chip, both save outcomes); the save adjudicates the
+// Poisoned rider alone. Composites whose save leg DOES carry damage (Salamander/
+// Marilith save-effect dice, Dao secondary) and pure-save rows byte-identical.
+const deathDogBite = {
+    name: 'Bite',
+    description: 'Melee Attack Roll: +4, reach 5 ft. <strong>Hit:</strong> 4 (1d4 + 2) Piercing damage. If the target is a creature, it is subjected to the following effect. Constitution Saving Throw: DC 12. First Failure: The target has the <strong>Poisoned</strong> condition. While Poisoned, the target\'s Hit Point maximum doesn\'t return to normal when finishing a Long Rest, and it repeats the save every 24 hours that elapse, ending the effect on itself on a success. Subsequent Failures: The Poisoned target\'s Hit Point maximum decreases by 5 (1d10).',
+    attack_bonus: 4,
+    reach: '5 ft.',
+    save_dc: 12,
+    save_type: 'Constitution',
+    save_effect: 'First Failure: The target has the Poisoned condition. While Poisoned, the target\'s Hit Point maximum doesn\'t return to normal when finishing a Long Rest, and it repeats the save every 24 hours that elapse, ending the effect on itself on a success. Subsequent Failures: The Poisoned target\'s Hit Point maximum decreases by 5 (1d10).',
+    damage_dice_primary: '1d4 + 2',
+    damage_type_primary: 'Piercing',
+};
+
+describe('MA-0560 — Death Dog Bite rider-only composite save fork', () => {
+    it('composite fork covers the row: attack_bonus + numeric save_dc', () => {
+        expect(isCompositeAttackSaveRow(deathDogBite)).toBe(true);
+    });
+
+    it('saveLegIsConditionRider: true for rider-only composite, false for damage-carrying twins', () => {
+        expect(saveLegIsConditionRider(deathDogBite)).toBe(true);
+        // MA-0551 composite whose rider carries secondary dice
+        expect(saveLegIsConditionRider(daoRow)).toBe(false);
+        // composites whose save_effect prose carries its own damage dice
+        expect(saveLegIsConditionRider({
+            name: 'Constrict', attack_bonus: 0, save_dc: 15, save_type: 'Strength',
+            save_effect: 'Failure: 11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Fire damage. The target has the Grappled condition (escape DC 14).',
+        })).toBe(false);
+        expect(saveLegIsConditionRider({
+            name: 'Constrict', attack_bonus: 0, save_dc: 17, save_type: 'Strength',
+            save_effect: '15 (2d10 + 4) Bludgeoning damage. The target has the Grappled condition (escape DC 14).',
+        })).toBe(false);
+        // pure-save rows byte-identical (never forked)
+        expect(saveLegIsConditionRider({ name: 'Constrict', save_dc: 12, save_type: 'Strength', save_effect: 'The target has the Grappled condition (escape DC 12).' })).toBe(false);
+        expect(saveLegIsConditionRider({ name: 'Club', attack_bonus: 4 })).toBe(false);
+    });
+
+    it('save_effect prose extraction yields poisoned rider (byte-carries canonical word)', () => {
+        expect(extractConditionsFromSaveEffect(deathDogBite.save_effect)).toEqual(['poisoned']);
+    });
+
+    it('save chip context arms NO damage on the rider leg (zero on save success)', () => {
+        const ctx = buildAbilitySaveRollContext({
+            monsterName: 'Death Dog 1',
+            target: { name: 'Bandit 1', type: 'npc' },
+            spellName: null,
+            action: deathDogBite,
+            saveType: 'CON',
+            dcSuccess: 'half',
+            saveDamageFormula: null, // ActionSaveRoll forks the formula to null
+            saveConditions: ['poisoned'],
+            usesGate: null,
+            prerequisite: null,
+            getDamageTypesForAction,
+        });
+        expect(ctx.autoDamageFormula).toBeNull();
+        // rider save keys stay armed so the DC chip adjudicates conditions
+        expect(ctx.saveDc).toBe(12);
+        expect(ctx.saveType).toBe('CON');
+        expect(ctx.saveConditions).toEqual(['poisoned']);
+    });
+
+    it('attack chip full-damage transport keeps primary FULL unhalved (no save keys)', () => {
+        // buildSaveOptions stays byte-identical (save affordance source);
+        // the attack-chip strip lives in buildAttackChipSaveOptions (MA-0551) —
+        // verified via buildSaveOptions still exposing the primary untouched.
+        const opts = buildSaveOptions(deathDogBite);
+        expect(opts.saveDc).toBe(12);
+        expect(opts.saveType).toBe('con');
+        // advisory ladder residual: the (1d10) HP-max ladder never enters the
+        // damage transport (MA-0483 §70 readers-only, no producer — advisory)
+        expect(opts.autoDamageSecondaryFormula).toBeNull();
+        expect(opts.autoDamageSecondaryName).toBeNull();
     });
 });

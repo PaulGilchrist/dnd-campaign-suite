@@ -1,7 +1,7 @@
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { canRollExpression } from '../../services/dice/diceRoller.js';
-import { extractDamageDiceFromDescription } from './MonsterCardModal.jsx';
+import { extractDamageDiceFromDescription, saveChipPlan } from './MonsterCardModal.jsx';
 import { attackRowMissingToHit, extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage } from './MonsterCardHelpers.js';
 import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
 import { legendaryCheckRow, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
@@ -87,7 +87,11 @@ function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast 
 
 function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed, rechargeOut = false }) {
   if (action.save_dc == null) return null;
-  const saveDamageFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
+  // MA-0560: rider-only composite rows (Death Dog Bite) arm NO damage on the
+  // DC chip — the fixed primary pays full on the attack chip (MA-0551 fork);
+  // the save adjudicates the condition rider alone. Other rows byte-identical.
+  const plan = saveChipPlan(action, attackerCannotAct);
+  const saveDamageFormula = plan.formula;
   const saveConditions = extractConditionsFromSaveEffect(action?.save_effect);
   const usesGate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
   const usesNote = usesGate ? <em> ({usesGate.maxUses}/Day · {usesGate.remaining} left)</em> : null;
@@ -95,7 +99,7 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed, 
   const handleSaveRoll = () => {
     onSaveRoll(action, saveDamageFormula, saveConditions);
   };
-  if (saveDamageFormula && canRollExpression(saveDamageFormula)) {
+  if (plan.rollable) {
     // MA-0035: the dice chip stays its clean formula text (existing exact-text
     // selectors intact); the labelled "DC N <Type>" save affordance renders as
     // a sibling clickable span (same handleSaveRoll), no per-row fork.
@@ -110,9 +114,8 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed, 
       </>
     );
   }
-  const clickable = !action.attack_bonus && !attackerCannotAct;
   return (
-    <span className={`mc-dice-link ${clickable ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}${spentClass}`} onClick={clickable ? handleSaveRoll : undefined} role="button" tabIndex={0}>
+    <span className={`mc-dice-link ${plan.clickable ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}${spentClass}`} onClick={plan.clickable ? handleSaveRoll : undefined} role="button" tabIndex={0}>
       DC {action.save_dc} {action.save_type}{usesNote}
     </span>
   );

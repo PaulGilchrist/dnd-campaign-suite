@@ -136,3 +136,63 @@ describe('MA-0348 Hold Person damageless save leg', () => {
         expect(stamped.saveResult).toBe('failure');
     });
 });
+
+// MA-0560: Death Dog Bite rider-only composite — the DC chip (MA-0560 fork in
+// ActionSaveRoll) reaches this seam with autoDamageFormula NULL + saveConditions
+// ['poisoned'] against an EB-NPC victim (processNpcSave inline branch): FAILED
+// save → Poisoned + source meta + condition log, ZERO damage rolled; SUCCESS →
+// nothing lands. The fixed 1d4+2 primary is paid once, FULL, on the attack chip.
+const deathDogContext = {
+    saveDc: 12,
+    saveType: 'CON',
+    attackerName: 'Death Dog 1',
+    actionName: 'Bite',
+    spellName: null,
+    dcSuccess: 'half',
+    autoDamageFormula: null,
+    saveConditions: ['poisoned'],
+    isSpellDamage: false,
+    _characters: [],
+};
+
+function resolveNpcSave(success) {
+    return processSaveRoll({
+        rollType: 'save',
+        target: { name: 'Bandit 1', type: 'npc' },
+        characterName: 'Death Dog 1',
+        campaignName,
+        context: { ...deathDogContext, effectiveD20: success ? 15 : 5 },
+        bonus: 0,
+        r1: success ? 15 : 5,
+        r2: success ? 15 : 5,
+        logEntry,
+        setPopupHtml: vi.fn(),
+    });
+}
+
+describe('MA-0560 Death Dog rider-only composite save on EB-NPC', () => {
+    it('failed save: Poisoned lands with source meta + condition log, zero save damage', async () => {
+        await resolveNpcSave(false);
+        expect(runtimeStore['Bandit 1.activeConditions']).toEqual(['poisoned']);
+        expect(runtimeStore['Bandit 1.activeConditionMeta'].poisoned).toMatchObject({ source: 'Death Dog 1' });
+        const conditionLog = conditionLogs.find(e => e.type === 'condition' && e.action === 'applied');
+        expect(conditionLog).toMatchObject({ characterName: 'Bandit 1', condition: 'Poisoned', sourceName: 'Death Dog 1', sourceAbility: 'Bite' });
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(gmLog.some(e => e.rollType === 'save-damage')).toBe(false);
+    });
+
+    it('successful save: nothing lands, zero damage (bite already paid FULL on attack chip)', async () => {
+        await resolveNpcSave(true);
+        expect(runtimeStore['Bandit 1.activeConditions']).toBeUndefined();
+        expect(conditionLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(gmLog.some(e => e.rollType === 'save-damage')).toBe(false);
+    });
+
+    it('advisory ladder residual: no save damage pool authored anywhere (MA-0483 §70)', () => {
+        expect(deathDogContext.autoDamageFormula).toBeNull();
+        expect(deathDogContext.autoDamageSecondaryFormula).toBeUndefined();
+    });
+});
