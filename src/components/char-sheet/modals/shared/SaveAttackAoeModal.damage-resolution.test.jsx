@@ -2,6 +2,7 @@
 // @cleaned-by-ai
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 
 // ── Mocked modules ──
@@ -204,6 +205,7 @@ import * as automationExpressions from '../../../../services/combat/automation/a
 import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
 import * as savePromptService from '../../../../services/combat/conditions/savePromptService.js';
 import * as logService from '../../../../services/ui/logService.js';
+import * as applyDamage from '../../../../services/rules/combat/applyDamage.js';
 
 // ── Test fixtures ──
 
@@ -434,6 +436,135 @@ describe('SaveAttackAoeModal - Damage resolution', () => {
         [],
         'test-campaign'
       );
+    });
+  });
+
+  // ── MA-0563: dual-pool AoE save rows (Death Knight Hellfire Orb) ──
+
+  describe('MA-0563 secondary damage pool', () => {
+    const REAL_HALF = (raw, success, dcSuccess) => {
+      if (!success) return raw;
+      return dcSuccess === 'half' ? Math.floor(raw / 2) : 0;
+    };
+    const formulaRoll = (total) => ({ total, rolls: [total], modifier: 0 });
+
+    function dualProps(overrides) {
+      return makeProps({ damage: '8d6', damageType: 'Fire', secondaryDamage: '10d6', secondaryDamageType: 'Necrotic', ...overrides });
+    }
+
+    function mockDualDice() {
+      diceRoller.rollExpression.mockImplementation((f) => formulaRoll(f === '8d6' ? 12 : 7));
+      applyDamage.computeDamageAfterEvasion.mockImplementation(REAL_HALF);
+    }
+
+    function damageLogCalls() {
+      return logService.addEntry.mock.calls.map(c => c[1]).filter(e => e && e.rollType === 'save-damage' && e.formula);
+    }
+
+    it('failed save rolls BOTH pools full and logs one save-damage entry per type', async () => {
+      mockDualDice();
+      // DC 999 → guaranteed NPC fail, both legs full (floor-halving untaken).
+      render(<SaveAttackAoeModal {...dualProps({ saveDc: 999 })} />);
+      await confirmSelection('Goblin A');
+
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+        expect.anything(), 'Goblin A', 12, ['Fire'], expect.anything());
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+        expect.anything(), 'Goblin A', 7, ['Necrotic'], expect.anything());
+
+      const logs = damageLogCalls();
+      const primary = logs.find(e => e.formula === '8d6');
+      const secondary = logs.find(e => e.formula === '10d6');
+      expect(primary).toBeTruthy();
+      expect(primary.damageType).toBe('Fire');
+      expect(primary.finalDamage).toBe(12);
+      expect(primary.saveResult).toBe('failure');
+      expect(secondary).toBeTruthy();
+      expect(secondary.damageType).toBe('Necrotic');
+      expect(secondary.finalDamage).toBe(7);
+      expect(secondary.saveResult).toBe('failure');
+
+      const rollback = damageRollback.addTargetResult.mock.calls.find(c => c[1]?.targetName === 'Goblin A');
+      expect(rollback[1].appliedDamage).toBe(19);
+
+      await waitFor(() => {
+        expect(screen.getByText(/takes 12 Fire \+ 7 Necrotic damage/)).toBeInTheDocument();
+      }, { timeout: 200 });
+    });
+
+    it('successful save halves EACH pool independently (floor each leg)', async () => {
+      mockDualDice();
+      render(<SaveAttackAoeModal {...dualProps({ dcSuccess: 'half' })} />);
+      await confirmSelection('Player One');
+
+      expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        targetName: 'Player One',
+        rawDamage: 12,
+        secondaryRawDamage: 7,
+        secondaryDamageType: 'Necrotic',
+      }));
+
+      const promptCall = savePromptService.sendSavePrompt.mock.calls[0][1];
+      await act(async () => {
+        window.dispatchEvent(new CustomEvent('save-result', {
+          detail: { promptId: promptCall.promptId, success: true, saveBonus: 4, rawDamage: 12, total: 16, roll: 12 },
+        }));
+      });
+
+      await waitFor(() => {
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+          expect.anything(), 'Player One', 6, ['Fire'], expect.anything());
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+          expect.anything(), 'Player One', 3, ['Necrotic'], expect.anything());
+      }, { timeout: 200 });
+
+      const logs = damageLogCalls();
+      expect(logs.some(e => e.formula === '8d6' && e.finalDamage === 6 && e.saveResult === 'success')).toBe(true);
+      expect(logs.some(e => e.formula === '10d6' && e.finalDamage === 3 && e.saveResult === 'success')).toBe(true);
+    });
+
+    it('single-damage rows stay byte-identical: one roll, one type, one log, no secondary fields', async () => {
+      diceRoller.rollExpression.mockImplementation((f) => formulaRoll(f === '8d6' ? 12 : 7));
+      applyDamage.computeDamageAfterEvasion.mockImplementation(REAL_HALF);
+      render(<SaveAttackAoeModal {...makeProps({ saveDc: 999 })} />);
+      // picker copy byte-check BEFORE confirm swaps the view to the summary.
+      expect(screen.getByText('On a failed save, target takes 8d6 Fire damage. On a successful save, target takes half damage.')).toBeInTheDocument();
+      expect(screen.queryByText(/plus 10d6/)).toBeNull();
+      await confirmSelection('Goblin A');
+
+      const targetCalls = applyDamage.applyDamageToTarget.mock.calls.filter(c => c[1] === 'Goblin A');
+      expect(targetCalls.length).toBe(1);
+      expect(targetCalls[0][2]).toBe(12);
+      expect(targetCalls[0][3]).toEqual(['Fire']);
+
+      const logs = damageLogCalls();
+      expect(logs.every(e => e.formula === '8d6')).toBe(true);
+      expect(logs.every(e => e.damageType === 'Fire')).toBe(true);
+      expect(logs.every(e => !('secondaryFinalDamage' in e) && !('secondaryDamageType' in e))).toBe(true);
+
+      const rollback = damageRollback.addTargetResult.mock.calls.find(c => c[1]?.targetName === 'Goblin A');
+      expect(rollback[1].appliedDamage).toBe(12);
+      expect('secondaryFinalDamage' in rollback[1]).toBe(false);
+    });
+
+    it('Death Knight + Aspirant twin data-lock: Hellfire Orb dual pools on disk', () => {
+      const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+      const dk = monsters.find(m => m.name === 'Death Knight');
+      const orb = dk.actions.find(a => a.name === 'Hellfire Orb');
+      expect(orb.damage_dice_primary).toBe('10d6');
+      expect(orb.damage_type_primary).toBe('Fire');
+      expect(orb.damage_dice_secondary).toBe('10d6');
+      expect(orb.damage_type_secondary).toBe('Necrotic');
+      expect(orb.save_dc).toBe(18);
+      expect(orb.save_type).toBe('Dexterity');
+      expect(orb.recharge).toBe('5-6');
+      expect(orb.dc_success).toBeUndefined();
+
+      const asp = monsters.find(m => m.name === 'Death Knight Aspirant');
+      const aspOrb = asp.actions.find(a => a.name === 'Hellfire Orb');
+      expect(aspOrb.damage_dice_secondary).toBe('6d6');
+      expect(aspOrb.damage_type_secondary).toBe('Necrotic');
+      expect(aspOrb.save_dc).toBe(15);
     });
   });
 });

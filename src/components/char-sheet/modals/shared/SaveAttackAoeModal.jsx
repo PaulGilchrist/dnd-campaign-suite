@@ -71,6 +71,37 @@ function rollDamageFormula(formula, overchannelActive) {
     return overchannelActive ? rollExpressionMaximized(formula) : rollExpression(formula);
 }
 
+// MA-0563: authored secondary pool on an AoE SAVE row (Death Knight Hellfire
+// Orb "Failure: 10d6 Fire plus 10d6 Necrotic") — pre-MA-0563 the picker route
+// rolled PRIMARY only and mislabelled the joined type "Fire/Necrotic". Each
+// secondary rolls SEPARATELY per target, halves independently via
+// computeDamageAfterEvasion (MA-0427 save-path recipe, floors each leg),
+// applies its own damage type, and logs its own save-damage entry.
+// Byte-inert null for every row without a secondaryDamage prop.
+function applySecondaryNpcDamageLeg({ ctx, success, saveBonus, saveRoll, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, resistances, immunities, evasionActive, carefulSpellProtected }) {
+    if (!ctx.secondaryDamage) return null;
+    const damageType = ctx.secondaryDamageType || null;
+    if (!damageType) console.error(`[SaveAttackAoeModal] MA-0563 secondary formula "${ctx.secondaryDamage}" has no authored damage_type_secondary — applying typeless.`);
+    const damageRoll = rollDamageFormula(ctx.secondaryDamage, ctx.overchannelActive);
+    const rawDamage = damageRoll?.total ?? 0;
+    const damageAfterSave = computeDamageAfterEvasion(rawDamage, success, ctx.dcSuccess, evasionActive);
+    const resResult = computeDamageAfterResistancesWithDetails({ rawDamage: damageAfterSave, damageTypes: [damageType], resistances, immunities, ignoreResistance: false });
+    const finalDamage = carefulSpellProtected ? 0 : resResult.finalDamage;
+    if (finalDamage > 0) {
+        applyDamageToTarget(ctx.combatSummary, ctx.targetName, finalDamage, [damageType], { campaignName: ctx.campaignName, characters: ctx.characters, ignoreResistance: true, attackerName: ctx.playerStats.name, suppressHpLog: false });
+        addEntry(ctx.campaignName, buildNpcSaveLogEntry({ action: ctx.action, playerStats: ctx.playerStats, targetDamageFormula: ctx.secondaryDamage, damageRoll, rawDamage, damageType, targetName: ctx.targetName, saveType: ctx.saveType, saveDc: ctx.saveDc, dcSuccess: ctx.dcSuccess, success, saveRoll, saveBonus, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, finalDamage })).catch((e) => { console.error('[SaveAttackAoeModal] Error logging secondary save damage:', e); });
+    }
+    return { rawDamage, finalDamage, damageType };
+}
+
+function withSecondaryFields(base, secondary) {
+    return secondary ? { ...base, secondaryRawDamage: secondary.rawDamage, secondaryFinalDamage: secondary.finalDamage, secondaryDamageType: secondary.damageType } : base;
+}
+
+function appliedDamageTotal(finalDamage, secondary) {
+    return secondary ? finalDamage + secondary.finalDamage : finalDamage;
+}
+
 function getTargetDefenses(combatSummary, targetName) {
     const targetCreature = combatSummary.creatures.find(c => c.name === targetName);
     const resistances = targetCreature?.resistances || [];
@@ -178,8 +209,9 @@ function resolveNpcTarget(ctx) {
         const updatedEffects = targetEffects.filter(te => !(te.target === targetName && te.effect === 'disadvantage_on_next_save'));
         setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
     }
-    addTargetResult(campaignName, { targetName, saveResult: success ? 'success' : 'failure', roll: saveRoll, total: saveTotal, conditions: [], appliedDamage: finalDamage });
-    return { targetName, success, roll: saveRoll, total: saveTotal, saveBonus, rawDamage, finalDamage };
+    const secondary = applySecondaryNpcDamageLeg({ ctx, success, saveBonus, saveRoll, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, resistances, immunities, evasionActive, carefulSpellProtected });
+    addTargetResult(campaignName, { targetName, saveResult: success ? 'success' : 'failure', roll: saveRoll, total: saveTotal, conditions: [], appliedDamage: appliedDamageTotal(finalDamage, secondary) });
+    return withSecondaryFields({ targetName, success, roll: saveRoll, total: saveTotal, saveBonus, rawDamage, finalDamage }, secondary);
 }
 
 // Resolve a PC target: soulstitch/careful auto-protect (returns { result }) or a save prompt ({ prompt }).
@@ -222,6 +254,13 @@ function resolvePcTarget(ctx) {
     const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
     const rawDamage = damageRoll?.total ?? 0;
 
+    // MA-0563: secondary pool rolled once at prompt-build with the primary;
+    // stashed on the prompt record so the save adjudication halves each leg
+    // independently. Null for single-damage rows (payload byte-identical).
+    const secondary = ctx.secondaryDamage
+        ? buildPromptSecondary(ctx, ctx.secondaryDamage, ctx.overchannelActive)
+        : null;
+
     sendSavePrompt(campaignName, {
         promptId,
         targetName,
@@ -229,6 +268,7 @@ function resolvePcTarget(ctx) {
         saveDc: saveDc,
         sourceName: playerStats.name,
         rawDamage,
+        ...(secondary ? { secondaryRawDamage: secondary.rawDamage, secondaryDamageType: secondary.damageType } : {}),
         dcSuccess,
         disadvantage: heightenTarget === targetName,
         // MA-0079: carry the authored failed-save conditions onto the prompt
@@ -239,7 +279,59 @@ function resolvePcTarget(ctx) {
     const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
     existingPrompts.push(promptId);
     setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
-    return { prompt: { promptId, targetName } };
+    return { prompt: { promptId, targetName, secondary } };
+}
+
+// MA-0563: prompt-build roll for the secondary pool (mirrors the primary's
+// overchannel/maximize handling at the same moment the prompt is sent).
+function buildPromptSecondary(ctx, formula, overchannelActive) {
+    const damageRoll = overchannelActive ? rollExpressionMaximized(formula) : rollExpression(formula);
+    return {
+        formula,
+        damageType: ctx.secondaryDamageType || null,
+        rolls: damageRoll?.rolls ?? [],
+        modifier: damageRoll?.modifier ?? 0,
+        rawDamage: damageRoll?.total ?? 0,
+    };
+}
+
+// MA-0563: secondary leg at PC-prompt resolution — own computeDamageAfterEvasion
+// pass (independent floor-half / evasion), own apply, own save-damage log.
+// Returns null when no secondary rides the prompt (single-damage byte-identical).
+// MA-0563 soulstitch gate for the prompt secondary leg (zeroes it alongside
+// the primary; complexity hoist out of handleSaveResult).
+function resolvePromptSecondaryOutcome(args) {
+    if (args.isSoulstitchProtected) return null;
+    return applySecondaryPromptDamage(args);
+}
+
+function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, actionName, targetName, saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, secondary }) {
+    if (!secondary) return null;
+    const finalDamage = resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage: secondary.rawDamage, success, saveType, dcSuccess });
+    if (finalDamage <= 0) return { rawDamage: secondary.rawDamage, finalDamage: 0, damageType: secondary.damageType };
+    const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
+    applyDamageToTarget(combatSummary, targetName, finalDamage, [secondary.damageType], { campaignName, characters, ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
+    addEntry(campaignName, {
+        type: 'roll',
+        rollType: 'save-damage',
+        characterName: playerStats.name,
+        name: actionName,
+        formula: secondary.formula,
+        rolls: secondary.rolls,
+        total: secondary.rawDamage,
+        modifier: secondary.modifier,
+        damageType: secondary.damageType,
+        targetName,
+        saveType: saveType,
+        saveDc: saveDc,
+        dcSuccess: dcSuccess,
+        saveResult: success ? 'success' : 'failure',
+        saveRoll: saveRoll,
+        saveBonus,
+        finalDamage: finalDamage,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging secondary player damage:', e); });
+    return { rawDamage: secondary.rawDamage, finalDamage: finalDamage, damageType: secondary.damageType };
 }
 
 // CLA-321: soulstitch-chosen target auto-succeeds the prompt's save, takes no damage.
@@ -760,11 +852,18 @@ function grantSlowedClauses({ effects, campaignName, targetName, casterName, act
 // Result-row copy: damage rows keep the byte-identical damage line; damageless
 // rows never print "null null damage" (MA-0090 cosmetic), and staged sleep
 // rows state the Incapacitated-until-repeat-save semantics (MA-0068).
+// MA-0563: dual-pool results row — "35 Fire + 30 Necrotic" when a secondary
+// rode the row; single-damage rows render the legacy byte-identical text.
+function damageTotalsText(r, damageType) {
+    if (r.secondaryFinalDamage == null) return `${r.finalDamage ?? 0} ${damageType}`;
+    return `${r.finalDamage ?? 0} ${damageType} + ${r.secondaryFinalDamage} ${r.secondaryDamageType}`;
+}
+
 function resultRowText(r, damage, damageType, sleepStaging, stagedParalysis) {
     if (r.soulstitchProtected) return 'Soulstitch — automatically succeeds, takes no damage';
     if (r.success) {
         return (r.finalDamage ?? 0) > 0
-            ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.roll ?? 0}, halved)`
+            ? `Saved — takes ${damageTotalsText(r, damageType)} damage (rolled ${r.roll ?? 0}, halved)`
             : `Saved — takes no damage (rolled ${r.roll ?? 0})`;
     }
     if (!damage) {
@@ -773,7 +872,7 @@ function resultRowText(r, damage, damageType, sleepStaging, stagedParalysis) {
         }
         return `Failed the save (rolled ${r.roll ?? 0})`;
     }
-    return `Failed — takes ${r.finalDamage ?? 0} ${damageType} damage (rolled ${r.roll ?? 0})`;
+    return `Failed — takes ${damageTotalsText(r, damageType)} damage (rolled ${r.roll ?? 0})`;
 }
 
 // MA-0031: advisory cone/area coverage gate — isWithinRange from the attacker
@@ -862,7 +961,14 @@ function successSaveSentence(dcSuccess) {
     return 'On a successful save, target takes half damage.';
 }
 
-function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, slowedClauses, weakeningBreath, dcSuccess }) {
+// MA-0563: dual-pool picker phrase — "10d6 Fire plus 10d6 Necrotic" when a
+// secondary rides the row; single-damage phrase byte-identical otherwise.
+function pickerDamagePhrase(damage, damageType, secondaryDamage, secondaryDamageType) {
+    if (!secondaryDamage) return `${damage} ${damageType}`;
+    return `${damage} ${damageType} plus ${secondaryDamage} ${secondaryDamageType}`;
+}
+
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, secondaryDamage, secondaryDamageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, slowedClauses, weakeningBreath, dcSuccess }) {
     const successSentence = successSaveSentence(dcSuccess);
     if (!zoneOnly) {
         const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
@@ -883,7 +989,7 @@ function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, da
         return {
             icon: 'fa-bomb',
             description: head,
-            note: `On a failed save, target takes ${damage} ${damageType} damage. ${successSentence}${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+            note: `On a failed save, target takes ${pickerDamagePhrase(damage, damageType, secondaryDamage, secondaryDamageType)} damage. ${successSentence}${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
         };
     }
     return zoneOnlyPickerCopy(zoneTe, range);
@@ -943,10 +1049,10 @@ function ZoneArmedNote({ zoneOnly, zoneTe, selected }) {
 
 // Damageless rows (MA-0068/MA-0090) never print the half-damage line.
 // MA-0084: dc_success 'none' rows state "no damage" on a successful save.
-function DamageNote({ damage, damageType, dcSuccess }) {
+function DamageNote({ damage, damageType, secondaryDamage, secondaryDamageType, dcSuccess }) {
     if (!damage) return null;
     const successText = dcSuccess === 'none' ? 'no damage' : dcSuccess === 'full' ? 'full damage (the save gates any additional effect only)' : 'half damage';
-    return <p className="sp-note">On a failed save, target takes {damage} {damageType} damage. On a successful save, target takes {successText}.</p>;
+    return <p className="sp-note">On a failed save, target takes {pickerDamagePhrase(damage, damageType, secondaryDamage, secondaryDamageType)} damage. On a successful save, target takes {successText}.</p>;
 }
 
 function SaveAttackAoeModal({
@@ -957,6 +1063,12 @@ function SaveAttackAoeModal({
     range,
     damage,
     damageType,
+    // MA-0563 optional secondary damage pool (byte-inert undefined default):
+    // monster AoE save rows with damage_dice_secondary (Death Knight Hellfire
+    // Orb 10d6 Fire + 10d6 Necrotic) roll each pool separately per target,
+    // half each independently, log both types. Single-damage rows byte-identical.
+    secondaryDamage,
+    secondaryDamageType,
     radiantSoulChaMod = 0,
     saveType,
     saveDc,
@@ -1097,7 +1209,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -1128,7 +1240,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote]);
+    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -1250,6 +1362,10 @@ function SaveAttackAoeModal({
             applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey });
         }
 
+        // MA-0563: secondary pool pays its own adjudicated leg (soulstitch
+        // protection zeroes it); null when no secondary rides the prompt.
+        const secondary = resolvePromptSecondaryOutcome({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, saveType: detail.saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, isSoulstitchProtected, secondary: pendingPrompts[pendingIndex].secondary });
+
         if (!success && pullMarkerEffect) {
             // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
             registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
@@ -1267,13 +1383,13 @@ function SaveAttackAoeModal({
             roll: saveRoll,
             total: saveTotal,
             conditions: [],
-            appliedDamage: finalDamage,
+            appliedDamage: appliedDamageTotal(finalDamage, secondary),
         });
 
         if (combatSummary) {
             persistAndNotify(combatSummary, campaignName);
         }
-        const targetResult = {
+        const targetResult = withSecondaryFields({
             targetName,
             success,
             roll: saveRoll,
@@ -1282,7 +1398,7 @@ function SaveAttackAoeModal({
             rawDamage,
             finalDamage,
             soulstitchProtected: isSoulstitchProtected,
-        };
+        }, secondary);
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
     }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote]);
@@ -1377,7 +1493,7 @@ function SaveAttackAoeModal({
             return (
                 <>
                     <p>Select creatures in the area of effect. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}).</p>
-                    <DamageNote damage={damage} damageType={damageType} dcSuccess={dcSuccess} />
+                    <DamageNote damage={damage} damageType={damageType} secondaryDamage={secondaryDamage} secondaryDamageType={secondaryDamageType} dcSuccess={dcSuccess} />
                     {metamagicHeighten && <p className="sp-note">Heightened Spell: select one target for disadvantage on its first save.</p>}
                     <p className="sp-note">Targets selected: {ctx.selected.size}/{ctx.eligibleTargets.length}</p>
                     {metamagicCareful && renderTargetList({ eligibleTargets: ctx.eligibleTargets, selected: ctx.selected, toggleTarget: ctx.toggleTarget, isCarefulAlly: ctx.isCarefulAlly, heightenTarget: ctx.heightenTarget, setHeightenTarget: ctx.setHeightenTarget, metamagicHeighten: metamagicHeighten })}
@@ -1486,7 +1602,7 @@ function SaveAttackAoeModal({
         );
     }
 
-    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, slowedClauses, weakeningBreath, dcSuccess });
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, secondaryDamage, secondaryDamageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, slowedClauses, weakeningBreath, dcSuccess });
 
     return (
         <CreatureSelectionModal

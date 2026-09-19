@@ -240,6 +240,26 @@ function bothOutcomesClauseForAction(spellInfo, action) {
   return parseBothOutcomesClause(action?.save_effect);
 }
 
+// MA-0563: AoE picker secondary pool — the MA-0427 transport triple rides the
+// cone/radius picker (previously PRIMARY-only, playbook §9). Null triple is
+// byte-inert for every single-damage row. When a secondary rides, the picker
+// damage label sheds the joined secondary type ("Fire/Necrotic" → "Fire") so
+// each pool logs its own type; a shared-type row keeps the full label.
+function pickerSecondaryFields(action) {
+  const transport = buildSecondaryDamageTransport(action);
+  return {
+    secondaryFormula: transport.autoDamageSecondaryFormula,
+    secondaryType: transport.autoDamageSecondaryDamageType,
+  };
+}
+
+function pickerPrimaryDamageType(action, getDamageTypesForAction, secondaryType) {
+  const types = getDamageTypesForAction(action);
+  if (!secondaryType) return formatDamageTypes(types);
+  const primaryOnly = types.filter(t => t !== secondaryType);
+  return formatDamageTypes(primaryOnly.length > 0 ? primaryOnly : types);
+}
+
 function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml, animalSpiritVariant = null, animalSpiritFortifyHp = null }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
@@ -287,7 +307,8 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   (async () => {
     if (recharge.gate) await spendMonsterRecharge({ monsterName, action, campaignName });
     if (aoe != null) {
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: formatDamageTypes(getDamageTypesForAction(action)), zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
+      const secondary = pickerSecondaryFields(action);
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -1935,6 +1956,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           range={conePicker.coneFt}
           damage={conePicker.saveDamageFormula}
           damageType={conePicker.damageType}
+          secondaryDamage={conePicker.secondaryFormula}
+          secondaryDamageType={conePicker.secondaryType}
           saveType={conePicker.saveType}
           saveDc={conePicker.action.save_dc}
           dcSuccess={conePicker.dcSuccess}
