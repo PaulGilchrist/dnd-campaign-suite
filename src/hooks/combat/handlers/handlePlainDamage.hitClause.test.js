@@ -697,6 +697,96 @@ describe('MA-0442 Bugbear Stalker Morningstar grapple-on-hit hit-clause', () => 
     });
 });
 
+const BUGBEAR_WARRIOR = monsters.find(m => m.index === 'bugbear-warrior');
+const WARRIOR_GRAB_ACTION = BUGBEAR_WARRIOR.actions[0];
+
+describe('MA-0443 Bugbear Warrior Grab grapple-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Bugbear Warrior 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Bugbear Warrior 1', computedStats: { armorClass: 14 } },
+            { name: 'AasimarTest', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 9, newHp: 134, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'AasimarTest', type: 'player', size: 'Medium', ac: 12, currentHp: 143, maxHp: 143 }],
+        });
+    });
+
+    it('MA-0443 data-lock: authors hit_conditions:["grappled"] + escape_dc:12 on the Grab row', () => {
+        expect(WARRIOR_GRAB_ACTION.name).toBe('Grab');
+        expect(WARRIOR_GRAB_ACTION.attack_bonus).toBe(4);
+        expect(WARRIOR_GRAB_ACTION.reach).toBe('10 ft.');
+        expect(WARRIOR_GRAB_ACTION.damage_dice_primary).toBe('2d6 + 2');
+        expect(WARRIOR_GRAB_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(WARRIOR_GRAB_ACTION.hit_conditions).toEqual(['grappled']);
+        expect(WARRIOR_GRAB_ACTION.escape_dc).toBe(12);
+    });
+
+    it('builds the grappled clause with escape DC 12 (statblock STR 15/+2 + PB 2)', () => {
+        expect(BUGBEAR_WARRIOR.ability_score_modifiers.str).toBe(2);
+        expect(BUGBEAR_WARRIOR.proficiency_bonus).toBe(2);
+        expect(buildHitConditionClause(WARRIOR_GRAB_ACTION)).toEqual({
+            conditions: ['grappled'],
+            escapeDc: 12,
+            attackName: 'Grab',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + escape-meta + condition log on a resolved Grab hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Grab', formula: '2d6 + 2', total: 9, rolls: [4, 3], modifier: 2, context: {
+            targetName: 'AasimarTest',
+            damageType: 'Bludgeoning',
+            attackerName: 'Bugbear Warrior 1',
+            hitClause: buildHitConditionClause(WARRIOR_GRAB_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 12, ability: 'str', source: 'Bugbear Warrior 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'AasimarTest',
+            condition: 'Grappled',
+            reason: 'Grab (escape DC 12)',
+        }));
+    });
+
+    it('writes no condition when the Grab attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Grab', formula: '2d6 + 2', total: 9, rolls: [4, 3], modifier: 2, context: {
+            targetName: 'AasimarTest',
+            damageType: 'Bludgeoning',
+            attackerName: 'Bugbear Warrior 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AasimarTest', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AasimarTest', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+
 const ANKYLOSAURUS = monsters.find(m => m.index === 'ankylosaurus');
 const TAIL_ACTION = ANKYLOSAURUS.actions.find(a => a.name === 'Tail');
 

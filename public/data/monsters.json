@@ -11167,7 +11167,9 @@
         "reach": "10 ft.",
         "save_effect": "The target has the Grappled condition (escape DC 12).",
         "damage_dice_primary": "2d6 + 2",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 12
       },
       {
         "name": "Light Hammer",
