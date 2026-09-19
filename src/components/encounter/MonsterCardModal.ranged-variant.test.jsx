@@ -399,6 +399,25 @@ describe('MA-0539 cyclops rock pure-ranged band lock', () => {
     expect(buildRangedBandAdvisory({ range: '60 ft.' })).toBeNull();
     expect(buildRangedBandAdvisory(undefined)).toBeNull();
   });
+
+  // MA-0547 twin: Cyclops Sentry Rock authored "30/120 ft." (suffix form) —
+  // parseRangedBand is suffix-intolerant by design, so DATA normalizes the
+  // range field to the MA-0539 byte-shape "30/120" (description prose keeps
+  // " ft."). Band advisory must stamp on the disk row exactly like Cyclops.
+  it('MA-0547 Cyclops Sentry Rock disk band is normalized suffix-free and stamps the advisory', () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const sentry = monsters.find((m) => m.name === 'Cyclops Sentry');
+    const rock = sentry.actions[2];
+    expect(rock.name).toBe('Rock');
+    expect(rock.range).toBe('30/120');
+    expect(rock.reach).toBeUndefined();
+    expect(rock.attack_bonus).toBe(9);
+    expect(rock.damage_dice_primary).toBe('3d10 + 6');
+    expect(rock.description).toContain('range 30/120 ft.');
+    expect(parseRangedBand(rock.range)).toEqual({ normalFt: 30, longFt: 120 });
+    expect(parseRangedBand('30/120 ft.')).toBeNull();
+    expect(buildRangedBandAdvisory(rock)).toBe('Range band 30/120 ft — gridless: advisory (GM-enforced).');
+  });
 });
 
 describe('MA-0436 offer forwarding', () => {

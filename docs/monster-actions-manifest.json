@@ -8424,7 +8424,7 @@
       "damageTypePrimary": "Bludgeoning",
       "range": "30/120 ft.",
       "description": "Ranged Attack Roll: +9, range 30/120 ft. Hit: 22 (3d10 + 6) Bludgeoning damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0547-cyclops-sentry-rock-range-band-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0548",

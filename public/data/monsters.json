@@ -15734,7 +15734,7 @@
         "name": "Rock",
         "description": "Ranged Attack Roll: +9, range 30/120 ft. <strong>Hit:</strong> 22 (3d10 + 6) Bludgeoning damage.",
         "attack_bonus": 9,
-        "range": "30/120 ft.",
+        "range": "30/120",
         "damage_dice_primary": "3d10 + 6",
         "damage_type_primary": "Bludgeoning"
       }
