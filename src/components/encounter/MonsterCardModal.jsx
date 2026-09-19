@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildHitConditionClause, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
@@ -727,6 +727,8 @@ function buildAttackRollOptions(v) {
     chargeBonusOffer: buildChargeBonusOffer(v.action, v.name),
     // MA-0325: two-handed versatile-damage choice (HIT popup offer).
     twoHandedVariantOffer: buildTwoHandedVariantOffer(v.action, v.name),
+    // MA-0436: melee-or-ranged dual-mode damage choice (HIT popup offer).
+    rangedVariantOffer: buildRangedVariantOffer(v.action, v.name),
   };
 }
 
@@ -1109,7 +1111,59 @@ function resolveTwoHandedVariantSelection({ popupHtml, decision, monsterName, ca
   }
 }
 
-function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll, onChargeBonus, onChargeBonusDecline, onTwoHandedVariant }) {
+// MA-0436: band advisory for the chosen RANGED mode (gridless-lenient,
+// playbook §42): measures token distance against the authored "N/M" band only
+// when a map places both tokens; the mode CHOICE is the enforced part.
+function buildRangedBandNote({ offer, mapData, monsterName, target }) {
+  if (!offer?.normalFt) return null;
+  if (!mapData || !target) return `Range band ${offer.range} ft — no map position: advisory (GM-enforced).`;
+  const attackerPlaced = (mapData.placedItems || []).find(i => i.name === monsterName) || null;
+  const targetPos = resolveTargetGridPos(mapData, target, attackerPlaced);
+  if (!attackerPlaced || !targetPos) return `Range band ${offer.range} ft — tokens unplaced: advisory (GM-enforced).`;
+  const distanceFt = Math.round(getDistanceFeet({ gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY }, targetPos));
+  if (distanceFt <= offer.normalFt) return `Distance ${distanceFt} ft — within normal range (${offer.normalFt} ft).`;
+  if (distanceFt <= offer.longFt) return `Distance ${distanceFt} ft — long range (${offer.normalFt}/${offer.longFt} ft): disadvantage GM-enforced.`;
+  return `Distance ${distanceFt} ft — beyond ${offer.longFt} ft: out of range, GM-enforced.`;
+}
+
+function resolveRangedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml, mapData, getTarget }) {
+  const offer = popupHtml?.rangedVariantOffer;
+  if (!offer || popupHtml?.rangedVariantResolved) return;
+  const attackPopupSnapshot = popupHtml;
+  if (decision === 'ranged') {
+    const autoDamage = attackPopupSnapshot.autoDamage
+      ? { ...attackPopupSnapshot.autoDamage, formula: offer.formula, rangedChoice: 'ranged' }
+      : attackPopupSnapshot.autoDamage;
+    const rangeNote = buildRangedBandNote({ offer, mapData, monsterName, target: getTarget?.() });
+    addEntry(campaignName, buildRangedVariantSelectLog({ monsterName, offer, mode: 'ranged', rangeNote }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging ranged variant selection:', e); });
+    setPopupHtml({ ...attackPopupSnapshot, autoDamage, rangedVariantResolved: 'ranged' });
+    return;
+  }
+  if (decision === 'melee') {
+    const autoDamage = attackPopupSnapshot.autoDamage
+      ? { ...attackPopupSnapshot.autoDamage, rangedChoice: 'melee' }
+      : attackPopupSnapshot.autoDamage;
+    addEntry(campaignName, buildRangedVariantSelectLog({ monsterName, offer, mode: 'melee' }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging melee variant selection:', e); });
+    setPopupHtml({ ...attackPopupSnapshot, autoDamage, rangedVariantResolved: 'melee' });
+  }
+}
+
+// An unpicked popup Done records the default variant so every variant
+// resolution logs its choice (MA-0325 one-handed, MA-0436 melee).
+function logUnpickedVariantDefaults({ campaignName, monsterName, autoDamage }) {
+  if (autoDamage.twoHandedVariantOffer && autoDamage.twoHandedChoice === 'one-handed-default') {
+    addEntry(campaignName, buildTwoHandedVariantSelectLog({ monsterName, offer: autoDamage.twoHandedVariantOffer, hands: 'one-handed', defaulted: true }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging two-handed default:', e); });
+  }
+  if (autoDamage.rangedVariantOffer && autoDamage.rangedChoice === 'melee-default') {
+    addEntry(campaignName, buildRangedVariantSelectLog({ monsterName, offer: autoDamage.rangedVariantOffer, mode: 'melee', defaulted: true }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging ranged variant default:', e); });
+  }
+}
+
+function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll, onChargeBonus, onChargeBonusDecline, onTwoHandedVariant, onRangedVariant }) {
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <AttackResultPopup
@@ -1122,6 +1176,7 @@ function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml
         onChargeBonus={onChargeBonus}
         onChargeBonusDecline={onChargeBonusDecline}
         onTwoHandedVariant={onTwoHandedVariant}
+        onRangedVariant={onRangedVariant}
       />
     </div>
   );
@@ -1266,12 +1321,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
             if (autoDamage.hitClause) {
               context.hitClause = autoDamage.hitClause;
             }
-            // MA-0325: an unpicked two-handed-popup Done records the
-            // one-handed default so every variant resolution logs its choice.
-            if (autoDamage.twoHandedVariantOffer && autoDamage.twoHandedChoice === 'one-handed-default') {
-              addEntry(campaignName, buildTwoHandedVariantSelectLog({ monsterName, offer: autoDamage.twoHandedVariantOffer, hands: 'one-handed', defaulted: true }))
-                .catch((e) => { console.error('[MonsterCardModal] Error logging two-handed default:', e); });
-            }
+            logUnpickedVariantDefaults({ campaignName, monsterName, autoDamage });
             rollDamage({ name: autoDamage.name, formula: autoDamage.formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
           } else {
             logBlockedDamageRoll(campaignName, monsterName, autoDamage.name || monsterName, autoDamage.formula);
@@ -1718,6 +1768,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           onChargeBonus={() => resolveChargeBonus('granted')}
           onChargeBonusDecline={() => resolveChargeBonus('declined')}
           onTwoHandedVariant={(decision) => resolveTwoHandedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml })}
+          onRangedVariant={(decision) => resolveRangedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml, mapData, getTarget })}
         />
       )}
     </div>

@@ -892,6 +892,38 @@ function TwoHandedVariantOffer({ props, state }) {
     );
 }
 
+// MA-0436: GM-adjudicated melee-vs-ranged damage-dice choice (monsters.json
+// damage_dice_ranged, e.g. Bugbear Javelin "2d6 + 2 in melee or 1d6 + 2 at
+// range"). MA-0325 two-handed mirror: ALTERNATIVE primary dice, offered on HIT
+// only; choosing ranged swaps the Done auto-damage formula in the modal before
+// damage is applied. Range band (range "30/120") is a logged advisory
+// (gridless-lenient) — the mode CHOICE is the enforced part.
+function RangedVariantOffer({ props, state }) {
+    const offer = props.rangedVariantOffer;
+    if (!offer) return null;
+    if (props.rangedVariantResolved) {
+        return (
+            <div className="dice-roll-reroll-result">
+                <i className={`fa-solid ${props.rangedVariantResolved === 'ranged' ? 'fa-crosshairs' : 'fa-hand-fist'}`}></i>
+                {props.rangedVariantResolved === 'ranged'
+                    ? `Ranged applied (${offer.formula} ${offer.damageType}).`
+                    : `Melee applied (${offer.baseFormula} ${offer.damageType}).`}
+            </div>
+        );
+    }
+    if (state.computedHit !== true) return null;
+    return (
+        <div className="dice-roll-reroll">
+            <button className="dice-roll-reroll-btn" onClick={() => props.onRangedVariant?.('melee')} type="button">
+                <i className="fa-solid fa-hand-fist"></i> Melee: {offer.baseFormula} {offer.damageType}
+            </button>
+            <button className="dice-roll-reroll-btn" onClick={() => props.onRangedVariant?.('ranged')} type="button">
+                <i className="fa-solid fa-crosshairs"></i> Ranged: {offer.formula} {offer.damageType}
+            </button>
+        </div>
+    );
+}
+
 // AC modifier labels for the popup "vs AC" line (MA-0341 added Parry).
 // Module helper keeps DiceRollResult under the complexity ceiling.
 function buildAcBuffLabels({ shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, parryAcBonus, slowAcPenalty }) {
@@ -1033,6 +1065,8 @@ function DiceRollResult(props) {
             <ChargeBonusOffer props={props} state={state} />
 
             <TwoHandedVariantOffer props={props} state={state} />
+
+            <RangedVariantOffer props={props} state={state} />
 
             <FeatureResultSummary props={props} state={state} handlers={handlers} />
 

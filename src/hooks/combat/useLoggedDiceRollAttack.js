@@ -146,6 +146,15 @@ function comboTrapArmsFromContext(context) {
     };
 }
 
+// MA-0436: melee-or-ranged dual-mode rows (monsters.json damage_dice_ranged)
+// carry the offer + a melee-default marker so the Done resolution logs the
+// melee default when no popup choice is made (MA-0325 transport mirror).
+// Non-variant rows get an inert empty spread.
+function rangedVariantTransportFields(context) {
+    if (!context || !context.rangedVariantOffer) return {};
+    return { rangedVariantOffer: context.rangedVariantOffer, rangedChoice: 'melee-default' };
+}
+
 function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName }) {
     if (!context?.autoDamageFormula) return undefined;
     return {
@@ -179,6 +188,7 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         // flips twoHandedChoice on an explicit pick). Byte-inert undefined.
         twoHandedVariantOffer: context?.twoHandedVariantOffer || undefined,
         twoHandedChoice: context?.twoHandedVariantOffer ? 'one-handed-default' : undefined,
+        ...rangedVariantTransportFields(context),
         ...comboTrapArmsFromContext(context),
     };
 }
@@ -243,6 +253,9 @@ function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) 
         // MA-0325: GM-adjudicated two-handed damage-dice choice
         // (monsters.json damage_dice_two_handed) — HIT popup only.
         twoHandedVariantOffer: context?.twoHandedVariantOffer || null,
+        // MA-0436: GM-adjudicated melee-vs-ranged damage-dice choice
+        // (monsters.json damage_dice_ranged) — HIT popup only.
+        rangedVariantOffer: context?.rangedVariantOffer || null,
         // MA-0341: defender Parry +2 AC riding the popup AC flags (target-side).
         parryAcBonus: ctx._parryAcBonus || 0,
     };

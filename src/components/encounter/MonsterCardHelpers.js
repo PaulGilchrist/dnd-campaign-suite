@@ -679,6 +679,52 @@ export function buildTwoHandedVariantOffer(action, name) {
   };
 }
 
+// MA-0436: authored melee-or-ranged dual-mode variant (monsters.json
+// damage_dice_ranged + range "N/M" band, e.g. Bugbear Javelin "2d6 + 2 in
+// melee or 1d6 + 2 at range"). MA-0325 mirror: ALTERNATIVE primary dice
+// offered on the HIT popup; picking ranged swaps the Done auto-damage formula.
+// Arming requires the authored variant dice AND the melee-or-ranged wording —
+// rows without both are byte-inert (null). Range band is advisory
+// (gridless-lenient, playbook §42): normalFt/longFt ride the offer for logs.
+export function parseRangedBand(range) {
+  if (!range || typeof range !== 'string') return null;
+  const match = range.trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (!match) return null;
+  return { normalFt: Number(match[1]), longFt: Number(match[2]) };
+}
+
+export function buildRangedVariantOffer(action, name) {
+  const row = action || {};
+  const variant = row.damage_dice_ranged;
+  const base = row.damage_dice_primary;
+  if (!variant || !base || variant === base) return null;
+  if (!/melee or ranged/i.test(row.description || '')) return null;
+  const damageType = row.damage_type_primary || '';
+  const band = parseRangedBand(row.range);
+  return {
+    formula: variant,
+    baseFormula: base,
+    damageType,
+    label: `Ranged: ${variant} ${damageType}?`,
+    attackName: name || row.name || 'Attack',
+    range: row.range || null,
+    normalFt: band ? band.normalFt : null,
+    longFt: band ? band.longFt : null,
+  };
+}
+
+export function buildRangedVariantSelectLog({ monsterName, offer, mode, defaulted = false, rangeNote = null }) {
+  const formula = mode === 'ranged' ? offer.formula : offer.baseFormula;
+  return {
+    type: 'automation',
+    automationType: mode === 'ranged' ? 'ranged_variant_selected' : 'melee_variant_selected',
+    characterName: monsterName,
+    abilityName: offer.attackName,
+    description: `${monsterName} ${offer.attackName} ${mode === 'ranged' ? 'RANGED' : 'melee'} variant selected${defaulted ? ' (default — no popup choice made)' : ''} — ${formula} ${offer.damageType} applied on Done.${rangeNote ? ` ${rangeNote}` : ''}`,
+    timestamp: Date.now(),
+  };
+}
+
 export function buildTwoHandedVariantSelectLog({ monsterName, offer, hands, defaulted = false }) {
   const formula = hands === 'two-handed' ? offer.formula : offer.baseFormula;
   return {
