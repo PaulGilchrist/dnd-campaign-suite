@@ -7723,7 +7723,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Piercing damage. If the target is a creature, it is subjected to the following effect. Constitution Saving Throw: DC 14. First Failure: The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure: The target has the Petrified condition instead of the Restrained condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0503-petrify-rider-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0504",
