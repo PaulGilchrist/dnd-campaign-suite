@@ -8167,7 +8167,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 3 (1d4 + 1) Slashing damage plus 1 Necrotic damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0530-cultist-ritual-sickle-necrotic-rider-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0531",

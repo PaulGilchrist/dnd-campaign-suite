@@ -665,13 +665,22 @@ function buildAutoDamageOptions(action, name) {
 // keys, now shared by both save seams (block-save context + attack+save combo)
 // so one producer serves every secondary-damage consumer. Byte-inert nulls
 // for every row without a secondary.
+// MA-0530: flat riders (Cultist Ritual Sickle "plus 1 Necrotic") author
+// flat_damage_secondary instead of dice — emitted as the constant formula and
+// resolved dice-less at the consumers (MA-0322 lineage), flat never doubled
+// on crit (CLA-281). Dice-bearing rows keep the dice formula byte-identical.
 // eslint-disable-next-line react-refresh/only-export-components
 export function buildSecondaryDamageTransport(action, fallbackName = null) {
-  if (!action?.damage_dice_secondary) {
+  const diceSecondary = action?.damage_dice_secondary;
+  const flatSecondary = action?.flat_damage_secondary;
+  const secondaryFormula = diceSecondary != null && diceSecondary !== ''
+    ? diceSecondary
+    : (flatSecondary != null && flatSecondary !== '' ? String(flatSecondary) : null);
+  if (!secondaryFormula) {
     return { autoDamageSecondaryFormula: null, autoDamageSecondaryName: null, autoDamageSecondaryDamageType: null };
   }
   return {
-    autoDamageSecondaryFormula: action.damage_dice_secondary,
+    autoDamageSecondaryFormula: secondaryFormula,
     autoDamageSecondaryName: fallbackName || action.name || null,
     autoDamageSecondaryDamageType: action.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
   };

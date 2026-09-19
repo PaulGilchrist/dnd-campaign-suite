@@ -1,4 +1,4 @@
-import { rollExpression, rollExpressionDoubled, formatDamageFormula } from '../../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled, parseConstant, formatDamageFormula } from '../../../services/dice/diceRoller.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import utils from '../../../services/ui/utils.js';
 import { applyDamageToTarget, clearReTriggeredSequence } from '../../../services/rules/combat/applyDamage.js';
@@ -79,8 +79,18 @@ function withRayReduction(applyResult, rayReduction) {
     return rayReduction > 0 ? { ...applyResult, rayOfEnfeebleReduction: rayReduction } : applyResult;
 }
 
+// MA-0530: flat_damage_secondary constant ("1") has no dice to roll —
+// resolve verbatim dice-less (MA-0322 lineage); flat NEVER doubles on crit —
+// rollExpressionDoubled returns null for constants (CLA-281).
+function resolveSecondaryRoll(secondaryFormula, isAutoCrit) {
+    const rolled = isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
+    if (rolled) return rolled;
+    const flat = parseConstant(secondaryFormula);
+    return flat != null ? { total: flat, rolls: [], modifier: 0 } : null;
+}
+
 async function rollAndApplySecondaryDamage({ combatSummary, target, context, secondaryFormula, secondaryName, secondaryDamageType, damageSequenceId, campaignName, characters, characterName }) {
-    const secondaryRollResult = context?.isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
+    const secondaryRollResult = resolveSecondaryRoll(secondaryFormula, context?.isAutoCrit);
     if (!secondaryRollResult) return null;
 
     const secondaryTotal = computeGwfAdjustedSecondaryTotal(secondaryRollResult, context?.playerStats, secondaryDamageType);

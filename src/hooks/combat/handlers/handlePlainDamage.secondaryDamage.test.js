@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
+    parseConstant: vi.fn((formula) => /^[+-]?\d+$/.test(String(formula ?? '').replace(/\s*\[.*?\]\s*/g, '').trim()) ? parseInt(String(formula).trim(), 10) : null),
     formatDamageFormula: vi.fn((formula, rolls, isCrit) => {
         if (!isCrit) return formula;
         const parsed = formula.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
@@ -384,6 +385,79 @@ describe('Plain damage secondary damage', () => {
             const primaryCall = applyDamageToTarget.mock.calls[1];
             const options = primaryCall[4];
             expect(options.concentrationTotalDamage).toBe(15);
+        });
+    });
+
+    describe('MA-0530 flat constant secondary (Cultist Ritual Sickle)', () => {
+        function flatContext(isCrit) {
+            return {
+                targetName: 'Goblin',
+                damageType: 'slashing',
+                isAutoCrit: isCrit,
+                autoDamageSecondaryFormula: '1',
+                autoDamageSecondaryName: 'Ritual Sickle',
+                autoDamageSecondaryDamageType: 'Necrotic',
+            };
+        }
+
+        it('resolves dice-less constant "1" and applies it as Necrotic on a hit', async () => {
+            setupSecondaryFormulaContext();
+            rollExpression.mockReset().mockReturnValue(null);
+            applyDamageToTarget
+                .mockReturnValueOnce({ finalDamage: 1, newHp: 12, damageReduced: false })
+                .mockReturnValueOnce({ finalDamage: 4, newHp: 8, damageReduced: false });
+
+            const fn = createFn();
+            await fn({ name: 'Ritual Sickle', formula: '1d4 + 1', total: 4, rolls: [3], modifier: 1, context: flatContext(false) });
+
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+            const secondaryCall = applyDamageToTarget.mock.calls[0];
+            expect(secondaryCall[2]).toBe(1);
+            expect(secondaryCall[3]).toEqual(['Necrotic']);
+            const logCall = deps.logEntry.mock.calls[0][0];
+            expect(logCall.secondaryFormula).toBe('1');
+            expect(logCall.secondaryDamageType).toBe('Necrotic');
+            expect(logCall.secondaryTotal).toBe(1);
+            expect(logCall.secondaryFinalDamage).toBe(1);
+        });
+
+        it('keeps the flat "1" NOT doubled on a crit (CLA-281 flat constants)', async () => {
+            setupSecondaryFormulaContext();
+            rollExpression.mockReset().mockReturnValue(null);
+            rollExpressionDoubled.mockReset().mockReturnValue(null);
+            applyDamageToTarget
+                .mockReturnValueOnce({ finalDamage: 1, newHp: 12, damageReduced: false })
+                .mockReturnValueOnce({ finalDamage: 6, newHp: 8, damageReduced: false });
+
+            const fn = createFn();
+            await fn({ name: 'Ritual Sickle', formula: '1d4 + 1', total: 6, rolls: [2], modifier: 1, context: flatContext(true) });
+
+            expect(rollExpressionDoubled).toHaveBeenCalledWith('1');
+            const secondaryCall = applyDamageToTarget.mock.calls[0];
+            expect(secondaryCall[2]).toBe(1);
+            expect(secondaryCall[3]).toEqual(['Necrotic']);
+        });
+
+        it('both damage types flow: slashing primary + Necrotic secondary in popup and log', async () => {
+            setupSecondaryFormulaContext();
+            rollExpression.mockReset().mockReturnValue(null);
+            applyDamageToTarget
+                .mockReturnValueOnce({ finalDamage: 1, newHp: 12, damageReduced: false })
+                .mockReturnValueOnce({ finalDamage: 4, newHp: 8, damageReduced: false });
+
+            const fn = createFn();
+            await fn({ name: 'Ritual Sickle', formula: '1d4 + 1', total: 4, rolls: [3], modifier: 1, context: flatContext(false) });
+
+            const popupCall = deps.setPopupHtml.mock.calls[0][0];
+            expect(popupCall.damageType).toBe('slashing');
+            expect(popupCall.secondaryDamageType).toBe('Necrotic');
+            expect(popupCall.secondaryFinalDamage).toBe(1);
+            const logCall = deps.logEntry.mock.calls[0][0];
+            expect(logCall.damageType).toBe('slashing');
+            expect(logCall.secondaryDamageType).toBe('Necrotic');
+            expect(logCall.note).toBe('combined_damage_roll');
+            const typesApplied = applyDamageToTarget.mock.calls.map(c => c[3][0]);
+            expect(typesApplied).toEqual(['Necrotic', 'slashing']);
         });
     });
 });
