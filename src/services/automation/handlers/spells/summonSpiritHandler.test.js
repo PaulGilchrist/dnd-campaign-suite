@@ -3,7 +3,7 @@
 // @cleaned-by-ai
 // @improved-by-ai
 // @cleaned-by-ai
-import { handle, confirmSummonSpirit, resolveMonsterActions } from './summonSpiritHandler.js';
+import { handle, confirmSummonSpirit, resolveMonsterActions, resolveMonsterReactions } from './summonSpiritHandler.js';
 import summonFeySpells from '../../../../../public/data/2024/spells.json' with { type: 'json' };
 import summonFeyMonsters from '../../../../../public/data/monsters.json' with { type: 'json' };
 
@@ -640,6 +640,68 @@ describe('summonSpiritHandler', () => {
             const added = combatSummary.creatures.find(c => c.name === 'Celestial Spirit (Avenger)');
             expect(added.actions[0].damage_dice_primary).toBe('2d6+2+5');
             expect(added.actions[0].attack_bonus).toBe(9);
+        });
+    });
+
+    describe('MA-0467 reaction dice fold (Healing Touch)', () => {
+        const defender = summonFeyMonsters.find(m => m.index === 'celestial-spirit-defender');
+        const lv17Mods = { slotLevel: 5, spellAttackMod: 9, spellSaveDc: 17, wisModifier: 3, spellcastingModifier: 3 };
+
+        it('folds Defender reactions[0] slot5 disk row "2d8+spell level" → "2d8+5"', () => {
+            expect(defender.reactions[0].name).toBe('Healing Touch');
+            expect(defender.reactions[0].damage_dice_primary).toBe('2d8+spell level');
+            const [reaction] = resolveMonsterReactions(defender, lv17Mods);
+            expect(reaction.damage_dice_primary).toBe('2d8+5');
+            expect(reaction.description).toContain('2d8+5');
+        });
+
+        it('folds at upcast slot levels too', () => {
+            const [reaction] = resolveMonsterReactions(defender, { ...lv17Mods, slotLevel: 7 });
+            expect(reaction.damage_dice_primary).toBe('2d8+7');
+        });
+
+        it('never backfills attack_bonus/save_dc on reaction rows (no false auto-hit affordance); automation + At Will sentinel ride byte-shape', () => {
+            const [reaction] = resolveMonsterReactions(defender, lv17Mods);
+            expect(reaction.attack_bonus).toBeNull();
+            expect(reaction.automation).toEqual(defender.reactions[0].automation);
+            expect(reaction.usage).toBe('At Will');
+            expect(reaction.uses).toBe(999);
+            expect(reaction.maxUses).toBe(999);
+        });
+
+        it('empty/missing reactions fold to [] without crashing', () => {
+            expect(resolveMonsterReactions({}, lv17Mods)).toEqual([]);
+            expect(resolveMonsterReactions({ reactions: [] }, lv17Mods)).toEqual([]);
+        });
+
+        it('end-to-end: summoned Defender combatant carries the folded live heal reaction', async () => {
+            loadMonsters.mockResolvedValue(summonFeyMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+            const lv17Cleric = {
+                ...mockPlayerStats,
+                level: 17,
+                proficiency: 6,
+                spellAbilities: { toHit: 9, saveDc: 17, modifier: 3 },
+            };
+            const action = {
+                name: 'Summon Celestial',
+                automation: {
+                    type: 'summon_spirit',
+                    typeLabel: 'Celestial Spirit',
+                    baseLevel: 5,
+                    hpPerLevelAbove: 10,
+                    variants: [{ name: 'Celestial Spirit (Defender)', monsterIndex: 'celestial-spirit-defender' }],
+                },
+                spell: { level: 5, duration: 'Concentration, up to 1 hour', concentration: true },
+            };
+
+            await confirmSummonSpirit(action, lv17Cleric, mockCampaignName, 'Celestial Spirit (Defender)');
+
+            const added = combatSummary.creatures.find(c => c.name === 'Celestial Spirit (Defender)');
+            expect(added.reactions).toHaveLength(1);
+            expect(added.reactions[0].name).toBe('Healing Touch');
+            expect(added.reactions[0].damage_dice_primary).toBe('2d8+5');
+            expect(added.reactions[0].automation).toMatchObject({ type: 'reaction', trigger: 'touch', effect: 'heal' });
         });
     });
 });

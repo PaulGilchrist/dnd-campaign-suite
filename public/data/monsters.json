@@ -12283,9 +12283,17 @@
         "name": "Healing Touch",
         "description": "The spirit touches another creature. The target regains Hit Points equal to 2d8+spell level.",
         "attack_bonus": null,
-        "reach": null,
+        "reach": "5 ft.",
         "damage_dice_primary": "2d8+spell level",
-        "damage_type_primary": "healing"
+        "damage_type_primary": "healing",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "touch",
+          "effect": "heal"
+        }
       }
     ],
     "legendary_actions": [],

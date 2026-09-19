@@ -64,33 +64,48 @@ function normalizeSigns(text) {
     return out;
 }
 
-function resolveMonsterActions(monster, { slotLevel, spellAttackMod, spellSaveDc, wisModifier, spellcastingModifier }) {
-    return (monster.actions || []).map(action => {
-        const resolved = { ...action };
-        resolved.damage_dice_primary = normalizeSigns(String(resolved.damage_dice_primary || '')
+function foldRowDice(row, { slotLevel, spellAttackMod, wisModifier, spellcastingModifier }) {
+    const resolved = { ...row };
+    resolved.damage_dice_primary = normalizeSigns(String(resolved.damage_dice_primary || '')
+        .replace(/WIS modifier/gi, String(wisModifier))
+        .replace(/spellcasting modifier/gi, String(spellcastingModifier))
+        .replace(/spell level/gi, String(slotLevel)));
+    if (resolved.damage_dice_secondary != null) {
+        resolved.damage_dice_secondary = normalizeSigns(String(resolved.damage_dice_secondary)
             .replace(/WIS modifier/gi, String(wisModifier))
             .replace(/spellcasting modifier/gi, String(spellcastingModifier))
             .replace(/spell level/gi, String(slotLevel)));
-        if (resolved.damage_dice_secondary != null) {
-            resolved.damage_dice_secondary = normalizeSigns(String(resolved.damage_dice_secondary)
-                .replace(/WIS modifier/gi, String(wisModifier))
-                .replace(/spellcasting modifier/gi, String(spellcastingModifier))
-                .replace(/spell level/gi, String(slotLevel)));
-        }
-        let desc = String(resolved.description || '');
-        desc = desc.replace(/WIS modifier/gi, String(wisModifier));
-        desc = desc.replace(/\+?spell attack modifier/gi, () => (spellAttackMod < 0 ? `-${Math.abs(spellAttackMod)}` : `+${spellAttackMod}`));
-        desc = desc.replace(/spell level/gi, String(slotLevel));
-        desc = desc.replace(/spellcasting modifier/gi, String(spellcastingModifier));
-        resolved.description = normalizeSigns(desc);
+    }
+    let desc = String(resolved.description || '');
+    desc = desc.replace(/WIS modifier/gi, String(wisModifier));
+    desc = desc.replace(/\+?spell attack modifier/gi, () => (spellAttackMod < 0 ? `-${Math.abs(spellAttackMod)}` : `+${spellAttackMod}`));
+    desc = desc.replace(/spell level/gi, String(slotLevel));
+    desc = desc.replace(/spellcasting modifier/gi, String(spellcastingModifier));
+    resolved.description = normalizeSigns(desc);
+    return resolved;
+}
+
+function resolveMonsterActions(monster, mods) {
+    return (monster.actions || []).map(action => {
+        const resolved = foldRowDice(action, mods);
         if (resolved.attack_bonus === null || resolved.attack_bonus === undefined) {
-            resolved.attack_bonus = spellAttackMod;
+            resolved.attack_bonus = mods.spellAttackMod;
         }
         if (resolved.save_dc != null && resolved.save_dc === 20) {
-            resolved.save_dc = spellSaveDc;
+            resolved.save_dc = mods.spellSaveDc;
         }
         return resolved;
     });
+}
+
+// MA-0467: reactions fold the SAME dice tokens as actions ("spell level" →
+// slotLevel, WIS/spellcasting mod) — previously omitted entirely, leaving
+// summoned combatants with reactions:None and unnormalized "+spell level"
+// prose (stricter block than MA-0465's action-dice gap). attack_bonus/
+// save_dc stay untouched: a reaction row must never gain a false auto-hit
+// attack affordance. automation/usage ride the row byte-shape unchanged.
+function resolveMonsterReactions(monster, mods) {
+    return (monster.reactions || []).map(row => foldRowDice(row, mods));
 }
 
 function resolveSummonedHp({ baseHp, auto, slotLevel, scale, halveHp }) {
@@ -156,6 +171,7 @@ function buildSpiritCreature({ monster, displayName, casterName, initiativeValue
         size: monster.size || 'Medium',
         speed: monster.speed || { walk: '30 ft.' },
         actions,
+        reactions: resolveMonsterReactions(monster, { slotLevel, spellAttackMod, spellSaveDc, wisModifier, spellcastingModifier }),
         summonedBy: casterName,
         summonSource: 'spell',
         createThrall: true,
@@ -352,4 +368,4 @@ export async function confirmSummonSpirit(action, playerStats, campaignName, var
     return performSummon(action, playerStats, campaignName, variant);
 }
 
-export { buildSpiritCreature, resolveMonsterActions };
+export { buildSpiritCreature, resolveMonsterActions, resolveMonsterReactions };

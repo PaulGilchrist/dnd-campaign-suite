@@ -7131,7 +7131,7 @@
       "damageTypePrimary": "healing",
       "reach": null,
       "description": "The spirit touches another creature. The target regains Hit Points equal to 2d8+spell level.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0467-healing-touch-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0468",

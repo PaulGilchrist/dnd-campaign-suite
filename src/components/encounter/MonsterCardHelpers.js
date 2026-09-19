@@ -5,7 +5,8 @@ import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { applyDamageToTarget, computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import { isWithinRange } from '../../services/rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
-import { rollExpression } from '../../services/dice/diceRoller.js';
+import { rollExpression, canRollExpression } from '../../services/dice/diceRoller.js';
+import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 
@@ -778,6 +779,15 @@ const GATED_MONSTER_REACTIONS = {
   // unlimited; 1/round latch (_split_usedRound) + lastAttack.splitResolved
   // event stamp are the only fire limits.
   split: { effect: 'split', trigger: 'bloodied_or_lightning_slashing', label: 'Split', icon: 'fa-droplet' },
+  // MA-0467: Celestial Spirit (Defender) Healing Touch — self-initiated touch
+  // heal reaction (2024 PHB: reaction, touch, target regains 2d8+spell level).
+  // No attack event gates it (unlike parry/counterspell) — GM-click fires the
+  // touch, gated by the 1/round latch + At Will sentinel (usage:'At Will'+
+  // uses:999, MA-0341 shape) + touch reach (isWithinRange 5 ft., gridless
+  // lenient §42) + a live wound on the target. Dice fold via the summon seam
+  // ("spell level"→slotLevel, MA-0465 lineage); heal rides the canonical
+  // applyHealingToTarget choke point (MA-0367).
+  heal: { effect: 'heal', trigger: 'touch', label: 'Healing Touch', icon: 'fa-hand-holding-medical' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -1193,7 +1203,144 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
     return resolveMonsterSplit({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, setRuntimeValue: ctx.setRV } });
   }
 
+  if (def.effect === 'heal') {
+    return resolveMonsterHealReaction({ action, monsterName, campaignName, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
+  }
+
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });
+}
+
+// MA-0467: Healing Touch — dice preference order: the summoned combatant's
+// folded reaction row (summonSpiritHandler.resolveMonsterReactions stamps
+// "2d8+spell level" → "2d8+<slot>"), else the row itself when already
+// numeric. An unfolded token (EB-direct join, off-RAW route per the caster-
+// fold adjudication) is honestly refused — zero spend, no mod-0 silent roll.
+export function healReactionDice({ action, combatant }) {
+  const folded = (combatant?.reactions || []).find(r => r?.automation?.effect === 'heal');
+  const formula = [folded?.damage_dice_primary, action?.damage_dice_primary]
+    .find(d => d != null && canRollExpression(String(d)));
+  return formula != null ? String(formula) : null;
+}
+
+function healTargetState(cs, targetName, getRV) {
+  const creature = (cs?.creatures || []).find(c => c.name === targetName);
+  if (!creature) return null;
+  const maxHp = Number(creature.maxHp ?? 0);
+  const hp = creature.type === 'player'
+    ? Number(getRV(targetName, 'currentHitPoints') ?? creature.currentHp ?? 0)
+    : Number(creature.currentHp ?? 0);
+  return { hp, maxHp };
+}
+
+export function healGate({ monsterName, targetName, state, formula, inRange, currentRound, usedRound, storedUses, action }) {
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: `Healing Touch: Reaction already used this round (1/round) — refused.` };
+  }
+  const used = Number((storedUses && storedUses.heal) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: `Healing Touch: ${limit} uses already spent today — refused.` };
+  }
+  if (!formula) {
+    return { ok: false, reason: 'dice', message: `Healing Touch: no rollable dice for ${monsterName} — "spell level" is unresolved off the summon cast path. Refused.` };
+  }
+  if (!state) {
+    return { ok: false, reason: 'target', message: `Healing Touch: ${targetName} is not an active combatant — refused.` };
+  }
+  if (!inRange) {
+    return { ok: false, reason: 'range', message: `Healing Touch: ${targetName} is out of touch (5 ft.) — refused.` };
+  }
+  if (state.hp > 0 && state.hp >= state.maxHp) {
+    return { ok: false, reason: 'full_hp', message: `Healing Touch: ${targetName} is already at full hit points (${state.hp}/${state.maxHp}) — nothing to heal, nothing spent.` };
+  }
+  return { ok: true, used, limit, formula, hp: state.hp, maxHp: state.maxHp };
+}
+
+function buildHealRefusalLog({ monsterName, gate }) {
+  return {
+    type: 'automation',
+    characterName: monsterName,
+    automationType: 'heal_refused',
+    name: 'Healing Touch',
+    description: `Healing Touch refused (${gate.reason}): ${gate.message}`,
+    timestamp: Date.now(),
+  };
+}
+
+function buildHealAbilityUseLog({ monsterName, targetName, gate, roll, result }) {
+  const actualHeal = result ? result.actualHeal : 0;
+  const newHp = result ? result.newHp : gate.hp;
+  const blockedNote = result && actualHeal === 0 ? ' (healing blocked — no HP regained)' : '';
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Healing Touch',
+    description: `${monsterName} uses Healing Touch on ${targetName} — ${gate.formula} rolled ${roll.total}${blockedNote}. ${targetName} ${gate.hp}/${gate.maxHp} → ${newHp}/${gate.maxHp}. At Will — unlimited, 1 Reaction per round.`,
+    timestamp: Date.now(),
+  };
+}
+
+function buildHealHpChangeLog({ monsterName, targetName, result }) {
+  return {
+    type: 'hp_change',
+    targetName,
+    sourceName: monsterName,
+    delta: result.actualHeal,
+    currentHp: result.newHp,
+    maxHp: result.maxHp,
+    isHealing: true,
+    isUnconscious: false,
+    timestamp: Date.now(),
+  };
+}
+
+function buildHealPopupHtml({ monsterName, targetName, gate, roll, result }) {
+  const actualHeal = result ? result.actualHeal : 0;
+  const newHp = result ? result.newHp : gate.hp;
+  return `<div class="mc-prerequisite-refusal"><h3>Healing Touch</h3><p>${monsterName} touches ${targetName} — ${gate.formula} rolled <strong>${roll.total}</strong>, ${targetName} regains <strong>${actualHeal}</strong> HP (${gate.hp}/${gate.maxHp} → ${newHp}/${gate.maxHp}).</p></div>`;
+}
+
+function resolveHealDeps(deps) {
+  return {
+    setRV: deps.setRuntimeValue || setRuntimeValue,
+    getRV: deps.getRuntimeValue || getRuntimeValue,
+    log: deps.addEntry || addEntry,
+    checkRange: deps.isWithinRange || isWithinRange,
+    applyHeal: deps.applyHealingToTarget || applyHealingToTarget,
+    rollDice: deps.rollExpression || rollExpression,
+  };
+}
+
+async function resolveMonsterHealReaction({ action, monsterName, campaignName, cs, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const { setRV, getRV, log, checkRange, applyHeal, rollDice } = resolveHealDeps(deps);
+  const combatant = (cs?.creatures || []).find(c => c.name === monsterName) || null;
+  const armed = deps.getTarget ? deps.getTarget() : null;
+  const targetName = (armed && armed.name) || monsterName;
+  const state = healTargetState(cs, targetName, getRV);
+  const inRange = await checkRange(monsterName, targetName, 5);
+  const gate = healGate({ monsterName, targetName, state, formula: healReactionDice({ action, combatant }), inRange, currentRound, usedRound, storedUses, action });
+  if (!gate.ok) {
+    await log(campaignName, buildHealRefusalLog({ monsterName, gate }));
+    return { ok: false, message: gate.message, popupHtml: `<div class="mc-prerequisite-refusal"><h3>Healing Touch Refused</h3><p>${gate.message}</p></div>` };
+  }
+  const roll = rollDice(gate.formula);
+  if (!roll) {
+    const diceGate = { reason: 'dice', message: `${gate.formula} did not resolve — nothing spent.` };
+    await log(campaignName, buildHealRefusalLog({ monsterName, gate: diceGate }));
+    return { ok: false, message: diceGate.message };
+  }
+  // Round latch stamped AWAITED before the heal write (CLA-361 precedent) —
+  // the 1/round fire limit must be visible to the next click before it reads.
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, heal: gate.used + 1 }, campaignName);
+  const result = applyHeal(cs, targetName, roll.total, campaignName);
+  const spendLog = buildHealAbilityUseLog({ monsterName, targetName, gate, roll, result });
+  await log(campaignName, spendLog);
+  if (result) {
+    await log(campaignName, buildHealHpChangeLog({ monsterName, targetName, result }));
+  }
+  return { ok: true, message: spendLog.description, healAmount: result ? result.actualHeal : 0, rollTotal: roll.total, targetName, popupHtml: buildHealPopupHtml({ monsterName, targetName, gate, roll, result }) };
 }
 
 // MA-0006: record-only gated reactions (Feather Fall) — the app has no

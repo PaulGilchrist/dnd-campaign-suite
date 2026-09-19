@@ -1589,12 +1589,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       action,
       monsterName,
       campaignName,
-      deps: { resolveSpellLevel: resolveGatedSpellLevel, spellAbilityMod },
+      // MA-0467: getTarget arms the Healing Touch touch target (the card's
+      // armed target-select); the resolver falls back to self unarmed.
+      deps: { resolveSpellLevel: resolveGatedSpellLevel, spellAbilityMod, getTarget },
     });
     // MA-0399: Split — the resolver's popupHtml carries the trigger verdict
     // plus the GM duplication instruction; refusals surface the honest message.
     if (result?.popupHtml) setPopupHtml(result.popupHtml);
-  }, [campaignName, monsterName, spellAbilityMod, setPopupHtml]);
+  }, [campaignName, monsterName, spellAbilityMod, getTarget, setPopupHtml]);
 
   // MA-0021: legendary-row gated click — expend 1 use (round+turn latch,
   // refusal popup + legendary_use_refused zero-spend log) then resolve the
