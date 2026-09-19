@@ -8502,7 +8502,7 @@
       "actionType": "spellcasting",
       "saveDc": 16,
       "description": "The dao casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16): At Will: Detect Evil and Good, Detect Magic, Stone Shape 1/Day Each: Gaseous Form, Invisibility, Move Earth, Passwall, Plane Shift, Tongues, Wall of Stone",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0552-dao-spellcasting-unmarked-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0553",

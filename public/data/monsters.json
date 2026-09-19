@@ -15869,9 +15869,11 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The dao casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\n<strong>At Will:</strong> Detect Evil and Good, Detect Magic, Stone Shape\n<strong>1/Day Each:</strong> Gaseous Form, Invisibility, Move Earth, Passwall, Plane Shift, Tongues, Wall of Stone",
+        "description": "The dao casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\n<strong>At Will:</strong> <em>Detect Evil and Good</em>, <em>Detect Magic</em>, <em>Stone Shape</em>\n<strong>1/Day Each:</strong> <em>Gaseous Form</em>, <em>Invisibility</em>, <em>Move Earth</em>, <em>Passwall</em>, <em>Plane Shift</em>, <em>Tongues</em>, <em>Wall of Stone</em>",
         "spell_save_dc": 16,
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "save_dc": 16,
+        "save_type": "Charisma"
       }
     ],
     "bonus_actions": [],
