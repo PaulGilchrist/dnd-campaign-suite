@@ -16467,9 +16467,11 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The aspirant casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> Phantom Steed\n<strong>1/Day Each:</strong> Destructive Wave (Necrotic), Dispel Magic",
+        "description": "The aspirant casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> <em>Phantom Steed</em>\n<strong>1/Day Each:</strong> <em>Destructive Wave</em> (Necrotic), <em>Dispel Magic</em>",
         "spell_save_dc": 15,
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "save_dc": 15,
+        "save_type": "Charisma"
       }
     ],
     "bonus_actions": [],

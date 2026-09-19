@@ -8801,7 +8801,7 @@
       "range": "120 feet",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 15, each creature in a 20-foot-radius Sphere centered on a point the aspirant can see within 120 feet of itself. Failure: 21 (6d6) Fire damage plus 21 (6d6) Necrotic damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0571-aspirant-hellfire-orb-secondary-pool-lost.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0572",
@@ -8814,7 +8814,7 @@
       "actionType": "spellcasting",
       "saveDc": 15,
       "description": "The aspirant casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 15): At Will: Phantom Steed 1/Day Each: Destructive Wave (Necrotic), Dispel Magic",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0572-aspirant-spellcasting-unmarked-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0573",
