@@ -15745,7 +15745,12 @@
         "name": "Limited Foresight",
         "trigger": "A creature the cyclops can see makes an attack roll against it.",
         "description": "The cyclops imposes Disadvantage on the roll, and the cyclops gains Advantage on attack rolls against the target until the end of the cyclops's next turn.",
-        "recharge": "6"
+        "recharge": "6",
+        "automation": {
+          "type": "reaction",
+          "trigger": "attacked_by_seen",
+          "effect": "limited_foresight"
+        }
       }
     ],
     "legendary_actions": [],

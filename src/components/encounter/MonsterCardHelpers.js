@@ -10,6 +10,8 @@ import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.j
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, rechargeActionKey, parseRechargeThreshold, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
+import { registerTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
+import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -836,6 +838,23 @@ const GATED_MONSTER_REACTIONS = {
   // d6 4+ at the monster's own turn-start regains it (rollMonsterRecharges,
   // turnStartEffects seam; the spent stamp IS the regain registration).
   portent: { effect: 'portent', trigger: 'd20_test_seen', label: 'Portent', icon: 'fa-dice-d20' },
+  // MA-0548: Cyclops Sentry Limited Foresight — pre-roll cloud reaction.
+  // RAW trigger: a creature the cyclops can see makes an attack roll
+  // against it (vision is GM-enforced advisory, CLA-325). Gate is the
+  // campaign lastAttack identity (parry MA-0341 lineage, WITHOUT the
+  // hit requirement — the roll is clouded before its result is committed;
+  // damageApplied:true refuses as too-late). Response: te
+  // `disadvantage_attack_rolls` on the ATTACKER (MA-0542 registered te,
+  // consumer bumpCount(attackDisadvantageCount) in conditionEffects.js)
+  // + self te `next_attack_advantage` with vexTarget = the attacker
+  // (CLA-341 verified target-scoped adv channel, §69) — one merged
+  // addExpiration anchored on the cyclops (MA-0016/§38 anchor leg fires
+  // at its NEXT turn-start; RAW end-of-turn anchor is the accepted
+  // advisory residual). Economy is the authored recharge "6"
+  // (spendMonsterRecharge MA-0031 — the spent stamp IS the regain
+  // registration via rollMonsterRecharges at the monster's turn-start)
+  // + the 1/round latch (`_limited_foresight_usedRound`, MA-0013 shape).
+  limited_foresight: { effect: 'limited_foresight', trigger: 'attacked_by_seen', label: 'Limited Foresight', icon: 'fa-eye' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -1261,6 +1280,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'portent') {
     return resolveMonsterPortentReaction({ action, monsterName, campaignName, currentRound: ctx.currentRound, getRV: ctx.getRV, setRV: ctx.setRV, log: ctx.log, deps });
+  }
+
+  if (def.effect === 'limited_foresight') {
+    return resolveMonsterLimitedForesight({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, currentRound: ctx.currentRound, usedRound: ctx.usedRound, latchKey: ctx.latchKey, getRV: ctx.getRV, setRV: ctx.setRV, log: ctx.log, deps });
   }
 
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });
@@ -1991,4 +2014,136 @@ async function resolveMonsterPortentReaction({ action, monsterName, campaignName
   await log(campaignName, entry);
   await spendMonsterRecharge({ monsterName, action, campaignName, deps: { getRuntimeValue: getRV, setRuntimeValue: setRV, addEntry: log } });
   return { ok: true, message: entry.description, rollTotal: roll.total, pool, popupHtml: buildPortentPopupHtml({ monsterName, roll, poolSize: pool.length }) };
+}
+
+// MA-0548: Cyclops Sentry Limited Foresight — event-identity probe (mirrors
+// parryIdentityRefusal MA-0341 WITHOUT the hit requirement: RAW clouds the
+// attack roll before its result is committed, so `damageApplied:true` is the
+// too-late boundary, not `hit:false`). rollType guard keeps non-attack
+// events (saves/checks) off the trigger. Returns a refusal token or null.
+export function limitedForesightIdentityRefusal(lastAttack, monsterName) {
+  if (!lastAttack || lastAttack.targetName !== monsterName) return 'trigger';
+  if (lastAttack.rollType && lastAttack.rollType !== 'attack' && lastAttack.rollType !== 'spell-attack') return 'roll';
+  if (lastAttack.damageApplied === true) return 'resolved';
+  if (lastAttack.limitedForesightResolved === true) return 'reacted';
+  if (!lastAttack.attackerName || lastAttack.attackerName === monsterName) return 'attacker';
+  return null;
+}
+
+const LIMITED_FORESIGHT_REFUSAL_MESSAGES = {
+  trigger: (m) => `Limited Foresight: no attack roll has targeted ${m} — ${m} can only cloud a roll made against it.`,
+  roll: () => 'Limited Foresight: the last event against the cyclops was not an attack roll — refused.',
+  resolved: () => 'Limited Foresight: damage is already applied on that attack — too late to cloud the roll.',
+  reacted: () => 'Limited Foresight: already responded to that attack — one foresight per trigger.',
+  attacker: () => 'Limited Foresight: no identifiable attacker to cloud — refused.',
+  recharge: (m, t) => `Limited Foresight: not recharged — ${m} must roll a d6 ${t ?? 6}+ at the start of its next turn before Limited Foresight can trigger again.`,
+  round: () => 'Limited Foresight: Reaction already used this round — refused.',
+  target: (m, a) => `Limited Foresight must cloud the creature that attacked ${m} — arm ${a || 'the triggering attacker'} on the card first.`,
+};
+
+export function limitedForesightGate({ action, lastAttack, monsterName, rechargeMap, armed, currentRound, usedRound }) {
+  const identity = limitedForesightIdentityRefusal(lastAttack, monsterName);
+  if (identity) {
+    return { ok: false, reason: identity, message: LIMITED_FORESIGHT_REFUSAL_MESSAGES[identity](monsterName, lastAttack?.attackerName) };
+  }
+  const recharge = monsterRechargeGate(action, rechargeMap || {});
+  if (recharge && !recharge.available) {
+    return { ok: false, reason: 'recharge', message: LIMITED_FORESIGHT_REFUSAL_MESSAGES.recharge(monsterName, recharge.threshold) };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: LIMITED_FORESIGHT_REFUSAL_MESSAGES.round() };
+  }
+  const attackerName = lastAttack.attackerName;
+  if (!armed || armed.name !== attackerName) {
+    return { ok: false, reason: 'target', message: LIMITED_FORESIGHT_REFUSAL_MESSAGES.target(monsterName, attackerName) };
+  }
+  return { ok: true, attackerName, threshold: recharge ? recharge.threshold : 6 };
+}
+
+function buildLimitedForesightGrantLogs({ monsterName, attackerName }) {
+  const anchorNote = `anchor expiry fires at ${monsterName}'s next turn start — RAW end-of-turn anchor is advisory`;
+  return [
+    {
+      type: 'condition',
+      action: 'applied',
+      characterName: attackerName,
+      condition: 'Attack Disadvantage',
+      reason: `Limited Foresight (${monsterName}) — Disadvantage on attack rolls; the triggering attack re-resolves with disadvantage once the armed target is the attacker`,
+      note: `disadvantage_attack_rolls te on ${attackerName} — dismissed pending popup must be re-clicked to re-roll; ${anchorNote}.`,
+      timestamp: Date.now(),
+    },
+    {
+      type: 'condition',
+      action: 'applied',
+      characterName: monsterName,
+      condition: 'Next Attack Advantage',
+      reason: `Limited Foresight — Advantage on attack rolls against ${attackerName} until the end of ${monsterName}'s next turn (vexTarget channel, CLA-341)`,
+      note: `next_attack_advantage te (vexTarget: ${attackerName}) — consumed by ${monsterName}'s next attack against ${attackerName}; ${anchorNote}.`,
+      timestamp: Date.now(),
+    },
+  ];
+}
+
+function buildLimitedForesightPopupHtml({ monsterName, attackerName }) {
+  return `<div class="mc-prerequisite-refusal"><h3>Limited Foresight</h3><p>${monsterName} clouds <strong>${attackerName}</strong>'s attack roll — ${attackerName} carries Attack Disadvantage and ${monsterName} gains Advantage on attack rolls against ${attackerName} until the end of its next turn. Dismiss the pending ${attackerName} attack popup WITHOUT Done, then re-click ${attackerName}'s attack chip to re-resolve with disadvantage (parry MA-0341 seam). Seen is GM-enforced (no vision model). Recharge 6 spent.</p></div>`;
+}
+
+async function refuseLimitedForesight({ monsterName, action, campaignName, log, gate }) {
+  if (gate.reason === 'recharge') {
+    await log(campaignName, buildRechargeRefusalLog({ monsterName, actionName: action?.name || 'Limited Foresight', rechargeKey: rechargeActionKey(action), threshold: parseRechargeThreshold(action?.recharge) }));
+  } else {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: 'limited_foresight_refused',
+      name: action?.name || 'Limited Foresight',
+      description: `Limited Foresight refused (${gate.reason}): ${gate.message}`,
+      timestamp: Date.now(),
+    });
+  }
+  return {
+    ok: false,
+    message: gate.message,
+    popupHtml: gate.reason === 'recharge'
+      ? buildRechargeRefusalPopup({ monsterName, actionName: action?.name || 'Limited Foresight', threshold: parseRechargeThreshold(action?.recharge) })
+      : `<div class="mc-prerequisite-refusal"><h3>Limited Foresight Refused</h3><p>${gate.message} Nothing spent — Recharge kept.</p></div>`,
+  };
+}
+
+async function resolveMonsterLimitedForesight({ action, monsterName, campaignName, lastAttack, currentRound, usedRound, latchKey, getRV, setRV, log, deps }) {
+  const armed = deps.getTarget ? deps.getTarget() : null;
+  const gate = limitedForesightGate({ action, lastAttack, monsterName, rechargeMap: getRV(monsterName, MONSTER_RECHARGE_KEY), armed, currentRound, usedRound });
+  if (!gate.ok) return refuseLimitedForesight({ monsterName, action, campaignName, log, gate });
+  const attackerName = gate.attackerName;
+  // Round latch AWAITED before the grants (CLA-361) — the re-click that
+  // re-rolls with disadvantage must not find the Reaction refirable.
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  registerTargetEffect(campaignName, attackerName, 'disadvantage_attack_rolls', monsterName, { duration: 'until_start_of_next_turn' });
+  registerTargetEffect(campaignName, monsterName, 'next_attack_advantage', monsterName, { vexTarget: attackerName, duration: 'until_start_of_next_turn' });
+  // ONE merged clock anchored on the cyclops (§38/§39 — two sequential
+  // addExpiration calls race; a single list carries both remove entries).
+  addExpiration({
+    attackerName: monsterName,
+    targetName: attackerName,
+    effects: [
+      { type: 'remove_target_effect', effectKey: 'disadvantage_attack_rolls', source: monsterName, target: attackerName },
+      { type: 'remove_target_effect', effectKey: 'next_attack_advantage', source: monsterName, target: monsterName },
+    ],
+    campaignName,
+    rounds: undefined,
+    expireOnCreatureName: monsterName,
+  });
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    limitedForesightResolved: true,
+    foresightBy: monsterName,
+    foresightTarget: attackerName,
+  }, campaignName);
+  for (const entry of buildLimitedForesightGrantLogs({ monsterName, attackerName })) {
+    await log(campaignName, entry);
+  }
+  await spendMonsterRecharge({ monsterName, action, campaignName, deps: { getRuntimeValue: getRV, setRuntimeValue: setRV, addEntry: log } });
+  const message = `${monsterName} uses Limited Foresight — ${attackerName}'s attack roll is clouded (Disadvantage) and ${monsterName} gains Advantage on attack rolls against ${attackerName} until the end of its next turn. Seen is GM-enforced (no vision model). Recharge 6 spent.`;
+  return { ok: true, message, attackerName, popupHtml: buildLimitedForesightPopupHtml({ monsterName, attackerName }) };
 }
