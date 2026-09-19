@@ -1324,3 +1324,90 @@ describe('MA-0366 Bearded Devil Beard poisoned + no_healing hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const BROWN_BEAR = monsters.find(m => m.index === 'brown-bear');
+const BROWN_BEAR_CLAW_ACTION = BROWN_BEAR.actions[2];
+
+describe('MA-0434 Brown Bear Claw prone-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Brown Bear 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Brown Bear 1', computedStats: { armorClass: 11 } },
+            { name: 'AasimarTest', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 138, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'AasimarTest', type: 'player', size: 'Medium', ac: 12, currentHp: 143, maxHp: 143 }],
+        });
+    });
+
+    it('MA-0434 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Claw row', () => {
+        expect(BROWN_BEAR_CLAW_ACTION.name).toBe('Claw');
+        expect(BROWN_BEAR_CLAW_ACTION.attack_bonus).toBe(5);
+        expect(BROWN_BEAR_CLAW_ACTION.reach).toBe('5 ft.');
+        expect(BROWN_BEAR_CLAW_ACTION.damage_dice_primary).toBe('1d4 + 3');
+        expect(BROWN_BEAR_CLAW_ACTION.damage_type_primary).toBe('Slashing');
+        expect(BROWN_BEAR_CLAW_ACTION.hit_conditions).toEqual(['prone']);
+        expect(BROWN_BEAR_CLAW_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(BROWN_BEAR_CLAW_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Claw',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Claw hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claw', formula: '1d4 + 3', total: 5, rolls: [2], modifier: 3, context: {
+            targetName: 'AasimarTest',
+            damageType: 'Slashing',
+            attackerName: 'Brown Bear 1',
+            hitClause: buildHitConditionClause(BROWN_BEAR_CLAW_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Brown Bear 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'AasimarTest',
+            condition: 'Prone',
+            reason: 'Claw (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Claw attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claw', formula: '1d4 + 3', total: 5, rolls: [2], modifier: 3, context: {
+            targetName: 'AasimarTest',
+            damageType: 'Slashing',
+            attackerName: 'Brown Bear 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AasimarTest', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'AasimarTest', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

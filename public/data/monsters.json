@@ -10730,7 +10730,8 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "1d4 + 3",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": ["prone"]
       }
     ],
     "bonus_actions": [],
