@@ -12941,7 +12941,13 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "conditional_damage": {
+          "dice": "4d6",
+          "modifier": 4,
+          "damage_type": "Piercing",
+          "condition": "advantage on the attack roll"
+        }
       },
       {
         "name": "Claw",

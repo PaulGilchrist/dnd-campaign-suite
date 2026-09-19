@@ -7417,7 +7417,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage, or 18 (4d6 + 4) Piercing damage if the chimera had Advantage on the attack roll.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0485-bite-advantage-variant-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0486",
