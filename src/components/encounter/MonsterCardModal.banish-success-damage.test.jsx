@@ -265,3 +265,74 @@ describe('MA-0505 MonsterCardModal Magical Backlash save: zero damage on success
     expect(computeDamageAfterSave(21, false, context.dcSuccess)).toBe(21);
   });
 });
+
+// MA-0514: Constrictor Snake Constrict — failure-only damage+Grappled prose;
+// the absent dc_success field let resolveBlockSaveDcSuccess default the save
+// context to 'half' (live proof: nat 16 +0 vs DC 12 SAVE SUCCESS paid
+// finalDamage 4 of a rolled 8 pool, own hp_change entry; second success nat
+// 15 paid 3 of 6). Same MA-0218/MA-0481/MA-0505 byte-shape data fix:
+// dc_success:"none" threaded onto the save context → computeDamageAfterSave
+// (…, 'none') = 0 on success, full raw on failure. escape_dc:12 authored as
+// the machine representation of prose "(escape DC 12)"; RESIDUAL: the only
+// escape_dc consumer app-wide is the ATTACK-hit hit_conditions stamper
+// (handlePlainDamage.applyHitClauseConditions) — the save-path grapple stamp
+// (saveProcessing.stampConditionMetaAndLogClauses) writes source meta only,
+// so live save-row grapple meta carries no dc field (badge escape remains
+// GM-adjudicated).
+const constrictor = () => monstersData.find(m => m.index === 'constrictor-snake');
+const constrictRow = () => constrictor().actions[1];
+
+const CONSTRICTOR_CREATURES = [
+  { name: 'Constrictor Snake 1', type: 'npc', targetName: 'Bandit 1', currentHp: 13, maxHp: 13, ac: 13, conditions: [] },
+  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+];
+
+function renderConstrictor() {
+  const m = makeMonster({ name: 'Constrictor Snake', armor_class: 13, hit_points: 13, actions: constrictor().actions });
+  ctx.value = { round: 1, activeCreatureName: 'Constrictor Snake 1', creatures: CONSTRICTOR_CREATURES };
+  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Constrictor Snake 1', creatures: CONSTRICTOR_CREATURES })} />);
+}
+
+function constrictSaveChip() {
+  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 12 Strength')) || null;
+}
+
+describe('MA-0514 monsters.json data lock: Constrictor Snake Constrict row', () => {
+  it('authors dc_success none + escape_dc 12 with DC 12 Strength 3d4 Bludgeoning + Grappled', () => {
+    const row = constrictRow();
+    expect(row.name).toBe('Constrict');
+    expect(row.save_dc).toBe(12);
+    expect(row.save_type).toBe('Strength');
+    expect(row.dc_success).toBe('none');
+    expect(row.escape_dc).toBe(12);
+    expect(row.damage_dice_primary).toBe('3d4');
+    expect(row.damage_type_primary).toBe('Bludgeoning');
+    expect(row.range).toBe('5 feet');
+    expect(row.save_effect).toMatch(/Grappled.*escape DC 12/i);
+    expect(row.description).toMatch(/<strong>Failure:<\/strong>\s*7 \(3d4\) Bludgeoning damage/);
+    expect(row.description).not.toMatch(/Success:/i);
+  });
+
+  it('RESIDUAL lock: escape_dc rides ONLY the attack-hit hit_conditions seam — save row stays grapple-stamp without dc meta', () => {
+    expect(constrictRow().hit_conditions).toBeUndefined();
+  });
+});
+
+describe('MA-0514 MonsterCardModal Constrict save: zero damage on success', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('save chip context carries dcSuccess none: success = 0 damage, failure = full 3d4 raw', async () => {
+    renderConstrictor();
+    fireEvent.click(constrictSaveChip());
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(context.saveDc).toBe(12);
+    expect(context.dcSuccess).toBe('none');
+    expect(context.saveConditions).toContain('grappled');
+    expect(computeDamageAfterSave(12, true, context.dcSuccess)).toBe(0);
+    expect(computeDamageAfterSave(12, false, context.dcSuccess)).toBe(12);
+  });
+});

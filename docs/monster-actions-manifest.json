@@ -7905,7 +7905,7 @@
         "grappled"
       ],
       "description": "Strength Saving Throw: DC 12, one Medium or smaller creature the snake can see within 5 feet. Failure: 7 (3d4) Bludgeoning damage, and the target has the Grappled condition (escape DC 12).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0514-constrict-half-on-save.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0515",
