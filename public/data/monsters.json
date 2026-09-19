@@ -15304,7 +15304,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 12, +4 to hit with spell attacks):\n<strong>At Will:</strong> Light, Thaumaturgy\n<strong>2/Day:</strong> Command\n<strong>1/Day:</strong> Hold Person",
+        "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 12, +4 to hit with spell attacks):\n<strong>At Will:</strong> <em>Light</em>, <em>Thaumaturgy</em>\n<strong>2/Day:</strong> <em>Command</em>\n<strong>1/Day:</strong> <em>Hold Person</em>",
         "spell_save_dc": 12,
         "spell_attack_bonus": 4,
         "spellcasting_ability": "Wisdom",

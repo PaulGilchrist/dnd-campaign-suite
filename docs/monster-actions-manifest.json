@@ -8200,7 +8200,7 @@
       "saveDc": 12,
       "saveType": "Wisdom",
       "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 12, +4 to hit with spell attacks): At Will: Light, Thaumaturgy 2/Day: Command 1/Day: Hold Person",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0532-cultist-fanatic-spellcasting-unmarked-spell-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0533",
