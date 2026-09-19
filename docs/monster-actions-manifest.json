@@ -8827,7 +8827,7 @@
       "actionType": "other",
       "trigger": "The aspirant is hit by a melee attack roll while holding a weapon.",
       "description": "The aspirant adds 4 to its AC against that attack, possibly causing it to miss.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0573-aspirant-parry-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0574",

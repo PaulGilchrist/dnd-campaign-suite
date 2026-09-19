@@ -16479,7 +16479,16 @@
       {
         "name": "Parry",
         "trigger": "The aspirant is hit by a melee attack roll while holding a weapon.",
-        "description": "The aspirant adds 4 to its AC against that attack, possibly causing it to miss."
+        "description": "The aspirant adds 4 to its AC against that attack, possibly causing it to miss.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "melee_hit",
+          "effect": "parry",
+          "acBonus": 4
+        }
       }
     ],
     "legendary_actions": [],
