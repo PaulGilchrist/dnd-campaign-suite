@@ -1752,3 +1752,89 @@ describe('MA-0480 Chain Devil Chain grappled+restrained-on-hit hit-clause', () =
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const CHIMERA = monsters.find(m => m.index === 'chimera');
+const RAM_ACTION = CHIMERA.actions[3];
+
+describe('MA-0487 Chimera Ram prone-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Chimera 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Chimera 1', computedStats: { armorClass: 14 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 9, newHp: 990, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0487 data-lock: authors hit_conditions:["prone"] on the Ram row (byte-mirrors Brown Bear Claw)', () => {
+        expect(RAM_ACTION.name).toBe('Ram');
+        expect(RAM_ACTION.attack_bonus).toBe(7);
+        expect(RAM_ACTION.reach).toBe('5 ft.');
+        expect(RAM_ACTION.damage_dice_primary).toBe('1d12 + 4');
+        expect(RAM_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(RAM_ACTION.hit_conditions).toEqual(['prone']);
+    });
+
+    it('builds the prone clause with no escape DC (Ram prose has no escape save)', () => {
+        expect(buildHitConditionClause(RAM_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Ram',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + provenance-meta + condition log on a resolved Ram hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Ram', formula: '1d12 + 4', total: 9, rolls: [5], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Chimera 1',
+            hitClause: buildHitConditionClause(RAM_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Chimera 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Prone',
+            reason: 'Ram (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Ram attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Ram', formula: '1d12 + 4', total: 9, rolls: [5], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Chimera 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
