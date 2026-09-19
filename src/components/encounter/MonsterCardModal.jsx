@@ -122,6 +122,9 @@ function comboTrapArmsFrom(autoDamage) {
     // MA-0367: Infernal Wound arm rides the combo auto-damage to the
     // save-result fail seam. Byte-inert null elsewhere.
     infernalWound: autoDamage.infernalWound || null,
+    // MA-0501: staged petrify ladder arm (Cockatrice) rides the combo
+    // auto-damage to the save-fail seams. Byte-inert null elsewhere.
+    stagedPetrify: autoDamage.stagedPetrify || null,
   };
 }
 
@@ -674,12 +677,25 @@ export function buildSecondaryDamageTransport(action, fallbackName = null) {
   };
 }
 
+// MA-0501: authored staged petrify ladder key (Cockatrice Petrifying Bite) —
+// structured-only arm (never prose-parsed, playbook §67): Restrained-first →
+// turn-END repeat save → Petrified for petrified_hours×600 rounds (CLA-334).
+// Rides the save transport to BOTH failed-save seams (NPC inline
+// handleNpcSaveDamage + PC prompt saveProcessing → cockatricePetrifyService).
+// Byte-inert null for every row without the structured key.
+// eslint-disable-next-line react-refresh/only-export-components
+export function parseStagedPetrifyClause(action) {
+  if (!action?.staged_petrify) return null;
+  return { petrifiedRounds: (Number(action.staged_petrify.petrified_hours) || 24) * 600 };
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function buildSaveOptions(action) {
   return {
     saveDc: action?.save_dc || null,
     saveType: action?.save_type ? toAbbr(action.save_type) : null,
     dcSuccess: action?.save_dc != null ? (action?.dc_success ?? 'half') : null,
+    stagedPetrify: parseStagedPetrifyClause(action),
     saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
     // MA-0298: Soul Tome trap arm rides the attack+save combo context to the
     // player-save-result fail seam (soulTomeTrapService). Byte-inert null for
@@ -1030,6 +1046,9 @@ export function buildAbilitySaveRollContext({ monsterName, target, spellName, ac
     // MA-0048: authored repeat-save clause (Frightful Presence) — arm the
     // turn-end repeat-save marker at the failed-save seam in saveProcessing.
     repeatSave: action?.repeat_save || null,
+    // MA-0501: Cockatrice staged petrify ladder (Restrained → turn-END repeat
+    // save → Petrified 24h) — arm for the saveProcessing failed-save seam.
+    stagedPetrify: parseStagedPetrifyClause(action),
     // MA-0038: authored failed-save concentration-disadvantage clause
     // (Cloud of Insects) — te producer arm for saveProcessing on a fail.
     concentrationDisadvantage: parseConcentrationDisadvantageClause(saveEffect),

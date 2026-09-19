@@ -13505,6 +13505,10 @@
         "reach": "5 ft.",
         "save_dc": 11,
         "save_type": "Constitution",
+        "dc_success": "full",
+        "staged_petrify": {
+          "petrified_hours": 24
+        },
         "save_effect": "First Failure: The target has the Restrained condition. The target repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure: The target has the Petrified condition, instead of the Restrained condition, for 24 hours.",
         "damage_dice_primary": "1d4 + 1",
         "damage_type_primary": "Piercing"

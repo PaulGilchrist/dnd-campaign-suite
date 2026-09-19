@@ -386,6 +386,21 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'dc', 'saveType'],
   },
   {
+    // MA-0501: Cockatrice Petrifying Bite staged ladder — first failed CON
+    // save Restrains, a repeat save at the end of the target's next turn ends
+    // it on a success; a second failure (repeat save or a fresh bite while
+    // Restrained) Petrifies instead, for 24 hours (petrified_hours×600 round
+    // clock, CLA-334). Own te key (NOT eye_ray_petrifying — MA-0374's
+    // Beholder ladder has no petrification expiry).
+    effect: 'petrifying_bite_staged',
+    label: 'Petrifying Bite',
+    description: 'Staged by Petrifying Bite (MA-0501): first failed CON save — Restrained, repeats the CON save (DC indicated) at the end of its next turn, ending the effect on itself on a success; a second failure Petrifies it instead of Restrained, for 24 hours.',
+    icon: 'fa-diamond',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source', 'dc', 'saveType'],
+  },
+  {
     effect: 'tashas_hideous_laughter',
     label: "Tasha's Hideous Laughter",
     description: 'Target laughs uncontrollably: Prone and Incapacitated for the duration. Target can\'t end the Prone condition on itself. At the end of each turn and each time it takes damage, target can repeat the WIS save (has Advantage on save triggered by damage). On a success, the spell ends. Concentration, up to 1 minute.',

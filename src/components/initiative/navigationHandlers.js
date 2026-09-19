@@ -8,6 +8,7 @@ import { applySleepTurnEnd } from '../../services/rules/features/sleepService.js
 import { applyFrightfulPresenceTurnEnd } from '../../services/rules/features/frightfulPresenceService.js'
 import { applyWeakeningBreathTurnEnd } from '../../services/rules/features/weakeningBreathService.js'
 import { applyParalyzingBreathTurnEnd } from '../../services/rules/features/paralyzingBreathService.js'
+import { applyPetrifyingBiteTurnEnd } from '../../services/rules/features/cockatricePetrifyService.js'
 import { applyEyeRaysTurnEnd } from '../../services/rules/features/beholderEyeRayService.js'
 import { applySoulTomeTrapTurnEnd } from '../../services/rules/features/soulTomeTrapService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
@@ -132,6 +133,12 @@ function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters
     // a success (paralyzingBreathService MA-0068/MA-0102 shapes).
     applyParalyzingBreathTurnEnd(campaignName, activeCreatureName)
         .catch((e) => { console.error('[navigationHandlers] MA-0248 paralyzing breath turn-end save failed:', e) })
+    // MA-0501: Petrifying Bite (Cockatrice) — the OUTGOING Restrained target
+    // repeats its CON save at the end of its own staged turn; success sheds
+    // Restrained and retires the ladder, a failure is the second failure →
+    // Petrified for 24 hours (cockatricePetrifyService MA-0248 ladder shape).
+    applyPetrifyingBiteTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] MA-0501 petrifying bite turn-end save failed:', e) })
     // MA-0374: Beholder Eye Rays ladders — the OUTGOING target repeats its
     // CON save at the end of its own turn while eye_ray_paralyzed /
     // eye_ray_petrifying te exists: Paralyzing Ray repeat (auto-success

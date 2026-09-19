@@ -15,6 +15,7 @@ import { trackFrightfulPresence } from '../../services/rules/features/frightfulP
 import { setTempHp } from '../../services/automation/handlers/buffs/tempHpService.js';
 import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
 import { applyEyeRayFailedGrants } from '../../services/rules/features/beholderEyeRayService.js';
+import { stagePetrifyingBiteTargets } from '../../services/rules/features/cockatricePetrifyService.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -379,6 +380,26 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     if (context?.eyeRay) {
         await applyEyeRayFailedGrants({ campaignName, attackerName, targetName: applyTarget, ray: context.eyeRay });
     }
+    // MA-0501: Cockatrice staged petrify ladder arm (byte-inert unless
+    // context.stagedPetrify authored; cockatricePetrifyService).
+    await applyStagedPetrifyClauseGrant({ context, campaignName, attackerName, applyTarget });
+}
+
+// MA-0501: Cockatrice Petrifying Bite staged ladder — first failed CON
+// save Restrains + arms the petrifying_bite_staged te (turn-END repeat
+// save consumer in navigationHandlers); a second failure — repeat save or
+// a fresh bite while Restrained — Petrifies for 24 hours
+// (cockatricePetrifyService, MA-0248/MA-0374 ladder shapes). Split to a
+// sibling helper to keep applyFailedSaveClauseGrants under the ceiling (§5).
+async function applyStagedPetrifyClauseGrant({ context, campaignName, attackerName, applyTarget }) {
+    if (!context || !context.stagedPetrify) return;
+    await stagePetrifyingBiteTargets({
+        campaignName,
+        casterName: attackerName,
+        targetNames: [applyTarget],
+        saveDc: context.saveDc,
+        options: { ...context.stagedPetrify, label: context.actionName || context.name || 'Petrifying Bite' },
+    });
 }
 
 // Banishment-family + movement-penalty te grants (MA-0104/0107/0115/0146),

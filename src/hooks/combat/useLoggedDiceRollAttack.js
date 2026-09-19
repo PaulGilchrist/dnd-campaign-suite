@@ -143,6 +143,10 @@ function comboTrapArmsFromContext(context) {
         // MA-0367: Infernal Wound arm rides the combo auto-damage to the
         // save-result seam. Byte-inert null elsewhere.
         infernalWound: context?.infernalWound || null,
+        // MA-0501: Cockatrice staged petrify ladder arm rides the combo
+        // auto-damage to the NPC-inline save-fail seam (handleNpcSaveDamage
+        // → cockatricePetrifyService). Byte-inert null elsewhere.
+        stagedPetrify: context?.stagedPetrify || null,
     };
 }
 

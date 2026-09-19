@@ -20,6 +20,7 @@ import { hasBuffEffect } from '../../../services/automation/common/buffToggle.js
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { triggerViciousMockeryForGeneric } from '../../../services/rules/features/viciousMockeryService.js';
 import { grantInfernalWound } from '../../../services/rules/features/infernalWoundService.js';
+import { stagePetrifyingBiteTargets } from '../../../services/rules/features/cockatricePetrifyService.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp } from './damageHandlerUtils.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage', 'SaveResult', 'SaveRoll', 'SaveBonus', 'SaveRawRolls', 'DcSuccess'];
@@ -239,15 +240,33 @@ function applyFailedSaveConditions({ context, target, targetCharacter, combatSum
     }
 }
 
+// MA-0501: staged petrify rider arm (byte-inert unless context.stagedPetrify
+// authored) split to a sibling helper to keep applyNpcFailedSaveLegs under the
+// complexity ceiling (playbook §5, MA-0087 family split model).
+async function applyStagedPetrifyNpcLeg({ context, target, campaignName, characterName, name }) {
+    if (!context || !context.stagedPetrify) return;
+    await stagePetrifyingBiteTargets({
+        campaignName,
+        casterName: context.attackerName || characterName,
+        targetNames: [target.name],
+        saveDc: context.saveDc,
+        options: { ...context.stagedPetrify, label: name || 'Petrifying Bite' },
+    });
+}
+
 // Failed-save legs for an NPC save-damage resolution: canonical statusEffects
 // (MA-0016 family) + the MA-0367 Infernal Wound te (infernalWoundService;
-// already-wounded victims get no second wound). Extracted to keep the main
-// handler under the complexity ceiling (playbook §5).
+// already-wounded victims get no second wound) + the MA-0501 Cockatrice staged
+// petrify ladder (cockatricePetrifyService — first fail Restrained + ladder
+// armed, second fail Petrified 24h; the same service the PC-prompt seam and
+// the turn-END seam call). Extracted to keep the main handler under the
+// complexity ceiling (playbook §5).
 async function applyNpcFailedSaveLegs({ saveResult, context, target, targetCharacter, combatSummary, characterName, campaignName, name }) {
     if (saveResult.success) return;
     if (context?.statusEffects?.length > 0) {
         applyFailedSaveConditions({ context, target, targetCharacter, combatSummary, characterName, campaignName });
     }
+    await applyStagedPetrifyNpcLeg({ context, target, campaignName, characterName, name });
     if (context?.infernalWound) {
         await grantInfernalWound({
             campaignName,
