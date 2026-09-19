@@ -124,7 +124,7 @@ import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { buildRangedVariantOffer, parseRangedBand } from './MonsterCardHelpers.js';
+import { buildRangedVariantOffer, parseRangedBand, buildRangedBandAdvisory } from './MonsterCardHelpers.js';
 
 const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
 
@@ -341,6 +341,63 @@ describe('MA-0529 cult-fanatic identical-dice ranged band lock', () => {
     const bandOnly = { ...CULT_FANATIC_DAGGER };
     delete bandOnly.damage_dice_ranged;
     expect(buildRangedVariantOffer(bandOnly, 'Dagger')).toMatchObject({ formula: '1d4 + 2', normalFt: 20 });
+  });
+});
+
+// MA-0539: Cyclops Rock — PURE ranged row (no reach) twin of MA-0436/0529.
+// DATA fix authors range "30/120" (byte-shape of the Javelin band). No melee
+// chooser is expected (chooser arms only on melee-or-ranged rows); band
+// truth rides the attack log as an advisory rangeReason (gridless rows can
+// never be token-gated; rangeToFeet cannot split bands — advisory-locked).
+describe('MA-0539 cyclops rock pure-ranged band lock', () => {
+  const CYCLOPS_ROCK = {
+    name: 'Rock',
+    description: 'Ranged Weapon Attack: +9 to hit, range 30/120 ft., one target. Hit: 28 (4d10 + 6) bludgeoning damage.',
+    attack_bonus: 9,
+    range: '30/120',
+    damage_dice_primary: '4d10 + 6',
+    damage_type_primary: 'Bludgeoning',
+  };
+
+  it('the Cyclops Rock row authors range "30/120" + 4d10 + 6 (MA-0436 byte-shape)', () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const cyclops = monsters.find((m) => m.name === 'Cyclops');
+    const rock = cyclops.actions[2];
+    expect(rock.name).toBe('Rock');
+    expect(rock.range).toBe('30/120');
+    expect(rock.reach).toBeUndefined();
+    expect(rock.attack_bonus).toBe(9);
+    expect(rock.damage_dice_primary).toBe('4d10 + 6');
+    expect(rock.damage_type_primary).toBe('Bludgeoning');
+    expect(rock.description).not.toContain('4dl0');
+  });
+
+  it('parseRangedBand parses the cyclops "30/120" band', () => {
+    expect(parseRangedBand(CYCLOPS_ROCK.range)).toEqual({ normalFt: 30, longFt: 120 });
+  });
+
+  it('NO melee chooser arms on the pure-ranged row (MA-0436 guardrail holds)', () => {
+    expect(buildRangedVariantOffer(CYCLOPS_ROCK, 'Rock')).toBeNull();
+  });
+
+  it('rangeToFeet cannot split bands; computeRangeEffect never mis-adjudicates the band', async () => {
+    const actual = await vi.importActual('../../services/rules/combat/rangeValidation.js');
+    expect(actual.rangeToFeet('30/120')).toBeNull();
+    expect(actual.computeRangeEffect('30/120', 100)).toEqual({ mode: 'normal' });
+    expect(actual.computeRangeEffect('30/120', 500)).toEqual({ mode: 'normal' });
+  });
+
+  it('buildRangedBandAdvisory stamps band truth on pure-ranged band rows', () => {
+    const note = buildRangedBandAdvisory(CYCLOPS_ROCK);
+    expect(note).toContain('Range band 30/120 ft');
+    expect(note).toContain('advisory');
+  });
+
+  it('advisory stays null for reach rows, band-less rows, and missing actions (byte-inert)', () => {
+    expect(buildRangedBandAdvisory({ reach: '5 ft.', range: '30/120', description: 'Melee or Ranged Weapon Attack.' })).toBeNull();
+    expect(buildRangedBandAdvisory({ damage_dice_primary: '1d4 + 2' })).toBeNull();
+    expect(buildRangedBandAdvisory({ range: '60 ft.' })).toBeNull();
+    expect(buildRangedBandAdvisory(undefined)).toBeNull();
   });
 });
 

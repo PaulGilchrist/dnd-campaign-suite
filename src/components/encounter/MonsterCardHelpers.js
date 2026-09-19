@@ -726,6 +726,17 @@ export function buildRangedVariantOffer(action, name) {
   };
 }
 
+// MA-0539: PURE-ranged rows (authored "N/M" band, NO reach, no melee mode) —
+// rangeToFeet cannot split bands and no chooser applies (MA-0436 chooser is
+// melee-or-ranged only). Gridless/no-token-gate rows record the authored band
+// as an advisory rangeReason so the attack log carries band truth.
+export function buildRangedBandAdvisory(action) {
+  if (!action || action.reach) return null;
+  const band = parseRangedBand(action.range);
+  if (!band) return null;
+  return `Range band ${band.normalFt}/${band.longFt} ft — gridless: advisory (GM-enforced).`;
+}
+
 export function buildRangedVariantSelectLog({ monsterName, offer, mode, defaulted = false, rangeNote = null }) {
   const formula = mode === 'ranged' ? offer.formula : offer.baseFormula;
   return {

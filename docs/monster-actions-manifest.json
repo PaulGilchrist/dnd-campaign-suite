@@ -8303,7 +8303,7 @@
       "damageDicePrimary": "4d10 + 6",
       "damageTypePrimary": "Bludgeoning",
       "description": "Ranged Weapon Attack: +9 to hit, range 30/120 ft., one target. Hit: 28 (4dl0 + 6) bludgeoning damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0539-cyclops-rock-range-band-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0540",
