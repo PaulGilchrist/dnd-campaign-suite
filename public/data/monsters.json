@@ -12607,7 +12607,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The centaur casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> Druidcraft, Speak with Animals",
+        "description": "The centaur casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> <em>Druidcraft</em>, <em>Speak with Animals</em>",
         "spell_save_dc": 15,
         "spellcasting_ability": "Wisdom",
         "save_dc": 15,

@@ -366,6 +366,16 @@ describe('MonsterCardHelpers - MA-0012 em-marked spell name extraction', () => {
     expect(row.save_type).toBe('Wisdom');
     expect(8 + cultist.ability_score_modifiers.wis + cultist.proficiency_bonus).toBe(15);
   });
+
+  it('MA-0478: Centaur Warden row extracts BOTH em-marked At Will names (plain-text once = zero chips)', () => {
+    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+    const warden = monsters.find(m => m.index === 'centaur-warden');
+    const row = warden.actions.find(a => a.name === 'Spellcasting');
+    expect(extractSpellNamesFromSpellcasting(row.description)).toEqual(['Druidcraft', 'Speak with Animals']);
+    expect(row.save_dc).toBe(15);
+    expect(row.save_type).toBe('Wisdom');
+    expect(8 + warden.ability_score_modifiers.wis + warden.proficiency_bonus).toBe(15);
+  });
 });
 
 describe('MonsterCardModal - MA-0012 Aberrant Cultist per-spell links', () => {
