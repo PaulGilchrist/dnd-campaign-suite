@@ -8150,7 +8150,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 20/60 ft., one creature. Hit: 4 (1d4 + 2) piercing damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0529-cult-fanatic-dagger-range-band-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0530",

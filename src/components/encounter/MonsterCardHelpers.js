@@ -694,19 +694,31 @@ export function parseRangedBand(range) {
   return { normalFt: Number(match[1]), longFt: Number(match[2]) };
 }
 
+// MA-0529: dice-identical dual-mode rows (Cult Fanatic Dagger "1d4 + 2" in
+// BOTH modes) still carry a RAW 20/60 band — the mode CHOICE is enforced even
+// when no dice swap exists, so an authored "N/M" band arms the chooser with
+// formula === baseFormula (band advisory rides the ranged-select log). Rows
+// with NO band and identical/absent variant dice stay byte-inert (null).
+function rangedVariantRowArmed(row, band) {
+  const variant = row.damage_dice_ranged;
+  const base = row.damage_dice_primary;
+  if (!base) return false;
+  if (!band && (!variant || variant === base)) return false;
+  return /melee or ranged/i.test(row.description || '');
+}
+
 export function buildRangedVariantOffer(action, name) {
   const row = action || {};
   const variant = row.damage_dice_ranged;
   const base = row.damage_dice_primary;
-  if (!variant || !base || variant === base) return null;
-  if (!/melee or ranged/i.test(row.description || '')) return null;
-  const damageType = row.damage_type_primary || '';
   const band = parseRangedBand(row.range);
+  if (!rangedVariantRowArmed(row, band)) return null;
+  const damageType = row.damage_type_primary || '';
   return {
-    formula: variant,
+    formula: variant || base,
     baseFormula: base,
     damageType,
-    label: `Ranged: ${variant} ${damageType}?`,
+    label: `Ranged: ${variant || base} ${damageType}?`,
     attackName: name || row.name || 'Attack',
     range: row.range || null,
     normalFt: band ? band.normalFt : null,

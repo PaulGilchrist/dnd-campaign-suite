@@ -84,3 +84,43 @@ describe('MA-0436 ranged variant chooser gate (DiceRollResult)', () => {
     expect(onRangedVariant).toHaveBeenCalledWith('melee');
   });
 });
+
+// MA-0529 twin: Cult Fanatic Dagger — dice-identical chooser (1d4 + 2 in
+// both modes); the band/choice is still adjudicated on the HIT popup.
+describe('MA-0529 identical-dice chooser (DiceRollResult)', () => {
+  const IDENTICAL_OFFER = { ...OFFER, formula: '1d4 + 2', baseFormula: '1d4 + 2', label: 'Ranged: 1d4 + 2 Piercing?', attackName: 'Dagger', range: '20/60', normalFt: 20, longFt: 60 };
+
+  it('offers Melee/Ranged both at 1d4 + 2 on a HIT', () => {
+    render(
+      <DiceRollResult
+        name="Dagger"
+        type="d20"
+        rollType="attack"
+        rolls={[15]}
+        bonus={4}
+        hit
+        targetName="Bandit 1"
+        rangedVariantOffer={IDENTICAL_OFFER}
+      />
+    );
+    expect(screen.getByRole('button', { name: /Melee: 1d4 \+ 2 Piercing/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ranged: 1d4 \+ 2 Piercing/ })).toBeInTheDocument();
+  });
+
+  it('shows the ranged applied notice after picking Ranged', () => {
+    render(
+      <DiceRollResult
+        name="Dagger"
+        type="d20"
+        rollType="attack"
+        rolls={[15]}
+        bonus={4}
+        hit
+        targetName="Bandit 1"
+        rangedVariantOffer={IDENTICAL_OFFER}
+        rangedVariantResolved="ranged"
+      />
+    );
+    expect(screen.getByText(/Ranged applied \(1d4 \+ 2 Piercing\)\./)).toBeInTheDocument();
+  });
+});

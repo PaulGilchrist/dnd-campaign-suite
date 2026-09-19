@@ -298,6 +298,52 @@ describe('MA-0436 parseRangedBand + buildRangedVariantOffer', () => {
   });
 });
 
+// MA-0529: Cult Fanatic Dagger — dice-identical dual-mode twin of MA-0436.
+// RAW 20/60 band with "1d4 + 2" in BOTH modes: the authored band alone arms
+// the chooser (mode CHOICE is the enforced part; band advisory rides the
+// ranged-select log). Identical dice WITHOUT a band stay inert.
+describe('MA-0529 cult-fanatic identical-dice ranged band lock', () => {
+  const CULT_FANATIC_DAGGER = {
+    name: 'Dagger',
+    description: 'Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 20/60 ft., one creature. Hit: 4 (1d4 + 2) piercing damage.',
+    attack_bonus: 4,
+    reach: '5 ft.',
+    range: '20/60',
+    damage_dice_primary: '1d4 + 2',
+    damage_dice_ranged: '1d4 + 2',
+    damage_type_primary: 'Piercing',
+  };
+
+  it('the Cult Fanatic Dagger row authors range "20/60" + damage_dice_ranged "1d4 + 2"', () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const fanatic = monsters.find((m) => m.name === 'Cult Fanatic');
+    const dagger = fanatic.actions[1];
+    expect(dagger.name).toBe('Dagger');
+    expect(dagger.range).toBe('20/60');
+    expect(dagger.damage_dice_primary).toBe('1d4 + 2');
+    expect(dagger.damage_dice_ranged).toBe('1d4 + 2');
+  });
+
+  it('parseRangedBand parses the "20/60" band', () => {
+    expect(parseRangedBand('20/60')).toEqual({ normalFt: 20, longFt: 60 });
+  });
+
+  it('arms the offer on identical dice when the band is authored (formula === baseFormula)', () => {
+    const offer = buildRangedVariantOffer(CULT_FANATIC_DAGGER, 'Dagger');
+    expect(offer).toMatchObject({ formula: '1d4 + 2', baseFormula: '1d4 + 2', damageType: 'Piercing', attackName: 'Dagger', range: '20/60', normalFt: 20, longFt: 60 });
+    expect(offer.label).toBe('Ranged: 1d4 + 2 Piercing?');
+  });
+
+  it('stays byte-inert for identical dice WITHOUT an authored band; band alone arms', () => {
+    const noBand = { ...CULT_FANATIC_DAGGER };
+    delete noBand.range;
+    expect(buildRangedVariantOffer(noBand, 'Dagger')).toBeNull();
+    const bandOnly = { ...CULT_FANATIC_DAGGER };
+    delete bandOnly.damage_dice_ranged;
+    expect(buildRangedVariantOffer(bandOnly, 'Dagger')).toMatchObject({ formula: '1d4 + 2', normalFt: 20 });
+  });
+});
+
 describe('MA-0436 offer forwarding', () => {
   it('forwards rangedVariantOffer to the attack roll context', () => {
     renderBugbear();
