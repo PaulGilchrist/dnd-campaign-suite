@@ -7852,7 +7852,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The colossus moves up to half its Speed without provoking Opportunity Attacks, and it can make one Slam attack at any point during that move.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0511-colossus-stomp-legendary-silent-burn.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0512",
