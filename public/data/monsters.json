@@ -11066,7 +11066,9 @@
         "attack_bonus": 5,
         "reach": "10 ft.",
         "damage_dice_primary": "2d8 + 3",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 13
       }
     ],
     "bonus_actions": [

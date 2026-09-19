@@ -625,6 +625,78 @@ describe('MA-0288 Ankheg Bite grapple-on-hit hit-clause', () => {
     });
 });
 
+const BUGBEAR_STALKER = monsters.find(m => m.index === 'bugbear-stalker');
+const MORNINGSTAR_ACTION = BUGBEAR_STALKER.actions.find(a => a.name === 'Morningstar');
+
+describe('MA-0442 Bugbear Stalker Morningstar grapple-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Bugbear Stalker 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Bugbear Stalker 1', computedStats: { armorClass: 15 } },
+            { name: 'AasimarTest', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 12, newHp: 131, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'AasimarTest', type: 'player', size: 'Medium', ac: 12, currentHp: 143, maxHp: 143 }],
+        });
+    });
+
+    it('MA-0442 data-lock: authors hit_conditions:["grappled"] + escape_dc:13 on the Morningstar row', () => {
+        expect(MORNINGSTAR_ACTION.attack_bonus).toBe(5);
+        expect(MORNINGSTAR_ACTION.damage_dice_primary).toBe('2d8 + 3');
+        expect(MORNINGSTAR_ACTION.damage_type_primary).toBe('Piercing');
+        expect(MORNINGSTAR_ACTION.reach).toBe('10 ft.');
+        expect(MORNINGSTAR_ACTION.hit_conditions).toEqual(['grappled']);
+        expect(MORNINGSTAR_ACTION.escape_dc).toBe(13);
+    });
+
+    it('builds the grappled clause with escape DC 13 (statblock STR 17/+3 + PB 2)', () => {
+        expect(BUGBEAR_STALKER.ability_score_modifiers.str).toBe(3);
+        expect(BUGBEAR_STALKER.proficiency_bonus).toBe(2);
+        expect(buildHitConditionClause(MORNINGSTAR_ACTION)).toEqual({
+            conditions: ['grappled'],
+            escapeDc: 13,
+            attackName: 'Morningstar',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + escape-meta + condition log on a resolved Morningstar hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Morningstar', formula: '2d8 + 3', total: 12, rolls: [4, 5], modifier: 3, context: {
+            targetName: 'AasimarTest',
+            damageType: 'Piercing',
+            attackerName: 'Bugbear Stalker 1',
+            hitClause: buildHitConditionClause(MORNINGSTAR_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 13, ability: 'str', source: 'Bugbear Stalker 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'AasimarTest',
+            condition: 'Grappled',
+            reason: 'Morningstar (escape DC 13)',
+        }));
+    });
+});
+
 const ANKYLOSAURUS = monsters.find(m => m.index === 'ankylosaurus');
 const TAIL_ACTION = ANKYLOSAURUS.actions.find(a => a.name === 'Tail');
 

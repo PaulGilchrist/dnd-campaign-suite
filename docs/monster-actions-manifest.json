@@ -6731,7 +6731,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the bugbear), reach 10 ft. Hit: 12 (2d8 + 3) Piercing damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0442-morningstar-grapple-hit-clause-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0443",
