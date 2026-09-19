@@ -7935,7 +7935,7 @@
       "damageTypePrimary": null,
       "reach": null,
       "description": "Trigger: The spirit takes damage from a creature. Response: The spirit makes a Slam attack against that creature if possible, or the spirit moves up to half its Speed toward that creature without provoking Opportunity Attacks.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0516-berserk-lashing-prose-reaction-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0517",

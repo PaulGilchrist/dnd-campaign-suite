@@ -1610,7 +1610,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       campaignName,
       // MA-0467: getTarget arms the Healing Touch touch target (the card's
       // armed target-select); the resolver falls back to self unarmed.
-      deps: { resolveSpellLevel: resolveGatedSpellLevel, spellAbilityMod, getTarget },
+      // MA-0516: Berserk Lashing routes its folded Slam attack through the
+      // modal's existing attack-roll seam (ref keeps the callback late-bound).
+      deps: { resolveSpellLevel: resolveGatedSpellLevel, spellAbilityMod, getTarget, handleAttack: (name, bonus, action) => rollHandlerRef.current?.(name, bonus, action) },
     });
     // MA-0399: Split — the resolver's popupHtml carries the trigger verdict
     // plus the GM duplication instruction; refusals surface the honest message.

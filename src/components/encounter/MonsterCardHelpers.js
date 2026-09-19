@@ -788,6 +788,20 @@ const GATED_MONSTER_REACTIONS = {
   // ("spell level"→slotLevel, MA-0465 lineage); heal rides the canonical
   // applyHealingToTarget choke point (MA-0367).
   heal: { effect: 'heal', trigger: 'touch', label: 'Healing Touch', icon: 'fa-hand-holding-medical' },
+  // MA-0516: Construct Spirit (Clay) Berserk Lashing — reactive attack
+  // reaction (2024 PHB: take damage from a creature → Slam attack vs THAT
+  // creature, or half-speed move, advisory). Gate is the campaign lastAttack
+  // identity (same damaged-target/damage-dealt probe as hellish_rebuke
+  // MA-0329 — any weapon OR spell damage arms; "if possible" move-alternative
+  // stays GM-adjudicated, CLA-325). The response routes the folded Slam row
+  // from the summoned combatant's actions (attack_bonus backfill + dice token
+  // fold, MA-0465/0284 caster-fold lineage) through the modal's existing
+  // attack-roll seam (deps.handleAttack) against the triggering attacker.
+  // Unfolded rows (EB-direct join, off-RAW route per MA-0286 adjudication)
+  // refuse honestly — no false +0 auto-hit. At Will sentinel
+  // (usage:'At Will'+uses:999, MA-0341 shape) — RAW unlimited; 1/round latch
+  // (_attack_usedRound) + lastAttack.berserkLashingResolved identity stamp.
+  attack: { effect: 'attack', trigger: 'damage_taken', label: 'Berserk Lashing', icon: 'fa-hand-fist' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -1207,6 +1221,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
     return resolveMonsterHealReaction({ action, monsterName, campaignName, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
   }
 
+  if (def.effect === 'attack') {
+    return resolveMonsterAttackReaction({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, setRuntimeValue: ctx.setRV } });
+  }
+
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });
 }
 
@@ -1341,6 +1359,141 @@ async function resolveMonsterHealReaction({ action, monsterName, campaignName, c
     await log(campaignName, buildHealHpChangeLog({ monsterName, targetName, result }));
   }
   return { ok: true, message: spendLog.description, healAmount: result ? result.actualHeal : 0, rollTotal: roll.total, targetName, popupHtml: buildHealPopupHtml({ monsterName, targetName, gate, roll, result }) };
+}
+
+// MA-0516: reactive attack reaction (Construct Spirit (Clay) Berserk
+// Lashing). Event identity mirrors hellishRebukeIdentityRefusal (MA-0329) —
+// ANY damage (weapon or spell legs) dealt to this monster by a distinct
+// creature arms it; a resolved lashing stamp stops refire on the same event.
+export function attackReactionIdentityRefusal(lastAttack, monsterName) {
+  if (!lastAttack || lastAttack.targetName !== monsterName) return 'trigger';
+  const dealt = Number(lastAttack.actualDamage ?? ((lastAttack.primaryDamage || 0) + (lastAttack.secondaryDamage || 0)));
+  if (!(dealt > 0)) return 'damage';
+  if (lastAttack.berserkLashingResolved === true) return 'reacted';
+  if (!lastAttack.attackerName || lastAttack.attackerName === monsterName) return 'attacker';
+  return null;
+}
+
+const ATTACK_REACTION_REFUSAL_MESSAGES = {
+  trigger: (m) => `${m} was not the damaged target of the last attack — refused.`,
+  damage: (m) => `the last attack dealt ${m} no damage — refused.`,
+  reacted: () => 'already responded to that damage event — one lashing per trigger.',
+  attacker: () => 'no identifiable attacker to lash against — refused.',
+  round: () => 'Reaction already used this round — refused.',
+  uses: (limit) => `${limit} uses already spent today — refused.`,
+  target: (m, a) => `${m} must Slam the creature that damaged it — arm ${a} on the card first.`,
+  fold: (m) => `${m} was not summoned via the cast path — no folded caster mod/dice — refused.`,
+};
+
+export function attackReactionGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action }) {
+  const identity = attackReactionIdentityRefusal(lastAttack, monsterName);
+  if (identity) {
+    return { ok: false, reason: identity, message: ATTACK_REACTION_REFUSAL_MESSAGES[identity](monsterName, lastAttack?.attackerName) };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: ATTACK_REACTION_REFUSAL_MESSAGES.round() };
+  }
+  const used = Number((storedUses && storedUses.attack) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: ATTACK_REACTION_REFUSAL_MESSAGES.uses(limit) };
+  }
+  return { ok: true, used, limit, attackerName: lastAttack.attackerName };
+}
+
+// The folded Slam row rides the summoned combatant's actions (resolveMonster-
+// Actions backfill + foldRowDice token fold, MA-0465 lineage). A row still
+// carrying an unfolded token ("+spell attack modifier" / "spell level") is
+// the EB-direct off-RAW route (MA-0286 adjudication) — refuse, never bake a
+// false +0 auto-hit.
+export function attackReactionSlamRow({ action, combatant }) {
+  const attackName = String(action?.automation?.attack || 'Slam');
+  return (combatant?.actions || []).find(a => a?.name === attackName) || null;
+}
+
+export function attackReactionFoldCheck(slamRow) {
+  const attackBonus = Number(slamRow?.attack_bonus);
+  const formula = slamRow?.damage_dice_primary != null ? String(slamRow.damage_dice_primary) : null;
+  if (!slamRow) return { reason: 'fold', message: 'no Slam row on the combatant — refused.' };
+  if (!Number.isFinite(attackBonus)) return { reason: 'fold', message: 'Slam attack_bonus is unfolded — summon via the cast path. Refused.' };
+  if (!formula || !canRollExpression(formula)) return { reason: 'fold', message: `Slam damage "${formula}" is unfolded — no rollable dice. Refused.` };
+  return { attackBonus, formula, damageType: slamRow.damage_type_primary || 'Bludgeoning' };
+}
+
+// Fold + armed-target verification: RAW slams the creature that dealt the
+// damage, so the armed target must be the triggering attacker — never a
+// false +0 auto-hit, never a swung-at-bystander.
+export function attackReactionFireCheck({ action, combatant, armed, attackerName, monsterName }) {
+  const slamRow = attackReactionSlamRow({ action, combatant });
+  const fold = attackReactionFoldCheck(slamRow);
+  if (fold.reason) return { reason: 'fold', message: fold.message };
+  if (!armed || armed.name !== attackerName) {
+    return { reason: 'target', message: ATTACK_REACTION_REFUSAL_MESSAGES.target(monsterName, attackerName) };
+  }
+  return { slamRow, ...fold };
+}
+
+function buildAttackReactionRefusalLog({ monsterName, action, reason, message }) {
+  const name = action?.name || 'Berserk Lashing';
+  return {
+    type: 'automation',
+    characterName: monsterName,
+    automationType: 'berserk_lashing_refused',
+    name,
+    description: `${name} refused (${reason}): ${message}`,
+    timestamp: Date.now(),
+  };
+}
+
+function buildAttackReactionSpendLog({ monsterName, action, attackerName, spec }) {
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: action?.name || 'Berserk Lashing',
+    description: `${monsterName} uses Berserk Lashing — Slam attack on ${attackerName}, the creature that damaged it (+${spec.attackBonus} to hit, ${spec.formula} ${spec.damageType}). Half-speed move alternative is GM-adjudicated (advisory — no OA gridless). At Will — unlimited, 1 Reaction per round.`,
+    timestamp: Date.now(),
+  };
+}
+
+async function refuseAttackReaction({ monsterName, action, campaignName, log, reason, message }) {
+  await log(campaignName, buildAttackReactionRefusalLog({ monsterName, action, reason, message }));
+  return { ok: false, message, popupHtml: `<div class="mc-prerequisite-refusal"><h3>${action?.name || 'Berserk Lashing'} Refused</h3><p>${message}</p></div>` };
+}
+
+async function resolveMonsterAttackReaction({ action, monsterName, campaignName, lastAttack, cs, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const gate = attackReactionGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action });
+  if (!gate.ok) return refuseAttackReaction({ monsterName, action, campaignName, log, reason: gate.reason, message: gate.message });
+  const combatant = (cs?.creatures || []).find(c => c.name === monsterName) || null;
+  const armed = deps.getTarget ? deps.getTarget() : null;
+  const spec = attackReactionFireCheck({ action, combatant, armed, attackerName: gate.attackerName, monsterName });
+  if (spec.reason) return refuseAttackReaction({ monsterName, action, campaignName, log, reason: spec.reason, message: spec.message });
+  // Round latch + spend + event stamp AWAITED before the attack fires
+  // (CLA-361 precedent) — a thrown attack step cannot leave the Reaction refirable.
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, attack: gate.used + 1 }, campaignName);
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    berserkLashingResolved: true,
+    lashedBy: monsterName,
+    lashedTarget: gate.attackerName,
+  }, campaignName);
+  const entry = buildAttackReactionSpendLog({ monsterName, action, attackerName: gate.attackerName, spec });
+  await log(campaignName, entry);
+  if (!deps.handleAttack) {
+    console.error('[MA-0516] handleAttack dep missing — Berserk Lashing attack not routed');
+    return { ok: false, message: `${entry.description} ATTACK ROLL NOT ROUTED (no modal seam).` };
+  }
+  deps.handleAttack('Berserk Lashing (Slam)', spec.attackBonus, {
+    name: 'Berserk Lashing (Slam)',
+    damage_dice_primary: spec.formula,
+    damage_type_primary: spec.damageType,
+    reach: '5 ft.',
+    description: null,
+  });
+  return { ok: true, message: entry.description, attackerName: gate.attackerName, attackBonus: spec.attackBonus, formula: spec.formula };
 }
 
 // MA-0006: record-only gated reactions (Feather Fall) — the app has no

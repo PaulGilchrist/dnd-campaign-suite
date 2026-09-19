@@ -14060,9 +14060,18 @@
         "name": "Berserk Lashing",
         "description": "Trigger: The spirit takes damage from a creature. Response: The spirit makes a Slam attack against that creature if possible, or the spirit moves up to half its Speed toward that creature without provoking Opportunity Attacks.",
         "attack_bonus": null,
-        "reach": null,
+        "reach": "5 ft.",
         "damage_dice_primary": null,
-        "damage_type_primary": null
+        "damage_type_primary": null,
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "damage_taken",
+          "effect": "attack",
+          "attack": "Slam"
+        }
       }
     ],
     "legendary_actions": [],

@@ -704,4 +704,52 @@ describe('summonSpiritHandler', () => {
             expect(added.reactions[0].automation).toMatchObject({ type: 'reaction', trigger: 'touch', effect: 'heal' });
         });
     });
+
+    describe('MA-0516 Berserk Lashing fold (Construct Spirit (Clay))', () => {
+        const clay = summonFeyMonsters.find(m => m.index === 'construct-spirit-clay');
+        const lv20Mods = { slotLevel: 5, spellAttackMod: 11, spellSaveDc: 19, wisModifier: 0, spellcastingModifier: 5 };
+
+        it('disk reactions[0] carries the gated attack automation + At Will sentinel (MA-0341 byte-shape)', () => {
+            expect(clay.reactions[0].name).toBe('Berserk Lashing');
+            expect(clay.reactions[0].automation).toMatchObject({ type: 'reaction', trigger: 'damage_taken', effect: 'attack', attack: 'Slam' });
+            expect(clay.reactions[0].usage).toBe('At Will');
+            expect(clay.reactions[0].attack_bonus).toBeNull();
+        });
+
+        it('fold carries automation byte-shape AND the Slam action row folds attack_bonus + dice for the lashing route', () => {
+            const [reaction] = resolveMonsterReactions(clay, lv20Mods);
+            expect(reaction.automation).toEqual(clay.reactions[0].automation);
+            expect(reaction.attack_bonus).toBeNull();
+            const [slam] = resolveMonsterActions(clay, lv20Mods);
+            expect(slam.attack_bonus).toBe(11);
+            expect(slam.damage_dice_primary).toBe('1d8+4+5');
+        });
+
+        it('end-to-end: summoned Clay combatant carries the gated lashing reaction + folded Slam', async () => {
+            loadMonsters.mockResolvedValue(summonFeyMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+            const lv20Wizard = {
+                ...mockPlayerStats,
+                level: 20,
+                proficiency: 6,
+                spellAbilities: { toHit: 11, saveDc: 19, modifier: 5 },
+            };
+            const action = {
+                name: 'Summon Construct',
+                automation: {
+                    type: 'summon_spirit',
+                    typeLabel: 'Construct Spirit',
+                    baseLevel: 4,
+                    hpPerLevelAbove: 5,
+                    variants: [{ name: 'Construct Spirit (Clay)', monsterIndex: 'construct-spirit-clay' }],
+                },
+                spell: { level: 4, duration: 'Concentration, up to 1 hour', concentration: true },
+            };
+            await confirmSummonSpirit(action, lv20Wizard, mockCampaignName, 'Construct Spirit (Clay)');
+            const added = combatSummary.creatures.find(c => c.name === 'Construct Spirit (Clay)');
+            expect(added.reactions[0].automation).toMatchObject({ effect: 'attack', attack: 'Slam' });
+            expect(added.actions[0].attack_bonus).toBe(11);
+            expect(added.actions[0].damage_dice_primary).toBe('1d8+4+4');
+        });
+    });
 });
