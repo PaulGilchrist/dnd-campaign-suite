@@ -8362,7 +8362,7 @@
       "saveDc": 16,
       "saveType": "Wisdom",
       "description": "The cyclops casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 16): 2/Day Each: Arcane Eye, Detect Magic, Locate Object 1/Day: Legend Lore",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0543-cyclops-oracle-spellcasting-unmarked-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0544",

@@ -15633,7 +15633,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The cyclops casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 16):\n<strong>2/Day Each:</strong> Arcane Eye, Detect Magic, Locate Object\n<strong>1/Day:</strong> Legend Lore",
+        "description": "The cyclops casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 16):\n<strong>2/Day Each:</strong> <em>Arcane Eye</em>, <em>Detect Magic</em>, <em>Locate Object</em>\n<strong>1/Day:</strong> <em>Legend Lore</em>",
         "spell_save_dc": 16,
         "spellcasting_ability": "Wisdom",
         "save_dc": 16,
