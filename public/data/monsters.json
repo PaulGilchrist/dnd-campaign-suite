@@ -15848,6 +15848,7 @@
         "attack_bonus": 10,
         "reach": "5 ft.",
         "save_effect": "If the target is a Large or smaller creature, it has the Prone condition.",
+        "hit_conditions": ["prone"],
         "damage_dice_primary": "4d6 + 6",
         "damage_type_primary": "Bludgeoning"
       },

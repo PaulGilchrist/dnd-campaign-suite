@@ -2487,3 +2487,88 @@ describe('MA-0542 disadvantage_attack_rolls te consumer', () => {
         expect(combineAttackModes(effects, computeConditionEffects({}), null, 'Cyclops Oracle 1')).toBe('disadvantage');
     });
 });
+
+const DAO = monsters.find(m => m.index === 'dao');
+const EARTHEN_MAUL_ACTION = DAO.actions.find(a => a.name === 'Earthen Maul');
+
+describe('MA-0550 Dao Earthen Maul prone rider inert', () => {
+    const deps = {
+        characterName: 'Dao 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Dao 1', computedStats: { armorClass: 18 } },
+            { name: 'Knight 1', computedStats: { armorClass: 18 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: 979, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Knight 1', type: 'monster', size: 'Medium', ac: 18, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0550 data-lock: authors lowercase hit_conditions:["prone"] on the Earthen Maul row', () => {
+        expect(EARTHEN_MAUL_ACTION.attack_bonus).toBe(10);
+        expect(EARTHEN_MAUL_ACTION.damage_dice_primary).toBe('4d6 + 6');
+        expect(EARTHEN_MAUL_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(EARTHEN_MAUL_ACTION.hit_conditions).toEqual(['prone']);
+        expect(EARTHEN_MAUL_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(EARTHEN_MAUL_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Earthen Maul',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Earthen Maul hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Earthen Maul', formula: '4d6 + 6', total: 20, rolls: [6, 1, 1, 6], modifier: 6, context: {
+            targetName: 'Knight 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Dao 1',
+            hitClause: buildHitConditionClause(EARTHEN_MAUL_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Dao 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Knight 1',
+            condition: 'Prone',
+            reason: 'Earthen Maul (escape DC —)',
+        }));
+    });
+
+    it('skips the prone clause for Huge or larger targets', async () => {
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Knight 1', type: 'monster', size: 'Huge', ac: 18, currentHp: 999, maxHp: 999 }],
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Earthen Maul', formula: '4d6 + 6', total: 20, rolls: [6, 1, 1, 6], modifier: 6, context: {
+            targetName: 'Knight 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Dao 1',
+            hitClause: buildHitConditionClause(EARTHEN_MAUL_ACTION),
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Knight 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
