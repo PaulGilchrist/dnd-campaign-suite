@@ -16352,7 +16352,8 @@
         "range": "120 feet",
         "save_effect": "The target's Hit Point maximum decreases by an amount equal to the damage taken.",
         "damage_dice_primary": "5d6",
-        "damage_type_primary": "Necrotic"
+        "damage_type_primary": "Necrotic",
+        "dc_success": "none"
       },
       {
         "name": "Lunge",

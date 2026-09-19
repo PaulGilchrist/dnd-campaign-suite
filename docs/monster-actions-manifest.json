@@ -8737,7 +8737,7 @@
       "damageTypePrimary": "Necrotic",
       "range": "120 feet",
       "description": "Constitution Saving Throw: DC 18, one creature the death knight can see within 120 feet. Failure: 17 (5d6) Necrotic damage, and the target's Hit Point maximum decreases by an amount equal to the damage taken. Failure or Success: The death knight can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0567-death-knight-fell-word-half-on-success-leak.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0568",

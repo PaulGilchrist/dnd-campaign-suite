@@ -405,3 +405,71 @@ describe('MA-0523 MonsterCardModal Couatl Constrict save: zero damage on success
     expect(computeDamageAfterSave(11, false, context.dcSuccess)).toBe(11);
   });
 });
+
+// MA-0567: Death Knight Fell Word (legendary row, after MA-0566 header
+// prepend at legendary_actions[0]) — failure-only damage prose; the absent
+// dc_success field let resolveBlockSaveDcSuccess default the save context to
+// 'half' (live proof: nat 18 +0 vs DC 18 SAVE SUCCESS paid finalDamage 7 of
+// a rolled 14 pool, floor(14/2), hp 999→992). Same MA-0218/MA-0481/MA-0505
+// byte-shape data fix: dc_success:"none" threaded onto the save context →
+// computeDamageAfterSave(…, 'none') = 0 on success, full 5d6 raw on failure.
+// RESIDUAL (MA-0483/MA-0559 §116 precedent): the hp-max-reduction clause in
+// save_effect has ZERO producers app-wide — readers-only (greaterRestoration/
+// popups) — advisory-unbuilt, not a new defect.
+const deathKnight = () => monstersData.find(m => m.index === 'death-knight');
+const fellWordRow = () => deathKnight().legendary_actions.find(a => a.name === 'Fell Word');
+
+const DEATH_KNIGHT_CREATURES = [
+  { name: 'Death Knight 1', type: 'npc', targetName: 'Bandit 1', currentHp: 199, maxHp: 199, ac: 19, conditions: [] },
+  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+];
+
+function renderDeathKnight() {
+  runtime.store['Death Knight 1.monsterLegendaryUses'] = { max: 2, used: 0 };
+  const m = makeMonster({ name: 'Death Knight', armor_class: 19, hit_points: 199, actions: deathKnight().actions, legendary_actions: deathKnight().legendary_actions });
+  ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: DEATH_KNIGHT_CREATURES };
+  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Death Knight 1', creatures: DEATH_KNIGHT_CREATURES })} />);
+}
+
+function fellWordSaveChip() {
+  const row = Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Fell Word'));
+  return Array.from(row.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 18 Constitution')) || null;
+}
+
+describe('MA-0567 monsters.json data lock: Death Knight Fell Word row', () => {
+  it('authors dc_success none (failure-only damage) with DC 18 Constitution 5d6 Necrotic', () => {
+    const row = fellWordRow();
+    expect(row.save_dc).toBe(18);
+    expect(row.save_type).toBe('Constitution');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary).toBe('5d6');
+    expect(row.damage_type_primary).toBe('Necrotic');
+    expect(row.range).toBe('120 feet');
+    expect(row.description).toMatch(/<strong>Failure:<\/strong>\s*17 \(5d6\) Necrotic damage/);
+    expect(hasLegendaryCooldownClause(row)).toBe(true);
+  });
+
+  it('RESIDUAL lock: hp-max-reduction clause stays advisory prose (zero hpMaxReduction producers, MA-0483 §116)', () => {
+    const row = fellWordRow();
+    expect(row.save_effect).toMatch(/Hit Point maximum decreases by an amount equal to the damage taken/i);
+    expect(row.hit_conditions).toBeUndefined();
+  });
+});
+
+describe('MA-0567 MonsterCardModal Fell Word save: zero damage on success', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('legendary save chip context carries dcSuccess none: success = 0 damage, failure = full 5d6 raw', async () => {
+    renderDeathKnight();
+    fireEvent.click(fellWordSaveChip());
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(context.saveDc).toBe(18);
+    expect(context.dcSuccess).toBe('none');
+    expect(computeDamageAfterSave(14, true, context.dcSuccess)).toBe(0);
+    expect(computeDamageAfterSave(14, false, context.dcSuccess)).toBe(14);
+  });
+});
