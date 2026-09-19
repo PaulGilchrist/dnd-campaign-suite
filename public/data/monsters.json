@@ -13765,14 +13765,19 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "Immediately after another creature's turn, the colossus can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
         "name": "Smite",
-        "description": "The colossus makes one Radiant Ray attack.",
-        "uses": 1
+        "delegates_to": "Radiant Ray",
+        "description": "The colossus makes one Radiant Ray attack."
       },
       {
         "name": "Stomp",
-        "description": "The colossus moves up to half its Speed without provoking <strong>Opportunity Attacks</strong>, and it can make one Slam attack at any point during that move.",
-        "uses": 1
+        "delegates_to": "Slam",
+        "description": "The colossus moves up to half its Speed without provoking <strong>Opportunity Attacks</strong>, and it can make one Slam attack at any point during that move."
       }
     ],
     "lair_actions": [],

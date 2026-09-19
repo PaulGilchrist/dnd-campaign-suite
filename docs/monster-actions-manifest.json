@@ -7839,7 +7839,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The colossus makes one Radiant Ray attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0510-colossus-smite-legendary-header-swallow.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0511",
