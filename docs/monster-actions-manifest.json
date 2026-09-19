@@ -7632,24 +7632,7 @@
         "incapacitated"
       ],
       "description": "Ranged Attack Roll: +12, range 240 ft. Hit: 18 (3d6 + 8) Thunder damage, and the target has the Incapacitated condition until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0499-cloud-giant-thundercloud-incapacitated-not-applied.md"
-    },
-    {
-      "id": "MA-0500",
-      "stableKey": "cloud-giant|actions|3",
-      "monsterIndex": "cloud-giant",
-      "monster": "Cloud Giant",
-      "actionIndex": 3,
-      "actionName": "Spellcasting",
-      "category": "actions",
-      "actionType": "spellcasting",
-      "saveDc": 15,
-      "saveType": "Charisma",
-      "description": "The giant casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15): At Will: Detect Magic, Fog Cloud, Light 1/Day Each: Control Weather, Gaseous Form, Telekinesis",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0500-spellcasting-zero-chips.md"
-    },
-    {
-      "id": "MA-0501",
+      "verified": "verified"501",
       "stableKey": "cockatrice|actions|0",
       "monsterIndex": "cockatrice",
       "monster": "Cockatrice",

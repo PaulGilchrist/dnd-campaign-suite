@@ -1947,3 +1947,90 @@ describe('MA-0490 Chuul Pincer grapple-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const CLOUD_GIANT = monsters.find(m => m.index === 'cloud-giant');
+const THUNDERCLOUD_ACTION = CLOUD_GIANT.actions[2];
+
+describe('MA-0499 Cloud Giant Thundercloud incapacitated-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Cloud Giant 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Cloud Giant 1', computedStats: { armorClass: 14 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: 984, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0499 data-lock: authors hit_conditions:["incapacitated"] with no escape_dc on the Thundercloud row', () => {
+        expect(THUNDERCLOUD_ACTION.name).toBe('Thundercloud');
+        expect(THUNDERCLOUD_ACTION.attack_bonus).toBe(12);
+        expect(THUNDERCLOUD_ACTION.range).toBe('240 ft.');
+        expect(THUNDERCLOUD_ACTION.damage_dice_primary).toBe('3d6 + 8');
+        expect(THUNDERCLOUD_ACTION.damage_type_primary).toBe('Thunder');
+        expect(THUNDERCLOUD_ACTION.hit_conditions).toEqual(['incapacitated']);
+        expect(THUNDERCLOUD_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds an incapacitated-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(THUNDERCLOUD_ACTION)).toEqual({
+            conditions: ['incapacitated'],
+            escapeDc: null,
+            attackName: 'Thundercloud',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Incapacitated + attacker-source meta + condition log on a resolved Thundercloud hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Thundercloud', formula: '3d6 + 8', total: 15, rolls: [2, 2, 3], modifier: 8, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Thunder',
+            attackerName: 'Cloud Giant 1',
+            hitClause: buildHitConditionClause(THUNDERCLOUD_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['incapacitated']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ incapacitated: { source: 'Cloud Giant 1' } });
+        expect(metaCall[2].incapacitated.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Incapacitated',
+            reason: 'Thundercloud (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Thundercloud attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Thundercloud', formula: '3d6 + 8', total: 15, rolls: [2, 2, 3], modifier: 8, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Thunder',
+            attackerName: 'Cloud Giant 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

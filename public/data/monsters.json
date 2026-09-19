@@ -13410,6 +13410,7 @@
         "description": "Ranged Attack Roll: +12, range 240 ft. <strong>Hit:</strong> 18 (3d6 + 8) Thunder damage, and the target has the <strong>Incapacitated</strong> condition until the end of its next turn.",
         "attack_bonus": 12,
         "range": "240 ft.",
+        "hit_conditions": ["incapacitated"],
         "save_effect": "The target has the Incapacitated condition until the end of its next turn.",
         "damage_dice_primary": "3d6 + 8",
         "damage_type_primary": "Thunder"
