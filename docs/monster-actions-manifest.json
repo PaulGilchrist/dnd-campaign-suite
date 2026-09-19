@@ -7503,26 +7503,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 9 (1d10 + 4) Bludgeoning damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from one of two pincers.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0490-chuul-pincer-grapple-not-applied.md"
-    },
-    {
-      "id": "MA-0491",
-      "stableKey": "chuul|actions|2",
-      "monsterIndex": "chuul",
-      "monster": "Chuul",
-      "actionIndex": 2,
-      "actionName": "Paralyzing Tentacles",
-      "category": "actions",
-      "actionType": "save",
-      "saveDc": 13,
-      "saveType": "Constitution",
-      "saveEffect": "The target has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. While Poisoned, the target has the Paralyzed condition.",
-      "conditions": [
-        "grappled",
-        "paralyzed",
-        "poisoned"
-      ],
-      "description": "Constitution Saving Throw: DC 13, one creature Grappled by the chuul. Failure: The target has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. While Poisoned, the target has the Paralyzed condition.",
+      "verified": "verified"arget has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. While Poisoned, the target has the Paralyzed condition.",
       "verified": "verified"
     },
     {

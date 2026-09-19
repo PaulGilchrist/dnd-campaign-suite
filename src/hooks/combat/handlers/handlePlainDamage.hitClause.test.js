@@ -1838,3 +1838,112 @@ describe('MA-0487 Chimera Ram prone-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const CHUUL = monsters.find(m => m.index === 'chuul');
+const CHUUL_PINCER_ACTION = CHUUL.actions[1];
+
+describe('MA-0490 Chuul Pincer grapple-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Chuul 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Chuul 1', computedStats: { armorClass: 16 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 12, newHp: 987, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0490 data-lock: authors hit_conditions:["grappled"] + escape_dc:14 on the Pincer row', () => {
+        expect(CHUUL_PINCER_ACTION.name).toBe('Pincer');
+        expect(CHUUL_PINCER_ACTION.attack_bonus).toBe(6);
+        expect(CHUUL_PINCER_ACTION.reach).toBe('10 ft.');
+        expect(CHUUL_PINCER_ACTION.damage_dice_primary).toBe('1d10 + 4');
+        expect(CHUUL_PINCER_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(CHUUL_PINCER_ACTION.hit_conditions).toEqual(['grappled']);
+        expect(CHUUL_PINCER_ACTION.escape_dc).toBe(14);
+        expect(CHUUL_PINCER_ACTION.save_effect).toContain('Grappled');
+    });
+
+    it('builds the grappled clause with escape DC 14 (statblock STR 19/+4 + PB 2 + 8; save_effect decoy inert, hit_conditions arms path)', () => {
+        expect(CHUUL.ability_score_modifiers.str).toBe(4);
+        expect(CHUUL.proficiency_bonus).toBe(2);
+        expect(buildHitConditionClause(CHUUL_PINCER_ACTION)).toEqual({
+            conditions: ['grappled'],
+            escapeDc: 14,
+            attackName: 'Pincer',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + escape-meta dc14 STR + condition log on a resolved Pincer hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Pincer', formula: '1d10 + 4', total: 12, rolls: [8], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Chuul 1',
+            hitClause: buildHitConditionClause(CHUUL_PINCER_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 14, ability: 'str', source: 'Chuul 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Grappled',
+            reason: 'Pincer (escape DC 14)',
+        }));
+    });
+
+    it('writes no condition when the Pincer attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Pincer', formula: '1d10 + 4', total: 12, rolls: [8], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Chuul 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('writes no condition on a hit against a Huge victim (Large-or-smaller gate)', async () => {
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Huge', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Pincer', formula: '1d10 + 4', total: 12, rolls: [8], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Chuul 1',
+            hitClause: buildHitConditionClause(CHUUL_PINCER_ACTION),
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

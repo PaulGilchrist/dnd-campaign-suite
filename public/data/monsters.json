@@ -13073,6 +13073,8 @@
         "attack_bonus": 6,
         "reach": "10 ft.",
         "save_effect": "If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from one of two pincers.",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 14,
         "damage_dice_primary": "1d10 + 4",
         "damage_type_primary": "Bludgeoning"
       },
