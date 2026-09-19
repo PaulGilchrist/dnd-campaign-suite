@@ -16320,7 +16320,16 @@
       {
         "name": "Parry",
         "trigger": "The death knight is hit by a melee attack roll while holding a weapon.",
-        "description": "The death knight adds 6 to its AC against that attack, possibly causing it to miss."
+        "description": "The death knight adds 6 to its AC against that attack, possibly causing it to miss.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "melee_hit",
+          "effect": "parry",
+          "acBonus": 6
+        }
       }
     ],
     "legendary_actions": [

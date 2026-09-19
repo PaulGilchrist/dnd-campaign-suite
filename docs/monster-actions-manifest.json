@@ -8706,7 +8706,7 @@
       "actionType": "other",
       "trigger": "The death knight is hit by a melee attack roll while holding a weapon.",
       "description": "The death knight adds 6 to its AC against that attack, possibly causing it to miss.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0565-death-knight-parry-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0566",

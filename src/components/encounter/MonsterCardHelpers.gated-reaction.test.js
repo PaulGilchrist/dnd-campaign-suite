@@ -451,3 +451,45 @@ describe('MA-0341 resolveMonsterGatedReaction — Parry', () => {
     expect(deps.setRuntimeValue).not.toHaveBeenCalled();
   });
 });
+
+// MA-0565: Death Knight Parry — MA-0341 routine DATA twin. Disk reactions[0]
+// prose-only (name/trigger/description) = gate-null inert; fix authors the
+// MA-0341 byte-shape with acBonus 6 (RAW: +6 AC vs the triggering melee hit).
+const DEATH_KNIGHT_ACTION = monsters.find(m => m.index === 'death-knight').reactions[0];
+const KNIGHT = 'Death Knight 1';
+
+describe('MA-0565 Death Knight Parry — data-lock + acBonus 6', () => {
+  it('monsters.json death-knight reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 6)', () => {
+    expect(DEATH_KNIGHT_ACTION.name).toBe('Parry');
+    expect(DEATH_KNIGHT_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 6 });
+    expect(DEATH_KNIGHT_ACTION.usage).toBe('At Will');
+    expect(DEATH_KNIGHT_ACTION.uses).toBe(999);
+    expect(DEATH_KNIGHT_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(DEATH_KNIGHT_ACTION)?.effect).toBe('parry');
+  });
+
+  it('gate accepts unresolved melee hit on the knight and refuses a 2nd same-round press', () => {
+    const hit = { attackerName: 'Bandit 1', targetName: KNIGHT, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 9, total: 21, targetAc: 20, effectiveAc: 20 };
+    const g = parryGate({ lastAttack: hit, monsterName: KNIGHT, currentRound: 3, storedUses: {}, usedRound: 0, action: DEATH_KNIGHT_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+    const again = parryGate({ lastAttack: hit, monsterName: KNIGHT, currentRound: 3, storedUses: {}, usedRound: 3, action: DEATH_KNIGHT_ACTION });
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('round');
+  });
+
+  it('resolve: +6 AC stamp, AC 20 → 26 flips the nat-flush hit to miss, At Will never spends uses', async () => {
+    const hit = { attackerName: 'Bandit 1', targetName: KNIGHT, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 9, total: 21, targetAc: 20, effectiveAc: 20 };
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+    const result = await resolveMonsterGatedReaction({ action: DEATH_KNIGHT_ACTION, monsterName: KNIGHT, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(6);
+    expect(result.newAc).toBe(26);
+    expect(result.newAc).toBeGreaterThan(hit.total);
+    expect(state[`${KNIGHT}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 6)).toBe(true);
+    expect(state[`${KNIGHT}._parry_usedRound`]).toBe(3);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: KNIGHT, parryAcBonus: 6 });
+    expect(state[`${KNIGHT}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 20 → 26/);
+  });
+});
