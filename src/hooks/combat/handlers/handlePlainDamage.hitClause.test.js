@@ -2390,6 +2390,93 @@ describe('MA-0542 Cyclops Oracle Flash of Light disadvantage_attack_rolls hit-cl
     });
 });
 
+const CYCLOPS_SENTRY = monsters.find(m => m.index === 'cyclops-sentry');
+const STONE_CLUB_ACTION = CYCLOPS_SENTRY.actions[1];
+
+describe('MA-0546 Cyclops Sentry Stone Club prone-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Cyclops Sentry 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Cyclops Sentry 1', computedStats: { armorClass: 14 } },
+            { name: 'Knight 1', computedStats: { armorClass: 18 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 11, newHp: 189, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Knight 1', type: 'npc', size: 'Medium', ac: 18, currentHp: 200, maxHp: 200 }],
+        });
+    });
+
+    it('MA-0546 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Stone Club row', () => {
+        expect(STONE_CLUB_ACTION.name).toBe('Stone Club');
+        expect(STONE_CLUB_ACTION.attack_bonus).toBe(9);
+        expect(STONE_CLUB_ACTION.reach).toBe('10 ft.');
+        expect(STONE_CLUB_ACTION.damage_dice_primary).toBe('3d6 + 6');
+        expect(STONE_CLUB_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(STONE_CLUB_ACTION.hit_conditions).toEqual(['prone']);
+        expect(STONE_CLUB_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(STONE_CLUB_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Stone Club',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Stone Club hit (Medium victim passes size gate)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Stone Club', formula: '3d6 + 6', total: 11, rolls: [5], modifier: 6, context: {
+            targetName: 'Knight 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Cyclops Sentry 1',
+            hitClause: buildHitConditionClause(STONE_CLUB_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Cyclops Sentry 1' } });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Knight 1',
+            condition: 'Prone',
+            reason: 'Stone Club (escape DC —)',
+        }));
+    });
+
+    it('MA-0546 size-gate note-lock: RAW "Huge or smaller" vs code gate Tiny/Small/Medium/Large — Huge victim stays untripped (accepted residual)', async () => {
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Frostmooth', type: 'npc', size: 'Huge', ac: 18, currentHp: 200, maxHp: 200 }],
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Stone Club', formula: '3d6 + 6', total: 11, rolls: [5], modifier: 6, context: {
+            targetName: 'Frostmooth',
+            damageType: 'Bludgeoning',
+            attackerName: 'Cyclops Sentry 1',
+            hitClause: buildHitConditionClause(STONE_CLUB_ACTION),
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Frostmooth', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+
 describe('MA-0542 disadvantage_attack_rolls te consumer', () => {
     it('bumps attackDisadvantageCount for the holder via the pesky_swarm channel (no ability-check leg)', () => {
         const effects = computeConditionEffects({

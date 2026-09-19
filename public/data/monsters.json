@@ -15725,6 +15725,7 @@
         "description": "Melee Attack Roll: +9, reach 10 ft. <strong>Hit:</strong> 16 (3d6 + 6) Bludgeoning damage. If the target is a Huge or smaller creature, it has the <strong>Prone</strong> condition.",
         "attack_bonus": 9,
         "reach": "10 ft.",
+        "hit_conditions": ["prone"],
         "save_effect": "If the target is a Huge or smaller creature, it has the Prone condition.",
         "damage_dice_primary": "3d6 + 6",
         "damage_type_primary": "Bludgeoning"
