@@ -7001,7 +7001,7 @@
       "actionType": "spellcasting",
       "saveDc": 14,
       "description": "The cambion casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14): 2/Day Each: Alter Self, Command (level 3 version), Detect Magic 1/Day Each: Dominate Person (level 8 version), Plane Shift (self only)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0459-spellcasting-zero-chips-unmarked-names.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0460",

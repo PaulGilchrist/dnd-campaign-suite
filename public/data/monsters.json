@@ -11802,9 +11802,11 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The cambion casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14):\n<strong>2/Day Each:</strong> Alter Self, Command (level 3 version), Detect Magic\n<strong>1/Day Each:</strong> Dominate Person (level 8 version), Plane Shift (self only)",
+        "description": "The cambion casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14):\n<strong>2/Day Each:</strong> <em>Alter Self</em>, <em>Command</em> (level 3 version), <em>Detect Magic</em>\n<strong>1/Day Each:</strong> <em>Dominate Person</em> (level 8 version), <em>Plane Shift</em> (self only)",
         "spell_save_dc": 14,
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "save_dc": 14,
+        "save_type": "Charisma"
       }
     ],
     "bonus_actions": [],
