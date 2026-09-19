@@ -14482,9 +14482,11 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The couatl casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> Detect Evil and Good, Detect Magic, Detect Thoughts, Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell)\n<strong>1/Day Each:</strong> Create Food and Water, Dream, Greater Restoration, Scrying, Sleep",
+        "description": "The couatl casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> <em>Detect Evil and Good</em>, <em>Detect Magic</em>, <em>Detect Thoughts</em>, <em>Shapechange</em> (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell)\n<strong>1/Day Each:</strong> <em>Create Food and Water</em>, <em>Dream</em>, <em>Greater Restoration</em>, <em>Scrying</em>, <em>Sleep</em>",
         "spell_save_dc": 15,
-        "spellcasting_ability": "Wisdom"
+        "spellcasting_ability": "Wisdom",
+        "save_dc": 15,
+        "save_type": "Wisdom"
       }
     ],
     "bonus_actions": [
