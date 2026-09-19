@@ -13623,6 +13623,7 @@
         "description": "Dexterity Saving Throw: DC 14, the triggering creature. <strong>Failure:</strong> 13 (3d6 + 3) Force damage.",
         "save_dc": 14,
         "save_type": "Dexterity",
+        "dc_success": "none",
         "range": "120 feet",
         "damage_dice_primary": "3d6 + 3",
         "damage_type_primary": "Force",

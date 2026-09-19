@@ -7758,7 +7758,7 @@
       "range": "120 feet",
       "trigger": "A creature within 120 feet of the cockatrice deals damage to it.",
       "description": "Dexterity Saving Throw: DC 14, the triggering creature. Failure: 13 (3d6 + 3) Force damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0505-magical-backlash-half-leak.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0506",

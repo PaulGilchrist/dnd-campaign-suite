@@ -208,3 +208,60 @@ describe('MA-0481 MonsterCardModal Conjure Infernal Chain save: zero damage on s
     expect(computeDamageAfterSave(24, false, context.dcSuccess)).toBe(24);
   });
 });
+
+// MA-0505: Cockatrice Regent Magical Backlash — reactions[0], failure-only
+// damage prose; the absent dc_success field let resolveBlockSaveDcSuccess
+// default the save context to 'half' (live proof: nat 20 vs DC 14 SAVE
+// SUCCESS paid finalDamage 7, hp_change -7, 999→992). Same MA-0218/MA-0481
+// byte-shape data fix: dc_success:"none" threaded onto the generic reaction
+// save-shell chip → computeDamageAfterSave(…, 'none') = 0 on success, full
+// raw on failure (DC 14 Dexterity 3d6 + 3 Force).
+const cockatrice = () => monstersData.find(m => m.index === 'cockatrice-regent');
+const backlashRow = () => cockatrice().reactions.find(a => a.name === 'Magical Backlash');
+
+const COCKATRICE_CREATURES = [
+  { name: 'Cockatrice Regent 1', type: 'npc', targetName: 'Bandit 1', currentHp: 136, maxHp: 136, ac: 15, conditions: [] },
+  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+];
+
+function renderCockatrice() {
+  const m = makeMonster({ name: 'Cockatrice Regent', armor_class: 15, hit_points: 136, actions: cockatrice().actions, reactions: cockatrice().reactions });
+  ctx.value = { round: 1, activeCreatureName: 'Cockatrice Regent 1', creatures: COCKATRICE_CREATURES };
+  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Cockatrice Regent 1', creatures: COCKATRICE_CREATURES })} />);
+}
+
+function backlashSaveChip() {
+  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 14 Dexterity')) || null;
+}
+
+describe('MA-0505 monsters.json data lock: Cockatrice Regent Magical Backlash row', () => {
+  it('authors dc_success none (failure-only damage) with DC 14 Dexterity 3d6 + 3 Force', () => {
+    const row = backlashRow();
+    expect(row.save_dc).toBe(14);
+    expect(row.save_type).toBe('Dexterity');
+    expect(row.dc_success).toBe('none');
+    expect(row.damage_dice_primary).toBe('3d6 + 3');
+    expect(row.damage_type_primary).toBe('Force');
+    expect(row.range).toBe('120 feet');
+    expect(row.description).toMatch(/<strong>Failure:<\/strong>\s*13 \(3d6 \+ 3\) Force damage\./);
+    expect(row.description).not.toMatch(/Success:/i);
+  });
+});
+
+describe('MA-0505 MonsterCardModal Magical Backlash save: zero damage on success', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('reaction save chip context carries dcSuccess none: success = 0 damage, failure = full raw', async () => {
+    renderCockatrice();
+    fireEvent.click(backlashSaveChip());
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(context.saveDc).toBe(14);
+    expect(context.dcSuccess).toBe('none');
+    expect(computeDamageAfterSave(21, true, context.dcSuccess)).toBe(0);
+    expect(computeDamageAfterSave(21, false, context.dcSuccess)).toBe(21);
+  });
+});
