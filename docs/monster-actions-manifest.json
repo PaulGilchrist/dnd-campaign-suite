@@ -8036,7 +8036,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 11 (1d12 + 5) Piercing damage, and the target has the Poisoned condition until the end of the couatl's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0522-couatl-bite-missing-hit-conditions.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0523",

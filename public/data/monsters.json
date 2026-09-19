@@ -14465,7 +14465,8 @@
         "reach": "5 ft.",
         "save_effect": "The target has the Poisoned condition until the end of the couatl's next turn.",
         "damage_dice_primary": "1d12 + 5",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["poisoned"]
       },
       {
         "name": "Constrict",

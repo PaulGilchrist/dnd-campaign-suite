@@ -2121,3 +2121,89 @@ describe('MA-0508 Colossus Radiant Ray prone-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const COUATL = monsters.find(m => m.index === 'couatl');
+const COUATL_BITE_ACTION = COUATL.actions[0];
+
+describe('MA-0522 Couatl Bite poisoned-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Couatl 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Couatl 1', computedStats: { armorClass: 19 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: 984, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0522 data-lock: authors hit_conditions:["poisoned"] with no escape_dc on the Bite row', () => {
+        expect(COUATL_BITE_ACTION.name).toBe('Bite');
+        expect(COUATL_BITE_ACTION.attack_bonus).toBe(7);
+        expect(COUATL_BITE_ACTION.damage_dice_primary).toBe('1d12 + 5');
+        expect(COUATL_BITE_ACTION.damage_type_primary).toBe('Piercing');
+        expect(COUATL_BITE_ACTION.hit_conditions).toEqual(['poisoned']);
+        expect(COUATL_BITE_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds the poisoned clause with no escape DC (Bite prose has no escape save)', () => {
+        expect(buildHitConditionClause(COUATL_BITE_ACTION)).toEqual({
+            conditions: ['poisoned'],
+            escapeDc: null,
+            attackName: 'Bite',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Poisoned + provenance-meta + condition log on a resolved Bite hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d12 + 5', total: 15, rolls: [10], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Couatl 1',
+            hitClause: buildHitConditionClause(COUATL_BITE_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['poisoned']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ poisoned: { source: 'Couatl 1' } });
+        expect(metaCall[2].poisoned.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Poisoned',
+            reason: 'Bite (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Bite attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d12 + 5', total: 15, rolls: [10], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Couatl 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
