@@ -7503,7 +7503,26 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 9 (1d10 + 4) Bludgeoning damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from one of two pincers.",
-      "verified": "verified"arget has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. While Poisoned, the target has the Paralyzed condition.",
+      "verified": "verified"
+    },
+    {
+      "id": "MA-0491",
+      "stableKey": "chuul|actions|2",
+      "monsterIndex": "chuul",
+      "monster": "Chuul",
+      "actionIndex": 2,
+      "actionName": "Paralyzing Tentacles",
+      "category": "actions",
+      "actionType": "save",
+      "saveDc": 13,
+      "saveType": "Constitution",
+      "saveEffect": "The target has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. While Poisoned, the target has the Paralyzed condition.",
+      "conditions": [
+        "grappled",
+        "paralyzed",
+        "poisoned"
+      ],
+      "description": "Constitution Saving Throw: DC 13, one creature Grappled by the chuul. Failure: The target has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. While Poisoned, the target has the Paralyzed condition.",
       "verified": "verified"
     },
     {
@@ -7632,7 +7651,24 @@
         "incapacitated"
       ],
       "description": "Ranged Attack Roll: +12, range 240 ft. Hit: 18 (3d6 + 8) Thunder damage, and the target has the Incapacitated condition until the end of its next turn.",
-      "verified": "verified"501",
+      "verified": "verified"
+    },
+    {
+      "id": "MA-0500",
+      "stableKey": "cloud-giant|actions|3",
+      "monsterIndex": "cloud-giant",
+      "monster": "Cloud Giant",
+      "actionIndex": 3,
+      "actionName": "Spellcasting",
+      "category": "actions",
+      "actionType": "spellcasting",
+      "saveDc": 15,
+      "saveType": "Charisma",
+      "description": "The giant casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15): At Will: Detect Magic, Fog Cloud, Light 1/Day Each: Control Weather, Gaseous Form, Telekinesis",
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0500-spellcasting-zero-chips.md"
+    },
+    {
+      "id": "MA-0501",
       "stableKey": "cockatrice|actions|0",
       "monsterIndex": "cockatrice",
       "monster": "Cockatrice",
