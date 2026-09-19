@@ -336,3 +336,72 @@ describe('MA-0514 MonsterCardModal Constrict save: zero damage on success', () =
     expect(computeDamageAfterSave(12, false, context.dcSuccess)).toBe(12);
   });
 });
+
+// MA-0523: Couatl Constrict — failure-only damage+Grappled(escape DC 13)+
+// Restrained prose; the absent dc_success field let the save context default
+// to 'half' (live proof: nat 20 vs DC 15 SAVE SUCCESS paid finalDamage 5,
+// own hp_change entry). Same MA-0218/MA-0481/MA-0505/MA-0514 byte-shape data
+// fix: dc_success:"none" threaded onto the save context → computeDamageAfterSave
+// (…, 'none') = 0 on success, full raw on failure. escape_dc:13 authored as the
+// machine representation of prose "(escape DC 13)"; RESIDUAL (MA-0514 precedent):
+// the only escape_dc consumer is the attack-hit hit_conditions stamper — the
+// save-path grapple stamp writes source meta only, so live save-row grapple meta
+// carries no dc field (badge escape stays GM-adjudicated).
+const couatl = () => monstersData.find(m => m.name === 'Couatl');
+const couatlConstrictRow = () => couatl().actions[1];
+
+const COUATL_CREATURES = [
+  { name: 'Couatl 1', type: 'npc', targetName: 'Bandit 1', currentHp: 60, maxHp: 60, ac: 19, conditions: [] },
+  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+];
+
+function renderCouatl() {
+  const m = makeMonster({ name: 'Couatl', armor_class: 19, hit_points: 60, actions: couatl().actions });
+  ctx.value = { round: 1, activeCreatureName: 'Couatl 1', creatures: COUATL_CREATURES };
+  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Couatl 1', creatures: COUATL_CREATURES })} />);
+}
+
+function couatlConstrictSaveChip() {
+  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 15 Strength')) || null;
+}
+
+describe('MA-0523 monsters.json data lock: Couatl Constrict row', () => {
+  it('authors dc_success none + escape_dc 13 with DC 15 Strength 1d6 + 5 Bludgeoning + Grappled, Restrained', () => {
+    const row = couatlConstrictRow();
+    expect(row.name).toBe('Constrict');
+    expect(row.save_dc).toBe(15);
+    expect(row.save_type).toBe('Strength');
+    expect(row.dc_success).toBe('none');
+    expect(row.escape_dc).toBe(13);
+    expect(row.damage_dice_primary).toBe('1d6 + 5');
+    expect(row.damage_type_primary).toBe('Bludgeoning');
+    expect(row.range).toBe('5 feet');
+    expect(row.save_effect).toMatch(/Grappled.*escape DC 13.*Restrained/i);
+    expect(row.description).toMatch(/<strong>Failure:<\/strong>\s*8 \(1d6 \+ 5\) Bludgeoning damage/);
+    expect(row.description).not.toMatch(/Success:/i);
+  });
+
+  it('RESIDUAL lock: escape_dc rides ONLY the attack-hit hit_conditions seam — save row stays grapple-stamp without dc meta', () => {
+    expect(couatlConstrictRow().hit_conditions).toBeUndefined();
+  });
+});
+
+describe('MA-0523 MonsterCardModal Couatl Constrict save: zero damage on success', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('save chip context carries dcSuccess none: success = 0 damage, failure = full 1d6 + 5 raw', async () => {
+    renderCouatl();
+    fireEvent.click(couatlConstrictSaveChip());
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(context.saveDc).toBe(15);
+    expect(context.dcSuccess).toBe('none');
+    expect(context.saveConditions).toContain('grappled');
+    expect(context.saveConditions).toContain('restrained');
+    expect(computeDamageAfterSave(11, true, context.dcSuccess)).toBe(0);
+    expect(computeDamageAfterSave(11, false, context.dcSuccess)).toBe(11);
+  });
+});
