@@ -8999,7 +8999,7 @@
         "grappled"
       ],
       "description": "Walls sprout spectral appendages until initiative count 20 on the round after next. Any creature, including one on the Ethereal Plane, that is hostile to the tyrant and starts its turn within 10 feet of a wall must succeed on a DC 17 Dexterity saving throw or be grappled. Escaping requires a successful DC 17 Strength (Athletics) or Dexterity (Acrobatics) check.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0584-death-tyrant-lair-walls.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0585",
