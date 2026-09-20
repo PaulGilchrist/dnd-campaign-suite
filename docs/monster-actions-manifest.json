@@ -8876,7 +8876,7 @@
       "actionType": "spellcasting",
       "saveDc": 16,
       "description": "The slaad casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16): At Will: Detect Magic, Detect Thoughts, Invisibility (self only), Mage Hand, Major Image 1/Day Each: Blight (level 8 version), Cloudkill (level 6 version), Fly, Plane Shift, Tongues",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0576-death-slaad-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0577",

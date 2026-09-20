@@ -16610,9 +16610,11 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The slaad casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\n<strong>At Will:</strong> Detect Magic, Detect Thoughts, Invisibility (self only), Mage Hand, Major Image\n<strong>1/Day Each:</strong> Blight (level 8 version), Cloudkill (level 6 version), Fly, Plane Shift, Tongues",
+        "description": "The slaad casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\n<strong>At Will:</strong> <em>Detect Magic</em>, <em>Detect Thoughts</em>, <em>Invisibility</em> (self only), <em>Mage Hand</em>, <em>Major Image</em>\n<strong>1/Day Each:</strong> <em>Blight</em> (level 8 version), <em>Cloudkill</em> (level 6 version), <em>Fly</em>, <em>Plane Shift</em>, <em>Tongues</em>",
         "spell_save_dc": 16,
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "save_dc": 16,
+        "save_type": "Charisma"
       }
     ],
     "bonus_actions": [
