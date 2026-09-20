@@ -3861,3 +3861,146 @@ describe('MA-0380 beholder surfaced eye advisory data lock', () => {
     expect(lairRowAffordance(beholder.lair_actions[1])).toBe('save');
   });
 });
+
+// MA-0582/0583/0584: Death Tyrant lair_actions was a MIXED inert array —
+// [0] raw STRING (MV-24 fingerprint: raw-string static span, zero chip),
+// [1] nameless description-only dict BYTE-DUPLICATING [0] text (corrupt
+// duplicate; RAW carries only TWO lair effects), [2] nameless save dict
+// (MA-0222 name-gate — isLairRowClickable !row.name, monsterLairActions
+// .js:26) — all three rendered inert (live 2026-09-19: .mc-dice-link-lair
+// count 0, log join-noise-only). Data-only triple fix mirroring the VERIFIED
+// MA-0378 zone byte-shape (chip → zoneOnly area picker arms lair_spectral_eyes
+// te + tracking + zone_armed log, NO save roll) and the VERIFIED MA-0379
+// grasping-walls save byte-shape (name + dc_success "none" + save_effect
+// carrying the canonical grappled word + GM-enforced residual advisory;
+// escape_dc stays OFF a save row per MA-0010). "ofthe" OCR typo corrected
+// in the surviving description. Light-level, difficult-terrain movement cost,
+// grapple state-machine and initiative-20 cadence remain zero-consumer
+// advisory residuals (§7 / MA-0378 accepted residual) — badge+picker+log is
+// the achievable ceiling.
+describe('MA-0582/0583/0584 death tyrant lair actions data lock', () => {
+  const tyrant = monstersData.find(m => m.index === 'death-tyrant');
+  const lair = tyrant.lair_actions;
+  const zone = lair[0];
+  const walls = lair[1];
+
+  it('lair_actions holds exactly TWO rows (byte-duplicate dict DELETED)', () => {
+    expect(Array.isArray(lair)).toBe(true);
+    expect(lair).toHaveLength(2);
+    expect(typeof lair[0]).toBe('object');
+    expect(typeof lair[1]).toBe('object');
+  });
+
+  it('[0] is now a structured clickable ZONE row named Spectral Eyes and Tentacles (was raw string)', () => {
+    expect(zone.name).toBe('Spectral Eyes and Tentacles');
+    expect(isLairRowClickable(zone)).toBe(true);
+    expect(lairRowAffordance(zone)).toBe('zone');
+  });
+
+  it('[0] description is the original RAW clause with the "ofthe" typo corrected', () => {
+    expect(zone.description).toBe('An area that is a 50-foot cube within 120 feet of the tyrant is filled with spectral eyes and tentacles. To creatures other than the death tyrant, that area is lightly obscured and difficult terrain until initiative count 20 on the next round.');
+    expect(zone.description).not.toMatch(/ofthe/);
+    expect(JSON.stringify(tyrant)).not.toMatch(/ofthe tyrant/);
+  });
+
+  it('[0] canonical zone: save-less, 50-ft cube modeled as 25-ft radius (MA-0378 Slimy Ground precedent)', () => {
+    expect(zone.save_dc).toBeUndefined();
+    expect(zone.save_type).toBeUndefined();
+    expect(zone.damage_dice_primary).toBeUndefined();
+    expect(zone.zone.radius_ft).toBe(25);
+    expect(zone.zone.no_save).toBe(true);
+    expect(zone.zone.noun).toBe('spectral eyes and tentacles');
+    expect(zone.zone.effect_key).toBe('lair_spectral_eyes');
+    expect(zone.duration).toBe('until initiative count 20 next round (advisory)');
+  });
+
+  it('[0] zone advisory honestly carries cube→radius + lightly-obscured + difficult-terrain + init-20 residuals', () => {
+    expect(zone.zone.advisory).toMatch(/50-foot cube/i);
+    expect(zone.zone.advisory).toMatch(/25-ft radius/i);
+    expect(zone.zone.advisory).toMatch(/cube→radius approximation/i);
+    expect(zone.zone.advisory).toMatch(/lightly obscured/i);
+    expect(zone.zone.advisory).toMatch(/difficult terrain/i);
+    expect(zone.zone.advisory).toMatch(/no movement-cost consumer/i);
+    expect(zone.zone.advisory).toMatch(/initiative count 20 on the next round — GM-enforced/i);
+  });
+
+  it('lair_spectral_eyes te is registered covering BOTH lightly obscured AND difficult terrain (Lair group)', async () => {
+    const { getEffectDefinition, TARGET_EFFECT_DEFINITIONS } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_spectral_eyes');
+    expect(def).toBeTruthy();
+    expect(def.label).toBe('Spectral Eyes and Tentacles (Lair)');
+    expect(def.group).toBe('Lair');
+    expect(def.cls).toBe('effect-debuff');
+    expect(def.icon).toMatch(/^fa-/);
+    expect(def.fields).toEqual(['source']);
+    expect(def.description).toMatch(/lightly obscured/i);
+    expect(def.description).toMatch(/difficult terrain/i);
+    expect(def.description).toMatch(/GM-enforced/i);
+    const keys = TARGET_EFFECT_DEFINITIONS.map((d) => d.effect);
+    expect(keys.filter((k) => k === 'lair_spectral_eyes')).toHaveLength(1);
+  });
+
+  it('[0] zone row routes through handleZone, zero save/attack/damage handlers', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: zone,
+      monsterName: 'Death Tyrant 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(zone);
+  });
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict) — DC 17 Dexterity authored', () => {
+    expect(walls.name).toBe('Spectral Appendage Walls');
+    expect(isLairRowClickable(walls)).toBe(true);
+    expect(lairRowAffordance(walls)).toBe('save');
+    expect(walls.save_dc).toBe(17);
+    expect(walls.save_type).toBe('Dexterity');
+    expect(walls.dc_success).toBe('none');
+    expect(walls.damage_dice_primary).toBeUndefined();
+    expect(walls.damage_type_primary).toBeUndefined();
+    expect(walls.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('[1] description kept byte-identical; save_effect carries grappled word + residuals; escape_dc seam NOT authored', () => {
+    expect(walls.description).toBe('Walls sprout spectral appendages until initiative count 20 on the round after next. Any creature, including one on the Ethereal Plane, that is hostile to the tyrant and starts its turn within 10 feet of a wall must succeed on a DC 17 Dexterity saving throw or be grappled. Escaping requires a successful DC 17 Strength (Athletics) or Dexterity (Acrobatics) check.');
+    expect(extractConditionsFromSaveEffect(walls.save_effect)).toEqual(['grappled']);
+    expect(walls.save_effect).toMatch(/DC 17 Strength \(Athletics\) or Dexterity \(Acrobatics\) escape check/i);
+    expect(walls.save_effect).toMatch(/GM-enforced/i);
+    expect(walls.save_effect).toMatch(/no grapple state-machine or initiative-20 lair seam consumer/i);
+    expect(walls.escape_dc).toBeUndefined();
+    expect(walls.hit_conditions).toBeUndefined();
+  });
+
+  it('[1] save row routes through handleSaveRoll with zero damage formula + grappled', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: walls,
+      monsterName: 'Death Tyrant 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(walls.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(walls, null, ['grappled']);
+  });
+
+  it('scope guard: beholder MA-0378/0379 template rows untouched', () => {
+    const beholder = monstersData.find(m => m.index === 'beholder');
+    expect(beholder.lair_actions[0].name).toBe('Slimy Ground');
+    expect(beholder.lair_actions[0].zone.effect_key).toBe('lair_slimy_ground');
+    expect(beholder.lair_actions[1].name).toBe('Grasping Walls');
+    expect(beholder.lair_actions[1].save_dc).toBe(15);
+  });
+});

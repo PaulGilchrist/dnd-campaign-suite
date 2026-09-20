@@ -8969,7 +8969,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "An area that is a 50-foot cube within 120 feet ofthe tyrant is filled with spectral eyes and tentacles. To creatures other than the death tyrant, that area is lightly obscured and difficult terrain until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0582-death-tyrant-lair-eyes.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0583",

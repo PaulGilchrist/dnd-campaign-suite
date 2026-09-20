@@ -990,6 +990,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    effect: 'lair_spectral_eyes',
+    label: 'Spectral Eyes and Tentacles (Lair)',
+    description: 'Spectral eyes and tentacles zone (death tyrant lair action; canonical 50-foot cube, modeled as 25-ft radius): to creatures other than the tyrant the area is lightly obscured AND difficult terrain — light/vision levels have no consumer and moving 1 foot costs 2 feet has no movement-cost consumer in this engine — GM-enforced. No saving throw. Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam in this engine).',
+    icon: 'fa-eye',
+    cls: 'effect-debuff',
+    group: 'Lair',
+    fields: ['source'],
+  },
+  {
     effect: 'lair_mud',
     label: 'Liquid Mud (Lair)',
     description: 'In 3-foot-deep mud (10-foot square, modeled as radius, lair action): Dexterity save (DC indicated) when the mud appears; on a failed save the target is restrained until freed by a DC 15 Strength check action — GM-enforced (no rescue-engine consumer). Moving 1 foot costs 2 feet of movement, and the mud hardens at initiative count 20 next round (Strength DC rises to 20) — GM-enforced (no movement-cost or initiative-20 lair seam in this engine).',

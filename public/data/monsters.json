@@ -16900,15 +16900,25 @@
       }
     ],
     "lair_actions": [
-      "An area that is a 50-foot cube within 120 feet ofthe tyrant is filled with spectral eyes and tentacles. To creatures other than the death tyrant, that area is lightly obscured and difficult terrain until initiative count 20 on the next round.",
       {
-        "description": "An area that is a 50-foot cube within 120 feet of the tyrant is filled with spectral eyes and tentacles. To creatures other than the death tyrant, that area is lightly obscured and difficult terrain until initiative count 20 on the next round."
+        "name": "Spectral Eyes and Tentacles",
+        "description": "An area that is a 50-foot cube within 120 feet of the tyrant is filled with spectral eyes and tentacles. To creatures other than the death tyrant, that area is lightly obscured and difficult terrain until initiative count 20 on the next round.",
+        "zone": {
+          "radius_ft": 25,
+          "no_save": true,
+          "noun": "spectral eyes and tentacles",
+          "effect_key": "lair_spectral_eyes",
+          "advisory": "Canonical shape is a 50-foot cube — modeled as a 25-ft radius picker (cube→radius approximation; GM positions the area). Lightly obscured has no light-level consumer in this engine and difficult terrain (1 ft costs 2 ft) has no movement-cost consumer — GM-enforced. No saving throw. Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam)."
+        },
+        "duration": "until initiative count 20 next round (advisory)"
       },
       {
+        "name": "Spectral Appendage Walls",
         "description": "Walls sprout spectral appendages until initiative count 20 on the round after next. Any creature, including one on the Ethereal Plane, that is hostile to the tyrant and starts its turn within 10 feet of a wall must succeed on a DC 17 Dexterity saving throw or be grappled. Escaping requires a successful DC 17 Strength (Athletics) or Dexterity (Acrobatics) check.",
         "save_dc": 17,
         "save_type": "Dexterity",
-        "save_effect": "The target is grappled. Escaping requires a successful DC 17 Strength (Athletics) or Dexterity (Acrobatics) check."
+        "dc_success": "none",
+        "save_effect": "The target is grappled by the wall. The DC 17 Strength (Athletics) or Dexterity (Acrobatics) escape check and the initiative count 20 round-after-next expiry are GM-enforced (no grapple state-machine or initiative-20 lair seam consumer)."
       }
     ],
     "book": "Monster Manual",
