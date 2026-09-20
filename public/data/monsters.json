@@ -17826,7 +17826,10 @@
         "range": "120 feet",
         "save_effect": "If the target is a Large or smaller creature, it has the Prone condition.",
         "damage_dice_primary": "3d8",
-        "damage_type_primary": "Thunder"
+        "damage_type_primary": "Thunder",
+        "hit_conditions": [
+          "prone"
+        ]
       },
       {
         "name": "Create Whirlwind",

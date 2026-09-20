@@ -9406,7 +9406,7 @@
         "prone"
       ],
       "description": "Ranged Attack Roll: +9, range 120 feet. Hit: 13 (3d8) Thunder damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0609-djinni-storm-bolt.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0610",

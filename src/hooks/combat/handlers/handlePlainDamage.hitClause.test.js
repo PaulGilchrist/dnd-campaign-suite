@@ -3185,3 +3185,114 @@ describe('MA-0605 Displacer Beast Rend prone hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const DJINNI = monsters.find(m => m.index === 'djinni');
+const DJINNI_STORM_BOLT_ACTION = DJINNI.actions[2];
+
+describe('MA-0609 Djinni Storm Bolt prone hit-clause', () => {
+    const deps = {
+        characterName: 'Djinni 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Djinni 1', computedStats: { armorClass: 17 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 11, newHp: 988, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'monster', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0609 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Storm Bolt row', () => {
+        expect(DJINNI_STORM_BOLT_ACTION.name).toBe('Storm Bolt');
+        expect(DJINNI_STORM_BOLT_ACTION.attack_bonus).toBe(9);
+        expect(DJINNI_STORM_BOLT_ACTION.range).toBe('120 feet');
+        expect(DJINNI_STORM_BOLT_ACTION.damage_dice_primary).toBe('3d8');
+        expect(DJINNI_STORM_BOLT_ACTION.damage_type_primary).toBe('Thunder');
+        expect(DJINNI_STORM_BOLT_ACTION.hit_conditions).toEqual(['prone']);
+        expect(DJINNI_STORM_BOLT_ACTION.escape_dc).toBeUndefined();
+        expect(DJINNI_STORM_BOLT_ACTION.save_dc).toBeUndefined();
+        expect(DJINNI_STORM_BOLT_ACTION.description).toContain('Prone');
+        // §115 decoy save_effect retained byte-identical per house pattern
+        // (verified twins MA-0480 Chain Devil / MA-0522 Couatl / MA-0527 Crocodile keep theirs)
+        expect(DJINNI_STORM_BOLT_ACTION.save_effect).toBe('If the target is a Large or smaller creature, it has the Prone condition.');
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(DJINNI_STORM_BOLT_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Storm Bolt',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Storm Bolt hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Storm Bolt', formula: '3d8', total: 11, rolls: [3, 6, 2], modifier: 0, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Thunder',
+            attackerName: 'Djinni 1',
+            hitClause: buildHitConditionClause(DJINNI_STORM_BOLT_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe('Bandit 1');
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Djinni 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Prone',
+            reason: 'Storm Bolt (escape DC —)',
+        }));
+    });
+
+    it('skips the prone clause for Huge or larger targets', async () => {
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Hill Giant 1', type: 'monster', size: 'Huge', ac: 13, currentHp: 999, maxHp: 999 }],
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Storm Bolt', formula: '3d8', total: 11, rolls: [3, 6, 2], modifier: 0, context: {
+            targetName: 'Hill Giant 1',
+            damageType: 'Thunder',
+            attackerName: 'Djinni 1',
+            hitClause: buildHitConditionClause(DJINNI_STORM_BOLT_ACTION),
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Hill Giant 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('grants nothing when Storm Bolt misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Storm Bolt', formula: '3d8', total: 11, rolls: [3, 6, 2], modifier: 0, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Thunder',
+            attackerName: 'Djinni 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
