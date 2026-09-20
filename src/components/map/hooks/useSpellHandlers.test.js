@@ -86,7 +86,7 @@ describe('useSpellHandlers', () => {
       const { result, mocks } = getHook();
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn(), button: 0 };
       act(() => {
-        result.current.handleSpellPointerDown(mockEvent, OverlayShape.SPHERE, mockOverlays);
+        result.current.handleSpellPointerDown(mockEvent, OverlayShape.SPHERE, []);
       });
       expect(mocks.addOverlay).toHaveBeenCalled();
       expect(result.current.spellDraft).toBeNull();
@@ -102,7 +102,7 @@ describe('useSpellHandlers', () => {
       const { result, mocks } = getHook();
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn(), button: 0 };
       act(() => {
-        result.current.handleSpellPointerDown(mockEvent, OverlayShape.CYLINDER, mockOverlays);
+        result.current.handleSpellPointerDown(mockEvent, OverlayShape.CYLINDER, []);
       });
       expect(mocks.addOverlay).toHaveBeenCalled();
       expect(result.current.spellDraft).toBeNull();
@@ -115,7 +115,7 @@ describe('useSpellHandlers', () => {
       const { result } = getHook();
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn(), button: 0, clientX: 100, clientY: 200 };
       act(() => {
-        result.current.handleSpellPointerDown(mockEvent, OverlayShape.CUBE, mockOverlays);
+        result.current.handleSpellPointerDown(mockEvent, OverlayShape.CUBE, []);
       });
       expect(result.current.spellDraft).not.toBeNull();
       expect(result.current.spellDraft.startGridX).toBe(5);
@@ -127,7 +127,7 @@ describe('useSpellHandlers', () => {
       const { result } = getHook();
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn(), button: 0, clientX: 100, clientY: 200 };
       act(() => {
-        result.current.handleSpellPointerDown(mockEvent, OverlayShape.LINE, mockOverlays);
+        result.current.handleSpellPointerDown(mockEvent, OverlayShape.LINE, []);
       });
       expect(result.current.spellDraft).not.toBeNull();
       expect(result.current.spellDraft.startGridX).toBe(5);
@@ -139,7 +139,7 @@ describe('useSpellHandlers', () => {
       const { result } = getHook();
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn(), button: 0, clientX: 100, clientY: 200 };
       act(() => {
-        result.current.handleSpellPointerDown(mockEvent, OverlayShape.CONE, mockOverlays);
+        result.current.handleSpellPointerDown(mockEvent, OverlayShape.CONE, []);
       });
       expect(result.current.spellDraft).not.toBeNull();
       expect(result.current.spellDraft.startGridX).toBe(5);
@@ -244,12 +244,39 @@ describe('useSpellHandlers', () => {
       const { result, mocks } = getHook({ shapeParams: customParams });
       const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn(), button: 0 };
       act(() => {
-        result.current.handleSpellPointerDown(mockEvent, OverlayShape.SPHERE, mockOverlays);
+        result.current.handleSpellPointerDown(mockEvent, OverlayShape.SPHERE, []);
       });
       expect(mocks.addOverlay).toHaveBeenCalled();
       const overlay = mocks.addOverlay.mock.calls[0][0];
       expect(overlay.radiusFt).toBe(30);
       expect(overlay.color).toBe('rgba(0,100,255,0.5)');
+    });
+
+    it('should drag an existing overlay instead of creating a new one when spell mode is active', () => {
+      const sphereOverlay = createOverlay(OverlayShape.SPHERE, 5, 7, 0);
+      const { result, mocks } = getHook();
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn(), button: 0, clientX: 200, clientY: 200 };
+      act(() => {
+        result.current.handleSpellPointerDown(mockEvent, OverlayShape.SPHERE, [sphereOverlay]);
+      });
+      expect(mocks.addOverlay).not.toHaveBeenCalled();
+      expect(result.current.spellDraft).toBeNull();
+      expect(result.current.dragOverlay).not.toBeNull();
+      expect(result.current.dragOverlay.overlayId).toBe(sphereOverlay.id);
+    });
+
+    it('should rotate an existing overlay instead of creating a new one when spell mode is active and the grab is near the edge', () => {
+      const coneOverlay = createOverlay(OverlayShape.CONE, 0, 0, 0);
+      const { result, mocks } = getHook();
+      mocks.getGridFromEvent.mockReturnValue({ gridX: 5.3, gridY: 0.8 });
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn(), button: 0, clientX: 200, clientY: 200 };
+      act(() => {
+        result.current.handleSpellPointerDown(mockEvent, OverlayShape.CONE, [coneOverlay]);
+      });
+      expect(mocks.addOverlay).not.toHaveBeenCalled();
+      expect(result.current.spellDraft).toBeNull();
+      expect(result.current.rotateOverlay).not.toBeNull();
+      expect(result.current.rotateOverlay.overlayId).toBe(coneOverlay.id);
     });
   });
 
