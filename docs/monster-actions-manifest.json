@@ -9137,7 +9137,7 @@
         "blinded"
       ],
       "description": "The demilich flies up to its Fly Speed, shedding grave dust. Each creature within 5 feet of the demilich as it moves is targeted once by the following effect. Constitution Saving Throw: DC 19. Failure: The target has the Blinded condition until the end of the demilich's next turn. Failure or Success: The demilich can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0592-demilich-grave-dust-flight.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0593",
