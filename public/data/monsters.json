@@ -17273,9 +17273,12 @@
     ],
     "lair_actions": [
       {
+        "name": "Tomb Trembles",
         "description": "The tomb trembles violently for a moment. Each crea­ture on the floor of the tomb must succeed on a DC 19 Dexterity saving throw or be knocked prone.",
         "save_dc": 19,
-        "save_type": "Dexterity"
+        "save_type": "Dexterity",
+        "dc_success": "none",
+        "save_effect": "The target is knocked Prone. Applying Prone to every other creature on the tomb floor and the initiative count 20 expiry are GM-enforced (single-target save seam; no initiative-20 lair seam consumer)."
       },
       "The demilich targets one creature it can see within 60 feet of it. An antimagic field fills the space of the target, moving with it until initiative count 20 on the next round.",
       "The demilich targets any number of creatures it can see within 30 feet of it. No target can regain hit points until initiative count 20 on the next round."

@@ -9167,7 +9167,7 @@
         "prone"
       ],
       "description": "The tomb trembles violently for a moment. Each crea\u00adture on the floor of the tomb must succeed on a DC 19 Dexterity saving throw or be knocked prone.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0594-demilich-lair-tremble.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0595",

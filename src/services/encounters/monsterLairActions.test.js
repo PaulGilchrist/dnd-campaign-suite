@@ -4004,3 +4004,74 @@ describe('MA-0582/0583/0584 death tyrant lair actions data lock', () => {
     expect(beholder.lair_actions[1].save_dc).toBe(15);
   });
 });
+
+// MA-0594: Demilich lair_actions[0] was a nameless save dict (DC 19 Dex,
+// "tomb trembles… knocked prone") — isLairRowClickable name-gate
+// (monsterLairActions.js:26) rendered it inert: lone bold "." + static
+// prose, zero .mc-dice-link-lair chips, zero log delta (live repro
+// 2026-09-20). Data-only fix mirroring the VERIFIED MA-0584 Spectral
+// Appendage Walls byte-shape: name + dc_success "none" (condition-only
+// save, no MV-20 half-leak) + save_effect carrying the canonical Prone
+// word for extractConditionsFromSaveEffect (the ONLY transport at the
+// lair save seam — handleLairRow passes saveConditions from save_effect,
+// description is never read for grants). Soft-hyphen U+00AD in description
+// kept byte-identical. Tomb-floor AoE and initiative-20 cadence remain
+// zero-consumer advisory residuals (§70) — GM-clicked single-target save
+// with prone-on-fail is the achievable ceiling.
+describe('MA-0594 demilich lair tomb trembles save row data lock', () => {
+  const demilich = monstersData.find(m => m.index === 'demilich');
+  const tremble = demilich.lair_actions[0];
+
+  it('[0] is now a named clickable SAVE row (was nameless inert dict) — DC 19 Dexterity authored', () => {
+    expect(tremble.name).toBe('Tomb Trembles');
+    expect(isLairRowClickable(tremble)).toBe(true);
+    expect(lairRowAffordance(tremble)).toBe('save');
+    expect(tremble.save_dc).toBe(19);
+    expect(tremble.save_type).toBe('Dexterity');
+    expect(tremble.dc_success).toBe('none');
+    expect(tremble.damage_dice_primary).toBeUndefined();
+    expect(tremble.damage_type_primary).toBeUndefined();
+    expect(tremble.save_effect).not.toMatch(/damage/i);
+  });
+
+  it('[0] description kept byte-identical incl. soft-hyphen U+00AD; save_effect carries Prone word + GM-enforced residuals', () => {
+    expect(tremble.description).toBe('The tomb trembles violently for a moment. Each crea\u00adture on the floor of the tomb must succeed on a DC 19 Dexterity saving throw or be knocked prone.');
+    expect(extractConditionsFromSaveEffect(tremble.save_effect)).toEqual(['prone']);
+    expect(tremble.save_effect).toMatch(/knocked Prone/i);
+    expect(tremble.save_effect).toMatch(/GM-enforced/i);
+    expect(tremble.save_effect).toMatch(/no initiative-20 lair seam consumer/i);
+  });
+
+  it('[0] save row routes through handleSaveRoll with zero damage formula + prone', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: tremble,
+      monsterName: 'Demilich 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(tremble.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(tremble, null, ['prone']);
+  });
+
+  it('[1]/[2] raw-string siblings (MA-0595/0596) stay inert — NOT this ticket', () => {
+    expect(typeof demilich.lair_actions[1]).toBe('string');
+    expect(typeof demilich.lair_actions[2]).toBe('string');
+    expect(isLairRowClickable(demilich.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(demilich.lair_actions[2])).toBe(false);
+  });
+
+  it('scope guard: MA-0584 death tyrant walls twin untouched', () => {
+    const tyrant = monstersData.find(m => m.index === 'death-tyrant');
+    expect(tyrant.lair_actions[1].name).toBe('Spectral Appendage Walls');
+    expect(tyrant.lair_actions[1].save_dc).toBe(17);
+    expect(tyrant.lair_actions[1].dc_success).toBe('none');
+    expect(extractConditionsFromSaveEffect(tyrant.lair_actions[1].save_effect)).toEqual(['grappled']);
+  });
+});
