@@ -265,7 +265,7 @@ export async function addFightingStyleFeatFeatures(playerStats, allFeatures) {
 export async function addBackgroundFeatures(playerStats, allFeatures) {
     if (is2024(playerStats, null) && playerStats.background) {
         try {
-            const backgrounds = loadBackgroundData('2024');
+            const backgrounds = await loadBackgroundData('2024');
             if (backgrounds) {
                 const bg = backgrounds.find(b => b.name === playerStats.background || b.index === playerStats.background.toLowerCase());
                 if (bg && bg.features && Array.isArray(bg.features)) {

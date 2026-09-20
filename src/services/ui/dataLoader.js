@@ -146,6 +146,18 @@ export async function loadBackgroundData(version = '5e') {
 }
 
 /**
+ * Synchronous getter for already-cached background data.
+ * Returns null if the data has not been loaded yet.
+ * @param {string} version - '5e' or '2024'
+ * @returns {object[]|null} - Array of background data, or null if not cached
+ */
+export function getCachedBackgroundData(version = '5e') {
+  const versionCache = dataCache[version];
+  if (!versionCache) return null;
+  return versionCache.backgrounds || null;
+}
+
+/**
  * Fetches feat data from JSON files (with caching)
  * @param {string} version - '5e' or '2024'
  * @returns {Promise<object[]>} - Array of feat data
