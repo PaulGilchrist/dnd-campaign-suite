@@ -9150,7 +9150,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The demilich makes one Necrotic Burst attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0593-demilich-necrosis.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0594",
