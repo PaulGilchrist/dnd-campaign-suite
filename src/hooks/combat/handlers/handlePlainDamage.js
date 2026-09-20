@@ -538,7 +538,7 @@ function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, a
         action: 'applied',
         characterName: target.name,
         condition: conditionLabels,
-        reason: `${hitClause.attackName} (escape DC ${hitClause.escapeDc ?? '—'})`,
+        reason: hitClause.reasonOverride || `${hitClause.attackName} (escape DC ${hitClause.escapeDc ?? '—'})`,
         note: hitClause.escapeDc != null
             ? `${target.name} is held by a tentacle — escape via the condition badge save (DC ${hitClause.escapeDc}, STR); Restrained lasts until the grapple ends.`
             : null,
@@ -547,14 +547,67 @@ function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, a
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
+// MA-0575: random-condition rider (Death Slaad Chaos Blade — "a condition
+// determined by rolling 1d4: 1 Charmed; 2 Frightened; 3 Poisoned; 4
+// Incapacitated" until the slaad's next turn). Rolls the authored die via
+// the existing rollExpression seam on the resolved hit, logs the die value
+// transparently, and returns the chosen standard condition (no fabricated
+// per-condition mechanics — grant is stamp + meta source + log only).
+function rollHitConditionChoice({ hitClause, targetName, logEntry, attackerName }) {
+    const { die, conditions } = hitClause.conditionRoll;
+    const roll = rollExpression(`1d${die}`);
+    const value = roll?.rolls?.[0] ?? roll?.total;
+    if (!Number.isInteger(value) || value < 1 || value > conditions.length) {
+        console.error(`[MA-0575] Chaos condition roll failed for ${hitClause.attackName}: 1d${die} →`, value);
+        return null;
+    }
+    const condition = conditions[value - 1];
+    const label = condition.charAt(0).toUpperCase() + condition.slice(1);
+    logEntry({
+        type: 'roll',
+        characterName: attackerName,
+        rollType: 'chaos-condition',
+        name: hitClause.attackName,
+        formula: `1d${die}`,
+        rolls: [value],
+        total: value,
+        targetName,
+        description: `1d${die} → ${value} → ${label}`,
+        timestamp: Date.now(),
+    });
+    return { condition, label };
+}
+
 function maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry, characterName }) {
     const hitClause = context?.hitClause;
     if (!hitClause || !target || !applyResult) return;
-    const hasConditions = Array.isArray(hitClause.conditions) && hitClause.conditions.length > 0;
-    if (!hasConditions && !hitClause.targetEffect) return;
     if (!isLargeOrSmallerTarget(target.size)) return;
+    let effectiveClause = hitClause;
+    let riderChoice = null;
+    if (hitClause.conditionRoll) {
+        riderChoice = rollHitConditionChoice({ hitClause, targetName: target.name, logEntry, attackerName: characterName });
+        if (riderChoice) {
+            effectiveClause = {
+                ...hitClause,
+                conditions: [riderChoice.condition],
+                reasonOverride: `${hitClause.attackName} — 1d${hitClause.conditionRoll.die} rolled ${hitClause.conditionRoll.conditions.indexOf(riderChoice.condition) + 1} → ${riderChoice.label}; until the start of ${characterName}'s next turn`,
+            };
+        }
+    }
+    const hasConditions = Array.isArray(effectiveClause.conditions) && effectiveClause.conditions.length > 0;
+    if (!hasConditions && !hitClause.targetEffect) return;
     if (hasConditions) {
-        applyHitClauseConditions({ hitClause, target, campaignName, logEntry, attackerName: characterName });
+        applyHitClauseConditions({ hitClause: effectiveClause, target, campaignName, logEntry, attackerName: characterName });
+    }
+    if (riderChoice) {
+        addExpiration({
+            attackerName: characterName,
+            targetName: target.name,
+            effects: [{ type: 'condition', condition: riderChoice.condition, source: characterName }],
+            campaignName,
+            rounds: undefined,
+            expireOnCreatureName: characterName,
+        });
     }
     if (hitClause.targetEffect) {
         applyHitClauseTargetEffect({ hitClause, target, attackerName: characterName, campaignName, logEntry });

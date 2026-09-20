@@ -527,15 +527,30 @@ export function buildChargeBonusOffer(action, name) {
 // plain-damage handler can apply the conditions to the target on a hit.
 // MA-0016: hit_target_effect (e.g. 'no_healing' — Aberrant Spirit (Slaad)
 // Claw "can't regain Hit Points") rides the same clause as a te write.
+// MA-0575: random-condition rider (Death Slaad Chaos Blade — "a condition
+// determined by rolling 1d4: 1 Charmed; 2 Frightened; 3 Poisoned; 4
+// Incapacitated" until the slaad's next turn). Structured
+// hit_condition_roll:{die, conditions[]} rides the same hit-clause seam;
+// the consumer rolls the die on the resolved hit and grants conditions[roll-1].
+// Byte-inert outside authored rows (key absent = null = no clause).
+export function parseHitConditionRoll(action) {
+  const hcr = action?.hit_condition_roll;
+  if (!hcr || !Number.isInteger(Number(hcr.die)) || Number(hcr.die) < 2) return null;
+  if (!Array.isArray(hcr.conditions) || hcr.conditions.length === 0) return null;
+  return { die: Number(hcr.die), conditions: hcr.conditions.map(c => String(c).toLowerCase()) };
+}
+
 export function buildHitConditionClause(action) {
   const conditions = Array.isArray(action?.hit_conditions) ? action.hit_conditions.map(c => String(c).toLowerCase()) : [];
   const targetEffect = action?.hit_target_effect || null;
-  if (conditions.length === 0 && !targetEffect) return null;
+  const conditionRoll = parseHitConditionRoll(action);
+  if (conditions.length === 0 && !targetEffect && !conditionRoll) return null;
   return {
     conditions,
     escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,
     attackName: action?.name || 'Attack',
     targetEffect,
+    ...(conditionRoll ? { conditionRoll } : {}),
   };
 }
 
