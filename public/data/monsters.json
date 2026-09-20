@@ -17246,6 +17246,11 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "The demilich takes 3 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The demilich regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Energy Drain",
         "description": "Constitution Saving Throw: DC 19, one creature the demilich can see within 120 feet. <strong>Failure:</strong> The target's Hit Point maximum decreases by 14 (4d6). Failure or Success: The demilich can't take this action again until the start of its next turn.",
         "save_dc": 19,
@@ -17262,8 +17267,8 @@
       },
       {
         "name": "Necrosis",
-        "description": "The demilich makes one Necrotic Burst attack.",
-        "uses": 1
+        "delegates_to": "Necrotic Burst",
+        "description": "The demilich makes one Necrotic Burst attack."
       }
     ],
     "lair_actions": [

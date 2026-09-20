@@ -9119,7 +9119,7 @@
       "saveEffect": "The target's Hit Point maximum decreases by 14 (4d6).",
       "range": "120 feet",
       "description": "Constitution Saving Throw: DC 19, one creature the demilich can see within 120 feet. Failure: The target's Hit Point maximum decreases by 14 (4d6). Failure or Success: The demilich can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0591-demilich-energy-drain.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0592",

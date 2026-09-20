@@ -1346,3 +1346,56 @@ describe('MA-0580 Death Tyrant legendary header + delegates_to shape', () => {
     expect(rays.rays.length).toBe(10);
   });
 });
+
+// MA-0591: Demilich legendary_actions had NO numeric header (rows[0] was
+// Energy Drain, uses==null → legendaryHeaderAction null, monsterLegendaryUses.js:153)
+// → MonsterCardBody fallback rendered ALL rows as ungated plain chips:
+// Energy Drain DC 19 fired twice same turn, zero spend (MA-0406 fingerprint);
+// Necrosis carried uses:1 in the wrong child slot. Fix mirrors the verified
+// MA-0580 Death Tyrant twin byte-shape: header + delegates_to same pass.
+describe('MA-0591 Demilich legendary header + delegates_to shape', () => {
+  const demilich = monstersData.find(m => m.name === 'Demilich');
+
+  it('rows[0] is the numeric header dict with uses 3 (RAW total)', () => {
+    const header = legendaryHeaderAction(demilich);
+    expect(header).toBe(demilich.legendary_actions[0]);
+    expect(header.name).toBe('Legendary Action Uses: 3');
+    expect(header.uses).toBe(3);
+    expect(legendaryMaxUses(header, null)).toBe(3);
+    expect(legendaryUsesRemaining(header, null)).toBe(3);
+  });
+
+  it('no child row carries a swallowed uses counter', () => {
+    demilich.legendary_actions.slice(1).forEach(row => {
+      expect(row.uses == null).toBe(true);
+    });
+  });
+
+  it('Energy Drain rides the legendary gate: save_dc 19 Constitution + own-turn cooldown clause', () => {
+    const drain = demilich.legendary_actions.find(r => r.name === 'Energy Drain');
+    expect(drain.save_dc).toBe(19);
+    expect(drain.save_type).toBe('Constitution');
+    expect(drain.range).toBe('120 feet');
+    expect(drain.uses == null).toBe(true);
+    expect(hasLegendaryCooldownClause(drain)).toBe(true);
+  });
+
+  it('Grave-Dust Flight keeps its numeric save affordance, no child counter', () => {
+    const flight = demilich.legendary_actions.find(r => r.name === 'Grave-Dust Flight');
+    expect(flight.save_dc).toBe(19);
+    expect(flight.save_type).toBe('Constitution');
+    expect(flight.uses == null).toBe(true);
+  });
+
+  it('Necrosis delegates_to the real Necrotic Burst attack row (+11 / 7d6 Necrotic)', () => {
+    const necrosis = demilich.legendary_actions.find(r => r.name === 'Necrosis');
+    expect(necrosis.delegates_to).toBe('Necrotic Burst');
+    expect(necrosis.uses == null).toBe(true);
+    const burst = legendaryDelegateAction(demilich, necrosis);
+    expect(burst).not.toBeNull();
+    expect(burst.attack_bonus).toBe(11);
+    expect(burst.damage_dice_primary).toBe('7d6');
+    expect(burst.damage_type_primary).toBe('Necrotic');
+    expect(legendaryDelegateAttackName(necrosis, burst)).toBe('Necrosis (Necrotic Burst attack)');
+  });
+});
