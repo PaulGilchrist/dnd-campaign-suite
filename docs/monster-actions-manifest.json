@@ -8888,7 +8888,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The death tyrant uses Eye Rays three times.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0577-death-tyrant-multiattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0578",
