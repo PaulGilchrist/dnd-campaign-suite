@@ -9340,7 +9340,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 feet. Hit: 9 (1d10 + 4) Slashing damage. If target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0605-displacer-beast-rend.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0606",

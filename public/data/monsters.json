@@ -17708,7 +17708,10 @@
         "attack_bonus": 6,
         "reach": "5 feet",
         "damage_dice_primary": "1d10 + 4",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": [
+          "prone"
+        ]
       },
       {
         "name": "Tentacle",

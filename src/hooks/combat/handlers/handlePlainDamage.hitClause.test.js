@@ -3078,3 +3078,110 @@ describe('MA-0602 Dire Worg Bite poisoned + no_healing hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const DISPLACER_BEAST = monsters.find(m => m.index === 'displacer-beast');
+const DISPLACER_BEAST_REND_ACTION = DISPLACER_BEAST.actions[1];
+
+describe('MA-0605 Displacer Beast Rend prone hit-clause', () => {
+    const deps = {
+        characterName: 'Displacer Beast 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Displacer Beast 1', computedStats: { armorClass: 13 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 989, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'monster', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0605 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Rend row', () => {
+        expect(DISPLACER_BEAST_REND_ACTION.name).toBe('Rend');
+        expect(DISPLACER_BEAST_REND_ACTION.attack_bonus).toBe(6);
+        expect(DISPLACER_BEAST_REND_ACTION.reach).toBe('5 feet');
+        expect(DISPLACER_BEAST_REND_ACTION.damage_dice_primary).toBe('1d10 + 4');
+        expect(DISPLACER_BEAST_REND_ACTION.damage_type_primary).toBe('Slashing');
+        expect(DISPLACER_BEAST_REND_ACTION.hit_conditions).toEqual(['prone']);
+        expect(DISPLACER_BEAST_REND_ACTION.escape_dc).toBeUndefined();
+        expect(DISPLACER_BEAST_REND_ACTION.description).toContain('Prone');
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(DISPLACER_BEAST_REND_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Rend',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Rend hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Rend', formula: '1d10 + 4', total: 10, rolls: [6], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Slashing',
+            attackerName: 'Displacer Beast 1',
+            hitClause: buildHitConditionClause(DISPLACER_BEAST_REND_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe('Bandit 1');
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Displacer Beast 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Prone',
+            reason: 'Rend (escape DC —)',
+        }));
+    });
+
+    it('skips the prone clause for Huge or larger targets', async () => {
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Hill Giant 1', type: 'monster', size: 'Huge', ac: 13, currentHp: 999, maxHp: 999 }],
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Rend', formula: '1d10 + 4', total: 10, rolls: [6], modifier: 4, context: {
+            targetName: 'Hill Giant 1',
+            damageType: 'Slashing',
+            attackerName: 'Displacer Beast 1',
+            hitClause: buildHitConditionClause(DISPLACER_BEAST_REND_ACTION),
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Hill Giant 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('grants nothing when the Rend attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Rend', formula: '1d10 + 4', total: 10, rolls: [6], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Slashing',
+            attackerName: 'Displacer Beast 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
