@@ -22,6 +22,17 @@ describe('MA-0303 parseBothOutcomesClause', () => {
     });
   });
 
+  // MA-0590: Demilich Howl — DATA-marked "Failure or Success:" Frightened
+  // tail arms the picker success-leg Frightened grant (condition only, no te).
+  it('MA-0590 Demilich Howl arms frightened condition (no te)', () => {
+    const howl = monstersData.find(m => m.index === 'demilich').actions.find(a => a.name === 'Howl');
+    expect(howl.save_effect).toBe("Failure or Success: The target has the Frightened condition until the start of the demilich's next turn.");
+    expect(parseBothOutcomesClause(howl.save_effect)).toEqual({
+      conditions: ['frightened'],
+      effects: [],
+    });
+  });
+
   it('tail-scoped: Blinded/Poisoned BEFORE the marker never arm (Kraken, Solar)', () => {
     const kraken = monstersData.find(m => m.name === 'Kraken');
     const toxic = kraken.legendary_actions.find(a => a.name === 'Toxic Ink');
@@ -44,7 +55,7 @@ describe('MA-0303 parseBothOutcomesClause', () => {
         }
       }
     }
-    expect(armed).toEqual(['Arch-hag / Crackling Wave']);
+    expect(armed).toEqual(['Arch-hag / Crackling Wave', 'Demilich / Howl']);
   });
 
   it('caster-side restriction tails never arm (no condition, no Reactions)', () => {

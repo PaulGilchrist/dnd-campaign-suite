@@ -17236,7 +17236,7 @@
         "save_dc": 19,
         "save_type": "Constitution",
         "range": "30-foot Emanation",
-        "save_effect": "The target has the Frightened condition until the start of the demilich's next turn.",
+        "save_effect": "Failure or Success: The target has the Frightened condition until the start of the demilich's next turn.",
         "recharge": "5-6",
         "damage_dice_primary": "20d6",
         "damage_type_primary": "Psychic"

@@ -9103,7 +9103,7 @@
         "frightened"
       ],
       "description": "Constitution Saving Throw: DC 19, each creature in a 30-foot Emanation originating from the demilich. Failure: 70 (20d6) Psychic damage. Failure or Success: The target has the Frightened condition until the start of the demilich's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0590-demilich-howl.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0591",

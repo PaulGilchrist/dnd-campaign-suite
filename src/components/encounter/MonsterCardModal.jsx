@@ -46,6 +46,34 @@ function sphereRadiusFeet(description) {
   return m ? Number(m[1]) : null;
 }
 
+// MA-0590: coverage feet for an authored emanation save row (Demilich Howl
+// "range": "30-foot Emanation") — parsed from the RANGE field byte ONLY: the
+// composite attack+save Dao Earth Burst carries the same wording inside its
+// description (range_save/description, MA-0551 two-chip fork), so parsing the
+// description would reroute that adjudicated seam. Byte-inert null for every
+// row without the authored emanation range.
+function emanationRadiusFeet(action) {
+  const m = String(action?.range || '').match(/^(\d+(?:\.\d+)?)\s*[- ]?(?:foot|feet|ft\.?)?[- ]?emanation\b/i);
+  return m ? Number(m[1]) : null;
+}
+
+// Shapeless-row fallback (complexity hoist, playbook §45/§105): the MA-0084
+// sphere/radius token is GM point-placed (rangeGateFt null); the MA-0590
+// emanation range is attacker-origin, so it rides the MA-0031 cone gate
+// (rangeGateFt = the authored feet; gridless stays lenient §42). Both were
+// picker-inert before their rows landed (MA-0084 / MA-0317→MA-0590).
+function radiusAoeFallback(action, description) {
+  const radiusFt = sphereRadiusFeet(description);
+  if (radiusFt != null) {
+    return { shape: 'Radius', feet: radiusFt, rangeGateFt: null };
+  }
+  const emanationFt = emanationRadiusFeet(action);
+  if (emanationFt != null) {
+    return { shape: 'Radius', feet: emanationFt, rangeGateFt: emanationFt };
+  }
+  return null;
+}
+
 function breathAoeShape(action, spellInfo) {
   if (spellInfo) return null;
   if (!action || action.save_dc == null) return null;
@@ -61,10 +89,8 @@ function breathAoeShape(action, spellInfo) {
   // same area picker as the MA-0031 cones / MA-0042 zones. The GM positions
   // the center, so the attacker-origin gate does NOT apply (zone shape).
   if (shape === null) {
-    const radiusFt = sphereRadiusFeet(description);
-    if (radiusFt != null) {
-      return { shape: 'Radius', feet: radiusFt, rangeGateFt: null };
-    }
+    const radiusAoe = radiusAoeFallback(action, description);
+    if (radiusAoe != null) return radiusAoe;
   }
   if (!shape) return null;
   const tokens = [...description.matchAll(/(\d+(?:\.\d+)?)\s*-?\s*(?:foot|feet)\b/gi)].map(t => Number(t[1]));
