@@ -17416,7 +17416,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The deva casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n<strong>At Will:</strong> Detect Evil and Good, Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell)\n<strong>1/Day Each:</strong> Commune, Raise Dead",
+        "description": "The deva casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n<strong>At Will:</strong> <em>Detect Evil and Good</em>, <em>Shapechange</em> (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell)\n<strong>1/Day Each:</strong> <em>Commune</em>, <em>Raise Dead</em>",
         "spell_save_dc": 17,
         "spellcasting_ability": "Charisma"
       }

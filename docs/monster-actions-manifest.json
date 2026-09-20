@@ -9234,7 +9234,7 @@
       "actionType": "spellcasting",
       "saveDc": 17,
       "description": "The deva casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17): At Will: Detect Evil and Good, Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell) 1/Day Each: Commune, Raise Dead",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0599-deva-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0600",
