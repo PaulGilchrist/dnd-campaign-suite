@@ -17839,8 +17839,21 @@
         "range": "120 feet",
         "range_save": "20-foot-radius, 60-foot-high Cylinder",
         "save_effect": "While in the whirlwind, the target has the Restrained condition and moves with the whirlwind. At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success.",
-        "damage_dice_primary": "6d6",
-        "damage_type_primary": "Thunder"
+        "dc_success": "none",
+        "duration": "Concentration, until the djinni dismisses it (GM-enforced)",
+        "zone": {
+          "radius_ft": 20,
+          "noun": "whirlwind",
+          "effect_key": "whirlwind",
+          "recurring_damage": "6d6",
+          "recurring_damage_type": "Thunder",
+          "repeat_save": {
+            "save_type": "Strength",
+            "dc": 17,
+            "condition": "restrained"
+          },
+          "advisory": "Cylinder (20-ft radius, 60-ft high) modeled as a 20-ft radius picker (height has no consumer — GM-enforced). Concentration anchor on the djinni, moving the whirlwind up to 20 ft at the start of the djinni's turns, the enters-space re-save trigger, and the once-per-turn save latch have no consumers in this engine — GM-enforced. Restrained, the turn-start 6d6 Thunder tick, and the turn-end repeat save (STR DC 17, ends on self) are enforced via the whirlwind te."
+        }
       },
       {
         "name": "Spellcasting",

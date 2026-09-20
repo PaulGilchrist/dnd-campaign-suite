@@ -11,6 +11,7 @@ import { applyParalyzingBreathTurnEnd } from '../../services/rules/features/para
 import { applyPetrifyingBiteTurnEnd } from '../../services/rules/features/cockatricePetrifyService.js'
 import { applyEyeRaysTurnEnd } from '../../services/rules/features/beholderEyeRayService.js'
 import { applySoulTomeTrapTurnEnd } from '../../services/rules/features/soulTomeTrapService.js'
+import { applyRepeatSaveTurnEnd } from '../../services/rules/features/repeatSaveService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
@@ -153,6 +154,14 @@ function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters
     // (bound-at-3 stays GM-adjudicated — no fail-counter consumer).
     applySoulTomeTrapTurnEnd(campaignName, activeCreatureName)
         .catch((e) => { console.error('[navigationHandlers] MA-0298 soul tome turn-end save failed:', e) })
+    // MA-0610: GENERIC turn-END repeat-save roller (repeatSaveService) — the
+    // OUTGOING creature holding a te authored with a repeat_save descriptor
+    // (Djinni whirlwind: Restrained-gated STR DC 17) repeats the save at the
+    // end of its own turn; success strips te + gated condition on itself.
+    // Frightful presence / weakening breath / soul tome keep their own
+    // service-specific turn-end seams byte-identical.
+    applyRepeatSaveTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] MA-0610 repeat save turn-end failed:', e) })
 }
 
 /**

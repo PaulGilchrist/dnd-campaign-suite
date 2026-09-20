@@ -924,6 +924,24 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Spells',
     fields: ['source', 'dc'],
   },
+  {
+    // MA-0610: Djinni Create Whirlwind zone te (armed by the MA-0042/MA-0043
+    // zone picker over covered creatures). Restrained while in the whirlwind;
+    // the Restrained target takes 6d6 Thunder at the START of each of its
+    // turns (recurring tick consumer: whirlwindService via turnStartEffects)
+    // and repeats the STR save (DC indicated) at the END of each of its turns,
+    // ending the effect on itself on a success (generic repeat-save consumer:
+    // repeatSaveService via navigationHandlers turn-END). A successful save
+    // pays nothing (dc_success:none). Concentration anchor, 20-ft/turn movement,
+    // enters-space re-save and once-per-turn latch are GM-enforced (§7).
+    effect: 'whirlwind',
+    label: 'Whirlwind (Zone)',
+    description: 'Inside a djinni whirlwind (20-foot-radius Cylinder): Restrained. At the start of each of its turns the Restrained target takes 6d6 Thunder damage; at the end of each of its turns it repeats the STR save (DC indicated), ending the effect on itself on a success. A successful initial save pays no damage. Concentration anchor, 20-ft/turn movement and the once-per-turn latch are GM-enforced.',
+    icon: 'fa-hurricane',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source', 'dc', 'saveType'],
+  },
 
   // ── Lair ─────────────────────────────────────────────────
   {

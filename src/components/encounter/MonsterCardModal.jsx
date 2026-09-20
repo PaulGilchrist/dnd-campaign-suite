@@ -74,12 +74,16 @@ function radiusAoeFallback(action, description) {
   return null;
 }
 
-function breathAoeShape(action, spellInfo) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function breathAoeShape(action, spellInfo) {
   if (spellInfo) return null;
   if (!action || action.save_dc == null) return null;
   // MA-0042: an authored zone (e.g. Adult Black Dragon Insect Cloud) is a
   // persisting radius area — picker centered on a GM-chosen point, so the
   // attacker-origin coverage gate does NOT apply (selection advisory).
+  // MA-0610: this zone branch is checked BEFORE sphereRadiusFeet, so an
+  // authored zone.radius_ft opens the Radius picker even when the description
+  // names a Cylinder (the MA-0084 cylinder exclusion never applies).
   if (action.zone?.radius_ft != null) {
     return { shape: 'Radius', feet: Number(action.zone.radius_ft), rangeGateFt: null };
   }
@@ -113,7 +117,33 @@ function breathAoeShape(action, spellInfo) {
 // condition_removal/sleep/stink-cleanup only), so the RAW "repeat 3d6 at
 // turn end" clause is recorded + logged as GM-enforced (CLA-325 precedent)
 // — wiring a turn-end zone-damage pass would be new state design.
-function zoneTeForAction(action) {
+// MA-0610: MA-0042 zone-damage-at-turn-end stays advisory, BUT a zone row
+// may now author zone.recurring_damage (turn-START tick → whirlwindService)
+// and zone.repeat_save (turn-END repeat save → repeatSaveService); those
+// descriptors ride the te payload below to their consumers.
+// MA-0610: recurring-damage + repeat-save descriptors ride the zone te so
+// the turn-start tick (whirlwindService) and generic turn-END repeat-save
+// roller (repeatSaveService) can consume them per victim. Byte-inert —
+// returns {} for every existing zone row (MA-0042/0043/0085 author neither
+// key), merged via spread so those payloads stay byte-identical.
+function ma0610ZoneDescriptors(zone) {
+  const extra = {};
+  if (zone.recurring_damage) {
+    extra.recurringDie = String(zone.recurring_damage).toLowerCase();
+    extra.recurringType = zone.recurring_damage_type || null;
+  }
+  if (zone.repeat_save && typeof zone.repeat_save === 'object') {
+    extra.repeatSave = {
+      saveType: zone.repeat_save.save_type || null,
+      dc: zone.repeat_save.dc ?? null,
+      condition: zone.repeat_save.condition || null,
+    };
+  }
+  return extra;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function zoneTeForAction(action) {
   if (!action?.zone?.radius_ft || !action.name) return null;
   const slug = String(action.name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const baseKey = action.zone.effect_key || `lair_${slug}`;
@@ -124,6 +154,7 @@ function zoneTeForAction(action) {
     repeatTurnEnd: action.zone.repeat_turn_end === true,
     damage: action.damage_dice_primary || null,
     duration: action.duration || null,
+    ...ma0610ZoneDescriptors(action.zone),
   };
   // MA-0043: authored advisory clause (e.g. darkness "dispel only by
   // 2nd-level+ light — GM-enforced") rides the arm log. Absent on

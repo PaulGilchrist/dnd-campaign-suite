@@ -9,6 +9,7 @@ import { cleanUpToppleConditions } from './toppleCleanup.js';
 import { regainLegendaryUses } from '../../encounters/monsterLegendaryUses.js';
 import { rollMonsterRecharges } from '../../encounters/monsterRecharge.js';
 import { applyInfernalWoundBleedTurnStart } from '../../rules/features/infernalWoundService.js';
+import { applyWhirlwindTurnStart } from '../features/whirlwindService.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
 
@@ -185,6 +186,11 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         // via infernalWoundService — computeDamageAfterResistances throws on
         // empty damageTypes).
         await applyInfernalWoundBleedTurnStart(activeName, campaignName);
+        // MA-0610: Whirlwind turn-start tick — te-keyed + Restrained-gated
+        // recurring 6d6 Thunder for creatures inside a djinni whirlwind
+        // (whirlwindService; same pre-playerStats seam as MA-0367 — PC AND
+        // monster victims tick alike; untyped direct-HP loss shape).
+        await applyWhirlwindTurnStart(activeName, campaignName);
     }
 
     if (!activeName || !playerStats) {

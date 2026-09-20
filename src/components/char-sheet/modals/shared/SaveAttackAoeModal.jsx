@@ -415,6 +415,18 @@ function maybeStoreLastAttack(enabled, campaignName, cfg) {
 // GM-enforced": no turn-END zone-damage consumer exists in this engine
 // (expireStaleEffects zone phases are turn-START passes only), so the
 // repeat damage + "until dismissed" duration stay advisory (CLA-325).
+// MA-0610: recurring-damage + repeat-save descriptors ride the te to the
+// turn-start tick (whirlwindService) + generic turn-END repeat-save roller
+// (repeatSaveService). Byte-inert undefined on every existing zone row.
+function ma0610TeDescriptors(zoneTe) {
+    return {
+        recurringDie: zoneTe.recurringDie || undefined,
+        recurringType: zoneTe.recurringType || undefined,
+        repeatSave: zoneTe.repeatSave || undefined,
+        noun: zoneTe.noun || undefined,
+    };
+}
+
 function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc, saveType, campaignName }) {
     if (!zoneTe || !zoneTe.effectKey) return;
     for (const targetName of selectedNames) {
@@ -423,6 +435,7 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
             radiusFt: zoneTe.radiusFt,
             repeatTurnEnd: zoneTe.repeatTurnEnd === true,
             duration: 'until_end_of_zone',
+            ...ma0610TeDescriptors(zoneTe),
         });
     }
     const trackingKey = `_${zoneTe.trackingPrefix}_${String(casterName).replace(/\s+/g, '_')}`;

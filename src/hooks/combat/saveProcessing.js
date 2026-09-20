@@ -12,6 +12,7 @@ import { registerTargetEffect, getActiveTargetEffect } from '../../services/comb
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
 import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
+import { grantRepeatSaveEffect } from '../../services/rules/features/repeatSaveService.js';
 import { setTempHp } from '../../services/automation/handlers/buffs/tempHpService.js';
 import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
 import { applyEyeRayFailedGrants } from '../../services/rules/features/beholderEyeRayService.js';
@@ -436,6 +437,21 @@ async function applyTransportAndMovementClauseGrants({ context, campaignName, at
     }
 }
 
+// MA-0048/MA-0610: failed-save repeat-save arm (complexity hoist out of
+// applySaveOutcome). GENERIC fork — an authored repeat_save object that names
+// its te via `effect` routes to the generic turn-END repeat-save roller
+// (repeatSaveService); every legacy row (Frightful Presence:
+// repeat_save={condition:'frightened', save_type, duration_minutes} with NO
+// `effect`) stays on the FP-specific trackFrightfulPresence leg byte-identical.
+async function armRepeatSaveClause({ saveSuccess, context, campaignName, attackerName, applyTarget, saveDc, saveType }) {
+    if (saveSuccess !== false || !context?.repeatSave) return;
+    if (context.repeatSave.effect) {
+        await grantRepeatSaveEffect({ campaignName, attackerName, targetName: applyTarget, repeatSave: context.repeatSave, saveDc, saveType });
+        return;
+    }
+    await trackFrightfulPresence({ campaignName, attackerName, targetName: applyTarget, saveType: context.repeatSave.save_type || saveType, saveDc });
+}
+
 async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
     // MA-0020: ability N/Day spend lands here — prompt-confirm seam (reaches
     // this point only once the save has resolved), regardless of the outcome.
@@ -450,17 +466,7 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
     } else {
         applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget: targetName || characterName, attackerName, campaignName });
     }
-    // MA-0048: authored repeat-save clause (Frightful Presence) — arm the
-    // turn-end repeat-save marker on a failed save.
-    if (saveSuccess === false && context?.repeatSave) {
-        await trackFrightfulPresence({
-            campaignName,
-            attackerName,
-            targetName: targetName || characterName,
-            saveType: context.repeatSave.save_type || saveType,
-            saveDc,
-        });
-    }
+    await armRepeatSaveClause({ saveSuccess, context, campaignName, attackerName, applyTarget: targetName || characterName, saveDc, saveType });
 }
 
 // MA-0030: successful-save immunity grant. Writes a registry te (e.g.
