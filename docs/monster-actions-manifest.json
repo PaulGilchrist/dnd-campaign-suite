@@ -9287,7 +9287,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 15 (2d8 + 6) Piercing damage plus 7 (2d6) Poison damage, and the target has the Poisoned condition until the start of the worg's next turn. While Poisoned, the target can't regain Hit Points.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0602-dire-worg-bite.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0603",

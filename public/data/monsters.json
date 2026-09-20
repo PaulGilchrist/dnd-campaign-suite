@@ -17602,7 +17602,11 @@
         "damage_dice_primary": "2d8 + 6",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "2d6",
-        "damage_type_secondary": "Poison"
+        "damage_type_secondary": "Poison",
+        "hit_conditions": [
+          "poisoned"
+        ],
+        "hit_target_effect": "no_healing"
       },
       {
         "name": "Dreadful Howl",

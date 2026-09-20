@@ -88,6 +88,7 @@ vi.mock('../../rules/spells/metamagicRules.js', () => ({
     getChaModifier: vi.fn(),
 }));
 
+import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
@@ -2898,6 +2899,182 @@ describe('MA-0600 Dire Wolf Bite prone hit-clause', () => {
         expect(setRuntimeValue).not.toHaveBeenCalledWith(
             'Hill Giant 1', 'activeConditions', expect.anything(), 'test-campaign'
         );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+
+const DIRE_WORG = monsters.find(m => m.index === 'dire-worg');
+const DIRE_WORG_BITE_ACTION = DIRE_WORG.actions.find(a => a.name === 'Bite');
+
+describe('MA-0602 Dire Worg Bite poisoned + no_healing hit-clause', () => {
+    afterEach(() => { rollExpression.mockReset(); });
+
+    const deps = {
+        characterName: 'Dire Worg 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Dire Worg 1', computedStats: { armorClass: 16 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 13, newHp: 983, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'monster', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0602 data-lock: authors hit_conditions:["poisoned"] + hit_target_effect:"no_healing" on the Bite row', () => {
+        expect(DIRE_WORG_BITE_ACTION.attack_bonus).toBe(10);
+        expect(DIRE_WORG_BITE_ACTION.damage_dice_primary).toBe('2d8 + 6');
+        expect(DIRE_WORG_BITE_ACTION.damage_type_primary).toBe('Piercing');
+        expect(DIRE_WORG_BITE_ACTION.damage_dice_secondary).toBe('2d6');
+        expect(DIRE_WORG_BITE_ACTION.damage_type_secondary).toBe('Poison');
+        expect(DIRE_WORG_BITE_ACTION.hit_conditions).toEqual(['poisoned']);
+        expect(DIRE_WORG_BITE_ACTION.hit_target_effect).toBe('no_healing');
+        expect(DIRE_WORG_BITE_ACTION.escape_dc).toBeUndefined();
+        expect(DIRE_WORG.actions[0].hit_conditions).toBeUndefined();
+    });
+
+    it('builds the combined poisoned + no_healing clause from the Bite row', () => {
+        expect(buildHitConditionClause(DIRE_WORG_BITE_ACTION)).toEqual({
+            conditions: ['poisoned'],
+            escapeDc: null,
+            attackName: 'Bite',
+            targetEffect: 'no_healing',
+        });
+    });
+
+    it('applies Poisoned + attacker-source meta on a resolved Bite hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 6', total: 13, rolls: [7], modifier: 6, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Dire Worg 1',
+            hitClause: buildHitConditionClause(DIRE_WORG_BITE_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe('Bandit 1');
+        expect(condCall[2]).toEqual(['poisoned']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ poisoned: { source: 'Dire Worg 1' } });
+        expect(metaCall[2].poisoned.dc).toBeUndefined();
+    });
+
+    it('registers the no_healing te on the target, sourced from the worg, on a resolved Bite hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 6', total: 13, rolls: [7], modifier: 6, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Dire Worg 1',
+            hitClause: buildHitConditionClause(DIRE_WORG_BITE_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'no_healing',
+            'Dire Worg 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('expires the te anchored on the worg (until its next turn start, MA-0016 clock)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 6', total: 13, rolls: [7], modifier: 6, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Dire Worg 1',
+            hitClause: buildHitConditionClause(DIRE_WORG_BITE_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Dire Worg 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'no_healing', source: 'Dire Worg 1', target: 'Bandit 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Dire Worg 1',
+        });
+    });
+
+    it('logs condition-applied entries for both the Poisoned grant and the heal-block te', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 6', total: 13, rolls: [7], modifier: 6, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Dire Worg 1',
+            hitClause: buildHitConditionClause(DIRE_WORG_BITE_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Poisoned',
+            reason: 'Bite (escape DC —)',
+        }));
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            reason: "Bite — until the start of Dire Worg 1's next turn",
+        }));
+    });
+
+    it('still applies normal damage on the Bite hit (combined primary + secondary leg)', async () => {
+        rollExpression.mockImplementation((f) => (f === '2d6' ? { total: 5, rolls: [2, 3], modifier: 0 } : null));
+        applyDamageToTarget.mockImplementation(async (cs, name, dmg, types) => (
+            types[0] === 'Poison'
+                ? { finalDamage: 5, newHp: 978, damageReduced: false }
+                : { finalDamage: dmg, newHp: 983, damageReduced: false }
+        ));
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 6', total: 13, rolls: [7], modifier: 6, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Dire Worg 1',
+            autoDamageSecondaryFormula: '2d6',
+            autoDamageSecondaryType: 'Poison',
+            hitClause: buildHitConditionClause(DIRE_WORG_BITE_ACTION),
+        } });
+
+        expect(applyDamageToTarget).toHaveBeenCalled();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'roll',
+            rollType: 'damage',
+            characterName: 'Dire Worg 1',
+            finalDamage: 13,
+            note: 'combined_damage_roll',
+            secondaryFinalDamage: 5,
+        }));
+    });
+
+    it('grants nothing when the Bite attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 6', total: 13, rolls: [7], modifier: 6, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Dire Worg 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
