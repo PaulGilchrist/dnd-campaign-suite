@@ -8876,7 +8876,7 @@
       "actionType": "spellcasting",
       "saveDc": 16,
       "description": "The slaad casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16): At Will: Detect Magic, Detect Thoughts, Invisibility (self only), Mage Hand, Major Image 1/Day Each: Blight (level 8 version), Cloudkill (level 6 version), Fly, Plane Shift, Tongues",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0576-death-slaad-spellcasting.md"
     },
     {
       "id": "MA-0577",
@@ -8888,7 +8888,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The death tyrant uses Eye Rays three times.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0577-death-tyrant-multiattack.md"
     },
     {
       "id": "MA-0578",
@@ -8904,7 +8904,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 feet",
       "description": "Melee Attack Roll: +9, reach 5 feet. Hit: 13 (2d8 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0579",
@@ -8931,7 +8931,7 @@
         "unconscious"
       ],
       "description": "The death tyrant randomly shoots one of the following magical rays at a target it can see within 120 feet of itself (roll 1d10; reroll if the death tyrant has already used that ray during this turn): Charm Ray. Wisdom Saving Throw: DC 17. Failure: 13 (3d8) Psychic damage, and the target has the Charmed condition for 1 hour or until it takes damage. Success: Half damage only. Paralyzing Ray. Constitution Saving Throw: DC 17. Failure: The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. Fear Ray. Wisdom Saving Throw: DC 17. Failure: 10 (3d6) Psychic damage, and the target has the Frightened condition until the end of its next turn. Success: Half damage only. Slowing Ray. Constitution Saving Throw: DC 17. Failure: 18 (4d8) Necrotic damage. Until the end of the target's next turn, the target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. Success: Half damage only. Enervation Ray. Constitution Saving Throw: DC 17. Failure: 16 (3d10) Poison damage, and the target has the Poisoned condition until the end of its next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only. Telekinetic Ray. Strength Saving Throw: DC 17 (the target succeeds automatically if it is Gargantuan). Failure: The death tyrant moves the target up to 30 feet in any direction. The target has the Restrained condition until the start of the death tyrant's next turn or until the death tyrant has the Incapacitated condition. The death tyrant can also exert fine control on objects with this ray, such as manipulating a tool or opening a door or container. Sleep Ray. Wisdom Saving Throw: DC 17 (the target succeeds automatically if it is a Construct or an Undead). Failure: The target has the Unconscious condition for 1 minute. The condition ends if the target takes damage or a creature within 5 feet of it takes an action to wake it. Petrification Ray. Constitution Saving Throw: DC 17. First Failure: The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure: The target has the Petrified condition instead of the Restrained condition. Disintegration Ray. Dexterity Saving Throw: DC 17. Failure: 36 (8d8) Force damage. If the target is a nonmagical object or a creation of magical force, a 10-foot Cube of it disintegrates into dust. Success: Half damage. Failure or Success: If the target is a creature and this damage reduces it to 0 Hit Points, it disintegrates into dust. Death Ray. Dexterity Saving Throw: DC 17. Failure: 55 (10d10) Necrotic damage. Success: Half damage. Failure or Success: The target dies if the ray reduces it to 0 Hit Points.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0579-death-tyrant-eye-rays.md"
     },
     {
       "id": "MA-0580",
@@ -8944,7 +8944,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The death tyrant makes two Bite attacks.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0580-death-tyrant-chomp.md"
     },
     {
       "id": "MA-0581",
@@ -8957,7 +8957,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The death tyrant uses Eye Rays.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0581-death-tyrant-glare.md"
     },
     {
       "id": "MA-0582",
@@ -8969,7 +8969,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "An area that is a 50-foot cube within 120 feet ofthe tyrant is filled with spectral eyes and tentacles. To creatures other than the death tyrant, that area is lightly obscured and difficult terrain until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0582-death-tyrant-lair-eyes.md"
     },
     {
       "id": "MA-0583",
@@ -8981,7 +8981,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "An area that is a 50-foot cube within 120 feet of the tyrant is filled with spectral eyes and tentacles. To creatures other than the death tyrant, that area is lightly obscured and difficult terrain until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0583-death-tyrant-lair-eyes-2.md"
     },
     {
       "id": "MA-0584",
@@ -8999,7 +8999,7 @@
         "grappled"
       ],
       "description": "Walls sprout spectral appendages until initiative count 20 on the round after next. Any creature, including one on the Ethereal Plane, that is hostile to the tyrant and starts its turn within 10 feet of a wall must succeed on a DC 17 Dexterity saving throw or be grappled. Escaping requires a successful DC 17 Strength (Athletics) or Dexterity (Acrobatics) check.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0584-death-tyrant-lair-walls.md"
     },
     {
       "id": "MA-0585",
@@ -9015,7 +9015,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 6 (1d8 + 2) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0586",
@@ -9036,7 +9036,7 @@
         "poisoned"
       ],
       "description": "Ranged Weapon Attack: +4 to hit, range 30/120 ft., one creature. Hit: 4 (1d4 + 2) piercing damage, and the target must succeed on a DC 12 Constitution saving throw or be poisoned for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0587",
@@ -9052,7 +9052,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 2 (1d4) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0588",
@@ -9064,7 +9064,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The demilich makes three Necrotic Burst attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0589",
@@ -9081,7 +9081,7 @@
       "reach": "5 ft.",
       "range": "120 ft.",
       "description": "Melee or Ranged Attack Roll: +11, reach 5 ft. or range 120 ft. Hit: 24 (7d6) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0589-demilich-necrotic-burst.md"
     },
     {
       "id": "MA-0590",
@@ -9103,7 +9103,7 @@
         "frightened"
       ],
       "description": "Constitution Saving Throw: DC 19, each creature in a 30-foot Emanation originating from the demilich. Failure: 70 (20d6) Psychic damage. Failure or Success: The target has the Frightened condition until the start of the demilich's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0590-demilich-howl.md"
     },
     {
       "id": "MA-0591",
@@ -9119,7 +9119,7 @@
       "saveEffect": "The target's Hit Point maximum decreases by 14 (4d6).",
       "range": "120 feet",
       "description": "Constitution Saving Throw: DC 19, one creature the demilich can see within 120 feet. Failure: The target's Hit Point maximum decreases by 14 (4d6). Failure or Success: The demilich can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0591-demilich-energy-drain.md"
     },
     {
       "id": "MA-0592",
@@ -9137,7 +9137,7 @@
         "blinded"
       ],
       "description": "The demilich flies up to its Fly Speed, shedding grave dust. Each creature within 5 feet of the demilich as it moves is targeted once by the following effect. Constitution Saving Throw: DC 19. Failure: The target has the Blinded condition until the end of the demilich's next turn. Failure or Success: The demilich can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0592-demilich-grave-dust-flight.md"
     },
     {
       "id": "MA-0593",
@@ -9150,7 +9150,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The demilich makes one Necrotic Burst attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0593-demilich-necrosis.md"
     },
     {
       "id": "MA-0594",
@@ -9167,7 +9167,7 @@
         "prone"
       ],
       "description": "The tomb trembles violently for a moment. Each crea\u00adture on the floor of the tomb must succeed on a DC 19 Dexterity saving throw or be knocked prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0594-demilich-lair-tremble.md"
     },
     {
       "id": "MA-0595",
@@ -9179,7 +9179,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The demilich targets one creature it can see within 60 feet of it. An antimagic field fills the space of the target, moving with it until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0595-demilich-lair-antimagic.md"
     },
     {
       "id": "MA-0596",
@@ -9191,7 +9191,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The demilich targets any number of creatures it can see within 30 feet of it. No target can regain hit points until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0596-demilich-lair-nohealing.md"
     },
     {
       "id": "MA-0597",
@@ -9203,7 +9203,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The deva makes two Holy Mace attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0598",
@@ -9221,7 +9221,7 @@
       "damageTypeSecondary": "Radiant",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 7 (1d6 + 4) Bludgeoning damage plus 18 (4d8) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0599",
@@ -9234,7 +9234,7 @@
       "actionType": "spellcasting",
       "saveDc": 17,
       "description": "The deva casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17): At Will: Detect Evil and Good, Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no Concentration or Temporary Hit Points required to maintain the spell) 1/Day Each: Commune, Raise Dead",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0599-deva-spellcasting.md"
     },
     {
       "id": "MA-0600",
@@ -9253,7 +9253,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Piercing damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0600-dire-wolf-bite.md"
     },
     {
       "id": "MA-0601",
@@ -9265,7 +9265,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The worg makes three Bite attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0602",
@@ -9287,7 +9287,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 15 (2d8 + 6) Piercing damage plus 7 (2d6) Poison damage, and the target has the Poisoned condition until the start of the worg's next turn. While Poisoned, the target can't regain Hit Points.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0602-dire-worg-bite.md"
     },
     {
       "id": "MA-0603",
@@ -9309,7 +9309,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 16, each creature within 30 feet that isn't a worg. Failure: 36 (8d8) Psychic damage, and the target has the Frightened condition until the start of the worg's next turn. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0603-dire-worg-dreadful-howl.md"
     },
     {
       "id": "MA-0604",
@@ -9321,7 +9321,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The displacer beast makes one Rend attack and one Tentacle attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0605",
@@ -9340,7 +9340,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 feet. Hit: 9 (1d10 + 4) Slashing damage. If target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0605-displacer-beast-rend.md"
     },
     {
       "id": "MA-0606",
@@ -9356,7 +9356,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "10 feet",
       "description": "Melee Attack Roll: +6, reach 10 feet. Hit: 11 (2d6 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0607",
@@ -9368,7 +9368,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The djinni makes three attacks, using Storm Blade or Storm Bolt in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0608",
@@ -9386,7 +9386,7 @@
       "damageTypeSecondary": "Lightning",
       "reach": "5 feet",
       "description": "Melee Attack Roll: +9, reach 5 feet. Hit: 12 (2d6 + 5) Slashing damage plus 7 (2d6) Lightning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0609",
@@ -9406,7 +9406,7 @@
         "prone"
       ],
       "description": "Ranged Attack Roll: +9, range 120 feet. Hit: 13 (3d8) Thunder damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0609-djinni-storm-bolt.md"
     },
     {
       "id": "MA-0610",
@@ -9427,7 +9427,7 @@
         "restrained"
       ],
       "description": "The djinni conjures a whirlwind at a point it can see within 120 feet. The whirlwind fills a 20-foot-radius, 60-foot-high Cylinder centered on that point. The whirlwind lasts until the djinni's Concentration on it ends. The djinni can move the whirlwind up to 20 feet at the start of each of its turns. Whenever the whirlwind enters a creature's space or a creature enters the whirlwind, that creature is subjected to the following effect. Strength Saving Throw: DC 17 (a creature makes this save only once per turn, and the djinni is unaffected). Failure: While in the whirlwind, the target has the Restrained condition and moves with the whirlwind. At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0610-djinni-create-whirlwind.md"
     },
     {
       "id": "MA-0611",
@@ -9440,7 +9440,7 @@
       "actionType": "spellcasting",
       "saveDc": 17,
       "description": "The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17): At Will: Detect Evil and Good, Detect Magic 2/Day Each: Create Food and Water (can create wine instead of water), Tongues, Wind Walk 1/Day Each: Creation, Gaseous Form, Invisibility, Major Image, Plane Shift",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0611-djinni-spellcasting.md"
     },
     {
       "id": "MA-0612",
@@ -9452,7 +9452,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The doppelganger makes two Slam attacks and uses Unsettling Visage if available.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0613",
@@ -9468,7 +9468,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6 (with Advantage during the first round of each combat), reach 5 ft. Hit: 11 (2d6 + 4) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0614",
@@ -9481,7 +9481,7 @@
       "actionType": "save",
       "saveDc": 12,
       "description": "The doppelganger casts Detect Thoughts, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 12).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0614-doppelganger-read-thoughts.md"
     },
     {
       "id": "MA-0615",
@@ -9501,7 +9501,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 12, each creature in a 15-foot Emanation originating from the doppelganger that can see the doppelganger. Failure: The target has the Frightened condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0616",
@@ -9513,7 +9513,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dracolich makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Ray of Sickness (level 2 version).",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0617",
@@ -9531,7 +9531,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +13, reach 10 ft. Hit: 18 (2d10 + 7) Slashing damage plus 4 (1d8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0618",
@@ -9550,7 +9550,7 @@
       "range": "60-foot Cone",
       "recharge": "5-6",
       "description": "Constitution Saving Throw: DC 20, each creature in a 60-foot Cone. Failure: 52 (8d12) Necrotic damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0619",
@@ -9564,7 +9564,7 @@
       "attackBonus": 11,
       "saveDc": 19,
       "description": "The dracolich casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 19, +11 to hit with spell attacks): At Will: Detect Magic, Ray of Sickness (level 2 version) 1/Day Each: Create Undead (level 8 version), Finger of Death",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0619-dracolich-spellcasting.md"
     },
     {
       "id": "MA-0620",
@@ -9577,7 +9577,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The dracolich moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0620-dracolich-pounce.md"
     },
     {
       "id": "MA-0621",
@@ -9590,7 +9590,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The dracolich uses Spellcasting to cast Ray of Sickness (level 2 version). The dracolich can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0621-dracolich-sickening-ray.md"
     },
     {
       "id": "MA-0622",
@@ -9611,7 +9611,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 19, each creature in a 30-foot Emanation originating from the dracolich. Failure: 11 (2d10) Psychic damage, and the target has the Frightened condition until the end of its next turn. Failure or Success: The dracolich can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0622-dracolich-terrifying-presence.md"
     },
     {
       "id": "MA-0623",
@@ -9626,7 +9626,7 @@
       "damageTypePrimary": "piercing",
       "reach": "10 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 10 ft. Hit: 1d6+4+spell level Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0624",
@@ -9642,7 +9642,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 6 (1d4 + 4) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0625",
@@ -9654,7 +9654,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon turtle makes three attacks: one with its bite and two with its claws. It can make one tail attack in place of its two claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0626",
@@ -9670,7 +9670,7 @@
       "damageTypePrimary": "piercing",
       "reach": "15 ft.",
       "description": "Melee Weapon Attack: +13 to hit, reach 15 ft., one target. Hit: 26 (3d12 + 7) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0627",
@@ -9686,7 +9686,7 @@
       "damageTypePrimary": "slashing",
       "reach": "10 ft.",
       "description": "Melee Weapon Attack: +13 to hit, reach 10 ft., one target. Hit: 16 (2d8 + 7) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0628",
@@ -9708,7 +9708,7 @@
         "prone"
       ],
       "description": "Melee Weapon Attack: +13 to hit, reach 15 ft., one target. Hit: 26 (3d12 + 7) bludgeoning damage. If the target is a creature, it must succeed on a DC 20 Strength saving throw or be pushed up to 10 feet away from the dragon turtle and knocked prone.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0629",
@@ -9723,7 +9723,7 @@
       "saveType": "Constitution",
       "saveEffect": "Failure: 52 (15d6) fire damage. Success: half as much damage.",
       "description": "The dragon turtle exhales scalding steam in a 60-foot cone. Each creature in that area must make a DC 18 Constitution saving throw, taking 52 (15d6) fire damage on a failed save, or half as much damage on a successful one. Being underwater doesn't grant resistance against this damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0629-dragon-turtle-steam-breath.md"
     },
     {
       "id": "MA-0630",
@@ -9735,7 +9735,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dretch makes two attacks: one with its bite and one with its claws.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0631",
@@ -9751,7 +9751,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 3 (1d6) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0632",
@@ -9767,7 +9767,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 5 (2d4) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0633",
@@ -9785,7 +9785,7 @@
         "poisoned"
       ],
       "description": "A 10-foot radius of disgusting green gas extends out from the dretch. The gas spreads around corners, and its area is lightly obscured. It lasts for 1 minute or until a strong wind disperses it. Any creature that starts its turn in that area must succeed on a DC 11 Constitution saving throw or be poisoned until the start of its next turn. While poisoned in this way, the target can take either an action or a bonus action on its turn, not both, and can't take reactions.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0633-dretch-fetid-cloud.md"
     },
     {
       "id": "MA-0634",
@@ -9797,7 +9797,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The drider makes three attacks, either with its longsword or its longbow. It can replace one of those attacks with a bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0635",
@@ -9815,7 +9815,7 @@
       "damageTypeSecondary": "poison",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one creature. Hit: 2 (1d4) piercing damage plus 9 (2d8) poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0636",
@@ -9831,7 +9831,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) slashing damage, or 8 (1d10 + 3) slashing damage if used with two hands.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0636-drider-longsword.md"
     },
     {
       "id": "MA-0637",
@@ -9848,7 +9848,7 @@
       "damageDiceSecondary": "1d8",
       "damageTypeSecondary": "poison",
       "description": "Ranged Weapon Attack: +6 to hit, range 150/600 ft., one target. Hit: 7 (1d8 + 3) piercing damage plus 4 (1d8) poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0638",
@@ -9864,7 +9864,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0639",
@@ -9886,7 +9886,7 @@
         "unconscious"
       ],
       "description": "Ranged Weapon Attack: +4 to hit, range 30/120 ft., one target. Hit: 5 (1d6 + 2) piercing damage, and the target must succeed on a DC 13 Constitution saving throw or be poisoned for 1 hour. If the saving throw fails by 5 or more, the target is also unconscious while poisoned in this way. The target wakes up if it takes damage or if another creature takes an action to shake it awake.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-0639-drow-hand-crossbow.md"
     },
     {
       "id": "MA-0640",
