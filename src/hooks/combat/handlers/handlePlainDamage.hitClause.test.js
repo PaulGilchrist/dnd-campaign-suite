@@ -2815,3 +2815,89 @@ describe('MA-0550 Dao Earthen Maul prone rider inert', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const DIRE_WOLF = monsters.find(m => m.index === 'dire-wolf');
+const DIRE_WOLF_BITE_ACTION = DIRE_WOLF.actions.find(a => a.name === 'Bite');
+
+describe('MA-0600 Dire Wolf Bite prone hit-clause', () => {
+    const deps = {
+        characterName: 'Dire Wolf 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Dire Wolf 1', computedStats: { armorClass: 14 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 991, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'monster', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0600 data-lock: authors hit_conditions:["prone"] with no escape_dc on the Bite row', () => {
+        expect(DIRE_WOLF_BITE_ACTION.attack_bonus).toBe(5);
+        expect(DIRE_WOLF_BITE_ACTION.damage_dice_primary).toBe('1d10 + 3');
+        expect(DIRE_WOLF_BITE_ACTION.damage_type_primary).toBe('Piercing');
+        expect(DIRE_WOLF_BITE_ACTION.hit_conditions).toEqual(['prone']);
+        expect(DIRE_WOLF_BITE_ACTION.escape_dc).toBeUndefined();
+        expect(DIRE_WOLF_BITE_ACTION.description).toContain('Prone');
+    });
+
+    it('builds a prone-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(DIRE_WOLF_BITE_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Bite',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + attacker-source meta + condition log on a resolved Bite hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d10 + 3', total: 8, rolls: [5], modifier: 3, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Dire Wolf 1',
+            hitClause: buildHitConditionClause(DIRE_WOLF_BITE_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Dire Wolf 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Prone',
+            reason: 'Bite (escape DC —)',
+        }));
+    });
+
+    it('skips the prone clause for Huge or larger targets', async () => {
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Hill Giant 1', type: 'monster', size: 'Huge', ac: 13, currentHp: 999, maxHp: 999 }],
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d10 + 3', total: 8, rolls: [5], modifier: 3, context: {
+            targetName: 'Hill Giant 1',
+            damageType: 'Piercing',
+            attackerName: 'Dire Wolf 1',
+            hitClause: buildHitConditionClause(DIRE_WOLF_BITE_ACTION),
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Hill Giant 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
