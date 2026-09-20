@@ -18469,7 +18469,10 @@
           "min_value": 5
         },
         "save_type": "Constitution",
-        "save_effect": "Failure: 52 (15d6) fire damage. Success: half as much damage."
+        "save_effect": "Failure: 52 (15d6) fire damage. Success: half as much damage.",
+        "range": "60-foot Cone",
+        "damage_dice_primary": "15d6",
+        "damage_type_primary": "Fire"
       }
     ],
     "traits": [

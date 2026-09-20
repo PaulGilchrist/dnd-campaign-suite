@@ -9723,7 +9723,7 @@
       "saveType": "Constitution",
       "saveEffect": "Failure: 52 (15d6) fire damage. Success: half as much damage.",
       "description": "The dragon turtle exhales scalding steam in a 60-foot cone. Each creature in that area must make a DC 18 Constitution saving throw, taking 52 (15d6) fire damage on a failed save, or half as much damage on a successful one. Being underwater doesn't grant resistance against this damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0629-dragon-turtle-steam-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0630",
