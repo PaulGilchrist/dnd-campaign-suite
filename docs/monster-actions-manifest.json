@@ -9831,7 +9831,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) slashing damage, or 8 (1d10 + 3) slashing damage if used with two hands.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0636-drider-longsword.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0637",
