@@ -9191,7 +9191,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The demilich targets any number of creatures it can see within 30 feet of it. No target can regain hit points until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0596-demilich-lair-nohealing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0597",

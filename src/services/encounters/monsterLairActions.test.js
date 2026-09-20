@@ -4060,10 +4060,10 @@ describe('MA-0594 demilich lair tomb trembles save row data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(tremble, null, ['prone']);
   });
 
-  it('[1] fixed by MA-0595 (zone dict); [2] raw-string sibling (MA-0596) stays inert — NOT this ticket', () => {
+  it('[1]/[2] siblings fixed by MA-0595/MA-0596 (zone dicts) — NOT this ticket', () => {
     expect(typeof demilich.lair_actions[1]).toBe('object');
-    expect(typeof demilich.lair_actions[2]).toBe('string');
-    expect(isLairRowClickable(demilich.lair_actions[2])).toBe(false);
+    expect(typeof demilich.lair_actions[2]).toBe('object');
+    expect(isLairRowClickable(demilich.lair_actions[2])).toBe(true);
   });
 
   it('scope guard: MA-0584 death tyrant walls twin untouched', () => {
@@ -4155,8 +4155,94 @@ describe('MA-0595 demilich lair antimagic shroud zone row data lock', () => {
     expect(handleZone).toHaveBeenCalledWith(shroud);
   });
 
-  it('[2] raw-string no-healing sibling stays inert — MA-0596, NOT this ticket', () => {
-    expect(typeof demilich.lair_actions[2]).toBe('string');
-    expect(isLairRowClickable(demilich.lair_actions[2])).toBe(false);
+  it('[2] fixed by MA-0596 (zone dict) — no longer the raw-string twin', () => {
+    expect(typeof demilich.lair_actions[2]).toBe('object');
+    expect(isLairRowClickable(demilich.lair_actions[2])).toBe(true);
+  });
+});
+
+// MA-0596: Demilich lair_actions[2] was a RAW STRING (MA-0582/MA-0595 twin
+// fingerprint — typeof guard monsterLairActions.js:26) rendering a bare inert
+// span: zero .mc-dice-link-lair chip, zero popup, zero log delta (live repro
+// 2026-09-20). Data-only fix mirroring the VERIFIED MA-0595 zone byte-shape
+// (chip → zoneOnly area picker, NO save roll): the te `no_healing` is
+// PRE-REGISTERED (targetEffectDefinitions.js — group 'Defensive', fields
+// ['source']) with a LIVE consumer chain (healingBlock.js
+// isHealingBlocked/getHealingBlockEffect ← applyHealing.js + healingRoll.js
+// refuse-and-log), so NO new te registration is needed — armZoneTargets
+// passes zone.effect_key unfiltered into registerTargetEffect, stamping
+// source = caster name per the fields whitelist. Multi-target RAW ("any
+// number it can see within 30 feet") rides the picker's multi-select;
+// initiative-count-20 expiry stays zero-consumer advisory (§70) carried
+// honestly in the zone advisory.
+describe('MA-0596 demilich lair stifling mortality no-healing zone row data lock', () => {
+  const demilich = monstersData.find(m => m.index === 'demilich');
+  const mortality = demilich.lair_actions[2];
+
+  it('[2] is now a structured clickable ZONE row named Stifling Mortality (was raw string)', () => {
+    expect(typeof mortality).toBe('object');
+    expect(mortality.name).toBe('Stifling Mortality');
+    expect(isLairRowClickable(mortality)).toBe(true);
+    expect(lairRowAffordance(mortality)).toBe('zone');
+  });
+
+  it('[2] description is the original RAW clause byte-identical', () => {
+    expect(mortality.description).toBe('The demilich targets any number of creatures it can see within 30 feet of it. No target can regain hit points until initiative count 20 on the next round.');
+  });
+
+  it('[2] zone: save-less, no_save, reuses the EXISTING no_healing te (no new registration)', () => {
+    expect(mortality.save_dc).toBeUndefined();
+    expect(mortality.save_type).toBeUndefined();
+    expect(mortality.damage_dice_primary).toBeUndefined();
+    expect(mortality.zone.radius_ft).toBe(30);
+    expect(mortality.zone.no_save).toBe(true);
+    expect(mortality.zone.noun).toBe('creatures');
+    expect(mortality.zone.effect_key).toBe('no_healing');
+    expect(mortality.duration).toBe('until initiative count 20 next round (advisory)');
+  });
+
+  it('[2] zone advisory honestly carries multi-target picker + live-consumer + init-20 residuals', () => {
+    expect(mortality.zone.advisory).toMatch(/any number of creatures within 30 feet/i);
+    expect(mortality.zone.advisory).toMatch(/multi-select/i);
+    expect(mortality.zone.advisory).toMatch(/selection advisory/i);
+    expect(mortality.zone.advisory).toMatch(/no_healing te is pre-registered/i);
+    expect(mortality.zone.advisory).toMatch(/GM-enforced/i);
+    expect(mortality.zone.advisory).toMatch(/initiative count 20 on the next round — GM-enforced/i);
+  });
+
+  it('no_healing te stays registered single-key (Defensive group, fields whitelist [source]) — consumer reuse, not duplication', async () => {
+    const { getEffectDefinition, TARGET_EFFECT_DEFINITIONS } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('no_healing');
+    expect(def).toBeTruthy();
+    expect(def.group).toBe('Defensive');
+    expect(def.fields).toEqual(['source']);
+    const keys = TARGET_EFFECT_DEFINITIONS.map((d) => d.effect);
+    expect(keys.filter((k) => k === 'no_healing')).toHaveLength(1);
+    expect(keys).not.toContain('lair_no_healing');
+    expect(keys).not.toContain('lair_stifling_mortality');
+  });
+
+  it('[2] zone row routes through handleZone, zero save/attack/damage handlers', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: mortality,
+      monsterName: 'Demilich 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(mortality);
+  });
+
+  it('[0]/[1] fixed siblings untouched: named save chip + Antimagic Shroud zone', () => {
+    expect(demilich.lair_actions[0].name).toBe('Tomb Trembles');
+    expect(demilich.lair_actions[0].save_dc).toBe(19);
+    expect(lairRowAffordance(demilich.lair_actions[0])).toBe('save');
+    expect(demilich.lair_actions[1].name).toBe('Antimagic Shroud');
+    expect(lairRowAffordance(demilich.lair_actions[1])).toBe('zone');
   });
 });
