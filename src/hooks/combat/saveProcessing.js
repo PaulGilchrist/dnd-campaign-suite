@@ -464,9 +464,58 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
             await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
         }
     } else {
-        applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget: targetName || characterName, attackerName, campaignName });
+        applyDamagelessSaveConditions({ context, saveDc, saveSuccess, saveTotal, applyTarget: targetName || characterName, attackerName, campaignName });
     }
     await armRepeatSaveClause({ saveSuccess, context, campaignName, attackerName, applyTarget: targetName || characterName, saveDc, saveType });
+}
+
+// MA-0639: failed-save fail-margin rider (Drow Hand Crossbow — "If the
+// saving throw fails by 5 or more, the target is also unconscious while
+// poisoned in this way"). Armed ONLY by the structured context.saveMargin
+// forwarded from the row's save_margin key (parser: parseSaveMarginClause,
+// playbook §5 trio) — byte-inert for every clauseless row. The margin rides
+// saveTotal (all bane/bless/cosmic-omen adjustments already folded), so
+// margin = saveDc − saveTotal. Grants the canonical condition (no new te
+// key — unconscious is a canonical activeConditions entry, same machinery as
+// the poisoned grant above) with source meta + its own `condition applied`
+// log. ONE addExpiration clock (CLA-334 hours×600 = 1 hour, matching the
+// save_effect "for 1 hour" the rider is bound to — "unconscious WHILE
+// poisoned") carrying BOTH condition legs in a single merged write (§5 —
+// never two racing clocks; the clock is armed only on save_margin rows, so
+// every legacy condition grant stays byte-identical). Waking early on damage
+// / a shake-awake action has no consumer app-wide (§70 "shake awake"
+// advisory residual — GM-enforced, documented not built).
+function applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attackerName, campaignName }) {
+    const margin = context?.saveMargin;
+    if (!margin || saveDc == null || !Number.isFinite(Number(saveTotal))) return;
+    if ((saveDc - saveTotal) < margin.failsBy) return;
+    const condition = margin.also;
+    const current = getRuntimeValue(applyTarget, 'activeConditions') || [];
+    if (!current.some(c => String(c).toLowerCase() === condition)) {
+        setRuntimeValue(applyTarget, 'activeConditions', [...current, condition], campaignName);
+    }
+    const meta = getRuntimeValue(applyTarget, 'activeConditionMeta') || {};
+    setRuntimeValue(applyTarget, 'activeConditionMeta', { ...meta, [condition]: { ...(meta[condition] || {}), source: attackerName } }, campaignName);
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds: 600,
+        effects: [
+            { type: 'condition', condition: 'poisoned' },
+            { type: 'condition', condition },
+        ],
+    });
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: applyTarget,
+        condition: condition.charAt(0).toUpperCase() + condition.slice(1),
+        sourceName: attackerName,
+        sourceAbility: context?.actionName || context?.name,
+        description: `${applyTarget} failed the save by ${saveDc - saveTotal} (DC ${saveDc}, total ${saveTotal}) — also unconscious while poisoned (1 hour; waking on damage/shake is GM-enforced).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:save-margin-rider]', e); });
 }
 
 // MA-0030: successful-save immunity grant. Writes a registry te (e.g.
@@ -802,16 +851,20 @@ async function grantDreamPlaneBanishment({ context, campaignName, attackerName, 
 }
 
 // MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.
-function applyDamagelessSaveConditions({ context, saveDc, saveSuccess, applyTarget, attackerName, campaignName }) {
+function applyDamagelessSaveConditions({ context, saveDc, saveSuccess, saveTotal, applyTarget, attackerName, campaignName }) {
     if (saveDc == null || saveSuccess !== false) return;
     const saveConditions = context?.saveConditions || [];
     if (saveConditions.length <= 0) return;
     const targetChar = (context._characters || []).find(c => c.name === applyTarget);
-    applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    const applied = applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    // MA-0639: fail-by-N margin rider lands ONLY when the base condition
+    // actually landed (RAW: "unconscious WHILE poisoned" — immunity to the
+    // base save_effect blocks the rider too).
+    if (applied) applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attackerName, campaignName });
 }
 
 function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName }) {
-    if (saveConditions.length <= 0 || saveSuccess) return;
+    if (saveConditions.length <= 0 || saveSuccess) return false;
     const targetStats = targetChar?.computedStats || targetChar;
     const isImmune = targetStats && playerIsImmuneToCondition({
         conditionKey: saveConditions[0],
@@ -819,7 +872,7 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
         getRuntimeValue,
         campaignName,
     });
-    if (isImmune) return;
+    if (isImmune) return false;
     const currentConditions = getRuntimeValue(applyTarget, 'activeConditions') || [];
     const newConditions = [...currentConditions];
     for (const cond of saveConditions) {
@@ -839,6 +892,7 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
         sourceAbility: context?.actionName || context.name,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[saveProcessing:log-error]", e); });
+    return true;
 }
 
 // MA-0019 provenance: stamp the inflicting creature into condition meta so

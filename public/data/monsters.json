@@ -18829,7 +18829,11 @@
         "damage_dice_primary": "1d6 + 2",
         "damage_type_primary": "piercing",
         "save_type": "Constitution",
-        "save_effect": "Failure: be poisoned for 1 hour."
+        "save_effect": "Failure: be poisoned for 1 hour.",
+        "save_margin": {
+          "fails_by": 5,
+          "also": "unconscious"
+        }
       }
     ],
     "traits": [

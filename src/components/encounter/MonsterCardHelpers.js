@@ -274,6 +274,23 @@ export function parseInfernalWoundClause(action) {
   };
 }
 
+// MA-0639: authored fail-margin rider key (Drow Hand Crossbow — "If the
+// saving throw fails by 5 or more, the target is also unconscious while
+// poisoned in this way"). The margin clause lives ONLY in description prose,
+// so extractConditionsFromSaveEffect (save_effect-scoped) can never see it.
+// STRUCTURED-KEY-ONLY arm (MA-0501/MA-0367 precedent, playbook §5) — never
+// prose-parsed; null for every row without the save_margin dict, so no other
+// monster's wording can double-arm. { fails_by, also } forwards on the save
+// options/context to the failed-save consumer in saveProcessing.
+export function parseSaveMarginClause(action) {
+  const margin = action?.save_margin;
+  if (!margin || typeof margin !== 'object') return null;
+  const failsBy = Number(margin.fails_by);
+  const also = typeof margin.also === 'string' ? margin.also.toLowerCase() : null;
+  if (!Number.isFinite(failsBy) || !also) return null;
+  return { failsBy, also };
+}
+
 export function extractConditionsFromSaveEffect(saveEffect) {
   if (!saveEffect || typeof saveEffect !== 'string') return [];
   const found = [];
