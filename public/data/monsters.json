@@ -18117,14 +18117,23 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 1",
+        "uses": 1,
+        "description": "The dracolich takes 1 legendary action, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The dracolich regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Pounce",
-        "description": "The dracolich moves up to half its Speed, and it makes one Rend attack.",
-        "uses": 1
+        "delegates_to": "Rend",
+        "description": "The dracolich moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       },
       {
         "name": "Sickening Ray",
-        "description": "The dracolich uses Spellcasting to cast Ray of Sickness (level 2 version). The dracolich can't take this action again until the start of its next turn.",
-        "uses": 1
+        "attack_bonus": 11,
+        "spell_attack_bonus": 11,
+        "range": "60 feet",
+        "damage_dice_primary": "3d8",
+        "damage_type_primary": "Poison",
+        "description": "The dracolich uses Spellcasting to cast <em>Ray of Sickness</em> (level 2 version): Ranged Spell Attack: +11 to hit. Hit: 3d8 Poison damage (the granted-Poisoned rider has no monster-spell consumer — GM-enforced, CLA-325). The dracolich can't take this action again until the start of its next turn."
       },
       {
         "name": "Terrifying Presence",

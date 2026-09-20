@@ -9577,7 +9577,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The dracolich moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0620-dracolich-pounce.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0621",
