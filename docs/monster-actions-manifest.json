@@ -8957,7 +8957,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The death tyrant uses Eye Rays.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0581-death-tyrant-glare.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0582",
