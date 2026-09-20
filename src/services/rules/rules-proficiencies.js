@@ -1,6 +1,6 @@
 import { is2024 } from './rules-helpers.js';
 import { getSubModules } from './rules-core.js';
-import { loadBackgroundData } from '../ui/dataLoader.js';
+import { getCachedBackgroundData } from '../ui/dataLoader.js';
 
 // Parse "Choose one kind of Artisan's Tools" → { choose, from } for a background tool proficiency.
 function parseChooseToolProficiency(toolProficiencies) {
@@ -74,7 +74,7 @@ function getProficiencies2024(playerStats, skill, pu) {
         const bgName = playerStats.background;
         if (bgName) {
             try {
-                const backgrounds = loadBackgroundData('2024');
+                const backgrounds = getCachedBackgroundData('2024');
                 if (backgrounds) {
                     const bg = backgrounds.find(b => b.name === bgName || b.index === bgName.toLowerCase());
                     if (bg && bg.tool_proficiencies && !bg.tool_proficiencies.startsWith('Choose')) {
@@ -95,7 +95,7 @@ function getProficiencies2024(playerStats, skill, pu) {
         const bgName = playerStats.background;
         if (bgName) {
             try {
-                const backgrounds = loadBackgroundData('2024');
+                const backgrounds = getCachedBackgroundData('2024');
                 if (backgrounds) {
                     const bg = backgrounds.find(b => b.name === bgName || b.index === bgName.toLowerCase());
                     if (bg && bg.tool_proficiencies && bg.tool_proficiencies.startsWith('Choose')) {

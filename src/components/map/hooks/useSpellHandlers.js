@@ -42,22 +42,9 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
         const gx = Math.floor(grid.gridX);
         const gy = Math.floor(grid.gridY);
 
-        if (spellMode) {
-            e.preventDefault();
-            if (spellMode === OverlayShape.SPHERE || spellMode === OverlayShape.CYLINDER) {
-                addOverlay(createOverlay(spellMode, gx, gy, 0, shapeParams));
-            } else {
-                setSpellDraft({
-                    startGridX: gx,
-                    startGridY: gy,
-                    startScreenX: e.clientX,
-                    startScreenY: e.clientY,
-                    angle: 0,
-                });
-            }
-            return;
-        }
-
+        // Manipulate an existing overlay if the click lands on one. This runs
+        // while a placement shape is active too, so clicking inside an existing
+        // overlay moves/rotates it instead of creating a new one.
         for (let i = overlays.length - 1; i >= 0; i--) {
             const overlay = overlays[i];
             if (!hitTestOverlay(overlay, gx, gy)) continue;
@@ -86,6 +73,22 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
                 });
             }
             return;
+        }
+
+        // No overlay under the cursor: place a new one (placement mode only).
+        if (spellMode) {
+            e.preventDefault();
+            if (spellMode === OverlayShape.SPHERE || spellMode === OverlayShape.CYLINDER) {
+                addOverlay(createOverlay(spellMode, gx, gy, 0, shapeParams));
+            } else {
+                setSpellDraft({
+                    startGridX: gx,
+                    startGridY: gy,
+                    startScreenX: e.clientX,
+                    startScreenY: e.clientY,
+                    angle: 0,
+                });
+            }
         }
     }, [rulerMode, getGridFromEvent, clientToSVG, addOverlay, shapeParams, svgRef]);
 

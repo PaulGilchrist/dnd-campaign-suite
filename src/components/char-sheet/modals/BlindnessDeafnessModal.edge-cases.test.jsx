@@ -103,6 +103,7 @@ vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
 }));
 
 vi.mock('../../../services/automation/handlers/spells/blindnessDeafnessHandler.js', () => ({
+    handle: vi.fn(),
     getEffectOptions: vi.fn(() => [
         { key: 'blinded', label: 'Blinded', condition: 'blinded' },
         { key: 'deafened', label: 'Deafened', condition: 'deafened' },
