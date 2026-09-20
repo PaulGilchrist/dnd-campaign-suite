@@ -244,3 +244,60 @@ describe('MA-0590 shape-detection twins stay byte-identical', () => {
     expect(aoeProps.current).toBeNull();
   });
 });
+
+describe('MA-0603 Dire Worg Dreadful Howl: 30-ft each-creature AoE routes to the area picker', () => {
+  const direWorgRow = () => monstersData.find(m => m.index === 'dire-worg').actions.find(a => a.name === 'Dreadful Howl');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    aoeProps.current = null;
+    ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: CREATURES };
+  });
+
+  it('disk ground truth: range authored "30-foot Emanation", DC 16 WIS, 8d8 Psychic, Recharge 5-6, dc_success absent (default half)', () => {
+    const row = direWorgRow();
+    expect(row.range).toBe('30-foot Emanation');
+    expect(row.save_dc).toBe(16);
+    expect(row.save_type).toBe('Wisdom');
+    expect(row.damage_dice_primary).toBe('8d8');
+    expect(row.damage_type_primary).toBe('Psychic');
+    expect(row.dc_success).toBeUndefined();
+    expect(row.recharge).toBe('5-6');
+    expect(row.save_effect).toBe("The target has the Frightened condition until the start of the worg's next turn.");
+    expect(row.description).toMatch(/each creature within 30 feet/i);
+    expect(row.description).not.toMatch(/\bcone\b|\bline\b|\bcylinder\b/i);
+  });
+
+  it('fresh click opens the 30-ft Radius picker with half-on-save + Frightened fail grant, spends recharge, never the single-target save', async () => {
+    renderMonster('Dire Worg', [direWorgRow()], 'Dire Worg 1');
+    fireEvent.click(rowLink('Dreadful Howl'));
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    const props = aoeProps.current;
+    expect(props.titleOverride).toBe('30-ft Radius (GM positions tokens; selection advisory)');
+    expect(props.range).toBe(30);
+    expect(props.rangeGateFt).toBe(30);
+    expect(props.saveDc).toBe(16);
+    expect(props.saveType).toBe('Wisdom');
+    expect(props.dcSuccess).toBe('half');
+    expect(props.damage).toBe('8d8');
+    expect(props.damageType).toBe('Psychic');
+    expect(props.saveConditions).toEqual(['frightened']);
+    expect(props.conditionDurationNote).toBe("until the start of the worg's next turn (GM-enforced)");
+    expect(props.excludeNames).toEqual(['Dire Worg 1']);
+    expect(rollSavingThrow).not.toHaveBeenCalled();
+    await waitFor(() => expect(runtime.store['Dire Worg 1.monsterRecharge']).toBeTruthy());
+    expect(runtime.store['Dire Worg 1.monsterRecharge']).toEqual({ 'Dreadful Howl': { recharged: false, threshold: 5 } });
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
+    expect(spend.description).toMatch(/Dreadful Howl.*Recharge 5-6; unavailable until a d6 5\+/);
+  });
+
+  it('Bite attack twin on the same monster stays picker-inert (emanation parse is save-row-only)', async () => {
+    const bite = monstersData.find(m => m.index === 'dire-worg').actions.find(a => a.name === 'Bite');
+    renderMonster('Dire Worg', [bite], 'Dire Worg 1');
+    fireEvent.click(rowLink('Bite'));
+    await new Promise(r => setTimeout(r, 200));
+    expect(aoeProps.current).toBeNull();
+    expect(rollSavingThrow).not.toHaveBeenCalled();
+  });
+});

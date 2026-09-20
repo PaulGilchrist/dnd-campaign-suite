@@ -17613,7 +17613,7 @@
         "description": "Wisdom Saving Throw: DC 16, each creature within 30 feet that isn't a worg. <strong>Failure:</strong> 36 (8d8) Psychic damage, and the target has the <strong>Frightened</strong> condition until the start of the worg's next turn. <strong>Success:</strong> Half damage only.",
         "save_dc": 16,
         "save_type": "Wisdom",
-        "range": "30 feet",
+        "range": "30-foot Emanation",
         "save_effect": "The target has the Frightened condition until the start of the worg's next turn.",
         "recharge": "5-6",
         "damage_dice_primary": "8d8",

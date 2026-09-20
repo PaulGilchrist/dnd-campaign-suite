@@ -9309,7 +9309,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 16, each creature within 30 feet that isn't a worg. Failure: 36 (8d8) Psychic damage, and the target has the Frightened condition until the start of the worg's next turn. Success: Half damage only.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0603-dire-worg-dreadful-howl.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0604",
