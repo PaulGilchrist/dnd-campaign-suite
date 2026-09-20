@@ -18146,7 +18146,8 @@
         "range": "30-foot Emanation",
         "save_effect": "The target has the Frightened condition until the end of its next turn.",
         "damage_dice_primary": "2d10",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "dc_success": "none"
       }
     ],
     "lair_actions": "A dracolich lurks in a corrupted version of the lair it had in life. The region containing a dracolich's lair is warped by its presence, creating the following effects:<br/><br/><b>Sapping Mist.</b> The area within 1 mile of the lair is Lightly Obscured by pale fog. Whenever a creature other than the dracolich or one of its allies finishes a Long Rest in that area, it must succeed on a DC 15 Constitution saving throw or gain 1 Exhaustion level.<br/><b>Soul Drain.</b> Creatures within 1 mile of the lair have Disadvantage on Death Saving Throws.<br/><br/>If the dracolich is destroyed or moves its lair elsewhere, these effects end immediately. The effects resume if the dracolich gains a new body (see its Soul Gem trait).<br/><br/>",

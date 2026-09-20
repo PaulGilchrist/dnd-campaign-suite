@@ -9611,7 +9611,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 19, each creature in a 30-foot Emanation originating from the dracolich. Failure: 11 (2d10) Psychic damage, and the target has the Frightened condition until the end of its next turn. Failure or Success: The dracolich can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0622-dracolich-terrifying-presence.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0623",
