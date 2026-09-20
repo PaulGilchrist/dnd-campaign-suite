@@ -9590,7 +9590,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The dracolich uses Spellcasting to cast Ray of Sickness (level 2 version). The dracolich can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0621-dracolich-sickening-ray.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0622",

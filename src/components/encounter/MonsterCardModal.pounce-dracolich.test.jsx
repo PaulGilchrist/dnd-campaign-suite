@@ -147,6 +147,17 @@ describe('MA-0620 monsters.json data: dracolich legendary block header + childre
     expect(row.damage_type_primary).toBe('Poison');
     expect(row.range).toBe('60 feet');
   });
+
+  // MA-0621: RAW level-2 Ray of Sickness poisons on hit (no save). Transport
+  // is authored hit_conditions (§150: buildHitConditionClause reads
+  // action.hit_conditions only; MA-0010/MA-0452 byte-shape twins —
+  // Assassin Shortsword, Bearded Devil Beard).
+  it('MA-0621 Sickening Ray authors hit_conditions ["poisoned"] (MA-0010 hit-clause seam)', () => {
+    const row = sickeningRayRow();
+    expect(row.hit_conditions).toEqual(['poisoned']);
+    expect(row.save_dc).toBeUndefined();
+    expect(row.save_type).toBeUndefined();
+  });
 });
 
 // MA-0620 live seam: header renders "Legendary Action Uses: 1" (counter),
@@ -225,6 +236,9 @@ describe('MA-0620 MonsterCardModal dracolich legendary gated rows', () => {
     expect(options.autoDamageFormula).toBe('3d8');
     expect(options.damageType).toBe('Poison');
     expect(options.isSpellDamage).toBe(true);
+    expect(options.hitClause).not.toBeNull();
+    expect(options.hitClause.conditions).toEqual(['poisoned']);
+    expect(options.hitClause.attackName).toBe('Sickening Ray');
     expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
     errSpy.mockRestore();
   });

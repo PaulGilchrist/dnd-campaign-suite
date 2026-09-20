@@ -18133,7 +18133,10 @@
         "range": "60 feet",
         "damage_dice_primary": "3d8",
         "damage_type_primary": "Poison",
-        "description": "The dracolich uses Spellcasting to cast <em>Ray of Sickness</em> (level 2 version): Ranged Spell Attack: +11 to hit. Hit: 3d8 Poison damage (the granted-Poisoned rider has no monster-spell consumer — GM-enforced, CLA-325). The dracolich can't take this action again until the start of its next turn."
+        "hit_conditions": [
+          "poisoned"
+        ],
+        "description": "The dracolich uses Spellcasting to cast <em>Ray of Sickness</em> (level 2 version): Ranged Spell Attack: +11 to hit. Hit: 3d8 Poison damage, and the target has the <strong>Poisoned</strong> condition until the end of its next turn (MA-0010 hit_conditions seam; end-of-target-turn expiry anchor is GM-enforced, CLA-325). The dracolich can't take this action again until the start of its next turn."
       },
       {
         "name": "Terrifying Presence",
