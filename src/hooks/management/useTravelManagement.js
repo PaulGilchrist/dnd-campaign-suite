@@ -60,21 +60,21 @@ export default function useTravelManagement({
 }) {
   const init = resolveInitialTravelState(initialTravelState);
 
-  const [travelMode, setTravelMode] = useSyncedState(campaignName, 'travel-mode', init.travelMode, campaignName);
-  const [travelPace, setTravelPace] = useSyncedState(campaignName, 'travel-pace', init.travelPace, campaignName);
-  const [destination, setDestination] = useSyncedState(campaignName, 'travel-destination', init.destination, campaignName);
-  const [path, setPath] = useSyncedState(campaignName, 'travel-path', init.path, campaignName);
-  const [pathIndex, setPathIndex] = useSyncedState(campaignName, 'travel-pathIndex', init.pathIndex, campaignName);
-  const [accruedCost, setAccruedCost] = useSyncedState(campaignName, 'travel-accruedCost', init.accruedCost, campaignName);
-  const [dailyBudget, setDailyBudget] = useSyncedState(campaignName, 'travel-dailyBudget', init.dailyBudget, campaignName);
-  const [dayExhausted, setDayExhausted] = useSyncedState(campaignName, 'travel-dayExhausted', init.dayExhausted, campaignName);
-  const [forcedMarchHours, setForcedMarchHours] = useSyncedState(campaignName, 'travel-forcedMarchHours', init.forcedMarchHours, campaignName);
-  const [travelLog, setTravelLog] = useSyncedState(campaignName, 'travel-log', [], campaignName);
-  const [lastMessage, setLastMessage] = useSyncedState(campaignName, 'travel-lastMessage', null, campaignName);
-  const [pendingEvent, setPendingEvent] = useSyncedState(campaignName, 'travel-pendingEvent', null, campaignName);
-  const [eventFrequency, setEventFrequency] = useSyncedState(campaignName, 'travel-eventFrequency', 'normal', campaignName);
-  const [rerollsRemaining, setRerollsRemaining] = useSyncedState(campaignName, 'travel-rerollsRemaining', 3, campaignName);
-  const [horseback, setHorseback] = useSyncedState(campaignName, 'travel-horseback', false, campaignName);
+  const [travelMode, setTravelMode] = useSyncedState('campaign', 'travel-mode', init.travelMode, campaignName);
+  const [travelPace, setTravelPace] = useSyncedState('campaign', 'travel-pace', init.travelPace, campaignName);
+  const [destination, setDestination] = useSyncedState('campaign', 'travel-destination', init.destination, campaignName);
+  const [path, setPath] = useSyncedState('campaign', 'travel-path', init.path, campaignName);
+  const [pathIndex, setPathIndex] = useSyncedState('campaign', 'travel-pathIndex', init.pathIndex, campaignName);
+  const [accruedCost, setAccruedCost] = useSyncedState('campaign', 'travel-accruedCost', init.accruedCost, campaignName);
+  const [dailyBudget, setDailyBudget] = useSyncedState('campaign', 'travel-dailyBudget', init.dailyBudget, campaignName);
+  const [dayExhausted, setDayExhausted] = useSyncedState('campaign', 'travel-dayExhausted', init.dayExhausted, campaignName);
+  const [forcedMarchHours, setForcedMarchHours] = useSyncedState('campaign', 'travel-forcedMarchHours', init.forcedMarchHours, campaignName);
+  const [travelLog, setTravelLog] = useSyncedState('campaign', 'travel-log', [], campaignName);
+  const [lastMessage, setLastMessage] = useSyncedState('campaign', 'travel-lastMessage', null, campaignName);
+  const [pendingEvent, setPendingEvent] = useSyncedState('campaign', 'travel-pendingEvent', null, campaignName);
+  const [eventFrequency, setEventFrequency] = useSyncedState('campaign', 'travel-eventFrequency', 'normal', campaignName);
+  const [rerollsRemaining, setRerollsRemaining] = useSyncedState('campaign', 'travel-rerollsRemaining', 3, campaignName);
+  const [horseback, setHorseback] = useSyncedState('campaign', 'travel-horseback', false, campaignName);
 
   const pathRef = useRef([]);
   const pathIndexRef = useRef(0);

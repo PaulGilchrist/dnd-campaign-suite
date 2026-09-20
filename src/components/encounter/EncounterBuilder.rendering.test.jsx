@@ -329,7 +329,7 @@ const _runtimeState = {
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
   useSyncedState: vi.fn((key, prop, defaultValue) => {
-    if (key === 'test-campaign' && prop === 'encounter-viewingMonster') {
+    if (key === 'campaign' && prop === 'encounter-viewingMonster') {
       return [_runtimeState.viewingMonster, vi.fn((v) => { _runtimeState.viewingMonster = v; })];
     }
     return [defaultValue, vi.fn()];

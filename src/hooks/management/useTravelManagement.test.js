@@ -381,7 +381,7 @@ describe('useTravelManagement', () => {
       expect(result.current.lastMessage).toBe('A new day dawns. Travel budget refreshed.');
     });
 
-    it('transitions from paused to planning, but not from other modes', () => {
+    it('transitions from paused to planning', () => {
       const { result: pausedResult } = renderHook(() => useTravelManagement({
         ...baseArgs,
         campaignName: 'test-campaign-paused',
@@ -389,7 +389,9 @@ describe('useTravelManagement', () => {
       }));
       act(() => { pausedResult.current.forceCamp(); });
       expect(pausedResult.current.travelMode).toBe('planning');
+    });
 
+    it('does not transition from inactive', () => {
       const { result: inactiveResult } = renderHook(() => useTravelManagement({
         ...baseArgs,
         campaignName: 'test-campaign-inactive',

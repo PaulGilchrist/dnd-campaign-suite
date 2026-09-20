@@ -350,7 +350,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
   return {
     getStore: vi.fn(() => store),
     useSyncedState: vi.fn((key, prop, defaultValue) => {
-      if (key === 'test-campaign' && prop === 'encounter-viewingMonster') {
+      if (key === 'campaign' && prop === 'encounter-viewingMonster') {
         return [syncedStateValue, syncedStateSetter];
       }
       return [defaultValue, vi.fn()];

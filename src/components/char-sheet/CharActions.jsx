@@ -269,8 +269,8 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
 
     const mergedModalState = React.useMemo(() => ({ ...modalState, ...spellModalState }), [modalState, spellModalState]);
 
-    const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState(campaignName, 'cleavePending', false, campaignName);
-    const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState(campaignName, 'cleaveSecondTargets', [], campaignName);
+    const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState('campaign', 'cleavePending', false, campaignName);
+    const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState('campaign', 'cleaveSecondTargets', [], campaignName);
 
     // Event listeners extracted to hook
     useCharActionsEventListeners({

@@ -16,7 +16,7 @@ import { getStore, setRuntimeValue, listeners } from './useRuntimeState.js';
  * @returns {[*, function]} - [value, setValue] tuple identical to useState
  *
  * @example
- * const [pendingDamage, setPendingDamage] = useSyncedState(campaignName, 'pipeline-pause', null);
+ * const [pendingDamage, setPendingDamage] = useSyncedState('campaign', 'pipeline-pause', null, campaignName);
  * const [healingPool, setHealingPool] = useSyncedState(characterName, 'healingPool', 0);
  */
 export function useSyncedState(characterKey, propertyName, defaultValue, campaignName) {

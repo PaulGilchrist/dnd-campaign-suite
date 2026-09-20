@@ -18,7 +18,7 @@ export default function useCharActionModals({
         _setModalState(prev => ({ ...prev, ...updates }));
     }, [_setModalState]);
 
-    const [pendingDamage, setPendingDamage] = useSyncedState(campaignName, 'pipeline-pause', null, campaignName);
+    const [pendingDamage, setPendingDamage] = useSyncedState('campaign', 'pipeline-pause', null, campaignName);
     const pipelineRef = useRef(null);
 
     const { resolveAttackDamage, resumeAttackPipeline, proceedWithDamage, handleAttackRiderManeuverUse, handleAttackRiderManeuverSkip, handleAttackRiderOptionSelect } = useAttackDamageResolution({

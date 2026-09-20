@@ -202,7 +202,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
 
   const [pendingEncounterData, setPendingEncounterData] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
-  const [viewingMonster, setViewingMonster] = useSyncedState(campaignName, 'encounter-viewingMonster', null, campaignName);
+  const [viewingMonster, setViewingMonster] = useSyncedState('campaign', 'encounter-viewingMonster', null, campaignName);
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
   const [description, setDescription] = useState('');
