@@ -9081,7 +9081,7 @@
       "reach": "5 ft.",
       "range": "120 ft.",
       "description": "Melee or Ranged Attack Roll: +11, reach 5 ft. or range 120 ft. Hit: 24 (7d6) Necrotic damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0589-demilich-necrotic-burst.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0590",

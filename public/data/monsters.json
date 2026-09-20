@@ -17225,8 +17225,9 @@
         "description": "Melee or Ranged Attack Roll: +11, reach 5 ft. or range 120 ft. <strong>Hit:</strong> 24 (7d6) Necrotic damage.",
         "attack_bonus": 11,
         "reach": "5 ft.",
-        "range": "120 ft.",
+        "range": "5/120",
         "damage_dice_primary": "7d6",
+        "damage_dice_ranged": "7d6",
         "damage_type_primary": "Necrotic"
       },
       {

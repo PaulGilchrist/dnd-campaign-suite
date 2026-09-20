@@ -420,6 +420,40 @@ describe('MA-0539 cyclops rock pure-ranged band lock', () => {
   });
 });
 
+// MA-0589: Demilich Necrotic Burst — dice-identical dual-mode twin of
+// MA-0529 (same seam as Cult Fanatic Dagger). Row was range-band-inert:
+// single-number range "120 ft." + reach made the RAW 120 ft ranged half
+// unreachable (resolveAttackRange reach-first, rangeToFeet band-blind).
+// DATA fix authors the MA-0436 byte-shape: range "5/120" +
+// damage_dice_ranged "7d6" (dice-identical arms per the MA-0529 ratchet).
+describe('MA-0589 demilich necrotic burst dice-identical band lock', () => {
+  it('the Demilich Necrotic Burst disk row authors range "5/120" + damage_dice_ranged "7d6"', () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const demilich = monsters.find((m) => m.name === 'Demilich');
+    const burst = demilich.actions[1];
+    expect(burst.name).toBe('Necrotic Burst');
+    expect(burst.range).toBe('5/120');
+    expect(burst.reach).toBe('5 ft.');
+    expect(burst.attack_bonus).toBe(11);
+    expect(burst.damage_dice_primary).toBe('7d6');
+    expect(burst.damage_dice_ranged).toBe('7d6');
+    expect(burst.damage_type_primary).toBe('Necrotic');
+    expect(burst.description).toContain('reach 5 ft. or range 120 ft.');
+  });
+
+  it('parseRangedBand parses the demilich "5/120" band', () => {
+    expect(parseRangedBand('5/120')).toEqual({ normalFt: 5, longFt: 120 });
+  });
+
+  it('arms the dice-identical chooser on the demilich row (formula === baseFormula, band rides)', () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const burst = monsters.find((m) => m.name === 'Demilich').actions[1];
+    const offer = buildRangedVariantOffer(burst, 'Necrotic Burst');
+    expect(offer).toMatchObject({ formula: '7d6', baseFormula: '7d6', damageType: 'Necrotic', attackName: 'Necrotic Burst', range: '5/120', normalFt: 5, longFt: 120 });
+    expect(offer.label).toBe('Ranged: 7d6 Necrotic?');
+  });
+});
+
 describe('MA-0436 offer forwarding', () => {
   it('forwards rangedVariantOffer to the attack roll context', () => {
     renderBugbear();
