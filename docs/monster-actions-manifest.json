@@ -9564,7 +9564,7 @@
       "attackBonus": 11,
       "saveDc": 19,
       "description": "The dracolich casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 19, +11 to hit with spell attacks): At Will: Detect Magic, Ray of Sickness (level 2 version) 1/Day Each: Create Undead (level 8 version), Finger of Death",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0619-dracolich-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0620",

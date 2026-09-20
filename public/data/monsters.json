@@ -18105,10 +18105,12 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The dracolich casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 19, +11 to hit with spell attacks):\n<strong>At Will:</strong> Detect Magic, Ray of Sickness (level 2 version)\n<strong>1/Day Each:</strong> Create Undead (level 8 version), Finger of Death",
+        "description": "The dracolich casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 19, +11 to hit with spell attacks):\n<strong>At Will:</strong> <strong>Detect Magic</strong>, <strong>Ray of Sickness</strong> (level 2 version)\n<strong>1/Day Each:</strong> <strong>Create Undead</strong> (level 8 version), <strong>Finger of Death</strong>",
         "spell_save_dc": 19,
         "spell_attack_bonus": 11,
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "save_dc": 19,
+        "save_type": "Charisma"
       }
     ],
     "bonus_actions": [],
