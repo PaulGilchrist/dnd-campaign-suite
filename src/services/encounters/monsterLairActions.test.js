@@ -4060,10 +4060,9 @@ describe('MA-0594 demilich lair tomb trembles save row data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(tremble, null, ['prone']);
   });
 
-  it('[1]/[2] raw-string siblings (MA-0595/0596) stay inert — NOT this ticket', () => {
-    expect(typeof demilich.lair_actions[1]).toBe('string');
+  it('[1] fixed by MA-0595 (zone dict); [2] raw-string sibling (MA-0596) stays inert — NOT this ticket', () => {
+    expect(typeof demilich.lair_actions[1]).toBe('object');
     expect(typeof demilich.lair_actions[2]).toBe('string');
-    expect(isLairRowClickable(demilich.lair_actions[1])).toBe(false);
     expect(isLairRowClickable(demilich.lair_actions[2])).toBe(false);
   });
 
@@ -4073,5 +4072,91 @@ describe('MA-0594 demilich lair tomb trembles save row data lock', () => {
     expect(tyrant.lair_actions[1].save_dc).toBe(17);
     expect(tyrant.lair_actions[1].dc_success).toBe('none');
     expect(extractConditionsFromSaveEffect(tyrant.lair_actions[1].save_effect)).toEqual(['grappled']);
+  });
+});
+
+// MA-0595: Demilich lair_actions[1] was a RAW STRING (MA-0582 twin
+// fingerprint — typeof guard monsterLairActions.js:26) rendering a bare inert
+// span: zero .mc-dice-link-lair chip, zero popup, zero log delta (live repro
+// 2026-09-20). Data-only fix mirroring the VERIFIED MA-0582/MA-0378 zone
+// byte-shape (chip → zoneOnly area picker, NO save roll): instead of
+// registering a NEW dead Lair-group te (Option B, §69 smell), the row REUSES
+// the existing PC te `antimagic_field` (targetEffectDefinitions.js — group
+// 'Spells', fields ['source']): zoneTeForAction passes effect_key
+// unfiltered and registerTargetEffect does no group check, so the zone picker
+// arms the SAME te the live consumers already read —
+// contextBuilder-sync.js:726 blocks non-weapon attacks when attacker OR
+// target carries it, ConditionEffectBadges badges it,
+// spellCastService/execution/index.js checkAntimagicField blocks PC spells,
+// restRules-shortRest.js:280 + useInitiativeEffects INITIATIVE_CLEARED keys
+// clean it up. Attached-movement ("moving with it") and initiative-20
+// expiry remain zero-consumer advisory residuals (§70) carried honestly in
+// the zone advisory.
+describe('MA-0595 demilich lair antimagic shroud zone row data lock', () => {
+  const demilich = monstersData.find(m => m.index === 'demilich');
+  const shroud = demilich.lair_actions[1];
+
+  it('[1] is now a structured clickable ZONE row named Antimagic Shroud (was raw string)', () => {
+    expect(typeof shroud).toBe('object');
+    expect(shroud.name).toBe('Antimagic Shroud');
+    expect(isLairRowClickable(shroud)).toBe(true);
+    expect(lairRowAffordance(shroud)).toBe('zone');
+  });
+
+  it('[1] description is the original RAW clause byte-identical', () => {
+    expect(shroud.description).toBe('The demilich targets one creature it can see within 60 feet of it. An antimagic field fills the space of the target, moving with it until initiative count 20 on the next round.');
+  });
+
+  it('[1] zone: save-less, no_save, reuses the EXISTING antimagic_field te (no new registration)', () => {
+    expect(shroud.save_dc).toBeUndefined();
+    expect(shroud.save_type).toBeUndefined();
+    expect(shroud.damage_dice_primary).toBeUndefined();
+    expect(shroud.zone.radius_ft).toBe(5);
+    expect(shroud.zone.no_save).toBe(true);
+    expect(shroud.zone.noun).toBe('antimagic field');
+    expect(shroud.zone.effect_key).toBe('antimagic_field');
+    expect(shroud.duration).toBe('until initiative count 20 next round (advisory)');
+  });
+
+  it('[1] zone advisory honestly carries moving-with-it + init-20 + single-target picker residuals', () => {
+    expect(shroud.zone.advisory).toMatch(/moves with the target/i);
+    expect(shroud.zone.advisory).toMatch(/no grid-token-move consumer/i);
+    expect(shroud.zone.advisory).toMatch(/GM-enforced/i);
+    expect(shroud.zone.advisory).toMatch(/initiative count 20 on the next round — GM-enforced/i);
+    expect(shroud.zone.advisory).toMatch(/one creature within 60 feet/i);
+    expect(shroud.zone.advisory).toMatch(/attacker-or-target/i);
+  });
+
+  it('antimagic_field te stays registered single-key (Spells group, fields whitelist [source]) — consumer reuse, not duplication', async () => {
+    const { getEffectDefinition, TARGET_EFFECT_DEFINITIONS } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('antimagic_field');
+    expect(def).toBeTruthy();
+    expect(def.group).toBe('Spells');
+    expect(def.fields).toEqual(['source']);
+    const keys = TARGET_EFFECT_DEFINITIONS.map((d) => d.effect);
+    expect(keys.filter((k) => k === 'antimagic_field')).toHaveLength(1);
+    expect(keys).not.toContain('lair_antimagic_field');
+    expect(keys).not.toContain('lair_antimagic_shroud');
+  });
+
+  it('[1] zone row routes through handleZone, zero save/attack/damage handlers', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: shroud,
+      monsterName: 'Demilich 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(shroud);
+  });
+
+  it('[2] raw-string no-healing sibling stays inert — MA-0596, NOT this ticket', () => {
+    expect(typeof demilich.lair_actions[2]).toBe('string');
+    expect(isLairRowClickable(demilich.lair_actions[2])).toBe(false);
   });
 });

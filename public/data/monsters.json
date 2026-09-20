@@ -17280,7 +17280,18 @@
         "dc_success": "none",
         "save_effect": "The target is knocked Prone. Applying Prone to every other creature on the tomb floor and the initiative count 20 expiry are GM-enforced (single-target save seam; no initiative-20 lair seam consumer)."
       },
-      "The demilich targets one creature it can see within 60 feet of it. An antimagic field fills the space of the target, moving with it until initiative count 20 on the next round.",
+      {
+        "name": "Antimagic Shroud",
+        "description": "The demilich targets one creature it can see within 60 feet of it. An antimagic field fills the space of the target, moving with it until initiative count 20 on the next round.",
+        "zone": {
+          "radius_ft": 5,
+          "no_save": true,
+          "noun": "antimagic field",
+          "effect_key": "antimagic_field",
+          "advisory": "RAW targets one creature within 60 feet — picker selects the shroud bearer (selection advisory). The field moves with the target — attached movement has no grid-token-move consumer in this engine — GM-enforced. The PC antimagic_field te consumer keys off attacker-or-target, so non-weapon attacks involving the bearer are suppressed. Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam consumer)."
+        },
+        "duration": "until initiative count 20 next round (advisory)"
+      },
       "The demilich targets any number of creatures it can see within 30 feet of it. No target can regain hit points until initiative count 20 on the next round."
     ],
     "book": "Monster Manual",

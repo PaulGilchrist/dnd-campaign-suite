@@ -9179,7 +9179,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The demilich targets one creature it can see within 60 feet of it. An antimagic field fills the space of the target, moving with it until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0595-demilich-lair-antimagic.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0596",
