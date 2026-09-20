@@ -17857,9 +17857,11 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n<strong>At Will:</strong> Detect Evil and Good, Detect Magic\n<strong>2/Day Each:</strong> Create Food and Water (can create wine instead of water), Tongues, Wind Walk\n<strong>1/Day Each:</strong> Creation, Gaseous Form, Invisibility, Major Image, Plane Shift",
+        "description": "The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n<strong>At Will:</strong> <strong>Detect Evil and Good</strong>, <strong>Detect Magic</strong>\n<strong>2/Day Each:</strong> <strong>Create Food and Water</strong> (can create wine instead of water), <strong>Tongues</strong>, <strong>Wind Walk</strong>\n<strong>1/Day Each:</strong> <strong>Creation</strong>, <strong>Gaseous Form</strong>, <strong>Invisibility</strong>, <strong>Major Image</strong>, <strong>Plane Shift</strong>",
         "spell_save_dc": 17,
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "save_dc": 17,
+        "save_type": "Charisma"
       }
     ],
     "bonus_actions": [],
