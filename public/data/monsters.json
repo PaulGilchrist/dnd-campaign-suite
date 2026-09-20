@@ -16884,14 +16884,19 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "The death tyrant takes 2 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The death tyrant regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Chomp",
-        "description": "The death tyrant makes two Bite attacks.",
-        "uses": 1
+        "delegates_to": "Bite",
+        "description": "The death tyrant makes two Bite attacks (the delegate seam resolves one Bite per click — second Bite GM-clicks the chip again; two-Bite count GM-adjudicated, MA-0009 multiattack analogue)."
       },
       {
         "name": "Glare",
-        "description": "The death tyrant uses Eye Rays.",
-        "uses": 1
+        "delegates_to": "Eye Rays",
+        "description": "The death tyrant uses Eye Rays."
       }
     ],
     "lair_actions": [

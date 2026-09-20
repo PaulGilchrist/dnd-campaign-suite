@@ -1303,3 +1303,46 @@ describe('MA-0209 Ancient Copper Pounce delegates_to Rend', () => {
     expect(ancient.legendary_actions.find(r => r.name === 'Pounce').delegates_to).toBe('Rend');
   });
 });
+
+// MA-0580: Death Tyrant legendary_actions header-swallow — Chomp (uses:1)
+// was rows[0], swallowed as the header (counter "(1 left)", zero affordance,
+// §99 MA-0510 fingerprint); Glare rode "Expend Legendary" with
+// delegates_to:undefined → silent-burn console.error. Fix mirrors the verified
+// Colossus/Death Knight twins: numeric header + delegates_to children.
+describe('MA-0580 Death Tyrant legendary header + delegates_to shape', () => {
+  const tyrant = monstersData.find(m => m.name === 'Death Tyrant');
+
+  it('rows[0] is the numeric header dict with uses 2 (RAW total)', () => {
+    const header = legendaryHeaderAction(tyrant);
+    expect(header).toBe(tyrant.legendary_actions[0]);
+    expect(header.name).toBe('Legendary Action Uses: 2');
+    expect(header.uses).toBe(2);
+    expect(legendaryMaxUses(header, null)).toBe(2);
+    expect(legendaryUsesRemaining(header, null)).toBe(2);
+  });
+
+  it('no child row carries a swallowed uses counter', () => {
+    tyrant.legendary_actions.slice(1).forEach(row => {
+      expect(row.uses == null).toBe(true);
+    });
+  });
+
+  it('Chomp delegates_to the real Bite row (+9 / 2d8 + 4 Piercing)', () => {
+    const chomp = tyrant.legendary_actions.find(r => r.name === 'Chomp');
+    expect(chomp.delegates_to).toBe('Bite');
+    const bite = legendaryDelegateAction(tyrant, chomp);
+    expect(bite.attack_bonus).toBe(9);
+    expect(bite.damage_dice_primary).toBe('2d8 + 4');
+    expect(bite.damage_type_primary).toBe('Piercing');
+    expect(legendaryDelegateAttackName(chomp, bite)).toBe('Chomp (Bite attack)');
+  });
+
+  it('Glare delegates_to the real Eye Rays row carrying rays[] picker', () => {
+    const glare = tyrant.legendary_actions.find(r => r.name === 'Glare');
+    expect(glare.delegates_to).toBe('Eye Rays');
+    const rays = legendaryDelegateAction(tyrant, glare);
+    expect(rays.save_dc).toBe(17);
+    expect(Array.isArray(rays.rays)).toBe(true);
+    expect(rays.rays.length).toBe(10);
+  });
+});

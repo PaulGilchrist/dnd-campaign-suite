@@ -8944,7 +8944,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The death tyrant makes two Bite attacks.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0580-death-tyrant-chomp.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0581",
