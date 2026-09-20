@@ -9481,7 +9481,7 @@
       "actionType": "save",
       "saveDc": 12,
       "description": "The doppelganger casts Detect Thoughts, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 12).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0614-doppelganger-read-thoughts.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0615",

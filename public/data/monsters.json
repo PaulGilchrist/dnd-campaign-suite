@@ -17954,7 +17954,9 @@
         "name": "Read Thoughts",
         "description": "The doppelganger casts <em>Detect Thoughts</em>, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 12).",
         "spell_save_dc": 12,
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "save_dc": 12,
+        "save_type": "Intelligence"
       },
       {
         "name": "Unsettling Visage",
