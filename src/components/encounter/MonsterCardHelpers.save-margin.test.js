@@ -43,10 +43,12 @@ describe('MA-0639 parseSaveMarginClause', () => {
         expect(parseSaveMarginClause({ save_margin: { fails_by: '5', also: 'stunned' } })).toEqual({ failsBy: 5, also: 'stunned' });
     });
 
-    it('Drow Elite Warrior byte stays inert (same prose, no structured key — ticket scope)', () => {
+    it('locks the MA-0642 Drow Elite Warrior Hand Crossbow row: save_margin fails_by 5 also unconscious', () => {
         const elite = monstersData.find(m => m.name === 'Drow Elite Warrior');
         const row = elite.actions.find(a => a.name === 'Hand Crossbow');
-        expect(row.save_margin).toBeUndefined();
-        expect(parseSaveMarginClause(row)).toBeNull();
+        expect(row.save_margin).toEqual({ fails_by: 5, also: 'unconscious' });
+        expect(row.save_effect).toBe('Failure: be poisoned for 1 hour.');
+        expect(row.description).toContain('If the saving throw fails by 5 or more, the target is also unconscious while poisoned in this way.');
+        expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'unconscious' });
     });
 });
