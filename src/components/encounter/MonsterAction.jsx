@@ -7,6 +7,7 @@ import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbi
 import { legendaryCheckRow, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
 import { monsterRechargeGate, rechargeDisplayText } from '../../services/encounters/monsterRecharge.js';
 import { isSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
+import { isMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -190,7 +191,25 @@ function ZoneAuraLink({ action, spellUsesUsed, attackerCannotAct, onZoneAuraRow 
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow }) {
+// MA-0648: monster-side summon row (Drow Mage "Summon Demon") — automation
+// {type:"monster_summon", options:[...]} arms a clickable summon chip that
+// routes the coin-flip adjudication + combatSummary spawn in the modal.
+// 1/Day counter rides the MA-0020 monsterSpellUses gate (numeric uses/
+// maxUses); exhausted chips stay clickable and route the honest refusal.
+function SummonLink({ action, spellUsesUsed, attackerCannotAct, onSummonRow }) {
+  if (!isMonsterSummonRow(action)) return null;
+  const gate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
+  const usesNote = gate ? <em> ({gate.maxUses}/Day · {gate.remaining} left)</em> : null;
+  const spentClass = gate && gate.remaining === 0 ? ' mc-dice-link-spell-spent' : '';
+  const clickable = !attackerCannotAct && !!onSummonRow;
+  return (
+    <span className={`mc-dice-link mc-dice-link-summon${spentClass}`} onClick={clickable ? () => onSummonRow(action) : undefined} role="button" tabIndex={0} title={`Summon a demon — coin flip: ${action.automation.options.map(o => `${o.monster}${o.chance != null ? ` (${Math.round(o.chance * 100)}%)` : ''}`).join(' or ')}, ${action.automation.range_ft || 60} ft, ${action.automation.duration_minutes || 10} min`}>
+      <i className="fa-solid fa-hat-wizard" /> Summon{usesNote}
+    </span>
+  );
+}
+
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
@@ -207,6 +226,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <strong>{action.name}.</strong>{' '}
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
       <ZoneAuraLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onZoneAuraRow={onZoneAuraRow} />
+      <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
         <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>

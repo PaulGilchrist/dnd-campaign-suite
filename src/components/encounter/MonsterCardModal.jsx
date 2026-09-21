@@ -22,6 +22,7 @@ import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSa
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
+import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
@@ -1988,6 +1989,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         // map, refuses when exhausted with zero te/zero spend. Light/vision
         // legs stay advisory (§70 no illumination model) on log + popup.
         handleZoneAuraRow={(action) => resolveSelfAuraRow({ action, monsterName, campaignName, setPopupHtml, storedUses: monsterSpellUses || {} })}
+        // MA-0648: monster-side summon row (Drow Mage "Summon Demon") — coin
+        // flip adjudication (shadow demon on d100 ≤ chance×100, else quasit),
+        // spawn into combatSummary as ally acting right after the caster,
+        // spends the row's 1/Day via the MA-0020 monsterSpellUses map,
+        // refuses when exhausted with zero roll/zero spawn. Expiry clock,
+        // dismiss-as-action and "can't summon other demons" are §70 residuals.
+        handleSummonRow={(action) => resolveMonsterSummonRow({ action, monsterName, campaignName, setPopupHtml, storedUses: monsterSpellUses || {} })}
       />
       {popupHtml && (
         <MonsterAttackPopup
