@@ -3517,3 +3517,173 @@ describe('MA-0704 Ettercap Bite poisoned hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const FIRE_GIANT = monsters.find(m => m.index === 'fire-giant');
+const HAMMER_THROW_ACTION = FIRE_GIANT.actions.find(a => a.name === 'Hammer Throw');
+
+describe('MA-0733 Fire Giant Hammer Throw disadvantage_next_attack hit-clause', () => {
+    const deps = {
+        characterName: 'Fire Giant 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Fire Giant 1', computedStats: { armorClass: 18 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getEffectDefinition.mockImplementation((key) => ({
+            effect: key,
+            label: 'Disadv Next Attack',
+            description: 'Disadvantage on the next attack roll.',
+            group: 'Attack',
+        }));
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 16, newHp: 983, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0733 data-lock: Hammer Throw row authors hit_target_effect:"disadvantage_next_attack" (+11 ranged 60/240 ft., 3d10 + 7 Bludgeoning + 1d8 Fire)', () => {
+        expect(HAMMER_THROW_ACTION.attack_bonus).toBe(11);
+        expect(HAMMER_THROW_ACTION.range).toBe('60/240 ft.');
+        expect(HAMMER_THROW_ACTION.damage_dice_primary).toBe('3d10 + 7');
+        expect(HAMMER_THROW_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(HAMMER_THROW_ACTION.damage_dice_secondary).toBe('1d8');
+        expect(HAMMER_THROW_ACTION.damage_type_secondary).toBe('Fire');
+        expect(HAMMER_THROW_ACTION.hit_target_effect).toBe('disadvantage_next_attack');
+        expect(HAMMER_THROW_ACTION.hit_conditions).toBeUndefined();
+        expect(HAMMER_THROW_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a targetEffect-only clause from the Hammer Throw row', () => {
+        expect(buildHitConditionClause(HAMMER_THROW_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Hammer Throw',
+            targetEffect: 'disadvantage_next_attack',
+        });
+    });
+
+    it('registers the disadvantage_next_attack te on the victim, sourced from the giant, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Hammer Throw', formula: '3d10 + 7', total: 16, rolls: [1, 7, 1], modifier: 7, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Fire Giant 1',
+            hitClause: buildHitConditionClause(HAMMER_THROW_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'disadvantage_next_attack',
+            'Fire Giant 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('MA-0733 clock-lock: grants ONE addExpiration clock anchored on the giant (MA-0016/MA-0542 anchor leg; RAW end-of-turn anchor advisory)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Hammer Throw', formula: '3d10 + 7', total: 16, rolls: [1, 7, 1], modifier: 7, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Fire Giant 1',
+            hitClause: buildHitConditionClause(HAMMER_THROW_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Fire Giant 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'Fire Giant 1', target: 'Bandit 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Fire Giant 1',
+        });
+    });
+
+    it('logs condition-applied with the registry label and writes no raw activeConditions', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Hammer Throw', formula: '3d10 + 7', total: 16, rolls: [1, 7, 1], modifier: 7, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Fire Giant 1',
+            hitClause: buildHitConditionClause(HAMMER_THROW_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Disadv Next Attack',
+        }));
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+    });
+
+    it('keeps combined primary + secondary damage legs intact alongside the te grant', async () => {
+        rollExpression.mockImplementation((f) => (f === '1d8' ? { total: 5, rolls: [5], modifier: 0 } : null));
+        applyDamageToTarget.mockImplementation(async (cs, name, dmg, types) => (
+            types[0] === 'Fire'
+                ? { finalDamage: 5, newHp: 978, damageReduced: false }
+                : { finalDamage: dmg, newHp: 983, damageReduced: false }
+        ));
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Hammer Throw', formula: '3d10 + 7', total: 16, rolls: [1, 7, 1], modifier: 7, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Fire Giant 1',
+            autoDamageSecondaryFormula: '1d8',
+            autoDamageSecondaryType: 'Fire',
+            hitClause: buildHitConditionClause(HAMMER_THROW_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'roll',
+            rollType: 'damage',
+            characterName: 'Fire Giant 1',
+            formula: '3d10 + 7',
+            finalDamage: 16,
+            note: 'combined_damage_roll',
+            secondaryFormula: '1d8',
+            secondaryFinalDamage: 5,
+        }));
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'disadvantage_next_attack',
+            'Fire Giant 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('grants nothing when the Hammer Throw attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Hammer Throw', formula: '3d10 + 7', total: 16, rolls: [1, 7, 1], modifier: 7, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Fire Giant 1',
+        } });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+
+describe('MA-0733 disadvantage_next_attack te consumer', () => {
+    it('bumps attackDisadvantageCount for the holder — one-shot channel feeding combineAttackModes', () => {
+        const effects = computeConditionEffects({
+            targetEffects: [{ effect: 'disadvantage_next_attack', target: 'Bandit 1', source: 'Fire Giant 1' }],
+        });
+        expect(effects.attackDisadvantageCount).toBeGreaterThanOrEqual(1);
+        expect(combineAttackModes(effects, computeConditionEffects({}), null, 'Bandit 1')).toBe('disadvantage');
+    });
+});

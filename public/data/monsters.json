@@ -23285,6 +23285,7 @@
         "attack_bonus": 11,
         "range": "60/240 ft.",
         "save_effect": "The target is pushed up to 15 feet straight away from the giant and has Disadvantage on the next attack roll it makes before the end of its next turn.",
+        "hit_target_effect": "disadvantage_next_attack",
         "damage_dice_primary": "3d10 + 7",
         "damage_type_primary": "Bludgeoning",
         "damage_dice_secondary": "1d8",
