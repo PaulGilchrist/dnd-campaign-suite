@@ -102,3 +102,44 @@ describe('MA-0647 data lock (monsters.json Drow Mage Staff)', () => {
     expect(buildTwoHandedVariantOffer(summon, 'Summon Demon')).toBeNull();
   });
 });
+
+describe('MA-0652 data lock (monsters.json Druid Quarterstaff)', () => {
+  const staffRow = () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const staff = monsters.find((m) => m.name === 'Druid').actions[0];
+    expect(staff.name).toBe('Quarterstaff');
+    return staff;
+  };
+
+  it('actions[0] Quarterstaff authors damage_dice_two_handed "1d8 + 2" beside the 1d6 primary (MA-0636/0647 placement)', () => {
+    const staff = staffRow();
+    expect(staff.attack_bonus).toBe(2);
+    expect(staff.damage_dice_primary).toBe('1d6');
+    expect(staff.damage_dice_two_handed).toBe('1d8 + 2');
+    expect(staff.damage_type_primary).toBe('bludgeoning');
+    expect(staff.description).toMatch(/1d8 \+ 2\) bludgeoning damage with shillelagh or if wielded with two hands/);
+  });
+
+  it('buildTwoHandedVariantOffer arms the Quarterstaff HIT-popup chooser with both formulas', () => {
+    const offer = buildTwoHandedVariantOffer(staffRow(), 'Quarterstaff');
+    expect(offer).toMatchObject({
+      formula: '1d8 + 2',
+      baseFormula: '1d6',
+      damageType: 'bludgeoning',
+      attackName: 'Quarterstaff',
+    });
+    expect(offer.label).toContain('1d8 + 2');
+  });
+
+  it('select logs record each choice with the correct formula', () => {
+    const offer = buildTwoHandedVariantOffer(staffRow(), 'Quarterstaff');
+    const two = buildTwoHandedVariantSelectLog({ monsterName: 'Druid 1', offer, hands: 'two-handed' });
+    expect(two.automationType).toBe('two_handed_variant_selected');
+    expect(two.description).toContain('TWO-HANDED');
+    expect(two.description).toContain('1d8 + 2');
+    const one = buildTwoHandedVariantSelectLog({ monsterName: 'Druid 1', offer, hands: 'one-handed', defaulted: true });
+    expect(one.automationType).toBe('one_handed_variant_selected');
+    expect(one.description).toContain('default');
+    expect(one.description).toContain('1d6');
+  });
+});
