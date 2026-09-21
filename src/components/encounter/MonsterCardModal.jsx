@@ -1664,6 +1664,20 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const target = getTarget();
     if (psychicStrikePreconditionFailed(name, target, allTargetEffects)) return;
 
+    // MA-0687: attack-row target_prerequisite gate — previously SAVE-chip-only
+    // (handleSaveRoll). Reuses evaluateTargetPrerequisiteGate (MA-0019 helpers
+    // shape): target failing the authored eligibility (Elephant Stomp — "one
+    // prone creature") refuses BEFORE any roll with refusal popup +
+    // `<action-slug>_refused` log, zero roll zero damage. Rows without the
+    // structured field are byte-inert.
+    const prerequisiteGate = evaluateTargetPrerequisiteGate({ action, target, monsterName, campaignName, getRuntimeValue });
+    if (!prerequisiteGate.satisfied) {
+      setPopupHtml(prerequisiteGate.popupHtml);
+      addEntry(campaignName, prerequisiteGate.refusalLog)
+        .catch((e) => { console.error('[MonsterCardModal] Error logging attack prerequisite refusal:', e); });
+      return;
+    }
+
     const primaryDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
     const attackRange = resolveAttackRange(action);
     const isMeleeAttack = attackRange <= 5;

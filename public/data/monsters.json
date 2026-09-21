@@ -21170,7 +21170,12 @@
         "attack_bonus": 8,
         "reach": "5 ft.",
         "damage_dice_primary": "3d10 + 6",
-        "damage_type_primary": "bludgeoning"
+        "damage_type_primary": "bludgeoning",
+        "target_prerequisite": {
+          "conditions": [
+            "prone"
+          ]
+        }
       }
     ],
     "traits": [

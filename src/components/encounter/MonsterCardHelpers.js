@@ -609,7 +609,7 @@ export function evaluateTargetPrerequisiteGate({ action, target, monsterName, ca
   return {
     prerequisite,
     satisfied: false,
-    popupHtml: `<div class="mc-prerequisite-refusal"><h3>Prerequisite Not Met</h3><p>${monsterName} can't use ${action.name} on ${targetLabel} — the target must be ${conditionLabels} by ${monsterName}. No save rolled, nothing spent (GM-enforced target eligibility).</p></div>`,
+    popupHtml: `<div class="mc-prerequisite-refusal"><h3>Prerequisite Not Met</h3><p>${monsterName} can't use ${action.name} on ${targetLabel} — the target must be ${conditionLabels}${prerequisite.byAttacker ? ` by ${monsterName}` : ''}. No roll, nothing spent (GM-enforced target eligibility).</p></div>`,
     refusalLog: buildTargetPrerequisiteRefusalLog({ monsterName, actionName: action.name, targetName: target?.name || 'no target', prerequisite }),
   };
 }
