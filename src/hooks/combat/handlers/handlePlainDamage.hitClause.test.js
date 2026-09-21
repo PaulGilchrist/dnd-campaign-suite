@@ -3390,3 +3390,130 @@ describe('MA-0691 Empyrean Sacred Weapon stunned hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const ETTERCAP = monsters.find(m => m.index === 'ettercap');
+const ETTERCAP_BITE_ACTION = ETTERCAP.actions[1];
+
+describe('MA-0704 Ettercap Bite poisoned hit-clause', () => {
+    const deps = {
+        characterName: 'Ettercap 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Ettercap 1', computedStats: { armorClass: 13 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 9, newHp: 990, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'monster', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0704 data-lock: authors hit_conditions:["poisoned"] appended after damage fields on the Bite row', () => {
+        expect(ETTERCAP_BITE_ACTION.name).toBe('Bite');
+        expect(ETTERCAP_BITE_ACTION.attack_bonus).toBe(4);
+        expect(ETTERCAP_BITE_ACTION.reach).toBe('5 ft.');
+        expect(ETTERCAP_BITE_ACTION.damage_dice_primary).toBe('1d6 + 2');
+        expect(ETTERCAP_BITE_ACTION.damage_type_primary).toBe('Piercing');
+        expect(ETTERCAP_BITE_ACTION.damage_dice_secondary).toBe('1d4');
+        expect(ETTERCAP_BITE_ACTION.damage_type_secondary).toBe('Poison');
+        expect(ETTERCAP_BITE_ACTION.hit_conditions).toEqual(['poisoned']);
+        expect(ETTERCAP_BITE_ACTION.escape_dc).toBeUndefined();
+        expect(ETTERCAP_BITE_ACTION.save_dc).toBeUndefined();
+        expect(ETTERCAP_BITE_ACTION.description).toContain('Poisoned');
+        // MA-0621 byte-shape twin: save_effect prose stays (decoy field), hit_conditions
+        // appended after damage fields; attack chip rides no save.
+        expect(ETTERCAP.actions[0].hit_conditions).toBeUndefined();
+        expect(ETTERCAP.actions[2].hit_conditions).toBeUndefined();
+    });
+
+    it('builds a poisoned-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(ETTERCAP_BITE_ACTION)).toEqual({
+            conditions: ['poisoned'],
+            escapeDc: null,
+            attackName: 'Bite',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Poisoned + attacker-source meta + condition log on a resolved Bite hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d6 + 2', total: 6, rolls: [4], modifier: 2, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Ettercap 1',
+            hitClause: buildHitConditionClause(ETTERCAP_BITE_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe('Bandit 1');
+        expect(condCall[2]).toEqual(['poisoned']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ poisoned: { source: 'Ettercap 1' } });
+        expect(metaCall[2].poisoned.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Poisoned',
+            reason: 'Bite (escape DC —)',
+        }));
+    });
+
+    it('keeps combined primary + secondary damage legs intact alongside the Poisoned grant', async () => {
+        rollExpression.mockImplementation((f) => (f === '1d4' ? { total: 3, rolls: [3], modifier: 0 } : null));
+        applyDamageToTarget.mockImplementation(async (cs, name, dmg, types) => (
+            types[0] === 'Poison'
+                ? { finalDamage: 3, newHp: 990, damageReduced: false }
+                : { finalDamage: dmg, newHp: 993, damageReduced: false }
+        ));
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d6 + 2', total: 6, rolls: [4], modifier: 2, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Ettercap 1',
+            autoDamageSecondaryFormula: '1d4',
+            autoDamageSecondaryType: 'Poison',
+            hitClause: buildHitConditionClause(ETTERCAP_BITE_ACTION),
+        } });
+
+        expect(applyDamageToTarget).toHaveBeenCalled();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'roll',
+            rollType: 'damage',
+            characterName: 'Ettercap 1',
+            finalDamage: 6,
+            note: 'combined_damage_roll',
+            secondaryFinalDamage: 3,
+        }));
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['poisoned']);
+    });
+
+    it('grants nothing when the Bite attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d6 + 2', total: 6, rolls: [1], modifier: 2, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Ettercap 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
