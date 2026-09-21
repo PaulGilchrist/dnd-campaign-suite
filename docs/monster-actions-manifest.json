@@ -11216,7 +11216,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The cultist casts Hellish Rebuke in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken — see .opencode/plans/bug-MA-0725-hellish-rebuke.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0726",

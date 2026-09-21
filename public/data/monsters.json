@@ -22744,6 +22744,20 @@
       {
         "name": "Hellish Rebuke",
         "description": "The cultist casts <strong>Hellish Rebuke</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "range": "60 ft.",
+        "automation": {
+          "type": "reaction",
+          "trigger": "takes_damage",
+          "effect": "hellish_rebuke",
+          "saveType": "DEX",
+          "saveDc": 15,
+          "dcSuccess": "half",
+          "damageExpression": "2d10",
+          "damageType": "Fire"
+        },
         "spellcasting_ability": "Wisdom"
       }
     ],

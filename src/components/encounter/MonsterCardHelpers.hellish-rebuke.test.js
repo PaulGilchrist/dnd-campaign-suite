@@ -80,11 +80,23 @@ describe('MA-0329 Hellish Rebuke data + registry', () => {
     expect(HR_ACTION.usage).toBe('2/Day');
   });
 
-  it('registry resolves hellish_rebuke; unregistered reaction rows stay byte-inert (null)', () => {
+  it('registry resolves hellish_rebuke; MA-0725 fiend-cultist row now arms; unregistered rows stay byte-inert (null)', () => {
     expect(getGatedMonsterReaction(HR_ACTION)?.effect).toBe('hellish_rebuke');
     const cultistRow = monsters.find(m => m.index === 'fiend-cultist').reactions[0];
-    expect(getGatedMonsterReaction(cultistRow)).toBeNull();
+    expect(getGatedMonsterReaction(cultistRow)?.effect).toBe('hellish_rebuke');
     expect(getGatedMonsterReaction({ name: 'Mace', description: 'Hit: 1d6+2 bludgeoning.' })).toBeNull();
+  });
+
+  it('MA-0725 data-lock: fiend-cultist reactions[0] carries the Azer-authored byte-shape with cultist numerics', () => {
+    const cultistRow = monsters.find(m => m.index === 'fiend-cultist').reactions[0];
+    expect(cultistRow.automation).toEqual(HR_ACTION.automation);
+    expect(cultistRow.automation).toMatchObject({ type: 'reaction', trigger: 'takes_damage', effect: 'hellish_rebuke', saveType: 'DEX', saveDc: 15, dcSuccess: 'half', damageExpression: '2d10', damageType: 'Fire' });
+    expect(cultistRow.range).toBe('60 ft.');
+    expect(cultistRow.usage).toBe('At Will');
+    expect(cultistRow.uses).toBe(999);
+    expect(cultistRow.maxUses).toBe(999);
+    expect(Object.keys(cultistRow.automation)).toEqual(Object.keys(HR_ACTION.automation));
+    expect(monsterReactionUsesRemaining(cultistRow, {})).toBe(999);
   });
 
   it('remaining uses: 2 fresh, 0 at spent', () => {
