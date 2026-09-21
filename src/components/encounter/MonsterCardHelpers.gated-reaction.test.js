@@ -14,6 +14,10 @@ import {
   counterspellGate,
   parryGate,
   parryIdentityRefusal,
+  elementalAbsorptionGate,
+  elementalAbsorptionIdentityRefusal,
+  elementalAbsorptionMatchedType,
+  resolveMonsterElementalAbsorption,
 } from './MonsterCardHelpers.js';
 import monsters from '../../../public/data/monsters.json';
 
@@ -577,3 +581,166 @@ describe('MA-0643 Drow Elite Warrior Parry — data-lock + acBonus 3', () => {
     expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 18 → 21/);
   });
 });
+
+// MA-0681: Elemental Cultist Elemental Absorption (1/Day) — damage-taken
+// press-at-pending-hit reaction (parry MA-0341 lineage). RAW trigger: takes
+// Acid/Cold/Fire/Lightning/Thunder damage → Resistance to THAT instance + 10
+// THP. Gate keys off the pending campaign lastAttack identity (this monster as
+// target, hit, elemental type match, damage NOT yet committed via Done, not
+// already absorbed) + 1/round latch + 1/Day uses. Press stamps a one-shot
+// elemental_absorption resistance activeBuffs entry, grants 10 THP via the
+// tempHpService replace-if-larger channel (injectable), spends the 1/Day use,
+// and marks the lastAttack absorbed. Non-elemental / spent / committed refusals
+// log elemental_absorption_refused and spend nothing.
+const ABSORPTION_ACTION = monsters.find(m => m.index === 'elemental-cultist').reactions[0];
+const CULTIST_681 = 'Elemental Cultist 1';
+const AZER = 'Azer Pyromancer 1';
+
+function pendingFireHitOnCultist(overrides = {}) {
+  return { attackerName: AZER, targetName: CULTIST_681, attackName: 'Flame Burst', rollType: 'attack', weaponType: 'ranged', hit: true, d20: 13, bonus: 7, total: 20, targetAc: 16, effectiveAc: 16, primaryDamage: 22, primaryDamageType: 'Fire', damageTypes: ['Fire'], damageApplied: undefined, elementalAbsorptionResolved: undefined, ...overrides };
+}
+
+function makeAbsorbDeps({ lastAttack = pendingFireHitOnCultist(), round = 1, store = {}, tempHp = 0 } = {}) {
+  const state = { ...store };
+  const logs = [];
+  const campaignWrites = [];
+  const thpGrants = [];
+  return {
+    state,
+    logs,
+    campaignWrites,
+    thpGrants,
+    deps: {
+      findLastAttack: vi.fn(async () => lastAttack),
+      getCombatContext: vi.fn(async () => ({ round })),
+      getRuntimeValue: vi.fn((key, prop) => (prop === 'tempHp' ? tempHp : (state[`${key}.${prop}`] ?? null))),
+      setRuntimeValue: vi.fn(async (key, prop, value) => {
+        if (key === 'campaign' && prop === 'lastAttack') campaignWrites.push(value);
+        state[`${key}.${prop}`] = value;
+      }),
+      addEntry: vi.fn(async (c, e) => { logs.push(e); }),
+      // tempHpService replace-if-larger stand-in: never adds, keeps the larger.
+      setTempHp: vi.fn((name, amount) => { thpGrants.push({ name, amount }); return Math.max(Number(tempHp) || 0, amount); }),
+    },
+  };
+}
+
+describe('MA-0681 Elemental Absorption registry + data-lock', () => {
+  it('monsters.json elemental-cultist reactions[0] carries the automation + numeric 1/Day', () => {
+    expect(ABSORPTION_ACTION.name).toBe('Elemental Absorption');
+    expect(ABSORPTION_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'damage_taken_elemental', effect: 'elemental_absorption', tempHp: 10 });
+    expect(ABSORPTION_ACTION.automation.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
+    expect(ABSORPTION_ACTION.uses).toBe(1);
+    expect(ABSORPTION_ACTION.maxUses).toBe(1);
+    expect(ABSORPTION_ACTION.usage).toBe('1/Day');
+  });
+
+  it('getGatedMonsterReaction arms the chip and the counter renders remaining uses', () => {
+    expect(getGatedMonsterReaction(ABSORPTION_ACTION)?.effect).toBe('elemental_absorption');
+    expect(getGatedMonsterReaction({ name: 'Scimitar', description: 'Hit: 1d6+2 slashing.' })).toBeNull();
+    expect(monsterReactionUsesRemaining(ABSORPTION_ACTION, {})).toBe(1);
+    expect(monsterReactionUsesRemaining(ABSORPTION_ACTION, { elemental_absorption: 1 })).toBe(0);
+  });
+
+  it('elementalAbsorptionMatchedType matches case-insensitively and rejects non-elemental', () => {
+    expect(elementalAbsorptionMatchedType(pendingFireHitOnCultist(), ABSORPTION_ACTION.automation)).toBe('Fire');
+    expect(elementalAbsorptionMatchedType(pendingFireHitOnCultist({ primaryDamageType: 'Poison', damageTypes: ['Poison'] }), ABSORPTION_ACTION.automation)).toBeNull();
+  });
+});
+
+describe('MA-0681 elementalAbsorptionGate RAW identity refusals', () => {
+  it('refuses no lastAttack / wrong target / miss / committed damage / already absorbed', () => {
+    expect(elementalAbsorptionIdentityRefusal(null, CULTIST_681, ABSORPTION_ACTION.automation)).toBe('trigger');
+    expect(elementalAbsorptionIdentityRefusal(pendingFireHitOnCultist({ targetName: 'Other 1' }), CULTIST_681, ABSORPTION_ACTION.automation)).toBe('trigger');
+    expect(elementalAbsorptionIdentityRefusal(pendingFireHitOnCultist({ hit: false }), CULTIST_681, ABSORPTION_ACTION.automation)).toBe('miss');
+    expect(elementalAbsorptionIdentityRefusal(pendingFireHitOnCultist({ damageApplied: true, actualDamage: 22 }), CULTIST_681, ABSORPTION_ACTION.automation)).toBe('resolved');
+    expect(elementalAbsorptionIdentityRefusal(pendingFireHitOnCultist({ elementalAbsorptionResolved: true }), CULTIST_681, ABSORPTION_ACTION.automation)).toBe('reacted');
+  });
+
+  it('refuses non-elemental damage of any kind (never triggers)', () => {
+    for (const t of ['Poison', 'Necrotic', 'Bludgeoning', 'Radiant', 'Psychic', 'Slashing']) {
+      const hit = pendingFireHitOnCultist({ primaryDamageType: t, damageTypes: [t] });
+      expect(elementalAbsorptionIdentityRefusal(hit, CULTIST_681, ABSORPTION_ACTION.automation)).toBe('type');
+    }
+  });
+
+  it('accepts every RAW elemental type on a pending hit', () => {
+    for (const t of ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']) {
+      const g = elementalAbsorptionGate({ lastAttack: pendingFireHitOnCultist({ primaryDamageType: t, damageTypes: [t] }), monsterName: CULTIST_681, currentRound: 1, storedUses: {}, usedRound: 0, action: ABSORPTION_ACTION });
+      expect(g.ok).toBe(true);
+      expect(g.matchedType).toBe(t);
+    }
+  });
+
+  it('1/round latch + 1/Day uses refusals', () => {
+    const same = elementalAbsorptionGate({ lastAttack: pendingFireHitOnCultist(), monsterName: CULTIST_681, currentRound: 3, storedUses: {}, usedRound: 3, action: ABSORPTION_ACTION });
+    expect(same.ok).toBe(false);
+    expect(same.reason).toBe('round');
+    const spent = elementalAbsorptionGate({ lastAttack: pendingFireHitOnCultist(), monsterName: CULTIST_681, currentRound: 8, storedUses: { elemental_absorption: 1 }, usedRound: 2, action: ABSORPTION_ACTION });
+    expect(spent.ok).toBe(false);
+    expect(spent.reason).toBe('uses');
+  });
+});
+
+describe('MA-0681 resolveMonsterElementalAbsorption press → arm + spend + THP', () => {
+  it('press on a pending Fire hit: spends 1/Day, grants 10 THP replace-if-larger, arms resistance, stamps lastAttack absorbed, ability_use log', async () => {
+    const { state, logs, campaignWrites, thpGrants, deps } = makeAbsorbDeps({ round: 5 });
+    const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.tempHp).toBe(10);
+    expect(result.halved).toBe(11);
+    expect(thpGrants).toEqual([{ name: CULTIST_681, amount: 10 }]);
+    expect(state[`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ elemental_absorption: 1 });
+    expect(state[`${CULTIST_681}._elemental_absorption_usedRound`]).toBe(5);
+    const buffs = state[`${CULTIST_681}.activeBuffs`];
+    expect(buffs.some(b => b.effect === 'elemental_absorption' && b.resistanceTypes.includes('Fire'))).toBe(true);
+    expect(campaignWrites[0]).toMatchObject({ elementalAbsorptionResolved: true, absorbedBy: CULTIST_681, elementalAbsorbedType: 'Fire' });
+    const spend = logs.find(l => l.type === 'ability_use');
+    expect(spend.abilityName).toBe('Elemental Absorption');
+    expect(spend.description).toMatch(/Resistance to this instance/i);
+    expect(spend.description).toMatch(/22 Fire halved to 11/);
+    expect(spend.description).toMatch(/1\/Day · 0 left today/);
+  });
+
+  it('THP replace-if-larger respects a larger standing buffer', async () => {
+    const { deps, thpGrants } = makeAbsorbDeps({ tempHp: 25 });
+    const result = await resolveMonsterElementalAbsorption({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, lastAttack: pendingFireHitOnCultist(), currentRound: 1, storedUses: {}, usedRound: 0, latchKey: '_elemental_absorption_usedRound', deps });
+    expect(result.ok).toBe(true);
+    expect(thpGrants).toEqual([{ name: CULTIST_681, amount: 10 }]);
+    expect(result.tempHp).toBe(25);
+  });
+
+  it('second press on the same resolved hit: elemental_absorption_refused (reacted), zero additional spend', async () => {
+    const { state, logs, deps } = makeAbsorbDeps({
+      lastAttack: pendingFireHitOnCultist({ elementalAbsorptionResolved: true }),
+      round: 5,
+      store: { [`${CULTIST_681}._elemental_absorption_usedRound`]: 5, [`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]: { elemental_absorption: 1 } },
+    });
+    const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs[0].automationType).toBe('elemental_absorption_refused');
+    expect(logs[0].description).toMatch(/reacted/);
+    expect(state[`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ elemental_absorption: 1 });
+  });
+
+  it('spent 1/Day on a fresh elemental hit: elemental_absorption_refused (uses), zero THP, zero spend', async () => {
+    const { state, logs, thpGrants, deps } = makeAbsorbDeps({ round: 9, store: { [`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]: { elemental_absorption: 1 } } });
+    const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs[0].automationType).toBe('elemental_absorption_refused');
+    expect(logs[0].description).toMatch(/uses/i);
+    expect(thpGrants).toHaveLength(0);
+    expect(state[`${CULTIST_681}.activeBuffs`]).toBeUndefined();
+  });
+
+  it('non-elemental damage never fires: elemental_absorption_refused (type), zero writes', async () => {
+    const { state, logs, thpGrants, deps } = makeAbsorbDeps({ lastAttack: pendingFireHitOnCultist({ primaryDamageType: 'Poison', damageTypes: ['Poison'] }) });
+    const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(false);
+    expect(logs[0].automationType).toBe('elemental_absorption_refused');
+    expect(logs[0].description).toMatch(/type/);
+    expect(thpGrants).toHaveLength(0);
+    expect(state[`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+  });
+});
+

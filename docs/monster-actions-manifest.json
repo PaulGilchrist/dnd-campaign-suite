@@ -10519,7 +10519,7 @@
       "uses": "1/Day",
       "trigger": "The cultist takes Acid, Cold, Fire, Lightning, or Thunder damage.",
       "description": "The cultist gives itself Resistance to that instance of damage and gains 10 Temporary Hit Points.",
-      "verified": "broken — see .opencode/plans/bug-MA-0681-elemental-absorption.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0682",

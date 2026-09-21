@@ -9,6 +9,7 @@ import { rollExpression, canRollExpression } from '../../services/dice/diceRolle
 import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { setTempHp } from '../../services/automation/handlers/buffs/tempHpService.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, rechargeActionKey, parseRechargeThreshold, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
 import { registerTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
@@ -887,6 +888,26 @@ const GATED_MONSTER_REACTIONS = {
   // registration via rollMonsterRecharges at the monster's turn-start)
   // + the 1/round latch (`_limited_foresight_usedRound`, MA-0013 shape).
   limited_foresight: { effect: 'limited_foresight', trigger: 'attacked_by_seen', label: 'Limited Foresight', icon: 'fa-eye' },
+  // MA-0681: Elemental Cultist Elemental Absorption (1/Day) — reactive
+  // damage-taken reaction. RAW trigger: takes Acid/Cold/Fire/Lightning/
+  // Thunder damage; response gives Resistance to THAT instance + 10 THP.
+  // Press-at-pending-hit (parry MA-0341 precedent — defender presses the
+  // chip on their OWN initiative card over the attacker's pending HIT popup,
+  // before Done commits damage). The press stamps a one-shot activeBuffs
+  // resistance entry ({effect:'elemental_absorption', resistanceTypes:[<type>]}),
+  // grants 10 THP via the canonical tempHpService replace-if-larger channel
+  // (MA-0275 producer lineage), spends the 1/Day use (MONSTER_REACTION_USES
+  // MA-0013 spend shape), and marks the campaign lastAttack absorbed. The
+  // HALVING rides the canonical resistance pipeline: applyDamage.
+  // resolveCreatureDefenses folds the armed buff's resistanceTypes into the
+  // NPC target's resistances (computeDamageAfterResistancesWithDetails →
+  // floor(raw/2)); the 10 THP then absorbs the halved instance before HP
+  // (absorbWithTempHp). Done on the pending popup applies it. The armed buff
+  // is one-shot — consumed once the triggering attack resolves
+  // (consumeElementalAbsorption in attackPostProcessing, parry_consumed
+  // lineage), so a later hit never re-halves. Non-elemental damage / spent
+  // uses refuse honestly (elemental_absorption_refused, zero spend).
+  elemental_absorption: { effect: 'elemental_absorption', trigger: 'damage_taken_elemental', label: 'Elemental Absorption', icon: 'fa-cube' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -1215,6 +1236,137 @@ export async function resolveMonsterSplit({ action, monsterName, campaignName, l
   return { ok: true, message: entry.description, eachHp: gate.eachHp, newSize, popupHtml: buildSplitAdvisoryPopup({ monsterName, gate, newSize, eachHp: gate.eachHp }) };
 }
 
+// MA-0681: Elemental Cultist Elemental Absorption (1/Day) — damage-taken
+// gated reaction, press-at-pending-hit (parry MA-0341 lineage). A pending
+// elemental hit (target=this monster, hit, damage NOT yet committed via Done)
+// arms it; the press stamps a one-shot resistance activeBuffs entry + 10 THP
+// via tempHpService (MA-0275 monster THP producer) and spends the 1/Day use
+// (MONSTER_REACTION_USES MA-0013 spend shape). The halving rides the canonical
+// resistance pipeline in applyDamage.resolveCreatureDefenses (the armed buff's
+// resistanceTypes fold into the NPC target's resistances → floor(raw/2)); the
+// 10 THP then absorbs the halved instance before HP (absorbWithTempHp).
+// Refusals log elemental_absorption_refused and spend nothing.
+function elementalAbsorptionTypes(auto) {
+  const list = Array.isArray(auto?.damageTypes) && auto.damageTypes.length > 0
+    ? auto.damageTypes
+    : ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
+  return list.map(t => String(t).toLowerCase());
+}
+
+function elementalAbsorptionIncomingTypes(lastAttack) {
+  if (Array.isArray(lastAttack?.damageTypes) && lastAttack.damageTypes.length > 0) return lastAttack.damageTypes;
+  if (lastAttack?.primaryDamageType) return [lastAttack.primaryDamageType];
+  if (lastAttack?.damageType) return [lastAttack.damageType];
+  return [];
+}
+
+function elementalAbsorptionPendingDamage(lastAttack) {
+  return Number(lastAttack?.actualDamage ?? ((lastAttack?.primaryDamage || 0) + (lastAttack?.secondaryDamage || 0)));
+}
+
+// Event-identity probe (mirrors parryIdentityRefusal MA-0341 / hellish
+// MA-0329). Returns a refusal reason token or null.
+export function elementalAbsorptionIdentityRefusal(lastAttack, monsterName, auto) {
+  if (!lastAttack || lastAttack.targetName !== monsterName) return 'trigger';
+  if (lastAttack.hit !== true) return 'miss';
+  if (lastAttack.damageApplied === true) return 'resolved';
+  if (lastAttack.elementalAbsorptionResolved === true) return 'reacted';
+  const types = elementalAbsorptionTypes(auto);
+  const matched = elementalAbsorptionIncomingTypes(lastAttack).find(t => types.includes(String(t).toLowerCase()));
+  if (!matched) return 'type';
+  return null;
+}
+
+export function elementalAbsorptionMatchedType(lastAttack, auto) {
+  const types = elementalAbsorptionTypes(auto);
+  return elementalAbsorptionIncomingTypes(lastAttack).find(t => types.includes(String(t).toLowerCase())) || null;
+}
+
+const ELEMENTAL_ABSORPTION_REFUSAL_MESSAGES = {
+  trigger: (m) => `Elemental Absorption: ${m} was not the damaged target of the last attack — refused.`,
+  miss: (m) => `Elemental Absorption: the last attack against ${m} missed — nothing to absorb.`,
+  resolved: () => 'Elemental Absorption: damage is already applied on that attack — too late to absorb.',
+  reacted: () => 'Elemental Absorption: already responded to that damage — one absorption per hit.',
+  type: (m) => `Elemental Absorption: the damage against ${m} was not Acid/Cold/Fire/Lightning/Thunder — refused.`,
+  round: () => 'Elemental Absorption: Reaction already used this round — refused.',
+  uses: (limit) => `Elemental Absorption: ${limit}/Day uses already spent today — refused. Uses reset at a long rest; GM-enforced for monsters.`,
+};
+
+export function elementalAbsorptionGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action }) {
+  const identity = elementalAbsorptionIdentityRefusal(lastAttack, monsterName, action?.automation);
+  if (identity) {
+    return { ok: false, reason: identity, message: ELEMENTAL_ABSORPTION_REFUSAL_MESSAGES[identity](monsterName) };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: ELEMENTAL_ABSORPTION_REFUSAL_MESSAGES.round() };
+  }
+  const used = Number((storedUses && storedUses.elemental_absorption) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: ELEMENTAL_ABSORPTION_REFUSAL_MESSAGES.uses(limit) };
+  }
+  return { ok: true, used, limit, matchedType: elementalAbsorptionMatchedType(lastAttack, action?.automation), pendingDamage: elementalAbsorptionPendingDamage(lastAttack) };
+}
+
+// One-shot armed resistance to THAT instance; consumed once the triggering
+// attack resolves (consumeElementalAbsorption, attackPostProcessing — the
+// parry_consumed MA-0341 lineage).
+function buildElementalAbsorptionBuff(action, lastAttack, matchedType) {
+  return {
+    effect: 'elemental_absorption',
+    resistanceTypes: [matchedType],
+    source: action?.name || 'Elemental Absorption',
+    vsAttack: `${lastAttack.attackerName || 'the attacker'}:${lastAttack.attackName || 'attack'}`,
+    timestamp: Date.now(),
+  };
+}
+
+export async function resolveMonsterElementalAbsorption({ action, monsterName, campaignName, lastAttack, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const getRV = deps.getRuntimeValue || getRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const grantTempHp = deps.setTempHp || setTempHp;
+  const gate = elementalAbsorptionGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action });
+  if (!gate.ok) {
+    await log(campaignName, {
+      type: 'automation',
+      automationType: 'elemental_absorption_refused',
+      characterName: monsterName,
+      name: 'Elemental Absorption',
+      description: `Elemental Absorption refused (${gate.reason}): ${gate.message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message: gate.message, popupHtml: `<div class="mc-prerequisite-refusal"><h3>Elemental Absorption Refused</h3><p>${gate.message} Nothing spent.</p></div>` };
+  }
+  const tempHp = Number(action?.automation?.tempHp) || 10;
+  const buff = buildElementalAbsorptionBuff(action, lastAttack, gate.matchedType);
+  const buffs = getRV(monsterName, 'activeBuffs') || [];
+  const newBuffs = [...(Array.isArray(buffs) ? buffs : []).filter(b => !(b && b.effect === 'elemental_absorption')), buff];
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, elemental_absorption: gate.used + 1 }, campaignName);
+  const newTempHp = grantTempHp(monsterName, tempHp, campaignName);
+  await setRV(monsterName, 'activeBuffs', newBuffs, campaignName);
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    elementalAbsorptionResolved: true,
+    absorbedBy: monsterName,
+    elementalAbsorbedType: gate.matchedType,
+  }, campaignName);
+  const remaining = Math.max(0, gate.limit - gate.used - 1);
+  const halved = Math.floor(gate.pendingDamage / 2);
+  const rawNote = gate.pendingDamage > 0 ? `${gate.pendingDamage} ${gate.matchedType} halved to ${halved}` : `${gate.matchedType}`;
+  const description = `${monsterName} uses Elemental Absorption — Resistance to this instance of ${rawNote} damage on Done, and gains ${tempHp} Temporary Hit Points (now ${newTempHp} THP). Press Done on the pending attack popup to commit the halved damage. 1/Day · ${remaining} left today.`;
+  await log(campaignName, {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Elemental Absorption',
+    description,
+    timestamp: Date.now(),
+  });
+  return { ok: true, message: description, tempHp: newTempHp, matchedType: gate.matchedType, halved, remaining, popupHtml: `<div class="mc-prerequisite-refusal"><h3>Elemental Absorption</h3><p>${monsterName} absorbs the ${gate.matchedType} instance — ${gate.pendingDamage} halved to ${halved} on Done, +${tempHp} THP (now ${newTempHp}). Press <strong>Done</strong> on the pending attack popup.</p></div>` };
+}
+
 export function getGatedMonsterReaction(action) {
   const effect = action?.automation?.effect;
   return effect ? GATED_MONSTER_REACTIONS[effect] || null : null;
@@ -1316,6 +1468,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'limited_foresight') {
     return resolveMonsterLimitedForesight({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, currentRound: ctx.currentRound, usedRound: ctx.usedRound, latchKey: ctx.latchKey, getRV: ctx.getRV, setRV: ctx.setRV, log: ctx.log, deps });
+  }
+
+  if (def.effect === 'elemental_absorption') {
+    return resolveMonsterElementalAbsorption({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
   }
 
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });

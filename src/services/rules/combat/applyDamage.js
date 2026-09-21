@@ -223,6 +223,21 @@ function addBuffResistances(resistances, activeBuffs) {
   return resistances;
 }
 
+// MA-0681: Elemental Absorption (Elemental Cultist, 1/Day) — a MONSTER (NPC)
+// defensive reaction. The press-at-pending-hit resolver (MonsterCardHelpers)
+// stamps a one-shot activeBuffs entry {effect:'elemental_absorption',
+// resistanceTypes:[<type>]}. addBuffResistances above is player-only, so this
+// narrow reader folds ONLY elemental_absorption buffs' resistanceTypes into an
+// NPC target's live resistances — it gives Resistance to THAT damage instance
+// (halved by computeDamageAfterResistancesWithDetails). Byte-inert for every
+// other buff/effect; players already carry the addBuffResistances channel.
+function addElementalAbsorptionResistances(resistances, activeBuffs) {
+  const types = activeBuffs
+    .filter(b => b && b.effect === 'elemental_absorption' && Array.isArray(b.resistanceTypes))
+    .flatMap(b => b.resistanceTypes);
+  return types.length > 0 ? [...new Set([...resistances, ...types])] : resistances;
+}
+
 // Silence — Thunder immunity for ANY creature (player or monster) inside the silence zone
 function applySilenceThunderImmunity(creature, activeBuffs, immunities, campaignName) {
   for (const buff of activeBuffs) {
@@ -608,6 +623,10 @@ async function resolveCreatureDefenses(creature, targetName, isPlayer, character
 
   if (isPlayer) {
     resistances = addBuffResistances(resistances, activeBuffs);
+  } else {
+    // MA-0681: NPC monsters fold only their armed elemental_absorption
+    // instance-resistance into live resistances (never generic buff resistances).
+    resistances = addElementalAbsorptionResistances(resistances, activeBuffs);
   }
   const silenceResult = applySilenceThunderImmunity(creature, activeBuffs, immunities, campaignName);
   immunities = silenceResult.immunities;
@@ -797,6 +816,37 @@ function isUsableRawDamage(rawDamage) {
   return !isNaN(rawDamage) && rawDamage != null;
 }
 
+// MA-0681: Elemental Absorption one-shot consume. Fires only when this
+// apply's resistance came from an armed elemental_absorption buff whose
+// resistanceTypes cover one of the incoming damage types. Strips the buff so
+// the resistance covers THAT instance only, then logs the raw→halved detail
+// plus the current THP (granted at press). Zero writes when no buff stands.
+async function consumeElementalAbsorptionOnApply({ creature, rawDamage, finalDamage, damageTypes, resistanceDetails, campaignName }) {
+  const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
+  const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
+  const buff = activeBuffs.find(b => b && b.effect === 'elemental_absorption' && Array.isArray(b.resistanceTypes));
+  if (!buff) return;
+  const lowerTypes = damageTypes.map(t => String(t).toLowerCase());
+  const matched = buff.resistanceTypes.find(rt => lowerTypes.includes(String(rt).toLowerCase()));
+  if (!matched) return;
+  const resisted = (resistanceDetails || []).some(rd => rd.status === 'resistant' && String(rd.damageType).toLowerCase() === String(matched).toLowerCase());
+  if (!resisted) return;
+  setRuntimeValue(creature.name, 'activeBuffs', activeBuffs.filter(b => !(b && b.effect === 'elemental_absorption')), campaignName);
+  const tempHp = Number(getRuntimeValue(creature.name, 'tempHp', campaignName) || 0);
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'elemental_absorption_applied',
+    characterName: creature.name,
+    name: 'Elemental Absorption',
+    description: `${creature.name} absorbs this instance of ${matched} damage — ${rawDamage} halved to ${finalDamage}; ${tempHp} Temporary Hit Points standing.`,
+    damageTypes,
+    rawDamage,
+    appliedDamage: finalDamage,
+    tempHp,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MA-0681 Elemental Absorption] consume log failed:', e); });
+}
+
 export async function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, { campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false, ...options } = {}) {
   if (!combatSummary) return null;
   if (!isUsableRawDamage(rawDamage)) return null;
@@ -816,6 +866,13 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
   const resResult = computeDamageAfterResistancesWithDetails({ rawDamage, damageTypes, resistances: defenses.resistances, immunities: defenses.immunities, ignoreResistance, spellOrigin });
 
   logResistanceOutcomes({ creature, rawDamage, finalDamage: resResult.finalDamage, damageTypes, resistanceDetails: resResult.typeDetails, passiveResistances: defenses.passiveResistances, silenceThunderImmunity: defenses.silenceThunderImmunity, spellOrigin, campaignName });
+
+  // MA-0681: Elemental Cultist Elemental Absorption — when the resistance
+  // that halved THIS instance came from an armed elemental_absorption buff
+  // (press-at-pending-hit), log the raw→halved instance detail and consume
+  // the one-shot stamp so a later hit never re-halves (parry_consumed
+  // MA-0341 one-shot lineage). Zero-effect when no matching armed buff.
+  await consumeElementalAbsorptionOnApply({ creature, rawDamage, finalDamage: resResult.finalDamage, damageTypes, resistanceDetails: resResult.typeDetails, campaignName });
 
   const absorbed = absorbThroughFeaturesAndWards({ creature, isPlayer, playerComputed, playerStats, damageTypes, finalDamage: resResult.finalDamage, campaignName });
   const { finalDamage, damageReducedByFeature, wardDamage, damageAfterTempHp } = absorbed;
