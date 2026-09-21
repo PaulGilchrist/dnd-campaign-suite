@@ -8,6 +8,7 @@ import { legendaryCheckRow, legendaryCheckLabel } from '../../services/encounter
 import { monsterRechargeGate, rechargeDisplayText } from '../../services/encounters/monsterRecharge.js';
 import { isSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { isMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
+import { isMonsterSelfBuffRow } from '../../services/encounters/monsterSelfBuff.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -209,7 +210,26 @@ function SummonLink({ action, spellUsesUsed, attackerCannotAct, onSummonRow }) {
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow }) {
+// MA-0655: monster-side self-buff row (Duergar "Enlarge") — automation
+// {type:"monster_self_buff", effect:"enlarge", rounds:N} arms a clickable
+// self-grant chip routed to resolveMonsterSelfBuffRow in the modal (te on
+// self + one merged expiry clock + spend). Uses counter rides the MA-0020
+// monsterSpellUses gate; exhausted chips stay clickable and refuse honestly.
+function SelfBuffLink({ action, spellUsesUsed, attackerCannotAct, onSelfBuffRow }) {
+  if (!isMonsterSelfBuffRow(action)) return null;
+  const gate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
+  const usesNote = gate ? <em> ({gate.maxUses}/Day · {gate.remaining} left)</em> : null;
+  const spentClass = gate && gate.remaining === 0 ? ' mc-dice-link-spell-spent' : '';
+  const clickable = !attackerCannotAct && !!onSelfBuffRow;
+  const label = action.name || action.automation.effect;
+  return (
+    <span className={`mc-dice-link mc-dice-link-selfbuff${spentClass}`} onClick={clickable ? () => onSelfBuffRow(action) : undefined} role="button" tabIndex={0} title={`Self buff — ${action.name}: te ${action.automation.effect} on self, ${action.automation.rounds || 10} rounds`}>
+      <i className="fa-solid fa-up-right-and-down-left-from-center" /> {label}{usesNote}
+    </span>
+  );
+}
+
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
@@ -227,6 +247,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
       <ZoneAuraLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onZoneAuraRow={onZoneAuraRow} />
       <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} />
+      <SelfBuffLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSelfBuffRow={onSelfBuffRow} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
         <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>

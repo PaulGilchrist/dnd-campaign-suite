@@ -652,6 +652,19 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { ability: 'STR' },
   },
   {
+    // MA-0655: Duergar Enlarge self-buff te — Large size, doubled damage
+    // dice on Strength-based weapon attacks (STR-dice consumer in
+    // MonsterCardModal.handleAttack), STR checks/saves advantage stay
+    // advisory (§70 no generic ability-check advantage channel).
+    effect: 'enlarged',
+    label: 'Enlarged',
+    description: 'The creature magically increases in size to Large and doubles its damage dice on Strength-based weapon attacks. STR checks and saving throws with advantage are GM-enforced (§70 advisory).',
+    icon: 'fa-up-right-and-down-left-from-center',
+    cls: 'effect-buff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
     // MA-0374: Beholder Paralyzing Ray ladder — failed CON save Paralyzes,
     // the target repeats the save at the end of each of its turns ending on
     // a success; auto-succeeds after 1 minute (10-round clock, CLA-334).

@@ -19735,7 +19735,14 @@
             "short",
             "long"
           ]
-        }
+        },
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "enlarged",
+          "rounds": 10
+        },
+        "uses": 1,
+        "maxUses": 1
       },
       {
         "name": "War Pick",
@@ -19743,7 +19750,8 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "1d8 + 2",
-        "damage_type_primary": "piercing"
+        "damage_type_primary": "piercing",
+        "strength_based": true
       },
       {
         "name": "Javelin",
@@ -19751,7 +19759,8 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 2",
-        "damage_type_primary": "piercing"
+        "damage_type_primary": "piercing",
+        "strength_based": true
       },
       {
         "name": "Invisibility",

@@ -24,6 +24,7 @@ import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
+import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount } from '../../services/encounters/monsterSelfBuff.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
@@ -733,12 +734,20 @@ function resolveForcedMode(forcedMode, rangeForcedMode) {
   return forcedMode !== 'normal' ? forcedMode : undefined;
 }
 
-function buildAutoDamageOptions(action, name) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildAutoDamageOptions(action, name, enlarged = false) {
+  // MA-0322: dice rows resolve first (byte-inert); flat prose-only hit
+  // damage ("Hit: 1 Slashing damage.") falls back to a constant formula
+  // the auto-damage seam resolves dice-less.
+  const baseFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || extractFlatHitDamage(action) || null;
+  // MA-0655: Duergar Enlarge — while the attacker carries te `enlarged`,
+  // `strength_based:true` attack rows roll DOUBLE dice count (1d8 + 2 →
+  // 2d8 + 2, 1d6 + 2 → 2d6 + 2); modifier NEVER doubled, crit ×2
+  // still multiplies the doubled formula downstream unchanged. Non-STR rows
+  // and every un-enlarged attack stay byte-identical.
+  const autoDamageFormula = enlarged && action?.strength_based === true ? doublePrimaryDiceCount(baseFormula) : baseFormula;
   return {
-    // MA-0322: dice rows resolve first (byte-inert); flat prose-only hit
-    // damage ("Hit: 1 Slashing damage.") falls back to a constant formula
-    // the auto-damage seam resolves dice-less.
-    autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || extractFlatHitDamage(action) || null,
+    autoDamageFormula,
     autoDamageName: name,
     // MA-0427: MA-0426 secondary keys now produced by the shared transport
     // helper (name falls back to the chip name for synthesized actions).
@@ -890,6 +899,29 @@ function isSpellOriginAction(action) {
     || /spell attack/i.test(action?.description || '');
 }
 
+// MA-0655: Duergar Enlarge attack-damage discriminator — te `enlarged` on
+// the attacker (live monsterTargetEffects channel) doubles the PRIMARY dice
+// count of `strength_based:true` rows (1d8 + 2 → 2d8 + 2) via the auto
+// damage options, with a marked `enlarged` log; modifier untouched, crit ×2
+// still multiplies the doubled formula downstream unchanged. Non-STR rows
+// and every un-enlarged attack stay byte-identical ({ enlarged: false }).
+// eslint-disable-next-line react-refresh/only-export-components
+export function enlargedAttackDamageFields({ monsterTargetEffects, action, name, monsterName, campaignName }) {
+  const enlarged = monsterTargetEffects.some(te => te.effect === 'enlarged' && (!te.target || te.target === monsterName)) && action?.strength_based === true;
+  if (!enlarged) return { enlarged: false };
+  const baseFormula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) ?? action?.damage_dice_primary ?? null;
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'enlarge_damage_doubled',
+    characterName: monsterName,
+    abilityName: name,
+    note: 'enlarged',
+    description: `${monsterName} is Enlarged — ${name} damage dice doubled: ${baseFormula} → ${doublePrimaryDiceCount(baseFormula)} (modifier not doubled).`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MonsterCardModal] Error logging enlarged damage doubling:', e); });
+  return { enlarged: true };
+}
+
 function buildAttackRollOptions(v) {
   return {
     damageType: formatDamageTypes(v.primaryDamageType),
@@ -903,7 +935,7 @@ function buildAttackRollOptions(v) {
     coverAcBonus: v.coverAcBonus,
     coverLevel: v.coverLevel,
     coverReason: v.coverReason,
-    ...buildAutoDamageOptions(v.action, v.name),
+    ...buildAutoDamageOptions(v.action, v.name, v.enlarged === true),
     targetName: v.target?.name,
     attackerName: v.monsterName,
     grazeDamage: v.grazeDamage,
@@ -1633,11 +1665,18 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         .catch((e) => { console.error('[MonsterCardModal] Error spending attack recharge:', e); });
     }
 
+    // MA-0655: Duergar Enlarge consumer — te `enlarged` on self (live
+    // monsterTargetEffects channel) doubles the PRIMARY dice count of
+    // `strength_based:true` attack rows (1d8 + 2 → 2d8 + 2) with a marked
+    // log; modifier untouched, crit ×2 still applies downstream as today.
+    const enlargedFields = enlargedAttackDamageFields({ monsterTargetEffects, action, name, monsterName, campaignName });
+
     rollAttack(name, effectiveBonus, buildAttackRollOptions({
       action,
       name,
       target,
       monsterName,
+      ...enlargedFields,
       primaryDamageType,
       resistanceNotice,
       forcedMode,
@@ -1996,6 +2035,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         // refuses when exhausted with zero roll/zero spawn. Expiry clock,
         // dismiss-as-action and "can't summon other demons" are §70 residuals.
         handleSummonRow={(action) => resolveMonsterSummonRow({ action, monsterName, campaignName, setPopupHtml, storedUses: monsterSpellUses || {} })}
+        // MA-0655: monster-side self-buff row (Duergar "Enlarge") — grants te
+        // `enlarged` on self with ONE merged rounds:10 addExpiration clock,
+        // spends the row's use via the MA-0020 monsterSpellUses map BEFORE
+        // arming, refuses (zero spend) when already enlarged or exhausted.
+        handleSelfBuffRow={(action) => resolveMonsterSelfBuffRow({ action, monsterName, campaignName, setPopupHtml, storedUses: monsterSpellUses || {} })}
       />
       {popupHtml && (
         <MonsterAttackPopup
