@@ -1399,3 +1399,54 @@ describe('MA-0591 Demilich legendary header + delegates_to shape', () => {
     expect(legendaryDelegateAttackName(necrosis, burst)).toBe('Necrosis (Necrotic Burst attack)');
   });
 });
+
+// MA-0675: Elemental Cataclysm legendary_actions[0] was the Eruption CHILD
+// with uses:1 — §99 header-swallow (legendaryHeaderAction returns rows[0] on
+// uses!=null), so Eruption became inert header text and the economy was
+// unreachable. Fix §165 byte-template: canonical header rows[0] + Eruption
+// re-authored as a delegating child onto the +15 Elemental Burst attack row.
+// N=3 mirrors the same-CR-band twins in THIS file (ancient bronze/green CR 22
+// and blob-of-annihilation CR 23 all stamp numeric 3); canonical total is a
+// named honest gap — a correction is a one-line edit of la[0].uses + name.
+describe('MA-0675 Elemental Cataclysm legendary header + Eruption delegation', () => {
+  const cataclysm = monstersData.find(m => m.name === 'Elemental Cataclysm');
+
+  it('legendaryHeaderAction returns the header, no longer the swallowed Eruption child', () => {
+    const header = legendaryHeaderAction(cataclysm);
+    expect(header.name).toBe('Legendary Action Uses: 3');
+    expect(header.uses).toBe(3);
+    expect(legendaryUsesRemaining(header, {})).toBe(3);
+    expect(legendaryUsesRemaining(header, { max: 3, used: 2 })).toBe(1);
+  });
+
+  it('Eruption resolves through legendaryDelegateAction onto the +15 Elemental Burst row', () => {
+    const eruption = cataclysm.legendary_actions.find(r => r.name === 'Eruption');
+    expect(eruption.delegates_to).toBe('Elemental Burst');
+    expect(eruption.uses == null).toBe(true);
+    const burst = legendaryDelegateAction(cataclysm, eruption);
+    expect(burst).not.toBeNull();
+    expect(burst.attack_bonus).toBe(15);
+    expect(burst.damage_dice_primary).toBe('5d6 + 8');
+    expect(burst.damage_type_primary).toBe('Acid');
+    expect(legendaryDelegateAttackName(eruption, burst)).toBe('Eruption (Elemental Burst attack)');
+  });
+
+  it('expending Eruption spends 1 of 3 and stamps the turn latch', async () => {
+    const eruption = cataclysm.legendary_actions.find(r => r.name === 'Eruption');
+    const r = await expendLegendaryUse({ monsterName: 'Elemental Cataclysm 1', monster: cataclysm, actionName: 'Eruption', campaignName: 'test-campaign', action: eruption, deps });
+    expect(r.spent).toBe(true);
+    expect(r.remaining).toBe(2);
+    expect(store['Elemental Cataclysm 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(logs.some(e => e.type === 'ability_use' && /expends a legendary use for Eruption/.test(e.description))).toBe(true);
+  });
+
+  it('exhausted (3/3): Eruption expend refuses with reason exhausted, zero spend', async () => {
+    const eruption = cataclysm.legendary_actions.find(r => r.name === 'Eruption');
+    store['Elemental Cataclysm 1.monsterLegendaryUses'] = { max: 3, used: 3 };
+    const r = await expendLegendaryUse({ monsterName: 'Elemental Cataclysm 1', monster: cataclysm, actionName: 'Eruption', campaignName: 'test-campaign', action: eruption, deps });
+    expect(r.spent).toBe(false);
+    expect(r.reason).toBe('exhausted');
+    expect(store['Elemental Cataclysm 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
+    expect(logs.some(e => e.automationType === 'legendary_use_refused')).toBe(true);
+  });
+});

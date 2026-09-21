@@ -10429,7 +10429,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The cataclysm makes one Elemental Burst attack.",
-      "verified": "broken — see .opencode/plans/bug-MA-0675-eruption.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0676",

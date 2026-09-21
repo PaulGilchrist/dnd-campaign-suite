@@ -20520,9 +20520,14 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, the cataclysm can expend a use to take one of the following actions. The cataclysm regains all expended uses at the start of each of its turns."
+      },
+      {
         "name": "Eruption",
         "description": "The cataclysm makes one Elemental Burst attack.",
-        "uses": 1
+        "delegates_to": "Elemental Burst"
       },
       {
         "name": "Rumbling Movement",
