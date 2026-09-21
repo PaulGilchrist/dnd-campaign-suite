@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';
+import { isMonsterSelfBuffRow, selfBuffRounds } from '../../services/encounters/monsterSelfBuff.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const duergar = monsters.find(m => m.index === 'duergar');
@@ -64,10 +65,48 @@ describe('MA-0655 Enlarge self-buff chip', () => {
     expect(onSelfBuffRow).not.toHaveBeenCalled();
   });
 
-  it('STR weapon + other rows arm no self-buff chip', () => {
+  it('STR weapon rows arm no self-buff chip', () => {
     const { container } = renderRow(WAR_PICK);
     expect(container.querySelector('.mc-dice-link-selfbuff')).toBeNull();
-    const invis = duergar.actions.find(a => a.name === 'Invisibility');
-    expect(renderRow(invis).container.querySelector('.mc-dice-link-selfbuff')).toBeNull();
+  });
+});
+
+// MA-0658: Duergar "Invisibility" rides the SAME self-buff chip seam —
+// automation:{type:"monster_self_buff", effect:"invisible", rounds:600}
+// arms .mc-dice-link-selfbuff with the eye-slash icon + uses counter,
+// routing the modal's resolveMonsterSelfBuffRow (te invisible on self +
+// ONE merged rounds:600 clock + spend; §70 invisibility adjudication).
+describe('MA-0658 Invisibility self-buff chip', () => {
+  const INVIS_ROW = duergar.actions.find(a => a.name === 'Invisibility');
+
+  it('row authors the monster_self_buff automation (no parallel type)', () => {
+    expect(INVIS_ROW.automation).toEqual({ type: 'monster_self_buff', effect: 'invisible', rounds: 600 });
+    expect(INVIS_ROW.uses).toBe(1);
+    expect(INVIS_ROW.maxUses).toBe(1);
+    expect(isMonsterSelfBuffRow(INVIS_ROW)).toBe(true);
+    expect(selfBuffRounds(INVIS_ROW)).toBe(600);
+    expect(INVIS_ROW.usage).toEqual({ type: 'recharge after rest', rest_types: ['short', 'long'] });
+  });
+
+  it('arms a clickable self-buff chip with eye-slash icon + uses counter', () => {
+    const { container, onSelfBuffRow } = renderRow(INVIS_ROW);
+    const chip = container.querySelector('.mc-dice-link-selfbuff');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('Invisibility');
+    expect(chip.textContent).toContain('(1/Day · 1 left)');
+    expect(chip.querySelector('i').className).toContain('fa-eye-slash');
+    expect(chip.getAttribute('title')).toContain('te invisible on self, 600 rounds');
+    fireEvent.click(chip);
+    expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
+    expect(onSelfBuffRow.mock.calls[0][0]).toBe(INVIS_ROW);
+  });
+
+  it('spent row shows 0 left + spent class and stays clickable for honest refusal', () => {
+    const { container, onSelfBuffRow } = renderRow(INVIS_ROW, { spellUsesUsed: { Invisibility: 1 } });
+    const chip = container.querySelector('.mc-dice-link-selfbuff');
+    expect(chip.className).toContain('mc-dice-link-spell-spent');
+    expect(chip.textContent).toContain('0 left');
+    fireEvent.click(chip);
+    expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
   });
 });

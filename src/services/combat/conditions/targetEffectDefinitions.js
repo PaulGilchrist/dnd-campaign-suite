@@ -665,6 +665,20 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-0658: Duergar Invisibility self-buff te — monsterSelfBuff seam
+    // grants it ON SELF with ONE merged rounds:600 (1 hour) clock; attack /
+    // cast / enlarge enders drop it early with a log. Invisibility CONDITION
+    // mechanics (attackers roll blind, attacks against have disadvantage)
+    // are GM-enforced (§70 advisory) — this te carries the self-state only.
+    effect: 'invisible',
+    label: 'Invisible',
+    description: 'The creature magically turns invisible until it attacks, casts a spell, or uses its Enlarge (enders logged), or until its concentration is broken, up to 1 hour. Equipment is invisible with it. Advantage/disadvantage adjudication is GM-enforced (§70 advisory).',
+    icon: 'fa-eye-slash',
+    cls: 'effect-buff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
     // MA-0374: Beholder Paralyzing Ray ladder — failed CON save Paralyzes,
     // the target repeats the save at the end of each of its turns ending on
     // a success; auto-succeeds after 1 minute (10-round clock, CLA-334).

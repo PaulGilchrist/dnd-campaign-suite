@@ -19771,7 +19771,14 @@
             "short",
             "long"
           ]
-        }
+        },
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "invisible",
+          "rounds": 600
+        },
+        "uses": 1,
+        "maxUses": 1
       }
     ],
     "traits": [

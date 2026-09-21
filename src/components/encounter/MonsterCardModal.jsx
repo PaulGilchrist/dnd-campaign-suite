@@ -24,7 +24,7 @@ import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
-import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount } from '../../services/encounters/monsterSelfBuff.js';
+import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount, endSelfBuffOnTrigger } from '../../services/encounters/monsterSelfBuff.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
@@ -1665,6 +1665,16 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         .catch((e) => { console.error('[MonsterCardModal] Error spending attack recharge:', e); });
     }
 
+    // MA-0658: Invisibility attack ender — RAW "until it attacks": an
+    // attack rolled by a monster carrying its OWN self-buff te `invisible`
+    // drops the te + cancels its merged clock with an `invisible_ended`
+    // / ends_on_attack log, before the roll fires. Other monsters/te are
+    // byte-inert (self-origin check on source === attacker).
+    if (monsterTargetEffects.some(te => te.effect === 'invisible' && te.source === monsterName)) {
+      endSelfBuffOnTrigger({ campaignName, monsterName, effectKey: 'invisible', trigger: 'attack', actionName: action?.name })
+        .catch((e) => { console.error('[MonsterCardModal] Error ending invisibility on attack:', e); });
+    }
+
     // MA-0655: Duergar Enlarge consumer — te `enlarged` on self (live
     // monsterTargetEffects channel) doubles the PRIMARY dice count of
     // `strength_based:true` attack rows (1d8 + 2 → 2d8 + 2) with a marked
@@ -1792,6 +1802,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         .catch((e) => { console.error('[MonsterCardModal] Error logging monster spell refusal:', e); });
       return;
     }
+    // MA-0658: Invisibility cast ender — RAW "until it … casts a spell":
+    // a proceeding cast (post-gate) drops the monster's OWN self-buff te
+    // `invisible` with an `invisible_ended` / ends_on_cast log. Reads the
+    // runtime store itself (no stale-closure risk in this useCallback) and
+    // self-gates: no matching self te = zero write, zero log. Exhausted
+    // refusals never spent a cast, so the te stays untouched above.
+    await endSelfBuffOnTrigger({ campaignName, monsterName, effectKey: 'invisible', trigger: 'cast', actionName: action?.name })
+      .catch((e) => { console.error('[MonsterCardModal] Error ending invisibility on cast:', e); });
     const spell = await findMonsterSpell(spellName);
     if (!spell) {
       console.error(`[MonsterCardModal] Spell '${spellName}' not found in spells.json (5e or 2024)`);

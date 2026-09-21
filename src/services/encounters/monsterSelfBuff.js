@@ -9,9 +9,15 @@
 // MA-0020 monsterSpellUses gate (`enlarge_refused`, zero te).
 // STR checks/saves advantage and the rest-rearm clause stay §70 advisory
 // residuals (no generic ability-check advantage channel / rest consumer).
+// MA-0658 extends the SAME seam generically to Duergar "Invisibility"
+// (effect:"invisible", rounds:600): effect-keyed grant/refusal copy +
+// endSelfBuffOnTrigger enders (attack/cast in MonsterCardModal, enlarge
+// here) drop the self te early with an `${effectKey}_ended` log; RAW
+// invisibility advantage adjudication and concentration-break stay §70.
 import { addEntry } from '../ui/logService.js';
 import { registerTargetEffect, getActiveTargetEffect } from '../combat/conditions/targetEffectDefinitions.js';
-import { addExpiration } from '../rules/effects/expirations.js';
+import { addExpiration, KEY as EXPIRATION_KEY } from '../rules/effects/expirations.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup } from './monsterAbilityUses.js';
 
 export function isMonsterSelfBuffRow(row) {
@@ -22,13 +28,27 @@ export function selfBuffRounds(action) {
   return Number(action?.automation?.rounds) || 10;
 }
 
+// 10 rounds = 1 minute (combat-round clock). MA-0655 enlarged twin pins
+// "10 rounds (1 minute)" byte-identical; MA-0658 rounds:600 → "(1 hour)".
+function selfBuffDurationNote(rounds) {
+  const minutes = rounds / 10;
+  if (minutes >= 60) {
+    const hours = minutes / 60;
+    return `${rounds} rounds (${hours} hour${hours === 1 ? '' : 's'})`;
+  }
+  return `${rounds} rounds (${minutes} minute${minutes === 1 ? '' : 's'})`;
+}
+
 export function buildSelfBuffGrantLog({ monsterName, action, effectKey, rounds }) {
+  const effectNote = effectKey === 'enlarged'
+    ? 'damage dice on Strength-based weapon attacks doubled by the attack-damage consumer. STR checks/saves advantage and rest-rearm are GM-enforced (§70 advisory).'
+    : `ends when it attacks, casts a spell, or uses its Enlarge (attack/cast/enlarge enders drop the te with an \`${effectKey}_ended\` log), or when its clock runs out. Concentration-break ender and invisibility advantage/disadvantage adjudication are GM-enforced (§70 advisory).`;
   return {
     type: 'automation',
     automationType: `${effectKey}_granted`,
     characterName: monsterName,
     abilityName: action?.name || 'Self Buff',
-    description: `${monsterName} ${action?.name || 'Self Buff'}: te \`${effectKey}\` armed on itself for ${rounds} rounds (1 minute) — damage dice on Strength-based weapon attacks doubled by the attack-damage consumer. STR checks/saves advantage and rest-rearm are GM-enforced (§70 advisory).`,
+    description: `${monsterName} ${action?.name || 'Self Buff'}: te \`${effectKey}\` armed on itself for ${selfBuffDurationNote(rounds)} — ${effectNote}`,
     timestamp: Date.now(),
   };
 }
@@ -38,10 +58,10 @@ export function buildAlreadyEnlargedRefusalLog({ monsterName, action, effectKey 
   return {
     type: 'automation',
     automationType: `${slug}_refused`,
-    automationDetail: 'already_enlarged',
+    automationDetail: `already_${effectKey}`,
     characterName: monsterName,
     abilityName: action?.name || 'Self Buff',
-    description: `${monsterName} is already ${effectKey} — ${action?.name || 'Self Buff'} refused, zero use spent. Refusal reason: already_enlarged.`,
+    description: `${monsterName} is already ${effectKey} — ${action?.name || 'Self Buff'} refused, zero use spent. Refusal reason: already_${effectKey}.`,
     timestamp: Date.now(),
   };
 }
@@ -52,7 +72,50 @@ export function buildAlreadyEnlargedRefusalPopup({ monsterName, action, effectKe
 
 export function buildSelfBuffPopup({ monsterName, action, effectKey, rounds, remaining }) {
   const usesNote = remaining != null ? ` ${remaining} use(s) left (recharges after a short or long rest, GM-enforced).` : '';
-  return `<div class="mc-prerequisite-refusal"><h3>${monsterName} is ${effectKey.charAt(0).toUpperCase()}${effectKey.slice(1)}</h3><p>${monsterName} grows to Large via ${action?.name || 'Self Buff'} — Strength-based weapon damage dice doubled for ${rounds} rounds (one merged clock). STR checks/saves advantage are GM-enforced (§70).${usesNote}</p></div>`;
+  const body = effectKey === 'enlarged'
+    ? `${monsterName} grows to Large via ${action?.name || 'Self Buff'} — Strength-based weapon damage dice doubled for ${rounds} rounds (one merged clock). STR checks/saves advantage are GM-enforced (§70).`
+    : `${monsterName} turns invisible via ${action?.name || 'Self Buff'} — te \`invisible\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Ends on attack, spell cast, or Enlarge (logged); invisibility adjudication is GM-enforced (§70).`;
+  return `<div class="mc-prerequisite-refusal"><h3>${monsterName} is ${effectKey.charAt(0).toUpperCase()}${effectKey.slice(1)}</h3><p>${body}${usesNote}</p></div>`;
+}
+
+// MA-0658: ender log — self-buff te dropped before its clock by a RAW
+// end trigger (attack / cast / enlarge), with the merged clock cancelled.
+export function buildSelfBuffEndLog({ monsterName, effectKey, trigger, actionName }) {
+  return {
+    type: 'automation',
+    automationType: `${effectKey}_ended`,
+    automationDetail: `ends_on_${trigger}`,
+    characterName: monsterName,
+    abilityName: actionName || 'Self Buff',
+    description: `${monsterName}'s ${effectKey} ends on ${trigger} — te \`${effectKey}\` dropped and its expiration clock cancelled.`,
+    timestamp: Date.now(),
+  };
+}
+
+// MA-0658: RAW ender consumer shared by the attack / cast / enlarge seams.
+// Drops a monster-self-buff-origin te (target === source === monster) from
+// the campaign targetEffects store, cancels its merged addExpiration clock
+// entry, and logs `${effectKey}_ended` / ends_on_${trigger}. Returns false
+// (zero write, zero log) when the creature carries no matching self te.
+export async function endSelfBuffOnTrigger({ campaignName, monsterName, effectKey, trigger, actionName, deps = {} }) {
+  const getVal = deps.getRuntimeValue || getRuntimeValue;
+  const setVal = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const stored = getVal('campaign', 'targetEffects', campaignName);
+  if (!Array.isArray(stored)) return false;
+  const te = stored.find(e => e.target === monsterName && e.effect === effectKey && e.source === monsterName);
+  if (!te) return false;
+  setVal('campaign', 'targetEffects', stored.filter(e => e !== te), campaignName);
+  const list = getVal(monsterName, EXPIRATION_KEY, campaignName);
+  if (Array.isArray(list)) {
+    const remaining = list.filter(entry => !(entry.target === monsterName && Array.isArray(entry.effects)
+      && entry.effects.some(ef => ef.type === 'remove_target_effect' && ef.effectKey === effectKey && ef.source === monsterName)));
+    if (remaining.length !== list.length) {
+      setVal(monsterName, EXPIRATION_KEY, remaining, campaignName);
+    }
+  }
+  await log(campaignName, buildSelfBuffEndLog({ monsterName, effectKey, trigger, actionName }));
+  return true;
 }
 
 // Doubles the primary dice COUNT of a damage formula (1d8 + 2 → 2d8 + 2),
@@ -107,6 +170,12 @@ export async function resolveMonsterSelfBuffRow({ action, monsterName, campaignN
     rounds,
     effects: [{ type: 'remove_target_effect', effectKey, source: monsterName, target: monsterName }],
   });
+  // MA-0658: Enlarge ender — RAW "until it … uses its Enlarge": granting
+  // Enlarge drops the duergar's own te `invisible` (self-origin) with an
+  // `invisible_ended` / ends_on_enlarge log and clock cancel.
+  if (effectKey === 'enlarged') {
+    await endSelfBuffOnTrigger({ campaignName, monsterName, effectKey: 'invisible', trigger: 'enlarge', actionName: action.name, deps });
+  }
   await log(campaignName, buildSelfBuffGrantLog({ monsterName, action, effectKey, rounds }));
   setPopupHtml(buildSelfBuffPopup({ monsterName, action, effectKey, rounds, remaining }));
   return { resolved: true, effectKey, rounds, remaining };

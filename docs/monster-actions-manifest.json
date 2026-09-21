@@ -10175,7 +10175,7 @@
         "invisible"
       ],
       "description": "The duergar magically turns invisible until it attacks, casts a spell, or uses its Enlarge, or until its concentration is broken, up to 1 hour (as if concentrating on a spell). Any equipment the duergar wears or carries is invisible with it .",
-      "verified": "broken — see .opencode/plans/bug-MA-0658-invisibility.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0659",
