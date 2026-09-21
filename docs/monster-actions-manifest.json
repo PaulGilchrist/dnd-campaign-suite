@@ -10756,7 +10756,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The empyrean makes one Divine Ray attack.",
-      "verified": "broken — see .opencode/plans/bug-MA-0696-smite.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0697",
