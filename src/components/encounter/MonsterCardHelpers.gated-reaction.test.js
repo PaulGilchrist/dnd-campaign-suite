@@ -744,3 +744,45 @@ describe('MA-0681 resolveMonsterElementalAbsorption press → arm + spend + THP'
   });
 });
 
+// MA-0702: Erinyes Parry — MA-0643 routine DATA twin. Disk reactions[0] was
+// prose-only (name/trigger/description) = gate-null inert; fix authors the
+// MA-0341 byte-shape with acBonus 4 (RAW: +4 AC vs the triggering melee hit).
+const ERINYES_ACTION = monsters.find(m => m.index === 'erinyes').reactions[0];
+const ERINYES = 'Erinyes 1';
+
+describe('MA-0702 Erinyes Parry — data-lock + acBonus 4', () => {
+  it('monsters.json erinyes reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 4)', () => {
+    expect(ERINYES_ACTION.name).toBe('Parry');
+    expect(ERINYES_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 4 });
+    expect(ERINYES_ACTION.usage).toBe('At Will');
+    expect(ERINYES_ACTION.uses).toBe(999);
+    expect(ERINYES_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(ERINYES_ACTION)?.effect).toBe('parry');
+  });
+
+  it('gate accepts unresolved melee hit on the erinyes and refuses a 2nd same-round press', () => {
+    const hit = { attackerName: 'Bandit 1', targetName: ERINYES, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 3, total: 20, targetAc: 18, effectiveAc: 18 };
+    const g = parryGate({ lastAttack: hit, monsterName: ERINYES, currentRound: 3, storedUses: {}, usedRound: 0, action: ERINYES_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+    const again = parryGate({ lastAttack: hit, monsterName: ERINYES, currentRound: 3, storedUses: {}, usedRound: 3, action: ERINYES_ACTION });
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('round');
+  });
+
+  it('resolve: +4 AC stamp, AC 18 → 22 flips the 18-21 window hit to miss, At Will never spends uses', async () => {
+    const hit = { attackerName: 'Bandit 1', targetName: ERINYES, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 3, total: 20, targetAc: 18, effectiveAc: 18 };
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+    const result = await resolveMonsterGatedReaction({ action: ERINYES_ACTION, monsterName: ERINYES, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(4);
+    expect(result.newAc).toBe(22);
+    expect(result.newAc).toBeGreaterThan(hit.total);
+    expect(state[`${ERINYES}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 4)).toBe(true);
+    expect(state[`${ERINYES}._parry_usedRound`]).toBe(3);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: ERINYES, parryAcBonus: 4 });
+    expect(state[`${ERINYES}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 18 → 22/);
+  });
+});
+

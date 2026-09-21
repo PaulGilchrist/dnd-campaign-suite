@@ -10850,7 +10850,7 @@
       "actionType": "other",
       "trigger": "The erinyes is hit by a melee attack roll while holding a weapon.",
       "description": "The erinyes adds 4 to its AC against that attack, possibly causing it to miss.",
-      "verified": "broken — see .opencode/plans/bug-MA-0702-parry.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0703",
