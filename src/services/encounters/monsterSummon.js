@@ -10,6 +10,13 @@
 // monsterSpellUses gate/spend/refusal untouched (numeric uses/maxUses).
 // "Can't summon other demons", dismiss-as-action and the exact 10-minute
 // expiry clock stay §70 advisory residuals on the summon log.
+// MA-0664: optional `count` dice (Dust Mephit "Variant: Summon Mephits" —
+// 25% chance of 1d4 dust mephits): the count roll lands AFTER the chance
+// flip succeeds (failed flip = zero count roll, zero spawn); N copies spawn
+// with unique names via the EB getNextUniqueMonsterName seam, ONE summons
+// log lists all names + count detail, te "summoned" per spawn carrying the
+// row's duration_minutes. Rows without `count` spawn exactly one copy,
+// byte-identical to MA-0648 behavior.
 import { addEntry } from '../ui/logService.js';
 import { registerTargetEffect } from '../combat/conditions/targetEffectDefinitions.js';
 import { rollDie, rollExpression } from '../dice/diceRoller.js';
@@ -61,18 +68,23 @@ export function buildSummonCoinFlipLog({ monsterName, action, verdict }) {
     total: verdict.roll ?? 0,
     bonus: 0,
     mode: 'normal',
-    description: `${monsterName} flips for ${action.name}: d100 ${verdict.roll} vs ${pct}% — ${verdict.success ? `success, summons ${verdict.monster}` : (verdict.monster ? `failure, falls back to ${verdict.monster}` : 'failure, no demon answers')}.`,
+    description: `${monsterName} flips for ${action.name}: d100 ${verdict.roll} vs ${pct}% — ${verdict.success ? `success, summons ${verdict.monster}` : (verdict.monster ? `failure, falls back to ${verdict.monster}` : 'failure, no summon answers')}.`,
     timestamp: Date.now(),
   };
 }
 
-export function buildSummonSpawnLog({ monsterName, action, summonedName, durationMinutes }) {
+export function buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll = null, durationMinutes }) {
+  const names = summonedNames.join(', ');
+  const countDetail = countRoll ? `${action.automation.count} rolled ${countRoll.total} (${countRoll.rolls.join(' + ')}): ` : '';
+  const plural = summonedNames.length > 1;
   return {
     type: 'summons',
     characterName: monsterName,
-    summonName: summonedName,
-    description: `${monsterName} summons ${summonedName} via ${action.name} — ally of ${monsterName}, appears within ${action.automation.range_ft ?? 60} ft, remains ${durationMinutes} minutes (expiry clock, dismiss-as-action and "can't summon other demons" are §70 GM-enforced residuals).`,
-    summonedCreatures: [summonedName],
+    summonName: names,
+    summonCount: summonedNames.length,
+    countRoll,
+    description: `${monsterName} summons ${countDetail}${names} via ${action.name} — ${plural ? 'allies' : 'ally'} of ${monsterName}, ${plural ? 'appear' : 'appears'} within ${action.automation.range_ft ?? 60} ft, ${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (expiry clock, dismiss-as-action and "can't summon other ${plural ? 'creatures' : 'creature'}" are §70 GM-enforced residuals).`,
+    summonedCreatures: summonedNames,
     timestamp: Date.now(),
   };
 }
@@ -106,8 +118,8 @@ async function resolveSummonSelfDamageOutcome({ action, monsterName, campaignNam
   const combatSummary = getCS(campaignName) || { round: 1, creatures: [] };
   if (!Array.isArray(combatSummary.creatures)) combatSummary.creatures = [];
   verdict.selfDamage = await applySummonSelfDamage({ action, monsterName, campaignName, combatSummary, deps });
-  setPopupHtml(buildSummonPopup({ monsterName, summonedName: null, verdict, remaining }));
-  return { resolved: true, summonedName: null, verdict, remaining };
+  setPopupHtml(buildSummonPopup({ monsterName, summonedNames: [], verdict, remaining }));
+  return { resolved: true, summonedName: null, summonedNames: [], countRoll: null, verdict, remaining };
 }
 
 async function applySummonSelfDamage({ action, monsterName, campaignName, combatSummary, deps }) {
@@ -124,14 +136,30 @@ async function applySummonSelfDamage({ action, monsterName, campaignName, combat
   return { ...damageRoll, applied: result?.finalDamage ?? 0 };
 }
 
-export function buildSummonPopup({ monsterName, summonedName, verdict, remaining }) {
-  const flip = verdict.roll != null ? `Coin flip: d100 ${verdict.roll} — ${verdict.success ? 'summon attempt succeeds' : 'attempt fails'}.\n` : '';
+function summonFlipNote(verdict) {
+  if (verdict.roll == null) return '';
+  return `Coin flip: d100 ${verdict.roll} — ${verdict.success ? 'summon attempt succeeds' : 'attempt fails'}.\n`;
+}
+
+function summonCountNote(countRoll) {
+  if (!countRoll) return '';
+  return ` Count: ${countRoll.formula || 'dice'} rolled ${countRoll.total}.`;
+}
+
+export function buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll = null, durationMinutes = 10 }) {
+  const flip = summonFlipNote(verdict);
   const usesNote = remaining != null ? ` ${remaining} use(s) left today (resets at dawn, GM-enforced).` : '';
-  if (!summonedName) {
-    const selfNote = verdict.selfDamage ? ` ${monsterName} takes ${verdict.selfDamage.applied} ${verdict.selfDamage.damageType || 'psychic'} damage (rolled ${verdict.selfDamage.rolls.join(' + ')}).` : '';
-    return `<div class="mc-prerequisite-refusal"><h3>${monsterName}'s summon fails</h3><p>${flip}No demon answers the call.${selfNote}${usesNote}</p></div>`;
+  if (!summonedNames || summonedNames.length === 0) {
+    const dmg = verdict.selfDamage;
+    const selfNote = dmg ? ` ${monsterName} takes ${dmg.applied} ${dmg.damageType || 'psychic'} damage (rolled ${dmg.rolls.join(' + ')}).` : '';
+    return `<div class="mc-prerequisite-refusal"><h3>${monsterName}'s summon fails</h3><p>${flip}No summon answers the call.${selfNote}${usesNote}</p></div>`;
   }
-  return `<div class="mc-prerequisite-refusal"><h3>${monsterName} summons ${summonedName}</h3><p>${flip}${summonedName} joins the fight as an ally of ${monsterName}, acting right after it, for 10 minutes (§70 expiry GM-enforced).${usesNote}</p></div>`;
+  const names = summonedNames.join(', ');
+  const plural = summonedNames.length > 1;
+  const crowd = plural ? `${summonedNames.length} copies join` : `${names} joins`;
+  const ally = plural ? 'allies' : 'an ally';
+  const minutes = durationMinutes === 1 ? 'minute' : 'minutes';
+  return `<div class="mc-prerequisite-refusal"><h3>${monsterName} summons ${names}</h3><p>${flip}${crowd} the fight as ${ally} of ${monsterName}, acting right after it, for ${durationMinutes} ${minutes} (§70 expiry GM-enforced).${summonCountNote(countRoll)}${usesNote}</p></div>`;
 }
 
 function getCasterInitiativeValue(combatSummary, casterName) {
@@ -182,34 +210,39 @@ async function gateAndSpendSummon({ action, monsterName, campaignName, setPopupH
   return remaining == null ? { ok: false } : { ok: true, remaining };
 }
 
-function spawnSummonedCreature({ combatSummary, monster, monsterName, campaignName, deps }) {
+function spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count, durationMinutes, deps }) {
   // Base name on an empty board (expandMonstersToCreatures naming),
-  // numbered suffix on collision (EB-join getNextUniqueMonsterName seam).
-  const summonedName = combatSummary.creatures.some(c => c.name === monster.name)
-    ? getNextUniqueMonsterName(monster.name, combatSummary.creatures)
-    : monster.name;
-  const initiativeValue = getCasterInitiativeValue(combatSummary, monsterName);
-  const creature = buildSummonedCreature({ monster, name: summonedName, casterName: monsterName, initiativeValue });
-  combatSummary.creatures.push(creature);
+  // numbered suffix on collision (EB-join getNextUniqueMonsterName seam);
+  // MA-0664: N copies spawn in sequence so each collision re-suffixes.
+  const register = deps.registerTargetEffect || registerTargetEffect;
+  const summonedNames = [];
+  for (let i = 0; i < count; i++) {
+    const summonedName = combatSummary.creatures.some(c => c.name === monster.name)
+      ? getNextUniqueMonsterName(monster.name, combatSummary.creatures)
+      : monster.name;
+    const initiativeValue = getCasterInitiativeValue(combatSummary, monsterName);
+    combatSummary.creatures.push(buildSummonedCreature({ monster, name: summonedName, casterName: monsterName, initiativeValue }));
+    register(campaignName, summonedName, 'summoned', monsterName, { duration: `${durationMinutes}_minutes` });
+    summonedNames.push(summonedName);
+  }
   combatSummary.creatures.sort((a, b) => {
     const aInit = a.initiative === '' || a.initiative === undefined ? 0 : Number(a.initiative);
     const bInit = b.initiative === '' || b.initiative === undefined ? 0 : Number(b.initiative);
     return bInit - aInit;
   });
-  const register = deps.registerTargetEffect || registerTargetEffect;
-  register(campaignName, summonedName, 'summoned', monsterName, { duration: '10_minutes' });
   const setCS = deps.setCombatSummary || ((cs) => storage.set('combatSummary', cloneDeep(cs), campaignName));
   setCS(combatSummary);
   if (!deps.skipDomEvents) {
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
   }
-  return summonedName;
+  return summonedNames;
 }
 
 // One chip click: exhausted rows refuse with zero roll/zero spend/zero spawn;
-// otherwise spend 1/Day FIRST (double-spend guard), coin-flip, spawn the
-// chosen monster into combatSummary as an ally acting right after the
-// caster, register te "summoned", and log attempt + outcome + spawn.
+// otherwise spend 1/Day FIRST (double-spend guard), coin-flip, roll the
+// optional MA-0664 count dice only AFTER the flip lands, spawn N copies into
+// combatSummary as allies acting right after the caster, register te
+// "summoned" per spawn, and log attempt + count/spawn detail.
 export async function resolveMonsterSummonRow({ action, monsterName, campaignName, setPopupHtml, storedUses = {}, deps = {} }) {
   if (!isMonsterSummonRow(action)) return { resolved: false, reason: 'not-monster-summon' };
   const log = deps.addEntry || addEntry;
@@ -226,20 +259,42 @@ export async function resolveMonsterSummonRow({ action, monsterName, campaignNam
     return resolveSummonSelfDamageOutcome({ action, monsterName, campaignName, setPopupHtml, verdict, remaining, deps });
   }
 
+  // MA-0664: failed flip with no fallback and no self-damage (Dust Mephit
+  // 25%) — honest zero-count/zero-spawn refusal popup, use already spent.
+  if (verdict.monster == null) {
+    setPopupHtml(buildSummonPopup({ monsterName, summonedNames: [], verdict, remaining }));
+    return { resolved: true, summonedName: null, summonedNames: [], countRoll: null, verdict, remaining };
+  }
+
+  return resolveSummonSpawn({ action, monsterName, campaignName, setPopupHtml, verdict, remaining, deps });
+}
+
+async function resolveSummonSpawn({ action, monsterName, campaignName, setPopupHtml, verdict, remaining, deps }) {
+  const log = deps.addEntry || addEntry;
   const monsters = deps.monsters || await loadMonsters();
   const monster = monsters.find(m => m.index === verdict.monster);
   if (!monster) {
     console.error(`[monsterSummon] Monster "${verdict.monster}" not found in monsters.json`);
-    setPopupHtml(buildSummonPopup({ monsterName, summonedName: verdict.monster, verdict, remaining }));
+    setPopupHtml(buildSummonPopup({ monsterName, summonedNames: [], verdict, remaining }));
     return { resolved: false, reason: 'monster-not-found' };
   }
+
+  // MA-0664: count dice roll lands ONLY here, after the chance flip has
+  // landed a monster. Rows without `count` spawn one copy, byte-identical.
+  const countRoll = action.automation.count ? (deps.rollExpression || rollExpression)(action.automation.count) : null;
+  if (action.automation.count && !countRoll) {
+    console.error(`[monsterSummon] unparsable count "${action.automation.count}" on ${action.name}`);
+    setPopupHtml(buildSummonPopup({ monsterName, summonedNames: [], verdict, remaining }));
+    return { resolved: false, reason: 'count-unparsable' };
+  }
+  const durationMinutes = action.automation.duration_minutes ?? 10;
 
   const getCS = deps.getCombatSummary || getCombatSummary;
   const combatSummary = getCS(campaignName) || { round: 1, creatures: [] };
   if (!Array.isArray(combatSummary.creatures)) combatSummary.creatures = [];
-  const summonedName = spawnSummonedCreature({ combatSummary, monster, monsterName, campaignName, deps });
+  const summonedNames = spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count: countRoll?.total ?? 1, durationMinutes, deps });
 
-  await log(campaignName, buildSummonSpawnLog({ monsterName, action, summonedName, durationMinutes: action.automation.duration_minutes ?? 10 }));
-  setPopupHtml(buildSummonPopup({ monsterName, summonedName, verdict, remaining }));
-  return { resolved: true, summonedName, verdict, remaining };
+  await log(campaignName, buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll, durationMinutes }));
+  setPopupHtml(buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll, durationMinutes }));
+  return { resolved: true, summonedName: summonedNames[0], summonedNames, countRoll, verdict, remaining };
 }

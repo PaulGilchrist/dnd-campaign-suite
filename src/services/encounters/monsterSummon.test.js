@@ -111,7 +111,7 @@ describe('MA-0648 activation', () => {
       storedUses: {},
       deps,
     });
-    expect(result).toEqual({ resolved: true, summonedName: 'Shadow Demon', verdict: { monster: 'shadow-demon', roll: 42, success: true, chance: 0.5 }, remaining: 0 });
+    expect(result).toMatchObject({ resolved: true, summonedName: 'Shadow Demon', summonedNames: ['Shadow Demon'], countRoll: null, verdict: { monster: 'shadow-demon', roll: 42, success: true, chance: 0.5 }, remaining: 0 });
     expect(deps.store.uses).toEqual({ 'Summon Demon': 1 });
     const spawned = deps.store.cs.creatures.find(c => c.name === 'Shadow Demon');
     expect(spawned).toMatchObject({ type: 'npc', monsterIndex: 'shadow-demon', ac: 14, maxHp: 66, currentHp: 66, summonedBy: 'Drow Mage 1', summonSource: 'monster_ability', initiative: '11.9' });
@@ -194,7 +194,7 @@ describe('MA-0648 activation', () => {
       deps,
     });
     expect(result.summonedName).toBe('Quasit 1');
-    const log = buildSummonSpawnLog({ monsterName: 'Drow Mage 1', action: SUMMON_ROW, summonedName: 'Quasit 1', durationMinutes: 10 });
+    const log = buildSummonSpawnLog({ monsterName: 'Drow Mage 1', action: SUMMON_ROW, summonedNames: ['Quasit 1'], durationMinutes: 10 });
     expect(log.summonedCreatures).toEqual(['Quasit 1']);
     const flipLog = buildSummonCoinFlipLog({ monsterName: 'Drow Mage 1', action: SUMMON_ROW, verdict: { monster: 'quasit', roll: 77, success: false, chance: 0.5 } });
     expect(flipLog.total).toBe(77);
@@ -273,7 +273,7 @@ describe('MA-0651 failed summon with no fallback', () => {
     expect(deps.store.uses).toEqual({ 'Summon Demon': 1 });
     const flipLog = deps.logs.find(e => e.rollType === 'monster_summon_coin_flip');
     expect(flipLog.description).toContain('d100 88 vs 30%');
-    expect(flipLog.description).toContain('failure, no demon answers');
+    expect(flipLog.description).toContain('failure, no summon answers');
     const dmgLog = deps.logs.find(e => e.rollType === 'monster_summon_self_damage');
     expect(dmgLog).toMatchObject({ type: 'roll damage', characterName: 'Drow Priestess of Lolth', rolls: [7], total: 7, damageType: 'psychic', formula: '1d10' });
     expect(dmgLog.description).toContain('7 psychic damage (rolled 7)');
@@ -340,5 +340,143 @@ describe('MA-0651 failed summon with no fallback', () => {
     const log = buildSummonSelfDamageLog({ monsterName: 'Drow Priestess of Lolth', action: PRIESTESS_ROW, damageRoll: { total: 5, rolls: [5], modifier: 0, formula: '1d10' } });
     expect(log).toMatchObject({ type: 'roll damage', rollType: 'monster_summon_self_damage', total: 5, damageType: 'psychic' });
     expect(log.description).toContain('5 psychic damage (rolled 5)');
+  });
+});
+
+// MA-0664: Dust Mephit "Variant: Summon Mephits" (actions[2]) — formerly an
+// inert usage-only row. Authored automation {monster_summon, options:[dust-
+// mephit @ 25%], count:"1d4", range_ft:60, duration_minutes:1} + numeric
+// uses/maxUses:1 rides the MA-0648 seam extended with COUNT: the count dice
+// rolls only AFTER the chance flip succeeds (failed flip = zero count roll,
+// zero spawn, honest popup, 1/Day already spent); N self-copies spawn with
+// unique names via getNextUniqueMonsterName, ONE summons log lists names +
+// count detail, te "summoned" per spawn with the row's 1-minute duration.
+const dustMephit = monstersData.find(m => m.index === 'dust-mephit');
+const SUMMON_MEPHITS_ROW = dustMephit.actions[2];
+
+function makeCountDeps(cs, coin = 25, countRoll = { total: 3, rolls: [1, 1, 1], modifier: 0, formula: '1d4' }, uses = {}) {
+  const deps = makeDeps({ cs, uses }, coin);
+  deps.monsters = [dustMephit];
+  deps.rollExpression = vi.fn(() => countRoll);
+  return deps;
+}
+
+describe('MA-0664 dust-mephit summon data', () => {
+  it('actions[2] authors monster_summon + count dice + numeric 1/Day gate, keeps usage', () => {
+    expect(SUMMON_MEPHITS_ROW.name).toBe('Variant: Summon Mephits');
+    expect(SUMMON_MEPHITS_ROW.automation).toEqual({
+      type: 'monster_summon',
+      options: [{ monster: 'dust-mephit', chance: 0.25 }],
+      count: '1d4',
+      range_ft: 60,
+      duration_minutes: 1,
+    });
+    expect(SUMMON_MEPHITS_ROW.uses).toBe(1);
+    expect(SUMMON_MEPHITS_ROW.maxUses).toBe(1);
+    expect(SUMMON_MEPHITS_ROW.usage).toEqual({ type: 'per day', times: 1 });
+    expect(isMonsterSummonRow(SUMMON_MEPHITS_ROW)).toBe(true);
+    expect(dustMephit.hit_points).toBeGreaterThan(0);
+    expect(dustMephit.actions.length).toBeGreaterThan(0);
+  });
+
+  it('chance boundary: d100 25 lands, 26 fails with no fallback', () => {
+    expect(adjudicateSummonAttempt(SUMMON_MEPHITS_ROW.automation.options, () => 25)).toMatchObject({ monster: 'dust-mephit', roll: 25, success: true, chance: 0.25 });
+    expect(adjudicateSummonAttempt(SUMMON_MEPHITS_ROW.automation.options, () => 26)).toEqual({ monster: null, roll: 26, success: false, chance: 0.25 });
+  });
+});
+
+describe('MA-0664 count spawn resolution', () => {
+  it('failed flip d100 26: spends 1/Day, ZERO count roll, ZERO spawn/te, honest fails popup', async () => {
+    const deps = makeCountDeps({ round: 1, creatures: [{ name: 'Dust Mephit 1', type: 'npc', initiative: '14', currentHp: 17, maxHp: 17 }] }, 26);
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: SUMMON_MEPHITS_ROW,
+      monsterName: 'Dust Mephit 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: {},
+      deps,
+    });
+    expect(result).toMatchObject({ resolved: true, summonedName: null, summonedNames: [], countRoll: null, remaining: 0 });
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(deps.setCombatSummary).not.toHaveBeenCalled();
+    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(deps.store.cs.creatures).toHaveLength(1);
+    expect(deps.store.uses).toEqual({ 'Variant: Summon Mephits': 1 });
+    expect(deps.logs.find(e => e.rollType === 'monster_summon_coin_flip').description).toContain('d100 26 vs 25%');
+    expect(deps.logs.some(e => e.type === 'summons')).toBe(false);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('summon fails'));
+  });
+
+  it('success flip d100 25 + 1d4=3: count rolled AFTER flip, 3 unique-named self-copies spawn after caster, te per spawn @1_minutes, ONE summons log with count detail', async () => {
+    const deps = makeCountDeps({ round: 1, creatures: [{ name: 'Dust Mephit 1', type: 'npc', initiative: '14', currentHp: 17, maxHp: 17 }] }, 25);
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: SUMMON_MEPHITS_ROW,
+      monsterName: 'Dust Mephit 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: {},
+      deps,
+    });
+    expect(deps.rollDie).toHaveBeenCalledTimes(1);
+    expect(deps.rollExpression).toHaveBeenCalledWith('1d4');
+    expect(result).toMatchObject({ resolved: true, summonedName: 'Dust Mephit', countRoll: { total: 3 } });
+    // getNextUniqueMonsterName always-suffix quirk: summoner "Dust Mephit 1"
+    // pins maxNum=1, so copies land on 2/3 — names stay unique, as intended.
+    expect(result.summonedNames).toEqual(['Dust Mephit', 'Dust Mephit 2', 'Dust Mephit 3']);
+    const spawned = deps.store.cs.creatures.filter(c => c.monsterIndex === 'dust-mephit');
+    expect(spawned.map(c => c.name)).toEqual(['Dust Mephit', 'Dust Mephit 2', 'Dust Mephit 3']);
+    for (const c of spawned) {
+      expect(c).toMatchObject({ type: 'npc', ac: 12, maxHp: 17, currentHp: 17, summonedBy: 'Dust Mephit 1', summonSource: 'monster_ability', initiative: '13.9' });
+    }
+    expect(deps.registerTargetEffect).toHaveBeenCalledTimes(3);
+    for (const name of result.summonedNames) {
+      expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', name, 'summoned', 'Dust Mephit 1', { duration: '1_minutes' });
+    }
+    const spawnLogs = deps.logs.filter(e => e.type === 'summons');
+    expect(spawnLogs).toHaveLength(1);
+    expect(spawnLogs[0].summonedCreatures).toEqual(['Dust Mephit', 'Dust Mephit 2', 'Dust Mephit 3']);
+    expect(spawnLogs[0].summonCount).toBe(3);
+    expect(spawnLogs[0].countRoll).toEqual({ total: 3, rolls: [1, 1, 1], modifier: 0, formula: '1d4' });
+    expect(spawnLogs[0].description).toContain('1d4 rolled 3');
+    expect(spawnLogs[0].description).toContain('60 ft');
+    expect(spawnLogs[0].description).toContain('remain 1 minutes');
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Count: 1d4 rolled 3'));
+  });
+
+  it('count 1 spawns base name only, no suffix on empty board', async () => {
+    const deps = makeCountDeps({ round: 1, creatures: [{ name: 'Bandit', type: 'npc', initiative: '10' }] }, 12, { total: 1, rolls: [1], modifier: 0, formula: '1d4' });
+    const result = await resolveMonsterSummonRow({
+      action: SUMMON_MEPHITS_ROW,
+      monsterName: 'Dust Mephit 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      storedUses: {},
+      deps,
+    });
+    expect(result.summonedNames).toEqual(['Dust Mephit']);
+    expect(deps.store.cs.creatures.map(c => c.name)).toEqual(['Bandit', 'Dust Mephit']);
+  });
+
+  it('1/Day gate: second click refused with variant_summon_mephits_refused, zero coin/count/spend/spawn', async () => {
+    const deps = makeCountDeps({ round: 1, creatures: [{ name: 'Dust Mephit 1', initiative: '14' }] }, 5, { total: 4 }, { 'Variant: Summon Mephits': 1 });
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: SUMMON_MEPHITS_ROW,
+      monsterName: 'Dust Mephit 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: { 'Variant: Summon Mephits': 1 },
+      deps,
+    });
+    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(deps.setCombatSummary).not.toHaveBeenCalled();
+    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(deps.logs.find(e => e.automationType === 'variant_summon_mephits_refused')).toBeTruthy();
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
   });
 });

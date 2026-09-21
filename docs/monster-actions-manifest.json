@@ -10265,7 +10265,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The mephit has a 25 percent chance of summoning 1d4 mephits of its kind. A summoned mephit appears in an unoccupied space within 60 feet of its summoner, acts as an ally of its summoner, and can't summon other mephits. It remains for 1 minute, until it or its summoner dies, or until its summoner dismisses it as an action.",
-      "verified": "broken — see .opencode/plans/bug-MA-0664-summon-mephits.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0665",
