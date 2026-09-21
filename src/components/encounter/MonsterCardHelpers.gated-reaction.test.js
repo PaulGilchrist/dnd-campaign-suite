@@ -535,3 +535,45 @@ describe('MA-0573 Death Knight Aspirant Parry — data-lock + acBonus 4', () => 
     expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 20 → 24/);
   });
 });
+
+// MA-0643: Drow Elite Warrior Parry — MA-0341 routine DATA twin. Disk
+// reactions[0] was prose-only = gate-null inert; fix authors the MA-0341
+// byte-shape with acBonus 3 (RAW: +3 AC vs the triggering melee hit).
+const DROW_ACTION = monsters.find(m => m.index === 'drow-elite-warrior').reactions[0];
+const DROW = 'Drow Elite Warrior 1';
+
+describe('MA-0643 Drow Elite Warrior Parry — data-lock + acBonus 3', () => {
+  it('monsters.json drow-elite-warrior reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 3)', () => {
+    expect(DROW_ACTION.name).toBe('Parry');
+    expect(DROW_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 3 });
+    expect(DROW_ACTION.usage).toBe('At Will');
+    expect(DROW_ACTION.uses).toBe(999);
+    expect(DROW_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(DROW_ACTION)?.effect).toBe('parry');
+  });
+
+  it('gate accepts unresolved melee hit on the drow and refuses a 2nd same-round press', () => {
+    const hit = { attackerName: 'Gladiator 1', targetName: DROW, attackName: 'Spear', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 7, total: 19, targetAc: 18, effectiveAc: 18 };
+    const g = parryGate({ lastAttack: hit, monsterName: DROW, currentRound: 3, storedUses: {}, usedRound: 0, action: DROW_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+    const again = parryGate({ lastAttack: hit, monsterName: DROW, currentRound: 3, storedUses: {}, usedRound: 3, action: DROW_ACTION });
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('round');
+  });
+
+  it('resolve: +3 AC stamp, AC 18 → 21 flips the 18-20 window hit to miss, At Will never spends uses', async () => {
+    const hit = { attackerName: 'Gladiator 1', targetName: DROW, attackName: 'Spear', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 7, total: 19, targetAc: 18, effectiveAc: 18 };
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+    const result = await resolveMonsterGatedReaction({ action: DROW_ACTION, monsterName: DROW, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(3);
+    expect(result.newAc).toBe(21);
+    expect(result.newAc).toBeGreaterThan(hit.total);
+    expect(state[`${DROW}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 3)).toBe(true);
+    expect(state[`${DROW}._parry_usedRound`]).toBe(3);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: DROW, parryAcBonus: 3 });
+    expect(state[`${DROW}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 18 → 21/);
+  });
+});
