@@ -3296,3 +3296,97 @@ describe('MA-0609 Djinni Storm Bolt prone hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const EMPYREAN = monsters.find(m => m.index === 'empyrean');
+const SACRED_WEAPON_ACTION = EMPYREAN.actions[1];
+
+describe('MA-0691 Empyrean Sacred Weapon stunned hit-clause', () => {
+    const deps = {
+        characterName: 'Empyrean 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Empyrean 1', computedStats: { armorClass: 22 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 31, newHp: 968, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'monster', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0691 data-lock: authors hit_conditions:["stunned"] with no escape_dc on the Sacred Weapon row', () => {
+        expect(SACRED_WEAPON_ACTION.name).toBe('Sacred Weapon');
+        expect(SACRED_WEAPON_ACTION.attack_bonus).toBe(17);
+        expect(SACRED_WEAPON_ACTION.reach).toBe('10 ft.');
+        expect(SACRED_WEAPON_ACTION.damage_dice_primary).toBe('6d6 + 10');
+        expect(SACRED_WEAPON_ACTION.damage_type_primary).toBe('Force');
+        expect(SACRED_WEAPON_ACTION.hit_conditions).toEqual(['stunned']);
+        expect(SACRED_WEAPON_ACTION.escape_dc).toBeUndefined();
+        expect(SACRED_WEAPON_ACTION.save_dc).toBeUndefined();
+        expect(SACRED_WEAPON_ACTION.description).toContain('Stunned');
+        // MA-0621 byte-shape twin: no save in prose, so no escape_dc / save_dc.
+        // Opt-out extra-21 clause is design-ticket advisory (§107) — no structured
+        // opt-out transport authored; the row pins only the base stunned grant.
+        expect(SACRED_WEAPON_ACTION.opt_out_clause).toBeUndefined();
+    });
+
+    it('builds a stunned-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(SACRED_WEAPON_ACTION)).toEqual({
+            conditions: ['stunned'],
+            escapeDc: null,
+            attackName: 'Sacred Weapon',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Stunned + attacker-source meta + condition log on a resolved Sacred Weapon hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Sacred Weapon', formula: '6d6 + 10', total: 21, rolls: [4, 5, 1, 6, 3, 2], modifier: 10, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Force',
+            attackerName: 'Empyrean 1',
+            hitClause: buildHitConditionClause(SACRED_WEAPON_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe('Bandit 1');
+        expect(condCall[2]).toEqual(['stunned']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ stunned: { source: 'Empyrean 1' } });
+        expect(metaCall[2].stunned.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Stunned',
+            reason: 'Sacred Weapon (escape DC —)',
+        }));
+    });
+
+    it('grants nothing when Sacred Weapon misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Sacred Weapon', formula: '6d6 + 10', total: 21, rolls: [1, 5, 1, 6, 3, 2], modifier: 10, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Force',
+            attackerName: 'Empyrean 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

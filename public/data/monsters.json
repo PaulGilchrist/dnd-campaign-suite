@@ -21374,7 +21374,10 @@
         "attack_bonus": 17,
         "reach": "10 ft.",
         "damage_dice_primary": "6d6 + 10",
-        "damage_type_primary": "Force"
+        "damage_type_primary": "Force",
+        "hit_conditions": [
+          "stunned"
+        ]
       },
       {
         "name": "Divine Ray",
