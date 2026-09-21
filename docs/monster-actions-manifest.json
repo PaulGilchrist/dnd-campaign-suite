@@ -10709,7 +10709,7 @@
       "actionType": "spellcasting",
       "saveDc": 23,
       "description": "The empyrean casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): At Will: Calm Emotions, Greater Restoration, Pass with Trace, Water Breathing 1/Day Each: Commune, Dispel Evil and Good, Plane Shift",
-      "verified": "broken — see .opencode/plans/bug-MA-0693-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0694",

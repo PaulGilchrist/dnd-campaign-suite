@@ -21389,7 +21389,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The empyrean casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23):\n<strong>At Will:</strong> <strong>Calm Emotions</strong>, <strong>Greater Restoration</strong>, <strong>Pass with Trace</strong>, <strong>Water Breathing</strong>\n<strong>1/Day Each:</strong> <strong>Commune</strong>, <strong>Dispel Evil and Good</strong>, <strong>Plane Shift</strong>",
+        "description": "The empyrean casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23):\n<strong>At Will:</strong> <strong>Calm Emotions</strong>, <strong>Greater Restoration</strong>, <strong>Pass Without Trace</strong>, <strong>Water Breathing</strong>\n<strong>1/Day Each:</strong> <strong>Commune</strong>, <strong>Dispel Evil and Good</strong>, <strong>Plane Shift</strong>",
         "spell_save_dc": 23,
         "spellcasting_ability": "Charisma"
       }
