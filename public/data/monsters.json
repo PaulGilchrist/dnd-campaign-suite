@@ -19988,7 +19988,8 @@
         "description": "The mephit exhales a 15-foot cone of blinding dust. Each creature in that area must succeed on a DC 10 Dexterity saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
         "save_dc": 10,
         "save_type": "Dexterity",
-        "save_effect": "The target is blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success."
+        "save_effect": "The target is blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
+        "recharge": "6"
       },
       {
         "name": "Variant: Summon Mephits",

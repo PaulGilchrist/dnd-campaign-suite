@@ -2,6 +2,7 @@
 // fire-spend, refusal log shape, and turn-start d6 regain (≥6 recharges,
 // <6 stays spent + not-recharged log). Turn-start recovery is silent for
 // creatures without a spent map entry (no spam for every initiative walk).
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   MONSTER_RECHARGE_KEY,
@@ -180,5 +181,29 @@ describe('MA-0049 structured usage{recharge on roll} shape', () => {
     await rollMonsterRecharges({ monsterName: 'Adult Blue Dracolich 1', campaignName: 'test-campaign', deps: miss });
     expect(miss.store['Adult Blue Dracolich 1.monsterRecharge']['Lightning Breath'].recharged).toBe(false);
     expect(miss.addEntry.mock.calls[0][1].automationType).toBe('recharge_failed');
+  });
+});
+
+// MA-0663: Dust Mephit Blinding Breath (Recharge 6) data-consistency lock —
+// the RAW threshold was name-text only ("(Recharge 6)") with no authored
+// `recharge` field, so rechargeUsageOf returned null and the economy never
+// armed (unlimited same-round refires, zero refusals). One data field fix,
+// mirroring the string "6" byte-shape of the Ice/Magma/Mud Mephit and
+// Abominable Yeti (MA-0031) twins.
+describe('MA-0663 dust-mephit blinding-breath recharge data', () => {
+  const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+  const dustMephit = monsters.find((m) => m.name === 'Dust Mephit');
+  const blindingBreath = dustMephit.actions.find((a) => a.name.startsWith('Blinding Breath'));
+
+  it('row authors recharge "6" (string, twin byte-shape)', () => {
+    expect(blindingBreath.name).toBe('Blinding Breath (Recharge 6)');
+    expect(blindingBreath.recharge).toBe('6');
+  });
+
+  it('rechargeUsageOf + gate arm: threshold 6, fresh available, spent refused', () => {
+    expect(rechargeUsageOf(blindingBreath)).toEqual({ threshold: 6 });
+    const fresh = monsterRechargeGate(blindingBreath, null);
+    expect(fresh).toEqual({ key: 'Blinding Breath', threshold: 6, available: true });
+    expect(monsterRechargeGate(blindingBreath, { 'Blinding Breath': { recharged: false, threshold: 6 } }).available).toBe(false);
   });
 });
