@@ -10649,7 +10649,7 @@
         "prone"
       ],
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one prone creature. Hit: 8 (2d4 + 3) bludgeoning damage.",
-      "verified": "broken — see .opencode/plans/bug-MA-0689-hooves.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0690",
