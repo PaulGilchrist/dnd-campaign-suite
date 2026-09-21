@@ -443,6 +443,18 @@
       "ac": 22,
       "init": 0,
       "note": "MA-0234 VERIFIED PASS 2026-09-15: Multiattack header TEXT row (no roll button, numericAffordance false); Rend .mc-dice-link +17 x3 live vs ElderPaladin AC19 (18+17=35, 14+17=31, 15+17=32 all HIT; damage 2d8+10 Slashing + 3d6 Fire both types in hp_change damageBreakdown). Replace path: Spellcasting .mc-dice-link-spell Scorching Ray lv3 via spellCastLevelFromSpellcasting ('(level 3 version)' prose) = ranged SPELL ATTACK +15 (prose fallback, no structured spell_attack_bonus), d20 14+15=29 HIT, 2d6 Fire applied (rolls [2,3]=5); ability_use logs 'level 3 ranged spell attack +15'. At Will = monsterSpellUses never written. Residual (app model, MA-0065 parity): single attack roll + 2d6, multi-ray count GM-enforced advisory in log. Fire immunity. cs init 17 (card spinbutton). Joined EB exact, target-select armed ElderPaladin."
+    },
+    {
+      "name": "Fey Spirit",
+      "index": "fey-spirit",
+      "source": "public/data/monsters.json",
+      "monsterType": "fey",
+      "cr": "",
+      "hp": 30,
+      "ac": 12,
+      "init": null,
+      "note": "MA-0718 VERIFIED PASS 2026-09-21: FEY BLADE caster-fold seam live (MA-0623/§86/§161 lineage). Summoned via HeroesFeastBard lv20 Bard casting 2024 Fey Spirit (fey-spirit, lv3 summon_spirit, single variant auto-confirm no chooser) at slot level 3; raw disk row attack_bonus NULL + damage '2d6+3+spell level' folded in cs to attack_bonus 11 (= caster spellAtk +11) + formula '2d6+3+3' Force; description folded '+spell attack modifier'->'+11'. Chip '+11' on own card; Bandit 1 (AC12, cs maxHp 999 staged full-store POST) armed own-card select; 3/3 hits: bonus 11 x3 exact, formula '2d6+3+3' byte-exact x3 (distinct dice pools 5,3/6,5/3,6), finalDamage 14/17/15 == |hp_change| exact unclamped (999->985->968->953). Spirit 30/30 HP, AC 12 base (SP-114 no slot AC scale; spell prose says AC 12+level - app model codified, out-of-ticket). Spellbook-add PUT sanctioned §161, RESTORED byte-exact after; admin clears + GET quiet; §135 seed activeConditions:[] needed pre-cast (error fingerprint reproduced live).",
+      "verifiedRow": "MA-0718"
     }
   ]
 }
