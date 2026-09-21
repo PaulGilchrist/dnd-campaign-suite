@@ -10066,7 +10066,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The drow attempts to magically summon a yochlol with a 30 percent chance of success. If the attempt fails, the drow takes 5 (1dlO) psychic damage. Otherwise, the summoned demon appears in an unoccupied space within 60 feet of its summoner, acts as an ally of its summoner, and can't summon other demons. It remains for 10 minutes, until it or its summoner dies, or until its summoner dismisses it as an action.",
-      "verified": "broken — see .opencode/plans/bug-MA-0651-summon-demon.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0652",

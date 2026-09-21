@@ -68,3 +68,48 @@ describe('MA-0648 Summon Demon chip', () => {
     expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
   });
 });
+
+// MA-0651: Drow Priestess of Lolth "Summon Demon" rides the SAME
+// monster_summon seam — single chance-option (yochlol 30%) with self-damage
+// on fail. Chip arms identically; the 3/Day counter reads uses/maxUses.
+const priestess = monsters.find(m => m.index === 'drow-priestess-of-lolth');
+const PRIESTESS_ROW = priestess.actions.find(a => a.name === 'Summon Demon');
+
+describe('MA-0651 Priestess Summon Demon chip', () => {
+  it('data authors single yochlol chance-option + self-damage + 3/Day', () => {
+    expect(PRIESTESS_ROW.automation).toEqual({
+      type: 'monster_summon',
+      options: [{ monster: 'yochlol', chance: 0.3 }],
+      self_damage_formula: '1d10',
+      self_damage_type: 'psychic',
+      range_ft: 60,
+      duration_minutes: 10,
+    });
+    expect(PRIESTESS_ROW.uses).toBe(3);
+    expect(PRIESTESS_ROW.maxUses).toBe(3);
+    expect(PRIESTESS_ROW.description).toContain('1d10');
+    expect(PRIESTESS_ROW.description).not.toContain('1dlO');
+  });
+
+  it('arms a clickable summon chip counting down from 3/Day', () => {
+    const { container, onSummonRow } = renderRow(PRIESTESS_ROW);
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('Summon');
+    expect(chip.textContent).toContain('(3/Day · 3 left)');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+    expect(onSummonRow.mock.calls[0][0]).toBe(PRIESTESS_ROW);
+  });
+
+  it('two uses spent: 1 left; exhausted: spent class + still clickable', () => {
+    const { container } = renderRow(PRIESTESS_ROW, { spellUsesUsed: { 'Summon Demon': 2 } });
+    expect(container.querySelector('.mc-dice-link-summon').textContent).toContain('1 left');
+    const spent = renderRow(PRIESTESS_ROW, { spellUsesUsed: { 'Summon Demon': 3 } });
+    const chip = spent.container.querySelector('.mc-dice-link-summon');
+    expect(chip.className).toContain('mc-dice-link-spell-spent');
+    expect(chip.textContent).toContain('0 left');
+    fireEvent.click(chip);
+    expect(spent.onSummonRow).toHaveBeenCalledTimes(1);
+  });
+});

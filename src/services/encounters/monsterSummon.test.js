@@ -13,6 +13,7 @@ import {
   resolveMonsterSummonRow,
   buildSummonCoinFlipLog,
   buildSummonSpawnLog,
+  buildSummonSelfDamageLog,
 } from './monsterSummon.js';
 import monstersData from '../../../public/data/monsters.json';
 
@@ -197,5 +198,147 @@ describe('MA-0648 activation', () => {
     expect(log.summonedCreatures).toEqual(['Quasit 1']);
     const flipLog = buildSummonCoinFlipLog({ monsterName: 'Drow Mage 1', action: SUMMON_ROW, verdict: { monster: 'quasit', roll: 77, success: false, chance: 0.5 } });
     expect(flipLog.total).toBe(77);
+  });
+});
+
+// MA-0651: Drow Priestess of Lolth "Summon Demon" — single chance-option
+// row (yochlol @ 30%) with NO fallback: failed flip spawns nothing and the
+// summoner takes 1d10 psychic via applyDamageToTarget; uses:3 gate spends
+// then refuses at 0.
+const priestess = monstersData.find(m => m.index === 'drow-priestess-of-lolth');
+const PRIESTESS_ROW = priestess.actions.find(a => a.name === 'Summon Demon');
+const yochlol = monstersData.find(m => m.index === 'yochlol');
+
+function makeSelfDmgDeps(stored = {}, roll = 50, dmgRoll = { total: 7, rolls: [7], modifier: 0, formula: '1d10' }) {
+  const deps = makeDeps(stored, roll);
+  deps.monsters = [yochlol];
+  deps.rollExpression = vi.fn(() => dmgRoll);
+  deps.applyDamageToTarget = vi.fn(async (cs, target, raw) => {
+    const c = cs.creatures.find(x => x.name === target);
+    c.currentHp -= raw;
+    return { finalDamage: raw, newHp: c.currentHp };
+  });
+  return deps;
+}
+
+describe('MA-0651 Priestess summon data', () => {
+  it('authors monster_summon automation: yochlol 30% + structured self-damage + uses 3', () => {
+    expect(isMonsterSummonRow(PRIESTESS_ROW)).toBe(true);
+    expect(PRIESTESS_ROW.automation).toEqual({
+      type: 'monster_summon',
+      options: [{ monster: 'yochlol', chance: 0.3 }],
+      self_damage_formula: '1d10',
+      self_damage_type: 'psychic',
+      range_ft: 60,
+      duration_minutes: 10,
+    });
+    expect(PRIESTESS_ROW.uses).toBe(3);
+    expect(PRIESTESS_ROW.maxUses).toBe(3);
+    expect(PRIESTESS_ROW.description).toContain('1d10');
+    expect(PRIESTESS_ROW.description).not.toContain('1dlO');
+    expect(yochlol.hit_points).toBeGreaterThan(0);
+  });
+
+  it('per-row chance: 30% here vs 50% on the Drow Mage twin', () => {
+    expect(adjudicateSummonAttempt(PRIESTESS_ROW.automation.options, () => 30)).toMatchObject({ monster: 'yochlol', roll: 30, success: true, chance: 0.3 });
+    expect(adjudicateSummonAttempt(SUMMON_ROW.automation.options, () => 50)).toMatchObject({ monster: 'shadow-demon', success: true, chance: 0.5 });
+  });
+});
+
+describe('MA-0651 failed summon with no fallback', () => {
+  it('d100 31 > 30: verdict.monster null, no spawn', () => {
+    const verdict = adjudicateSummonAttempt(PRIESTESS_ROW.automation.options, () => 31);
+    expect(verdict).toEqual({ monster: null, roll: 31, success: false, chance: 0.3 });
+  });
+
+  it('fail: spends a use, zero spawn/te, rolls 1d10 applied to summoner via applyDamageToTarget, flips+self-damage logged', async () => {
+    const deps = makeSelfDmgDeps({ cs: { round: 1, creatures: [{ name: 'Drow Priestess of Lolth', type: 'npc', initiative: '15', currentHp: 113, maxHp: 113 }] } }, 88, { total: 7, rolls: [7], modifier: 0, formula: '1d10' });
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: PRIESTESS_ROW,
+      monsterName: 'Drow Priestess of Lolth',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: {},
+      deps,
+    });
+    expect(result.resolved).toBe(true);
+    expect(result.summonedName).toBeNull();
+    expect(result.remaining).toBe(2);
+    expect(deps.store.cs.creatures.some(c => c.name === 'Yochlol')).toBe(false);
+    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(deps.rollExpression).toHaveBeenCalledWith('1d10');
+    expect(deps.applyDamageToTarget).toHaveBeenCalledWith(deps.store.cs, 'Drow Priestess of Lolth', 7, ['psychic'], { campaignName: 'test-campaign', characters: [], attackerName: 'Drow Priestess of Lolth' });
+    expect(deps.store.cs.creatures[0].currentHp).toBe(106);
+    expect(deps.store.uses).toEqual({ 'Summon Demon': 1 });
+    const flipLog = deps.logs.find(e => e.rollType === 'monster_summon_coin_flip');
+    expect(flipLog.description).toContain('d100 88 vs 30%');
+    expect(flipLog.description).toContain('failure, no demon answers');
+    const dmgLog = deps.logs.find(e => e.rollType === 'monster_summon_self_damage');
+    expect(dmgLog).toMatchObject({ type: 'roll damage', characterName: 'Drow Priestess of Lolth', rolls: [7], total: 7, damageType: 'psychic', formula: '1d10' });
+    expect(dmgLog.description).toContain('7 psychic damage (rolled 7)');
+    expect(deps.logs.some(e => e.type === 'summons')).toBe(false);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('summon fails'));
+  });
+
+  it('success d100 30: spawns Yochlol ally, self-damage NEVER rolls', async () => {
+    const deps = makeSelfDmgDeps({ cs: { round: 1, creatures: [{ name: 'Drow Priestess of Lolth', type: 'npc', initiative: '15', currentHp: 113, maxHp: 113 }] } }, 30);
+    const result = await resolveMonsterSummonRow({
+      action: PRIESTESS_ROW,
+      monsterName: 'Drow Priestess of Lolth',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      storedUses: {},
+      deps,
+    });
+    expect(result).toMatchObject({ resolved: true, summonedName: 'Yochlol', remaining: 2 });
+    const spawned = deps.store.cs.creatures.find(c => c.name === 'Yochlol');
+    expect(spawned).toMatchObject({ type: 'npc', monsterIndex: 'yochlol', summonedBy: 'Drow Priestess of Lolth', summonSource: 'monster_ability', initiative: '14.9' });
+    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Yochlol', 'summoned', 'Drow Priestess of Lolth', { duration: '10_minutes' });
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(deps.applyDamageToTarget).not.toHaveBeenCalled();
+    expect(deps.store.cs.creatures.find(c => c.name === 'Drow Priestess of Lolth').currentHp).toBe(113);
+    expect(deps.logs.some(e => e.type === 'summons')).toBe(true);
+  });
+
+  it('uses gate counts 3→2→1→0 then refuses with summon_demon_refused, zero roll/self-damage/spawn', async () => {
+    const cs = { round: 1, creatures: [{ name: 'Drow Priestess of Lolth', type: 'npc', initiative: '15', currentHp: 113, maxHp: 113 }] };
+    for (const used of [0, 1, 2]) {
+      const deps = makeSelfDmgDeps({ cs, uses: { 'Summon Demon': used } }, 88);
+      const result = await resolveMonsterSummonRow({
+        action: PRIESTESS_ROW,
+        monsterName: 'Drow Priestess of Lolth',
+        campaignName: 'test-campaign',
+        setPopupHtml: vi.fn(),
+        storedUses: { 'Summon Demon': used },
+        deps,
+      });
+      expect(result).toMatchObject({ resolved: true, remaining: 2 - used });
+      expect(deps.store.uses).toEqual({ 'Summon Demon': used + 1 });
+    }
+    const deps = makeSelfDmgDeps({ cs, uses: { 'Summon Demon': 3 } }, 88);
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: PRIESTESS_ROW,
+      monsterName: 'Drow Priestess of Lolth',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: { 'Summon Demon': 3 },
+      deps,
+    });
+    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(deps.applyDamageToTarget).not.toHaveBeenCalled();
+    expect(deps.setCombatSummary).not.toHaveBeenCalled();
+    expect(deps.store.uses).toEqual({ 'Summon Demon': 3 });
+    expect(deps.logs.find(e => e.automationType === 'summon_demon_refused')).toBeTruthy();
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
+  });
+
+  it('buildSummonSelfDamageLog carries roll detail', () => {
+    const log = buildSummonSelfDamageLog({ monsterName: 'Drow Priestess of Lolth', action: PRIESTESS_ROW, damageRoll: { total: 5, rolls: [5], modifier: 0, formula: '1d10' } });
+    expect(log).toMatchObject({ type: 'roll damage', rollType: 'monster_summon_self_damage', total: 5, damageType: 'psychic' });
+    expect(log.description).toContain('5 psychic damage (rolled 5)');
   });
 });
