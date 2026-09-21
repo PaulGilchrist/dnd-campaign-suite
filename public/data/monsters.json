@@ -19624,7 +19624,7 @@
         "description": "Melee Weapon Attack: +2 to hit (+6 to hit with shillelagh), reach 5 ft., one target. Hit: 2 (1 d4) bludgeoning damage, or 8 (1d8 + 4) bludgeoning damage with shillelagh.",
         "attack_bonus": 2,
         "reach": "5 ft.",
-        "damage_dice_primary": "1d8 + 4",
+        "damage_dice_primary": "1d4",
         "damage_type_primary": "Bludgeoning"
       },
       {

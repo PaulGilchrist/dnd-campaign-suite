@@ -10098,7 +10098,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +2 to hit (+6 to hit with shillelagh), reach 5 ft., one target. Hit: 2 (1 d4) bludgeoning damage, or 8 (1d8 + 4) bludgeoning damage with shillelagh.",
-      "verified": "broken — see .opencode/plans/bug-MA-0653-club.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0654",

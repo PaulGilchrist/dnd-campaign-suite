@@ -143,3 +143,26 @@ describe('MA-0652 data lock (monsters.json Druid Quarterstaff)', () => {
     expect(one.description).toContain('1d6');
   });
 });
+
+describe('MA-0653 data lock (monsters.json Dryad Club)', () => {
+  const clubRow = () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const club = monsters.find((m) => m.name === 'Dryad').actions[0];
+    expect(club.name).toBe('Club');
+    return club;
+  };
+
+  it('actions[0] Club authors canonical base "1d4" (no modifier), shillelagh variant no longer primary', () => {
+    const club = clubRow();
+    expect(club.attack_bonus).toBe(2);
+    expect(club.damage_dice_primary).toBe('1d4');
+    expect(club.damage_type_primary).toBe('Bludgeoning');
+    expect(club.description).toMatch(/Hit: 2 \(1 d4\) bludgeoning damage/);
+  });
+
+  it('shillelagh prose stays advisory: no two-handed/variant field, no HIT-popup chooser offer', () => {
+    const club = clubRow();
+    expect(club.damage_dice_two_handed).toBeUndefined();
+    expect(buildTwoHandedVariantOffer(club, 'Club')).toBeNull();
+  });
+});
