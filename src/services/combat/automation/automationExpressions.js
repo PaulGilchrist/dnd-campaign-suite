@@ -1,4 +1,5 @@
 import { getAbilityModifier } from '../../shared/abilityLookup.js'
+import { canRollExpression, rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js'
 
 function resolveUses(playerStats, usesSpec) {
     if (typeof usesSpec === 'number') return usesSpec
@@ -120,10 +121,12 @@ function buildDiceTokenValues(playerStats, slotLevel) {
     const classLevels = ps.class?.class_levels || []
     const levelEntry = pickClassLevelEntry(classLevels, ps)
     const currentEntry = classLevels.find(cl => cl.level === ps.level) || {}
+    const spellcastingAbility = ps.spellAbilities?.spellcasting_ability || 'intelligence'
     return {
         prof: ps.proficiency || 0,
         level: ps.level || 1,
         slotLevel: slotLevel || 1,
+        spellcastingMod: getAbilityModifier(ps.abilities || [], spellcastingAbility),
         ...buildClassFeatureDiceTokens(playerStats, levelEntry, currentEntry),
         ...buildAbilityModifierTokens(ps.abilities || []),
     }
@@ -131,8 +134,9 @@ function buildDiceTokenValues(playerStats, slotLevel) {
 
 // Ordered [regex, value] token pairs — order is significant (e.g.
 // proficiency_bonus_d4 must resolve before proficiency_bonus, rage_damage_d6
-// before rage_damage, spell_slot_level before the generic \blevel\b, and
-// ability modifiers last).
+// before rage_damage, spell_slot_level/spellSlotLevel before the generic
+// \blevel\b, spellcasting_ability_modifier before the short ability
+// modifiers, and ability modifiers last).
 function buildDiceTokenPairs(v) {
     return [
         [/bardic_inspiration_die/g, v.bardicDie],
@@ -160,6 +164,8 @@ function buildDiceTokenPairs(v) {
         [/warlock_level/gi, v.level],
         [/warlock level/gi, v.level],
         [/spell_slot_level/g, v.slotLevel],
+        [/spellSlotLevel/g, v.slotLevel],
+        [/spellcasting_ability_modifier/g, v.spellcastingMod],
         [/\blevel\b/gi, v.level],
         [/STR modifier/gi, v.strength],
         [/DEX modifier/gi, v.dexterity],
@@ -203,6 +209,29 @@ export function reresolveAutomationUsesMax(playerStats) {
     }
 }
 
+// "3d4_min_3" token-resolves to "Math.max(3, (3d4))" — dice clamped after the roll.
+function unwrapClamp(expr) {
+    const m = String(expr).match(/^Math\.max\((\d+),\s*\((.*)\)\)$/)
+    return m ? { formula: m[2], min: parseInt(m[1], 10) } : { formula: String(expr), min: null }
+}
+
+function isPureArithmetic(expr) {
+    const stripped = expr.replace(/Math\.(floor|ceil|round|max|min)/g, '').replace(/\s/g, '')
+    return stripped !== '' && /^[\d+\-*/().,]+$/.test(stripped)
+}
+
+// Can the expression reach diceRoller as-is: a single dice group with
+// modifiers ("1d8 + 3"), the "or"/"plus" spellings, multiple dice groups
+// ("2d6+1d4-1"), or a clamped dice group from the _min_ rewrite.
+function isRollableDiceFormula(expr) {
+    if (canRollExpression(expr)) return true
+    const { formula } = unwrapClamp(expr)
+    if (canRollExpression(formula)) return true
+    const stripped = formula.replace(/\s*\[.*?\]\s*/g, '').replace(/\s/g, '')
+    const collapsed = stripped.replace(/\d*d\d+/gi, '#')
+    return collapsed.includes('#') && /^[#0-9+-]+$/.test(collapsed)
+}
+
 export function evaluateAutoExpression(expression, playerStats, prof, level, slotLevel) {
     if (!expression) return expression
     let expr = resolveDiceExpression(expression, playerStats, slotLevel)
@@ -212,15 +241,39 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
         expr = `Math.max(${minMatch[2]}, (${minMatch[1]}))`
     }
 
-    try {
-        let evalExpr = expr
-        evalExpr = evalExpr.replace(/(?<!Math\.)floor\b/g, 'Math.floor')
-        evalExpr = evalExpr.replace(/(?<!Math\.)ceil\b/g, 'Math.ceil')
-        evalExpr = evalExpr.replace(/(?<!Math\.)round\b/g, 'Math.round')
-        const result = new Function(`"use strict"; return (${evalExpr})`)()
-        if (typeof result === 'number' && !isNaN(result)) return result
-    } catch (_e) { console.warn('[automationExpressions] Not a simple expression, returning as string:', _e) }
+    let evalExpr = expr
+    evalExpr = evalExpr.replace(/(?<!Math\.)floor\b/g, 'Math.floor')
+    evalExpr = evalExpr.replace(/(?<!Math\.)ceil\b/g, 'Math.ceil')
+    evalExpr = evalExpr.replace(/(?<!Math\.)round\b/g, 'Math.round')
+
+    if (isRollableDiceFormula(evalExpr)) return expr
+
+    if (isPureArithmetic(evalExpr)) {
+        try {
+            const result = new Function(`"use strict"; return (${evalExpr})`)()
+            if (typeof result === 'number' && !isNaN(result)) return result
+        } catch (_e) { console.warn('[automationExpressions] Failed to evaluate arithmetic expression:', expr, _e) }
+    } else {
+        console.warn('[automationExpressions] Not arithmetic or dice notation, returning as string:', expr)
+    }
     return expr
+}
+
+// Numeric resolution for callers that must apply a value (temp HP, healing,
+// reduction): arithmetic evaluates, dice notation rolls (maximize/rerollOnes
+// honored via rollOptions), clamped dice clamps after the roll. Returns
+// null (and logs) only for genuinely unresolvable expressions.
+export function resolveNumericExpression(expression, playerStats, slotLevel, rollOptions = {}) {
+    if (!expression) return null
+    const resolved = evaluateAutoExpression(expression, playerStats, undefined, undefined, slotLevel)
+    if (typeof resolved === 'number') return resolved
+    const { formula, min } = unwrapClamp(resolved)
+    const roll = rollOptions.maximize ? rollExpressionMaximized(formula) : rollExpression(formula, rollOptions)
+    if (!roll || typeof roll.total !== 'number' || isNaN(roll.total)) {
+        console.error('[automationExpressions] resolveNumericExpression could not resolve to a number:', expression)
+        return null
+    }
+    return min !== null ? Math.max(min, roll.total) : roll.total
 }
 
 export { resolveUses, resolveScaling, getSaveDc, resolveHealingPoolExpression, resolveDiceExpression, getSuperiorityDieSize, getPsionicEnergyDieSize }

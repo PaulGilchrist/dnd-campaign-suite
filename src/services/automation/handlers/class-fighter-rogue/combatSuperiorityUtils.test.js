@@ -12,9 +12,10 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
-vi.mock('../../../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(() => ({ total: 5, rolls: [5] })),
-}));
+vi.mock('../../../../services/dice/diceRoller.js', async (importOriginal) => {
+    const actual = await importOriginal()
+    return { ...actual, rollExpression: vi.fn(() => ({ total: 5, rolls: [5] })) }
+});
 
 const CAMPAIGN = 'test-campaign';
 

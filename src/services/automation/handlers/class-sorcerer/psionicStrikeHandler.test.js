@@ -14,9 +14,10 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-}));
+vi.mock('../../../dice/diceRoller.js', async (importOriginal) => {
+    const actual = await importOriginal()
+    return { ...actual, rollExpression: vi.fn() }
+});
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),

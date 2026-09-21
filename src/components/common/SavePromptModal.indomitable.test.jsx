@@ -19,10 +19,10 @@ vi.mock('../../services/ui/utils.js', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
-  rollD20: vi.fn(),
-  rollExpression: vi.fn(),
-}));
+vi.mock('../../services/dice/diceRoller.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, rollD20: vi.fn(), rollExpression: vi.fn() }
+});
 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
   sendSaveResult: vi.fn(),

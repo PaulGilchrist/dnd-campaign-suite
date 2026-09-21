@@ -16,9 +16,10 @@ vi.mock('../../../ui/storage.js', () => ({
   },
 }));
 
-vi.mock('../../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(),
-}));
+vi.mock('../../../dice/diceRoller.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, rollExpression: vi.fn() }
+});
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(async () => {}),

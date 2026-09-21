@@ -44,9 +44,13 @@ vi.mock('../../../shared/abilityLookup.js', () => ({
   }),
 }))
 
-vi.mock('./automationExpressions.js', () => ({
-  evaluateAutoExpression: vi.fn(),
-}))
+vi.mock('./automationExpressions.js', () => {
+  const evaluateAutoExpression = vi.fn()
+  return {
+    evaluateAutoExpression,
+    resolveNumericExpression: (...args) => evaluateAutoExpression(...args),
+  }
+})
 
 vi.mock('../../rules/core/greatWeaponFighting.js', () => ({
   applyGreatWeaponFighting: vi.fn(),

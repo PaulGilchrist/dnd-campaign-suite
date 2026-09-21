@@ -24,9 +24,13 @@ vi.mock('../../../encounters/combatData.js', () => ({
   loadCombatSummary: vi.fn(),
 }));
 
-vi.mock('../../../combat/automation/automationService.js', () => ({
-  evaluateAutoExpression: vi.fn(),
-}));
+vi.mock('../../../combat/automation/automationService.js', () => {
+  const evaluateAutoExpression = vi.fn()
+  return {
+    evaluateAutoExpression,
+    resolveNumericExpression: (...args) => evaluateAutoExpression(...args),
+  }
+});
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),

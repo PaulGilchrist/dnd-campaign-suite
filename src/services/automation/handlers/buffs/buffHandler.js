@@ -5,7 +5,7 @@ import { handle as handleVowOfEnmity } from '../class-cleric-paladin/vowOfEnmity
 import { handle as handleSacredWeapon } from '../class-cleric-paladin/sacredWeaponHandler.js';
 import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCombatSummary, loadCombatSummary } from '../../../encounters/combatData.js';
-import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
+import { evaluateAutoExpression, resolveNumericExpression } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { setTempHp } from './tempHpService.js'
 import { cleanupWildShape } from '../class-druid/wildShapeCreatureBuilder.js';
@@ -188,7 +188,7 @@ async function applyGenericBuffSideEffects({ action, auto, playerStats, targetNa
     }
 
     if (!wasActive && auto?.tempHpExpression) {
-        const amount = evaluateAutoExpression(auto.tempHpExpression, playerStats);
+        const amount = resolveNumericExpression(auto.tempHpExpression, playerStats);
         if (typeof amount === 'number' && amount > 0) {
             setTempHp(playerStats.name, amount, campaignName);
         }
@@ -454,18 +454,16 @@ function resolveAdrenalineUsesMax(auto, playerStats) {
     return auto.usesMax != null ? auto.usesMax : 1;
 }
 
-// First eval applies temp HP; description re-evaluates below (matches original double-roll).
+// Rolls once and returns the amount so the log/popup describe the exact
+// value that was applied (dice formulas stay consistent).
 function applyDashTempHp(auto, playerStats, playerName, campaignName) {
-    if (auto?.bonusEffect !== 'temp_hp' || !auto?.bonusExpression) return;
-    const tempHpAmount = evaluateAutoExpression(auto.bonusExpression, playerStats);
+    if (auto?.bonusEffect !== 'temp_hp' || !auto?.bonusExpression) return 0;
+    const tempHpAmount = resolveNumericExpression(auto.bonusExpression, playerStats);
     if (typeof tempHpAmount === 'number' && tempHpAmount > 0) {
         setTempHp(playerName, tempHpAmount, campaignName);
+        return tempHpAmount;
     }
-}
-
-function dashBonusTempHp(auto, playerStats) {
-    if (auto?.bonusEffect !== 'temp_hp' || !auto?.bonusExpression) return 0;
-    return evaluateAutoExpression(auto.bonusExpression, playerStats);
+    return 0;
 }
 
 async function handleBonusActionDash(action, playerStats, campaignName, _mapName) {
@@ -494,12 +492,10 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
         };
     }
 
-    applyDashTempHp(auto, playerStats, playerName, campaignName);
+    const tempHpAmount = applyDashTempHp(auto, playerStats, playerName, campaignName);
 
     const newUses = usesRemaining - 1;
     await setRuntimeValue(playerName, usesKey, newUses, campaignName);
-
-    const tempHpAmount = dashBonusTempHp(auto, playerStats);
 
     const tempHpDesc = tempHpAmount > 0
         ? ` Gained ${tempHpAmount} temporary hit points.`

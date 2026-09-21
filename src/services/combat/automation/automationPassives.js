@@ -1,4 +1,4 @@
-import { evaluateAutoExpression } from './automationExpressions.js'
+import { evaluateAutoExpression, resolveNumericExpression } from './automationExpressions.js'
 import { parseMagicItemName } from '../../rules/core/attackCalc.js'
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js'
@@ -138,37 +138,37 @@ function describeHealingBonus(passive, bonus, requirePositive) {
 
 // Effects 'bonus_healing' and 'max_hp_increase'/'fortified_health' are mutually
 // exclusive on a single passive, so the branches never both fire for one entry.
-function healingPassiveContribution({ passive, stats, prof, level, slotLevel, campaignName, requirePositive }) {
+function healingPassiveContribution({ passive, stats, slotLevel, campaignName, requirePositive }) {
     if (passive.type !== 'passive_rule') return null;
     if (passive.effect === 'bonus_healing' && passive.bonusExpression) {
-        return describeHealingBonus(passive, evaluateAutoExpression(passive.bonusExpression, stats, prof, level, slotLevel), requirePositive);
+        return describeHealingBonus(passive, evaluateAutoExpression(passive.bonusExpression, stats, undefined, undefined, slotLevel), requirePositive);
     }
     if ((passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health') && passive.alsoSelfHealing?.extraHealingExpression) {
         if (passive.alsoSelfHealing.oncePerTurn && campaignName) {
             const stored = getRuntimeValue(stats.name, '_fortifiedHealth_usedRound');
             if (stored) return null;
         }
-        return describeHealingBonus(passive, evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, stats, prof, level, slotLevel), requirePositive);
+        return describeHealingBonus(passive, evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, stats), requirePositive);
     }
     return null;
 }
 
-export function resolveHealingBonuses(playerStats, prof, level, slotLevel, campaignName) {
+export function resolveHealingBonuses(playerStats, _prof, _level, slotLevel, campaignName) {
     const passives = playerStats.automation?.passives || [];
     let totalBonus = 0;
     for (const passive of passives) {
-        const contribution = healingPassiveContribution({ passive, stats: playerStats, prof, level, slotLevel, campaignName, requirePositive: false });
+        const contribution = healingPassiveContribution({ passive, stats: playerStats, slotLevel, campaignName, requirePositive: false });
         if (contribution) totalBonus += contribution.amount;
     }
     return totalBonus;
 }
 
-export function resolveHealingBonusesWithDetails(playerStats, { prof, level, slotLevel, campaignName, targetStats }) {
+export function resolveHealingBonusesWithDetails(playerStats, { slotLevel, campaignName, targetStats }) {
     const passives = playerStats.automation?.passives || [];
     let totalBonus = 0;
     const details = [];
     const applyContribution = (stats, passive) => {
-        const contribution = healingPassiveContribution({ passive, stats, prof, level, slotLevel, campaignName, requirePositive: true });
+        const contribution = healingPassiveContribution({ passive, stats, slotLevel, campaignName, requirePositive: true });
         if (!contribution) return;
         totalBonus += contribution.amount;
         details.push(contribution);
@@ -399,7 +399,7 @@ function resolveEntryReduction(auto, playerStats) {
     if (typeof auto.reduction === 'number') return auto.reduction;
     if (typeof auto.reductionExpression === 'number') return auto.reductionExpression;
     if (typeof auto.reductionExpression === 'string' && auto.reductionExpression) {
-        return evaluateAutoExpression(auto.reductionExpression, playerStats);
+        return resolveNumericExpression(auto.reductionExpression, playerStats);
     }
     return 0;
 }

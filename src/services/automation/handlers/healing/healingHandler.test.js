@@ -7,10 +7,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(),
-  rollExpressionMaximized: vi.fn(),
-}));
+vi.mock('../../../dice/diceRoller.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, rollExpression: vi.fn(), rollExpressionMaximized: vi.fn() }
+});
 
 vi.mock('../../../character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(),
