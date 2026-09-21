@@ -148,6 +148,20 @@ const TARGET_EFFECT_DEFINITIONS = [
 
   // ── Defensive ──────────────────────────────────────────
   {
+    // MA-0673: Elemental Cataclysm Clinging Flames — "Failure or Success: the
+    // target starts burning". Registered so the badge renders and the GM can
+    // add it from EffectAdder; there is no turn-start burn tick consumer in this
+    // engine (applyTurnStartEffects has no burn phase), so the ongoing fire
+    // damage is GM-enforced (advisory — removable badge).
+    effect: 'burning',
+    label: 'Burning',
+    description: 'The target is burning. Any ongoing fire damage is GM-enforced (no burn tick consumer in this engine).',
+    icon: 'fa-fire',
+    cls: 'effect-debuff',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
     effect: 'no_healing',
     label: "Can't Regain Hit Points",
     description: 'The target can\'t regain Hit Points while this effect lasts (e.g. Aberrant Spirit Claw — until the start of the spirit\'s next turn). Healing via the canonical heal helpers is refused and logged.',

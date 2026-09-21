@@ -427,3 +427,20 @@
   transition: background-color 0.15s ease;
   white-space: nowrap;
 }
+
+/* MA-0673: Elemental Cataclysm d4 event chooser listed beside the picked ray */
+.mc-eye-ray-chooser {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+}
+
+.mc-eye-ray-chooser li {
+  margin: 2px 0;
+}
+
+.mc-eye-ray-chooser .mc-eye-ray-picked-event {
+  color: var(--color-link);
+  font-weight: 600;
+}

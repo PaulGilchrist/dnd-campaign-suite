@@ -1912,7 +1912,36 @@ export function pickEyeRay({ rays, usedKeys = [], rollDie }) {
 // save_type, one dice formula, one dc_success — everything already parseable
 // byte-inert for every other monster. eyeRay rides the save context so
 // saveProcessing grants the ray's te/ladder/zero-HP clauses.
+// MA-0673: AoE ray (Elemental Cataclysm event) synthesis — shape-named row
+// so the existing breath picker (breathAoeShape, spellInfo null) opens with
+// the event's own coverage, damage type, and both damage pools
+// (damage_dice_secondary — MA-0426 transport); save_effect rides so the
+// picker's speed-zero/both-outcome extractors can grant riders per-event.
+function buildCataclysmEventAction(rowAction, ray) {
+  return {
+    name: `${ray.name} (${rowAction.name})`,
+    save_dc: rowAction.save_dc ?? 16,
+    save_type: ray.save_ability,
+    dc_success: ray.dc_success,
+    save_effect: ray.save_effect ?? null,
+    eyeRay: { ...ray, save_dc: ray.save_dc ?? rowAction.save_dc ?? 16 },
+    damage_dice_primary: ray.damage_dice ?? undefined,
+    damage_type_primary: ray.damage_type ?? undefined,
+    damage_dice_secondary: ray.damage_dice_secondary ?? undefined,
+    damage_type_secondary: ray.damage_type_secondary ?? undefined,
+    description: ray.shape_note ?? null,
+  };
+}
+
+// Synthesized single-ray row fed to the existing block-save seam: one
+// save_type, one dice formula, one dc_success — everything already parseable
+// byte-inert for every other monster. eyeRay rides the save context so
+// saveProcessing grants the ray's te/ladder/zero-HP clauses.
 export function buildEyeRayAction(rowAction, ray) {
+  // MA-0673: AoE rays (Elemental Cataclysm) route to their own picker-shaped
+  // synthesis; single-target rays (Beholder/Beholder Zombie) keep the
+  // byte-identical null description/save_effect leg below.
+  if (ray.aoe === true) return buildCataclysmEventAction(rowAction, ray);
   return {
     name: `${ray.name} (Eye Rays)`,
     save_dc: rowAction.save_dc ?? 16,
@@ -1928,6 +1957,28 @@ export function buildEyeRayAction(rowAction, ray) {
   };
 }
 
+// MA-0673: AoE rays fire with spellInfo null so breathAoeShape parses the
+// synthesized shape → the area picker opens; single-target rays keep their
+// damage-type/duration spellInfo leg byte-identical (Beholder).
+export function eyeRaySaveSpellInfo(ray) {
+  return ray.aoe === true ? null : { damageType: ray.damage_type, conditionDurationNote: ray.duration_note, dcSuccess: ray.dc_success };
+}
+
+// MA-0673: honest advisory log for an AoE event whose RAW riders (burning
+// both-outcome, recurring cloud, Cube/buried/suffocation, Athletics escape)
+// have no consumer in this engine — recorded every fire so nothing is silent.
+export function buildEyeRayAdvisoryLog({ monsterName, ray, actionName }) {
+  return {
+    type: 'automation',
+    automationType: 'eye_ray_advisory',
+    characterName: monsterName,
+    abilityName: `${ray.name} (${actionName})`,
+    sourceName: monsterName,
+    description: `${monsterName} — ${ray.name}: ${ray.advisory}`,
+    timestamp: Date.now(),
+  };
+}
+
 export function eyeRayAutoSuccessReason(ray, csCreature) {
   if (!ray || !csCreature) return null;
   const size = String(csCreature.size || '');
@@ -1940,11 +1991,17 @@ export function eyeRayAutoSuccessReason(ray, csCreature) {
   return null;
 }
 
-export function buildEyeRayPickerPopup({ monsterName, ray, roll, rerolls = [], targetName, die = 10, dc = 16 }) {
+export function buildEyeRayPickerPopup({ monsterName, ray, roll, rerolls = [], targetName, die = 10, dc = 16, events }) {
   const rerollNote = rerolls.length > 0
     ? ` (rerolled ${rerolls.join(', ')} — already used this turn)`
     : '';
-  return `<div class="mc-eye-ray-picked"><h3><i class="fa-solid fa-eye"></i> ${ray.name}</h3><p>${monsterName} rolls ${roll}${rerollNote} on the Eye Rays d${die} — <strong>${ray.name}</strong> at ${targetName} (DC ${dc} ${ray.save_ability} save).</p></div>`;
+  // MA-0673: an AoE chooser (Elemental Cataclysm) lists all four events so
+  // the GM sees the full d${die} table next to the picked event. Omitted for
+  // every single-target ray picker → byte-identical beholder popup.
+  const chooser = Array.isArray(events) && events.length > 0
+    ? `<ul class="mc-eye-ray-chooser">${events.map(ev => `<li class="${ev.key === ray.key ? 'mc-eye-ray-picked-event' : ''}">${ev.name}${ev.aoe ? ` — ${ev.shape_note}` : ''} (DC ${dc} ${ev.save_ability}${ev.damage_dice ? `, ${ev.damage_dice} ${ev.damage_type}${ev.damage_dice_secondary ? ` + ${ev.damage_dice_secondary} ${ev.damage_type_secondary}` : ''}` : ', no damage'})</li>`).join('')}</ul>`
+    : '';
+  return `<div class="mc-eye-ray-picked"><h3><i class="fa-solid fa-eye"></i> ${ray.name}</h3><p>${monsterName} rolls ${roll}${rerollNote} on the Eye Rays d${die} — <strong>${ray.name}</strong>${ray.aoe ? ' at each creature in the area' : ` at ${targetName}`} (DC ${dc} ${ray.save_ability} save).</p>${chooser}</div>`;
 }
 
 export function buildEyeRayPickerRollLog({ monsterName, ray, roll, rerolls = [], targetName, die = 10 }) {
@@ -1963,11 +2020,15 @@ export function buildEyeRayPickerRollLog({ monsterName, ray, roll, rerolls = [],
 }
 
 export function buildEyeRayAbilityUseLog({ monsterName, ray, targetName, dc = 16 }) {
+  // MA-0673: AoE rays log their coverage + both damage pools; secondary/
+  // shape_note are absent on every single-target ray → byte-identical beholder.
+  const coverage = ray.aoe && ray.shape_note ? ` in ${ray.shape_note}` : '';
+  const secondary = ray.damage_dice_secondary ? ` + ${ray.damage_dice_secondary} ${ray.damage_type_secondary}` : '';
   return {
     type: 'ability_use',
     characterName: monsterName,
     abilityName: `${ray.name} (Eye Rays)`,
-    description: `${monsterName} fires ${ray.name} from Eye Rays at ${targetName} — DC ${dc} ${ray.save_ability} save${ray.damage_dice ? `, ${ray.damage_dice} ${ray.damage_type} damage (half on a successful save)` : ' — no damage, condition save'} .`.replace(' .', '.'),
+    description: `${monsterName} fires ${ray.name} from Eye Rays at ${targetName}${coverage} — DC ${dc} ${ray.save_ability} save${ray.damage_dice ? `, ${ray.damage_dice} ${ray.damage_type}${secondary} damage (half on a successful save)` : ' — no damage, condition save'} .`.replace(' .', '.'),
     timestamp: Date.now(),
   };
 }
