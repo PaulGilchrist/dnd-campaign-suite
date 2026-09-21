@@ -9898,7 +9898,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The drow makes two shortsword attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0641",
@@ -9916,7 +9916,7 @@
       "damageTypeSecondary": "poison",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +7 to hit, reach 5 ft., one target. Hit: 7 (1d6 + 4) piercing damage plus 10 (3d6) poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0642",
@@ -9938,7 +9938,7 @@
         "unconscious"
       ],
       "description": "Ranged Weapon Attack: +7 to hit, range 30/120 ft., one target. Hit: 7 (1d6 + 4) piercing damage, and the target must succeed on a DC 13 Constitution saving throw or be poisoned for 1 hour. If the saving throw fails by 5 or more, the target is also unconscious while poisoned in this way. The target wakes up if it takes damage or if another creature takes an action to shake it awake.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0642-hand-crossbow.md"
     },
     {
       "id": "MA-0643",
@@ -9950,7 +9950,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The drow adds 3 to its AC against one melee attack that would hit it. To do so, the drow must see the attacker and be wielding a melee weapon.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0643-parry.md"
     },
     {
       "id": "MA-0644",
@@ -9962,7 +9962,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The drow makes two shortsword attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0645",
@@ -9978,7 +9978,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 7 (1d6 + 4) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0646",
@@ -9995,7 +9995,7 @@
       "damageDiceSecondary": "2d10",
       "damageTypeSecondary": "poison",
       "description": "Ranged Weapon Attack: +6 to hit, range 30/90 ft., one target. Hit: 9 (1d10 + 4) piercing damage plus 11 (2d10) poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0647",
@@ -10012,7 +10012,7 @@
       "damageTypeSecondary": "poison",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: + 2 to hit, reach 5 ft., one target. Hit: 2 (1d6 - 1) bludgeoning damage, or 3 (1d8 - 1) bludgeoning damage if used with two hands, plus 3 (1d6) poison damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0647-staff.md"
     },
     {
       "id": "MA-0648",
@@ -10024,7 +10024,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The drow magically summons a quasit, or attempts to summon a shadow demon with a 50 percent chance ofsuccess. The summoned demon appears in an unoccupied space within 60 feet of its summoner, acts as an ally of its summoner, and can't summon other demons. It remains for 10 minutes, until it or its summoner dies, or until its summoner dismisses it as an action.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0648-summon-demon.md"
     },
     {
       "id": "MA-0649",
@@ -10036,7 +10036,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The drow makes two scourge attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0650",
@@ -10054,7 +10054,7 @@
       "damageTypeSecondary": "poison",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage plus 17 (5d6) poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0651",
@@ -10066,7 +10066,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The drow attempts to magically summon a yochlol with a 30 percent chance of success. If the attempt fails, the drow takes 5 (1dlO) psychic damage. Otherwise, the summoned demon appears in an unoccupied space within 60 feet of its summoner, acts as an ally of its summoner, and can't summon other demons. It remains for 10 minutes, until it or its summoner dies, or until its summoner dismisses it as an action.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0651-summon-demon.md"
     },
     {
       "id": "MA-0652",
@@ -10082,7 +10082,7 @@
       "damageTypePrimary": "bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +2 to hit (+4 to hit with shillelagh), reach 5 ft., one target. Hit: 3 (1d6) bludgeoning damage, or 6 (1d8 + 2) bludgeoning damage with shillelagh or if wielded with two hands.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0652-quarterstaff.md"
     },
     {
       "id": "MA-0653",
@@ -10098,7 +10098,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +2 to hit (+6 to hit with shillelagh), reach 5 ft., one target. Hit: 2 (1 d4) bludgeoning damage, or 8 (1d8 + 4) bludgeoning damage with shillelagh.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0653-club.md"
     },
     {
       "id": "MA-0654",
@@ -10116,7 +10116,7 @@
         "charmed"
       ],
       "description": "The dryad targets one humanoid or beast that she can see within 30 feet of her. If the target can see the dryad, it must succeed on a DC 14 Wisdom saving throw or be magically charmed. The charmed creature regards the dryad as a trusted friend to be heeded and protected. Although the target isn't under the dryad's control, it takes the dryad's requests or actions in the most favorable way it can. Each time the dryad or its allies do anything harmful to the target, it can repeat the saving throw, ending the effect on itself on a success. Otherwise, the effect lasts 24 hours or until the dryad dies, is on a different plane of existence from the target, or ends the effect as a bonus action. If a target's saving throw is successful, the target is immune to the dryad's Fey Charm for the next 24 hours. The dryad can have no more than one humanoid and up to three beasts charmed at a time.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0655",
@@ -10126,9 +10126,9 @@
       "actionIndex": 0,
       "actionName": "Enlarge",
       "category": "actions",
-      "actionType": "save",
+      "actionType": "other",
       "description": "For 1 minute, the duergar magically increases in size, along with anything it is wearing or carrying. While enlarged, the duergar is Large, doubles its damage dice on Strength-based weapon attacks (included in the attacks), and makes Strength checks and Strength saving throws with advantage. If the duergar lacks the room to become Large, it attains the maximum size possible in the space available.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0655-enlarge.md"
     },
     {
       "id": "MA-0656",
@@ -10144,7 +10144,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 6 (1d8 + 2) piercing damage, or 11 (2d8 + 2) piercing damage while enlarged.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0657",
@@ -10160,7 +10160,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 9 (2d6 + 2) piercing damage while enlarged.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0658",
@@ -10175,7 +10175,7 @@
         "invisible"
       ],
       "description": "The duergar magically turns invisible until it attacks, casts a spell, or uses its Enlarge, or until its concentration is broken, up to 1 hour (as if concentrating on a spell). Any equipment the duergar wears or carries is invisible with it .",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0658-invisibility.md"
     },
     {
       "id": "MA-0659",
@@ -10187,7 +10187,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The duodrone makes two fist attacks or two javelin attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0660",
@@ -10203,7 +10203,7 @@
       "damageTypePrimary": "bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0661",
@@ -10219,7 +10219,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 4 (1d6 + 1) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0662",
@@ -10235,7 +10235,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one creature. Hit: 4 (1d4 + 2) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0663",
@@ -10253,7 +10253,7 @@
         "blinded"
       ],
       "description": "The mephit exhales a 15-foot cone of blinding dust. Each creature in that area must succeed on a DC 10 Dexterity saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0663-blinding-breath.md"
     },
     {
       "id": "MA-0664",
@@ -10265,7 +10265,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The mephit has a 25 percent chance of summoning 1d4 mephits of its kind. A summoned mephit appears in an unoccupied space within 60 feet of its summoner, acts as an ally of its summoner, and can't summon other mephits. It remains for 1 minute, until it or its summoner dies, or until its summoner dismisses it as an action.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-MA-0664-summon-mephits.md"
     },
     {
       "id": "MA-0665",
@@ -10281,7 +10281,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0666",
@@ -10293,7 +10293,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The elemental makes two slam attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0667",
@@ -10309,7 +10309,7 @@
       "damageTypePrimary": "bludgeoning",
       "reach": "10 ft.",
       "description": "Melee Weapon Attack: +8 to hit, reach 10 ft., one target. Hit: 14 (2d8 + 5) bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0668",
@@ -10321,7 +10321,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The efreeti makes two scimitar attacks or uses its Hurl Flame twice.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0669",
@@ -10339,7 +10339,7 @@
       "damageTypeSecondary": "fire",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +10 to hit, reach 5 ft., one target. Hit: 13 (2d6 + 6) slashing damage plus 7 (2d6) fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0670",
@@ -10354,7 +10354,7 @@
       "damageDicePrimary": "5d6",
       "damageTypePrimary": "fire",
       "description": "Ranged Spell Attack: +7 to hit, range 120 ft., one target. Hit: 17 (5d6) fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0671",
