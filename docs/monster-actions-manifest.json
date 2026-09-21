@@ -10416,7 +10416,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The cataclysm casts the Control Weather spell, requiring no spell components and using Constitution as the spellcasting ability.",
-      "verified": "broken — see .opencode/plans/bug-MA-0674-control-weather.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0675",

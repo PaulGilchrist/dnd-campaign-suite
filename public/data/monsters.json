@@ -20511,8 +20511,8 @@
         ]
       },
       {
-        "name": "Control Weather",
-        "description": "The cataclysm casts the <strong>Control Weather</strong> spell, requiring no spell components and using Constitution as the spellcasting ability.",
+        "name": "Spellcasting",
+        "description": "The cataclysm casts one of the following spells, requiring no spell components and using Constitution as the spellcasting ability:\n<strong>At Will:</strong> <em>Control Weather</em>",
         "spellcasting_ability": "Constitution"
       }
     ],
