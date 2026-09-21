@@ -113,7 +113,7 @@ describe('MA-0286 suppression-gate collateral scan — whole monsters.json', () 
     return hm ? hm[1].replace(/\s+/g, ' ').trim() : null;
   };
 
-  it('suppresses EXACTLY the two auto-hit attack rows app-wide (AO Medium Slam, Drow Mage Staff)', () => {
+  it('suppresses EXACTLY the one auto-hit attack row app-wide (AO Medium Slam; Drow Mage Staff armed by MA-0647)', () => {
     const suppressed = [];
     const kept = [];
     for (const mo of monsters) {
@@ -129,18 +129,23 @@ describe('MA-0286 suppression-gate collateral scan — whole monsters.json', () 
         }
       }
     }
-    expect(suppressed).toEqual(['animated-object-medium/Slam', 'drow-mage/Staff']);
+    expect(suppressed).toEqual(['animated-object-medium/Slam']);
     expect(kept).toEqual(expect.arrayContaining(['giant-frog/Swallow', 'young-remorhaz/Heat Aura']));
     expect(kept.every(k => !/attack/i.test(k))).toBe(true);
   });
 
-  it('Drow Mage Staff (same defect class, prose "+ 2 to hit" only) renders text-only too', () => {
+  it('MA-0647: Drow Mage Staff armed with attack_bonus 2 — renders the +2 attack chip, no auto-hit damage chip', () => {
     const staff = diskRow('drow-mage', 'Staff');
-    expect(staff.attack_bonus == null).toBe(true);
+    expect(staff.attack_bonus).toBe(2);
+    expect(attackRowMissingToHit(staff)).toBe(false);
     expect(staff.description).toMatch(/Melee Weapon Attack/i);
-    const { container, onDamage } = renderRow(staff);
-    expect(container.querySelectorAll('.mc-dice-link').length).toBe(0);
-    expect(container.textContent).toContain('1d6 - 1');
+    const { container, onDamage, onAttack } = renderRow(staff);
+    const chips = [...container.querySelectorAll('.mc-dice-link')];
+    expect(chips.length).toBe(1);
+    expect(chips[0].textContent).toContain('+2');
+    fireEvent.click(chips[0]);
+    expect(onAttack).toHaveBeenCalledWith('Staff', 2, expect.objectContaining({ name: 'Staff' }));
     expect(onDamage).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('1d6 - 1');
   });
 });

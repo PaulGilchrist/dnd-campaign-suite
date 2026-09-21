@@ -55,3 +55,50 @@ describe('MA-0636 data lock (monsters.json Drider Longsword)', () => {
     expect(one.description).toContain('1d8 + 3');
   });
 });
+
+describe('MA-0647 data lock (monsters.json Drow Mage Staff)', () => {
+  const staffRow = () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const staff = monsters.find((m) => m.name === 'Drow Mage').actions[0];
+    expect(staff.name).toBe('Staff');
+    return staff;
+  };
+
+  it('actions[0] Staff authors attack_bonus 2 (DEX mod, canonical "+ 2 to hit")', () => {
+    const staff = staffRow();
+    expect(staff.attack_bonus).toBe(2);
+    expect(staff.description).toMatch(/\+ 2 to hit/);
+  });
+
+  it('actions[0] Staff authors damage_dice_two_handed "1d8 - 1" beside the 1d6 - 1 primary + poison secondary', () => {
+    const staff = staffRow();
+    expect(staff.damage_dice_primary).toBe('1d6 - 1');
+    expect(staff.damage_dice_two_handed).toBe('1d8 - 1');
+    expect(staff.damage_type_primary).toBe('bludgeoning');
+    expect(staff.damage_dice_secondary).toBe('1d6');
+    expect(staff.damage_type_secondary).toBe('poison');
+  });
+
+  it('attackRowMissingToHit no longer suppresses the Staff row chips', async () => {
+    const { attackRowMissingToHit } = await import('./MonsterCardHelpers.js');
+    expect(attackRowMissingToHit(staffRow())).toBe(false);
+  });
+
+  it('buildTwoHandedVariantOffer arms the Staff HIT-popup chooser with both formulas', () => {
+    const offer = buildTwoHandedVariantOffer(staffRow(), 'Staff');
+    expect(offer).toMatchObject({
+      formula: '1d8 - 1',
+      baseFormula: '1d6 - 1',
+      damageType: 'bludgeoning',
+      attackName: 'Staff',
+    });
+    expect(offer.label).toContain('1d8 - 1');
+  });
+
+  it('drow mage Summon Demon sibling row stays byte-inert', () => {
+    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
+    const summon = monsters.find((m) => m.name === 'Drow Mage').actions[1];
+    expect(summon.name).toBe('Summon Demon');
+    expect(buildTwoHandedVariantOffer(summon, 'Summon Demon')).toBeNull();
+  });
+});
