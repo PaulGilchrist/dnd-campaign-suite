@@ -8,7 +8,7 @@ import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } fro
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
-import { registerTargetEffect, getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
+import { registerTargetEffect, getActiveTargetEffect, getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
 import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
@@ -435,6 +435,81 @@ async function applyTransportAndMovementClauseGrants({ context, campaignName, at
     if (context?.speedZeroClause) {
         await grantSpeedZeroClause({ context, campaignName, attackerName, applyTarget });
     }
+    // MA-0711: Faerie Dragon Euphoria Breath — inline failed-save slowed-rider
+    // grant (shapeless row, picker never opens, MA-0087 picker-only gap;
+    // MA-0146 both-seams twin shape). Grants each registered te named by
+    // parseSlowedClauses (no_reactions here) + ONE merged clock; the d6
+    // behavior table / repeat-save ender legs are §70 advisory, logged.
+    if (context?.slowedClauses) {
+        await grantSlowedClausesInline({ context, campaignName, attackerName, applyTarget });
+    }
+}
+
+// MA-0711: inline failed-save slowed-clause grant (Faerie Dragon Euphoria
+// Breath — "The target can't take reactions and must roll a d6 at the start
+// of each of its turns to determine its behavior ... make a DC 11 Wisdom
+// saving throw, ending the effect on itself on a success"). The MA-0087
+// picker grant (SaveAttackAoeModal.grantSlowedClauses) never reached this
+// shapeless inline row; this is its both-seams twin (MA-0146 speed_zero).
+// Grants EACH te named by parseSlowedClauses through the registry
+// (no_reactions consumer: CharReactions), duration honest per row — an
+// "until … next turn" clause row maps to the MA-0073 rounds:2 clock, else
+// 1 minute → rounds:10 (§37 minutes×10) — drained by ONE merged
+// addExpiration write (§38 never two racing clocks). Logs the grant in the
+// MA-0087 'condition applied' copy and names the unmodelable d6
+// start-of-turn behavior table + repeat-save ender as §70 GM-enforced
+// advisory (MA-0706 durationNote advisory precedent).
+// MA-0711 (complexity hoist, playbook §5): duration honesty per clause row —
+// an "until … next turn" clause (Spectator Confusion Ray) maps to the MA-0073
+// rounds:2 clock; else the row's RAW 1 minute → rounds:10 (§37 minutes×10).
+function resolveInlineSlowedDuration({ context, applyTarget }) {
+    const untilNextTurn = /next turn/i.test(context?.conditionDurationNote || '');
+    return untilNextTurn
+        ? { rounds: 2, durationKey: 'until_end_of_next_turn', durationText: `until the end of ${applyTarget}'s next turn` }
+        : { rounds: 10, durationKey: '1_minute', durationText: 'for 1 minute' };
+}
+
+async function grantSlowedClausesInline({ context, campaignName, attackerName, applyTarget }) {
+    const effects = context.slowedClauses.effects || [];
+    if (effects.length === 0) return;
+    const actionName = context?.actionName || context?.name || 'the action';
+    const { rounds, durationKey, durationText } = resolveInlineSlowedDuration({ context, applyTarget });
+    const labels = [];
+    for (const effectKey of effects) {
+        registerTargetEffect(campaignName, applyTarget, effectKey, attackerName, {
+            duration: durationKey,
+            actionName,
+        });
+        const def = getEffectDefinition(effectKey);
+        labels.push(def?.label || effectKey);
+    }
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        campaignName,
+        rounds,
+        effects: effects.map(effectKey => ({ type: 'remove_target_effect', effectKey, source: attackerName, target: applyTarget })),
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, effects[0]);
+    await addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: applyTarget,
+        condition: labels.join(', '),
+        sourceName: attackerName,
+        sourceAbility: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — ${labels.join(', ')} ${durationText}.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:slowed-clause-granted]', e); });
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'condition_clauses_advisory',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${applyTarget}'s ${actionName} d6 start-of-turn behavior table (1-4 random movement; 5-6 no movement + repeat save ending on self) is GM-enforced — no behavior-table subsystem; te clock rounds:${rounds} (${durationText}).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:slowed-clause-advisory]', e); });
 }
 
 // MA-0048/MA-0610: failed-save repeat-save arm (complexity hoist out of

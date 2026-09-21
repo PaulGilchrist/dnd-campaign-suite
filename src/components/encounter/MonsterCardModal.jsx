@@ -1378,6 +1378,17 @@ export function buildAbilitySaveRollContext({ monsterName, target, spellName, ac
     // (MA-0073 shape; the sphere row normally routes through the radius
     // picker, which carries its own speedZeroClause seam).
     speedZeroClause: parseSpeedZeroClause(saveEffect),
+    // MA-0711: Faerie Dragon Euphoria Breath — the MA-0087 slowed-clause rider
+    // on the INLINE block-save seam. The row is shapeless ("within 5 feet" in
+    // prose, no range field) so breathAoeShape is null and the picker never
+    // opens (§159/§211) — MA-0087's grant route was picker-only, this arm is
+    // its inline gap fixed in the MA-0146 speedZeroClause both-seams twin
+    // shape: the SAME parseSlowedClauses output (no_reactions here) rides the
+    // save context and saveProcessing.applyFailedSaveClauseGrants grants the
+    // registered te(s) on a failed save with ONE §37 clock. Byte-inert null
+    // for every clauseless row; picker rows keep their own setConePicker
+    // slowedClauses seam byte-identical (fire() never runs for them).
+    slowedClauses: parseSlowedClauses(saveEffect),
     // MA-0275: Animal Spirit GM-chosen variant (chooser at chip-click;
     // 'fortify' | 'marked_as_prey' | 'pesky_swarm' | null) — producer arm
     // for the EITHER-outcome grant in saveProcessing.
