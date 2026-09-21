@@ -215,8 +215,13 @@ function SummonLink({ action, spellUsesUsed, attackerCannotAct, onSummonRow }) {
 // self-grant chip routed to resolveMonsterSelfBuffRow in the modal (te on
 // self + one merged expiry clock + spend). Uses counter rides the MA-0020
 // monsterSpellUses gate; exhausted chips stay clickable and refuse honestly.
-function SelfBuffLink({ action, spellUsesUsed, attackerCannotAct, onSelfBuffRow }) {
-  if (!isMonsterSelfBuffRow(action)) return null;
+// MA-0694: a legendary gated child (Empyrean "Bolster") must NOT arm this
+// ungated chip too — the shared legendary economy rides the single
+// "Expend Legendary" chip (LegendarySpendLink → handleLegendaryRow: gate →
+// already-bolstered refusal → spend → self-buff mechanic). Non-legendary
+// self-buff rows (Duergar Enlarge/Invisibility) stay byte-identical.
+function SelfBuffLink({ action, spellUsesUsed, attackerCannotAct, onSelfBuffRow, legendaryGate }) {
+  if (!isMonsterSelfBuffRow(action) || legendaryGate) return null;
   const gate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
   const usesNote = gate ? <em> ({gate.maxUses}/Day · {gate.remaining} left)</em> : null;
   const spentClass = gate && gate.remaining === 0 ? ' mc-dice-link-spell-spent' : '';
@@ -248,7 +253,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
       <ZoneAuraLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onZoneAuraRow={onZoneAuraRow} />
       <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} />
-      <SelfBuffLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSelfBuffRow={onSelfBuffRow} />
+      <SelfBuffLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSelfBuffRow={onSelfBuffRow} legendaryGate={legendaryGate} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
         <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>

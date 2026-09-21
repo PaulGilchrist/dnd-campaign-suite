@@ -21398,9 +21398,20 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 1",
+        "uses": 1,
+        "description": "Immediately after another creature's turn, the empyrean can expend a use to take one of the following actions. The empyrean regains all expended uses at the start of each of its turns."
+      },
+      {
         "name": "Bolster",
         "description": "The empyrean gains 10 <strong>Temporary Hit Points</strong>, and the empyrean and each ally within 30 feet of it gain Advantage on <strong>D20 Tests</strong> until the end of the empyrean's next turn. The empyrean can't take this action again until the start of its next turn.",
-        "uses": 1
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "bolstered",
+          "rounds": 2,
+          "temp_hp": 10,
+          "ally_radius_ft": 30
+        }
       },
       {
         "name": "Shockwave of Glory",
@@ -21415,7 +21426,7 @@
       {
         "name": "Smite",
         "description": "The empyrean makes one Divine Ray attack.",
-        "uses": 1
+        "delegates_to": "Divine Ray"
       }
     ],
     "lair_actions": [],

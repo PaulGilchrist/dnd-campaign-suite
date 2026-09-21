@@ -24,7 +24,8 @@ import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
-import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount, endSelfBuffOnTrigger } from '../../services/encounters/monsterSelfBuff.js';
+import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount, endSelfBuffOnTrigger, isMonsterSelfBuffRow, buildAlreadyEnlargedRefusalPopup, buildAlreadyEnlargedRefusalLog } from '../../services/encounters/monsterSelfBuff.js';
+import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
@@ -529,6 +530,16 @@ function resolveLegendaryRowMechanic(action, { monsterName, handledActionName, h
     addEntry(campaignName, buildLegendaryAdvisoryLog({ monsterName, action }))
       .catch((e) => { console.error('[MonsterCardModal] Error logging legendary advisory row:', e); });
   }
+  else if (isMonsterSelfBuffRow(action)) {
+    // MA-0694: legendary self-buff child (Empyrean Bolster) — the shared
+    // legendary gate already spent the use above (expendLegendaryUse);
+    // resolveMonsterSelfBuffRow arms te `bolstered` + `bolster_advantage`
+    // (+ self THP replace-if-larger via tempHpService) with ONE merged
+    // clock and logs grants. The row authors NO uses/maxUses (§165), so
+    // its internal monsterSpellUses gate is null — zero double-spend.
+    resolveMonsterSelfBuffRow({ action, monsterName, campaignName, setPopupHtml, storedUses: {} })
+      .catch((e) => { console.error(`[MonsterCardModal] legendary self-buff row "${action.name}" failed:`, e); });
+  }
   else {
     const formula = extractDamageDiceFromDescription(action.description, action.damage_dice_primary);
     if (formula && canRollExpression(formula)) handleDamage(handledActionName ?? action.name, formula, action.damage_type_primary ? formatDamageTypes([action.damage_type_primary]) : '', action);
@@ -546,6 +557,21 @@ function resolveLegendaryRowMechanic(action, { monsterName, handledActionName, h
 // save resolves via the existing MA-0019-armed-target seam untouched, then
 // self_heal 1d10 rolls through the canonical applyHealingToTarget helper
 // (MA-0016 choke point — 'no_healing' te refused there with healing_blocked).
+// MA-0694: legendary self-buff child already-active gate — Bolster twice
+// refused BEFORE any spend (RAW "can't take this action again until the
+// start of its next turn" rides the te presence + the per-action cooldown
+// latch): refusal popup + `bolster_refused` / already_bolstered token log,
+// zero legendary use burned, zero THP, zero te re-stamp.
+async function legendarySelfBuffActiveRefusal({ action, monsterName, campaignName, setPopupHtml }) {
+  if (!isMonsterSelfBuffRow(action)) return false;
+  const effectKey = action.automation.effect;
+  if (!getActiveTargetEffect(campaignName, monsterName, effectKey)) return false;
+  setPopupHtml(buildAlreadyEnlargedRefusalPopup({ monsterName, action, effectKey }));
+  await addEntry(campaignName, buildAlreadyEnlargedRefusalLog({ monsterName, action, effectKey }))
+    .catch((e) => { console.error('[MonsterCardModal] Error logging legendary already-buffed refusal:', e); });
+  return true;
+}
+
 async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage, handleCheck }) {
   const allyPrerequisite = parseLegendaryAllyPrerequisite(action);
   if (allyPrerequisite) {
@@ -584,6 +610,7 @@ async function resolveLegendaryRow({ action, monsterName, monster, campaignName,
       .catch((e) => { console.error('[MonsterCardModal] Error logging check-bonus refusal:', e); });
     return;
   }
+  if (await legendarySelfBuffActiveRefusal({ action, monsterName, campaignName, setPopupHtml })) return;
   const result = await expendLegendaryUse({ monsterName, monster, actionName, campaignName, action });
   if (!result.spent) {
     setPopupHtml(result.popupHtml);
@@ -1078,6 +1105,19 @@ function hasStrTestDisadvantageOn(targetEffects, monsterName) {
 
 function rayDisadvantageContext(applies) {
   return applies ? { forcedMode: 'disadvantage' } : undefined;
+}
+
+// MA-0694: Empyrean Bolster consumer — te `bolster_advantage` ON THIS
+// monster (EB-joined ally or the empyrean itself) forces Advantage on its
+// own save/check/skill chip rolls (attacks already fold the te live via
+// computeConditionEffects → combineAttackModes). Disadvantage riders win
+// the same-test conflict per RAW cancel-forward.
+function hasBolsterAdvantageOn(targetEffects, monsterName) {
+  return !!targetEffects?.some(te => te.target === monsterName && te.effect === 'bolster_advantage');
+}
+
+function bolsterAdvantageContext(applies) {
+  return applies ? { forcedMode: 'advantage', advantageReason: 'Bolstered' } : undefined;
 }
 
 function monsterSpellcastingMod(monster) {
@@ -1779,14 +1819,16 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const handleAbilityCheck = (abbr, mod) => {
     const fullName = abilityNameMap[abbr] || abbr.toUpperCase();
-    const context = rayDisadvantageContext(abbr === 'str' && hasStrTestDisadvantageOn(monsterTargetEffects, monsterName));
+    const context = rayDisadvantageContext(abbr === 'str' && hasStrTestDisadvantageOn(monsterTargetEffects, monsterName))
+      || bolsterAdvantageContext(hasBolsterAdvantageOn(monsterTargetEffects, monsterName));
     rollAbilityCheck(fullName, mod, context);
   };
 
-  const handleSaveThrow = (ability, mod) => rollSavingThrow(saveAbilityAbbr(ability), mod);
+  const handleSaveThrow = (ability, mod) => rollSavingThrow(saveAbilityAbbr(ability), mod, bolsterAdvantageContext(hasBolsterAdvantageOn(monsterTargetEffects, monsterName)));
 
   const handleSkillCheck = (name, mod) => {
-    const context = rayDisadvantageContext(name === 'Athletics' && hasStrTestDisadvantageOn(monsterTargetEffects, monsterName));
+    const context = rayDisadvantageContext(name === 'Athletics' && hasStrTestDisadvantageOn(monsterTargetEffects, monsterName))
+      || bolsterAdvantageContext(hasBolsterAdvantageOn(monsterTargetEffects, monsterName));
     rollSkillCheck(name, mod, context);
   };
 

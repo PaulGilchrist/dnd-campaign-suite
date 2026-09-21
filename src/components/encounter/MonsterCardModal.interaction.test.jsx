@@ -192,7 +192,10 @@ describe('MonsterCardModal interaction / game rules', () => {
       const strSaveLink = Array.from(saveLinks).find((el) => el.textContent.includes('STR'));
       expect(strSaveLink).toBeTruthy();
       fireEvent.click(strSaveLink);
-      expect(rollSavingThrow).toHaveBeenCalledWith('STR', 2);
+      // MA-0694 stale-pin inversion: save chips gained a third forcedMode
+      // context channel (Bolster te consumer) — undefined = byte-inert
+      // without a `bolster_advantage` te on the holder.
+      expect(rollSavingThrow).toHaveBeenCalledWith('STR', 2, undefined);
     });
 
     it('clicking save modifier with negative value passes the negative modifier', () => {
@@ -203,7 +206,7 @@ describe('MonsterCardModal interaction / game rules', () => {
       const conSaveLink = Array.from(document.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.includes('CON'));
       expect(conSaveLink).toBeTruthy();
       fireEvent.click(conSaveLink);
-      expect(rollSavingThrow).toHaveBeenCalledWith('CON', -3);
+      expect(rollSavingThrow).toHaveBeenCalledWith('CON', -3, undefined);
     });
   });
 

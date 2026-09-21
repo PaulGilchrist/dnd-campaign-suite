@@ -10722,7 +10722,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "The empyrean gains 10 Temporary Hit Points, and the empyrean and each ally within 30 feet of it gain Advantage on D20 Tests until the end of the empyrean's next turn. The empyrean can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-MA-0694-bolster.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0695",

@@ -666,6 +666,33 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { ability: 'STR' },
   },
   {
+    // MA-0694: Empyrean Bolster self-buff marker te — monsterSelfBuff seam
+    // grants it ON SELF via the shared legendary gate (spend first) with ONE
+    // merged rounds:2 clock ("until the end of the empyrean's next turn");
+    // the te standing is the already_bolstered once-per-turn refusal truth.
+    effect: 'bolstered',
+    label: 'Bolstered',
+    description: 'The empyrean gained 10 Temporary Hit Points via Bolster; the te standing refuses a re-Bolster until its clock runs out at the end of the empyrean\'s next turn.',
+    icon: 'fa-shield-heart',
+    cls: 'effect-buff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
+    // MA-0694: Empyrean Bolster area advantage te — stamped on the empyrean
+    // AND every allied combatant within 30 ft (gridless: all non-PC board
+    // members, §42 lenient, membership/radius GM-enforced). LIVE consumer
+    // folds in conditionEffects.js (attacks + saves + ability checks = the
+    // RAW "Advantage on D20 Tests").
+    effect: 'bolster_advantage',
+    label: 'Bolstered (Advantage on D20 Tests)',
+    description: 'The creature has Advantage on attack rolls, saving throws and ability checks until the end of the empyrean\'s next turn (ONE merged clock; gridless 30-ft radius and ally membership are GM-enforced, §42 advisory).',
+    icon: 'fa-arrow-up',
+    cls: 'effect-buff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
     // MA-0655: Duergar Enlarge self-buff te — Large size, doubled damage
     // dice on Strength-based weapon attacks (STR-dice consumer in
     // MonsterCardModal.handleAttack), STR checks/saves advantage stay

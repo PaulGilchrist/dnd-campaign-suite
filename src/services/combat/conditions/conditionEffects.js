@@ -468,6 +468,21 @@ const LATE_TARGET_EFFECT_HANDLERS = {
       bumpCount(effects, 'targetDisadvantageCount');
     }
   },
+  // MA-0694: Empyrean Bolster — Advantage on D20 Tests (attacks + saves +
+  // ability checks) on the HOLDER until the end of the empyrean's next turn.
+  // Same verified fold channels as foresight (minus the defender-disadvantage
+  // leg): attackAdvantageCount feeds combineAttackModes (monster + PC attack
+  // rolls); saveAdvantageCount feeds CharAbilities/CharSheet save chips;
+  // abilityCheckAdvantage feeds CharAbilities/useCharActionsBaseActions checks.
+  // Gridless 30-ft radius + ally membership are GM-enforced (§42 advisory).
+  bolster_advantage: (effects, te) => {
+    bumpCount(effects, 'attackAdvantageCount');
+    addUniqueReason(effects.attackAdvantageReasons, te.source || 'Bolstered');
+    bumpCount(effects, 'saveAdvantageCount');
+    addUniqueReason(effects.saveAdvantageReasons, te.source || 'Bolstered');
+    effects.abilityCheckAdvantage = true;
+    addUniqueReason(effects.abilityCheckAdvantageReasons, te.source || 'Bolstered');
+  },
   // Handle Blur — creatures have Disadvantage on attack rolls against the target (unless attacker has Blindsight or Truesight)
   blur: (effects, te, attackerSenses) => {
     if (!attackerHasBlindsightOrTruesight(attackerSenses)) {
