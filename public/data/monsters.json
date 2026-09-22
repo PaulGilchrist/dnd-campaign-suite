@@ -27414,7 +27414,11 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 3",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "grappled"
+        ],
+        "escape_dc": 13
       },
       {
         "name": "Sting",
