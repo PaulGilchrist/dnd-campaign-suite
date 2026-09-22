@@ -27260,6 +27260,8 @@
         "save_dc": 11,
         "damage_dice_primary": "1d4 + 4",
         "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "3d6",
+        "damage_type_secondary": "Poison",
         "save_type": "Constitution",
         "save_effect": "On a failure, the target takes 10 (3d6) poison damage. On a success, the target takes half as much damage."
       }
