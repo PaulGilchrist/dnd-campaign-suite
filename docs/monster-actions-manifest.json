@@ -11622,7 +11622,7 @@
       "range": "120 feet",
       "recharge": "4-6",
       "description": "Wisdom Saving Throw: DC 16, one creature the fomorian can see within 120 feet. Failure: 21 (6d6) Psychic damage, and the target gains 1 Exhaustion level. Success: Half damage only.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0751-exhaustion-never-granted.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0752",

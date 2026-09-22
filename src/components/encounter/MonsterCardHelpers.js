@@ -146,6 +146,27 @@ export function parseSlowedClauses(saveEffect) {
   return clauses.length > 0 ? { effects: clauses } : null;
 }
 
+// MA-0751: authored failed-save exhaustion-level clause (Fomorian Warping
+// Hex — "The target gains 1 Exhaustion level."). 'exhaustion' is NOT in the
+// canonical CONDITIONS word list (it is LEVEL-based, stackable to 6, so the
+// boolean condition-list grant is not expressive for it), so
+// extractConditionsFromSaveEffect can never see it; this clause parse arms
+// the level-aware exhaustion grant in saveProcessing on a failed save
+// (MA-0711 slowedClauses inline both-seams shape). The grant writes the
+// canonical per-victim runtime exhaustionLevel storage consumed by
+// exhaustionRules/CharConditions/rest rules — no new te. Byte-inert (null)
+// for every row without the clause. The Salamander Inferno Master twin
+// ("The target gains 1 Exhaustion level whenever it takes this burning
+// damage") is a RECURRING burn-tick clause on a picker-route Sphere row
+// (§87 recurring ticks need an explicit consumer) — excluded explicitly so
+// the one-shot save-fail grant never over-grants it.
+export function parseExhaustionLevelClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  if (/whenever it takes this burning damage/i.test(saveEffect)) return null;
+  const m = saveEffect.match(/gains? (\d+) exhaustion levels?/i);
+  return m ? { effect: 'exhaustion', level: Math.max(1, Number(m[1]) || 1) } : null;
+}
+
 // MA-0303: authored both-outcomes tail clause (Arch-hag Crackling Wave —
 // "Failure or Success: The target is cursed until the end of the hag's next
 // turn. The target can't take Reactions until the curse ends."). Every AoE

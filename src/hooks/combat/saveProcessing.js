@@ -10,6 +10,7 @@ import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/c
 import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
 import { registerTargetEffect, getActiveTargetEffect, getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
+import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRules.js';
 import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
 import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
 import { grantRepeatSaveEffect } from '../../services/rules/features/repeatSaveService.js';
@@ -443,6 +444,15 @@ async function applyTransportAndMovementClauseGrants({ context, campaignName, at
     if (context?.slowedClauses) {
         await grantSlowedClausesInline({ context, campaignName, attackerName, applyTarget });
     }
+    // MA-0751: Fomorian Warping Hex — failed WIS save "and the target gains
+    // 1 Exhaustion level". Level-based grant onto the canonical per-victim
+    // runtime exhaustionLevel storage (exhaustionRules/CharConditions/rest
+    // rules channel — NOT the boolean condition list, NOT a te; no expiry
+    // clock: RAW persistence ends only at a rest, whose consumers already
+    // read exhaustionLevel). `condition applied` log names level + source.
+    if (context.exhaustionLevel) {
+        await grantExhaustionClause({ context, campaignName, attackerName, applyTarget });
+    }
 }
 
 // MA-0711: inline failed-save slowed-clause grant (Faerie Dragon Euphoria
@@ -510,6 +520,68 @@ async function grantSlowedClausesInline({ context, campaignName, attackerName, a
         description: `${applyTarget}'s ${actionName} d6 start-of-turn behavior table (1-4 random movement; 5-6 no movement + repeat save ending on self) is GM-enforced — no behavior-table subsystem; te clock rounds:${rounds} (${durationText}).`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:slowed-clause-advisory]', e); });
+}
+
+// MA-0751: failed-save exhaustion-level grant (Fomorian Warping Hex — "the
+// target gains 1 Exhaustion level"). exhaustionRules.js consumes a NUMERIC
+// per-victim level (stackable to 6, rest-removable), and the live storage is
+// the per-character runtime key exhaustionLevel (producers:
+// useTravelManagement forced march; consumers: CharConditions sheet,
+// restRules short/long rest, sleepService immunity) — so this rides THAT
+// canonical channel instead of a te or the boolean condition list (neither
+// is expressive for levels). Stamps source+level into activeConditionMeta
+// (§191 per-victim provenance surface) and logs `condition applied` with
+// level + source. NO addExpiration clock — RAW exhaustion persists until a
+// rest, whose consumers already read exhaustionLevel (monster rest-rearm
+// stays §70 advisory). Exhaustion-immune targets (cs.immunities, §43 partial
+// join caveat) get a zero-grant advisory; the level-6 death cap is capped +
+// advisory (§7 no 0-HP instakill consumer).
+function csIsExhaustionImmune(csCreature) {
+    const immunities = Array.isArray(csCreature && csCreature.immunities) ? csCreature.immunities : [];
+    return immunities.some(i => String(i).toLowerCase() === 'exhaustion');
+}
+
+function stampExhaustionMeta({ campaignName, applyTarget, attackerName, newLevel }) {
+    const meta = getRuntimeValue(applyTarget, 'activeConditionMeta', campaignName) || {};
+    setRuntimeValue(applyTarget, 'activeConditionMeta', { ...meta, exhaustion: { ...(meta.exhaustion || {}), source: attackerName, level: newLevel } }, campaignName);
+}
+
+async function logExhaustionGrant({ campaignName, applyTarget, attackerName, actionName, levels, newLevel }) {
+    const stored = getRuntimeValue(applyTarget, 'exhaustionLevel', campaignName);
+    await addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: applyTarget,
+        condition: `Exhaustion ${newLevel}`,
+        sourceName: attackerName,
+        sourceAbility: actionName,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — gains ${levels} Exhaustion level${levels > 1 ? 's' : ''}, now ${newLevel}/${EXHAUSTION_LEVELS} (stacks until a Long Rest; level 6 = death, GM-enforced).${Number(stored) === newLevel ? '' : ' (exhaustionLevel write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:exhaustion-granted]', e); });
+}
+
+async function grantExhaustionClause({ context, campaignName, attackerName, applyTarget }) {
+    const actionName = context.actionName || context.name || 'the action';
+    const levels = Number(context.exhaustionLevel.level) || 1;
+    const combatSummary = await loadCombatSummary(campaignName) || {};
+    const csCreature = (combatSummary.creatures || []).find(c => c.name === applyTarget);
+    if (csIsExhaustionImmune(csCreature)) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'exhaustion_immune_advisory',
+            characterName: applyTarget,
+            sourceName: attackerName,
+            abilityName: actionName,
+            description: `${applyTarget} is immune to Exhaustion — ${attackerName}'s ${actionName} grants no exhaustion level.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[saveProcessing:exhaustion-immune]', e); });
+        return;
+    }
+    const current = Number(getRuntimeValue(applyTarget, 'exhaustionLevel', campaignName)) || 0;
+    const newLevel = Math.min(EXHAUSTION_LEVELS, current + levels);
+    await setRuntimeValue(applyTarget, 'exhaustionLevel', newLevel, campaignName);
+    stampExhaustionMeta({ campaignName, applyTarget, attackerName, newLevel });
+    await logExhaustionGrant({ campaignName, applyTarget, attackerName, actionName, levels, newLevel });
 }
 
 // MA-0048/MA-0610: failed-save repeat-save arm (complexity hoist out of
