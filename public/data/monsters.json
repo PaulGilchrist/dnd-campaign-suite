@@ -29293,7 +29293,11 @@
         "attack_bonus": 9,
         "reach": "10 ft.",
         "damage_dice_primary": "2d10 + 5",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": [
+          "grappled"
+        ],
+        "escape_dc": 15
       },
       {
         "name": "Pummel",
