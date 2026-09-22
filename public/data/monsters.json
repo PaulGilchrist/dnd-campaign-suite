@@ -24738,9 +24738,11 @@
       {
         "name": "Touch",
         "description": "Melee Weapon Attack: + 0 to hit, reach 5 ft., one creature. Hit: 1 poison damage, and the creature must succeed on a DC 10 Constitution saving throw or become infected with the disease described in the Death Burst trait.",
+        "attack_bonus": 0,
         "reach": "5 ft.",
         "save_dc": 10,
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "The target becomes infected with the disease described in the Death Burst trait.",
         "damage_dice_primary": "1",
         "damage_type_primary": "Poison"

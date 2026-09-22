@@ -11796,7 +11796,7 @@
       "damageTypePrimary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: + 0 to hit, reach 5 ft., one creature. Hit: 1 poison damage, and the creature must succeed on a DC 10 Constitution saving throw or become infected with the disease described in the Death Burst trait.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0762-gas-spore-touch-missing-attack-bonus.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0763",
