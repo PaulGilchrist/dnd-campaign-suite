@@ -26165,7 +26165,8 @@
         "range": "10 feet",
         "save_effect": "The target has the Grappled condition (escape DC 14).",
         "damage_dice_primary": "2d8 + 4",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "dc_success": "none"
       }
     ],
     "bonus_actions": [],
