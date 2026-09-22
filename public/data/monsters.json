@@ -28513,7 +28513,8 @@
         "reach": "5 ft.",
         "save_effect": "If the target is a Medium or smaller creature, it has the Prone condition. The target dies if it is reduced to 0 Hit Points by this attack. Its body is then absorbed into the mouther, leaving only equipment behind.",
         "damage_dice_primary": "2d6",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["prone"]
       },
       {
         "name": "Blinding Spittle",

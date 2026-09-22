@@ -13083,7 +13083,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 7 (2d6) Piercing damage. If the target is a Medium or smaller creature, it has the Prone condition. The target dies if it is reduced to 0 Hit Points by this attack. Its body is then absorbed into the mouther, leaving only equipment behind.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0838-bite-prone-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0839",
