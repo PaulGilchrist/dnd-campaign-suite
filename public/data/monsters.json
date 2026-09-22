@@ -25998,7 +25998,8 @@
         "damage_dice_primary": "2d6 + 3",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "2d6",
-        "damage_type_secondary": "Piercing"
+        "damage_type_secondary": "Piercing",
+        "hit_conditions": ["prone"]
       }
     ],
     "bonus_actions": [],
