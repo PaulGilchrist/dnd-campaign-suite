@@ -12350,7 +12350,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Piercing damage, and the target has the Poisoned condition until the start of the centipede's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0795-bite-poisoned-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0796",
