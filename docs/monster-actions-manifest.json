@@ -13139,7 +13139,7 @@
         "frightened"
       ],
       "description": "Melee or Ranged Attack Roll: +10, reach 10 ft. or range 120 ft. Hit: 12 (2d6 + 5) Slashing damage plus 17 (5d6) Fire damage, and the target has the Frightened condition until the start of the githyanki's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0841-draconic-strike-frightened-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0842",

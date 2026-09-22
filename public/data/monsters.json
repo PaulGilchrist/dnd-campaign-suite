@@ -28616,7 +28616,8 @@
         "damage_dice_primary": "2d6 + 5",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "5d6",
-        "damage_type_secondary": "Fire"
+        "damage_type_secondary": "Fire",
+        "hit_conditions": ["frightened"]
       },
       {
         "name": "Conjured Dragon's Breath",
