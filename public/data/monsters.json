@@ -24536,11 +24536,18 @@
       },
       {
         "name": "Animate Boulders",
-        "description": "The galeb duhr magically animates up to two boulders it can see within 60 feet of it. A boulder has statistics like those ofa galeb duhr, except it has Intelligence 1 and Charisma 1, it can't be charmed or frightened, and it lacks the galeb duhr maintains concentration, up to 1 minute (as if concentrating on a spel1).",
-        "usage": {
-          "type": "per day",
-          "times": 1
-        }
+        "description": "The galeb duhr magically animates up to two boulders it can see within 60 feet of it. A boulder has statistics like those of a galeb duhr, except it has Intelligence 1 and Charisma 1, it can't be charmed or frightened, and it lacks this action. The galeb duhr maintains concentration, up to 1 minute (as if concentrating on a spell).",
+        "automation": {
+          "type": "monster_summon",
+          "options": [
+            { "monster": "galib-duhr", "stat_override": { "int": 1, "cha": 1 } }
+          ],
+          "count": 2,
+          "range_ft": 60,
+          "duration_minutes": 1
+        },
+        "uses": 1,
+        "maxUses": 1
       }
     ],
     "traits": [

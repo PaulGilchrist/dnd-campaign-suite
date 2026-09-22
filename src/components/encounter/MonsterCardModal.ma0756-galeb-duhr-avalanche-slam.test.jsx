@@ -180,8 +180,23 @@ describe('MA-0756 monsters.json data lock: Galeb Duhr Avalanche Slam hit riders'
     expect(animate.uses).toBe(1);
     expect(animate.maxUses).toBe(1);
     expect(typeof animate.uses).toBe('number');
+    // MA-0759 (stale pin inverted): galib-duhr's twin row now rides the
+    // same seam with the byte-shape mirrored from galeb-duhr — automation +
+    // numeric uses/maxUses, OCR prose ("ofa"/"spel1") restamped readable.
     const galib = monsters.find((m) => m.index === 'galib-duhr').actions[1];
-    expect(galib.automation).toBeUndefined();
+    expect(galib.automation).toEqual({
+      type: 'monster_summon',
+      options: [{ monster: 'galib-duhr', stat_override: { int: 1, cha: 1 } }],
+      count: 2,
+      range_ft: 60,
+      duration_minutes: 1,
+    });
+    expect(galib.uses).toBe(1);
+    expect(galib.maxUses).toBe(1);
+    expect(galib.description).toContain('of a galeb duhr');
+    expect(galib.description).toContain('concentrating on a spell');
+    expect(galib.description).not.toContain('ofa');
+    expect(galib.description).not.toContain('spel1');
   });
 
   it('authors conditional_damage mirroring the MA-0007 sibling shape (no flat modifier)', () => {

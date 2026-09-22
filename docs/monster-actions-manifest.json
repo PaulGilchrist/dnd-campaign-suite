@@ -11750,7 +11750,7 @@
         "frightened"
       ],
       "description": "The galeb duhr magically animates up to two boulders it can see within 60 feet of it. A boulder has statistics like those ofa galeb duhr, except it has Intelligence 1 and Charisma 1, it can't be charmed or frightened, and it lacks the galeb duhr maintains concentration, up to 1 minute (as if concentrating on a spel1).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0759-animate-boulders-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0760",

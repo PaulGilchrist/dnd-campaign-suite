@@ -162,3 +162,43 @@ describe('MA-0757 Galeb Duhr Animate Boulders chip', () => {
     expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
   });
 });
+
+// MA-0759: Galib Duhr "Animate Boulders" — galeb-duhr twin chip test. The
+// formerly zero-affordance row (usage DICT rendering cosmetic "(1/Day)"
+// only, §241 discriminator) now arms the same summon chip with the numeric
+// gate counter; its Slam attack row arms no summon chip.
+const galibDuhr = monsters.find(m => m.index === 'galib-duhr');
+const GALIB_ANIMATE_ROW = galibDuhr.actions.find(a => a.name === 'Animate Boulders');
+
+describe('MA-0759 Galib Duhr Animate Boulders chip', () => {
+  it('arms a clickable summon chip counting 1/Day with honest boulder tooltip', () => {
+    const { container, onSummonRow } = renderRow(GALIB_ANIMATE_ROW);
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute('role')).toBe('button');
+    expect(chip.textContent).toContain('Summon');
+    expect(chip.textContent).toContain('(1/Day · 1 left)');
+    const title = chip.getAttribute('title');
+    expect(title).toContain('galib-duhr');
+    expect(title).toContain('count 2');
+    expect(title).not.toContain('demon');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+    expect(onSummonRow.mock.calls[0][0]).toBe(GALIB_ANIMATE_ROW);
+  });
+
+  it('spent row: 0 left + spent class, stays clickable for honest refusal', () => {
+    const { container, onSummonRow } = renderRow(GALIB_ANIMATE_ROW, { spellUsesUsed: { 'Animate Boulders': 1 } });
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip.className).toContain('mc-dice-link-spell-spent');
+    expect(chip.textContent).toContain('0 left');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+  });
+
+  it('Slam attack row arms no summon chip', () => {
+    const slam = galibDuhr.actions.find(a => a.name === 'Slam');
+    const { container } = renderRow(slam);
+    expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
+  });
+});

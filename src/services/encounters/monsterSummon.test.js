@@ -512,12 +512,34 @@ describe('MA-0757 galeb-duhr Animate Boulders data', () => {
     expect(isMonsterSummonRow(ANIMATE_ROW)).toBe(true);
   });
 
-  it('galib-duhr twin row untouched (MA-0759 separate ticket)', () => {
+  // MA-0759 twin fix: galib-duhr's formerly inert row rides the SAME seam
+  // with the byte-shape mirrored from galeb-duhr. Its cosmetic usage DICT
+  // (§241 twin discriminator vs the silent uses-STRING) is dropped exactly
+  // like MA-0757 dropped its uses-string — numeric uses/maxUses gate now.
+  it('MA-0759 galib-duhr twin row mirrors the galeb-duhr byte-shape', () => {
     const galib = monstersData.find(m => m.index === 'galib-duhr');
-    expect(galib.actions[1].name).toBe('Animate Boulders');
-    expect(galib.actions[1].automation).toBeUndefined();
-    expect(galib.actions[1].uses).toBeUndefined();
-    expect(galib.actions[1].usage).toEqual({ type: 'per day', times: 1 });
+    const row = galib.actions[1];
+    expect(row.name).toBe('Animate Boulders');
+    expect(row.automation).toEqual({
+      type: 'monster_summon',
+      options: [{ monster: 'galib-duhr', stat_override: { int: 1, cha: 1 } }],
+      count: 2,
+      range_ft: 60,
+      duration_minutes: 1,
+    });
+    expect(row.uses).toBe(1);
+    expect(row.maxUses).toBe(1);
+    expect(typeof row.uses).toBe('number');
+    expect(row.usage).toBeUndefined();
+    expect(isMonsterSummonRow(row)).toBe(true);
+    // OCR restamp (§23): mangled bytes gone, readable prose in.
+    expect(row.description).toContain('of a galeb duhr');
+    expect(row.description).toContain('concentrating on a spell');
+    expect(row.description).not.toContain('ofa');
+    expect(row.description).not.toContain('spel1');
+    // Galib variant framing kept distinct from galeb-duhr's text.
+    expect(row.description).toContain('up to two boulders');
+    expect(row.description).not.toBe(galebDuhr.actions[1].description);
   });
 
   it('chance-less summon is guaranteed: adjudication never flips a d100', () => {
@@ -594,6 +616,85 @@ describe('MA-0757 constant-count self-summon resolution', () => {
     const result = await resolveMonsterSummonRow({
       action: ANIMATE_ROW,
       monsterName: 'Galeb Duhr 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: { 'Animate Boulders': 1 },
+      deps,
+    });
+    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(deps.setCombatSummary).not.toHaveBeenCalled();
+    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(deps.store.cs.creatures).toHaveLength(1);
+    expect(deps.logs.find(e => e.automationType === 'animate_boulders_refused')).toBeTruthy();
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
+  });
+});
+
+// MA-0759: Galib Duhr "Animate Boulders" (actions[1]) — galeb-duhr twin
+// riding the same MA-0757 extensions verbatim: chance-less guaranteed
+// summon, constant count 2 ("up to two" authored as the adjudicable max,
+// zero dice), option-level stat_override {int:1, cha:1}, and the
+// self-summon guard stripping monster_summon actions from the boulders
+// ("lacks this action", RAW — boulders can never chain-animate).
+const galibDuhr = monstersData.find(m => m.index === 'galib-duhr');
+const GALIB_ANIMATE_ROW = galibDuhr.actions[1];
+
+describe('MA-0759 galib-duhr constant-count self-summon resolution', () => {
+  function makeGalibDeps(cs, uses = {}) {
+    const deps = makeDeps({ cs, uses });
+    deps.monsters = [galibDuhr];
+    deps.rollExpression = vi.fn(() => ({ total: 99, rolls: [99], modifier: 99, formula: 'must-not-roll' }));
+    return deps;
+  }
+
+  const GALIB_CS = () => ({ round: 1, creatures: [{ name: 'Galib Duhr 1', type: 'npc', monsterIndex: 'galib-duhr', initiative: '10', currentHp: 85, maxHp: 85 }] });
+
+  it('spawns TWO boulders (constant count, ZERO dice rolled) right after the duhr; each lacks Animate Boulders, Int/Cha 1 stamped, te @1_minutes; no coin-flip log; summons+ability_use logged', async () => {
+    const deps = makeGalibDeps(GALIB_CS());
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: GALIB_ANIMATE_ROW,
+      monsterName: 'Galib Duhr 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: {},
+      deps,
+    });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ resolved: true, countRoll: null, remaining: 0 });
+    expect(result.summonedNames).toEqual(['Galib Duhr', 'Galib Duhr 2']);
+    const boulders = deps.store.cs.creatures.filter(c => c.name !== 'Galib Duhr 1');
+    expect(boulders.map(c => c.name)).toEqual(['Galib Duhr', 'Galib Duhr 2']);
+    for (const b of boulders) {
+      expect(b).toMatchObject({ type: 'npc', monsterIndex: 'galib-duhr', summonedBy: 'Galib Duhr 1', summonSource: 'monster_ability', ac: 16, maxHp: 85, currentHp: 85, initiative: '9.9' });
+      expect(b.ability_scores).toMatchObject({ str: 20, dex: 14, con: 20, int: 1, wis: 12, cha: 1 });
+      expect(b.actions.map(a => a.name)).toEqual(['Slam']);
+      expect(b.actions.some(a => a.automation?.type === 'monster_summon')).toBe(false);
+    }
+    expect(deps.registerTargetEffect).toHaveBeenCalledTimes(2);
+    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Galib Duhr', 'summoned', 'Galib Duhr 1', { duration: '1_minutes' });
+    expect(deps.store.uses).toEqual({ 'Animate Boulders': 1 });
+    expect(deps.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
+    const spawnLog = deps.logs.find(e => e.type === 'summons');
+    expect(spawnLog.summonedCreatures).toEqual(['Galib Duhr', 'Galib Duhr 2']);
+    expect(spawnLog.summonCount).toBe(2);
+    expect(spawnLog.description).toContain('60 ft');
+    expect(spawnLog.description).toContain('remain 1 minutes');
+    const spendLog = deps.logs.find(e => e.type === 'ability_use');
+    expect(spendLog.description).toContain('Animate Boulders');
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Galib Duhr'));
+  });
+
+  it('1/Day gate: refire refused with animate_boulders_refused, zero spend/spawn/te', async () => {
+    const deps = makeGalibDeps(GALIB_CS(), { 'Animate Boulders': 1 });
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: GALIB_ANIMATE_ROW,
+      monsterName: 'Galib Duhr 1',
       campaignName: 'test-campaign',
       setPopupHtml,
       storedUses: { 'Animate Boulders': 1 },
