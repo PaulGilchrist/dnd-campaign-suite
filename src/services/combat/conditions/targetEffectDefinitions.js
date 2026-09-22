@@ -706,6 +706,21 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-0780: Ghost Ethereality self-buff te — monsterSelfBuff seam grants
+    // it ON SELF with ONE merged rounds:4800 (8 hours) clock; At Will, no
+    // uses gate (RAW has no uses limit). Plane-interaction clause ("can't
+    // affect or be affected by anything on the other plane") and Border
+    // Ethereal visibility are GM-enforced (§70 advisory) — this te carries
+    // the self-state marker only. No early enders (non-concentration).
+    effect: 'ethereal',
+    label: 'Ethereal',
+    description: 'The ghost casts Ethereality (no components, Charisma) and enters the Border Ethereal for up to 8 hours — visible on the Material Plane while on the Border Ethereal and vice versa. Plane interaction (can\'t affect or be affected by anything on the other plane) is GM-enforced (§70 advisory).',
+    icon: 'fa-ghost',
+    cls: 'effect-buff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
     // MA-0658: Duergar Invisibility self-buff te — monsterSelfBuff seam
     // grants it ON SELF with ONE merged rounds:600 (1 hour) clock; attack /
     // cast / enlarge enders drop it early with a log. Invisibility CONDITION

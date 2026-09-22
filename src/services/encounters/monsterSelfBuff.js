@@ -63,7 +63,9 @@ export function buildSelfBuffGrantLog({ monsterName, action, effectKey, rounds }
     ? 'damage dice on Strength-based weapon attacks doubled by the attack-damage consumer. STR checks/saves advantage and rest-rearm are GM-enforced (§70 advisory).'
     : effectKey === 'bolstered'
       ? `te \`bolstered\` standing refuses a re-Bolster ("can't take this action again until the start of its next turn" rides the already_bolstered refusal + the legendary per-action cooldown latch); te \`bolster_advantage\` (Advantage on D20 Tests — live te fold in conditionEffects.js) stamped on itself${bolsterAllyRadiusFt(action) ? ` and allies within ${bolsterAllyRadiusFt(action)} ft` : ''}; gridless radius + ally membership GM-enforced (§42 advisory).`
-      : `ends when it attacks, casts a spell, or uses its Enlarge (attack/cast/enlarge enders drop the te with an \`${effectKey}_ended\` log), or when its clock runs out. Concentration-break ender and invisibility advantage/disadvantage adjudication are GM-enforced (§70 advisory).`;
+      : effectKey === 'ethereal'
+        ? 'the ghost enters the Border Ethereal — visible on the Material Plane while on the Border Ethereal and vice versa; plane interaction (can\'t affect or be affected by anything on the other plane) is GM-enforced (§70 advisory). At Will, no uses limit; a re-cast while ethereal refuses zero-cost via the `ethereality_refused` / already_ethereal latch.'
+        : `ends when it attacks, casts a spell, or uses its Enlarge (attack/cast/enlarge enders drop the te with an \`${effectKey}_ended\` log), or when its clock runs out. Concentration-break ender and invisibility advantage/disadvantage adjudication are GM-enforced (§70 advisory).`;
   return {
     type: 'automation',
     automationType: `${effectKey}_granted`,
@@ -97,7 +99,9 @@ export function buildSelfBuffPopup({ monsterName, action, effectKey, rounds, rem
     ? `${monsterName} grows to Large via ${action?.name || 'Self Buff'} — Strength-based weapon damage dice doubled for ${rounds} rounds (one merged clock). STR checks/saves advantage are GM-enforced (§70).`
     : effectKey === 'bolstered'
       ? `${monsterName} gains ${bolsterTempHp(action)} Temporary Hit Points (replace-if-larger) via ${action?.name || 'Self Buff'} and it + allies within ${bolsterAllyRadiusFt(action)} ft gain Advantage on D20 Tests for ${selfBuffDurationNote(rounds)} (one merged clock). Gridless radius + ally membership GM-enforced (§42).`
-      : `${monsterName} turns invisible via ${action?.name || 'Self Buff'} — te \`invisible\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Ends on attack, spell cast, or Enlarge (logged); invisibility adjudication is GM-enforced (§70).`;
+      : effectKey === 'ethereal'
+        ? `${monsterName} slips into the Border Ethereal via ${action?.name || 'Self Buff'} — te \`ethereal\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Visible on the Material Plane while on the Border Ethereal and vice versa; plane interaction (can't affect or be affected by anything on the other plane) is GM-enforced (§70). At Will — no uses limit.`
+        : `${monsterName} turns invisible via ${action?.name || 'Self Buff'} — te \`invisible\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Ends on attack, spell cast, or Enlarge (logged); invisibility adjudication is GM-enforced (§70).`;
   return `<div class="mc-prerequisite-refusal"><h3>${monsterName} is ${effectKey.charAt(0).toUpperCase()}${effectKey.slice(1)}</h3><p>${body}${usesNote}</p></div>`;
 }
 

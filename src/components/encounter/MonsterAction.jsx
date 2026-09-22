@@ -227,7 +227,7 @@ function SelfBuffLink({ action, spellUsesUsed, attackerCannotAct, onSelfBuffRow,
   const spentClass = gate && gate.remaining === 0 ? ' mc-dice-link-spell-spent' : '';
   const clickable = !attackerCannotAct && !!onSelfBuffRow;
   const label = action.name || action.automation.effect;
-  const icon = action.automation.effect === 'invisible' ? 'fa-eye-slash' : 'fa-up-right-and-down-left-from-center';
+  const icon = action.automation.effect === 'invisible' ? 'fa-eye-slash' : action.automation.effect === 'ethereal' ? 'fa-ghost' : 'fa-up-right-and-down-left-from-center';
   return (
     <span className={`mc-dice-link mc-dice-link-selfbuff${spentClass}`} onClick={clickable ? () => onSelfBuffRow(action) : undefined} role="button" tabIndex={0} title={`Self buff — ${action.name}: te ${action.automation.effect} on self, ${action.automation.rounds || 10} rounds`}>
       <i className={`fa-solid ${icon}`} /> {label}{usesNote}

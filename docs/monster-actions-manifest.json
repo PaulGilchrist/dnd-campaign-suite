@@ -12088,7 +12088,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The ghost casts the Ethereality spell, requiring no spell components and using Charisma as the spellcasting ability. The ghost is visible on the Material Plane while on the Border Ethereal and vice versa, but it can't affect or be affected by anything on the other plane.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0780-ghost-ethereality-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0781",

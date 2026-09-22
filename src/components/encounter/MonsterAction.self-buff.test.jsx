@@ -110,3 +110,41 @@ describe('MA-0658 Invisibility self-buff chip', () => {
     expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
   });
 });
+
+// MA-0780: Ghost "Ethereality" rides the SAME self-buff chip seam —
+// automation:{type:"monster_self_buff", effect:"ethereal", rounds:4800}
+// arms .mc-dice-link-selfbuff with the ghost icon. RAW has NO uses limit →
+// no uses counter renders (honest null gate, At Will ungated §57); the
+// already-active te refusal gates re-casts in the resolver.
+describe('MA-0780 Ghost Ethereality self-buff chip', () => {
+  const ghost = monsters.find(m => m.index === 'ghost');
+  const ETHEREALITY_ROW = ghost.actions.find(a => a.name === 'Ethereality');
+
+  it('row authors the monster_self_buff automation, name/description byte-preserved', () => {
+    expect(ETHEREALITY_ROW.automation).toEqual({ type: 'monster_self_buff', effect: 'ethereal', rounds: 4800 });
+    expect(ETHEREALITY_ROW.description).toContain('The ghost casts the <strong>Ethereality</strong> spell');
+    expect(isMonsterSelfBuffRow(ETHEREALITY_ROW)).toBe(true);
+    expect(selfBuffRounds(ETHEREALITY_ROW)).toBe(4800);
+  });
+
+  it('arms a clickable self-buff chip with ghost icon and NO uses counter (At Will)', () => {
+    const { container, onSelfBuffRow } = renderRow(ETHEREALITY_ROW);
+    const chip = container.querySelector('.mc-dice-link-selfbuff');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('Ethereality');
+    expect(chip.textContent).not.toContain('/Day');
+    expect(chip.querySelector('i').className).toContain('fa-ghost');
+    expect(chip.getAttribute('title')).toContain('te ethereal on self, 4800 rounds');
+    fireEvent.click(chip);
+    expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
+    expect(onSelfBuffRow.mock.calls[0][0]).toBe(ETHEREALITY_ROW);
+  });
+
+  it('incapacitated attacker: chip inert', () => {
+    const { container, onSelfBuffRow } = renderRow(ETHEREALITY_ROW, { attackerCannotAct: true });
+    const chip = container.querySelector('.mc-dice-link-selfbuff');
+    expect(chip).toBeTruthy();
+    fireEvent.click(chip);
+    expect(onSelfBuffRow).not.toHaveBeenCalled();
+  });
+});
