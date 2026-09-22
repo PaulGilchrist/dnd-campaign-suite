@@ -12661,7 +12661,7 @@
       "uses": "1/Day",
       "trigger": "The octopus takes damage while underwater.",
       "description": "The octopus releases ink that fills a 10-foot Cube centered on itself, and the octopus moves up to its Swim Speed. The Cube is Heavily Obscured for 1 minute or until a strong current or similar effect disperses the ink.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0813-ink-cloud-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0814",

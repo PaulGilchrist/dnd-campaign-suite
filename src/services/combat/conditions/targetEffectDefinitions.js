@@ -231,6 +231,20 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { bleedDie: '1d10' },
   },
   {
+    // MA-0813: Giant Octopus Ink Cloud reaction zone te (MA-0554 self-aura
+    // seam — self-origin save-less zone row; the zone picker excludes the
+    // caster). Cube shapes are not parsed (§62/§159): the 10-foot Cube is
+    // modeled at its largest supported centered radius (5 ft) with the
+    // shape/swim-move/dispel/underwater clauses advisory (GM-enforced).
+    effect: 'ink_cloud',
+    label: 'Ink Cloud',
+    description: 'Heavily Obscured ink cloud (10-foot Cube centered on the octopus, modeled as a 5-ft-radius self zone — Cube not parsed, §62): vision through the ink is blocked — no vision model in-engine, GM-enforced. Lasts 1 minute or until a strong current or similar effect disperses the ink (GM-enforced clock). The octopus moves up to its Swim Speed as it releases the ink (GM-enforced). Underwater trigger is GM-enforced.',
+    icon: 'fa-smog',
+    cls: 'effect-debuff',
+    group: 'Defensive',
+    fields: ['source'],
+  },
+  {
     effect: 'multiattack_defense',
     label: 'Multiattack Defense',
     description: 'Attacks against the target have Disadvantage (Multiattack Defense).',
