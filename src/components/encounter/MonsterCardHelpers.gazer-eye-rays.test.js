@@ -10,6 +10,7 @@
 // rows actions[2..5] stay byte-unchanged (MA-0766/0767/0768/0769 scope).
 import { describe, it, expect } from 'vitest';
 import { parseEyeRays, pickEyeRay, buildEyeRayAction } from './MonsterCardHelpers.js';
+import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import monsters from '../../../public/data/monsters.json';
 
 const list = Array.isArray(monsters) ? monsters : monsters.monsters;
@@ -98,5 +99,41 @@ describe('MA-0765 gazer Eye Rays launcher rays[] data', () => {
     expect(gazer.actions[3].save_dc).toBe(12);
     expect(gazer.actions[4].save_dc).toBe(12);
     expect(gazer.actions[5].save_dc).toBe(12);
+  });
+});
+
+// MA-0768: "3. Frost Ray" (actions[4]) RAW pays ZERO on a successful save
+// ("succeed ... or take 10 (3d6) cold damage" — no half-on-success clause).
+// dc_success was ABSENT → MV-20 default-half leak (§63/§126/§252 family:
+// MA-0481/MA-0622/MA-0781) — half the 3d6 landed on saves (fd6 on raw 12).
+// DATA fix: dc_success:"none" after damage_type_primary (MA-0481 byte-shape),
+// consistent with the MA-0765 launcher rays[2] which already carries 'none'.
+describe('MA-0768 gazer "3. Frost Ray" dc_success none — zero damage on save success', () => {
+  const frost = gazer.actions[4];
+
+  it('row is the Frost Ray save row', () => {
+    expect(frost.name).toBe('3. Frost Ray');
+    expect(frost.save_dc).toBe(12);
+    expect(frost.save_type).toBe('Dexterity');
+    expect(frost.damage_dice_primary).toBe('3d6');
+  });
+
+  it('canonical prose carries NO half-on-success clause', () => {
+    expect(frost.description).not.toMatch(/half/i);
+    expect(frost.save_effect).not.toMatch(/half/i);
+  });
+
+  it('dc_success authored "none" (half-default leak guard)', () => {
+    expect(frost.dc_success).toBe('none');
+  });
+
+  it('launcher rays[2] Frost stays consistent dc_success "none" (MA-0765 twin)', () => {
+    expect(parseEyeRays(row)[2].key).toBe('frost');
+    expect(parseEyeRays(row)[2].dc_success).toBe('none');
+  });
+
+  it('save seam pays full on fail, zero on success', () => {
+    expect(computeDamageAfterSave(12, false, frost.dc_success)).toBe(12);
+    expect(computeDamageAfterSave(12, true, frost.dc_success)).toBe(0);
   });
 });

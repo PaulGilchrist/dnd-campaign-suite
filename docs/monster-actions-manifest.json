@@ -11894,7 +11894,7 @@
       "damageDicePrimary": "3d6",
       "damageTypePrimary": "Cold",
       "description": "The targeted creature must succeed on a DC 12 Dexterity saving throw or take 10 (3d6) cold damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0768-gazer-frost-ray-half-on-success-leak.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0769",

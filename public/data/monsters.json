@@ -25018,7 +25018,8 @@
         "save_type": "Dexterity",
         "save_effect": "The target takes 10 (3d6) Cold damage.",
         "damage_dice_primary": "3d6",
-        "damage_type_primary": "Cold"
+        "damage_type_primary": "Cold",
+        "dc_success": "none"
       },
       {
         "name": "4. Telekinetic Ray",
