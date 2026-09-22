@@ -12555,7 +12555,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 11).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0807-bite-grapple-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0808",
