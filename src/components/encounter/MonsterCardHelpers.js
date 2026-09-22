@@ -579,8 +579,24 @@ export function parseHitConditionRoll(action) {
   return { die: Number(hcr.die), conditions: hcr.conditions.map(c => String(c).toLowerCase()) };
 }
 
+// MA-0855: condition-choice rider (Githzerai Psion Psychic Warp — "the
+// githzerai's choice of (A) Charmed … or (B) Prone"). When hit_choice is
+// armed the hit-clause consumer MUST NOT auto-grant the whole hit_conditions
+// array on every hit (that over-grants Charmed+Prone together — RAW-wrong);
+// the HIT-popup chooser grants ONLY the GM's picked condition instead. So the
+// hit_conditions array stays the authored grant LEDGER in the row but is
+// SUPPRESSED here (conditions:[]) whenever hit_choice carries options, and the
+// clause collapses to null (no te / no conditionRoll alongside) so
+// handlePlainDamage.maybeApplyHitClause early-returns. Rows WITHOUT hit_choice
+// (e.g. MA-0841 Draconic Strike) are byte-identical — the suppression only
+// arms on the structured hit_choice key.
+export function hitChoiceArmed(action) {
+  return Array.isArray(action?.hit_choice?.options) && action.hit_choice.options.length > 0;
+}
+
 export function buildHitConditionClause(action) {
-  const conditions = Array.isArray(action?.hit_conditions) ? action.hit_conditions.map(c => String(c).toLowerCase()) : [];
+  const autoGrantSuppressed = hitChoiceArmed(action);
+  const conditions = !autoGrantSuppressed && Array.isArray(action?.hit_conditions) ? action.hit_conditions.map(c => String(c).toLowerCase()) : [];
   const targetEffect = action?.hit_target_effect || null;
   const conditionRoll = parseHitConditionRoll(action);
   if (conditions.length === 0 && !targetEffect && !conditionRoll) return null;
@@ -734,6 +750,74 @@ export function buildTwoHandedVariantOffer(action, name) {
     damageType,
     label: `Two-Handed: ${variant} ${damageType}?`,
     attackName: name || action?.name || 'Attack',
+  };
+}
+
+// MA-0855: authored condition-choice rider (monsters.json hit_choice, e.g.
+// Githzerai Psion Psychic Warp — "the githzerai's choice of (A) the Charmed
+// condition … or (B) the Prone condition, provided the target is a Large or
+// smaller creature"). MA-0325 offer-on-result mirror, but this selects WHICH
+// CONDITION to grant rather than which damage dice: the HIT popup offers a GM
+// chooser, the picked condition is the ONLY one granted, and buildHitCondition-
+// Clause suppresses the hit_conditions array auto-grant whenever hit_choice is
+// armed. Byte-inert when the structured key is absent (null → no chooser, all
+// other rows unchanged).
+export function buildHitChoiceOffer(action, name) {
+  const hc = action?.hit_choice;
+  if (!hc || !Array.isArray(hc.options) || hc.options.length === 0) return null;
+  const options = hc.options.map(o => String(o).toLowerCase());
+  const attackName = name || action?.name || 'Attack';
+  const optionLabels = options.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+  return {
+    options,
+    label: `Condition Choice: ${optionLabels.join(' or ')}`,
+    note: hc.note || null,
+    attackName,
+  };
+}
+
+export function buildHitChoiceSelectedLog({ monsterName, offer, chosen, targetName = null }) {
+  const optionLabels = offer.options.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+  const label = chosen.charAt(0).toUpperCase() + chosen.slice(1);
+  return {
+    type: 'automation',
+    automationType: 'hit_choice_selected',
+    characterName: monsterName,
+    abilityName: offer.attackName,
+    targetName,
+    description: `${monsterName} ${offer.attackName} hit choice — GM chose ${label} of (${optionLabels.join(' or ')}); only ${label} applied.${offer.note ? ` ${offer.note}` : ''}`,
+    timestamp: Date.now(),
+  };
+}
+
+// shape of handlePlainDamage.applyHitClauseConditions (type:'condition' +
+// condition field + source meta) so badges/tests treat the chooser grant the
+// same as any other hit-clause condition grant.
+export function buildHitChoiceAppliedLog({ offer, chosen, targetName }) {
+  const label = chosen.charAt(0).toUpperCase() + chosen.slice(1);
+  return {
+    type: 'condition',
+    action: 'applied',
+    characterName: targetName,
+    condition: label,
+    reason: `${offer.attackName} (GM choice)`,
+    note: offer.note || null,
+    timestamp: Date.now(),
+  };
+}
+
+// A Done pressed without any popup choice must NEVER over-grant both options
+// (RAW-wrong). This records the undecided leg honestly: no condition granted.
+export function buildHitChoiceAdvisoryLog({ monsterName, offer, targetName = null }) {
+  const optionLabels = offer.options.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+  return {
+    type: 'automation',
+    automationType: 'hit_choice_undecided',
+    characterName: monsterName,
+    abilityName: offer.attackName,
+    targetName,
+    description: `${monsterName} ${offer.attackName} choice undecided — no condition granted (GM made no popup choice; options were ${optionLabels.join(' or ')}).`,
+    timestamp: Date.now(),
   };
 }
 

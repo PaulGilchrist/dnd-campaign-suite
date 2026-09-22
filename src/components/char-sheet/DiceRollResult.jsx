@@ -924,6 +924,39 @@ function RangedVariantOffer({ props, state }) {
     );
 }
 
+// MA-0855: GM-adjudicated condition-choice rider (monsters.json hit_choice,
+// e.g. Githzerai Psion Psychic Warp — "the githzerai's choice of (A) Charmed
+// … or (B) Prone"). MA-0325 two-handed chooser mirror: one button per option,
+// offered on HIT only, resolved-state notice once picked. Picking grants ONLY
+// that condition (modal resolveHitChoiceSelection); the hit_conditions array
+// auto-grant is suppressed so a hit never silently grants both (RAW-wrong).
+function ChoiceOffer({ props, state }) {
+    const offer = props.hitChoiceOffer;
+    if (!offer) return null;
+    if (props.hitChoiceResolved) {
+        const chosen = props.hitChoiceResolved.charAt(0).toUpperCase() + props.hitChoiceResolved.slice(1);
+        return (
+            <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-wand-magic-sparkles"></i>
+                {`${chosen} applied (${offer.attackName} GM choice).`}
+            </div>
+        );
+    }
+    if (state.computedHit !== true) return null;
+    return (
+        <div className="dice-roll-reroll">
+            {offer.options.map((option) => {
+                const label = option.charAt(0).toUpperCase() + option.slice(1);
+                return (
+                    <button key={option} className="dice-roll-reroll-btn" onClick={() => props.onHitChoice?.(option)} type="button">
+                        <i className="fa-solid fa-circle-half-stroke"></i> {label}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 // AC modifier labels for the popup "vs AC" line (MA-0341 added Parry).
 // Module helper keeps DiceRollResult under the complexity ceiling.
 function buildAcBuffLabels({ shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, parryAcBonus, slowAcPenalty }) {
@@ -1067,6 +1100,8 @@ function DiceRollResult(props) {
             <TwoHandedVariantOffer props={props} state={state} />
 
             <RangedVariantOffer props={props} state={state} />
+
+            <ChoiceOffer props={props} state={state} />
 
             <FeatureResultSummary props={props} state={state} handlers={handlers} />
 

@@ -29034,7 +29034,18 @@
         "reach": "5 ft.",
         "range": "120 ft.",
         "damage_dice_primary": "4d10 + 4",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "hit_conditions": [
+          "charmed",
+          "prone"
+        ],
+        "hit_choice": {
+          "options": [
+            "charmed",
+            "prone"
+          ],
+          "note": "Prone requires Large or smaller"
+        }
       },
       {
         "name": "Spellcasting",

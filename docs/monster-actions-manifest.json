@@ -13359,7 +13359,7 @@
         "prone"
       ],
       "description": "Melee or Ranged Attack Roll: +8, reach 5 ft. or range 120 ft. Hit: 26 (4d10 + 4) Psychic damage, and the target has the githzerai's choice of (A) the Charmed condition until the start of the githzerai's next turn or (B) the Prone condition, provided the target is a Large or smaller creature.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0855-psychic-warp-choice-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0856",

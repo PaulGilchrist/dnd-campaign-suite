@@ -159,6 +159,15 @@ function rangedVariantTransportFields(context) {
     return { rangedVariantOffer: context.rangedVariantOffer, rangedChoice: 'melee-default' };
 }
 
+// MA-0855: condition-choice rows carry the offer + an undecided marker on the
+// auto-damage so an unpicked Done logs the honest advisory (the modal flips
+// hitChoice to 'selected' on an explicit pick and grants only that condition).
+// Non-choice rows get an inert empty spread (buildAutoDamage stays under cap).
+function hitChoiceTransportFields(context) {
+    if (!context || !context.hitChoiceOffer) return {};
+    return { hitChoiceOffer: context.hitChoiceOffer, hitChoice: 'undecided-default' };
+}
+
 function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName }) {
     if (!context?.autoDamageFormula) return undefined;
     return {
@@ -192,6 +201,10 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         // flips twoHandedChoice on an explicit pick). Byte-inert undefined.
         twoHandedVariantOffer: context?.twoHandedVariantOffer || undefined,
         twoHandedChoice: context?.twoHandedVariantOffer ? 'one-handed-default' : undefined,
+        // MA-0325: two-handed variant rows carry the offer + a default marker.
+        // MA-0855 mirrors this for condition-choice riders via the hoisted
+        // hitChoiceTransportFields helper (keeps buildAutoDamage under cap).
+        ...hitChoiceTransportFields(context),
         ...rangedVariantTransportFields(context),
         ...comboTrapArmsFromContext(context),
     };
@@ -260,6 +273,10 @@ function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) 
         // MA-0436: GM-adjudicated melee-vs-ranged damage-dice choice
         // (monsters.json damage_dice_ranged) — HIT popup only.
         rangedVariantOffer: context?.rangedVariantOffer || null,
+        // MA-0855: GM-adjudicated condition-choice rider (monsters.json
+        // hit_choice, e.g. Githzerai Psion Psychic Warp — Charmed-or-Prone).
+        // HIT popup only; the picked condition is the only one granted.
+        hitChoiceOffer: context?.hitChoiceOffer || null,
         // MA-0341: defender Parry +2 AC riding the popup AC flags (target-side).
         parryAcBonus: ctx._parryAcBonus || 0,
     };
