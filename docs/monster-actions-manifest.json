@@ -12109,7 +12109,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 13, each creature in a 60-foot Cone that can see the ghost and isn't an Undead. Failure: 10 (2d6 + 3) Psychic damage, and the target has the Frightened condition until the start of the ghost's next turn. Success: The target is immune to this ghost's Horrific Visage for 24 hours.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0781-ghost-horrific-visage-half-on-success-leak.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0782",

@@ -25467,7 +25467,8 @@
         "save_effect": "The target has the Frightened condition until the start of the ghost's next turn.",
         "immunity": "Success: The target is immune to this ghost's Horrific Visage for 24 hours.",
         "damage_dice_primary": "2d6 + 3",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "dc_success": "none"
       },
       {
         "name": "Possession",
