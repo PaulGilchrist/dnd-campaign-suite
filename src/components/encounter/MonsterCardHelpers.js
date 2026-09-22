@@ -2011,8 +2011,16 @@ export function buildNoTargetRefusalLog({ monsterName, actionName }) {
 export function extractFlatHitDamage(action) {
   const description = String(action?.description || '');
   if (!description) return null;
-  if (/\(\s*\d+d\d+/.test(description)) return null;
   const stripped = description.replace(/<[^>]+>/g, '');
+  // MA-0747: the dice guard is scoped to the PRIMARY hit clause ONLY. Dice
+  // immediately after "Hit:/Failure:/Success: N" belong to the primary →
+  // dice-bearing, stay null (extractDamageDiceFromDescription owns those).
+  // Dice living ONLY in a secondary "plus M (XdY) <Type>" rider must NOT
+  // block flat-primary extraction: "Hit: 1 Piercing damage plus 5 (2d4)
+  // Poison damage." → flat "1"; the threaded damage_dice_secondary then
+  // resolves the poison leg at handlePlainDamage's combined_damage_roll
+  // seam (MA-0426 transport). Flying Snake Bite + Scorpion Sting byte-twins.
+  if (/(?:Hit|Failure|Success):\s*\d+\s*\(\s*\d+d\d+/.test(stripped)) return null;
   const m = stripped.match(/Hit:\s*(\d+)\s+(?:[A-Za-z-]+\s+)*?damage\b/i);
   return m ? m[1] : null;
 }
