@@ -13105,7 +13105,7 @@
         "blinded"
       ],
       "description": "Dexterity Saving Throw: DC 10, each creature in a 10-foot-radius Sphere centered on a point within 30 feet. Failure: 7 (2d6) Radiant damage, and the target has the Blinded condition until the end of the mouther's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0839-blinding-spittle-half-on-success-leak.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0840",

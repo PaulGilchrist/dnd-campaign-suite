@@ -28525,7 +28525,8 @@
         "save_effect": "Failure: 7 (2d6) Radiant damage, and the target has the Blinded condition until the end of the mouther's next turn.",
         "recharge": "5-6",
         "damage_dice_primary": "2d6",
-        "damage_type_primary": "Radiant"
+        "damage_type_primary": "Radiant",
+        "dc_success": "none"
       }
     ],
     "bonus_actions": [],
