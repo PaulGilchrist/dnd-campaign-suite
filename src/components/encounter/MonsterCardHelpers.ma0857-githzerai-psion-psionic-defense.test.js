@@ -4,7 +4,7 @@
 // {type,trigger:'falling',effect:'feather_fall'} + At-Will sentinel usage:"At Will" +
 // numeric uses/maxUses 999 (MA-0006/0300/0305 At-Will lineage — MA-0853 twin authored
 // 2/2 here; this row is RAW-unlimited). Shield half stays GM-adjudicated advisory in
-// automation.description. githzerai-zerth remains a separate queue ticket — locked untouched.
+// automation.description. githzerai-zerth since fixed in MA-0861 — pinned in its own test.
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
@@ -66,10 +66,11 @@ describe('MA-0857 Psionic Defense row shape + gate arming', () => {
     expect(gate.limit).toBe(999);
   });
 
-  it('zerth stays untouched separate ticket: row has NO automation (ma0853 monk row intact)', () => {
+  // zerth null-pin dropped: gated in MA-0861 (byte-twin of MA-0853); monk pin kept.
+  it('ma0853 monk row intact beside fixed zerth', () => {
     const zerth = monsters.find(m => m.index === 'githzerai-zerth').reactions[0];
-    expect(zerth.name).toBe('Psionic Defense');
-    expect(getGatedMonsterReaction(zerth)).toBeNull();
+    expect(getGatedMonsterReaction(zerth)?.effect).toBe('feather_fall');
+    expect(zerth.usage).toBe('2/Day');
     const monk = monsters.find(m => m.index === 'githzerai-monk').reactions[0];
     expect(getGatedMonsterReaction(monk)?.effect).toBe('feather_fall');
     expect(monk.usage).toBe('2/Day');
