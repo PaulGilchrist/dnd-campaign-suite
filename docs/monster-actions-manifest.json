@@ -12450,7 +12450,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 21 (3d10 + 5) Piercing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 15). While Grappled, the target has the Restrained condition and can't be targeted by the crocodile's Tail.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0801-bite-grapple-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0802",
