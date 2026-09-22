@@ -25316,7 +25316,8 @@
         "attack_bonus": 6,
         "reach": "5 ft.",
         "damage_dice_primary": "3d6 + 3",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": ["paralyzed"]
       },
       {
         "name": "Horrific Necrosis",

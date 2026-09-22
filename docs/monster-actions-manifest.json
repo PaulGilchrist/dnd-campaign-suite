@@ -12016,7 +12016,7 @@
         "paralyzed"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 13 (3d6 + 3) Slashing damage. If the target isn't an Undead, it has the Paralyzed condition until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0775-ghast-gravecaller-claw-paralyzed-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0776",
