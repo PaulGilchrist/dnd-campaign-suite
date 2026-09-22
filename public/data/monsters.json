@@ -25765,7 +25765,8 @@
         "attack_bonus": 8,
         "reach": "5 ft.",
         "damage_dice_primary": "2d8 + 5",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["prone"]
       }
     ],
     "bonus_actions": [],

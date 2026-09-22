@@ -12278,7 +12278,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 14 (2d8 + 5) Piercing damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0791-talons-missing-hit-conditions.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0792",
