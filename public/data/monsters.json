@@ -28170,7 +28170,8 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 2",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["poisoned"]
       }
     ],
     "bonus_actions": [],
