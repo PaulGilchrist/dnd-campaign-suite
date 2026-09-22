@@ -29059,7 +29059,16 @@
       {
         "name": "Psionic Defense",
         "description": "The githzerai casts <strong>Feather Fall</strong> or <strong>Shield</strong> in response to the spell's trigger, requiring no spell components and using the same spellcasting ability as Spellcasting.",
-        "spellcasting_ability": "Intelligence"
+        "spellcasting_ability": "Intelligence",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "falling",
+          "effect": "feather_fall",
+          "description": "GM adjudicates: or cast Shield per spell rules — no mechanical consumer"
+        }
       }
     ],
     "legendary_actions": [],

@@ -66,12 +66,10 @@ describe('MA-0853 Psionic Defense row shape + gate arming', () => {
     expect(gate.limit).toBe(2);
   });
 
-  it('siblings stay untouched separate tickets: zerth/psion rows have NO automation', () => {
-    for (const idx of ['githzerai-zerth', 'githzerai-psion']) {
-      const sib = monsters.find(m => m.index === idx).reactions[0];
-      expect(sib.name).toBe('Psionic Defense');
-      expect(getGatedMonsterReaction(sib)).toBeNull();
-    }
+  it('zerth stays untouched separate ticket: row has NO automation (psion fixed in MA-0857)', () => {
+    const sib = monsters.find(m => m.index === 'githzerai-zerth').reactions[0];
+    expect(sib.name).toBe('Psionic Defense');
+    expect(getGatedMonsterReaction(sib)).toBeNull();
   });
 });
 
