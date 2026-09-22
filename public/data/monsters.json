@@ -25326,7 +25326,8 @@
         "reach": "5 ft.",
         "range": "120 ft.",
         "damage_dice_primary": "2d10 + 4",
-        "damage_type_primary": "Necrotic"
+        "damage_type_primary": "Necrotic",
+        "hit_conditions": ["frightened"]
       },
       {
         "name": "Spellcasting",

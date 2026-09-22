@@ -12036,7 +12036,7 @@
         "frightened"
       ],
       "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 120 ft. Hit: 15 (2d10 + 4) Necrotic damage, and the target has the Frightened condition until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0776-ghast-gravecaller-horrific-necrosis-frightened-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0777",

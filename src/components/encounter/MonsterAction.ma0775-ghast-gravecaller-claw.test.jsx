@@ -58,9 +58,14 @@ describe('MA-0775 disk fingerprint: ghast-gravecaller Claw hit_conditions fix', 
     expect(onAttack).toHaveBeenCalledWith('Claw', 6, expect.objectContaining({ name: 'Claw' }));
   });
 
-  it('Horrific Necrosis twin byte-unchanged: no hit_conditions authored there (ticket scope)', () => {
-    expect(NECROSIS.hit_conditions).toBeUndefined();
-    expect(buildHitConditionClause(NECROSIS)).toBeNull();
+  it('Horrific Necrosis twin now authored: hit_conditions ["frightened"] (MA-0776 fix, pin inverted)', () => {
+    expect(NECROSIS.hit_conditions).toEqual(['frightened']);
+    expect(buildHitConditionClause(NECROSIS)).toEqual({
+      conditions: ['frightened'],
+      escapeDc: null,
+      attackName: 'Horrific Necrosis',
+      targetEffect: null,
+    });
     expect(NECROSIS.attack_bonus).toBe(7);
   });
 });
