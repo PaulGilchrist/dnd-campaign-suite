@@ -204,7 +204,7 @@ function SummonLink({ action, spellUsesUsed, attackerCannotAct, onSummonRow }) {
   const spentClass = gate && gate.remaining === 0 ? ' mc-dice-link-spell-spent' : '';
   const clickable = !attackerCannotAct && !!onSummonRow;
   return (
-    <span className={`mc-dice-link mc-dice-link-summon${spentClass}`} onClick={clickable ? () => onSummonRow(action) : undefined} role="button" tabIndex={0} title={`Summon a demon — coin flip: ${action.automation.options.map(o => `${o.monster}${o.chance != null ? ` (${Math.round(o.chance * 100)}%)` : ''}`).join(' or ')}, ${action.automation.range_ft || 60} ft, ${action.automation.duration_minutes || 10} min`}>
+    <span className={`mc-dice-link mc-dice-link-summon${spentClass}`} onClick={clickable ? () => onSummonRow(action) : undefined} role="button" tabIndex={0} title={`Summon ${action.automation.options.map(o => `${o.monster}${o.chance != null ? ` (${Math.round(o.chance * 100)}%)` : ''}`).join(' or ')} — ${action.automation.count != null ? `count ${action.automation.count}, ` : ''}${action.automation.range_ft || 60} ft, ${action.automation.duration_minutes || 10} min`}>
       <i className="fa-solid fa-hat-wizard" /> Summon{usesNote}
     </span>
   );

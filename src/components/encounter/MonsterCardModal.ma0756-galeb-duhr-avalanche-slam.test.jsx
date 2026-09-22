@@ -163,6 +163,27 @@ describe('MA-0756 monsters.json data lock: Galeb Duhr Avalanche Slam hit riders'
     expect(SLAM.hit_conditions).toEqual(['prone']);
   });
 
+  // MA-0757 (actions[1] rider, same monster block): the formerly inert
+  // "Animate Boulders" row now authors monster_summon automation + NUMERIC
+  // uses/maxUses (the ignored uses:"1/Day" STRING is gone). count:2 is a
+  // numeric constant — RAW "one or two" is the duhr's choice and no chooser
+  // seam exists, so the row adjudicates the max of two boulders.
+  it('MA-0757: actions[1] Animate Boulders rides the monster_summon seam with numeric uses', () => {
+    const animate = GALEB.actions.find((a) => a.name === 'Animate Boulders');
+    expect(animate.automation).toEqual({
+      type: 'monster_summon',
+      options: [{ monster: 'galeb-duhr', stat_override: { int: 1, cha: 1 } }],
+      count: 2,
+      range_ft: 60,
+      duration_minutes: 1,
+    });
+    expect(animate.uses).toBe(1);
+    expect(animate.maxUses).toBe(1);
+    expect(typeof animate.uses).toBe('number');
+    const galib = monsters.find((m) => m.index === 'galib-duhr').actions[1];
+    expect(galib.automation).toBeUndefined();
+  });
+
   it('authors conditional_damage mirroring the MA-0007 sibling shape (no flat modifier)', () => {
     const cd = SLAM.conditional_damage;
     expect(cd).toBeTruthy();

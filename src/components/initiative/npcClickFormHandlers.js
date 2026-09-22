@@ -204,6 +204,12 @@ async function runMonster({ creature, runtimeCreature, characters, setViewingMon
     if (runtimeCreature.actions) {
         merged.actions = runtimeCreature.actions
     }
+    // MA-0757: summoned combatants whose block was stamped at spawn time
+    // (Galeb Duhr boulders: Int/Cha 1, "lacks this action") carry
+    // ability_scores on the cs entry — honor them so the card is honest.
+    if (runtimeCreature.ability_scores) {
+        merged.ability_scores = runtimeCreature.ability_scores
+    }
     if (runtimeCreature.wildShapeSource) {
         const druidCharacter = findCasterCharacter(characters, runtimeCreature.wildShapeSource)
         applyDruidRetainedTraits(merged, druidCharacter)

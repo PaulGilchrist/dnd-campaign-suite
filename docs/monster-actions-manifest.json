@@ -11718,7 +11718,7 @@
       "actionType": "other",
       "uses": "1/Day",
       "description": "The galeb duhr magically animates one or two boulders it can see within 60 feet of itself. Each boulder uses the Galeb Duhr stat block, except it has Intelligence and Charisma scores of 1 and lacks this action. The boulder takes its turn immediately after the galeb duhr on the same Initiative count, and it obeys the galeb duhr. A boulder remains animate for 1 minute or until it or the galeb duhr dies.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0757-animate-boulders-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0758",

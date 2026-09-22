@@ -113,3 +113,52 @@ describe('MA-0651 Priestess Summon Demon chip', () => {
     expect(spent.onSummonRow).toHaveBeenCalledTimes(1);
   });
 });
+
+// MA-0757: Galeb Duhr "Animate Boulders" — the formerly zero-affordance
+// OTHER-type row (usage-only + ignored uses:"1/Day" STRING) now authors
+// monster_summon automation with a CONSTANT numeric count:2 (RAW "one or
+// two" GM choice; no chooser seam app-wide → adjudicable max spawns two).
+// Chip arms off automation.type with the numeric 1/Day counter; exhausted
+// chips stay clickable so the click routes the honest refusal (MA-0648
+// precedent). The Avalanche Slam attack row arms NO summon chip.
+const galebDuhr = monsters.find(m => m.index === 'galeb-duhr');
+const ANIMATE_ROW = galebDuhr.actions.find(a => a.name === 'Animate Boulders');
+
+describe('MA-0757 Galeb Duhr Animate Boulders chip', () => {
+  it('arms a clickable summon chip counting 1/Day with honest boulder tooltip', () => {
+    const { container, onSummonRow } = renderRow(ANIMATE_ROW);
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute('role')).toBe('button');
+    expect(chip.textContent).toContain('Summon');
+    expect(chip.textContent).toContain('(1/Day · 1 left)');
+    const title = chip.getAttribute('title');
+    expect(title).toContain('galeb-duhr');
+    expect(title).toContain('count 2');
+    expect(title).not.toContain('demon');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+    expect(onSummonRow.mock.calls[0][0]).toBe(ANIMATE_ROW);
+  });
+
+  it('spent row: 0 left + spent class, stays clickable for honest refusal', () => {
+    const { container, onSummonRow } = renderRow(ANIMATE_ROW, { spellUsesUsed: { 'Animate Boulders': 1 } });
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip.className).toContain('mc-dice-link-spell-spent');
+    expect(chip.textContent).toContain('0 left');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+  });
+
+  it('incapacitated duhr: chip inert', () => {
+    const { container, onSummonRow } = renderRow(ANIMATE_ROW, { attackerCannotAct: true });
+    fireEvent.click(container.querySelector('.mc-dice-link-summon'));
+    expect(onSummonRow).not.toHaveBeenCalled();
+  });
+
+  it('Avalanche Slam row arms no summon chip', () => {
+    const slam = galebDuhr.actions.find(a => a.name === 'Avalanche Slam');
+    const { container } = renderRow(slam);
+    expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
+  });
+});

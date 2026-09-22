@@ -170,7 +170,12 @@ function getCasterInitiativeValue(combatSummary, casterName) {
   return 0;
 }
 
-function buildSummonedCreature({ monster, name, casterName, initiativeValue }) {
+// MA-0757: summons fold the source block like summonSpiritHandler does —
+// transform at spawn time. `summonMods.actions` carries the row-authored
+// reductions ("lacks this action"); `ability_scores` rides the cs combatant
+// ONLY when a stat_override exists (Int/Cha 1 boulders), so drow-mage/
+// priestess/dust-mephit spawns stay byte-identical.
+function buildSummonedCreature({ monster, name, casterName, initiativeValue, summonMods = {} }) {
   const irv = resolveMonsterIRV(monster);
   const ac = typeof monster.armor_class === 'number' ? monster.armor_class : 10;
   const hp = monster.hit_points || 10;
@@ -190,11 +195,34 @@ function buildSummonedCreature({ monster, name, casterName, initiativeValue }) {
     currentHp: hp,
     saveBonuses: getMonsterSaveBonuses(monster),
     monsterIndex: monster.index || null,
-    actions: monster.actions || [],
+    actions: summonMods.actions || monster.actions || [],
     reactions: monster.reactions || [],
     summonedBy: casterName,
     summonSource: 'monster_ability',
+    ...(summonMods.ability_scores ? { ability_scores: summonMods.ability_scores } : {}),
   };
+}
+
+// MA-0757: Galeb Duhr "Animate Boulders" — the boulder IS the summoner's
+// own block ("Each boulder ... lacks this action", RAW), so a self-summon
+// (summoned index === summoner's cs monsterIndex) NEVER carries another
+// monster_summon automation action: boulders cannot chain-animate, and the
+// same guard stops any future self-referential summon from recursing.
+// Option-level exclude_actions drops named rows from the spawn; option-level
+// stat_override patches ability_scores onto the cs combatant (card stamp via
+// npcClickFormHandlers.runMonster). Rows without these fields get the full
+// block verbatim (MA-0648/0651/0664 spawns byte-identical).
+function resolveSummonMods({ action, monster, combatSummary, monsterName, verdict }) {
+  const summonerIndex = combatSummary.creatures.find(c => c.name === monsterName)?.monsterIndex ?? null;
+  const option = action.automation.options.find(o => o && o.monster === verdict.monster) || null;
+  const selfSummon = !!monster.index && monster.index === summonerIndex;
+  const excluded = new Set(option?.exclude_actions || []);
+  const actions = (monster.actions || []).filter(a =>
+    !excluded.has(a.name) && !(selfSummon && a?.automation?.type === 'monster_summon'));
+  const ability_scores = option?.stat_override
+    ? { ...(monster.ability_scores || {}), ...option.stat_override }
+    : null;
+  return { actions, ability_scores };
 }
 
 async function gateAndSpendSummon({ action, monsterName, campaignName, setPopupHtml, storedUses, deps }) {
@@ -210,7 +238,7 @@ async function gateAndSpendSummon({ action, monsterName, campaignName, setPopupH
   return remaining == null ? { ok: false } : { ok: true, remaining };
 }
 
-function spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count, durationMinutes, deps }) {
+function spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count, durationMinutes, summonMods, deps }) {
   // Base name on an empty board (expandMonstersToCreatures naming),
   // numbered suffix on collision (EB-join getNextUniqueMonsterName seam);
   // MA-0664: N copies spawn in sequence so each collision re-suffixes.
@@ -221,7 +249,7 @@ function spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignN
       ? getNextUniqueMonsterName(monster.name, combatSummary.creatures)
       : monster.name;
     const initiativeValue = getCasterInitiativeValue(combatSummary, monsterName);
-    combatSummary.creatures.push(buildSummonedCreature({ monster, name: summonedName, casterName: monsterName, initiativeValue }));
+    combatSummary.creatures.push(buildSummonedCreature({ monster, name: summonedName, casterName: monsterName, initiativeValue, summonMods }));
     register(campaignName, summonedName, 'summoned', monsterName, { duration: `${durationMinutes}_minutes` });
     summonedNames.push(summonedName);
   }
@@ -251,7 +279,11 @@ export async function resolveMonsterSummonRow({ action, monsterName, campaignNam
   const remaining = gateResult.remaining;
 
   const verdict = adjudicateSummonAttempt(action.automation.options, deps.rollDie || rollDie);
-  await log(campaignName, buildSummonCoinFlipLog({ monsterName, action, verdict }));
+  // MA-0757: chance-less rows (Galeb Duhr "magically animates" — no d100
+  // attempt) skip the coin-flip log entirely; a guaranteed summon is not a
+  // flip, so logging "d100 null vs 0%" would be dishonest. Rows WITH a
+  // chance (drow mage/priestess, dust mephit) log the flip byte-identical.
+  if (verdict.roll != null) await log(campaignName, buildSummonCoinFlipLog({ monsterName, action, verdict }));
 
   // MA-0651: no chance-less fallback + failed flip → nothing spawns, the
   // summoner takes the authored self-damage instead (both outcomes logged).
@@ -269,6 +301,20 @@ export async function resolveMonsterSummonRow({ action, monsterName, campaignNam
   return resolveSummonSpawn({ action, monsterName, campaignName, setPopupHtml, verdict, remaining, deps });
 }
 
+// MA-0664: count dice roll lands ONLY after the chance flip has landed a
+// monster (rows without count spawn one copy, byte-identical).
+// MA-0757: numeric count is a CONSTANT (Galeb Duhr "one or two" authored as
+// the adjudicable max 2 — RAW GM choice, no chooser seam app-wide, so two
+// boulders spawn and the GM holds one back for "one"); constants roll ZERO
+// dice. unparsable dice → caller fails honestly.
+function resolveSummonCount({ action, deps }) {
+  const raw = action.automation.count;
+  if (typeof raw === 'number') return { count: raw, countRoll: null, unparsable: false };
+  if (typeof raw !== 'string') return { count: 1, countRoll: null, unparsable: false };
+  const countRoll = (deps.rollExpression || rollExpression)(raw);
+  return countRoll ? { count: countRoll.total, countRoll, unparsable: false } : { count: 1, countRoll: null, unparsable: true };
+}
+
 async function resolveSummonSpawn({ action, monsterName, campaignName, setPopupHtml, verdict, remaining, deps }) {
   const log = deps.addEntry || addEntry;
   const monsters = deps.monsters || await loadMonsters();
@@ -279,10 +325,8 @@ async function resolveSummonSpawn({ action, monsterName, campaignName, setPopupH
     return { resolved: false, reason: 'monster-not-found' };
   }
 
-  // MA-0664: count dice roll lands ONLY here, after the chance flip has
-  // landed a monster. Rows without `count` spawn one copy, byte-identical.
-  const countRoll = action.automation.count ? (deps.rollExpression || rollExpression)(action.automation.count) : null;
-  if (action.automation.count && !countRoll) {
+  const { count, countRoll, unparsable } = resolveSummonCount({ action, deps });
+  if (unparsable) {
     console.error(`[monsterSummon] unparsable count "${action.automation.count}" on ${action.name}`);
     setPopupHtml(buildSummonPopup({ monsterName, summonedNames: [], verdict, remaining }));
     return { resolved: false, reason: 'count-unparsable' };
@@ -292,7 +336,8 @@ async function resolveSummonSpawn({ action, monsterName, campaignName, setPopupH
   const getCS = deps.getCombatSummary || getCombatSummary;
   const combatSummary = getCS(campaignName) || { round: 1, creatures: [] };
   if (!Array.isArray(combatSummary.creatures)) combatSummary.creatures = [];
-  const summonedNames = spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count: countRoll?.total ?? 1, durationMinutes, deps });
+  const summonMods = resolveSummonMods({ action, monster, combatSummary, monsterName, verdict });
+  const summonedNames = spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count, durationMinutes, summonMods, deps });
 
   await log(campaignName, buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll, durationMinutes }));
   setPopupHtml(buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll, durationMinutes }));
