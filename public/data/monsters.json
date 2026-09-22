@@ -27993,7 +27993,9 @@
         "damage_dice_primary": "1d6 + 2",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "2d4",
-        "damage_type_secondary": "Poison"
+        "damage_type_secondary": "Poison",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 12
       },
       {
         "name": "Swallow",
