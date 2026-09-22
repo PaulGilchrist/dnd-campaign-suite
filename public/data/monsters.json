@@ -24941,7 +24941,61 @@
       },
       {
         "name": "Eye Rays",
-        "description": "The gazer shoots two of the following magical eye rays at random (reroll duplicates), choosing one or two targets it can see within 60 feet of it:"
+        "description": "The gazer shoots two of the following magical eye rays at random (reroll duplicates), choosing one or two targets it can see within 60 feet of it:",
+        "save_dc": 12,
+        "range": "60 ft.",
+        "save_effect": "Dazing Ray: charmed condition (speed is halved; disadvantage on attack rolls). Fear Ray: frightened condition. Frost Ray: 10 (3d6) Cold damage, zero on a successful save. Telekinetic Ray: Medium or smaller target moved up to 30 feet directly away.",
+        "rays": [
+          {
+            "key": "dazing",
+            "name": "Dazing Ray",
+            "save_ability": "Wisdom",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": ["charmed"],
+            "te_grants": ["speed_half"],
+            "clock_rounds": 2,
+            "duration_note": "Charmed until the start of the gazer's next turn (rounds:2 clock); speed is halved (speed_half te); disadvantage on attack rolls while charmed is GM-enforced (no NPC attack-disadvantage consumer).",
+            "save_effect": "The target is charmed until the start of the gazer's next turn. While charmed, the target's speed is halved and it has disadvantage on attack rolls. Success: none — the ray deals no damage."
+          },
+          {
+            "key": "fear",
+            "name": "Fear Ray",
+            "save_ability": "Wisdom",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": ["frightened"],
+            "clock_rounds": 2,
+            "duration_note": "Frightened until the start of the gazer's next turn (rounds:2 clock).",
+            "save_effect": "The target is frightened until the start of the gazer's next turn. Success: none — the ray deals no damage."
+          },
+          {
+            "key": "frost",
+            "name": "Frost Ray",
+            "save_ability": "Dexterity",
+            "damage_dice": "3d6",
+            "damage_type": "Cold",
+            "dc_success": "none",
+            "conditions": [],
+            "duration_note": "3d6 Cold damage on a failed save only — RAW carries no half-on-success clause (dc_success:\"none\").",
+            "save_effect": "The target takes 10 (3d6) Cold damage. Success: none — the ray deals no damage."
+          },
+          {
+            "key": "telekinetic",
+            "name": "Telekinetic Ray",
+            "save_ability": "Strength",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": [],
+            "te_grants": ["telekinetic_movement"],
+            "clock_rounds": 2,
+            "duration_note": "Medium or smaller target moved up to 30 feet directly away from the gazer (telekinetic_movement te, rounds:2 clock); grid token placement and fine object control are GM-enforced (no grid-move consumer).",
+            "save_effect": "If the target is Medium or smaller, it is moved up to 30 feet directly away from the gazer. If the target is an object weighing 10 pounds or less not being worn or carried, the gazer moves it up to 30 feet in any direction. Success: none — the target is not moved."
+          }
+        ]
       },
       {
         "name": "1. Dazing Ray",
