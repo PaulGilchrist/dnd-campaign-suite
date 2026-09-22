@@ -27592,7 +27592,13 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 2",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "conditional_damage": {
+          "dice": "2d8",
+          "modifier": 2,
+          "damage_type": "Bludgeoning",
+          "condition": "moved 20+ feet straight toward the target immediately before the hit"
+        }
       }
     ],
     "bonus_actions": [
