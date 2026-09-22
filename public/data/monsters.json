@@ -29163,7 +29163,9 @@
         "name": "Spellcasting",
         "description": "The githzerai casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 14):\n<strong>At Will:</strong> <strong>Mage Hand</strong> (the hand is <strong>Invisible</strong>)\n<strong>1/Day Each:</strong> <strong>Phantasmal Killer</strong> (level 6 version), <strong>Plane Shift</strong>, <strong>See Invisibility</strong>",
         "spell_save_dc": 14,
-        "spellcasting_ability": "Wisdom"
+        "spellcasting_ability": "Wisdom",
+        "save_dc": 14,
+        "save_type": "Wisdom"
       }
     ],
     "bonus_actions": [

@@ -13433,7 +13433,7 @@
         "invisible"
       ],
       "description": "The githzerai casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 14): At Will: Mage Hand (the hand is Invisible) 1/Day Each: Phantasmal Killer (level 6 version), Plane Shift, See Invisibility",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0860-phantasmal-killer-dc-unknown-zero-effect.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0861",
