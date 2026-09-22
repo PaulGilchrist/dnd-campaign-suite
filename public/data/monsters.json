@@ -27900,7 +27900,18 @@
         "name": "Ink Cloud",
         "trigger": "The squid takes damage while underwater.",
         "description": "The squid releases ink that fills a 15-foot <strong>Cube</strong> centered on itself, and the squid moves up to its Swim Speed. The Cube is <strong>Heavily Obscured</strong> for 1 minute or until a strong current or similar effect disperses the ink.",
-        "uses": "1/Day"
+        "uses": "1/Day",
+        "range": "15-foot Cube",
+        "maxUses": 1,
+        "duration": "1 minute (advisory)",
+        "zone": {
+          "self": true,
+          "radius_ft": 8,
+          "no_save": true,
+          "effect_key": "ink_cloud",
+          "noun": "ink",
+          "advisory": "Cube NOT parsed (§62): 15-foot Cube modeled at 8-ft centered radius, heavily obscured for 1 minute or until a strong current disperses the ink; squid moves up to its Swim Speed; underwater trigger precondition — all GM-enforced. No vision model (§70)."
+        }
       }
     ],
     "legendary_actions": [],

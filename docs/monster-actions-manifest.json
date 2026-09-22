@@ -12932,7 +12932,7 @@
       "uses": "1/Day",
       "trigger": "The squid takes damage while underwater.",
       "description": "The squid releases ink that fills a 15-foot Cube centered on itself, and the squid moves up to its Swim Speed. The Cube is Heavily Obscured for 1 minute or until a strong current or similar effect disperses the ink.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0830-ink-cloud-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0831",
