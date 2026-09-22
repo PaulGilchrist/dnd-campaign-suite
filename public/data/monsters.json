@@ -26250,7 +26250,11 @@
         "attack_bonus": 3,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 1",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "grappled"
+        ],
+        "escape_dc": 11
       }
     ],
     "bonus_actions": [],
