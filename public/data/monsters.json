@@ -24835,7 +24835,8 @@
         "attack_bonus": 0,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6",
-        "damage_type_primary": "Poison"
+        "damage_type_primary": "Poison",
+        "hit_conditions": ["poisoned"]
       }
     ],
     "bonus_actions": [],

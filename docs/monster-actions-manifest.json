@@ -11815,7 +11815,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +0, reach 5 ft. Hit: 3 (1d6) Poison damage, and the target has the Poisoned condition until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-0763-gas-spore-fungus-tendril-poison-rider-missing.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0764",
