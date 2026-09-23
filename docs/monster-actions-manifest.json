@@ -13825,7 +13825,7 @@
    "damageTypePrimary": "Bludgeoning",
    "reach": "5 ft.",
    "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 1 Bludgeoning damage, or 2 (1d4) Bludgeoning damage if the goat moved 20+ feet straight toward the target immediately before the hit.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0885-goat-ram.md"
+    "verified": "verified"
   },
   {
    "id": "MA-0886",
