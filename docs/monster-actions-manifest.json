@@ -13886,7 +13886,7 @@
    "damageTypeSecondary": "Slashing",
    "reach": "5 ft.",
    "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage, plus 2 (1d4) Slashing damage if the attack roll had Advantage.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0889-goblin-boss-scimitar.md"
+    "verified": "verified"
   },
   {
    "id": "MA-0890",

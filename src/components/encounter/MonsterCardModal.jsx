@@ -870,6 +870,11 @@ export function buildAutoDamageOptions(action, name, enlarged = false) {
 // flat_damage_secondary instead of dice — emitted as the constant formula and
 // resolved dice-less at the consumers (MA-0322 lineage), flat never doubled
 // on crit (CLA-281). Dice-bearing rows keep the dice formula byte-identical.
+// MA-0889: METADATA SPLIT — `secondary_condition:"advantage"` (Goblin Boss
+// Scimitar/Shortbow "plus 1d4 if the attack roll had Advantage") rides the
+// transport so the consumer gates the rider on the RESOLVED attack mode.
+// Legacy rows without the field forward null = always-roll, preserving the
+// MA-0426/0531 additive-rider semantics verbatim.
 // eslint-disable-next-line react-refresh/only-export-components
 export function buildSecondaryDamageTransport(action, fallbackName = null) {
   const diceSecondary = action?.damage_dice_secondary;
@@ -884,6 +889,7 @@ export function buildSecondaryDamageTransport(action, fallbackName = null) {
     autoDamageSecondaryFormula: secondaryFormula,
     autoDamageSecondaryName: fallbackName || action.name || null,
     autoDamageSecondaryDamageType: action.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
+    secondaryCondition: action?.secondary_condition ?? null,
   };
 }
 
@@ -1765,6 +1771,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               context.autoDamageSecondaryFormula = autoDamage.secondaryFormula;
               context.autoDamageSecondaryName = autoDamage.secondaryName || autoDamage.name;
               context.autoDamageSecondaryDamageType = autoDamage.secondaryDamageType;
+              // MA-0889: rider condition rides the damage context; the plain
+              // consumer gates on the resolved lastAttack.forcedMode.
+              context.secondaryCondition = autoDamage.secondaryCondition ?? null;
             }
             if (autoDamage.overchannelActive) {
               context.overchannelActive = autoDamage.overchannelActive;

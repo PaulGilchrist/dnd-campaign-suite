@@ -30221,7 +30221,8 @@
         "damage_dice_primary": "1d6 + 2",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "1d4",
-        "damage_type_secondary": "Slashing"
+        "damage_type_secondary": "Slashing",
+        "secondary_condition": "advantage"
       },
       {
         "name": "Shortbow",
@@ -30231,7 +30232,8 @@
         "damage_dice_primary": "1d6 + 2",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "1d4",
-        "damage_type_secondary": "Piercing"
+        "damage_type_secondary": "Piercing",
+        "secondary_condition": "advantage"
       }
     ],
     "bonus_actions": [

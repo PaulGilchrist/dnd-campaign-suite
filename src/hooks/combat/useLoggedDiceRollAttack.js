@@ -168,6 +168,14 @@ function hitChoiceTransportFields(context) {
     return { hitChoiceOffer: context.hitChoiceOffer, hitChoice: 'undecided-default' };
 }
 
+// MA-0889: advantage-rider discriminator (Goblin Boss Scimitar/Shortbow) —
+// rides the popup auto-damage so the Done→rollDamage seam can gate the rider
+// on the resolved attack mode. Legacy always-roll secondaries forward null
+// (byte-inert). Hoisted spread helper keeps buildAutoDamage under the cap.
+function secondaryConditionTransportField(context) {
+    return { secondaryCondition: context?.secondaryCondition ?? null };
+}
+
 function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName }) {
     if (!context?.autoDamageFormula) return undefined;
     return {
@@ -189,6 +197,7 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         overchannelSpellLevel: context.overchannelSpellLevel,
         secondaryFormula: context.autoDamageSecondaryFormula,
         secondaryDamageType: context.autoDamageSecondaryDamageType,
+        ...secondaryConditionTransportField(context),
         ripostePopup: context.ripostePopup,
         source: autoDamageSourceRef?.current || characterName,
         isAutoCrit: ctx.isCrit,

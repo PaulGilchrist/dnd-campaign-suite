@@ -114,13 +114,41 @@ async function rollAndApplySecondaryDamage({ combatSummary, target, context, sec
     return { secondaryResult, secondaryFinalDamage };
 }
 
-async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name }) {
+// MA-0889: advantage-gated secondary rider (Goblin Boss Scimitar/Shortbow —
+// "plus 1d4 … if the attack roll had Advantage"). The rider fires ONLY when
+// the attack was resolved with Advantage, read honestly from the campaign
+// lastAttack.forcedMode stamp the attack resolver writes post-roll
+// (storeCampaignLastAttack — the same channel the advantage-rig te
+// `next_attack_advantage` lands on, forcedMode:"advantage", incl. Restore
+// Balance cancellation). No advantage → rider skipped, primary-only damage,
+// honest `secondary_damage_skipped` log. Rows without the discriminator
+// (null) — the MA-0426/0531 additive-rider family — stay byte-identical
+// always-roll.
+function secondaryRiderBlockedByAdvantageGate(context, lastAttack) {
+    return context?.secondaryCondition === 'advantage' && lastAttack?.forcedMode !== 'advantage';
+}
+
+async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name, lastAttack }) {
     if (!context?.autoDamageSecondaryFormula) {
         const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true });
         return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult: null, secondaryFinalDamage: 0 };
     }
     const secondaryFormula = context.autoDamageSecondaryFormula;
     const secondaryName = context.autoDamageSecondaryName || name;
+    if (secondaryRiderBlockedByAdvantageGate(context, lastAttack)) {
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'secondary_damage_skipped',
+            characterName: characterName,
+            abilityName: secondaryName,
+            targetName: target?.name || null,
+            reason: 'no advantage',
+            description: `${secondaryName} rider skipped — the attack roll did not have Advantage; primary damage only.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[MA-0889] Error logging secondary damage skip:', e); });
+        const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true });
+        return { applyResult: withRayReduction(primaryApplyResult, rayReduction), secondaryResult: null, secondaryFinalDamage: 0 };
+    }
     const secondaryDamageType = context.autoDamageSecondaryDamageType;
     const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
     const secondaryOutcome = await rollAndApplySecondaryDamage({ combatSummary, target, context, secondaryFormula, secondaryName, secondaryDamageType, damageSequenceId, campaignName, characters, characterName });
@@ -304,7 +332,7 @@ async function applyDamageForTarget({ context, target, combatSummary, characters
     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
     const { applyResult, secondaryResult, secondaryFinalDamage } = await rollAndApplySecondaryPlainDamage({
-        context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name,
+        context, combatSummary, target, reducedTotal, damageType, ignoreResistance, rayReduction, characters, campaignName, characterName, name, lastAttack,
     });
     return { applyResult, secondaryResult, secondaryFinalDamage, reducedTotal, rayReduction, rayOfEnfeebleRoll, weakeningReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll };
 }
