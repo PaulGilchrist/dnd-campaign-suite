@@ -9,6 +9,7 @@ import { monsterRechargeGate, rechargeDisplayText } from '../../services/encount
 import { isSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { isMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { isMonsterSelfBuffRow } from '../../services/encounters/monsterSelfBuff.js';
+import { isMonsterGrantReactionRow } from '../../services/encounters/monsterGrantReaction.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -235,7 +236,26 @@ function SelfBuffLink({ action, spellUsesUsed, attackerCannotAct, onSelfBuffRow,
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow }) {
+// MA-0882: monster-side grant-reaction row (Gnoll Pack Lord "Incite Rampage") —
+// automation {type:"monster_grant_reaction", effect:"incite_rampage", range_ft:60}
+// arms a clickable chip routed to resolveMonsterGrantReactionRow in the modal
+// (te on the GM-armed target + ONE rounds:1 clock). Recharge 5-6 rides the live
+// MA-0031 monsterRecharge map: a spent row gets the existing mc-dice-link-spell-
+// spent class and its click routes the honest "Not Recharged" refusal. Rampage
+// prerequisite stays §70 advisory on the grant log.
+function GrantReactionLink({ action, attackerCannotAct, rechargeState, onGrantReactionRow }) {
+  if (!isMonsterGrantReactionRow(action)) return null;
+  const rechargeOut = rechargeSpent(monsterRechargeGate(action, rechargeState));
+  const spentClass = rechargeOut ? ' mc-dice-link-spell-spent' : '';
+  const clickable = !attackerCannotAct && !!onGrantReactionRow;
+  return (
+    <span className={`mc-dice-link mc-dice-link-grantreaction${spentClass}`} onClick={clickable ? () => onGrantReactionRow(action) : undefined} role="button" tabIndex={0} title={`Grant Reaction — ${action.name}: te ${action.automation.effect} on an armed target within ${action.automation.range_ft || 60} ft, Recharge ${action.recharge || '5-6'} (Rampage prerequisite GM-checked)`}>
+      <i className="fa-solid fa-fire" /> Incite
+    </span>
+  );
+}
+
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow }) {
   const actionHasSave = action.save_dc != null;
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
@@ -254,6 +274,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <ZoneAuraLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onZoneAuraRow={onZoneAuraRow} />
       <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} />
       <SelfBuffLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSelfBuffRow={onSelfBuffRow} legendaryGate={legendaryGate} />
+      <GrantReactionLink action={action} attackerCannotAct={attackerCannotAct} rechargeState={rechargeState} onGrantReactionRow={onGrantReactionRow} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
         <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>

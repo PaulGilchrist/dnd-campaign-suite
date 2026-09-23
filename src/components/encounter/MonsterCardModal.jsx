@@ -25,6 +25,7 @@ import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbility
 import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount, endSelfBuffOnTrigger, isMonsterSelfBuffRow, buildAlreadyEnlargedRefusalPopup, buildAlreadyEnlargedRefusalLog } from '../../services/encounters/monsterSelfBuff.js';
+import { resolveMonsterGrantReactionRow } from '../../services/encounters/monsterGrantReaction.js';
 import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
@@ -2272,6 +2273,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         // spends the row's use via the MA-0020 monsterSpellUses map BEFORE
         // arming, refuses (zero spend) when already enlarged or exhausted.
         handleSelfBuffRow={(action) => resolveMonsterSelfBuffRow({ action, monsterName, campaignName, setPopupHtml, storedUses: monsterSpellUses || {} })}
+        // MA-0882: monster-side grant-reaction row (Gnoll Pack Lord "Incite
+        // Rampage") — recharge gate (live MA-0031) + armed-target gate FIRST
+        // (refusal popup + <slug>_refused log, zero grant), then spends the
+        // recharge (ability_use log), stamps te `incite_rampage` on the armed
+        // target with ONE rounds:1 addExpiration clock, and logs the
+        // grant-reaction affordance. Rampage prerequisite stays §70 advisory.
+        handleGrantReactionRow={(action) => resolveMonsterGrantReactionRow({ action, monsterName, campaignName, setPopupHtml })}
       />
       {popupHtml && (
         <MonsterAttackPopup

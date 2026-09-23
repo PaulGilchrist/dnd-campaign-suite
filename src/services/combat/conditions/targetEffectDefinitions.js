@@ -874,6 +874,20 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'constellation'],
   },
   {
+    // MA-0882: Gnoll Pack Lord Incite Rampage grant te — monsterGrantReaction
+    // seam stamps it ON THE ARMED TARGET (another creature it can see, 60 ft)
+    // with ONE rounds:1 addExpiration clock (the Reaction window); the live
+    // "one melee attack as a Reaction" adjudication and the "has the Rampage
+    // Bonus Action" prerequisite are GM-enforced (§70 advisory).
+    effect: 'incite_rampage',
+    label: 'Incited Rampage',
+    description: 'A Gnoll Pack Lord incited this creature to rampage — it can take a Reaction to make one melee attack (GM-enforced; Rampage Bonus Action prerequisite and the 60-ft line-of-sight range are GM-adjudicated, §70 advisory).',
+    icon: 'fa-fire',
+    cls: 'effect-buff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
     effect: 'summoned',
     label: 'Summoned',
     description: 'This creature was summoned by another creature.',

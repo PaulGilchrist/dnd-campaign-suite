@@ -29831,7 +29831,12 @@
         "name": "Incite Rampage",
         "description": "The gnoll targets another creature it can see within 60 feet of itself that has the Rampage Bonus Action. The target can take a Reaction to make one melee attack.",
         "range": "60 feet",
-        "recharge": "5-6"
+        "recharge": "5-6",
+        "automation": {
+          "type": "monster_grant_reaction",
+          "effect": "incite_rampage",
+          "range_ft": 60
+        }
       }
     ],
     "bonus_actions": [
