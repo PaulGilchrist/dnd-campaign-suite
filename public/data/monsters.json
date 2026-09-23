@@ -31510,7 +31510,21 @@
       },
       {
         "name": "Invisible Passage",
-        "description": "The hag magically turns invisible until she attacks or casts a spell, or until her concentration ends (as if concentrating on a spell). While invisible, she leaves no physical evidence of her passage, so she can be tracked only by magic. Any equipment she wears or carries is invisible with her."
+        "description": "The hag magically turns invisible until she attacks or casts a spell, or until her concentration ends (as if concentrating on a spell). While invisible, she leaves no physical evidence of her passage, so she can be tracked only by magic. Any equipment she wears or carries is invisible with her.",
+        "usage": {
+          "type": "recharge after rest",
+          "rest_types": [
+            "short",
+            "long"
+          ]
+        },
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "invisible",
+          "rounds": 600
+        },
+        "uses": 1,
+        "maxUses": 1
       }
     ],
     "traits": [

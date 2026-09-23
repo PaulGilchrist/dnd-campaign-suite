@@ -14382,7 +14382,7 @@
     "invisible"
    ],
    "description": "The hag magically turns invisible until she attacks or casts a spell, or until her concentration ends (as if concentrating on a spell). While invisible, she leaves no physical evidence of her passage, so she can be tracked only by magic. Any equipment she wears or carries is invisible with her.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0919-green-hag-invisible-passage.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0920",
