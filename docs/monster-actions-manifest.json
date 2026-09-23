@@ -13976,7 +13976,7 @@
    "saveEffect": "The attack misses instead",
    "trigger": "A creature the goblin can see hits it with an attack roll.",
    "description": "Wisdom Saving Throw: DC 13, the triggering creature. Failure: The attack misses instead.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0895-goblin-hexer-jinx.md"
+    "verified": "verified"
   },
   {
    "id": "MA-0896",

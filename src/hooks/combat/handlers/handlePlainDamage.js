@@ -13,6 +13,7 @@ import { registerTargetEffect, getEffectDefinition } from '../../../services/com
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { consumePendingRedirectOnResolve } from '../../../services/encounters/monsterRedirectAttack.js';
+import { consumePendingJinxOnResolve } from '../../../services/encounters/monsterJinx.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
@@ -749,6 +750,18 @@ export function createPlainDamageHandler(deps) {
         // retarget_original/retarget_to fields. No armed redirect (or an
         // unrelated roll) returns null — byte-inert legacy path.
         await consumePendingRedirectOnResolve(campaignName, context, combatSummary);
+        // MA-0895: Goblin Hexer Jinx resolve consumer — when a stamped
+        // pendingJinx matches this attack (attacker + original-target identity,
+        // not yet consumed) the attacker failed its WIS save, so the pending
+        // hit is honestly converted to a MISS BEFORE any damage lands:
+        // lastAttack hit:false + jinx_negated:true + zero hp_change +
+        // auto-miss popup "attack negated — Jinx". No armed jinx (or an
+        // unrelated roll) returns null — byte-inert legacy path.
+        const jinxNegated = await consumePendingJinxOnResolve(campaignName, context);
+        if (jinxNegated) {
+            setPopupHtml(jinxNegated.popupData);
+            return;
+        }
         const target = findTargetByContext(combatSummary, context);
         const targetMaxHp = resolveTargetMaxHp(target);
 

@@ -14,6 +14,7 @@ import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, rechar
 import { registerTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { resolveMonsterRedirectAttackRow } from '../../services/encounters/monsterRedirectAttack.js';
+import { resolveMonsterJinxRow } from '../../services/encounters/monsterJinx.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -953,6 +954,19 @@ const GATED_MONSTER_REACTIONS = {
   // (usage:'At Will'+uses:999) — RAW unlimited, no uses/day; 1/round latch
   // (_parry_usedRound, MA-0013 counterspell shape).
   parry: { effect: 'parry', trigger: 'melee_hit', label: 'Parry', icon: 'fa-shield-halved' },
+  // MA-0895: Goblin Hexer Jinx — reactive miss-negation reaction. RAW trigger:
+  // a creature the hexer can see hits it with an attack roll (seen is
+  // GM-enforced advisory, CLA-325); response: the ATTACKER makes a WIS save
+  // vs DC 13, and on a failed save THE ATTACK MISSES INSTEAD. Gate keys off
+  // the campaign lastAttack identity (parry MA-0341 pending-Done window —
+  // hit:true, damageApplied:false), NOT the generic save-shell whose isolated
+  // block save never consumed the save_effect clause. FAIL stamps
+  // campaign.pendingJinx; the resolve consumer in handlePlainDamage
+  // (consumePendingJinxOnResolve, MA-0891 redirect twin) converts the pending
+  // attack to hit:false + zero damage BEFORE Done commits it. At Will
+  // sentinel (usage:'At Will'+uses:999) — RAW unlimited; 1/round latch
+  // (_jinx_negate_usedRound) + lastAttack.jinxResolved identity stamp.
+  jinx_negate: { effect: 'jinx_negate', trigger: 'attacked_by_missable_hit', label: 'Jinx', icon: 'fa-eye' },
   // MA-0399: Black Pudding Split — reactive self-duplication reaction. RAW
   // trigger: while Large/Medium with 10+ HP, becomes Bloodied OR is subjected
   // to Lightning/Slashing damage. The gate reads live combatSummary HP
@@ -1622,6 +1636,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'redirect_attack') {
     return resolveMonsterRedirectAttackRow({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
+  }
+
+  if (def.effect === 'jinx_negate') {
+    return resolveMonsterJinxRow({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
   }
 
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });

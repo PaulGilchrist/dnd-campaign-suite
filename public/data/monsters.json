@@ -30369,7 +30369,17 @@
         "description": "Wisdom Saving Throw: DC 13, the triggering creature. Failure: The attack misses instead.",
         "save_dc": 13,
         "save_type": "Wisdom",
-        "save_effect": "The attack misses instead"
+        "save_effect": "The attack misses instead",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "attacked_by_missable_hit",
+          "effect": "jinx_negate",
+          "saveType": "WIS",
+          "saveDc": 13
+        }
       }
     ],
     "legendary_actions": [],
