@@ -14285,7 +14285,7 @@
     "poisoned"
    ],
    "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 9 (1d10 + 4) Slashing damage plus 11 (2d10) Necrotic damage. Until the start of the slaad's next turn, the target has a condition determined by rolling 1d4: on a 1, Charmed; on a 2, Frightened; on a 3, Poisoned; or on a 4, Incapacitated.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0913-gray-slaad-chaos-claw.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0914",

@@ -31248,7 +31248,11 @@
         "damage_dice_primary": "1d10 + 4",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "2d10",
-        "damage_type_secondary": "Necrotic"
+        "damage_type_secondary": "Necrotic",
+        "hit_condition_roll": {
+          "die": 4,
+          "conditions": ["charmed", "frightened", "poisoned", "incapacitated"]
+        }
       },
       {
         "name": "Spellcasting",
