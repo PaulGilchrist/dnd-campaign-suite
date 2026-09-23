@@ -418,7 +418,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
           timestamp: Date.now(),
         }).catch((e) => { console.error('[MonsterCardModal] Error logging Cube area advisory:', e); });
       }
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape}${aoe.shapeNote ? ` — ${aoe.shapeNote}` : ''} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant: parseTempHpGrantClause(action?.save_effect), conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape}${aoe.shapeNote ? ` — ${aoe.shapeNote}` : ''} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant: parseTempHpGrantClause(action?.save_effect), conditionDurationNote: extractConditionDurationNote(action?.save_effect), stagedPetrify: parseStagedPetrifyClause(action) });
       return;
     }
     fire();
@@ -2351,6 +2351,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           speedZeroClause={conePicker.speedZeroClause}
           bothOutcomesClause={conePicker.bothOutcomesClause}
           tempHpGrant={conePicker.tempHpGrant}
+          stagedPetrify={conePicker.stagedPetrify}
           conditionDurationNote={conePicker.conditionDurationNote}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}

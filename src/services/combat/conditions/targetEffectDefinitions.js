@@ -434,7 +434,9 @@ const TARGET_EFFECT_DEFINITIONS = [
     // it on a success; a second failure (repeat save or a fresh bite while
     // Restrained) Petrifies instead, for 24 hours (petrified_hours×600 round
     // clock, CLA-334). Own te key (NOT eye_ray_petrifying — MA-0374's
-    // Beholder ladder has no petrification expiry).
+    // Beholder ladder has no petrification expiry). MA-0904 reuses this key
+    // for Gorgon Petrifying Breath (cone picker, same ladder, per-source DC
+    // 15); the te instance label carries the cone-vs-bite discriminator.
     effect: 'petrifying_bite_staged',
     label: 'Petrifying Bite',
     description: 'Staged by Petrifying Bite (MA-0501): first failed CON save — Restrained, repeats the CON save (DC indicated) at the end of its next turn, ending the effect on itself on a success; a second failure Petrifies it instead of Restrained, for 24 hours.',

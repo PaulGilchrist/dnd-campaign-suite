@@ -122,10 +122,11 @@ describe('MA-0501 cockatricePetrifyService staging', () => {
         expect(teCall[2]).toHaveLength(0);
 
         const condWrite = setRuntimeValue.mock.calls.filter(c => c[0] === 'Bandit 1' && c[1] === 'activeConditions');
-        // Restrained stripped first, then Petrified applied (last write = live
-        // state; the stateless mock re-reads the pre-removal store, MA-0248 shape).
-        expect(condWrite[0][2]).toEqual([]);
-        expect(condWrite.at(-1)[2]).toContain('petrified');
+        // MA-0904: ATOMIC swap — one write, Restrained replaced by Petrified
+        // (the MA-0501 remove→apply POST pair raced out of order in live E2E
+        // and wiped the condition; final state is byte-identical).
+        expect(condWrite).toHaveLength(1);
+        expect(condWrite[0][2]).toEqual(['petrified']);
 
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith({
@@ -182,8 +183,8 @@ describe('MA-0501 cockatricePetrifyService staging', () => {
         expect(teCall[2]).toHaveLength(0);
 
         const condWrite = setRuntimeValue.mock.calls.filter(c => c[0] === 'Bandit 1' && c[1] === 'activeConditions');
-        expect(condWrite[0][2]).toEqual([]);
-        expect(condWrite.at(-1)[2]).toContain('petrified');
+        expect(condWrite).toHaveLength(1);
+        expect(condWrite[0][2]).toEqual(['petrified']);
 
         expect(addExpiration).toHaveBeenCalledWith({
             attackerName: caster,
@@ -272,5 +273,106 @@ describe('MA-0501 cockatricePetrifyService staging', () => {
         expect(result).toEqual({ handled: false });
         expect(addExpiration).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
+    });
+});
+
+// MA-0904: the SAME ladder consumer adjudicates picker-armed te (Gorgon
+// Petrifying Breath cone, DC 15, label discriminator) — no second tick.
+describe('MA-0904 picker-armed Gorgon cone ladder (shared MA-0501 ladder)', () => {
+    const gorgonTe = () => makeStagedTe({ dc: 15, label: 'Petrifying Breath', source: 'Gorgon 1' });
+
+    it('picker fail#1 on a fresh target: Restrained ONLY + te carries dc15 + Petrifying Breath label + petrifiedRounds 14400', async () => {
+        getRuntimeValue.mockImplementation((target, key) => {
+            if (target === 'campaign' && key === 'targetEffects') return [];
+            return null;
+        });
+
+        const staged = await stagePetrifyingBiteTargets({
+            campaignName, casterName: 'Gorgon 1', targetNames: ['Bandit 1'], saveDc: 15,
+            options: { saveType: 'CON', label: 'Petrifying Breath', petrifiedRounds: 14400 },
+        });
+
+        expect(staged).toEqual(['Bandit 1']);
+        const condCall = setRuntimeValue.mock.calls.find(c => c[0] === 'Bandit 1' && c[1] === 'activeConditions');
+        expect(condCall[2]).toEqual(['restrained']);
+        const teCall = setRuntimeValue.mock.calls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
+        expect(teCall[2][0]).toMatchObject({ dc: 15, saveType: 'CON', label: 'Petrifying Breath', petrifiedRounds: 14400, stage: 'restrained' });
+    });
+
+    it('turn-END repeat save vs picker-armed te rolls CON vs DC 15; failure escalates to Petrified with 14400-round clock, Petrified+Breath log copy', async () => {
+        getCombatSummary.mockReturnValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', saveBonuses: { con: -19 } }],
+        });
+        getRuntimeValue.mockImplementation((target, key) => {
+            if (target === 'campaign' && key === 'targetEffects') return [gorgonTe()];
+            if (target === 'Bandit 1' && key === 'activeConditions') return ['restrained'];
+            return null;
+        });
+        const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        const result = await applyPetrifyingBiteTurnEnd(campaignName, 'Bandit 1');
+
+        expect(result).toMatchObject({ handled: true, success: false, roll: 11, total: -8 });
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Gorgon 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'condition', condition: 'petrified' }],
+            campaignName,
+            rounds: 14400,
+        });
+        const condLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.action === 'applied');
+        expect(condLog.condition).toBe('Petrified');
+        expect(condLog.reason).toBe('Petrifying Breath (second failed save)');
+        const saveLog = addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-petrifying-repeat');
+        expect(saveLog.saveDc).toBe(15);
+        expect(saveLog.description).toContain('Petrified for 24 hours');
+
+        spy.mockRestore();
+    });
+
+    it('turn-END repeat save success strips Restrained + clears the ladder, zero petrified writes/clock', async () => {
+        getCombatSummary.mockReturnValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', saveBonuses: { con: 19 } }],
+        });
+        getRuntimeValue.mockImplementation((target, key) => {
+            if (target === 'campaign' && key === 'targetEffects') return [gorgonTe()];
+            if (target === 'Bandit 1' && key === 'activeConditions') return ['restrained'];
+            return null;
+        });
+        const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        const result = await applyPetrifyingBiteTurnEnd(campaignName, 'Bandit 1');
+
+        expect(result).toMatchObject({ handled: true, success: true, roll: 11, total: 30 });
+        const teCall = setRuntimeValue.mock.calls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
+        expect(teCall[2]).toHaveLength(0);
+        const condCall = setRuntimeValue.mock.calls.find(c => c[0] === 'Bandit 1' && c[1] === 'activeConditions');
+        expect(condCall[2]).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+        const removeLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.action === 'removed');
+        expect(removeLog.reason).toBe('Petrifying Breath ends (repeat save succeeded)');
+
+        spy.mockRestore();
+    });
+
+    it('picker re-fire fail on an already Restrained-staged target = second failure → Petrified (shared escalation leg)', async () => {
+        getRuntimeValue.mockImplementation((target, key) => {
+            if (target === 'campaign' && key === 'targetEffects') return [gorgonTe()];
+            if (target === 'Bandit 1' && key === 'activeConditions') return ['restrained'];
+            return null;
+        });
+
+        const staged = await stagePetrifyingBiteTargets({
+            campaignName, casterName: 'Gorgon 1', targetNames: ['Bandit 1'], saveDc: 15,
+            options: { saveType: 'CON', label: 'Petrifying Breath', petrifiedRounds: 14400 },
+        });
+
+        expect(staged).toEqual(['Bandit 1']);
+        const teCall = setRuntimeValue.mock.calls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
+        expect(teCall[2]).toHaveLength(0);
+        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({ rounds: 14400 }));
+        const condLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.action === 'applied');
+        expect(condLog.condition).toBe('Petrified');
+        expect(condLog.reason).toBe('Petrifying Breath (second failed save)');
     });
 });

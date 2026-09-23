@@ -14,6 +14,7 @@ import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
 import { stageParalysisTargets } from '../../../../services/rules/features/paralyzingBreathService.js';
 import { grantWeakeningBreath } from '../../../../services/rules/features/weakeningBreathService.js';
+import { stagePetrifyingBiteTargets } from '../../../../services/rules/features/cockatricePetrifyService.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -188,7 +189,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, bothOutcomesClause, tempHpGrant: ctx.tempHpGrant, conditionDurationNote: ctx.conditionDurationNote });
+    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, stagedPetrify: ctx.stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, bothOutcomesClause, tempHpGrant: ctx.tempHpGrant, conditionDurationNote: ctx.conditionDurationNote });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -614,16 +615,47 @@ function applyStagedParalysisSave({ stagedParalysis, success, saveDc, saveType, 
     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging staged paralysis condition:', e); });
 }
 
+// MA-0904: Gorgon Petrifying Breath — picker-armed leg of the MA-0501
+// staged-petrify ladder. Reuses cockatricePetrifyService verbatim (ONE
+// ladder, no fork): failed save → Restrained + petrifying_bite_staged te
+// (action-name label is the cone-vs-bite discriminator); a fresh fail on a
+// Restrained-staged target escalates to Petrified inside the service; save
+// success grants nothing. The existing MA-0501 turn-END repeater
+// (navigationHandlers applyPetrifyingBiteTurnEnd, same te key) adjudicates
+// the end-of-next-turn repeat save — no second tick. te.saveType is the
+// 3-letter abbr the inline seam stamps (picker saveType is full-word).
+function applyStagedPetrifySave({ stagedPetrify, success, saveDc, saveType, targetName, casterName, actionName, campaignName }) {
+    if (success === true) return;
+    stagePetrifyingBiteTargets({
+        campaignName,
+        casterName,
+        targetNames: [targetName],
+        saveDc,
+        options: { ...stagedPetrify, saveType: String(saveType || '').toUpperCase().slice(0, 3) || 'CON', label: actionName || 'Petrifying Breath' },
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error staging petrify ladder:', e); });
+}
+
 // Failed-save dispatch: MA-0068 staged sleep / MA-0248 staged paralysis rows
 // route through their staging seams; everything else keeps the MA-0063
 // one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote }) {
+function resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
     }
     if (stagedParalysis) {
         applyStagedParalysisSave({ stagedParalysis, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
+        return;
+    }
+    // MA-0904: Gorgon Petrifying Breath — the MA-0501 staged-petrify ladder
+    // (cockatricePetrifyService, ONE shared ladder) rides the cone picker.
+    // When armed the ladder OWNS the fail leg: the generic saveConditions
+    // auto-grant (extractor word-scan yields Petrified+Restrained — a REAL
+    // double-grant on ladder-word prose) is SUPPRESSED (§108 clause-supersedes
+    // precedent); fail#1 lands Restrained only + petrifying_bite_staged te,
+    // adjudicated to Petrified by the existing turn-END repeater.
+    if (stagedPetrify) {
+        applyStagedPetrifySave({ stagedPetrify, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName });
         return;
     }
     // MA-0303: "Failure or Success:" both-outcomes SUCCESS leg (byte-inert
@@ -1196,6 +1228,12 @@ function SaveAttackAoeModal({
     // null — falsy): Gnoll Demoniac Hunger of Yeenoghu — failed saves grant
     // the ATTACKER temp HP via tempHpService replace-if-larger + grant log.
     tempHpGrant,
+    // MA-0904 optional staged petrify ladder (byte-inert undefined default):
+    // Gorgon Petrifying Breath — the MA-0501 cockatricePetrifyService ladder
+    // rides the cone picker; failed saves STAGE Restrained + staged te
+    // instead of the MA-0063 flat saveConditions grant (suppressed while
+    // armed), adjudicated to Petrified by the turn-END repeater.
+    stagedPetrify,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -1257,7 +1295,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -1288,7 +1326,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote]);
+    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -1420,7 +1458,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, stagedParalysis, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote });
+        resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -1449,7 +1487,7 @@ function SaveAttackAoeModal({
         }, secondary);
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

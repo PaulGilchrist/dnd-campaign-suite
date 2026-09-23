@@ -68,11 +68,22 @@ function stageEffect(targetName, casterName, saveDc, options) {
 // Second failure: Restrained → Petrified for petrified_hours (ONE clock,
 // playbook §5), te retired so no further repeat saves fire (playbook §70:
 // Petrified 24h persists by clock, no rescue-engine consumer).
+// ATOMIC Restrained→Petrified swap (MA-0904): one authoritative
+// activeConditions write instead of the MA-0501 remove→apply pair — two
+// fire-and-forget setRuntimeValue POSTs to the same key can reach the
+// server OUT OF ORDER (live E2E: the stale "[]" landed after
+// "[petrified]" and wiped the condition). Same final state, one POST.
+function swapRestrainedForPetrified(targetName, campaignName, skipSync) {
+    const stored = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(stored) ? stored : [];
+    const filtered = conditions.filter(c => lower(c) !== 'restrained');
+    setRuntimeValue(targetName, 'activeConditions', [...filtered, 'petrified'], campaignName, skipSync);
+}
+
 function escalateToPetrified({ effects, idx, targetName, casterName, campaignName, skipSync, label, petrifiedRounds }) {
     if (idx >= 0) effects.splice(idx, 1);
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName, skipSync);
-    removeCondition(targetName, 'restrained', campaignName, skipSync);
-    applyCondition(targetName, 'petrified', campaignName, skipSync);
+    swapRestrainedForPetrified(targetName, campaignName, skipSync);
     addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'condition', condition: 'petrified' },
     ], campaignName, rounds: petrifiedRounds ?? DEFAULT_PETRIFIED_ROUNDS });

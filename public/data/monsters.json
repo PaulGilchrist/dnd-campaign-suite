@@ -30796,6 +30796,9 @@
         "save_dc": 15,
         "save_type": "Constitution",
         "range": "30-foot Cone",
+        "staged_petrify": {
+          "petrified_hours": 24
+        },
         "save_effect": "First Failure: The target has the Restrained condition and repeats the save at the end of its next turn if it is still Restrained, ending the effect on itself on a success. Second Failure: The target has the Petrified condition instead of the Restrained condition.",
         "recharge": "5-6"
       }
