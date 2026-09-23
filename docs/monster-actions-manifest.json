@@ -13560,7 +13560,7 @@
     "prone"
    ],
    "description": "Strength Saving Throw: DC 15, one creature within 5 feet that the gladiator can see. Failure: 9 (2d4 + 4) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0868-gladiator-shield-bash.md"
+    "verified": "verified"
   },
   {
    "id": "MA-0869",

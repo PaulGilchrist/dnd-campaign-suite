@@ -29408,6 +29408,7 @@
         "description": "Strength Saving Throw: DC 15, one creature within 5 feet that the gladiator can see. Failure: 9 (2d4 + 4) Bludgeoning damage. If the target is a Medium or smaller creature, it has the <strong>Prone</strong> condition.",
         "save_dc": 15,
         "save_type": "Strength",
+        "dc_success": "none",
         "range": "5 feet",
         "save_effect": "If the target is a Medium or smaller creature, it has the Prone condition.",
         "damage_dice_primary": "2d4 + 4",
