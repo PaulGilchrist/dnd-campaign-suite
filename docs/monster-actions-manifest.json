@@ -13703,7 +13703,7 @@
     "poisoned"
    ],
    "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage plus 7 (2d6) Poison damage, and the target has the Poisoned condition until the start of the gnoll's next turn.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0877-gnoll-fang-bite.md"
+    "verified": "verified"
   },
   {
    "id": "MA-0878",
