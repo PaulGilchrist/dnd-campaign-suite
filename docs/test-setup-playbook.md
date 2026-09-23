@@ -392,3 +392,4 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - MA-0936 (PASS, ancient Beak): PITFALLS: stage-2 damage popup dismisses ONLY on .dice-roll-result itself (ancestor sweeps no-op); hp_change key is damageBreakdown array {damageType,amount,resisted,status}. (2026-09-23)
 
 - MA-0937 (PASS, ancient Slam): PITFALLS: macOS EB search select-all = Meta+A (Control+A appends → false collision-free zero-rows); AC stamp renders split "Armor Class"+"18" — case-insensitive match. (2026-09-23)
+- MA-0868 (FIXED, gladiator Shield Bash dc_success:"none" §63 family): post-campaign-re-select initiative avatar click can double-register/toggle-close the .mc-overlay — first click lands closed-state (chip count 0); audit overlay display after every avatar click, re-click once, re-arm target-select on every card reopen (2026-09-23).
