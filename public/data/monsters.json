@@ -29529,9 +29529,8 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 2",
-        "damage_type_primary": "Piercing",
-        "damage_dice_secondary": "1d8 + 2",
-        "damage_type_secondary": "Piercing"
+        "damage_dice_two_handed": "1d8 + 2",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Longbow",
