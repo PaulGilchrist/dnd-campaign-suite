@@ -30246,7 +30246,17 @@
       {
         "name": "Redirect Attack",
         "trigger": "A creature the goblin can see makes an attack roll against it.",
-        "description": "The goblin chooses a Small or Medium ally within 5 feet of itself. The goblin and that ally swap places, and the ally becomes the target of the attack instead."
+        "description": "The goblin chooses a Small or Medium ally within 5 feet of itself. The goblin and that ally swap places, and the ally becomes the target of the attack instead.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "monster_redirect_attack",
+          "trigger": "attacked_by_seen",
+          "effect": "redirect_attack",
+          "ally_size": ["Small", "Medium"],
+          "range_ft": 5
+        }
       }
     ],
     "legendary_actions": [],

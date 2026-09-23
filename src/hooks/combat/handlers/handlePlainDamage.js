@@ -12,6 +12,7 @@ import { sendSavePrompt } from '../../../services/combat/conditions/savePromptSe
 import { registerTargetEffect, getEffectDefinition } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
+import { consumePendingRedirectOnResolve } from '../../../services/encounters/monsterRedirectAttack.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
@@ -740,6 +741,14 @@ export function createPlainDamageHandler(deps) {
 
     return async function handlePlainDamage({ name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary, displayRolls, gwfBaseRolls, gwfDisplayRolls }) {
         const { damageType, attackerName } = context || {};
+        // MA-0891: Goblin Boss Redirect Attack resolve consumer — when a
+        // stamped pendingRedirect matches this attack (attacker identity,
+        // not yet consumed), the victim is honestly rewritten to the armed
+        // ALLY before any target lookup: damage + hp_change land on the
+        // ally, the Boss stays unharmed, lastAttack carries redirected +
+        // retarget_original/retarget_to fields. No armed redirect (or an
+        // unrelated roll) returns null — byte-inert legacy path.
+        await consumePendingRedirectOnResolve(campaignName, context, combatSummary);
         const target = findTargetByContext(combatSummary, context);
         const targetMaxHp = resolveTargetMaxHp(target);
 

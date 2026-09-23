@@ -13,6 +13,7 @@ import { setTempHp } from '../../services/automation/handlers/buffs/tempHpServic
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, rechargeActionKey, parseRechargeThreshold, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
 import { registerTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
+import { resolveMonsterRedirectAttackRow } from '../../services/encounters/monsterRedirectAttack.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -1036,6 +1037,23 @@ const GATED_MONSTER_REACTIONS = {
   // lineage), so a later hit never re-halves. Non-elemental damage / spent
   // uses refuse honestly (elemental_absorption_refused, zero spend).
   elemental_absorption: { effect: 'elemental_absorption', trigger: 'damage_taken_elemental', label: 'Elemental Absorption', icon: 'fa-cube' },
+  // MA-0891: Goblin Boss Redirect Attack — reactive retarget reaction. RAW
+  // trigger: a creature the goblin can see makes an attack roll against it
+  // (vision is GM-enforced advisory, CLA-325). Press-over-pending lineage
+  // (parry MA-0341/§217 — defender chip pressed while the attacker's HIT
+  // popup is pending, no popupHtml on success so the pending Done survives).
+  // Gate is campaign lastAttack identity (pending attack against the boss,
+  // damage not yet committed) + the GM-armed cs.targetName seam
+  // (getTargetFromAttacker MA-0882 shape — the goblin's own card-armed
+  // Small/Medium ally is the chosen redirect target; no_target/self_target/
+  // size refuse zero-spend). Economy: MONSTER_REACTION_USES +
+  // `_redirect_attack_usedRound` 1/round latch (MA-0881 shape), At Will
+  // sentinel (usage:'At Will'+uses:999, MA-0341 shape). Press stamps campaign
+  // pendingRedirect + lastAttack retarget fields; the victim swap rides the
+  // resolve consumer in handlePlainDamage (consumePendingRedirectOnResolve),
+  // te `redirect_attack` lands on the ALLY rounds:1. 5-ft proximity + the
+  // physical position swap are gridless GM-enforced advisory (§42/§70).
+  redirect_attack: { effect: 'redirect_attack', trigger: 'attacked_by_seen', label: 'Redirect Attack', icon: 'fa-right-left' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -1600,6 +1618,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'elemental_absorption') {
     return resolveMonsterElementalAbsorption({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
+  }
+
+  if (def.effect === 'redirect_attack') {
+    return resolveMonsterRedirectAttackRow({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
   }
 
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });

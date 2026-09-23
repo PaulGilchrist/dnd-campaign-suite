@@ -888,6 +888,22 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-0891: Goblin Boss Redirect Attack reaction te — monsterRedirectAttack
+    // seam stamps it ON THE CHOSEN ALLY (Small/Medium, RAW ≤5 ft — gridless
+    // 5-ft proximity + physical token swap are GM-enforced, §42/§70 advisory)
+    // with ONE rounds:1 addExpiration clock (the redirect window clears next
+    // round). The armed ally becomes the target of the triggering attack —
+    // pending-damage retarget consumer lives in handlePlainDamage
+    // (consumePendingRedirectOnResolve).
+    effect: 'redirect_attack',
+    label: 'Redirected Attack',
+    description: 'A Goblin Boss redirected an attack to this ally — it becomes the target of the triggering attack instead (GM-enforced; the 5-ft proximity check and the physical position swap are gridless advisory, §42).',
+    icon: 'fa-right-left',
+    cls: 'effect-buff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
     effect: 'summoned',
     label: 'Summoned',
     description: 'This creature was summoned by another creature.',
