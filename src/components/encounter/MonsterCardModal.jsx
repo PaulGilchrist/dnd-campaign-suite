@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
@@ -74,7 +74,35 @@ function radiusAoeFallback(action, description) {
   if (emanationFt != null) {
     return { shape: 'Radius', feet: emanationFt, rangeGateFt: emanationFt };
   }
+  const cubeFt = cubeCoverageFeet(action, description);
+  if (cubeFt != null) {
+    return { shape: 'Cube', feet: cubeFt, rangeGateFt: null, shapeNote: 'modeled as radius — Darkness / Difficult Terrain / Concentration GM-enforced' };
+  }
   return null;
+}
+
+// MA-0875: coverage feet for an authored point-placed Cube save row (Gnoll
+// Demoniac Hunger of Yeenoghu "30-foot Cube of magical Darkness originating
+// from a point it can see within 60 feet"). A Cube is not a picker-native
+// shape, so it rides the MA-0084 point-centered Radius picker as an honest
+// radius approximation with a shapeNote advisory (MA-0673 "90-foot-radius
+// Cube" precedent, §85/§228 — accepted cube→radius residual). The origin is
+// GM-placed within the authored numeric range, so rangeGateFt stays null
+// like the sphere (selection advisory); the 60-ft token gates WHERE the
+// origin goes, never target selection. Arm ONLY when the row ALSO authors
+// a numeric origin range: object-clause cubes (Rust Monster "destroys a
+// 1-foot Cube of the object", range:"") and self-move engulf (Gelatinous
+// Cube — "cube" never digit-adjacent) stay byte-inert null, and the
+// Beholder-family eye-ray rows (range: null, disintegration "10-foot
+// Cube" prose) never reroute. Checked AFTER radiusAoeFallback's radius/
+// emanation legs so MA-0673 "90-foot-radius Cube" parses Radius first
+// byte-identical.
+function cubeCoverageFeet(action, description) {
+  const text = String(description || '').replace(/<[^>]+>/g, ' ');
+  const m = text.match(/(\d+(?:\.\d+)?)\s*[- ]?\s*(?:foot|feet|ft\.?)?\s*\bcube\b/i);
+  if (!m) return null;
+  const originFt = rangeToFeet(action?.range);
+  return originFt != null ? Number(m[1]) : null;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -375,7 +403,21 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
       // refusals); spendMonsterAbilityUse's double-spend guard stays loud.
       if (usesGate) await spendMonsterAbilityUse({ monsterName, use: { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName: action.name }, campaignName });
       const secondary = pickerSecondaryFields(action);
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
+      if (aoe.shape === 'Cube') {
+        // MA-0875: honest advisory each time a Cube row opens the picker —
+        // darkness/difficult-terrain/concentration/repeat-save are §70
+        // zero-consumer residuals, recorded GM-enforced (MA-0673
+        // eye_ray_advisory precedent).
+        addEntry(campaignName, {
+          type: 'automation',
+          automationType: 'cube_area_advisory',
+          characterName: monsterName,
+          abilityName: action.name,
+          description: `${monsterName} conjures a ${aoe.feet}-foot Cube — modeled as a ${aoe.feet}-foot radius picker (no Cube shape consumer); the point origin is GM-placed within ${rangeToFeet(action?.range) ?? aoe.feet} ft. Darkness, Difficult Terrain, 1-minute Concentration duration and the turn-start/first-entry repeat save are GM-enforced (§70 advisory).`,
+          timestamp: Date.now(),
+        }).catch((e) => { console.error('[MonsterCardModal] Error logging Cube area advisory:', e); });
+      }
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape}${aoe.shapeNote ? ` — ${aoe.shapeNote}` : ''} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant: parseTempHpGrantClause(action?.save_effect), conditionDurationNote: extractConditionDurationNote(action?.save_effect) });
       return;
     }
     fire();
@@ -1393,6 +1435,15 @@ export function buildAbilitySaveRollContext({ monsterName, target, spellName, ac
     // for every clauseless row; picker rows keep their own setConePicker
     // slowedClauses seam byte-identical (fire() never runs for them).
     slowedClauses: parseSlowedClauses(saveEffect),
+    // MA-0875: failed-save THP grant clause (Gnoll Demoniac Hunger of
+    // Yeenoghu "the gnoll or a creature of its choice it can see gains 10
+    // Temporary Hit Points") on the INLINE block-save seam — the same parse
+    // rides the save context and saveProcessing.grantFailedSaveTempHp grants
+    // it on the ATTACKER via tempHpService replace-if-larger (MA-0275
+    // Fortify producer twin; self-grant default, chooser GM-enforced).
+    // Byte-inert null for every clauseless row; Cube rows normally route
+    // the picker (its own tempHpGrant seam), so fire() rarely sees this arm.
+    tempHpGrant: parseTempHpGrantClause(saveEffect),
     // MA-0751: Fomorian Warping Hex — "The target gains 1 Exhaustion level."
     // exhaustion is LEVEL-based (stackable to 6), so it lives OUTSIDE the
     // canonical CONDITIONS word list and extractConditionsFromSaveEffect can
@@ -2282,6 +2333,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           acPenaltyClause={conePicker.acPenaltyClause}
           speedZeroClause={conePicker.speedZeroClause}
           bothOutcomesClause={conePicker.bothOutcomesClause}
+          tempHpGrant={conePicker.tempHpGrant}
           conditionDurationNote={conePicker.conditionDurationNote}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}

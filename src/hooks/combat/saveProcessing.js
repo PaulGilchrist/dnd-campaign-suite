@@ -385,6 +385,36 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     // MA-0501: Cockatrice staged petrify ladder arm (byte-inert unless
     // context.stagedPetrify authored; cockatricePetrifyService).
     await applyStagedPetrifyClauseGrant({ context, campaignName, attackerName, applyTarget });
+    // MA-0875: failed-save THP grant clause (Gnoll Demoniac Hunger of
+    // Yeenoghu) on the INLINE seam — fail-only, byte-inert null elsewhere.
+    await grantFailedSaveTempHp({ context, campaignName, attackerName });
+}
+
+// MA-0875: failed-save temporary-hit-point grant (Gnoll Demoniac Hunger of
+// Yeenoghu — "Failure: ... and the gnoll or a creature of its choice it can
+// see gains 10 Temporary Hit Points"). Armed ONLY by context.tempHpGrant
+// (parseTempHpGrantClause, MonsterCardHelpers — MA-0275 Fortify monster THP
+// producer twin): tempHpService replace-if-larger on the ATTACKER (self-
+// grant default; the "creature of its choice" chooser is GM-enforced per
+// MA-0875 adjudication). No addExpiration clock — THP is consumed by damage
+// (tempHpService semantics), mirroring the Fortify channel which carries no
+// clock either. Byte-inert for every clauseless row.
+async function grantFailedSaveTempHp({ context, campaignName, attackerName }) {
+    const clause = context?.tempHpGrant;
+    if (!clause) return;
+    const amount = Number(clause.tempHp) || 0;
+    if (!amount) return;
+    const granted = setTempHp(attackerName, amount, campaignName);
+    const actionName = context?.actionName || context?.name || 'the action';
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'temp_hp_granted',
+        characterName: attackerName,
+        sourceName: attackerName,
+        abilityName: actionName,
+        description: `${attackerName} gains ${amount} temporary hit points (now ${granted} THP, replace-if-larger) — ${actionName} failed-save clause; "creature of its choice" chooser GM-enforced, self-grant default.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:temp-hp-granted]', e); });
 }
 
 // MA-0501: Cockatrice Petrifying Bite staged ladder — first failed CON

@@ -277,6 +277,29 @@ export function parseAnimalSpiritVariants(action) {
   };
 }
 
+// MA-0875: failed-save temporary-hit-point grant clause (Gnoll Demoniac
+// Hunger of Yeenoghu — save_effect "The gnoll or a creature of its choice
+// it can see gains 10 Temporary Hit Points."). "Temporary Hit Points" is
+// NOT in the canonical CONDITIONS word list (§50), so
+// extractConditionsFromSaveEffect can never carry it — THP rides its own
+// structured clause through the save context / picker prop to the
+// failed-save grant seam, where tempHpService (replace-if-larger, MA-0275
+// Fortify producer semantics) writes it on the ATTACKER (the "gnoll ...
+// choice" chooser is optional per MA-0875 adjudication: self-grant is the
+// documented default, chooser GM-enforced). Byte-inert (null) for every
+// row without the clause; MA-0275 variant chooser rows
+// ("One of the following effects occurs: Fortify (Forager Only) — ...
+// gains 20 Temporary Hit Points") are EXCLUDED — applyAnimalSpiritVariant
+// Grant owns those grants on BOTH outcomes, arming here would double-grant
+// and mis-scope them fail-only.
+export function parseTempHpGrantClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  if (/one of the following effects occurs/i.test(saveEffect)) return null;
+  if (/\(\s*[\w-]+ only\s*\)/i.test(saveEffect)) return null;
+  const m = saveEffect.match(/gains\s+(\d+)\s+temporary hit points/i);
+  return m ? { tempHp: Number(m[1]) } : null;
+}
+
 // MA-0367: authored infernal-wound row (Bearded Devil Infernal Glaive —
 // "If the target is a creature and doesn't already have an infernal wound,
 // it is subjected to ... loses 1d10 Hit Points at the start of each of its
