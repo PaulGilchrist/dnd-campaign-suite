@@ -14213,7 +14213,7 @@
     "grappled"
    ],
    "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 10 (1d10 + 5) Bludgeoning damage plus 10 (3d6) Necrotic damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 15). Until the grapple ends, the target is suffocating. The revenant can have up to two targets Grappled in this way at a time.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0909-graveyard-revenant-suffocate.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0910",

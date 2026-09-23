@@ -31033,7 +31033,9 @@
         "damage_dice_primary": "1d10 + 5",
         "damage_type_primary": "Bludgeoning",
         "damage_dice_secondary": "3d6",
-        "damage_type_secondary": "Necrotic"
+        "damage_type_secondary": "Necrotic",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 15
       },
       {
         "name": "Haunting Glare",
