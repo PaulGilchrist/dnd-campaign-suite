@@ -9,8 +9,9 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { buildSecondaryDamageTransport } from './MonsterCardModal.jsx';
 
-const goblinBoss = JSON.parse(readFileSync(resolve(__dirname, '../../../public/data/monsters.json'), 'utf8'))
-    .find(m => m.index === 'goblin-boss');
+const monsters = JSON.parse(readFileSync(resolve(__dirname, '../../../public/data/monsters.json'), 'utf8'));
+const goblinBoss = monsters.find(m => m.index === 'goblin-boss');
+const goblinWarrior = monsters.find(m => m.index === 'goblin-warrior');
 const scimitarRow = goblinBoss.actions[1];
 const shortbowRow = goblinBoss.actions[2];
 
@@ -43,6 +44,35 @@ describe('MA-0889 Goblin Boss advantage-gated secondary rider', () => {
         expect(t.secondaryCondition).toBe('advantage');
         const s = buildSecondaryDamageTransport(shortbowRow, 'Shortbow');
         expect(s.secondaryCondition).toBe('advantage');
+    });
+
+    it('MA-0897 twin data-lock: Goblin Warrior Scimitar actions[0] carries secondary_condition "advantage"', () => {
+        const row = goblinWarrior.actions[0];
+        expect(row.name).toBe('Scimitar');
+        expect(row.attack_bonus).toBe(4);
+        expect(row.damage_dice_primary).toBe('1d6 + 2');
+        expect(row.damage_type_primary).toBe('Slashing');
+        expect(row.damage_dice_secondary).toBe('1d4');
+        expect(row.damage_type_secondary).toBe('Slashing');
+        expect(row.secondary_condition).toBe('advantage');
+        expect(row.description).toContain('if the attack roll had Advantage');
+        const t = buildSecondaryDamageTransport(row, 'Scimitar');
+        expect(t.secondaryCondition).toBe('advantage');
+        expect(t.autoDamageSecondaryFormula).toBe('1d4');
+        expect(t.autoDamageSecondaryDamageType).toBe('Slashing');
+    });
+
+    it('MA-0898 twin data-lock: Goblin Warrior Shortbow actions[1] carries secondary_condition "advantage"', () => {
+        const row = goblinWarrior.actions[1];
+        expect(row.name).toBe('Shortbow');
+        expect(row.damage_dice_primary).toBe('1d6 + 2');
+        expect(row.damage_dice_secondary).toBe('1d4');
+        expect(row.damage_type_secondary).toBe('Piercing');
+        expect(row.secondary_condition).toBe('advantage');
+        expect(row.description).toContain('if the attack roll had Advantage');
+        const t = buildSecondaryDamageTransport(row, 'Shortbow');
+        expect(t.secondaryCondition).toBe('advantage');
+        expect(t.autoDamageSecondaryDamageType).toBe('Piercing');
     });
 
     it('legacy always-roll riders forward secondaryCondition null byte-identical (MA-0426/0531 family)', () => {
