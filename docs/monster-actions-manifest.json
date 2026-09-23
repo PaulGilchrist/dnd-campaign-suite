@@ -14555,7 +14555,7 @@
     "grappled"
    ],
    "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 7 (1d10 + 2) Slashing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 12) from all four tentacles.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0930-grick-tentacles.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0931",
