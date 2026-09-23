@@ -786,3 +786,46 @@ describe('MA-0702 Erinyes Parry — data-lock + acBonus 4', () => {
   });
 });
 
+// MA-0869: Gladiator Parry — MA-0643/MA-0702 routine DATA twin. Disk
+// reactions[0] was prose-only (name/trigger/description) = gate-null inert;
+// fix authors the MA-0341 byte-shape with acBonus 3 (RAW: +3 AC vs the
+// triggering melee hit; AC 16 → 19, 16-18 window flips to miss).
+const GLADIATOR_ACTION = monsters.find(m => m.index === 'gladiator').reactions[0];
+const GLADIATOR = 'Gladiator 1';
+
+describe('MA-0869 Gladiator Parry — data-lock + acBonus 3', () => {
+  it('monsters.json gladiator reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 3)', () => {
+    expect(GLADIATOR_ACTION.name).toBe('Parry');
+    expect(GLADIATOR_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 3 });
+    expect(GLADIATOR_ACTION.usage).toBe('At Will');
+    expect(GLADIATOR_ACTION.uses).toBe(999);
+    expect(GLADIATOR_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(GLADIATOR_ACTION)?.effect).toBe('parry');
+  });
+
+  it('gate accepts unresolved melee hit on the gladiator and refuses a 2nd same-round press', () => {
+    const hit = { attackerName: 'Bandit 1', targetName: GLADIATOR, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 14, bonus: 3, total: 17, targetAc: 16, effectiveAc: 16 };
+    const g = parryGate({ lastAttack: hit, monsterName: GLADIATOR, currentRound: 3, storedUses: {}, usedRound: 0, action: GLADIATOR_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+    const again = parryGate({ lastAttack: hit, monsterName: GLADIATOR, currentRound: 3, storedUses: {}, usedRound: 3, action: GLADIATOR_ACTION });
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('round');
+  });
+
+  it('resolve: +3 AC stamp, AC 16 → 19 flips the 16-18 window hit to miss, At Will never spends uses', async () => {
+    const hit = { attackerName: 'Bandit 1', targetName: GLADIATOR, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 14, bonus: 3, total: 17, targetAc: 16, effectiveAc: 16 };
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+    const result = await resolveMonsterGatedReaction({ action: GLADIATOR_ACTION, monsterName: GLADIATOR, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(3);
+    expect(result.newAc).toBe(19);
+    expect(result.newAc).toBeGreaterThan(hit.total);
+    expect(state[`${GLADIATOR}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 3)).toBe(true);
+    expect(state[`${GLADIATOR}._parry_usedRound`]).toBe(3);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: GLADIATOR, parryAcBonus: 3 });
+    expect(state[`${GLADIATOR}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 16 → 19/);
+  });
+});
+
