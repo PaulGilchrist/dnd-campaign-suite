@@ -17556,7 +17556,7 @@
    "category": "actions",
    "actionType": "multiattack",
    "description": "The lizardfolk makes two attacks: one with its bite and one with its claws or trident or two melee attacks with its trident.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1098",
@@ -17572,7 +17572,7 @@
    "damageTypePrimary": "Piercing",
    "reach": "5 ft.",
    "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1099",
@@ -17588,7 +17588,7 @@
    "damageTypePrimary": "Slashing",
    "reach": "5 ft.",
    "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 5 (1d4 + 3) slashing damage.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1100",
@@ -17604,7 +17604,7 @@
    "damageTypePrimary": "Piercing",
    "reach": "5 ft.",
    "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 6 (1d6 + 3) piercing damage, or 7 (1d8 + 3) piercing damage if used with two hands to make a melee attack.",
-   "verified": "not verified"
+   "verified": "broken — see .opencode/plans/bug-mon-MA-1100-trident-two-handed-inert.md"
   },
   {
    "id": "MA-1101",
@@ -17616,7 +17616,7 @@
    "category": "actions",
    "actionType": "multiattack",
    "description": "The lizardfolk makes two melee attacks, each one with a different weapon.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1102",
@@ -17632,7 +17632,7 @@
    "damageTypePrimary": "Piercing",
    "reach": "5 ft.",
    "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1103",
@@ -17648,7 +17648,7 @@
    "damageTypePrimary": "Bludgeoning",
    "reach": "5 ft.",
    "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) bludgeoning damage.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1104",
@@ -17664,7 +17664,7 @@
    "damageTypePrimary": "Piercing",
    "reach": "5 ft.",
    "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1105",
@@ -17680,7 +17680,7 @@
    "damageTypePrimary": "Piercing",
    "reach": "5 ft.",
    "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1106",
@@ -17699,7 +17699,7 @@
    "range": "",
    "recharge": "",
    "description": "The lizardfolk makes two Earth Burst attacks.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1107",
@@ -17720,7 +17720,7 @@
    "range": "60 ft.",
    "recharge": "",
    "description": "Melee or Ranged Attack Roll: +4, reach 5 ft. or range 60 ft. Hit: 9 (2d6 + 2) Bludgeoning damage.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1108",
@@ -17744,7 +17744,7 @@
     "prone"
    ],
    "description": "Constitution Saving Throw: DC 12, each creature in a 20-foot-radius, 40-foot-high Cylinder centered on a point the lizardfolk can see within 60 feet. Failure: 15 (6d4) Bludgeoning damage, and the target has the Prone condition. Success: Half damage only.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1109",
@@ -17763,7 +17763,7 @@
    "range": "",
    "recharge": "",
    "description": "The lizardfolk casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12):At Will: Elementalism1/Day Each: Meld into Stone, Speak with Plants, Spike Growth",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1110",
@@ -17775,7 +17775,7 @@
    "category": "actions",
    "actionType": "multiattack",
    "description": "The lizardfolk makes two attacks: one with its bite and one with its claws.",
-   "verified": "not verified"
+   "verified": "verified"
   },
   {
    "id": "MA-1111",
