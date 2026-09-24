@@ -4945,5 +4945,41 @@
         "note": "FIXED-damage-lane: damageDicePrimary ABSENT, literal \"1\" Piercing rendered, only \"+2\" pressed (DC0-chip onclick=false inert); NAT20 crit-roll honest + 2 MISS n6; gap: crit popup auto-dismissed pre-Done so damage-entry-unobserved in budget -> subset; console 0"
       }
     ]
+  },
+  "Lizard King/Queen": {
+    "monsterIndex": "lizard-king-queen",
+    "placedIn": "test-campaign initiative via EB Join Encounter (Bandit 1 AC12 clean victim + Lizard King/Queen 1 AC15, both maxHp999 via full-store cs POST, Bandit 1 armed on Lizard own-card target-select; admin-cleared cd+log after test, cs creatures wiped)",
+    "config": {
+      "name": "Lizard King/Queen 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1097 (PASS multiattack header: byte-exact text row zero-chip §66; Bite 1d6+3=4 / Claws 1d4+3=5 / Trident 1d6+3=7 all +5 hit vs AC12, hp ledger exact, 0 console errors 2026-09-24; board admin-cleared after row) | MA-1098 (PASS Bite +5 1d6+3 Piercing: 9 rolls vs AC12, 7 hits incl nat7->12 tie boundary + nat20 crit 1d6*2+3 fd7 flat-undoubled, 2 honest misses; hp ledger exact; STR17+PB2=+5 holds; admin-cleared 2026-09-24) | MA-1099 (PASS Claws +5 1d4+3 Slashing: 3 rolls vs AC12, nat7->12 tie hit, miss zero-dmg, ledger clamp exact; admin-cleared 2026-09-24) | MA-1100 (FAIL(a)-DATA Trident: primary +5 1d6+3 exact incl crit; damage_dice_two_handed absent, toggles 0 x3, one-field fix per MA-1063 twin; bug file bug-mon-MA-1100-trident-two-handed-inert.md; admin-cleared 2026-09-24)"
+    }
+  },
+  "Lizardfolk": {
+    "monsterIndex": "lizardfolk",
+    "placedIn": "test-campaign initiative via EB Join (Bandit 1 AC12 + Lizardfolk 1 AC15, maxHp999 all-four-keys cs POST, own-card target-select; admin-cleared cd+log+cs after each row)",
+    "config": {
+      "name": "Lizardfolk 1",
+      "csIndex": 1,
+      "verifiedRow": "MA-1101 (PASS multiattack header §66: text row zero-chip; Bite nat16+4=20 hit 1d6+2 Piercing fd4, Heavy Club nat4+4=8 miss, Spiked Shield nat10+4=14 fd8 same round, count GM-adjudicated §66, ledger exact, 0 console errors 2026-09-24) | MA-1102 (PASS Bite +4 1d6+2 Piercing: nat17+4=21 fd4, nat12+4=16 fd3, nat6+4=10 miss; STR15+PB2=+4; empty-return recovered via task_id resume; admin-cleared 2026-09-24) | MA-1103 (PASS Heavy Club +4 1d6+2 Bludgeoning: nat1=5 CRIT-MISS zero-dmg, nat11+4=15 fd6=4+2, nat10+4=14 fd7=5+2; |hpD|==fd exact unclamped999, Bandit resisted:false full bludgeoning; four +4 chips row-anchor scoped; no nat20=crit-seam-absent; 0 console errors; admin-cleared 2026-09-24) | MA-1103 (PASS Heavy Club +4 1d6+2 Bludgeoning: nat11->15 fd6, nat10->14 fd7, nat1 crit-miss clean; resisted:false full; admin-cleared 2026-09-24) | MA-1104 (PASS-subset Javelin standalone dual-mode: disk byte-match attack_bonus 4 reach 5ft 1d6+2 Piercing NO damage_dice_ranged NO row range; 5 presses all first-click no-absorb vs AC12 Bandit 1 maxHp999 four-keys: nat16/14/19/13 HIT + nat7+4=11 MISS honest boundary done-less (§94); popup-OPEN audit 4x toggles [role=switch/radiogroup/tablist]=0 + buttons Done-only = no melee/ranged chooser, band inert-by-construction per MA-0867/MA-0657 (§149/§193; resolveAttackRange MonsterCardModal.jsx:1097 reach-first, rangedVariantRowArmed MonsterCardHelpers.js:894-900 arms ONLY on authored variant/band); damage formula 1d6 + 2 Piercing dice [4,4,4,5] fresh pools §77, fd 6/6/6/7, hp chain 999 to 974 sum-delta 25==sum-fd exact unclamped, miss-zero-dmg; rangeReason:null all 5 gridless-lenient §200; STR15+PB2=+4 holds; no nat20/nat1 in 5 rolls crit seam §32 untested note; console 0 errors; admin-clear cd+log 200/200 quiet-recheck 13s cd0 log0 cs null, single tab dev up 2026-09-24) | MA-1104 (PASS-subset Javelin +4 1d6+2 Piercing: 5 rolls vs AC12 4hits/1honest-miss, band 30/120 inert-by-construction documented MA-0867 precedent, toggles 0 popup-open; admin-cleared 2026-09-24) | MA-1105 (PASS Spiked Shield standalone melee +4 1d6+2 Piercing: disk byte-match actions[4]; 3 presses all first-click vs AC12 Bandit 1 maxHp999 four-keys: nat16+4=20 HIT dice[1] fd3 hp 999-996, nat3+4=7 honest MISS zero-dmg done-less, nat8+4=12 boundary-tie HIT dice[3] fd5 hp 996-991; |dhp|==fd exact, resisted:false full Piercing breakdown, formula 1d6 + 2 intact; four +4 chips collision-family scoped via evaluate strong startsWith(Spiked Shield)+fresh rect; 3 attacks/3 log rolls, 2 damage/2 hp_change, miss zero entries; rangeReason:null gridless-lenient; no nat20/nat1 crit seam untested note; console 0 errors; admin-clear cd+log 200, verify cd0 log0 cs null 2026-09-24)"
+    }
+  },
+  "Lizardfolk Geomancer": {
+    "monsterIndex": "lizardfolk-geomancer",
+    "placedIn": "test-campaign initiative via EB Join (Bandit 1 AC12 victim, maxHp999 four-key cs POST, own-card target-select; admin-cleared after each row)",
+    "config": {
+      "name": "Lizardfolk Geomancer 1",
+      "csIndex": 1,
+      "verifiedRow": "MA-1106 (PASS-subset Multiattack: header renders own +4 chip because disk authors attack_bonus on header row (§117 variance, cosmetic); Earth Burst +4 chip 6 hits full 2d6+2 Bludgeoning resisted:false, miss nat3 clean, DC0 chip NOT rendered MA-1071 gate live, ledger 999->938 exact; admin-cleared 2026-09-24) | MA-1107 (PASS-subset Earth Burst attack-only: single +4 chip no DC0, nat8 tie/nat14 hits full 2d6+2 resisted:false, nat7 miss clean; MA-1071 gate live; admin-cleared 2026-09-24) | MA-1108 (PASS-subset Hail of Stone DC12 CON inline single-stage (cylinder shape-inert §162 MA-0610 family): fail con-5 6d4=13 full + Prone, success con+19 15->7 floor half exact; recharge refuse+re-arm live; admin-cleared 2026-09-24) | MA-1109 (PASS-subset Spellcasting: 4/4 spell chips first-click, At-Will Elementalism x2 ungated advisory ability_use zero-noise (2024-only spell via 5e->2024 fallback, no Spell-not-found); 1/Day gate live — Meld re-click 'automation blocked...refused' log-only zero-extra-spend, spent class mc-dice-link-spent 0-left, Speak with Plants clean spent-1; save-less row: no save chip, prose DC12 only §207; '+0' noise chip present not-pressed; NOTE 2024 Meld DB carries conditional 6d6 Force damage (attack_type null) -> cast auto-adjudicated DC12/Wis half-damage vs armed target MA-0894-family data note; console 0 errors; rig pitfall: broad card-text click hit npc-remove-btn auto-accept confirm — click img.avatar-image[alt] only; admin-cleared 2026-09-24)"
+    }
+  },
+  "Lizardfolk Shaman": {
+    "monsterIndex": "lizardfolk-shaman",
+    "placedIn": "test-campaign initiative via EB Join Encounter (Bandit 1 AC12 clean victim + Lizardfolk Shaman 1, both maxHp999 four-key via full-store cs POST + reload + re-select, Bandit 1 armed on Shaman own-card target-select; admin-cleared cd+log after test, GET-verified empty)",
+    "config": {
+      "name": "Lizardfolk Shaman 1",
+      "csIndex": 1,
+      "verifiedRow": "MA-1110 (PASS-subset multiattack header: byte-exact zero-chip row §66; components Bite +4 1d6+2 Piercing / Claws +4 1d4+2 Slashing both live; ledger: Bite nat1->5 MISS done-less backdrop clean, Claws nat10->14 HIT fd5 hp999->994 exact, Bite nat9->13 HIT fd8 1d6+2 Piercing 994->986 exact; nat+4 flips vs AC12 honest x3, one attack log per press, 0 console errors 2026-09-24; 'Lizardfolk Form Only' clause inert §70 advisory: shapeShiftForm consumers only monsterShapeShift.js MA-1020 imp seam, zero ATTACK gating consumers, shaman Change Shape row no automation; count GM-adjudicated §66; admin-cleared after row)"
+    }
   }
 }
