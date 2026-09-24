@@ -535,11 +535,21 @@
     text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
 }
 
-/* Fog of war cell — GM overlay */
-.map .fog-cell {
-    fill: rgba(0, 0, 0, 0.45);
+/* Fog of war cells — the GM sees through a translucent veil; the player sees
+   an opaque grey covering (grey, not black, so it reads as "covered" rather
+   than blending into the dark floor) */
+.map .fog-cell,
+.map .fog-cell-player {
     pointer-events: none;
     user-select: none;
+}
+
+.map .fog-cell {
+    fill: rgba(0, 0, 0, 0.45);
+}
+
+.map .fog-cell-player {
+    fill: #3a3a42;
 }
 
 /* Room draw preview */

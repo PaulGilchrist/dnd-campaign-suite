@@ -13,8 +13,9 @@
     node demos/3d-map/serve.mjs
     -> http://localhost:8080/demos/3d-map/index.html?path=public/campaigns/Testing%20G3/maps/sealed-sanctum.json
 
-  ?path= is read from the URL; a file picker / drag-and-drop also works (no server needed).
-  Requires internet (three.js is loaded from a CDN). Assets are in ./assets/*.glb.
+   ?path= is read from the URL; a file picker / drag-and-drop also works (no server needed).
+   Requires internet (three.js is loaded from a CDN). Assets are shared with the
+   production app at /src/assets/3d-map/ (serve the repo root via serve.mjs).
 -->
 <style>
   :root { color-scheme: dark; }
@@ -214,14 +215,14 @@ let flameTex = null;
 function loadFlameTexture() {
   if (flameTex) return Promise.resolve(flameTex);
   return new Promise((resolve) => {
-    textureLoader.load('assets/flame_tex.png', (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; flameTex = t; resolve(t); }, undefined, () => resolve(null));
+    textureLoader.load('/src/assets/3d-map/flame_tex.png', (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; flameTex = t; resolve(t); }, undefined, () => resolve(null));
   });
 }
 
 function loadAsset(type) {
   if (assetCache[type]) return assetCache[type];
   assetCache[type] = new Promise((resolve) => {
-    gltfLoader.load(`assets/${type}.glb`,
+    gltfLoader.load(`/src/assets/3d-map/${type}.glb`,
       (gltf) => {
         gltf.scene.traverse((o) => {
           if (!o.isMesh) return;
@@ -583,9 +584,9 @@ function loadWallTextures() {
     }, undefined, () => res(null));
   });
   return Promise.all([
-    load('assets/rock_wall_diffuse.jpg', true),
-    load('assets/rock_wall_normal.png', false),
-    load('assets/rock_wall_roughness.jpg', false),
+    load('/src/assets/3d-map/rock_wall_diffuse.jpg', true),
+    load('/src/assets/3d-map/rock_wall_normal.png', false),
+    load('/src/assets/3d-map/rock_wall_roughness.jpg', false),
   ]).then(([diffuse, normal, roughness]) => { wallTex = { diffuse, normal, roughness }; return wallTex; });
 }
 

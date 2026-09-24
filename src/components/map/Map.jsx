@@ -3,6 +3,7 @@ import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import Subscriber from '../common/Subscriber.jsx';
 import MapToolbar from './MapToolbar.jsx';
 import { loadMonsters } from '../../services/ui/dataLoader.js';
+import { computeEffectiveWalls } from '../../services/maps/effectiveWalls.js';
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import './Map.css';
 import ItemsPanel from './ItemsPanel.jsx';
@@ -51,6 +52,7 @@ import RoomContextMenu from './RoomContextMenu.jsx';
 import PlayerContextMenu from './PlayerContextMenu.jsx';
 import useMapLoader from './hooks/useMapLoader';
 import useZoomPan from './hooks/useZoomPan';
+import Map3D from './Map3D/Map3D.jsx';
 import useWallDrawing from './hooks/useWallDrawing';
 import useRoomDrawing from './hooks/useRoomDrawing';
 import useSelectMove from './hooks/useSelectMove';
@@ -100,6 +102,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [spellMode, setSpellMode] = useState(null);
     const [selectedShape, setSelectedShape] = useState(OverlayShape.SPHERE);
     const [shapeParams, setShapeParams] = useState(DEFAULTS.sphere);
+    const [viewMode, setViewMode] = useState('2d');
 
     const { mapData, setMapData, placedItems, setPlacedItems } = useMapLoader({
         campaignName, characters, mapName, gridSize, setGridSize,
@@ -328,10 +331,25 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} isLocalhost={isLocalhost} onPoiEntered={onPoiEntered} />;
     }
 
-    const { players, walls } = mapData;
+    const { players } = mapData;
+    const effectiveWalls = computeEffectiveWalls(mapData.walls, placedItems);
 
     return (
         <div className="map">
+            <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
+            {viewMode === '3d' ? (
+                <Map3D
+                    campaignName={campaignName}
+                    mapData={mapData}
+                    placedItems={placedItems}
+                    characters={characters}
+                    isLocalhost={isLocalhost}
+                    fog={fog}
+                    npcImages={npcImages}
+                    onExit={() => setViewMode('2d')}
+                />
+            ) : (
+                <>
             <MapToolbar
                 mapName={mapName}
                 isLocalhost={isLocalhost}
@@ -347,6 +365,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 onBack={onBack}
                 rulerMode={rulerMode}
                 setRulerMode={handleSetRulerMode}
+                onEnter3D={() => setViewMode('3d')}
                 spellOverlayState={{
                     spellMode,
                     setSpellMode,
@@ -359,7 +378,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     clearOverlays,
                 }}
             />
-            <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
             <svg
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
@@ -403,7 +421,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
                 <GridAndWalls
                     gridSize={gridSize}
-                    walls={walls}
+                    walls={effectiveWalls}
                     isLocalhost={isLocalhost}
                     fog={fog}
                     bgFill={mapData.bgFill}
@@ -435,11 +453,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     handleItemPointerDown={handleItemPointerDown}
                 />
 
-                <FogOverlay
-                    fog={fog}
-                    isLocalhost={isLocalhost}
-                />
-
                 <SelectionPreviewRect visible={selectStart.current} rect={selectionRect} className="selection-preview" />
 
                 <SelectionPreviewRect rect={roomDrawRect} className="room-draw-preview" />
@@ -452,6 +465,13 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                         selectedRoom={selectedRoom}
                     />
                 ))}
+
+                {/* Above map content (incl. room outlines) so fogged areas cover
+                    their walls/rooms/labels for players; GM sees through the veil */}
+                <FogOverlay
+                    fog={fog}
+                    isLocalhost={isLocalhost}
+                />
 
                 <SelectionOutline
                     selectionActive={selectStart.current}
@@ -516,8 +536,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     cellSize={CELL_SIZE}
                 />
             </svg>
+                </>
+            )}
 
-            {renamePopover && (
+            {viewMode === '2d' && renamePopover && (
                 <MonsterNameAutocomplete
                     key={renamePopover.name}
                     value={renamePopover.name}
@@ -526,7 +548,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 />
             )}
 
-            {isLocalhost && itemsPanelOpen && (
+            {isLocalhost && itemsPanelOpen && viewMode === '2d' && (
                 <ItemsPanel
                     itemsPanelOpen={itemsPanelOpen}
                     placedItems={placedItems}

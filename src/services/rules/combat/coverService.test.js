@@ -364,4 +364,40 @@ describe('computeCover', () => {
       )).toEqual({ level: COVER.FULL, acBonus: null })
     })
   })
+
+  // --- Secret-door-specific ---
+
+  describe('secret-door behavior', () => {
+    it('returns full cover for a hidden secret door (disguised as a wall)', () => {
+      expect(computeCover(
+        { gridX: 0, gridY: 0 }, { gridX: 3, gridY: 0 }, new Set(), [
+          { type: 'secretDoor', gridX: 2, gridY: 0, visible: false },
+        ]
+      )).toEqual({ level: COVER.FULL, acBonus: null })
+    })
+
+    it('returns no cover for a discovered secret door (empty cell)', () => {
+      expect(computeCover(
+        { gridX: 0, gridY: 0 }, { gridX: 3, gridY: 0 }, new Set(), [
+          { type: 'secretDoor', gridX: 2, gridY: 0, visible: true },
+        ]
+      )).toEqual({ level: COVER.NONE, acBonus: 0 })
+    })
+
+    it('treats a hidden secret door that is also a base wall as full cover', () => {
+      expect(computeCover(
+        { gridX: 0, gridY: 0 }, { gridX: 3, gridY: 0 }, new Set(['2,0']), [
+          { type: 'secretDoor', gridX: 2, gridY: 0, visible: false },
+        ]
+      )).toEqual({ level: COVER.FULL, acBonus: null })
+    })
+
+    it('does not treat a discovered secret door that is also a base wall as cover', () => {
+      expect(computeCover(
+        { gridX: 0, gridY: 0 }, { gridX: 3, gridY: 0 }, new Set(['2,0']), [
+          { type: 'secretDoor', gridX: 2, gridY: 0, visible: true },
+        ]
+      )).toEqual({ level: COVER.NONE, acBonus: 0 })
+    })
+  })
 })

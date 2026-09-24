@@ -1,4 +1,5 @@
 import { bresenham } from '../../maps/lineOfSight.js'
+import { computeEffectiveWalls } from '../../maps/effectiveWalls.js'
 
 export const COVER = {
   FULL: 'full',
@@ -70,9 +71,9 @@ function lineHits(cells, test) {
 export function computeCover(attackerPos, targetPos, walls, placedItems) {
   const line = bresenham(attackerPos.gridX, attackerPos.gridY, targetPos.gridX, targetPos.gridY)
 
-  const wallKeys = walls?.has ? walls : new Set(walls || [])
-  const coverMap = buildCoverMap(placedItems)
-  const closedDoors = buildClosedDoors(placedItems)
+    const wallKeys = computeEffectiveWalls(walls, placedItems)
+    const coverMap = buildCoverMap(placedItems)
+    const closedDoors = buildClosedDoors(placedItems)
 
   const cells = line.slice(1, -1)
 

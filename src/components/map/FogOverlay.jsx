@@ -1,8 +1,13 @@
 
 import { CELL_SIZE } from '../../config/mapConfig';
 
+// The GM sees through a translucent veil (fog-cell); the player sees an opaque
+// grey covering (fog-cell-player) so fogged areas read as "covered/unknown"
+// while still hiding whatever is beneath (walls, rooms, items, players).
 const FogOverlay = ({ fog, isLocalhost }) => {
-    if (!isLocalhost || !fog) return null;
+    if (!fog) return null;
+
+    const cellClass = isLocalhost ? 'fog-cell' : 'fog-cell-player';
 
     return (
         <>
@@ -15,7 +20,7 @@ const FogOverlay = ({ fog, isLocalhost }) => {
                         y={gy * CELL_SIZE}
                         width={CELL_SIZE}
                         height={CELL_SIZE}
-                        className="no-print fog-cell"
+                        className={`no-print ${cellClass}`}
                     />
                 );
             })}

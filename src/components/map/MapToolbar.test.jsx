@@ -257,6 +257,25 @@ describe('MapToolbar', () => {
         });
     });
 
+    describe('3D view button', () => {
+        it('should render the 3D button when onEnter3D is provided', () => {
+            renderMapToolbar({ onEnter3D: vi.fn() });
+            expect(screen.getByTitle('View map in 3D')).toBeInTheDocument();
+        });
+
+        it('should not render the 3D button when onEnter3D is not provided', () => {
+            renderMapToolbar({ onEnter3D: undefined });
+            expect(screen.queryByTitle('View map in 3D')).not.toBeInTheDocument();
+        });
+
+        it('should call onEnter3D when the 3D button is clicked', () => {
+            const mockOnEnter3D = vi.fn();
+            renderMapToolbar({ onEnter3D: mockOnEnter3D });
+            fireEvent.click(screen.getByTitle('View map in 3D'));
+            expect(mockOnEnter3D).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('grid size input', () => {
         it('should call setGridSize with the new numeric value when input changes', () => {
             const mockSetGridSize = vi.fn();

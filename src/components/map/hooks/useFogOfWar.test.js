@@ -110,6 +110,40 @@ describe('useFogOfWar', () => {
       );
     });
 
+    it('adds a hidden secret door cell to the walls passed to computeVisibility', () => {
+      computeVisibility.mockReturnValue(new Set(['2,2']));
+      const gridSize = 5;
+      const players = [{ gridX: 2, gridY: 2 }];
+      const walls = new Set();
+      const placedItems = [{ type: 'secretDoor', gridX: 1, gridY: 1, visible: false }];
+
+      renderHook(() => useFogOfWar(players, walls, placedItems, gridSize));
+
+      expect(computeVisibility).toHaveBeenCalledWith(
+        players,
+        new Set(['1,1']),
+        new Set(),
+        gridSize
+      );
+    });
+
+    it('excludes a discovered secret door cell from the walls passed to computeVisibility', () => {
+      computeVisibility.mockReturnValue(new Set(['2,2']));
+      const gridSize = 5;
+      const players = [{ gridX: 2, gridY: 2 }];
+      const walls = new Set(['1,1']);
+      const placedItems = [{ type: 'secretDoor', gridX: 1, gridY: 1, visible: true }];
+
+      renderHook(() => useFogOfWar(players, walls, placedItems, gridSize));
+
+      expect(computeVisibility).toHaveBeenCalledWith(
+        players,
+        new Set(),
+        new Set(),
+        gridSize
+      );
+    });
+
     it('should handle placedItems being null', () => {
       computeVisibility.mockReturnValue(new Set(['1,1']));
 

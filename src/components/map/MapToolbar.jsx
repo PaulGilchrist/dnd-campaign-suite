@@ -23,6 +23,7 @@ const MapToolbar = ({
     onBack,
     rulerMode,
     setRulerMode,
+    onEnter3D,
     spellOverlayState,
 }) => {
     const {
@@ -95,6 +96,11 @@ const MapToolbar = ({
                     >
                         <i className="fa-solid fa-ruler"></i> Ruler
                     </button>
+                    {onEnter3D && (
+                        <button onClick={onEnter3D} title="View map in 3D">
+                            <i className="fa-solid fa-cube"></i> 3D
+                        </button>
+                    )}
                     {isLocalhost && (
                         <button onClick={() => setItemsPanelOpen(prev => !prev)}>
                             <i className="fa-solid fa-box"></i> Items

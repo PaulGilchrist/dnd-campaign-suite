@@ -2,6 +2,7 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hitTestOverlay } from '../../models/SpellOverlay.js';
 import { bresenham } from './lineOfSight.js';
 import { loadMapData } from './mapsService.js';
+import { computeEffectiveWalls } from './effectiveWalls.js';
 
 const FEET_PER_CELL = 5;
 
@@ -50,7 +51,7 @@ async function loadActiveMapContext(campaignName) {
         if (!data) return null;
         const tokens = [...(data.players || []), ...(data.placedItems || [])];
         if (!tokens.some(hasGridPos)) return null;
-        const walls = new Set(Array.from(data.walls || []));
+        const walls = computeEffectiveWalls(data.walls, data.placedItems);
         const closedDoors = new Set(
             (data.placedItems || [])
                 .filter(i => i.type === 'door' && !i.open)
