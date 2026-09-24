@@ -62,7 +62,18 @@ function ActionDamageLinks({ action, actionDamageFormula, actionDamageTypeLabel,
   );
 }
 
-function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast, spellNames = null, rechargeOut = false }) {
+// MA-1016: utility-row chips (Ice Mephit "Fog Cloud") ride the MA-0020
+// numeric uses/maxUses gate for the counter (row-level, no description
+// "N/Day:" tier); rowUsesGate=null (every Spellcasting row) keeps the
+// description-tier counter byte-identical.
+function chipUsesFor(spellName, spellUses, spellUsesUsed, rowUsesGate) {
+  const usesMax = spellUses[spellName] ?? (rowUsesGate ? rowUsesGate.maxUses : null);
+  if (usesMax == null) return null;
+  const used = spellUses[spellName] != null ? (Number(spellUsesUsed?.[spellName]) || 0) : rowUsesGate.used;
+  return { usesMax, remaining: Math.max(0, usesMax - used) };
+}
+
+function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast, spellNames = null, rechargeOut = false, rowUsesGate = null }) {
   const names = spellNames ?? extractSpellNamesFromSpellcasting(action.description);
   if (names.length === 0) return null;
   const spellUses = extractSpellcastingSpellUses(action.description);
@@ -70,8 +81,9 @@ function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast,
   return (
     <>
       {names.map(spellName => {
-        const usesMax = spellUses[spellName] ?? null;
-        const remaining = usesMax == null ? null : Math.max(0, usesMax - (Number(spellUsesUsed?.[spellName]) || 0));
+        const chipUses = chipUsesFor(spellName, spellUses, spellUsesUsed, rowUsesGate);
+        const remaining = chipUses ? chipUses.remaining : null;
+        const usesMax = chipUses ? chipUses.usesMax : null;
         const spentClass = remaining === 0 || rechargeOut ? ' mc-dice-link-spell-spent' : '';
         return (
           <span
@@ -270,7 +282,12 @@ function SpellOrSaveLinks({ action, isSpellcastingRow, utilityNames, attackerCan
     // spell_save_dc-only row; spent recharge gets the existing
     // mc-dice-link-spell-spent class and its click routes the honest
     // "Not Recharged" refusal (MA-0031/MA-0963 precedents).
-    return <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} spellNames={utilityNames} rechargeOut={rechargeOut} />;
+    // MA-1016: row-level numeric uses/maxUses (Ice Mephit "Fog Cloud"
+    // 1/Day) ride the same chip as a "(1/Day · N left)" counter + spent
+    // class via the MA-0020 gate; exhausted chips stay clickable and the
+    // resolver refuses honestly (MA-0633 byte-shape).
+    const rowUsesGate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
+    return <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} spellNames={utilityNames} rechargeOut={rechargeOut} rowUsesGate={rowUsesGate} />;
   }
   if (action.save_dc != null) {
     return <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />;

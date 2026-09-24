@@ -57,7 +57,12 @@ describe('MA-1014 disk fingerprint — Ice Devil Ice Wall (data byte-unchanged)'
     expect(SPELL_INDEX.has('Wall of Ice')).toBe(true);
   });
 
-  it('isUtilitySpellCastRow arms ONLY this row app-wide (whole-database scan)', () => {
+  // MA-1016 census re-run: the predicate widened to (spell_save_dc || spellcasting_ability)
+  // arms EXACTLY two rows more — ice-mephit/Fog Cloud (CHA, 1/Day numeric uses) and
+  // imp/Invisibility (byte-identical innate self-cast twin, at will). Rows with bold
+  // NON-spell words (fake-chip §161) and every save_dc/attack/dice/automation row
+  // stay out — the resolvable-name check is the discriminator.
+  it('isUtilitySpellCastRow arms only the MA-1014/MA-1016 set app-wide (whole-database scan)', () => {
     const armed = [];
     for (const mo of monsters) {
       for (const key of ['actions', 'legendary_actions', 'reactions']) {
@@ -70,7 +75,7 @@ describe('MA-1014 disk fingerprint — Ice Devil Ice Wall (data byte-unchanged)'
         }
       }
     }
-    expect(armed).toEqual(['ice-devil/Ice Wall']);
+    expect(armed).toEqual(['ice-devil/Ice Wall', 'ice-mephit/Fog Cloud', 'imp/Invisibility']);
   });
 
   it('covered rows stay byte-inert: Doppelganger Read Thoughts (save_dc) and Dao Spellcasting (name)', () => {

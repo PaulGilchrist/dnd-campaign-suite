@@ -377,10 +377,15 @@ export function extractSpellNamesFromSpellcasting(description) {
 // (name "Spellcasting" → SpellCastLinks; numeric save_dc → ActionSaveRoll,
 // e.g. Doppelganger Read Thoughts; attack/dice/automation/zone rows) is
 // byte-inert here.
+// MA-1016: minimally widened to (spell_save_dc != null || spellcasting_ability
+// != null) — innate utility rows carrying NO save DC but a casting ability
+// (Ice Mephit "Fog Cloud": CHA, no components, 1/Day; byte-identical twin imp
+// "Invisibility": CHA, at will, self) arm the same advisory lane. The
+// resolvable-name guard lives in utilitySpellNamesFor (§161 fake-chip strip).
 export function isUtilitySpellCastRow(action) {
   if (!action || typeof action !== 'object') return false;
   if (/^spellcasting$/i.test(action.name || '')) return false;
-  if (action.spell_save_dc == null) return false;
+  if (action.spell_save_dc == null && action.spellcasting_ability == null) return false;
   if (action.save_dc != null || action.attack_bonus != null) return false;
   if (action.automation || action.zone || Array.isArray(action.rays)) return false;
   if (action.damage_dice_primary != null || action.damage_dice_secondary != null) return false;

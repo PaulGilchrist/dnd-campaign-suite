@@ -15986,7 +15986,7 @@
    "actionType": "other",
    "uses": "1/Day",
    "description": "The mephit casts Fog Cloud, requiring no spell components and using Charisma as the spellcasting ability.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1016-fog-cloud.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1017",

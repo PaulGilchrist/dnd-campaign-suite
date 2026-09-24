@@ -35310,7 +35310,9 @@
         "name": "Fog Cloud",
         "description": "The mephit casts <strong>Fog Cloud</strong>, requiring no spell components and using Charisma as the spellcasting ability.",
         "spellcasting_ability": "Charisma",
-        "uses": "1/Day"
+        "usage": "1/Day",
+        "uses": 1,
+        "maxUses": 1
       },
       {
         "name": "Frost Breath",
