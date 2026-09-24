@@ -3779,3 +3779,130 @@ describe('MA-0984 Hill Giant Trash Lob poisoned-on-hit hit-clause', () => {
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const HOBGOBLIN_WARLORD = monsters.find(m => m.index === 'hobgoblin-warlord');
+const JAVELIN_ACTION = HOBGOBLIN_WARLORD.actions[1];
+
+describe('MA-0995 Hobgoblin Warlord Javelin speed_reduction hit-clause passthrough', () => {
+    const deps = {
+        characterName: 'Hobgoblin Warlord 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Hobgoblin Warlord 1', computedStats: { armorClass: 17 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getEffectDefinition.mockImplementation((key) => ({
+            effect: key,
+            label: 'Speed Reduced',
+            description: 'The creature\'s Speed is reduced by N feet.',
+            group: 'Movement',
+        }));
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 11, newHp: 988, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0995 data-lock: Javelin authors hit_target_effect:"speed_reduction" and NO save_effect decoy (§410 wrong-slot fix; attack core exact)', () => {
+        expect(JAVELIN_ACTION.attack_bonus).toBe(6);
+        expect(JAVELIN_ACTION.reach).toBe('5 ft.');
+        expect(JAVELIN_ACTION.range).toBe('30/120 ft.');
+        expect(JAVELIN_ACTION.damage_dice_primary).toBe('2d6 + 4');
+        expect(JAVELIN_ACTION.damage_type_primary).toBe('Piercing');
+        expect(JAVELIN_ACTION.hit_target_effect).toBe('speed_reduction');
+        expect(JAVELIN_ACTION.save_effect).toBeUndefined();
+        expect(JAVELIN_ACTION.save_dc).toBeUndefined();
+        expect(JAVELIN_ACTION.save_type).toBeUndefined();
+        expect(JAVELIN_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a targetEffect-only clause from the Javelin row', () => {
+        expect(buildHitConditionClause(JAVELIN_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Javelin',
+            targetEffect: 'speed_reduction',
+        });
+    });
+
+    it('registers the speed_reduction te on the victim, sourced from the hobgoblin, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Javelin', formula: '2d6 + 4', total: 11, rolls: [3, 4], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Hobgoblin Warlord 1',
+            hitClause: buildHitConditionClause(JAVELIN_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'speed_reduction',
+            'Hobgoblin Warlord 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('MA-0995 clock-lock: grants ONE addExpiration anchored on the hobgoblin — RAW "until the start of the hobgoblin\'s next turn" (§37 single-clock, no invented expiry)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Javelin', formula: '2d6 + 4', total: 11, rolls: [3, 4], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Hobgoblin Warlord 1',
+            hitClause: buildHitConditionClause(JAVELIN_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Hobgoblin Warlord 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'Hobgoblin Warlord 1', target: 'Bandit 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Hobgoblin Warlord 1',
+        });
+    });
+
+    it('logs condition-applied with the registry label, writes no raw activeConditions, and pays damage exactly once (no double-pay)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Javelin', formula: '2d6 + 4', total: 11, rolls: [3, 4], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Hobgoblin Warlord 1',
+            hitClause: buildHitConditionClause(JAVELIN_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Speed Reduced',
+            reason: "Javelin — until the start of Hobgoblin Warlord 1's next turn",
+        }));
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    });
+
+    it('grants nothing when the Javelin attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Javelin', formula: '2d6 + 4', total: 11, rolls: [3, 4], modifier: 4, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Hobgoblin Warlord 1',
+        } });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

@@ -154,6 +154,14 @@ describe('computeConditionEffects — targetEffects', () => {
     expect(result.speedReduction).toBe(15);
   });
 
+  // MA-0995: the monster hit_target_effect passthrough (applyHitClauseTargetEffect)
+  // writes NO value — the consumer default 10 must equal the Hobgoblin Warlord
+  // Javelin RAW "Speed decreases by 10 feet".
+  it('MA-0995: speed_reduction te without value falls back to 10 ft (passthrough default)', () => {
+    const result = computeConditionEffects({ targetEffects: [{ effect: 'speed_reduction' }] });
+    expect(result.speedReduction).toBe(10);
+  });
+
   it('sets pushEffect and pushDistance for push effect', () => {
     const result = computeConditionEffects({ targetEffects: [{ effect: 'push', value: 10 }] });
     expect(result.pushEffect).toBe(true);

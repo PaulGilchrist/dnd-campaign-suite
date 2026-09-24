@@ -265,6 +265,19 @@ describe('targetEffectDefinitions', () => {
         const speedReduction = movementEffects.find((d) => d.effect === 'speed_reduction');
         expect(speedReduction.defaults.value).toBe(10);
       });
+
+      // MA-0995 reuse contract: hobgoblin-warlord Javelin rides this te via
+      // the hit_target_effect passthrough (§215 MA-0542/MA-0733 twin). The
+      // producer (applyHitClauseTargetEffect) writes NO value — the registry
+      // default 10 is the RAW −10 ft and MUST stay pinned here and at the
+      // consumer default (conditionEffects.js te.value || 10).
+      it('MA-0995: speed_reduction whitelist pins value field + default 10 for the Javelin passthrough', () => {
+        const speedReduction = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'speed_reduction');
+        expect(speedReduction.label).toBe('Speed Reduced');
+        expect(speedReduction.group).toBe('Movement');
+        expect(speedReduction.fields).toEqual(['source', 'value']);
+        expect(speedReduction.defaults.value).toBe(10);
+      });
     });
   });
 

@@ -15630,7 +15630,7 @@
    "reach": "5 ft.",
    "range": "30/120 ft.",
    "description": "Melee or Ranged Attack Roll: +6, reach 5 ft. or range 30/120 ft. Hit: 11 (2d6 + 4) Piercing damage, and the target's Speed decreases by 10 feet until the start of the hobgoblin's next turn.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0995-javelin.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0996",
