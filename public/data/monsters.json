@@ -32840,6 +32840,8 @@
       },
       {
         "name": "Teleport (Costs 2 Actions)",
+        "advisory": "sphinx_teleport",
+        "advisory_message": "magically teleports up to 120 feet to an unoccupied space it can see — advisory record: GM moves the token, no position consumer (CLA-320). Canonical cost is 2 legendary uses — the engine spends 1 per click; the extra cost is GM-enforced.",
         "description": "The sphinx magically teleports, along with any equipment it is wearing or carrying, up to 120 feet to an unoccupied space it can see."
       },
       {

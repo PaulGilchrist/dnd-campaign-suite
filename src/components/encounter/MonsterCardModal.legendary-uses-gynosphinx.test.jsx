@@ -8,10 +8,13 @@
 // byte-template header {name:"Legendary Action Uses: 2", uses:2} (RAW gynosphinx
 // = 2/day, "The sphinx takes 2 legendary actions...") and give Claw Attack
 // delegates_to:"Claw" (MA-0022 seam; the sphinx's OWN weapon is Claw:
-// +9 / 13 (2d8 + 4) slashing, MA-0955 twin numbers). Teleport (Costs 2
-// Actions) / Cast a Spell (Costs 3 Actions) stay prose-only (their own
-// tickets) — they ride the header gate as prose children; their expend-chip
-// silent-burn on click is the MA-0510/§99 known residual, never clicked here.
+// +9 / 13 (2d8 + 4) slashing, MA-0955 twin numbers). MA-0957 (same pass):
+// Teleport (Costs 2 Actions) rode the live header gate as a silent-burn child
+// (MA-0696 shape: Expend chip armed by MA-0956, click spent 1 with console.error
+// "no resolvable mechanic" — live-caught) until it gained the MA-0270 advisory
+// seam (advisory:"sphinx_teleport" + honest advisory_message, Androsphinx byte-
+// twin). Cast a Spell (Costs 3 Actions) stays MA-0958's own ticket — never
+// clicked here.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -20,6 +23,7 @@ import monstersData from '../../../public/data/monsters.json';
 import {
   legendaryHeaderAction, legendaryMaxUses, legendaryUsesRemaining,
   legendaryDelegateAction, legendaryDelegateAttackName, regainLegendaryUses,
+  buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog,
 } from '../../services/encounters/monsterLegendaryUses.js';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
@@ -140,12 +144,14 @@ describe('MA-0956 monsters.json data: gynosphinx legendary header authors uses:2
     expect(legendaryDelegateAttackName(row('Claw Attack'), claw)).toBe('Claw Attack (Claw attack)');
   });
 
-  it('Teleport / Cast a Spell stay prose-only siblings (own tickets) — no delegates_to/advisory/numeric', () => {
+  it('MA-0957 inverted: Teleport is now an advisory row (was prose-only silent-burn); Cast a Spell stays prose-only (MA-0958)', () => {
     const t = row('Teleport (Costs 2 Actions)');
     expect(t.delegates_to).toBeUndefined();
-    expect(t.advisory).toBeUndefined();
+    expect(t.advisory).toBe('sphinx_teleport');
     expect(t.attack_bonus).toBeUndefined();
     expect(t.save_dc).toBeUndefined();
+    expect(t.advisory_message).toMatch(/GM moves the token, no position consumer \(CLA-320\)/);
+    expect(t.advisory_message).toMatch(/Canonical cost is 2 legendary uses — the engine spends 1 per click/);
     expect(t.description).toBe('The sphinx magically teleports, along with any equipment it is wearing or carrying, up to 120 feet to an unoccupied space it can see.');
     const c = row('Cast a Spell (Costs 3 Actions)');
     expect(c.delegates_to).toBeUndefined();
@@ -153,6 +159,33 @@ describe('MA-0956 monsters.json data: gynosphinx legendary header authors uses:2
     expect(c.attack_bonus).toBeUndefined();
     expect(c.save_dc).toBeUndefined();
     expect(c.description).toBe('The sphinx casts a spell from its list of prepared spells, using a spell slot as normal.');
+  });
+
+  it('MA-0957 advisory fields are the Androsphinx row byte-twins', () => {
+    const andro = monstersData.find(m => m.index === 'androsphinx').legendary_actions.find(a => a.name === 'Teleport (Costs 2 Actions)');
+    const t = row('Teleport (Costs 2 Actions)');
+    expect(t.advisory).toBe(andro.advisory);
+    expect(t.advisory_message).toBe(andro.advisory_message);
+    expect(t.description).toBe(andro.description);
+  });
+});
+
+// MA-0957 builders: the advisory seam renders the row's honest copy — popup
+// names the row + CLA-320 no-position-consumer + honest 2-cost/1-spend copy;
+// the log is the ability_use record naming the row (MA-0058 model).
+describe('MA-0957 advisory builders use the gynosphinx row copy', () => {
+  it('popup and ability_use log carry the honest CLA-320 / cost copy', () => {
+    const action = row('Teleport (Costs 2 Actions)');
+    const popup = buildLegendaryAdvisoryPopup({ monsterName: 'Gynosphinx 1', action });
+    expect(popup).toMatch(/Legendary Action — Teleport \(Costs 2 Actions\)/);
+    expect(popup).toMatch(/GM moves the token, no position consumer \(CLA-320\)/);
+    expect(popup).toMatch(/Canonical cost is 2 legendary uses — the engine spends 1 per click/);
+    expect(popup).not.toMatch(/invisibility/);
+    const log = buildLegendaryAdvisoryLog({ monsterName: 'Gynosphinx 1', action });
+    expect(log.type).toBe('ability_use');
+    expect(log.abilityName).toBe('Teleport (Costs 2 Actions)');
+    expect(log.description).toMatch(/legendary action Teleport \(Costs 2 Actions\): Gynosphinx 1 magically teleports up to 120 feet/);
+    expect(log.description).toMatch(/GM-enforced/);
   });
 });
 
@@ -202,6 +235,54 @@ describe('MA-0956 MonsterCardModal gynosphinx gated legendary economy', () => {
     expect(spend.description).toMatch(/expends a legendary use for Claw Attack/);
     expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
     errSpy.mockRestore();
+  });
+
+  // MA-0957: the gate-armed Teleport child must NOT silent-burn (MA-0696/
+  // §98 shape: spend 1 + console.error "no resolvable mechanic", no popup).
+  // With the advisory fields it routes the MA-0058 advisory seam: spend 1 +
+  // advisory popup + ability_use record, zero rolls, zero console dead-end.
+  // Canonical RAW cost is 2 uses — engine spends 1/click, extra cost honestly
+  // recorded GM-enforced (Androsphinx MA-0270 adjudication).
+  it('MA-0957 Teleport gated click spends 1 and lands the advisory record (popup + ability_use log), zero rolls, zero console dead-end', async () => {
+    renderASphinx({ max: 2, used: 0 });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fireEvent.click(sphinxRow('Teleport (Costs 2 Actions)').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 }));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    const html = String(setPopupHtml.mock.calls.map(c => String(c[0])).find(h => /Teleport/.test(h)));
+    expect(html).toMatch(/Legendary Action — Teleport \(Costs 2 Actions\)/);
+    expect(html).toMatch(/GM moves the token, no position consumer \(CLA-320\)/);
+    expect(html).toMatch(/Canonical cost is 2 legendary uses — the engine spends 1 per click/);
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e =>
+      e.type === 'ability_use' && e.abilityName === 'Teleport (Costs 2 Actions)' && /advisory record/.test(e.description))).toBe(true));
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /expends a legendary use for Teleport/.test(String(e.description)));
+    expect(spend.description).toMatch(/1 of 2 left/);
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+    expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
+    errSpy.mockRestore();
+  });
+
+  it('MA-0957 Teleport repeat same-window refuses (turn latch): zero extra spend, advisory entry once', async () => {
+    renderASphinx({ max: 2, used: 0 });
+    const chip = sphinxRow('Teleport (Costs 2 Actions)').querySelector('.mc-dice-link-legendary');
+    fireEvent.click(chip);
+    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 }));
+    fireEvent.click(chip);
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 });
+    const spends = addEntry.mock.calls.map(c => c[1]).filter(e => /expends a legendary use for Teleport/.test(String(e.description)));
+    expect(spends.length).toBe(1);
+  });
+
+  it('MA-0957 exhausted (2/2): Teleport chip click refuses with popup + legendary_use_refused, zero spend', async () => {
+    renderASphinx({ max: 2, used: 2 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(sphinxRow('Teleport (Costs 2 Actions)').querySelector('.mc-dice-link-legendary'));
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
 
   it('repeat same-window refuses (turn latch): zero extra spend, one spend log', async () => {

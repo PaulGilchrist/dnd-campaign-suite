@@ -14992,7 +14992,7 @@
    "category": "legendary_actions",
    "actionType": "other",
    "description": "The sphinx magically teleports, along with any equipment it is wearing or carrying, up to 120 feet to an unoccupied space it can see.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0957-teleport-legendary.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0958",
