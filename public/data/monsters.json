@@ -38306,8 +38306,10 @@
       {
         "name": "Frightening Gaze",
         "description": "The lich casts <strong>Fear</strong>, using the same spellcasting ability as Spellcasting. The lich can't take this action again until the start of its next turn.",
-        "uses": 1,
-        "recharge": false
+        "save_dc": 20,
+        "save_type": "Wisdom",
+        "save_effect": "Failure: The target drops whatever it is holding and has the Frightened condition until the spell ends, Concentration up to 1 minute. The target can repeat the Wisdom saving throw at the end of its turn if it lacks line of sight to the lich, ending the effect on itself. Success: The target is unaffected.",
+        "dc_success": "none"
       }
     ],
     "lair_actions": [
