@@ -15085,7 +15085,7 @@
    "range": "30-foot Cone",
    "recharge": "5-6",
    "description": "Dexterity Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: 28 (8d6) damage of the type chosen for the Draconic Origin trait. Success: Half damage.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0963-dragons-breath.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0964",

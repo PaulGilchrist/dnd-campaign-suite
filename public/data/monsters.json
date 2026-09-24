@@ -33042,7 +33042,9 @@
         "save_type": "Dexterity",
         "range": "30-foot Cone",
         "save_effect": "Half damage",
-        "recharge": "5-6"
+        "recharge": "5-6",
+        "damage_dice_primary": "8d6",
+        "damage_type_primary": "Acid/Cold/Fire/Lightning/Poison (GM-chosen)"
       }
     ],
     "bonus_actions": [
