@@ -16811,7 +16811,7 @@
    "recharge": false,
    "uses": 1,
    "description": "The kraken uses Lightning Strike.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1057-storm-bolt.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1058",

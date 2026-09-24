@@ -37114,16 +37114,18 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "The kraken takes 3 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The kraken regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Storm Bolt",
         "description": "The kraken uses Lightning Strike.",
-        "uses": 1,
-        "recharge": false
+        "delegates_to": "Lightning Strike"
       },
       {
         "name": "Toxic Ink",
         "description": "Constitution Saving Throw: DC 23, each creature in a 15-foot <strong>Emanation</strong> originating from the kraken while it is underwater. Failure: The target has the <strong>Blinded</strong> and <strong>Poisoned</strong> conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.",
-        "uses": 1,
-        "recharge": false,
         "save_type": "Constitution",
         "save_effect": "Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn."
       }
