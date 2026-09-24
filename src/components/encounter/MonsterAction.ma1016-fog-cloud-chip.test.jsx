@@ -62,17 +62,28 @@ describe('MA-1016 disk fingerprint — Ice Mephit Fog Cloud', () => {
     expect(isUtilitySpellCastRow(FOG_ROW)).toBe(true);
   });
 
-  it('imp/Invisibility is the named innate twin (self-cast, no DC, no uses)', () => {
+  // MA-1019 (§216 stale-pin inversion): imp/Invisibility was the named innate
+  // UTILITY twin while the predicate was widened. It now authors
+  // automation:{type:"monster_self_buff",effect:"invisible",rounds:600}
+  // (MA-0658/MA-0919 seam normalization), so the automation exclusion drops it
+  // from isUtilitySpellCastRow: the SpellCastLinks chip is GONE, replaced by
+  // the live SelfBuffLink .mc-dice-link-selfbuff chip (te invisible on self).
+  // At Will stays honest: no uses/maxUses, no uses counter (§230).
+  it('imp/Invisibility migrated OFF the utility lane onto the MA-0658 self-buff seam', () => {
     expect(IMP_ROW.spellcasting_ability).toBe('Charisma');
     expect(IMP_ROW.spell_save_dc ?? null).toBeNull();
     expect(IMP_ROW.uses ?? null).toBeNull();
-    expect(isUtilitySpellCastRow(IMP_ROW)).toBe(true);
-    const { container, onSpellCast } = renderRow(IMP_ROW, { spellNameIndex: SPELL_INDEX });
-    const chip = container.querySelector('.mc-dice-link-spell');
-    expect(chip.textContent.trim()).toBe('Invisibility');
+    expect(IMP_ROW.maxUses ?? null).toBeNull();
+    expect(isUtilitySpellCastRow(IMP_ROW)).toBe(false);
+    const onSelfBuffRow = vi.fn();
+    const { container } = renderRow(IMP_ROW, { spellNameIndex: SPELL_INDEX, onSelfBuffRow });
+    expect(container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
+    const chip = container.querySelector('.mc-dice-link-selfbuff');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('Invisibility');
     expect(chip.textContent).not.toMatch(/\/Day/);
     fireEvent.click(chip);
-    expect(onSpellCast).toHaveBeenCalledWith(IMP_ROW, 'Invisibility');
+    expect(onSelfBuffRow).toHaveBeenCalledWith(IMP_ROW);
   });
 });
 

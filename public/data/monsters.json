@@ -35431,7 +35431,12 @@
       {
         "name": "Invisibility",
         "description": "The imp casts <strong>Invisibility</strong> on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-        "spellcasting_ability": "Charisma"
+        "spellcasting_ability": "Charisma",
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "invisible",
+          "rounds": 600
+        }
       },
       {
         "name": "Shape-Shift",

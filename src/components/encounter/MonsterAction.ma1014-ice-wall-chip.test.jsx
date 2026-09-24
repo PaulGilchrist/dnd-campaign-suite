@@ -62,6 +62,10 @@ describe('MA-1014 disk fingerprint — Ice Devil Ice Wall (data byte-unchanged)'
   // imp/Invisibility (byte-identical innate self-cast twin, at will). Rows with bold
   // NON-spell words (fake-chip §161) and every save_dc/attack/dice/automation row
   // stay out — the resolvable-name check is the discriminator.
+  // MA-1019: imp/Invisibility now authors automation:{type:"monster_self_buff",
+  // effect:"invisible",rounds:600} (MA-0658/MA-0919 seam normalization) → the
+  // automation exclusion drops it from this census (§216 stale-pin inversion —
+  // utility census returns EXACTLY the two remaining rows).
   it('isUtilitySpellCastRow arms only the MA-1014/MA-1016 set app-wide (whole-database scan)', () => {
     const armed = [];
     for (const mo of monsters) {
@@ -75,7 +79,7 @@ describe('MA-1014 disk fingerprint — Ice Devil Ice Wall (data byte-unchanged)'
         }
       }
     }
-    expect(armed).toEqual(['ice-devil/Ice Wall', 'ice-mephit/Fog Cloud', 'imp/Invisibility']);
+    expect(armed).toEqual(['ice-devil/Ice Wall', 'ice-mephit/Fog Cloud']);
   });
 
   it('covered rows stay byte-inert: Doppelganger Read Thoughts (save_dc) and Dao Spellcasting (name)', () => {
