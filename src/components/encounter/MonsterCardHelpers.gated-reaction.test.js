@@ -876,3 +876,52 @@ describe('MA-0997 Hobgoblin Warlord Parry — data-lock + acBonus 3', () => {
   });
 });
 
+// MA-1048: Knight Parry — MA-0341/MA-0643/MA-0702/MA-0869/MA-0997 routine DATA
+// twin. Disk reactions[0] was prose-only (name/trigger/description) = gate-null
+// inert (MonsterCardHelpers.js:1558 automation.effect gate, Modal handleGated-
+// Reaction silent return); fix authors the MA-0341 byte-shape with acBonus 2
+// (knight row prose "adds 2" — do NOT copy the warlord's 3; buildParryBuff
+// silently defaults 2 so an authored value MUST match the row prose). RAW:
+// +2 AC vs the triggering melee hit; AC 18 → 20, 18-19 window flips to miss.
+const KNIGHT_ACTION = monsters.find(m => m.index === 'knight').reactions[0];
+const KNIGHT_1 = 'Knight 1';
+
+describe('MA-1048 Knight Parry — data-lock + acBonus 2', () => {
+  it('monsters.json knight reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 2)', () => {
+    expect(KNIGHT_ACTION.name).toBe('Parry');
+    expect(KNIGHT_ACTION.description).toMatch(/adds 2 to its AC/);
+    expect(KNIGHT_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
+    expect(KNIGHT_ACTION.automation).not.toMatchObject({ acBonus: 3 });
+    expect(KNIGHT_ACTION.usage).toBe('At Will');
+    expect(KNIGHT_ACTION.uses).toBe(999);
+    expect(KNIGHT_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(KNIGHT_ACTION)?.effect).toBe('parry');
+  });
+
+  it('gate arms the chip for the knight: accepts unresolved melee hit, refuses a 2nd same-round press', () => {
+    const hit = { attackerName: 'Bandit 1', targetName: KNIGHT_1, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 15, bonus: 3, total: 18, targetAc: 18, effectiveAc: 18 };
+    const g = parryGate({ lastAttack: hit, monsterName: KNIGHT_1, currentRound: 3, storedUses: {}, usedRound: 0, action: KNIGHT_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+    const again = parryGate({ lastAttack: hit, monsterName: KNIGHT_1, currentRound: 3, storedUses: {}, usedRound: 3, action: KNIGHT_ACTION });
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('round');
+  });
+
+  it('resolve: +2 AC stamp, AC 18 → 20 flips the 18-19 window hit to miss, At Will never spends uses', async () => {
+    const hit = { attackerName: 'Bandit 1', targetName: KNIGHT_1, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 15, bonus: 3, total: 18, targetAc: 18, effectiveAc: 18 };
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+    const result = await resolveMonsterGatedReaction({ action: KNIGHT_ACTION, monsterName: KNIGHT_1, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(2);
+    expect(result.newAc).toBe(20);
+    expect(result.newAc).toBeGreaterThan(hit.total);
+    expect(state[`${KNIGHT_1}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(true);
+    expect(state[`${KNIGHT_1}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 3)).toBe(false);
+    expect(state[`${KNIGHT_1}._parry_usedRound`]).toBe(3);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: KNIGHT_1, parryAcBonus: 2 });
+    expect(state[`${KNIGHT_1}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 18 → 20/);
+  });
+});
+
