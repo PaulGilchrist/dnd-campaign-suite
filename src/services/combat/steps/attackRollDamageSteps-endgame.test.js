@@ -175,7 +175,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelActive: true,
           overchannelUseCount: 2,
         });
-        expect(steps[16].condition(ctx)).toBe(true);
+        expect(steps[17].condition(ctx)).toBe(true);
       });
 
       it('returns false when overchannelActive is false', () => {
@@ -183,7 +183,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelActive: false,
           overchannelUseCount: 2,
         });
-        expect(steps[16].condition(ctx)).toBe(false);
+        expect(steps[17].condition(ctx)).toBe(false);
       });
 
       it('returns false when overchannelUseCount is 1', () => {
@@ -191,7 +191,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelActive: true,
           overchannelUseCount: 1,
         });
-        expect(steps[16].condition(ctx)).toBe(false);
+        expect(steps[17].condition(ctx)).toBe(false);
       });
 
       it('returns false when overchannelUseCount is 0', () => {
@@ -199,7 +199,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelActive: true,
           overchannelUseCount: 0,
         });
-        expect(steps[16].condition(ctx)).toBe(false);
+        expect(steps[17].condition(ctx)).toBe(false);
       });
     });
 
@@ -211,7 +211,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelSpellLevel: 1,
           playerStats: { name: 'TestChar' },
         });
-        const result = await steps[16].handler(ctx);
+        const result = await steps[17].handler(ctx);
 
         expect(rollExpression).toHaveBeenCalledWith('3d12');
         expect(result.data).toEqual({});
@@ -224,7 +224,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelSpellLevel: 2,
           playerStats: { name: 'TestChar' },
         });
-        await steps[16].handler(ctx);
+        await steps[17].handler(ctx);
 
         expect(rollExpression).toHaveBeenCalledWith('6d12');
       });
@@ -236,7 +236,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelSpellLevel: 3,
           playerStats: { name: 'TestChar' },
         });
-        await steps[16].handler(ctx);
+        await steps[17].handler(ctx);
 
         // dicePerLevel = 2 + (3-1) = 4, totalDice = 4 * 3 = 12
         expect(rollExpression).toHaveBeenCalledWith('12d12');
@@ -249,7 +249,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelSpellLevel: 1,
           playerStats: { name: 'TestChar' },
         });
-        await steps[16].handler(ctx);
+        await steps[17].handler(ctx);
 
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
           type: 'roll',
@@ -268,7 +268,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelSpellLevel: 1,
           playerStats: { name: 'TestChar' },
         });
-        await steps[16].handler(ctx);
+        await steps[17].handler(ctx);
 
         expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'TestChar', expect.any(Number), ['Necrotic'], { campaignName: 'test-campaign', characters: null, ignoreResistance: true, attackerName: 'TestChar' });
       });
@@ -281,7 +281,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           overchannelSpellLevel: 1,
           playerStats: { name: 'TestChar' },
         });
-        const result = await steps[16].handler(ctx);
+        const result = await steps[17].handler(ctx);
 
         expect(result.data).toEqual({});
         rollExpression.mockReset();
@@ -297,28 +297,28 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
     describe('condition', () => {
       it('returns true when ctx.formula is a string', () => {
         const ctx = makeCtx({ formula: '1d6' });
-        expect(steps[17].condition(ctx)).toBe(true);
+        expect(steps[18].condition(ctx)).toBe(true);
       });
 
       it('returns true when ctx.formula is 0', () => {
         const ctx = makeCtx({ formula: 0 });
-        expect(steps[17].condition(ctx)).toBe(true);
+        expect(steps[18].condition(ctx)).toBe(true);
       });
 
       it('returns true when ctx.formula is a number', () => {
         const ctx = makeCtx({ formula: 10 });
-        expect(steps[17].condition(ctx)).toBe(true);
+        expect(steps[18].condition(ctx)).toBe(true);
       });
 
       it('returns false when ctx.formula is undefined', () => {
         const ctx = makeCtx();
         delete ctx.formula;
-        expect(steps[17].condition(ctx)).toBe(false);
+        expect(steps[18].condition(ctx)).toBe(false);
       });
 
       it('returns false when ctx.formula is null', () => {
         const ctx = makeCtx({ formula: null });
-        expect(steps[17].condition(ctx)).toBe(false);
+        expect(steps[18].condition(ctx)).toBe(false);
       });
     });
 
@@ -331,7 +331,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           rolls: [12, 4],
           modifier: 4,
         });
-        const result = await steps[17].handler(ctx);
+        const result = await steps[18].handler(ctx);
 
         expect(ctx.proceedWithDamage).toHaveBeenCalledWith({
           attack: { name: 'Greataxe', damage: '1d12' },
@@ -352,7 +352,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
           rolls: [4],
           modifier: 0,
         });
-        const result = await steps[17].handler(ctx);
+        const result = await steps[18].handler(ctx);
 
         expect(result.data._done).toBe(true);
       });

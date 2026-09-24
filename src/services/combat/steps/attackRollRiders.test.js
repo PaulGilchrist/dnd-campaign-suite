@@ -44,11 +44,24 @@ vi.mock('../../ui/utils.js', () => ({
   default: { guid: () => 'test-guid-123' },
 }));
 
-import { buildCunningStrikeStep } from './attackRollRiders.js';
+import { buildCunningStrikeStep, buildChargerStep } from './attackRollRiders.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 
 const csPassive = { name: 'Devious Strikes', type: 'attack_rider' };
+
+const chargerPassive = {
+  name: 'Charge Attack',
+  type: 'attack_rider',
+  trigger: 'melee_hit_after_10ft_charge',
+  chooseOne: true,
+  oncePerTurn: true,
+  options: [
+    { name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d8' },
+    { name: 'Push 10 ft', effect: 'push', value: 10, sizeLimit: 'one_size_larger' },
+  ],
+};
 
 function makeCtx(overrides = {}) {
   return {
@@ -148,5 +161,100 @@ describe('buildCunningStrikeStep (CLA-188)', () => {
     const ctx = makeCtx({ buildCtxSync: vi.fn(() => Promise.resolve({ sneakAttackDice: 0 })) });
     const result = await step.handler(ctx);
     expect(result.modal).toBeUndefined();
+  });
+});
+
+describe('buildChargerStep (FT-022/023)', () => {
+  let step;
+
+  function chargerCtx(overrides = {}) {
+    return makeCtx({
+      attack: { name: 'Glaive', damage: '1d10+4', damageType: 'Slashing', weaponType: 'melee' },
+      playerStats: {
+        name: 'AasimarTest',
+        level: 8,
+        automation: { actions: [], passives: [chargerPassive] },
+      },
+      ...overrides,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    step = buildChargerStep();
+    getCurrentCombatRound.mockReturnValue(1);
+    runtimeValues({ lastAttack: { hit: true, attackerName: 'AasimarTest' } });
+  });
+
+  it('does not run when the attack missed', () => {
+    expect(step.condition(chargerCtx({ hit: false }))).toBe(false);
+  });
+
+  it('does not run for ranged attacks', () => {
+    expect(step.condition(chargerCtx({ attack: { weaponType: 'ranged' } }))).toBe(false);
+  });
+
+  it('pauses with a charger modal on a melee hit', async () => {
+    const ctx = chargerCtx();
+    const result = await step.handler(ctx);
+    expect(result.modal?.type).toBe('charger');
+    expect(result.modal?.props.action).toBe(chargerPassive);
+    expect(result.modal?.props.targetName).toBe('Animated Rug of Smothering 1');
+    expect(result.data).toEqual({ _charger: true });
+    expect(ctx.setAttackRiderModal).toHaveBeenCalled();
+  });
+
+  it('does not prompt without a charger passive', async () => {
+    const ctx = chargerCtx({
+      playerStats: { name: 'AasimarTest', level: 8, automation: { actions: [], passives: [] } },
+    });
+    const result = await step.handler(ctx);
+    expect(result.modal).toBeUndefined();
+    expect(result.data).toEqual({});
+  });
+
+  it('does not prompt when lastAttack is from another attacker', async () => {
+    runtimeValues({ lastAttack: { hit: true, attackerName: 'Goblin' } });
+    const ctx = chargerCtx();
+    const result = await step.handler(ctx);
+    expect(result.modal).toBeUndefined();
+  });
+
+  it('does not prompt when lastAttack missed', async () => {
+    runtimeValues({ lastAttack: { hit: false, attackerName: 'AasimarTest' } });
+    const ctx = chargerCtx();
+    const result = await step.handler(ctx);
+    expect(result.modal).toBeUndefined();
+  });
+
+  it('suppresses the modal when already used this round', async () => {
+    runtimeValues({
+      lastAttack: { hit: true, attackerName: 'AasimarTest' },
+      _Charge_Attack_usedRound: { round: 1, activeCreature: 'AasimarTest' },
+    });
+    const ctx = chargerCtx();
+    const result = await step.handler(ctx);
+    expect(result.modal).toBeUndefined();
+  });
+
+  it('suppresses the modal when skipped this round', async () => {
+    runtimeValues({
+      lastAttack: { hit: true, attackerName: 'AasimarTest' },
+      _Charge_Attack_skippedRound: { round: 1, activeCreature: 'AasimarTest' },
+    });
+    const ctx = chargerCtx();
+    const result = await step.handler(ctx);
+    expect(result.modal).toBeUndefined();
+  });
+
+  it('re-offers the modal in a later round', async () => {
+    runtimeValues({
+      lastAttack: { hit: true, attackerName: 'AasimarTest' },
+      _Charge_Attack_usedRound: { round: 1, activeCreature: 'AasimarTest' },
+    });
+    getCombatContext.mockResolvedValue({ round: 2, creatures: [] });
+    const ctx = chargerCtx();
+    const result = await step.handler(ctx);
+    expect(result.modal?.type).toBe('charger');
   });
 });

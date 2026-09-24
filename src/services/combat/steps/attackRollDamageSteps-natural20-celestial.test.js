@@ -175,7 +175,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           isNatural20: true,
           playerStats: { automation: { actions: [] } },
         });
-        expect(steps[12].condition(ctx)).toBe(true);
+        expect(steps[13].condition(ctx)).toBe(true);
       });
 
       it('returns false when ctx.isNatural20 is false', () => {
@@ -183,7 +183,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           isNatural20: false,
           playerStats: { automation: { actions: [] } },
         });
-        expect(steps[12].condition(ctx)).toBe(false);
+        expect(steps[13].condition(ctx)).toBe(false);
       });
 
       it('returns false when automation.actions is missing', () => {
@@ -191,7 +191,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           isNatural20: true,
           playerStats: { automation: {} },
         });
-        expect(steps[12].condition(ctx)).toBe(false);
+        expect(steps[13].condition(ctx)).toBe(false);
       });
 
       it('returns true when ctx.d20Roll is 20 (matches test threshold)', () => {
@@ -200,7 +200,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           d20Roll: 20,
           playerStats: { automation: { actions: [] } },
         });
-        expect(steps[12].condition(ctx)).toBe(true);
+        expect(steps[13].condition(ctx)).toBe(true);
       });
 
       it('returns false when ctx.d20Roll is 19 (below test threshold)', () => {
@@ -209,7 +209,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           d20Roll: 19,
           playerStats: { automation: { actions: [] } },
         });
-        expect(steps[12].condition(ctx)).toBe(false);
+        expect(steps[13].condition(ctx)).toBe(false);
       });
 
       it('returns false when ctx.d20Roll is 9 (below test threshold)', () => {
@@ -218,7 +218,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           d20Roll: 9,
           playerStats: { automation: { actions: [] } },
         });
-        expect(steps[12].condition(ctx)).toBe(false);
+        expect(steps[13].condition(ctx)).toBe(false);
       });
 
       it('returns false when ctx.d20Roll is undefined (auto-damage path without d20)', () => {
@@ -227,7 +227,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           d20Roll: undefined,
           playerStats: { automation: { actions: [] } },
         });
-        expect(steps[12].condition(ctx)).toBe(false);
+        expect(steps[13].condition(ctx)).toBe(false);
       });
     });
 
@@ -240,7 +240,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[12].handler(ctx);
+        const result = await steps[13].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3');
       });
@@ -265,7 +265,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[12].handler(ctx);
+        const result = await steps[13].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d6 [Overwhelming Strike]');
       });
@@ -291,7 +291,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[12].handler(ctx);
+        const result = await steps[13].handler(ctx);
 
         expect(result.data.formula).toContain('+ 5 [Overwhelming Strike]');
       });
@@ -314,7 +314,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
             },
           },
         });
-        const result = await steps[12].handler(ctx);
+        const result = await steps[13].handler(ctx);
 
         expect(result.data.formula).toContain('+ 0 [Overwhelming Strike]');
       });
@@ -340,7 +340,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[12].handler(ctx);
+        const result = await steps[13].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d6 [Overwhelming Strike]');
       });
@@ -365,7 +365,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[12].handler(ctx);
+        const result = await steps[13].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d6 [Overwhelming Strike]');
       });
@@ -389,7 +389,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[12].handler(ctx);
+        const result = await steps[13].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d6 [Overwhelming Strike]');
       });
@@ -404,12 +404,12 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
     describe('condition', () => {
       it('returns true when automation.passives exists', () => {
         const ctx = makeCtx({ playerStats: { automation: { passives: [] } } });
-        expect(steps[13].condition(ctx)).toBe(true);
+        expect(steps[14].condition(ctx)).toBe(true);
       });
 
       it('returns false when automation.passives is missing', () => {
         const ctx = makeCtx({ playerStats: { automation: {} } });
-        expect(steps[13].condition(ctx)).toBe(false);
+        expect(steps[14].condition(ctx)).toBe(false);
       });
     });
 
@@ -424,7 +424,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
             },
           },
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -446,7 +446,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
             },
           },
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -468,7 +468,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
             },
           },
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -497,7 +497,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
             },
           },
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -526,7 +526,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 1d8 [radiant]');
         expect(result.data.total).toBeGreaterThan(11);
@@ -559,7 +559,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
             },
           },
         });
-        await steps[13].handler(ctx);
+        await steps[14].handler(ctx);
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
           'TestChar',
@@ -594,7 +594,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 5,
           rolls: [5],
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data.formula).toBe('1d8 + 1d6 [radiant]');
       });
@@ -623,7 +623,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 4,
           rolls: [4],
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data.formula).toBe('1d6 + 1d4 [necrotic]');
       });
@@ -651,7 +651,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -678,7 +678,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data).toEqual({});
         expect(rollExpression).not.toHaveBeenCalled();
@@ -708,7 +708,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 1d8 [radiant]');
         expect(result.data.total).toBeGreaterThan(11);
@@ -739,7 +739,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 8,
           rolls: [6, 2],
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data.formula).toBe('1d6+2 + 1d4 [necrotic]');
         expect(result.data.total).toBeGreaterThan(8);
@@ -769,7 +769,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 5,
           rolls: [5],
         });
-        const result = await steps[13].handler(ctx);
+        const result = await steps[14].handler(ctx);
 
         expect(result.data.formula).toBe('1d8 + 1d6 [radiant]');
         expect(result.data.total).toBeGreaterThan(5);

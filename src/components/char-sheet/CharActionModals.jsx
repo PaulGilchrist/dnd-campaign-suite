@@ -426,6 +426,17 @@ function CharActionModals({
         if (isCunningStrikeVariant) {
             resumeAttackPipeline?.();
         }
+        // Charger: pause happens before damage lands. Latch the skip flag when
+        // the player declines so later melee hits this round don't re-prompt,
+        // then resume so the triggering hit's weapon damage applies.
+        if (modalAction?.trigger === 'melee_hit_after_10ft_charge') {
+            const base = `_${modalAction.name.replace(/\s+/g, '_')}`;
+            const chosen = getRuntimeValue(modalPlayerStats.name, `${base}_option`, modalCampaignName);
+            if (!chosen) {
+                await setSkipFlag(`${base}_skippedRound`, modalPlayerStats, modalCampaignName);
+            }
+            await resumeAttackPipeline?.();
+        }
     };
 
     const flurryTarget = getFlurryTarget(mergedModalState.openHandFromFlurry);

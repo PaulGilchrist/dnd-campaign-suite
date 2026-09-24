@@ -177,22 +177,22 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
     describe('condition', () => {
       it('returns true when ctx.isBonusActionAttack is true and playerStats exists', () => {
         const ctx = makeCtx({ isBonusActionAttack: true });
-        expect(steps[7].condition(ctx)).toBe(true);
+        expect(steps[8].condition(ctx)).toBe(true);
       });
 
       it('returns false when ctx.isBonusActionAttack is false', () => {
         const ctx = makeCtx({ isBonusActionAttack: false });
-        expect(steps[7].condition(ctx)).toBe(false);
+        expect(steps[8].condition(ctx)).toBe(false);
       });
 
       it('returns falsy when ctx.isBonusActionAttack is undefined but playerStats exists', () => {
         const ctx = makeCtx();
-        expect(steps[7].condition(ctx)).toBeFalsy();
+        expect(steps[8].condition(ctx)).toBeFalsy();
       });
 
       it('returns false when playerStats is missing', () => {
         const ctx = makeCtx({ isBonusActionAttack: true, playerStats: null });
-        expect(steps[7].condition(ctx)).toBe(false);
+        expect(steps[8].condition(ctx)).toBe(false);
       });
     });
 
@@ -202,7 +202,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           isBonusActionAttack: true,
           attack: { properties: ['Light'], abilityName: 'Dexterity' },
         });
-        const result = await steps[7].handler(ctx);
+        const result = await steps[8].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -213,7 +213,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           isBonusActionAttack: true,
           attack: { properties: ['Finesse'], abilityName: 'Dexterity' },
         });
-        const result = await steps[7].handler(ctx);
+        const result = await steps[8].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -224,7 +224,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           isBonusActionAttack: true,
           attack: { properties: ['Light'] },
         });
-        const result = await steps[7].handler(ctx);
+        const result = await steps[8].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -238,7 +238,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
             abilities: [{ name: 'Dexterity', bonus: 0 }],
           },
         });
-        const result = await steps[7].handler(ctx);
+        const result = await steps[8].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -255,7 +255,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           total: 11,
           rolls: [8],
         });
-        const result = await steps[7].handler(ctx);
+        const result = await steps[8].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -272,7 +272,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           total: 4,
           rolls: [1],
         });
-        const result = await steps[7].handler(ctx);
+        const result = await steps[8].handler(ctx);
 
         expect(result.data.formula).toBe('1d6 + 3 [Dexterity]');
         expect(result.data.total).toBe(7);
@@ -291,7 +291,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           total: 4,
           rolls: [3],
         });
-        const result = await steps[7].handler(ctx);
+        const result = await steps[8].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -305,15 +305,15 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
   describe('targetEffects step', () => {
     describe('condition', () => {
       it('always returns true', () => {
-        expect(steps[8].condition({})).toBe(true);
-        expect(steps[8].condition({ attack: null })).toBe(true);
+        expect(steps[9].condition({})).toBe(true);
+        expect(steps[9].condition({ attack: null })).toBe(true);
       });
     });
 
     describe('handler', () => {
       it('returns early when no targetEffects stored', async () => {
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[8].handler(ctx);
+        const result = await steps[9].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -323,7 +323,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
         getRuntimeValue.mockReturnValue([{ effect: 'push', value: 5 }]);
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[8].handler(ctx);
+        const result = await steps[9].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -332,7 +332,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
         getRuntimeValue.mockReturnValue([{ effect: 'damage_bonus', damageExpression: '1d4', damageType: 'force' }]);
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[8].handler(ctx);
+        const result = await steps[9].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 1d4 [force]');
         expect(result.data.total).toBeGreaterThan(11);
@@ -347,7 +347,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           rolls: [8, 3],
           attack: { damageType: 'slashing' },
         });
-        const result = await steps[8].handler(ctx);
+        const result = await steps[9].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 1d4 [slashing]');
       });
@@ -359,7 +359,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
         ]);
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[8].handler(ctx);
+        const result = await steps[9].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d4 [force]');
         expect(result.data.formula).toContain('+ 1d6 [cold]');
@@ -371,7 +371,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
         getRuntimeValue.mockReturnValue([{ effect: 'damage_bonus', damageExpression: '1d4' }]);
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[8].handler(ctx);
+        const result = await steps[9].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3');
         expect(result.data.total).toBe(11);
@@ -381,7 +381,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
         getRuntimeValue.mockReturnValue('not-an-array');
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[8].handler(ctx);
+        const result = await steps[9].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -395,7 +395,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
   describe('superiorityDieBonuses step', () => {
     describe('condition', () => {
       it('always returns true', () => {
-        expect(steps[9].condition({})).toBe(true);
+        expect(steps[10].condition({})).toBe(true);
       });
     });
 
@@ -403,7 +403,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
       it('returns early when no superiority values are set', async () => {
         getRuntimeValue.mockReturnValue(null);
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3');
         expect(result.data.total).toBe(11);
@@ -421,7 +421,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           rolls: [8, 3],
           attack: { damageType: 'slashing' },
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 4 [slashing]');
         expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -443,7 +443,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 5 [Bardic Inspiration]');
       });
@@ -460,7 +460,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           rolls: [8, 3],
           attack: { damageType: 'piercing' },
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 3 [piercing]');
       });
@@ -477,7 +477,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           rolls: [8, 3],
           attack: { damageType: 'piercing' },
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 6 [piercing]');
         expect(result.data.total).toBe(17);
@@ -502,7 +502,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           rolls: [8, 3],
           attack: { weaponType: 'melee', damageType: 'melee' },
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 2 [melee]');
         expect(result.data.isMeleeOrUnarmed).toBe(true);
@@ -520,7 +520,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           rolls: [8, 3],
           attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 2 [bludgeoning]');
       });
@@ -537,7 +537,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           rolls: [8, 3],
           attack: { weaponType: 'ranged' },
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).not.toContain('+ 2');
         expect(result.data.isMeleeOrUnarmed).toBe(false);
@@ -554,7 +554,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 6 [same_as_weapon]');
         expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -585,7 +585,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3');
         expect(result.data.total).toBe(11);
@@ -600,7 +600,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
           rolls: [8, 3],
           attack: { weaponType: 'melee' },
         });
-        const result = await steps[9].handler(ctx);
+        const result = await steps[10].handler(ctx);
 
         expect(result.data.isMeleeOrUnarmed).toBe(true);
       });
