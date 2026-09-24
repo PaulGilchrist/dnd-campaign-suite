@@ -16843,7 +16843,7 @@
    "category": "lair_actions",
    "actionType": "other",
    "description": "A strong current moves through the kraken's lair. Each creature within 60 feet of the kraken must suc­ ceed on a DC 23 Strength saving throw or be pushed up to 60 feet away from the kraken. On a success, the creature is pushed 10 feet away from the kraken.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1059-lair-current.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1060",

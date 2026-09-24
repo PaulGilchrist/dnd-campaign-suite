@@ -4246,3 +4246,96 @@ describe('MA-0596 demilich lair stifling mortality no-healing zone row data lock
     expect(lairRowAffordance(demilich.lair_actions[1])).toBe('zone');
   });
 });
+
+// MA-1059: Kraken lair_actions[0] was a RAW STRING (MA-0582/MA-0596 twin
+// fingerprint — typeof guard monsterLairActions.js:25) rendering a bare inert
+// span: zero .mc-dice-link-lair chip, zero popup, zero log delta (live repro
+// 2026-09-24, playbook §46 "raw-string/nameless = inert"). Data-only fix
+// mirroring the VERIFIED MA-0074 Strong Wind byte-shape: named "Strong Current"
+// + save_dc 23 Strength so the MA-0024 seam renders a clickable .mc-dice-link-
+// lair chip routed through handleSaveRoll. The description is kept BYTE-IDENTICAL
+// to the original RAW prose (soft hyphen U+00AD in "suc\xad ceed" included). Both
+// outcomes push (different distances) but push is MOVEMENT not a canonical
+// condition: extractConditionsFromSaveEffect returns [] (MA-0017 damageless
+// failed-save seam applies NO condition here — nothing to apply); parsePushFeetClause
+// arms the push te marker ONLY in the AoE picker (SaveAttackAoeModal) — this row
+// has no range/aoe field so it stays single-target inline and the push distance
+// stays GM-advisory (§70, CLA-325 precedent). parseBothOutcomesClause reads null
+// (no "Failure or Success:" byte marker). DC/type/both-outcome distances are the
+// honest fix; token movement stays advisory.
+describe('MA-1059 kraken lair strong current raw-string to structured save row data lock', () => {
+  const kraken = monstersData.find((m) => m.index === 'kraken');
+  const current = kraken.lair_actions[0];
+
+  it('[0] is now a structured clickable SAVE row named Strong Current (was raw string)', () => {
+    expect(typeof current).toBe('object');
+    expect(current.name).toBe('Strong Current');
+    expect(isLairRowClickable(current)).toBe(true);
+    expect(lairRowAffordance(current)).toBe('save');
+  });
+
+  it('[0] description is the original RAW prose byte-identical (soft hyphen U+00AD preserved)', () => {
+    const desc = current.description;
+    expect(typeof desc).toBe('string');
+    expect(desc).toMatch(/^A strong current moves through the kraken's lair\./);
+    expect(desc).toContain('must suc\u00ad ceed on a DC 23 Strength saving throw');
+    expect(desc).toContain('On a success, the creature is pushed 10 feet away from the kraken.');
+    expect(desc.charCodeAt(desc.indexOf('suc') + 3)).toBe(0x00AD);
+  });
+
+  it('[0] save fields: DC 23 Strength, no damage authored (push is movement not damage)', () => {
+    expect(current.save_dc).toBe(23);
+    expect(current.save_type).toBe('Strength');
+    expect(current.damage_dice_primary).toBeUndefined();
+    expect(current.damage_type_primary).toBeUndefined();
+    expect(current.zone).toBeUndefined();
+    expect(current.attack_bonus).toBeUndefined();
+    expect(current.rays).toBeUndefined();
+  });
+
+  it('[0] save_effect carries both push distances honestly (fail up to 60 / success 10)', () => {
+    expect(current.save_effect).toMatch(/Failure:.*pushed up to 60 feet away from the kraken/i);
+    expect(current.save_effect).toMatch(/Success:.*pushed 10 feet away from the kraken/i);
+  });
+
+  it('[0] push is MOVEMENT not a canonical condition — extractConditionsFromSaveEffect is EMPTY (zero fabricated conditions)', () => {
+    expect(extractConditionsFromSaveEffect(current.save_effect)).toEqual([]);
+  });
+
+  it('[0] parsePushFeetClause arms the push te marker ONLY in the AoE picker (MA-0079) — single-target inline row keeps distance GM-advisory (§70)', async () => {
+    const { parsePushFeetClause } = await import('../../components/encounter/MonsterCardHelpers.js');
+    expect(parsePushFeetClause(current.save_effect)).toEqual({ feet: 60 });
+    expect(current.range).toBeUndefined();
+    expect(current.zone).toBeUndefined();
+  });
+
+  it('[0] parseBothOutcomesClause reads null (no "Failure or Success:" byte marker — MA-0303)', async () => {
+    const { parseBothOutcomesClause } = await import('../../components/encounter/MonsterCardHelpers.js');
+    expect(parseBothOutcomesClause(current.save_effect)).toBeNull();
+  });
+
+  it('[0] save row routes through handleSaveRoll with zero damage formula and zero conditions (MA-0024 seam, MA-0017 nothing to apply)', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: current,
+      monsterName: 'Kraken 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(current.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(current, null, []);
+  });
+
+  it('[1]/[2] nameless sibling dicts stay inert (MA-1060/1061 lane — untouched by this row fix)', () => {
+    expect(kraken.lair_actions[1].name).toBeUndefined();
+    expect(kraken.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(kraken.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(kraken.lair_actions[2])).toBe(false);
+  });
+});

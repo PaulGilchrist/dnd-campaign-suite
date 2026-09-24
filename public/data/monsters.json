@@ -37133,7 +37133,13 @@
       }
     ],
     "lair_actions": [
-      "A strong current moves through the kraken's lair. Each creature within 60 feet of the kraken must suc­ ceed on a DC 23 Strength saving throw or be pushed up to 60 feet away from the kraken. On a success, the creature is pushed 10 feet away from the kraken.",
+      {
+        "name": "Strong Current",
+        "description": "A strong current moves through the kraken's lair. Each creature within 60 feet of the kraken must suc­ ceed on a DC 23 Strength saving throw or be pushed up to 60 feet away from the kraken. On a success, the creature is pushed 10 feet away from the kraken.",
+        "save_type": "Strength",
+        "save_dc": 23,
+        "save_effect": "Failure: The target is pushed up to 60 feet away from the kraken. Success: The target is pushed 10 feet away from the kraken."
+      },
       {
         "description": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round.",
         "save_type": "Strength",
