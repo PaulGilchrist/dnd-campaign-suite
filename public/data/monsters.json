@@ -33868,9 +33868,11 @@
         "description": "Ranged Attack Roll: +8, range 60/240 ft. <strong>Hit:</strong> 16 (2d10 + 5) Bludgeoning damage, and the target has the <strong>Poisoned</strong> condition until the end of its next turn.",
         "attack_bonus": 8,
         "range": "60/240 ft.",
-        "save_effect": "The target has the Poisoned condition until the end of its next turn.",
         "damage_dice_primary": "2d10 + 5",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "poisoned"
+        ]
       }
     ],
     "bonus_actions": [],

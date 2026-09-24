@@ -15445,7 +15445,7 @@
     "poisoned"
    ],
    "description": "Ranged Attack Roll: +8, range 60/240 ft. Hit: 16 (2d10 + 5) Bludgeoning damage, and the target has the Poisoned condition until the end of its next turn.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0984-trash-lob.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0985",

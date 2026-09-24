@@ -3687,3 +3687,95 @@ describe('MA-0733 disadvantage_next_attack te consumer', () => {
         expect(combineAttackModes(effects, computeConditionEffects({}), null, 'Bandit 1')).toBe('disadvantage');
     });
 });
+
+const HILL_GIANT = monsters.find(m => m.index === 'hill-giant');
+const TRASH_LOB_ACTION = HILL_GIANT.actions[2];
+
+describe('MA-0984 Hill Giant Trash Lob poisoned-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Hill Giant 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Hill Giant 1', computedStats: { armorClass: 13 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 9, newHp: 990, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-0984 data-lock: Trash Lob authors hit_conditions:["poisoned"] and NO save_effect decoy (§410 wrong-slot fix)', () => {
+        expect(TRASH_LOB_ACTION.name).toBe('Trash Lob');
+        expect(TRASH_LOB_ACTION.attack_bonus).toBe(8);
+        expect(TRASH_LOB_ACTION.range).toBe('60/240 ft.');
+        expect(TRASH_LOB_ACTION.damage_dice_primary).toBe('2d10 + 5');
+        expect(TRASH_LOB_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(TRASH_LOB_ACTION.hit_conditions).toEqual(['poisoned']);
+        expect(TRASH_LOB_ACTION.save_effect).toBeUndefined();
+        expect(TRASH_LOB_ACTION.save_dc).toBeUndefined();
+        expect(TRASH_LOB_ACTION.save_type).toBeUndefined();
+        expect(TRASH_LOB_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a poisoned-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(TRASH_LOB_ACTION)).toEqual({
+            conditions: ['poisoned'],
+            escapeDc: null,
+            attackName: 'Trash Lob',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Poisoned + attacker-source meta + condition log on a resolved Trash Lob hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Trash Lob', formula: '2d10 + 5', total: 9, rolls: [1, 3], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Hill Giant 1',
+            hitClause: buildHitConditionClause(TRASH_LOB_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe('Bandit 1');
+        expect(condCall[2]).toEqual(['poisoned']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[0]).toBe('Bandit 1');
+        expect(metaCall[2]).toMatchObject({ poisoned: { source: 'Hill Giant 1' } });
+        expect(metaCall[2].poisoned.dc).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Poisoned',
+            reason: 'Trash Lob (escape DC —)',
+        }));
+    });
+
+    it('writes no condition when the Trash Lob attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Trash Lob', formula: '2d10 + 5', total: 9, rolls: [1, 3], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Hill Giant 1',
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
+        );
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
