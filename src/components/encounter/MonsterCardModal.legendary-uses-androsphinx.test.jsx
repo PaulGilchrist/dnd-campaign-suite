@@ -156,7 +156,8 @@ describe('MA-0269 monsters.json data: Claw Attack delegates to Claw', () => {
   // MA-0956 stale-pin inversion (was: "byte-identical block UNTOUCHED" —
   // the gynosphinx twin hit the same prose-only defect and is now fixed the
   // same pass with the Death-Knight byte template: header uses:2 + Claw
-  // delegates_to. Teleport/Cast a Spell stay prose-only (their own tickets).
+  // delegates_to. MA-0957: Teleport advisory. MA-0958: Cast a Spell advisory
+  // twin of this card's spellcast_adjudication row (honest 3-vs-2 pool copy).
   it('gynosphinx legendary block carries MA-0956 header + Claw delegate', () => {
     const gy = monstersData.find(m => m.index === 'gynosphinx').legendary_actions;
     expect(gy.length).toBe(4);
@@ -167,6 +168,8 @@ describe('MA-0269 monsters.json data: Claw Attack delegates to Claw', () => {
     expect(gy[1].uses).toBeUndefined();
     expect(gy[2].delegates_to).toBeUndefined();
     expect(gy[3].delegates_to).toBeUndefined();
+    expect(gy[3].advisory).toBe('spellcast_adjudication');
+    expect(gy[3].advisory_message).toMatch(/GM adjudicates spell choice and spell-slot spend/);
   });
 });
 

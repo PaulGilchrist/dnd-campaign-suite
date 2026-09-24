@@ -32846,6 +32846,8 @@
       },
       {
         "name": "Cast a Spell (Costs 3 Actions)",
+        "advisory": "spellcast_adjudication",
+        "advisory_message": "casts a spell from its list of prepared spells, using a spell slot as normal — advisory record: GM adjudicates spell choice and spell-slot spend; no monster spell-slot machinery app-wide and the spell list lives only in the prose Spellcasting trait. RAW costs 3 legendary uses — exceeds this card's disk-canonical 2-use pool, RAW-unusable as printed; the engine spends 1 per click; the extra cost is GM-enforced.",
         "description": "The sphinx casts a spell from its list of prepared spells, using a spell slot as normal."
       }
     ],
