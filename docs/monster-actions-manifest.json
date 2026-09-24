@@ -16857,7 +16857,7 @@
    "saveType": "Strength",
    "saveEffect": "Failure: Each creature within 60 feet of the kraken is pushed up to 60 feet away from the kraken. Success: The creature is pushed 10 feet away from the kraken.",
    "description": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1060-1061-lair-unnamed.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1061",
@@ -16870,7 +16870,7 @@
    "actionType": "other",
    "saveEffect": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round.",
    "description": "The water in the kraken's lair becomes electrically charged. All creatures within 120 feet of the kraken must succeed on a DC 23 Constitution saving throw, taking 10 (3d6) lightning damage on a failed save, or half as much damage on a successful one.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1060-1061-lair-unnamed.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1062",

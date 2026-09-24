@@ -37141,13 +37141,20 @@
         "save_effect": "Failure: The target is pushed up to 60 feet away from the kraken. Success: The target is pushed 10 feet away from the kraken."
       },
       {
-        "description": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round.",
-        "save_type": "Strength",
-        "save_effect": "Failure: Each creature within 60 feet of the kraken is pushed up to 60 feet away from the kraken. Success: The creature is pushed 10 feet away from the kraken."
+        "name": "Lightning Vulnerability",
+        "advisory": "lightning_vulnerability",
+        "advisory_message": "grants vulnerability to lightning damage to creatures in the water within 60 feet of it until initiative count 20 on the next round — advisory record: the aura and its initiative-20 expiry are GM-enforced (no vulnerability/aura consumer, CLA-325 precedent)",
+        "description": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round."
       },
       {
+        "name": "Charged Water",
         "description": "The water in the kraken's lair becomes electrically charged. All creatures within 120 feet of the kraken must succeed on a DC 23 Constitution saving throw, taking 10 (3d6) lightning damage on a failed save, or half as much damage on a successful one.",
-        "save_effect": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round."
+        "save_dc": 23,
+        "save_type": "Constitution",
+        "damage_dice_primary": "3d6",
+        "damage_type_primary": "Lightning",
+        "dc_success": "half",
+        "save_effect": "Failure: 10 (3d6) lightning damage. Success: half damage."
       }
     ],
     "traits": [

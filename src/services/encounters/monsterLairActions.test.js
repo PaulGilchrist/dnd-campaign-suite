@@ -4332,10 +4332,170 @@ describe('MA-1059 kraken lair strong current raw-string to structured save row d
     expect(handleSaveRoll).toHaveBeenCalledWith(current, null, []);
   });
 
-  it('[1]/[2] nameless sibling dicts stay inert (MA-1060/1061 lane — untouched by this row fix)', () => {
-    expect(kraken.lair_actions[1].name).toBeUndefined();
-    expect(kraken.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(kraken.lair_actions[1])).toBe(false);
-    expect(isLairRowClickable(kraken.lair_actions[2])).toBe(false);
+  it('[1]/[2] siblings now structured by MA-1060/MA-1061 (stale inert pins inverted same pass)', () => {
+    expect(kraken.lair_actions[1].name).toBe('Lightning Vulnerability');
+    expect(lairRowAffordance(kraken.lair_actions[1])).toBe('advisory');
+    expect(kraken.lair_actions[2].name).toBe('Charged Water');
+    expect(lairRowAffordance(kraken.lair_actions[2])).toBe('save');
+  });
+});
+
+// MA-1060: Kraken lair_actions[1] was a nameless dict with a STRAY
+// save_type:"Strength" and a save_effect MIS-COPIED from lair_actions[0]'s
+// push mechanic (chain offset-by-one, MA-1058/1059 fingerprint) — zero
+// affordance, stray "." bullet (live repro 2026-09-24). The rules text is a
+// SAVE-LESS lightning-vulnerability aura: no save is fabricated. ADVISORY
+// lane (CLA-325): disk twins author advisory as a snake_case STRING key
+// (wall_of_ice/fog_cloud/glimpse_the_future/eye_rays) — advisory:true would
+// render the dishonest popup copy "casts true" (monsterLairActions.js:83),
+// so the honest live shape is key + MA-0380 advisory_message (Beholder
+// Surfaced Eye twin byte-shape, monsters.json:8920). Mis-copied save_effect
+// and stray save_type stripped.
+describe('MA-1060 kraken lair lightning vulnerability advisory data lock', () => {
+  const kraken = monstersData.find((m) => m.index === 'kraken');
+  const aura = kraken.lair_actions[1];
+  const VERBATIM = 'Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round.';
+
+  it('[1] is now a named clickable ADVISORY row (was nameless inert dict)', () => {
+    expect(typeof aura).toBe('object');
+    expect(aura.name).toBe('Lightning Vulnerability');
+    expect(aura.advisory).toBe('lightning_vulnerability');
+    expect(isLairRowClickable(aura)).toBe(true);
+    expect(lairRowAffordance(aura)).toBe('advisory');
+  });
+
+  it('[1] description byte-verbatim (save-less aura — no save invented in copy)', () => {
+    expect(aura.description).toBe(VERBATIM);
+    expect(aura.description).not.toMatch(/saving throw/i);
+  });
+
+  it('[1] NO save fields — stray save_type "Strength" stripped, nothing fabricated', () => {
+    expect(aura.save_type).toBeUndefined();
+    expect(aura.save_dc).toBeUndefined();
+    expect(aura.dc_success).toBeUndefined();
+    expect(aura.attack_bonus).toBeUndefined();
+    expect(aura.damage_dice_primary).toBeUndefined();
+    expect(aura.zone).toBeUndefined();
+  });
+
+  it('[1] chain mis-copy gone — no save_effect, no push text leaking from [0]', () => {
+    expect(aura.save_effect).toBeUndefined();
+    const rowJson = JSON.stringify(aura);
+    expect(rowJson).not.toMatch(/push/i);
+    expect(rowJson).not.toMatch(/Failure: Each creature/i);
+    expect(rowJson).not.toMatch(/Success: The creature is pushed/i);
+  });
+
+  it('[1] honest advisory_message (MA-0380 lane — no "casts true" junk copy)', () => {
+    expect(aura.advisory_message).toMatch(/grants vulnerability to lightning damage/i);
+    expect(aura.advisory_message).toMatch(/initiative count 20/i);
+    expect(aura.advisory_message).toMatch(/GM-enforced/i);
+    expect(aura.advisory_message).toMatch(/CLA-325/i);
+  });
+
+  it('[1] advisory click logs ability_use record, zero save/attack/damage/zone', async () => {
+    const logs = [];
+    const setPopupHtml = vi.fn();
+    const res = await resolveLairRow({
+      action: aura,
+      monsterName: 'Kraken 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].abilityName).toBe('Lightning Vulnerability');
+    expect(logs[0].description).toMatch(/grants vulnerability to lightning damage/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(logs[0].description).not.toMatch(/casts true/i);
+    expect(logs[0].description).not.toMatch(/save DC/i);
+    expect(logs[0].description).not.toMatch(/push/i);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringMatching(/Lair Action — Lightning Vulnerability/));
+    expect(setPopupHtml.mock.calls[0][0]).toContain(aura.advisory_message);
+  });
+});
+
+// MA-1061: Kraken lair_actions[2] was a nameless dict whose save_effect was
+// MIS-COPIED from [1]'s vulnerability aura prose while the fully-specified
+// DC 23 Constitution / 3d6 lightning half-on-success mechanic sat inert in
+// description only (zero affordance, live repro 2026-09-24). Fix mirrors the
+// VERIFIED Adult Silver Dragon "Cold Wind" lair save-row byte-shape
+// (name + description + save_dc/save_type + damage_dice_primary +
+// damage_type_primary + dc_success:"half" + terse Failure/Success
+// save_effect) — the disk convention for save-with-half-damage lair rows
+// (NOT damage_type — grep-zero field on lair twins). MV-20/27 half-on-
+// success math rides the untouched save seam.
+describe('MA-1061 kraken lair charged water save row data lock', () => {
+  const kraken = monstersData.find((m) => m.index === 'kraken');
+  const water = kraken.lair_actions[2];
+  const VERBATIM = "The water in the kraken's lair becomes electrically charged. All creatures within 120 feet of the kraken must succeed on a DC 23 Constitution saving throw, taking 10 (3d6) lightning damage on a failed save, or half as much damage on a successful one.";
+
+  it('[2] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof water).toBe('object');
+    expect(water.name).toBe('Charged Water');
+    expect(isLairRowClickable(water)).toBe(true);
+    expect(lairRowAffordance(water)).toBe('save');
+  });
+
+  it('[2] description byte-verbatim', () => {
+    expect(water.description).toBe(VERBATIM);
+  });
+
+  it('[2] save fields mirror Cold Wind twin: DC 23 Constitution, 3d6 Lightning, dc_success half', () => {
+    expect(water.save_dc).toBe(23);
+    expect(water.save_type).toBe('Constitution');
+    expect(water.damage_dice_primary).toBe('3d6');
+    expect(canRollExpression(water.damage_dice_primary)).toBe(true);
+    expect(water.damage_type_primary).toBe('Lightning');
+    expect(water.dc_success).toBe('half');
+    expect(water.attack_bonus).toBeUndefined();
+    expect(water.zone).toBeUndefined();
+  });
+
+  it('[2] save_effect aligned to OWN mechanic — [1]-aura mis-copy gone', () => {
+    expect(water.save_effect).toBe('Failure: 10 (3d6) lightning damage. Success: half damage.');
+    expect(water.save_effect).not.toMatch(/vulnerability/i);
+    expect(water.save_effect).not.toMatch(/initiative count 20/i);
+    expect(water.save_effect).not.toMatch(/push/i);
+  });
+
+  it('[2] save_effect carries no conditions — extractConditionsFromSaveEffect EMPTY', () => {
+    expect(extractConditionsFromSaveEffect(water.save_effect)).toEqual([]);
+  });
+
+  it('[2] save row routes through handleSaveRoll with 3d6 formula and zero conditions (MA-0024 seam, MV-20/27 untouched)', async () => {
+    const { extractDamageDiceFromDescription } = await import('../../components/encounter/MonsterCardModal.jsx');
+    const formula = extractDamageDiceFromDescription(water.description, water.damage_dice_primary);
+    expect(formula).toBe('3d6');
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: water,
+      monsterName: 'Kraken 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: formula,
+      saveConditions: extractConditionsFromSaveEffect(water.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(water, '3d6', []);
+  });
+
+  it('[0] MA-1059 sibling byte-untouched: Strong Current push save row intact', () => {
+    const current = kraken.lair_actions[0];
+    expect(current.name).toBe('Strong Current');
+    expect(current.save_dc).toBe(23);
+    expect(current.save_type).toBe('Strength');
+    expect(current.save_effect).toMatch(/Failure: The target is pushed up to 60 feet/i);
+    expect(lairRowAffordance(current)).toBe('save');
   });
 });
