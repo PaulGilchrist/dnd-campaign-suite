@@ -829,3 +829,50 @@ describe('MA-0869 Gladiator Parry — data-lock + acBonus 3', () => {
   });
 });
 
+// MA-0997: Hobgoblin Warlord Parry — MA-0643/MA-0702/MA-0869 routine DATA
+// twin. Disk reactions[0] was prose-only (name/trigger/description) = gate-null
+// inert (MonsterCardHelpers.js:1530 automation.effect gate, Modal:2089 silent
+// return); fix authors the MA-0341 byte-shape with acBonus 3 (row prose "adds
+// 3" — MUST be authored: buildParryBuff :1236 silently defaults 2). RAW: +3 AC
+// vs the triggering melee hit; AC 20 → 23, 20-22 window flips to miss.
+const WARLORD_ACTION = monsters.find(m => m.index === 'hobgoblin-warlord').reactions[0];
+const WARLORD = 'Hobgoblin Warlord 1';
+
+describe('MA-0997 Hobgoblin Warlord Parry — data-lock + acBonus 3', () => {
+  it('monsters.json hobgoblin-warlord reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 3)', () => {
+    expect(WARLORD_ACTION.name).toBe('Parry');
+    expect(WARLORD_ACTION.description).toMatch(/adds 3 to its AC/);
+    expect(WARLORD_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 3 });
+    expect(WARLORD_ACTION.usage).toBe('At Will');
+    expect(WARLORD_ACTION.uses).toBe(999);
+    expect(WARLORD_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(WARLORD_ACTION)?.effect).toBe('parry');
+  });
+
+  it('gate accepts unresolved melee hit on the warlord and refuses a 2nd same-round press', () => {
+    const hit = { attackerName: 'Bandit 1', targetName: WARLORD, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 3, total: 20, targetAc: 20, effectiveAc: 20 };
+    const g = parryGate({ lastAttack: hit, monsterName: WARLORD, currentRound: 3, storedUses: {}, usedRound: 0, action: WARLORD_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+    const again = parryGate({ lastAttack: hit, monsterName: WARLORD, currentRound: 3, storedUses: {}, usedRound: 3, action: WARLORD_ACTION });
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('round');
+  });
+
+  it('resolve: +3 AC stamp, AC 20 → 23 flips the 20-22 window hit to miss, At Will never spends uses', async () => {
+    const hit = { attackerName: 'Bandit 1', targetName: WARLORD, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 3, total: 20, targetAc: 20, effectiveAc: 20 };
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+    const result = await resolveMonsterGatedReaction({ action: WARLORD_ACTION, monsterName: WARLORD, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(3);
+    expect(result.newAc).toBe(23);
+    expect(result.newAc).toBeGreaterThan(hit.total);
+    expect(state[`${WARLORD}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 3)).toBe(true);
+    expect(state[`${WARLORD}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(false);
+    expect(state[`${WARLORD}._parry_usedRound`]).toBe(3);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: WARLORD, parryAcBonus: 3 });
+    expect(state[`${WARLORD}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 20 → 23/);
+  });
+});
+
