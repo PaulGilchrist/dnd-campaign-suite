@@ -11,6 +11,10 @@ You are the primary agent verifying combat automations against `docs/automations
 3. **Server caching blame without evidence:** The server uses in-memory caching with 10s debounce (`changeData.js`). If character edits don't appear to take effect, wait 15+ seconds, reload, or use the Admin panel to clear the cache. Do NOT claim "server caching is blocking" as a reason to give up — this was a past AI mistake when the real issue was the client failing to POST the updated data.
 4. **Wrong target type:** If a spell rejects a target type, add the correct type of NPC using the Encounter Builder rather than claiming the test cannot proceed.
 5. **Level requirements:** Check spell slot levels — 6th level spells require at least level 13 characters. Don't try to cast 6th-level spells on level 9 characters.
+6. **Monsters join initiative only via "Join Encounter":** Encounter Builder → search the exact monster name → tick the row checkbox → "Join Encounter". The "+ NPC" button on the Initiative view adds a *bare statless campaign NPC*, not a database monster. Quantity-suffixed creatures appear in initiative as "Goblin 1", "Goblin 2".
+7. **GM features are localhost-only:** the Encounter Builder, creature cards, and encounter tools are read-only off localhost. Run the app on localhost before building any scenario.
+8. **Caster-merged summons verify via the CAST path, not EB-direct:** summon-type spell automations (`summon_spirit`: Animate Objects, Summon Beast & kin, …) spawn a combatant whose stats are the caster's MERGED at cast time. Verify by having the caster PC cast the spell and exercising the merged combatant's card. A flat instance of such a creature joined directly via the Encounter Builder has NO caster context and its dynamic rows are HONESTLY SUPPRESSED by design (MA-0286) — that is NOT a FAIL.
+9. **The monster must also have a target set:** when a monster forces a save on a character, arm the target on the monster's own card (`targetName`) — an unarmed monster's roll hangs forever, no "vs AC", no damage.
 
 This list exists because subagents kept giving up on fixable problems. Treat it as a floor, not a ceiling: when a subagent finds a new pitfall like these, it goes back into this list (see step 3f below) so the next subagent doesn't rediscover it the hard way.
 
@@ -22,6 +26,8 @@ Every subagent run must land on exactly one of PASS / FAIL / INCOMPLETE. There i
 2. **FAIL (bug)** — EITHER (a) it triggered but behaved wrong, OR (b) **it is not implemented at all**: dead/inert feature row, plumbing collected with zero consumers, click produces no popup/keys/logs, or a control probe shows the feature grants zero observable delta. Unimplemented = BUG, not incomplete. A half-hardcoded implementation that works but ignores rule gates (e.g. fires on successes, skips proficiency checks) = BUG too.
 3. **INCOMPLETE** — ONLY when the subagent genuinely cannot BUILD the scenario through existing UI even after exhausting the pitfalls checklist: the required monster/spell/state does not exist in any data file, the trigger state is physically unreachable in the app, or the expected behavior is so ambiguous it cannot be judged. It must name the ONE concrete thing that blocks setup — never "the feature seems unimplemented" (that is FAIL).
 
+**Summon variants (pitfall 8):** for a summon-type spell automation, PASS/FAIL is judged on the CAST path — the merged combatant produced when the caster PC casts the spell. Zero affordance on an EB-direct-joined flat copy of a caster-dependent creature (dynamic `"+spell attack modifier"` tokens honestly suppressed, MA-0286) is BY DESIGN — never file it as FAIL.
+
 If a run dies without a verdict (memory guard, crash, timeout), the row goes back to `"not verified"` and onto the queue for a fresh attempt — that is a failed attempt, not incomplete.
 
 If the manifest row's wording contradicts canonical PHB/app data and the GM supplies canonical wording, fix the row's `name`/`triggerConditions`/`expectedBehavior` in the manifest when recording the verdict, and cite the canonical text in the bug file.
@@ -30,22 +36,23 @@ If the manifest row's wording contradicts canonical PHB/app data and the GM supp
 
 - `docs/test-setup-playbook.md` — accumulated known-good recipes ("how to build a 2024 Monk," "how to force a failed saving throw," "how to join an encounter with a specific monster") **and** the pitfalls list above. Grows over time as subagents succeed or get tripped up.
 - `docs/test-character-registry.json` — list of existing test characters and NPCs already present in "test-campaign," keyed by class/subclass/race/subrace/feat/background (for characters) or name (for NPCs), so reuse is a lookup instead of a search.
+- `docs/test-monster-registry.json` — monsters already in `test-campaign` initiative, keyed by monster name, with the config each test needed, so reuse is a lookup not a rebuild. The playbook above is SHARED with monster-actions-verify — append to it, don't fork it.
 
 ## Primary agent steps
 
 1. Kill all running processes for this project: `pkill -9 -f "node.*server" 2>/dev/null; pkill -9 -f "vite" 2>/dev/null; pkill -9 -f "concurrently" 2>/dev/null; pkill -9 -f "dnd-campaign" 2>/dev/null; echo "all killed"`
-2. Read `docs/automations-manifest.json`. Your queue is every row marked "not verified." Also read `docs/test-setup-playbook.md` and `docs/test-character-registry.json` if present (create empty versions if not) — you'll pass both to each subagent.
+2. Read `docs/automations-manifest.json`. Your queue is every row marked "not verified." Also read `docs/test-setup-playbook.md`, `docs/test-character-registry.json`, and `docs/test-monster-registry.json` if present (create empty versions if not) — you'll pass all three to each subagent.
 3. For each row, one at a time:
 
    a. **Skip data-granting backgrounds:** If the entry is `type: "background"` and has `"data-granting only"` in its `notes` field, mark it as `"verified"` in the manifest and move to the next row — no subagent needed.
 
-   b. Dispatch a subagent (task template below) with: the single automation's details (name, trigger conditions, source location), the current setup playbook (including the pitfalls list), and the current character registry. Do not give it the rest of the manifest. We are in no rush; memory conservation matters more than speed.
+    b. Dispatch a subagent (task template below) with: the single automation's details (name, trigger conditions, source location), the current setup playbook (including the pitfalls list), and the current character and monster registries. Do not give it the rest of the manifest. We are in no rush; memory conservation matters more than speed.
 
    c. Wait for it to return.
 
     d. Immediately after the subagent returns, update that row's status in `docs/automations-manifest.json` on disk: `"verified"` / `"broken — see .opencode/plans/bug-<slug>.md"` / `"incomplete — see .opencode/plans/incomplete-<slug>.md"`. Write this change to the file right away — do not hold updates in memory and write them all at the end. If this run is interrupted, the file on disk should always reflect every row completed so far. **If the subagent crashed/aborted without a verdict (memory guard, timeout), set the row back to `"not verified"` and re-append its ID to `.opencode/plans/queue.txt` — do not mark it incomplete.**
 
-   e. **If the subagent reports a new character/NPC** (whether created or reused-and-confirmed), record it in `docs/test-character-registry.json` now, before moving to the next row.
+    e. **If the subagent reports a new character/NPC** (whether created or reused-and-confirmed), record it in `docs/test-character-registry.json` now; **if it reports a monster newly placed into `test-campaign` initiative, record it in `docs/test-monster-registry.json`** — before moving to the next row.
 
    f. **If the subagent reports a new playbook recipe or a new pitfall it ran into** (something that cost it real time before it figured out the fix), append it to `docs/test-setup-playbook.md` now, so later rows in this same run — and future runs — benefit from it.
 
@@ -61,7 +68,7 @@ If the manifest row's wording contradicts canonical PHB/app data and the GM supp
 
 You are verifying a single combat automation: `{automation_details}`
 
-You are given the current **setup playbook** (including known pitfalls) and **character registry** — read both before doing anything else.
+You are given the current **setup playbook** (including known pitfalls), **character registry**, and **monster registry** — read all three before doing anything else.
 
 **All interaction with the running app happens through Playwright MCP.** This is a strict end-to-end test — direct data manipulation (editing save files, hitting APIs directly, etc.) invalidates the test.
 
@@ -74,13 +81,13 @@ You are given the current **setup playbook** (including known pitfalls) and **ch
 ### Step 2 — Build/confirm the scenario (via Playwright MCP)
 
 1. In "test-campaign," EDIT an existing 2024 character (or create one only if the class doesn't exist at all) via the Edit wizard so it has the exact class/subclass/race/subrace/feat/background needed. Never assume an existing character is already configured correctly for the automation — open the Edit wizard and set it up yourself; never 5e.
-2. Create or reuse any needed NPC creatures for combat/spell targeting tests via the Encounter Builder. NPC monster names must match `monsters.json` exactly — check `public/data/2024/monsters.json` or `public/data/monsters.json` rather than guessing a name.
-3. If what you're given doesn't quite support the scenario (missing feature, wrong target type, wrong level), **fix it** — edit the character, add the right NPC, adjust level — rather than declaring incomplete. Run through the pitfalls checklist above first; most "can't test this" situations turn out to be one of those five.
+2. Create or reuse any needed NPC creatures for combat/spell targeting tests via the Encounter Builder — check the monster registry first and reuse an already-joined monster when it fits. NPC monster names must match `public/data/monsters.json` exactly (there is NO `public/data/2024/monsters.json` — monsters are shared across both rulesets); check it rather than guessing a name.
+3. If what you're given doesn't quite support the scenario (missing feature, wrong target type, wrong level), **fix it** — edit the character, add the right NPC, adjust level — rather than declaring incomplete. Run through the pitfalls checklist above first; most "can't test this" situations turn out to be one of those nine.
 4. **Checkpoint:** write one line to `.opencode/plans/checkpoint-<automation-id>.md` — what character/NPCs now exist and their exact names. Cheap insurance if you get compacted after this point.
 
 ### Step 3 — Trigger the scenario (via Playwright MCP)
 
-1. Set a target before attacking — click the target icon on the creature card.
+1. Set a target before attacking — click the target icon on the creature card. When a monster forces a save on a character, arm the target on the monster's card too (`targetName`) — an unarmed monster's roll hangs forever.
 2. Trigger the specific situation named in the trigger conditions (the roll, action, or combat state). Click "Done" after attacks resolve — don't skip this step.
 3. If edits don't seem to take effect, check the caching pitfall above (wait 15+ seconds / reload / clear cache via Admin panel) before assuming something is broken.
 
