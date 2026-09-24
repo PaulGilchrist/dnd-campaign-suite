@@ -177,12 +177,12 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
     describe('condition', () => {
       it('returns true when automation.actions exists', () => {
         const ctx = makeCtx({ playerStats: { automation: { actions: [] } } });
-        expect(steps[11].condition(ctx)).toBe(true);
+        expect(steps[12].condition(ctx)).toBe(true);
       });
 
       it('returns false when automation.actions is missing', () => {
         const ctx = makeCtx({ playerStats: { automation: {} } });
-        expect(steps[11].condition(ctx)).toBe(false);
+        expect(steps[12].condition(ctx)).toBe(false);
       });
     });
 
@@ -194,7 +194,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3');
       });
@@ -218,7 +218,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d6 [radiant]');
       });
@@ -242,7 +242,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d6 [poison]');
       });
@@ -260,7 +260,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.data.formula).not.toContain('+ 1d6');
       });
@@ -291,7 +291,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.data.formula).not.toContain('+ 1d6');
       });
@@ -324,7 +324,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.data.formula).not.toContain('+ 1d6');
       });
@@ -352,7 +352,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.modal).toEqual({
           type: 'damageTypeChoice',
@@ -386,7 +386,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        await steps[11].handler(ctx);
+        await steps[12].handler(ctx);
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
           'TestChar',
@@ -424,7 +424,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        await steps[11].handler(ctx);
+        await steps[12].handler(ctx);
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
           'TestChar',
@@ -456,7 +456,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.data.formula).not.toContain('+ 1d6');
       });
@@ -483,7 +483,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses', () => {
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[11].handler(ctx);
+        const result = await steps[12].handler(ctx);
 
         expect(result.data.formula).toContain('+ 1d6');
       });

@@ -5,6 +5,7 @@ import { getAttackRiderOptions, getAttackRiderOptionsByContext } from '../../aut
 import { sendBardicInspirationOffensePrompt } from '../../combat/prompts/bardicInspirationPromptUtils.js';
 import { hasBardicInspirationOffense, getBardicInspirationDieSize } from '../../combat/auras/bardicInspirationState.js';
 import { spendResource } from '../../automation/common/resourceCheck.js';
+import { checkOncePerTurnWithSkip } from '../../automation/common/oncePerTurn.js';
 import { addEntry } from '../../ui/logService.js';
 import utils from '../../ui/utils.js';
 
@@ -114,10 +115,49 @@ export function buildCunningStrikeStep() {
   };
 }
 
+export function buildChargerStep() {
+  return {
+    name: 'charger',
+    subscribe: 'cunning:checked',
+    emit: 'charger:checked',
+    condition: (ctx) => ctx.hit && ['melee', 'unarmed'].includes(ctx.attack?.weaponType) && !!ctx.playerStats.automation?.passives,
+    handler: async (ctx) => {
+      const a = (ctx.playerStats.automation?.passives || []).find(
+        p => p.type === 'attack_rider' && p.trigger === 'melee_hit_after_10ft_charge' && p.chooseOne
+      );
+      if (!a) return { data: {} };
+
+      const lastAttack = await getRuntimeValue('campaign', 'lastAttack', ctx.campaignName);
+      if (!lastAttack?.hit || lastAttack?.attackerName !== ctx.playerStats.name) {
+        return { data: {} };
+      }
+
+      const usedKey = `_${a.name.replace(/\s+/g, '_')}_usedRound`;
+      const skipKey = `_${a.name.replace(/\s+/g, '_')}_skippedRound`;
+      const skip = await checkOncePerTurnWithSkip(a.name, usedKey, skipKey, ctx.playerStats, ctx.campaignName);
+      if (skip) return { data: {} };
+
+      const cs = await getCombatContext(ctx.campaignName);
+      const target = cs ? getTargetFromAttacker(cs, ctx.playerStats.name) : null;
+      const modalProps = {
+        action: a,
+        playerStats: ctx.playerStats,
+        campaignName: ctx.campaignName,
+        targetName: target?.name || null,
+      };
+      ctx.setAttackRiderModal?.(modalProps);
+      return {
+        data: { _charger: true },
+        modal: { type: 'charger', props: modalProps },
+      };
+    },
+  };
+}
+
 export function buildBardicInspirationOffenseStep() {
   return {
     name: 'bardicInspirationOffense',
-    subscribe: 'cunning:checked',
+    subscribe: 'charger:checked',
     emit: 'bi:checked',
     condition: (ctx) => ctx.hit,
     handler: async (ctx) => {

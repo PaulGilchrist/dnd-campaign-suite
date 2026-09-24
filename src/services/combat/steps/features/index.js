@@ -1,7 +1,6 @@
 import { assassinate } from './assassinate.js';
 import { stealthAttackCost } from './stealthAttackCost.js';
 import { rendMind } from './rendMind.js';
-import { charger } from './charger.js';
 import { shieldBash } from './shieldBash.js';
 import { colossusSlayer } from './colossusSlayer.js';
 import { superiorHuntersPrey } from './superiorHuntersPrey.js';
@@ -23,7 +22,6 @@ export const featureModules = [
   assassinate,
   stealthAttackCost,
   rendMind,
-  charger,
   shieldBash,
   colossusSlayer,
   superiorHuntersPrey,

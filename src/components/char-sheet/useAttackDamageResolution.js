@@ -486,7 +486,7 @@ export default function useAttackDamageResolution({
         // its own flow.
         const approvedFeatureRidersPause = pausedStep === 'featureRiders'
             && (pausedModalType === 'shieldBash' || pausedModalType === 'stalkersFlurry');
-        if (pausedStep !== 'cunningStrike' && pausedStep !== 'attackRiderManeuvers' && pausedStep !== 'tacticalMaster' && !approvedFeatureRidersPause) return;
+        if (pausedStep !== 'cunningStrike' && pausedStep !== 'charger' && pausedStep !== 'attackRiderManeuvers' && pausedStep !== 'tacticalMaster' && !approvedFeatureRidersPause) return;
         const stash = resumeRef.current?.pipelineStash;
         if (!stash) return;
         await stash.pipeline.resume(stash.ctx, resumeRef);

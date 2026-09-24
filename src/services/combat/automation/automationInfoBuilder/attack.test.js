@@ -115,6 +115,33 @@ describe('attackHandlers – attack_rider', () => {
         expect(speedResult.options[0].value).toBe(10)
     })
 
+    it('maps Charger push effect to a named option with distance and sizeLimit', () => {
+        const feature = makeFeature({
+            type: 'attack_rider',
+            trigger: 'melee_hit_after_10ft_charge',
+            chooseOne: true,
+            oncePerTurn: true,
+            effects: [
+                { option: 'damage_bonus', dice: '1d8' },
+                { option: 'push', distance: '10 ft', sizeLimit: 'one_size_larger' },
+            ]
+        })
+        const result = attackHandlers.attack_rider(feature, BASE_STATS)
+        expect(result.options).toHaveLength(2)
+        expect(result.options[0]).toEqual({
+            name: 'Damage Bonus',
+            effect: 'damage_bonus',
+            damageExpression: '1d8',
+            damageType: '',
+        })
+        expect(result.options[1]).toEqual({
+            name: 'Push 10 ft',
+            effect: 'push',
+            value: 10,
+            sizeLimit: 'one_size_larger',
+        })
+    })
+
     it('maps effects array to options for known effect types', () => {
         const feature = makeFeature({
             type: 'attack_rider',

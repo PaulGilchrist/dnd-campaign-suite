@@ -44,6 +44,17 @@ const CONDITION_EFFECT_OPTION_DEFAULTS = {
     blinded: { label: 'Blinded', saveAbility: 'DEX' },
 };
 
+function mapPushEffectOption(effect) {
+    const distMatch = String(effect.distance || '10 ft').match(/(\d+)/);
+    const dist = distMatch ? distMatch[1] : '10';
+    return {
+        name: effect.name || `Push ${dist} ft`,
+        effect: 'push',
+        value: parseInt(dist, 10) || 10,
+        sizeLimit: effect.sizeLimit || null,
+    };
+}
+
 function mapAutomationEffectOption(effect) {
     if (effect.option === 'damage_bonus') {
         return {
@@ -52,6 +63,9 @@ function mapAutomationEffectOption(effect) {
             damageExpression: effect.dice || '1d6',
             damageType: effect.damageType || '',
         };
+    }
+    if (effect.option === 'push') {
+        return mapPushEffectOption(effect);
     }
     const defaults = CONDITION_EFFECT_OPTION_DEFAULTS[effect.option];
     if (defaults) {

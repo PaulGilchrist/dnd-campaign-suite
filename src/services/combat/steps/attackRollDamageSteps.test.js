@@ -167,8 +167,8 @@ describe('buildAttackRollDamageSteps', () => {
       expect(steps.length).toBeGreaterThan(0);
     });
 
-    it('has 23 steps', () => {
-      expect(steps).toHaveLength(23);
+    it('has 24 steps', () => {
+      expect(steps).toHaveLength(24);
     });
 
     it('has steps with correct names in order', () => {
@@ -177,6 +177,7 @@ describe('buildAttackRollDamageSteps', () => {
         'housekeeping',
         'attackRiderManeuvers',
         'cunningStrike',
+        'charger',
         'bardicInspirationOffense',
         'rollBaseDamage',
         'buildContext',
@@ -205,7 +206,8 @@ describe('buildAttackRollDamageSteps', () => {
         { sub: 'housekeeping:do', emit: 'maneuvers:check' },
         { sub: 'maneuvers:check', emit: 'maneuvers:handled' },
         { sub: 'maneuvers:handled', emit: 'cunning:checked' },
-        { sub: 'cunning:checked', emit: 'bi:checked' },
+        { sub: 'cunning:checked', emit: 'charger:checked' },
+        { sub: 'charger:checked', emit: 'bi:checked' },
         { sub: 'bi:checked', emit: 'damage:rolled' },
         { sub: 'damage:rolled', emit: 'context:built' },
         { sub: 'context:built', emit: 'sneak:applied' },

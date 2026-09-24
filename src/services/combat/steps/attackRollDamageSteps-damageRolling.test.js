@@ -169,17 +169,17 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
     describe('condition', () => {
       it('returns true when ctx.attack has damage', () => {
         const ctx = makeCtx({ attack: { damage: '1d8+3' } });
-        expect(steps[4].condition(ctx)).toBe(true);
+        expect(steps[5].condition(ctx)).toBe(true);
       });
 
       it('returns true when ctx has autoFormulaOverride', () => {
         const ctx = makeCtx({ autoFormulaOverride: '2d6' });
-        expect(steps[4].condition(ctx)).toBe(true);
+        expect(steps[5].condition(ctx)).toBe(true);
       });
 
       it('returns false when neither attack.damage nor autoFormulaOverride exists', () => {
         const ctx = makeCtx({ attack: {} });
-        expect(steps[4].condition(ctx)).toBe(false);
+        expect(steps[5].condition(ctx)).toBe(false);
       });
     });
 
@@ -192,7 +192,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           setPopupHtml,
         });
 
-        await steps[4].handler(ctx);
+        await steps[5].handler(ctx);
 
         expect(setPopupHtml).toHaveBeenCalledWith(null);
       });
@@ -205,14 +205,14 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           setPopupHtml,
         });
 
-        await steps[4].handler(ctx);
+        await steps[5].handler(ctx);
 
         expect(setPopupHtml).not.toHaveBeenCalled();
       });
 
       it('uses autoFormulaOverride when no attack.damage', async () => {
         const ctx = makeCtx({ autoFormulaOverride: '3d6+2' });
-        const result = await steps[4].handler(ctx);
+        const result = await steps[5].handler(ctx);
 
         expect(rollExpression).toHaveBeenCalledWith('3d6+2');
         expect(result.data.formula).toBe('3d6+2');
@@ -223,7 +223,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           attack: { damage: '2d8+4' },
           autoFormulaOverride: '3d6',
         });
-        const result = await steps[4].handler(ctx);
+        const result = await steps[5].handler(ctx);
 
         expect(rollExpression).toHaveBeenCalledWith('3d6');
         expect(result.data.formula).toBe('3d6');
@@ -234,7 +234,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           attack: { damage: '8d6' },
           empoweredEvocationModifier: 3,
         });
-        const result = await steps[4].handler(ctx);
+        const result = await steps[5].handler(ctx);
 
         expect(result.data.formula).toBe('8d6 + 3 [Empowered Evocation]');
       });
@@ -244,7 +244,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           attack: { damage: '8d6' },
           empoweredEvocationModifier: 0,
         });
-        const result = await steps[4].handler(ctx);
+        const result = await steps[5].handler(ctx);
 
         expect(result.data.formula).toBe('8d6');
       });
@@ -254,7 +254,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           attack: { damage: '8d6' },
           empoweredEvocationModifier: -1,
         });
-        const result = await steps[4].handler(ctx);
+        const result = await steps[5].handler(ctx);
 
         expect(result.data.formula).toBe('8d6');
       });
@@ -264,7 +264,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           attack: { damage: '8d6' },
           isCrit: true,
         });
-        await steps[4].handler(ctx);
+        await steps[5].handler(ctx);
 
         expect(rollExpressionDoubled).toHaveBeenCalledWith('8d6');
         expect(rollExpression).not.toHaveBeenCalled();
@@ -275,7 +275,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           attack: { damage: '8d6' },
           overchannelActive: true,
         });
-        await steps[4].handler(ctx);
+        await steps[5].handler(ctx);
 
         expect(rollExpressionMaximized).toHaveBeenCalledWith('8d6');
         expect(rollExpressionDoubled).not.toHaveBeenCalled();
@@ -287,7 +287,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           isCrit: true,
           overchannelActive: true,
         });
-        await steps[4].handler(ctx);
+        await steps[5].handler(ctx);
 
         expect(rollExpressionMaximized).toHaveBeenCalledWith('8d6');
         expect(rollExpressionDoubled).not.toHaveBeenCalled();
@@ -295,14 +295,14 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
 
       it('returns null when rollExpression returns null', async () => {
         const ctx = makeCtx({ attack: { damage: '0' } });
-        const result = await steps[4].handler(ctx);
+        const result = await steps[5].handler(ctx);
 
         expect(result).toBeNull();
       });
 
       it('returns data with formula, total, rolls, and modifier', async () => {
         const ctx = makeCtx({ attack: { damage: '1d8+3' } });
-        const result = await steps[4].handler(ctx);
+        const result = await steps[5].handler(ctx);
 
         expect(result.data).toEqual(
           expect.objectContaining({
@@ -319,7 +319,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           autoFormulaOverride: '8d6',
           empoweredEvocationModifier: 2,
         });
-        const result = await steps[4].handler(ctx);
+        const result = await steps[5].handler(ctx);
 
         expect(result.data.formula).toBe('8d6 + 2 [Empowered Evocation]');
       });
@@ -334,17 +334,17 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
     describe('condition', () => {
       it('returns true when no buildCtxResult and no autoDamageSource', () => {
         const ctx = makeCtx();
-        expect(steps[5].condition(ctx)).toBe(true);
+        expect(steps[6].condition(ctx)).toBe(true);
       });
 
       it('returns false when ctx.buildCtxResult exists', () => {
         const ctx = makeCtx({ buildCtxResult: { sneakAttackDice: 2 } });
-        expect(steps[5].condition(ctx)).toBe(false);
+        expect(steps[6].condition(ctx)).toBe(false);
       });
 
       it('returns false when ctx.autoDamageSource exists', () => {
         const ctx = makeCtx({ autoDamageSource: 'some-source' });
-        expect(steps[5].condition(ctx)).toBe(false);
+        expect(steps[6].condition(ctx)).toBe(false);
       });
     });
 
@@ -352,7 +352,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
       it('calls buildCtxSync when available (default path)', async () => {
         const buildCtxSyncMock = vi.fn(async () => ({ sneakAttackDice: 2, targetName: 'Orc' }));
         const ctx = makeCtx({ buildCtxSync: buildCtxSyncMock });
-        const result = await steps[5].handler(ctx);
+        const result = await steps[6].handler(ctx);
 
         // WM-008: damage-phase ctx rebuild must not consume one-shot attack te.
         expect(buildCtxSyncMock).toHaveBeenCalledWith({}, { consumeAttackTe: false });
@@ -366,7 +366,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           mapName: 'test-map',
           buildCtx: buildCtxMock,
         });
-        const result = await steps[5].handler(ctx);
+        const result = await steps[6].handler(ctx);
 
         expect(buildCtxMock).toHaveBeenCalled();
         expect(result.data.sneakDice).toBe(3);
@@ -374,7 +374,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
 
       it('returns empty data when no build function available', async () => {
         const ctx = makeCtx();
-        const result = await steps[5].handler(ctx);
+        const result = await steps[6].handler(ctx);
 
         expect(result.data).toEqual({});
       });
@@ -382,7 +382,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
       it('sets targetName from buildResult when ctx.targetName is missing', async () => {
         const buildCtxSyncMock = vi.fn(async () => ({ sneakAttackDice: 1, targetName: 'Goblin' }));
         const ctx = makeCtx({ buildCtxSync: buildCtxSyncMock });
-        const result = await steps[5].handler(ctx);
+        const result = await steps[6].handler(ctx);
 
         expect(result.data.targetName).toBe('Goblin');
       });
@@ -393,7 +393,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           buildCtxSync: buildCtxSyncMock,
           targetName: 'Orc',
         });
-        const result = await steps[5].handler(ctx);
+        const result = await steps[6].handler(ctx);
 
         expect(result.data.targetName).toBeUndefined();
       });
@@ -401,7 +401,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
       it('handles buildCtxResult with no sneakAttackDice', async () => {
         const buildCtxSyncMock = vi.fn(async () => ({}));
         const ctx = makeCtx({ buildCtxSync: buildCtxSyncMock });
-        const result = await steps[5].handler(ctx);
+        const result = await steps[6].handler(ctx);
 
         expect(result.data.sneakDice).toBe(0);
       });
@@ -416,22 +416,22 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
     describe('condition', () => {
       it('returns true when ctx.sneakDice > 0', () => {
         const ctx = makeCtx({ sneakDice: 2 });
-        expect(steps[6].condition(ctx)).toBe(true);
+        expect(steps[7].condition(ctx)).toBe(true);
       });
 
       it('returns false when ctx.sneakDice is 0', () => {
         const ctx = makeCtx({ sneakDice: 0 });
-        expect(steps[6].condition(ctx)).toBe(false);
+        expect(steps[7].condition(ctx)).toBe(false);
       });
 
       it('returns false when ctx.sneakDice is undefined', () => {
         const ctx = makeCtx();
-        expect(steps[6].condition(ctx)).toBe(false);
+        expect(steps[7].condition(ctx)).toBe(false);
       });
 
       it('returns false when ctx.sneakDice is negative', () => {
         const ctx = makeCtx({ sneakDice: -1 });
-        expect(steps[6].condition(ctx)).toBe(false);
+        expect(steps[7].condition(ctx)).toBe(false);
       });
     });
 
@@ -444,7 +444,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[6].handler(ctx);
+        const result = await steps[7].handler(ctx);
 
         expect(result.data.formula).toBe('1d8+3 + 2d6 [Sneak Attack]');
         expect(result.data.effectiveSneakDice).toBe(2);
@@ -460,7 +460,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           rolls: [8, 3],
           isCrit: true,
         });
-        await steps[6].handler(ctx);
+        await steps[7].handler(ctx);
 
         expect(rollExpressionDoubled).toHaveBeenCalledWith('2d6');
         expect(rollExpression).not.toHaveBeenCalled();
@@ -475,7 +475,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           rolls: [8, 3],
           isCrit: false,
         });
-        await steps[6].handler(ctx);
+        await steps[7].handler(ctx);
 
         expect(rollExpression).toHaveBeenCalledWith('2d6');
         expect(rollExpressionDoubled).not.toHaveBeenCalled();
@@ -492,7 +492,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[6].handler(ctx);
+        const result = await steps[7].handler(ctx);
 
         expect(result.data.effectiveSneakDice).toBe(2);
         expect(result.data.formula).toBe('1d8+3 + 2d6 [Sneak Attack]');
@@ -509,7 +509,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[6].handler(ctx);
+        const result = await steps[7].handler(ctx);
 
         expect(result.data.effectiveSneakDice).toBe(0);
         expect(rollExpression).not.toHaveBeenCalled();
@@ -526,7 +526,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: [8, 3],
         });
-        await steps[6].handler(ctx);
+        await steps[7].handler(ctx);
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
           'TestChar',
@@ -544,7 +544,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: [8, 3],
         });
-        await steps[6].handler(ctx);
+        await steps[7].handler(ctx);
 
         expect(setRuntimeValue).not.toHaveBeenCalledWith(
           'TestChar',
@@ -562,7 +562,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: [8, 3],
         });
-        await steps[6].handler(ctx);
+        await steps[7].handler(ctx);
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
           'TestChar',
@@ -581,7 +581,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[6].handler(ctx);
+        const result = await steps[7].handler(ctx);
 
         expect(result.data.effectiveSneakDice).toBe(1);
         expect(result.data.formula).toBe('1d8+3');
@@ -597,7 +597,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[6].handler(ctx);
+        const result = await steps[7].handler(ctx);
 
         expect(result.data.rolls).toEqual([8, 3, 4, 3]);
       });
@@ -611,7 +611,7 @@ describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack
           total: 11,
           rolls: undefined,
         });
-        const result = await steps[6].handler(ctx);
+        const result = await steps[7].handler(ctx);
 
         expect(result.data.rolls).toEqual([5]);
       });

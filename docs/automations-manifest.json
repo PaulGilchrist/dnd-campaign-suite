@@ -1,8 +1,8 @@
 {
   "summary": {
-    "description": "Coverage manifest of all 598 combat automations implemented and tested, cross-referenced with source code implementation locations.",
+    "description": "Coverage manifest of all 618 combat automations implemented and tested, cross-referenced with source code implementation locations.",
     "dataSource": "Implemented and Tested.md",
-    "totalAutomations": 598,
+    "totalAutomations": 618,
     "implementationRoot": "src/services/combat/automation/",
     "verificationStatus": "verified"
   },
@@ -168,6 +168,18 @@
       "class": "Barbarian",
       "triggerConditions": "Action: 1 bonus action; Range: self",
       "expectedBehavior": "You can take the Dash action as a Bonus Action. When you do so, you gain a number of Temporary Hit Points equal to your Proficiency Bonus. You can use this trait a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Short or Long Rest."
+    },
+    {
+      "id": "SP-127",
+      "name": "Aid",
+      "type": "spell",
+      "handler": "src/services/automation/handlers/healing/aidHandler.js (handleAid + applyAid)",
+      "router": "src/services/automation/index.js (aid :508)",
+      "infoBuilder": "n/a (aid type — handled by the aid registry handler)",
+      "verified": "not verified",
+      "class": "Spell",
+      "triggerConditions": "Casting time: Bonus Action; up to 3 creatures within 30 ft",
+      "expectedBehavior": "Your spell bolsters your allies with toughness and resolve. Choose up to three creatures within range. Each target's hit point maximum and current hit points increase by 5 for the duration (upcast: +5 per slot level above 1st)."
     },
     {
       "id": "SP-001",
@@ -518,6 +530,19 @@
       "expectedBehavior": "As a Bonus Action, you gain the benefits below for 10 minutes or until you end them (no action required). Once you use this feature, you can't use it again until you finish a Long Rest. You can also restore your use of it by expending a level 5 spell slot (no action required). Flight: You sprout spectral wings on your back, have a Fly Speed of 60 feet, and can hover. Frightful Aura Whenever an enemy starts its turn in your Aura of Protection, that creature must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. Attack rolls against the Frightened creature have Advantage."
     },
     {
+      "id": "CLA-402",
+      "name": "Awakened Mind",
+      "type": "classFeature",
+      "handler": "src/services/automation/handlers/buffs/buffHandler.js (telepathic_speech — activation target-selection modal :92/:607, effect application :781)",
+      "router": "n/a (temp_buff)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/temp.js (temp_buff)",
+      "verified": "not verified",
+      "class": "Warlock",
+      "triggerConditions": "Bonus Action: choose one creature within 30 ft; duration = Warlock level in minutes",
+      "expectedBehavior": "Bonus Action, choose one creature within 30 feet. Communicate telepathically while within a number of miles equal to Charisma modifier (minimum 1 mile). Duration: minutes equal to Warlock level.",
+      "note": "Social/informational effect — activation (target-selection modal + duration) is automated; the telepathic communication itself is roleplayed."
+    },
+    {
       "id": "MN-002",
       "name": "Bait and Switch",
       "type": "maneuver",
@@ -602,6 +627,18 @@
       "expectedBehavior": "During your turn, your reach is 10 feet greater with any Melee weapon that has the Heavy or Versatile property, as tendrils of the World Tree extend from you. When you hit with such a weapon on your turn, you can activate the Push or Topple mastery property in addition to a different mastery property you're using with that weapon."
     },
     {
+      "id": "CLA-399",
+      "name": "Battle Magic",
+      "type": "classFeature",
+      "handler": "src/services/automation/handlers/combat/bonusActionAttackHandler.js (bonus_action_attack; gated on lastActionSpellCast — src/components/char-sheet/useCharActionsAutomation.js :119, flag set by src/services/rules/spells/spellCastService/execution/index.js :62)",
+      "router": "src/services/automation/index.js (bonus_action_attack :312)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (bonus_action_attack)",
+      "verified": "not verified",
+      "class": "Bard",
+      "triggerConditions": "Bonus Action: after casting a spell with an action casting time",
+      "expectedBehavior": "After you cast a spell that has a casting time of an action, you can make one attack with a weapon as a Bonus Action."
+    },
+    {
       "id": "SP-014",
       "name": "Beacon of Hope",
       "type": "spell",
@@ -612,6 +649,19 @@
       "class": "Spell",
       "triggerConditions": "Range: 30 feet",
       "expectedBehavior": "Level 3 Abjuration (Cleric) Casting Time: Action Range: 30 feet Components: V, S Duration: Concentration, up to 1 minute Choose any number of creatures within range. For the duration, each target has Advantage on Wisdom saving throws and Death Saving Throws and regains the maximum number of Hit Points possible from any healing."
+    },
+    {
+      "id": "CLA-404",
+      "name": "Beast Spells",
+      "type": "classFeature",
+      "handler": "n/a — not implemented",
+      "router": "n/a",
+      "infoBuilder": "n/a",
+      "verified": "not verified",
+      "class": "Druid",
+      "triggerConditions": "Passive: while in Wild Shape Beast form — may cast spells lacking costly/consumed Material components",
+      "expectedBehavior": "While using Wild Shape, you can cast spells in Beast form, except for any spell that has a Material component with a cost specified or that consumes its Material component.",
+      "note": "No automation implemented — classes.json declares passive_rule (beast_spells). Implement when verification runs."
     },
     {
       "id": "CLA-032",
@@ -817,6 +867,19 @@
       "expectedBehavior": "When you miss with an attack roll, you can hit instead. Once you use this benefit, you can't use it again until the start of your next turn."
     },
     {
+      "id": "FT-108",
+      "name": "Boon of Dimensional Travel",
+      "type": "feat",
+      "handler": "n/a — not implemented",
+      "router": "n/a",
+      "infoBuilder": "n/a",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "After the Attack action or the Dash action: teleport up to 30 ft (Blink Steps)",
+      "expectedBehavior": "Blink Steps. Immediately after you take the Attack action or the Dash action, you can teleport up to 30 feet to an unoccupied space you can see.",
+      "note": "No automation implemented — 2024 feats.json declares no automation for Blink Steps. Implement when verification runs."
+    },
+    {
       "id": "FT-009",
       "name": "Boon Of Energy Resistance",
       "type": "feat",
@@ -1011,6 +1074,31 @@
       "race": "Aasimar",
       "triggerConditions": "Action: 1 bonus action; Min level: 3; Recharge: long_rest",
       "expectedBehavior": "When you reach character level 3, you can transform as a Bonus Action using one of the options below (choose the option each time you transform). The transformation lasts for 1 minute or until you end it (no action required). Once you transform, you can't do so again until you finish a Long Rest. Once on each of your turns before the transformation ends, you can deal extra damage to one target when you deal damage to it with an attack or a spell. The extra damage equals your Proficiency Bonus, and the extra damage's type is either Necrotic for Necrotic Shroud or Radiant for Heavenly Wings and Inner Radiance. Here are the transformation options:"
+    },
+    {
+      "id": "FT-106",
+      "name": "Charger – Charge Attack",
+      "type": "feat",
+      "handler": "src/services/combat/steps/attackRollRiders.js (buildChargerStep – choose-one modal pause on melee hit) + src/services/automation/handlers/combat/attackRiderHandler.js (applyRiderOption: 1d8 bonus via targetEffects step, or 10 ft push)",
+      "router": "n/a (damage-pipeline step, not a registry handler)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (attack_rider – effects → options)",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "Melee hit, once per turn (chooseOne: 1d8 damage bonus or push up to 10 ft, target no more than one size larger)",
+      "expectedBehavior": "If you move at least 10 feet in a straight line toward a target immediately before hitting it with a melee attack roll as part of the Attack action, choose one of the following effects: gain a d8 bonus to the attack's damage roll, or push the target up to 10 feet away if it is no more than one size larger than you. You can use this benefit only once on each of your turns.",
+      "note": "Implemented 2026-09-24: effects→options normalization + buildChargerStep pipeline pause/resume (1d8 folds into the damage roll; push is logged). The 10 ft straight-line movement is not tracked by the engine — the modal prompts on any melee hit and the player self-attests the charge."
+    },
+    {
+      "id": "FT-105",
+      "name": "Charger – Improved Dash",
+      "type": "feat",
+      "handler": "src/services/automation/handlers/buffs/buffHandler.js (temp_buff speed_bonus)",
+      "router": "src/services/automation/index.js (temp_buff)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/temp.js (temp_buff)",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "Dash action",
+      "expectedBehavior": "When you take the Dash action, your Speed increases by 10 feet for that action."
     },
     {
       "id": "BG-003",
@@ -1954,6 +2042,18 @@
       "expectedBehavior": "You gain a +2 bonus to damage rolls you make with melee weapons."
     },
     {
+      "id": "FT-104",
+      "name": "Dual Wielder",
+      "type": "feat",
+      "handler": "src/services/rules/core/attackCalc2024.js (hasDualWielder :227 – off-hand Bonus Action attack, no ability modifier) + src/services/automation/handlers/combat/bonusAttacksHandler.js",
+      "router": "src/services/automation/index.js (bonus_attacks :443)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (bonus_attacks)",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "Attack action with a Light weapon (extra attack as a Bonus Action with a different one-handed weapon); Quick Draw: draw/stow two weapons",
+      "expectedBehavior": "When you take the Attack action on your turn and attack with a weapon that has the Light property, you can make one extra attack as a Bonus Action later on the same turn with a different weapon, which must be a Melee weapon that lacks the Two-Handed property. You don't add your ability modifier to the damage of this attack. You can draw or stow two weapons that lack the Two-Handed property when you would normally be able to draw or stow only one."
+    },
+    {
       "id": "FS-006",
       "name": "Dueling",
       "type": "fightingStyle",
@@ -2288,6 +2388,18 @@
       "expectedBehavior": "When commanding Primal Companion to take an action, also command it to take Dash, Disengage, Dodge, or Help action using its Bonus Action. It can deal Force damage or its normal damage type."
     },
     {
+      "id": "SP-128",
+      "name": "Expeditious Retreat",
+      "type": "spell",
+      "handler": "src/services/rules/features/expeditiousRetreatService.js + src/services/rules/spells/spellCastService/execution/triggerSpells.js (Dash bonus action while the spell is active)",
+      "router": "n/a",
+      "infoBuilder": "n/a",
+      "verified": "not verified",
+      "class": "Spell",
+      "triggerConditions": "Bonus Action on each of your turns until the spell ends: Dash",
+      "expectedBehavior": "This spell allows you to move at an incredible pace. When you cast this spell, and then as a bonus action on each of your turns until the spell ends, you can take the Dash action."
+    },
+    {
       "id": "CLA-128",
       "name": "Expert Divination",
       "type": "classFeature",
@@ -2575,6 +2687,19 @@
       "class": "Fire Giant",
       "triggerConditions": "On hit with attack roll; Uses: proficiency_bonus, recharges on long rest",
       "expectedBehavior": "When you hit a target with an attack roll and deal damage to it, you can also deal 1d10 Fire damage. (Fire Giant subrace of Goliath)"
+    },
+    {
+      "id": "CLA-405",
+      "name": "Fleet Step",
+      "type": "classFeature",
+      "handler": "n/a — not implemented",
+      "router": "n/a",
+      "infoBuilder": "n/a",
+      "verified": "not verified",
+      "class": "Monk",
+      "triggerConditions": "Passive: after taking any Bonus Action other than Step of the Wind, you may use Step of the Wind",
+      "expectedBehavior": "When you take a Bonus Action other than Step of the Wind, you can also use Step of the Wind immediately after that Bonus Action.",
+      "note": "No automation implemented — no automation declared in classes.json. Implement when verification runs."
     },
     {
       "id": "SP-050",
@@ -3266,6 +3391,18 @@
       "class": "Paladin",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "As a Bonus Action, you can imbue your Aura of Protection with holy power, granting the benefits below for 10 minutes or until you end them (no action required). Once you use this feature, you can't use it again until you finish a Long Rest. You can also restore your use of it by expending a level 5 spell slot (no action required). Holy Ward: You have Advantage on any saving throw you are forced to make by a Fiend or an Undead. Radiant Damage: Whenever an enemy starts its turn in the aura, that creature takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus"
+    },
+    {
+      "id": "CLA-398",
+      "name": "Hunter's Lore",
+      "type": "classFeature",
+      "handler": "src/services/automation/contextBuilder-sync.js (IRV knowledge for Hunter's Marked targets)",
+      "router": "n/a",
+      "infoBuilder": "n/a (passive_rule — no dedicated builder)",
+      "verified": "not verified",
+      "class": "Ranger",
+      "triggerConditions": "Passive: while a creature is marked by Hunter's Mark",
+      "expectedBehavior": "While a creature is marked by Hunter's Mark, know whether it has Immunities, Resistances, or Vulnerabilities."
     },
     {
       "id": "SP-068",
@@ -4233,6 +4370,19 @@
       "expectedBehavior": "As a Bonus Action, teleport up to 30 feet and have Advantage on the next attack roll. Uses equal to Wisdom modifier. Can restore uses by expending level 2+ spell slot."
     },
     {
+      "id": "FT-107",
+      "name": "Mounted Combatant",
+      "type": "feat",
+      "handler": "n/a — not implemented",
+      "router": "n/a",
+      "infoBuilder": "n/a",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "Mounted: advantage vs unmounted creatures one size smaller within 5 ft of the mount; reactions: Leap Aside (mount Dex save for half) / Veer (redirect attacks that hit the mount)",
+      "expectedBehavior": "While mounted, you have Advantage on attack rolls against any unmounted creature within 5 feet of your mount that is at least one size smaller than the mount. If your mount is subjected to an effect that allows it to make a Dexterity saving throw to take only half damage, it instead takes no damage if it succeeds on the saving throw and only half damage if it fails. While mounted, you can force an attack that hits your mount to hit you instead if you don't have the Incapacitated condition.",
+      "note": "No automation implemented. 2024 feats.json declares automations for all three benefits (conditional_advantage, reaction_bonus ×2) — implement when verification runs."
+    },
+    {
       "id": "FT-059",
       "name": "Musician",
       "type": "feat",
@@ -4638,6 +4788,30 @@
       "verified": "verified",
       "triggerConditions": "Automation type: ignore_resistance",
       "expectedBehavior": "When you make a damage roll that deals Poison damage, it ignores Resistance to Poison damage."
+    },
+    {
+      "id": "FT-102",
+      "name": "Polearm Master – Pole Strike",
+      "type": "feat",
+      "handler": "src/services/automation/handlers/combat/bonusActionAttackHandler.js",
+      "router": "src/services/automation/index.js (bonus_action_attack :312)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (bonus_action_attack)",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "Bonus Action: after the Attack action with a Quarterstaff, Spear, or Heavy+Reach weapon",
+      "expectedBehavior": "Immediately after you take the Attack action and attack with a Quarterstaff, a Spear, or a weapon that has the Heavy and Reach properties, you can use a Bonus Action to make a melee attack with the opposite end of the weapon. The weapon deals Bludgeoning damage, and the weapon's damage die for this attack is a d4."
+    },
+    {
+      "id": "FT-103",
+      "name": "Polearm Master – Reactive Strike",
+      "type": "feat",
+      "handler": "src/services/automation/handlers/reactions/reactionDamageHandler.js",
+      "router": "src/services/automation/index.js (reaction_damage :334)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/reaction.js (reaction_damage)",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "Reaction: while holding a polearm, a creature enters the 5 ft reach you have with it",
+      "expectedBehavior": "While you're holding a Quarterstaff, a Spear, or a weapon that has the Heavy and Reach properties, you can take a Reaction to make one melee attack against a creature that enters the 5-foot reach you have with that weapon."
     },
     {
       "id": "SP-086",
@@ -5215,6 +5389,18 @@
       "expectedBehavior": "Once per turn, when you use a maneuver, roll 1d8 and use the number instead of expending a Superiority Die."
     },
     {
+      "id": "CLA-397",
+      "name": "Relentless Avenger",
+      "type": "classFeature",
+      "handler": "src/services/automation/handlers/class-cleric-paladin/relentlessAvengerHandler.js (speed_zero on target until end of current turn)",
+      "router": "src/services/automation/index.js (relentless_avenger :412)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/core-handlers.js (relentless_avenger)",
+      "verified": "not verified",
+      "class": "Paladin",
+      "triggerConditions": "Reaction: after your Opportunity Attack hits a creature (per classes.json description)",
+      "expectedBehavior": "When you hit a creature with an Opportunity Attack, reduce creature's Speed to 0 until end of current turn. Move up to half Speed as part of same Reaction."
+    },
+    {
       "id": "CLA-288",
       "name": "Relentless Endurance",
       "type": "classFeature",
@@ -5611,6 +5797,30 @@
       "class": "Monk",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Remove Charmed, Frightened, or Poisoned condition from yourself at end of each turn. Forgoing food and drink doesn't give Exhaustion."
+    },
+    {
+      "id": "FT-100",
+      "name": "Sentinel – Guardian",
+      "type": "feat",
+      "handler": "src/services/automation/handlers/combat/sentinelGuardianHandler.js",
+      "router": "src/services/automation/index.js (sentinel_guardian :615)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/reaction.js (reaction_damage)",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "Reaction: a creature within 5 ft takes the Disengage action or hits a target other than you",
+      "expectedBehavior": "Immediately after a creature within 5 feet of you takes the Disengage action or hits a target other than you with an attack, you can make an Opportunity Attack against that creature."
+    },
+    {
+      "id": "FT-101",
+      "name": "Sentinel – Halt",
+      "type": "feat",
+      "handler": "src/services/automation/handlers/combat/sentinelHaltHandler.js",
+      "router": "src/services/automation/index.js (sentinel :616)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/passive.js (passive_rule)",
+      "verified": "not verified",
+      "class": "Feat",
+      "triggerConditions": "Passive: your Opportunity Attack hits a creature",
+      "expectedBehavior": "When you hit a creature with an Opportunity Attack, the creature's Speed becomes 0 for the rest of the current turn."
     },
     {
       "id": "CLA-308",
@@ -6193,6 +6403,18 @@
       "expectedBehavior": "When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 Thunder damage to that creature. (Storm Giant subrace of Goliath)"
     },
     {
+      "id": "CLA-400",
+      "name": "Stride of the Elements",
+      "type": "classFeature",
+      "handler": "src/services/automation/handlers/combat/strideOfTheElementsHandler.js",
+      "router": "src/services/automation/index.js (stride_of_the_elements :327)",
+      "infoBuilder": "n/a (type has no dedicated info builder)",
+      "verified": "not verified",
+      "class": "Monk",
+      "triggerConditions": "Passive: Elemental Attunement active (choose: Cold Ice Walk / Fire +10 ft Speed / Lightning Fly Speed / Thunder 30 ft teleport)",
+      "expectedBehavior": "When you use your Elemental Attunement, you can gain a special movement type: Cold = Ice Walk (walk on water/ice), Fire = +10ft Speed, Lightning = Fly Speed equal to your Speed, Thunder = teleport 30 ft."
+    },
+    {
       "id": "CLA-339",
       "name": "Stroke of Luck",
       "type": "classFeature",
@@ -6469,6 +6691,18 @@
       "expectedBehavior": "When you hit a creature with a melee attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die to attempt to damage another creature. Choose another creature within 5 feet of the original target and within your reach. If the original attack roll would hit the second creature, it takes damage equal to the number rolled on your Superiority Die. The damage type is the same as the original attack."
     },
     {
+      "id": "SP-129",
+      "name": "Swift Quiver",
+      "type": "spell",
+      "handler": "src/services/automation/handlers/combat/concentrationBonusAttackHandler.js (two bonus-action attacks per turn while concentrating; arrow/bolt weapons only)",
+      "router": "src/services/automation/index.js (concentration_bonus_attack :397)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (concentration_bonus_attack)",
+      "verified": "not verified",
+      "class": "Spell",
+      "triggerConditions": "Bonus Action each turn while concentrating: two attacks with an arrow/bolt weapon (spell creates the ammunition)",
+      "expectedBehavior": "When you cast the spell and as a Bonus Action until it ends, you can make two attacks with a weapon that fires Arrows or Bolts, such as a Longbow or a Light Crossbow. The spell magically creates the ammunition needed for each attack."
+    },
+    {
       "id": "MN-019",
       "name": "Tactical Assessment",
       "type": "maneuver",
@@ -6599,6 +6833,19 @@
       "expectedBehavior": "Action to move an object or willing creature up to 30 feet."
     },
     {
+      "id": "CLA-403",
+      "name": "Telepathic Speech",
+      "type": "classFeature",
+      "handler": "src/services/automation/handlers/buffs/buffHandler.js (telepathic_speech — activation target-selection modal :92/:607, effect application :781)",
+      "router": "n/a (temp_buff)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/temp.js (temp_buff)",
+      "verified": "not verified",
+      "class": "Sorcerer",
+      "triggerConditions": "Bonus Action: choose one creature within 30 ft; duration = Sorcerer level in minutes",
+      "expectedBehavior": "Bonus Action, choose one creature within 30 feet. Communicate telepathically while within a number of miles equal to Charisma modifier (minimum 1 mile). Duration: minutes equal to Sorcerer level.",
+      "note": "Social/informational effect — activation (target-selection modal + duration) is automated; the telepathic communication itself is roleplayed."
+    },
+    {
       "id": "FT-096",
       "name": "Telepathy",
       "type": "feat",
@@ -6716,6 +6963,18 @@
       "class": "Sorcerer",
       "triggerConditions": "Action: bonus action; Action: bonus_action; Duration: 1_minute",
       "expectedBehavior": "You gain the ability to align your consciousness with the endless calculations of Mechanus. As a Bonus Action, you can enter this state for 1 minute. For the duration, attack rolls against you can't benefit from Advantage, and whenever you make a D20 Test, you can treat a roll of 9 or lower on the d20 as a 10. Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 5 Sorcery Points (no action required) to restore your use of it."
+    },
+    {
+      "id": "CLA-401",
+      "name": "Travel Along the Tree",
+      "type": "classFeature",
+      "handler": "src/services/automation/handlers/combat/combatStanceHandler.js (teleport_on_rage → 60 ft teleport modal; 150 ft once per Rage, bring 6 allies within 10 ft)",
+      "router": "n/a (temp_buff effect — TELEPORT_EFFECTS in buffHandler.js :20)",
+      "infoBuilder": "src/services/combat/automation/automationInfoBuilder/temp.js (temp_buff)",
+      "verified": "not verified",
+      "class": "Barbarian",
+      "triggerConditions": "Bonus Action while Rage is active: teleport up to 60 ft (extend to 150 ft once per Rage)",
+      "expectedBehavior": "When you activate your Rage and as a Bonus Action while your Rage is active, you can teleport up to 60 feet to an unoccupied space you can see. In addition, once per Rage, you can increase the range of that teleport to 150 feet. When you do so, you can also bring up to six willing creatures who are within 10 feet of you."
     },
     {
       "id": "CLA-366",
@@ -7207,6 +7466,28 @@
       "class": null,
       "triggerConditions": "getPlayerStats for any character (feat count irrelevant); save_proficiency features from class/subclass/racial/feat via allFeatures",
       "expectedBehavior": "playerStats.saveProficiencies computed unconditionally from allFeatures so feature-based save grants (e.g. Iron Mind WIS) apply even with feats:[]."
+    }
+  ],
+  "excludedFeatures": [
+    {
+      "name": "Actor",
+      "source": "feat (2024 feats.json)",
+      "reason": "Roleplay-only benefit (fake injury/illness/death; advantage on Deception to feign emotion) — no mechanical combat effect to automate."
+    },
+    {
+      "name": "Halfling Nimbleness",
+      "source": "racial trait (2024 races.json)",
+      "reason": "Stealth pass-through (ignore Half/Three-Quarters Cover for Stealth; can move past a creature without Stealth) — no engine cover subsystem exists; advisory GM-enforced."
+    },
+    {
+      "name": "Assassin's Tools",
+      "source": "feat (2024 feats.json)",
+      "reason": "Grant of proficiencies/choices (tools, a skill, and a disguise-identity kit benefit) — character-creation-time data, not combat automation."
+    },
+    {
+      "name": "Expertise",
+      "source": "racial/feature (2024 data)",
+      "reason": "Proficiency doubling at character-creation/skill selection time (skillValidation) — already covered by the proficiency pipeline, not a combat automation."
     }
   ]
 }

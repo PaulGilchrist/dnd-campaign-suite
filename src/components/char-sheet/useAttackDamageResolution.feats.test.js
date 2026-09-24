@@ -201,6 +201,81 @@ describe('useAttackDamageResolution - feats', () => {
             }
             expect(mockRollDamage).toHaveBeenCalled();
         });
+
+        it('pauses with the Charge Attack modal, then folds the 1d8 into the damage roll on resume', async () => {
+            const store = new Map();
+            getRuntimeValue.mockImplementation((name, key) => store.get(`${name}:${key}`) ?? null);
+            setRuntimeValue.mockImplementation((name, key, value) => {
+                if (value === null || value === undefined) store.delete(`${name}:${key}`);
+                else store.set(`${name}:${key}`, value);
+                return Promise.resolve();
+            });
+            store.set('campaign:lastAttack', {
+                hit: true,
+                attackerName: 'TestFighter',
+                weaponType: 'melee',
+                targetName: 'Goblin',
+            });
+            getCombatContext.mockResolvedValue(createCombatContext());
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [],
+                    passives: [
+                        {
+                            type: 'attack_rider',
+                            trigger: 'melee_hit_after_10ft_charge',
+                            chooseOne: true,
+                            oncePerTurn: true,
+                            name: 'Charge Attack',
+                            options: [
+                                { name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '1d8' },
+                                { name: 'Push 10 ft', effect: 'push', value: 10, sizeLimit: 'one_size_larger' },
+                            ],
+                        },
+                    ],
+                },
+            };
+            const { resolveAttackDamage, resumeAttackPipeline } = UseAttackDamageResolution({ playerStats: stats });
+
+            await resolveAttackDamage(makeAttack(), { hit: true });
+            await tick();
+
+            expect(modalState.attackRiderModal).toBeDefined();
+            expect(modalState.attackRiderModal.action.name).toBe('Charge Attack');
+            expect(modalState.attackRiderModal.targetName).toBe('Goblin');
+            expect(mockRollDamage).not.toHaveBeenCalled();
+
+            const { applyRiderOption } = await import('../../services/automation/handlers/combat/attackRiderHandler.js');
+            await applyRiderOption(
+                modalState.attackRiderModal.action,
+                stats,
+                mockCampaignName,
+                'Goblin',
+                ['Damage Bonus'],
+            );
+
+            const effects = store.get('campaign:targetEffects');
+            expect(effects).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        source: 'TestFighter',
+                        effect: 'damage_bonus',
+                        damageExpression: '1d8',
+                    }),
+                ]),
+            );
+            expect(store.get('TestFighter:_Charge_Attack_usedRound')).toBeDefined();
+
+            await resumeAttackPipeline();
+            await tick();
+
+            expect(mockRollDamage).toHaveBeenCalledTimes(1);
+            const call = mockRollDamage.mock.calls[0][0];
+            expect(call.formula).toContain(' + 1d8 [Charge Attack]');
+        });
     });
 
     describe('Shield Master (2024 ruleset)', () => {

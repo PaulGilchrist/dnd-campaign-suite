@@ -171,7 +171,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
   describe('featureRiders step', () => {
     describe('condition', () => {
       it('always returns true', () => {
-        expect(steps[14].condition({})).toBe(true);
+        expect(steps[15].condition({})).toBe(true);
       });
     });
 
@@ -187,7 +187,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 11,
           rolls: [8, 3],
         });
-        const result = await steps[14].handler(ctx);
+        const result = await steps[15].handler(ctx);
 
         expect(result.data).toEqual({
           formula: '1d8+3',
@@ -204,7 +204,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
         });
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        await steps[14].handler(ctx);
+        await steps[15].handler(ctx);
 
         expect(handlerMock).not.toHaveBeenCalled();
       });
@@ -217,7 +217,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
         });
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        await steps[14].handler(ctx);
+        await steps[15].handler(ctx);
 
         expect(handlerMock).toHaveBeenCalledWith(ctx, expect.objectContaining({
           formula: '1d8+3',
@@ -235,7 +235,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
         });
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[14].handler(ctx);
+        const result = await steps[15].handler(ctx);
 
         expect(result.data.total).toBe(20);
         expect(result.data.formula).toBe('1d8+3 + 6 [Feature]');
@@ -250,7 +250,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
         });
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[14].handler(ctx);
+        const result = await steps[15].handler(ctx);
 
         expect(result).toEqual({ modal: { type: 'test-modal', props: {} } });
       });
@@ -266,7 +266,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
         });
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        await steps[14].handler(ctx);
+        await steps[15].handler(ctx);
 
         expect(sideEffectsMock).toHaveBeenCalled();
         featureModules.length = 0;
@@ -285,7 +285,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
         );
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[14].handler(ctx);
+        const result = await steps[15].handler(ctx);
 
         expect(result.data.total).toBe(20);
         featureModules.length = 0;
@@ -309,7 +309,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
         );
 
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        await steps[14].handler(ctx);
+        await steps[15].handler(ctx);
 
         expect(handler2).not.toHaveBeenCalled();
         featureModules.length = 0;
@@ -318,7 +318,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
       it('handles missing rolls gracefully', async () => {
         featureModules.length = 0;
         const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: undefined });
-        const result = await steps[14].handler(ctx);
+        const result = await steps[15].handler(ctx);
 
         expect(result.data.rolls).toEqual([]);
       });
@@ -336,7 +336,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           attack: { weaponType: 'unarmed' },
           playerStats: { automation: { passives: [] } },
         });
-        expect(steps[15].condition(ctx)).toBe(true);
+        expect(steps[16].condition(ctx)).toBe(true);
       });
 
       it('returns false when weaponType is not unarmed', () => {
@@ -344,7 +344,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           attack: { weaponType: 'melee' },
           playerStats: { automation: { passives: [] } },
         });
-        expect(steps[15].condition(ctx)).toBe(false);
+        expect(steps[16].condition(ctx)).toBe(false);
       });
 
       it('returns false when passives are missing', () => {
@@ -352,7 +352,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           attack: { weaponType: 'unarmed' },
           playerStats: { automation: {} },
         });
-        expect(steps[15].condition(ctx)).toBe(false);
+        expect(steps[16].condition(ctx)).toBe(false);
       });
     });
 
@@ -371,7 +371,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 4,
           rolls: [4],
         });
-        const result = await steps[15].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(result.data.formula).toBe('1d4');
       });
@@ -397,7 +397,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 4,
           rolls: [4],
         });
-        await steps[15].handler(ctx);
+        await steps[16].handler(ctx);
 
         expect(ctx.attack.damageType).toBe('psychic');
         expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -435,7 +435,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 4,
           rolls: [4],
         });
-        const result = await steps[15].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(ctx.attack.damageType).toBe('Force');
         expect(result.popup).toContain('resists Bludgeoning');
@@ -478,7 +478,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 4,
           rolls: [4],
         });
-        const result = await steps[15].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(ctx.attack.damageType).toBe('Force');
         expect(result.popup).toContain('immune to Bludgeoning');
@@ -521,7 +521,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 4,
           rolls: [4],
         });
-        const result = await steps[15].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(result.modal).toEqual({
           type: 'damageTypeChoice',
@@ -556,7 +556,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 4,
           rolls: [4],
         });
-        const result = await steps[15].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(result.modal).toEqual({
           type: 'damageTypeChoice',
@@ -591,7 +591,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 4,
           rolls: [4],
         });
-        const result = await steps[15].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(ctx.attack.damageType).toBe('Force');
         expect(result).toHaveProperty('popup');
@@ -626,7 +626,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
           total: 4,
           rolls: [4],
         });
-        const result = await steps[15].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(result.data.formula).toBe('1d4 + 1d6 [force]');
         expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -660,7 +660,7 @@ describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () =
             },
           },
         });
-        const result = await steps[15].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(result.modal).toEqual({
           type: 'damageTypeChoice',
