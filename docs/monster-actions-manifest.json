@@ -15020,7 +15020,7 @@
    "damageTypePrimary": "slashing",
    "reach": "5 ft.",
    "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 12 (2d8 + 3) slashing damage, or 14 (2dl0 + 3) slashing damage if used with two hands.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0959-battleaxe.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0960",

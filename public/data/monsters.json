@@ -32928,10 +32928,11 @@
     "actions": [
       {
         "name": "Battleaxe",
-        "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 12 (2d8 + 3) slashing damage, or 14 (2dl0 + 3) slashing damage if used with two hands.",
+        "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 12 (2d8 + 3) slashing damage, or 14 (2d10 + 3) slashing damage if used with two hands.",
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "2d8 + 3",
+        "damage_dice_two_handed": "2d10 + 3",
         "damage_type_primary": "slashing"
       },
       {
