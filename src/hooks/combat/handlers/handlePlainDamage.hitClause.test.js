@@ -4036,3 +4036,95 @@ describe('MA-1012 Ice Devil Ice Spear frozen_grip hit-clause passthrough', () =>
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const LICH = monsters.find(m => m.index === 'lich');
+const PARALYZING_TOUCH_ACTION = LICH.actions[2];
+
+describe('MA-1084 Lich Paralyzing Touch paralyzed-on-hit grant (one-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Lich 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Lich 1', computedStats: { armorClass: 20 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: 0, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Medium or Small', ac: 12, currentHp: 20, maxHp: 20 }],
+        });
+    });
+
+    function touchContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Cold',
+            attackerName: 'Lich 1',
+            hitClause: buildHitConditionClause(PARALYZING_TOUCH_ACTION),
+        };
+    }
+
+    it('disks-true clause: conditions ["paralyzed"], NO escape DC (RAW: no save)', () => {
+        expect(PARALYZING_TOUCH_ACTION.attack_bonus).toBe(12);
+        expect(PARALYZING_TOUCH_ACTION.hit_conditions).toEqual(['paralyzed']);
+        expect(PARALYZING_TOUCH_ACTION.escape_dc).toBeUndefined();
+        expect(buildHitConditionClause(PARALYZING_TOUCH_ACTION).conditions).toEqual(['paralyzed']);
+    });
+
+    it('grants Paralyzed on the resolved hit via the canonical activeConditions write path', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Paralyzing Touch', formula: '3d6 + 5', total: 20, rolls: [6, 6, 3], modifier: 5, context: touchContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['paralyzed']);
+    });
+
+    it('stamps source meta WITHOUT dc/ability (no escape-save channel)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Paralyzing Touch', formula: '3d6 + 5', total: 20, rolls: [6, 6, 3], modifier: 5, context: touchContext() });
+
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({ paralyzed: { source: 'Lich 1' } });
+        expect(metaCall[2].paralyzed.dc).toBeUndefined();
+        expect(metaCall[2].paralyzed.ability).toBeUndefined();
+    });
+
+    it('logs condition-applied naming the attack (escape DC em-dash, MA-0763 log shape)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Paralyzing Touch', formula: '3d6 + 5', total: 20, rolls: [6, 6, 3], modifier: 5, context: touchContext() });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Paralyzed',
+            reason: 'Paralyzing Touch (escape DC —)',
+        }));
+    });
+
+    it('until-next-turn latch: static-list grant rides the STANDARD latch, no custom clock registered (MA-0775/MA-0763 precedent)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Paralyzing Touch', formula: '3d6 + 5', total: 20, rolls: [6, 6, 3], modifier: 5, context: touchContext() });
+
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Paralyzing Touch', formula: '3d6 + 5', total: 20, rolls: [6, 6, 3], modifier: 5, context: touchContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+

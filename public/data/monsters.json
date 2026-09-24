@@ -38260,7 +38260,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "3d6 + 5",
-        "damage_type_primary": "Cold"
+        "damage_type_primary": "Cold",
+        "hit_conditions": ["paralyzed"]
       },
       {
         "name": "Spellcasting",

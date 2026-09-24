@@ -17343,7 +17343,7 @@
     "paralyzed"
    ],
    "description": "Melee Attack Roll: +12, reach 5 ft. Hit: 15 (3d6 + 5) Cold damage, and the target has the Paralyzed condition until the start of the lich's next turn.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1084-paralyzing-touch.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1085",
