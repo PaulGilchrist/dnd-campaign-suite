@@ -33145,6 +33145,7 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "1d8 + 3",
+        "damage_dice_two_handed": "1d10 + 3",
         "damage_type_primary": "slashing"
       },
       {
