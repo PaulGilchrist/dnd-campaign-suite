@@ -34583,9 +34583,13 @@
         "reach": "5 ft.",
         "save_dc": 12,
         "save_type": "Constitution",
-        "save_effect": "Failure: The target has the Poisoned condition until the end of the homunculus's next turn. Failure by 5 or more: The target has the Poisoned condition for 1 minute. While Poisoned, the target has the Unconscious condition, which ends early if the target takes any damage.",
+        "save_effect": "Failure: The target has the Poisoned condition until the end of the homunculus's next turn.",
         "damage_type_primary": "Piercing",
-        "damage_dice_primary": "1"
+        "damage_dice_primary": "1",
+        "save_margin": {
+          "fails_by": 5,
+          "also": "unconscious"
+        }
       }
     ],
     "bonus_actions": [],
