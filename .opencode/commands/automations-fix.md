@@ -25,20 +25,25 @@ This command pairs with `automations-verify`: verify produces the bug files in `
 
    c. Immediately after the subagent returns, update that row's `verified` field in `docs/automations-manifest.json` on disk — do not hold updates in memory and write them all at the end:
       - `FIX: FIXED` or `FIX: DISPROVED` → `"verified"`
-      - `FIX: SKIPPED` → `"needs manual decision — see .opencode/plans/<bug-file>.md"`
+       - `FIX: SKIPPED` → do NOT park it; go to step (g) — the primary decides and re-dispatches.
       - `FIX: FAILED` (after retry) → `"broken — fix attempts failed, see .opencode/plans/<bug-file>.md"`
 
    d. **Git commit — FIXED and DISPROVED only.** After the manifest row is updated (and the subagent has already deleted its bug file and written its regression test), stage explicitly by path — never `git add -A`:
       - the fixed source file(s) and new regression test file(s) as listed in the subagent's return message,
       - `docs/automations-manifest.json`,
       - the deleted bug file (`git rm` the path if it still shows as deleted-but-unstaged).
-      Commit message: first line `fix(<BUG-ID>): <title>` where `<title>` is the `## Title` text from the bug file (for disproved outcomes use `disproved(<BUG-ID>): <title>`). Do not add `Co-authored-by` or other trailers unless the repo history already uses them.
+       Commit message: first line `fix(<BUG-ID>): <title>` where `<BUG-ID>` is the row id (e.g. `CLA-192`) and `<title>` is the `## Title` text from the bug file (for disproved outcomes use `disproved(<BUG-ID>): <title>`). Do not add `Co-authored-by` or other trailers unless the repo history already uses them.
 
    e. **If the subagent reported a new playbook recipe or a new pitfall it hit**, append it to `docs/test-setup-playbook.md` now, so later bugs in this same run benefit.
 
    f. **Retry rule (FAILED only):** re-dispatch exactly once with the subagent's failure notes prepended to the prompt, so the retry doesn't repeat the same dead end. If the retry also fails, leave the bug file in place, set the manifest row per (c), and move on. Do not retry a third time — that's a signal it needs a human.
 
-   g. **SKIPPED:** the subagent has already appended its `## Fix options` section to the bug file. Do not commit, do not retry. Move on — the user will run a manual pass on `needs manual decision` rows and answer the options.
+    g. **SKIPPED → the PRIMARY decides, then re-dispatches.** The subagent has appended its `## Fix options` to the bug file. Read the options and pick ONE yourself — the option that best fits all of: (1) the automation's RAW description / rule data, (2) the current code (which verified seams already exist), and (3) how the game already works for comparable automations, features, targeted effects, spells, and abilities. Criteria learned this suite:
+       - **Reuse the canonical gameplay path, don't build parallel state.** When a feature already resolves through an established path (a spell-cast/merge seam, an existing automation handler, a verified grant/attack flow), ride that path instead of building parallel state. Never fabricate bonuses into static rule-data rows to compensate for a merge the engine already performs, and never add a GM-input modal when the existing path already resolves the mechanic.
+       - **Register onto existing seams; new consumer CODE is sanctioned.** Registering a targeted effect in `targetEffectDefinitions.js`, adding a parser/grant leg, gating a reaction/feature via an existing gate, threading a transport field (e.g. secondary damage), or a pre-guard turn-start tick are fixes — build them, mirroring the cited sibling byte-shapes. A "new subsystem" is not by itself a skip reason.
+       - **Advisory is the floor only where the mechanic genuinely has no consumer** and the rules say the GM decides (GM-positioned zones, square grids, count enforcement, instakill wording).
+       - **Prefer data authoring over code** (name/`save_dc`/`uses`/`delegates_to`/markup) when the engine already consumes the field.
+       Then re-dispatch ONE fixer with your chosen option as binding instruction ("implement option X, full stop — do not re-litigate"). If it returns FIXED → normal FIXED flow. If it returns FAILED → retry once (f). Only if the re-dispatch is blocked by a genuine hard blocker (e.g. a required UI cannot exist without new persistence + user sign-off) park the row as `"needs manual decision — see .opencode/plans/<bug-file>.md"` with the blocker named. Do not commit a SKIPPED row in the interim.
 
    h. Move to the next bug file.
 
@@ -97,7 +102,7 @@ Then **delete the bug file** (`rm .opencode/plans/<bug-file>.md`) — only after
 
 **FIX: DISPROVED** — Same as FIXED but no source/test changes: delete the bug file, verify deletion, return `FIX: DISPROVED` with the evidence and the title.
 
-**FIX: SKIPPED** — Only when, after studying the verified sibling patterns and the rule data, there are genuinely two or more defensible fix approaches and you cannot tell which the codebase's standards demand. Append a `## Fix options` section to the bug file listing each option with its trade-offs and the verified automations each mirrors, then return `FIX: SKIPPED` with the options. This must be rare — if one option clearly matches existing verified patterns, that IS the answer; fix it.
+**FIX: SKIPPED** — only when you cannot map ANY option onto an existing automation seam and genuinely need the primary to break a tie between two or more defensible designs (or the fix would require brand-new persisted GM-input state with no path to reuse). Append a `## Fix options` section to the bug file listing each option, its trade-offs, the verified behavior each mirrors, and which existing seam (if any) it could ride — then return `FIX: SKIPPED`; the primary will pick one and re-dispatch you (or another fixer) with a binding instruction. Building new consumer code that mirrors an existing verified seam is NOT a skip — fix it. If one option clearly matches existing verified patterns, that IS the answer; fix it.
 
 **FIX: FAILED** — You attempted the fix and it does not work (tests fail, re-verification fails, or the fix is wrong in a way you cannot resolve). Append a `## Fix attempt` section to the bug file: what you changed, what failed, exact error output. Leave the code changes in place if they are partially correct and note that clearly; revert them if they make things worse. Return `FIX: FAILED` with the failure summary.
 
