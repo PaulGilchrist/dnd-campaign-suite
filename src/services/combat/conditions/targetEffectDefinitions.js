@@ -1192,6 +1192,29 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-1012: Ice Devil "Ice Spear" hit-clause composite rider ("Until the
+    // end of its next turn, the target can't take a Bonus Action or Reaction,
+    // its Speed decreases by 10 feet, and it can move or take one action on
+    // its turn, not both"). The hit_target_effect passthrough carries ONE te
+    // (MA-0542/MA-0733/MA-0995 single-string shape), so the rider rides as a
+    // composite: conditionEffects.js folds the speed_reduction + no_reactions
+    // legs (MA-0087 trio consumers; te.value||10 = RAW −10 ft) and the badge
+    // consumer states the grip. The Bonus-Action block and the move-or-one-
+    // action-not-both economy clauses have no consumer channel app-wide
+    // (§70 — GM-enforced advisory copy). Clock via the passthrough's ONE
+    // addExpiration anchored on the ice devil (§38; RAW end-of-turn anchor
+    // is the accepted advisory residual, MA-0542 twin). The spear-returns
+    // clause is advisory-only (row description).
+    effect: 'frozen_grip',
+    label: 'Frozen Grip',
+    description: 'Frozen by an Ice Devil\'s Ice Spear: Speed is reduced by N feet and it can\'t take Reactions until the end of its next turn; it can\'t take a Bonus Action and it can move or take one action on its turn, not both (Bonus Action block and the move-or-action economy are GM-enforced, §70 advisory). The spear returns to the devil\'s hand after a ranged attack (advisory).',
+    icon: 'fa-snowflake',
+    cls: 'effect-debuff',
+    group: 'Movement',
+    fields: ['source', 'value'],
+    defaults: { value: 10 },
+  },
+  {
     effect: 'push',
     label: 'Pushed',
     description: 'The creature was pushed N feet straight away from the source.',

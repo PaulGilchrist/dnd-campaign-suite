@@ -35186,7 +35186,7 @@
         "attack_bonus": 10,
         "reach": "5 ft.",
         "range": "30/120 ft.",
-        "save_effect": "Until the end of its next turn, the target can't take a Bonus Action or Reaction, its Speed decreases by 10 feet, and it can move or take one action on its turn, not both.",
+        "hit_target_effect": "frozen_grip",
         "damage_dice_primary": "2d8 + 5",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "3d6",

@@ -162,6 +162,22 @@ describe('computeConditionEffects — targetEffects', () => {
     expect(result.speedReduction).toBe(10);
   });
 
+  // MA-1012: Ice Devil Ice Spear composite frozen_grip te — mirrors the
+  // MA-0087 trio consumers where live: speed_reduction numeric leg
+  // (te.value||10 = RAW −10 ft, charSummaryCalc consumes) + no_reactions
+  // marker. Bonus-Action block + move-or-action economy = §70 advisory.
+  it('MA-1012: frozen_grip te without value folds speedReduction 10 + riderNoReactions (passthrough default)', () => {
+    const result = computeConditionEffects({ targetEffects: [{ effect: 'frozen_grip' }] });
+    expect(result.speedReduction).toBe(10);
+    expect(result.riderNoReactions).toBe(true);
+  });
+
+  it('MA-1012: frozen_grip te with explicit value folds that value', () => {
+    const result = computeConditionEffects({ targetEffects: [{ effect: 'frozen_grip', value: 15 }] });
+    expect(result.speedReduction).toBe(15);
+    expect(result.riderNoReactions).toBe(true);
+  });
+
   it('sets pushEffect and pushDistance for push effect', () => {
     const result = computeConditionEffects({ targetEffects: [{ effect: 'push', value: 10 }] });
     expect(result.pushEffect).toBe(true);

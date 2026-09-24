@@ -278,6 +278,25 @@ describe('targetEffectDefinitions', () => {
         expect(speedReduction.fields).toEqual(['source', 'value']);
         expect(speedReduction.defaults.value).toBe(10);
       });
+
+      // MA-1012: Ice Devil Ice Spear composite rider — the single-string
+      // hit_target_effect passthrough (§215) carries ONE te, so the
+      // no-Bonus-Action/no-Reaction/Speed−10/move-or-action rider registers
+      // as frozen_grip with value default 10 = RAW −10 ft (MA-0995 whitelist
+      // shape). Consumer legs: conditionEffects.js speed_reduction +
+      // no_reactions fold (MA-0087 trio) + ConditionEffectBadges.jsx
+      // 'Frozen Grip' badge; economy clauses are §70 advisory copy.
+      it('MA-1012: frozen_grip whitelist pins label/group/value field + default 10 for the Ice Spear passthrough', () => {
+        const frozenGrip = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'frozen_grip');
+        expect(frozenGrip.label).toBe('Frozen Grip');
+        expect(frozenGrip.group).toBe('Movement');
+        expect(frozenGrip.fields).toEqual(['source', 'value']);
+        expect(frozenGrip.defaults.value).toBe(10);
+        expect(frozenGrip.description).toMatch(/Speed is reduced by N feet/);
+        expect(frozenGrip.description).toMatch(/can't take Reactions/);
+        expect(frozenGrip.description).toMatch(/move or take one action.*not both/);
+        expect(frozenGrip.description).toMatch(/GM-enforced/);
+      });
     });
   });
 

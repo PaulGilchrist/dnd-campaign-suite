@@ -15923,7 +15923,7 @@
    "reach": "5 ft.",
    "range": "30/120 ft.",
    "description": "Melee or Ranged Attack Roll: +10, reach 5 ft. or range 30/120 ft. Hit: 14 (2d8 + 5) Piercing damage plus 10 (3d6) Cold damage. Until the end of its next turn, the target can't take a Bonus Action or Reaction, its Speed decreases by 10 feet, and it can move or take one action on its turn, not both. Hit or Miss: The spear magically returns to the devil's hand immediately after a ranged attack.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1012-ice-spear.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1013",

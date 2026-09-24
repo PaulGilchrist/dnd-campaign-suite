@@ -386,6 +386,16 @@ const EARLY_TARGET_EFFECT_HANDLERS = {
   speed_reduction: (effects, te) => {
     effects.speedReduction = (effects.speedReduction || 0) + (te.value || 10);
   },
+  // MA-1012: Ice Devil Ice Spear composite hit-clause te — mirrors the
+  // MA-0087 trio consumers where live: speed_reduction numeric leg
+  // (te.value||10 = RAW −10 ft, consumed by charSummaryCalc) + no_reactions
+  // marker. The Bonus-Action block and move-or-one-action-not-both economy
+  // clauses have no consumer channel app-wide (§70) — GM-enforced advisory
+  // carried on the registry description + grant log.
+  frozen_grip: (effects, te) => {
+    effects.speedReduction = (effects.speedReduction || 0) + (te.value || 10);
+    effects.riderNoReactions = true;
+  },
   // MA-0073: Scorching Sands failed-save clause — halved Speed until the
   // end of the target's next turn. Consumed by charSummaryCalc (halved
   // numeric Speed) + CharSummary attribution line.

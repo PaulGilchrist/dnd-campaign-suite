@@ -3897,8 +3897,138 @@ describe('MA-0995 Hobgoblin Warlord Javelin speed_reduction hit-clause passthrou
         const fn = createLogDamageAndShow(deps);
         await fn({ name: 'Javelin', formula: '2d6 + 4', total: 11, rolls: [3, 4], modifier: 4, context: {
             targetName: 'Bandit 1',
+             damageType: 'Piercing',
+             attackerName: 'Hobgoblin Warlord 1',
+         } });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+
+const ICE_DEVIL = monsters.find(m => m.name === 'Ice Devil');
+const ICE_SPEAR_ACTION = ICE_DEVIL.actions[1];
+
+describe('MA-1012 Ice Devil Ice Spear frozen_grip hit-clause passthrough', () => {
+    const deps = {
+        characterName: 'Ice Devil 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Ice Devil 1', computedStats: { armorClass: 17 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getEffectDefinition.mockImplementation((key) => ({
+            effect: key,
+            label: 'Frozen Grip',
+            description: 'Frozen by an Ice Devil\'s Ice Spear: Speed is reduced by N feet and it can\'t take Reactions until the end of its next turn; it can\'t take a Bonus Action and it can move or take one action on its turn, not both (Bonus Action block and the move-or-action economy are GM-enforced, §70 advisory). The spear returns to the devil\'s hand after a ranged attack (advisory).',
+            group: 'Movement',
+        }));
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 21, newHp: 978, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-1012 data-lock: Ice Spear authors hit_target_effect:"frozen_grip" and NO save_effect decoy (§410 wrong-slot fix; attack core exact)', () => {
+        expect(ICE_SPEAR_ACTION.name).toBe('Ice Spear');
+        expect(ICE_SPEAR_ACTION.attack_bonus).toBe(10);
+        expect(ICE_SPEAR_ACTION.reach).toBe('5 ft.');
+        expect(ICE_SPEAR_ACTION.range).toBe('30/120 ft.');
+        expect(ICE_SPEAR_ACTION.damage_dice_primary).toBe('2d8 + 5');
+        expect(ICE_SPEAR_ACTION.damage_type_primary).toBe('Piercing');
+        expect(ICE_SPEAR_ACTION.damage_dice_secondary).toBe('3d6');
+        expect(ICE_SPEAR_ACTION.damage_type_secondary).toBe('Cold');
+        expect(ICE_SPEAR_ACTION.hit_target_effect).toBe('frozen_grip');
+        expect(ICE_SPEAR_ACTION.save_effect).toBeUndefined();
+        expect(ICE_SPEAR_ACTION.save_dc).toBeUndefined();
+        expect(ICE_SPEAR_ACTION.save_type).toBeUndefined();
+        expect(ICE_SPEAR_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a targetEffect-only clause from the Ice Spear row', () => {
+        expect(buildHitConditionClause(ICE_SPEAR_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Ice Spear',
+            targetEffect: 'frozen_grip',
+        });
+    });
+
+    it('registers the frozen_grip te on the victim, sourced from the ice devil, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Ice Spear', formula: '2d8 + 5', total: 13, rolls: [4, 4], modifier: 5, context: {
+            targetName: 'Bandit 1',
             damageType: 'Piercing',
-            attackerName: 'Hobgoblin Warlord 1',
+            attackerName: 'Ice Devil 1',
+            hitClause: buildHitConditionClause(ICE_SPEAR_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'frozen_grip',
+            'Ice Devil 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('MA-1012 clock-lock: grants ONE addExpiration anchored on the ice devil (§38 single-clock; anchor fires at its next turn start, RAW end-of-turn anchor advisory — §274/MA-0542 twin)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Ice Spear', formula: '2d8 + 5', total: 13, rolls: [4, 4], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Ice Devil 1',
+            hitClause: buildHitConditionClause(ICE_SPEAR_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Ice Devil 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'frozen_grip', source: 'Ice Devil 1', target: 'Bandit 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Ice Devil 1',
+        });
+    });
+
+    it('logs condition-applied with the registry label + advisory clause copy, writes no raw activeConditions, and pays damage exactly once (no double-pay)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Ice Spear', formula: '2d8 + 5', total: 13, rolls: [4, 4], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Ice Devil 1',
+            hitClause: buildHitConditionClause(ICE_SPEAR_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Frozen Grip',
+            reason: "Ice Spear — until the start of Ice Devil 1's next turn",
+        }));
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    });
+
+    it('grants nothing when the Ice Spear attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Ice Spear', formula: '2d8 + 5', total: 13, rolls: [4, 4], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Ice Devil 1',
         } });
 
         expect(registerTargetEffect).not.toHaveBeenCalled();

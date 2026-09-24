@@ -172,6 +172,14 @@ const BADGE_SPECS = [
         guard: ctx => ctx.creatureName && ctx.campaignName && (getRuntimeValue(ctx.creatureName, 'stealthAttackCost', ctx.campaignName) ?? 0) > 0,
         build: () => ({ label: 'Stealth Attack', cls: 'effect-neutral', icon: 'fa-eye-slash', removable: true, removeAction: 'stealth_attack' }),
     },
+    // MA-1012: Ice Devil Ice Spear Frozen Grip composite te badge. Sits
+    // BEFORE the speed_reduction accumulator guard so dedupeByLabel keeps
+    // this spec's remove key ('frozen_grip' — the standing te); the
+    // guard below still serves standalone speed_reduction te (MA-0995).
+    {
+        find: ctx => findDirect(ctx, 'frozen_grip'),
+        build: ctx => ({ label: `Speed -${ctx.te.value || 10}`, cls: 'effect-debuff', icon: 'fa-snowflake', removable: true, removeAction: 'target_effect', effectType: 'frozen_grip', tooltip: `Frozen Grip by ${ctx.te.source || 'unknown'}: Speed reduced by ${ctx.te.value || 10} ft and no Reactions until the end of the next turn; no Bonus Action, and it can move or take one action, not both (GM-enforced, §70 advisory)` }),
+    },
     {
         guard: ctx => ctx.effects.speedReduction,
         build: ctx => ({ label: ctx.effects.speedReduction >= 1000 ? 'Speed 0' : `Speed -${ctx.effects.speedReduction}`, cls: 'effect-debuff', icon: 'fa-minus', removable: true, removeAction: 'target_effect', effectType: 'speed_reduction' }),
