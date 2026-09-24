@@ -20,7 +20,7 @@ function computePlayerAvatars(players, characters, campaignName) {
     return avatars;
 }
 
-function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fog, npcImages, onExit }) {
+function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fog, npcImages, overlays, onExit }) {
     const containerRef = useRef(null);
     const sceneRef = useRef(null);
     const [ready, setReady] = useState(false);
@@ -76,8 +76,9 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
             npcImages,
             playerAvatars,
             bgFill,
+            overlays: overlays || [],
         });
-    }, [ready, mapData, gridSize, walls, rooms, bgFill, placedItems, players, fog, isLocalhost, npcImages, playerAvatars, showRooms, showLabels, showTorch]);
+    }, [ready, mapData, gridSize, walls, rooms, bgFill, placedItems, players, fog, isLocalhost, npcImages, playerAvatars, overlays, showRooms, showLabels, showTorch]);
 
     const handleTopDown = useCallback(() => {
         sceneRef.current?.topDown();

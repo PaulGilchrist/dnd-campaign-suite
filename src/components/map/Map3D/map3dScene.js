@@ -1,5 +1,6 @@
 import { CELL_SIZE, ROOM_TYPE_COLORS } from '../../../config/mapConfig.js';
 import { getAssetUrl } from './map3dAssets.js';
+import { createOverlayGroup } from './map3dSpellOverlays.js';
 import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
 
 // 1 grid cell in world units = exactly 5' (matches CELL_SIZE / 2D map scale)
@@ -363,7 +364,7 @@ export class Map3DScene {
         const gen = ++this.buildGen;
         const {
             gridSize, walls, rooms, items, players, fog, isLocalhost,
-            npcImages, playerAvatars, bgFill,
+            npcImages, playerAvatars, bgFill, overlays,
         } = data;
         this.gridSize = gridSize;
         this.half = (gridSize * CELL_SIZE) / 2;
@@ -381,7 +382,15 @@ export class Map3DScene {
         this._buildNpcs(items, fog, isLocalhost, npcImages, gen);
         this._buildPointLights(items, fog, isLocalhost);
         this._buildFog(fog, isLocalhost);
+        this._buildSpellOverlays(overlays);
         this._frameCamera(gridSize);
+    }
+
+    _buildSpellOverlays(overlays) {
+        for (const overlay of overlays || []) {
+            const group = createOverlayGroup(this.THREE, overlay, this.cellX(overlay.startGridX), this.cellZ(overlay.startGridY));
+            if (group) this.mapGroup.add(group);
+        }
     }
 
     _buildFloorAndGrid(gridSize, bgFill) {

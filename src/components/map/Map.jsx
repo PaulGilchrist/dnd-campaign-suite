@@ -346,6 +346,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     isLocalhost={isLocalhost}
                     fog={fog}
                     npcImages={npcImages}
+                    overlays={overlays}
                     onExit={() => setViewMode('2d')}
                 />
             ) : (

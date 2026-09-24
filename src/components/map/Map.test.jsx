@@ -233,8 +233,9 @@ vi.mock('./hooks/useMapDrops.js', () => ({
 vi.mock('../hex-map/HexMap.jsx', () => ({ default: vi.fn(() => <div data-testid="hex-map" />) }));
 
 vi.mock('./Map3D/Map3D.jsx', () => ({
-    default: ({ onExit }) => (
+    default: ({ onExit, overlays }) => (
         <div data-testid="map3d">
+            <span data-testid="map3d-overlays">{overlays ? overlays.length : 0}</span>
             <button data-testid="map3d-exit" onClick={onExit}>2D</button>
         </div>
     ),
@@ -437,6 +438,17 @@ describe('Map - 3D view toggle', () => {
         fireEvent.click(screen.getByTestId('map3d-exit'));
         expect(screen.queryByTestId('map3d')).not.toBeInTheDocument();
         expect(screen.getByTitle('View map in 3D')).toBeInTheDocument();
+    });
+
+    it('passes the active spell overlays to the 3D view', async () => {
+        mockState.overlays = [{
+            id: 'o1', shape: 'sphere', startGridX: 1, startGridY: 1, angle: 0,
+            radiusFt: 20, coneAngle: 0, widthFt: 0, distanceFt: 0, sizeFt: 0,
+            color: 'rgba(255,80,60,0.35)',
+        }];
+        await act(async () => renderMap());
+        fireEvent.click(screen.getByTitle('View map in 3D'));
+        expect(screen.getByTestId('map3d-overlays')).toHaveTextContent('1');
     });
 
     it('does not render the 3D button for outdoor maps', async () => {

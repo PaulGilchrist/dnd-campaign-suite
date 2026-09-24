@@ -109,6 +109,35 @@ describe('Map3D', () => {
         }));
     });
 
+    it('forwards spell overlays to buildMap and rebuilds when they change', async () => {
+        const overlays = [{ id: 'o1', shape: 'sphere', startGridX: 1, startGridY: 1, radiusFt: 20 }];
+        const { rerender } = renderMap3D({ overlays });
+        await act(async () => {});
+        expect(buildMapMock).toHaveBeenLastCalledWith(expect.objectContaining({ overlays }));
+        buildMapMock.mockClear();
+        const moreOverlays = [
+            ...overlays,
+            { id: 'o2', shape: 'line', startGridX: 2, startGridY: 2, distanceFt: 60 },
+        ];
+        await act(async () => {
+            rerender(
+                <Map3D
+                    campaignName="test-campaign"
+                    mapData={createMapData()}
+                    placedItems={[]}
+                    characters={[]}
+                    isLocalhost
+                    fog={fogSet}
+                    npcImages={{}}
+                    overlays={moreOverlays}
+                    onExit={vi.fn()}
+                />
+            );
+        });
+        expect(buildMapMock).toHaveBeenCalledTimes(1);
+        expect(buildMapMock).toHaveBeenLastCalledWith(expect.objectContaining({ overlays: moreOverlays }));
+    });
+
     it('rebuilds the map when map data changes', async () => {
         const { rerender } = renderMap3D();
         await act(async () => {});

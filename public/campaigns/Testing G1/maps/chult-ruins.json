@@ -271,14 +271,16 @@
       "type": "door",
       "gridX": 21,
       "gridY": 2,
-      "visible": true
+      "visible": true,
+      "open": false
     },
     {
       "id": "78ab9a54-8309-494e-bab5-79d963d7ef3c",
       "type": "door",
       "gridX": 21,
       "gridY": 3,
-      "visible": true
+      "visible": true,
+      "open": false
     },
     {
       "id": "c1ce415a-4b4d-4da3-b3d4-bb41e0079bb2",
@@ -873,8 +875,8 @@
     {
       "id": "elarielle",
       "name": "Elarielle",
-      "gridX": 18,
-      "gridY": 3
+      "gridX": 13,
+      "gridY": 4
     },
     {
       "id": "grommok",
@@ -885,8 +887,8 @@
     {
       "id": "liora",
       "name": "Liora",
-      "gridX": 16,
-      "gridY": 1
+      "gridX": 15,
+      "gridY": 2
     },
     {
       "id": "vexiron",
