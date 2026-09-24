@@ -80,6 +80,10 @@ export default [
         GamepadEvent: 'readonly',
         HTMLElement: 'readonly',
         Element: 'readonly',
+        Node: 'readonly',
+        requestAnimationFrame: 'readonly',
+        cancelAnimationFrame: 'readonly',
+        ResizeObserver: 'readonly',
       },
     },
     plugins: {

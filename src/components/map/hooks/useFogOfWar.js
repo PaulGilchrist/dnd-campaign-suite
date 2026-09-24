@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { computeVisibility } from '../../../services/maps/lineOfSight.js';
+import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
 
 function useFogOfWar(players, walls, placedItems, gridSize) {
     return useMemo(() => {
@@ -23,7 +24,8 @@ function useFogOfWar(players, walls, placedItems, gridSize) {
             return fogSet;
         }
 
-        const visible = computeVisibility(players, walls || new Set(), closedDoors, gridSize);
+        const effectiveWalls = computeEffectiveWalls(walls, placedItems);
+        const visible = computeVisibility(players, effectiveWalls, closedDoors, gridSize);
 
         for (let x = 0; x < gridSize; x++) {
             for (let y = 0; y < gridSize; y++) {

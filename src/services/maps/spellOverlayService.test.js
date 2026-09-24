@@ -100,9 +100,9 @@ describe('getCurrentOverlayTarget', () => {
 
 const sphere = { id: 'o1', shape: 'sphere', radiusFt: 20, startGridX: 5, startGridY: 5, angle: 0 };
 
-function mockActiveMap(tokens, walls = []) {
+function mockActiveMap(tokens, walls = [], placedItems = []) {
     getRuntimeValue.mockReturnValue('battle-map');
-    loadMapData.mockResolvedValue({ gridSize: 20, walls, players: tokens, placedItems: [] });
+    loadMapData.mockResolvedValue({ gridSize: 20, walls, players: tokens, placedItems });
 }
 
 describe('getCreaturesInsideOverlay', () => {
@@ -178,6 +178,34 @@ describe('getTargetMapStatuses', () => {
 
         const statuses = await getTargetMapStatuses(CAMPAIGN, 'Wizard', ['Caged'], 60);
         expect(statuses.Caged.status).toBe('blocked');
+    });
+
+    it('blocks line of sight at a hidden secret door', async () => {
+        mockActiveMap(
+            [
+                { name: 'Wizard', gridX: 0, gridY: 0 },
+                { name: 'Caged', gridX: 4, gridY: 0 },
+            ],
+            [],
+            [{ type: 'secretDoor', gridX: 2, gridY: 0, visible: false }]
+        );
+
+        const statuses = await getTargetMapStatuses(CAMPAIGN, 'Wizard', ['Caged'], 60);
+        expect(statuses.Caged.status).toBe('blocked');
+    });
+
+    it('does not block line of sight at a discovered secret door', async () => {
+        mockActiveMap(
+            [
+                { name: 'Wizard', gridX: 0, gridY: 0 },
+                { name: 'Free', gridX: 4, gridY: 0 },
+            ],
+            [],
+            [{ type: 'secretDoor', gridX: 2, gridY: 0, visible: true }]
+        );
+
+        const statuses = await getTargetMapStatuses(CAMPAIGN, 'Wizard', ['Free'], 60);
+        expect(statuses.Free.status).toBe('in');
     });
 
     it('treats unknown range as always in range', async () => {

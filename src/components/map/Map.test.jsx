@@ -1,8 +1,9 @@
 // @improved-by-ai
 // @cleaned-by-ai
-import { render, act, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, act, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Map from './Map.jsx';
+import useFogOfWar from './hooks/useFogOfWar.js';
 
 const mockLoadMonsters = vi.fn(() => Promise.resolve([]));
 
@@ -231,6 +232,14 @@ vi.mock('./hooks/useMapDrops.js', () => ({
 
 vi.mock('../hex-map/HexMap.jsx', () => ({ default: vi.fn(() => <div data-testid="hex-map" />) }));
 
+vi.mock('./Map3D/Map3D.jsx', () => ({
+    default: ({ onExit }) => (
+        <div data-testid="map3d">
+            <button data-testid="map3d-exit" onClick={onExit}>2D</button>
+        </div>
+    ),
+}));
+
 vi.mock('../encounter/MonsterCardModal.jsx', () => ({
     default: ({ monster, onClose }) => (
         <div data-testid="monster-card-modal">
@@ -406,5 +415,72 @@ describe('Map - room rendering', () => {
         });
         const { container } = await act(async () => renderMap());
         expect(container.querySelector('.room-hit-area')).toBeTruthy();
+    });
+});
+
+describe('Map - 3D view toggle', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        resetState();
+    });
+
+    it('renders the 3D button in the 2D toolbar', async () => {
+        await act(async () => renderMap());
+        expect(screen.getByTitle('View map in 3D')).toBeInTheDocument();
+    });
+
+    it('switches to the 3D view when 3D is clicked and back to 2D when 2D is clicked', async () => {
+        await act(async () => renderMap());
+        fireEvent.click(screen.getByTitle('View map in 3D'));
+        expect(screen.getByTestId('map3d')).toBeInTheDocument();
+        expect(screen.queryByTitle('View map in 3D')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('map3d-exit'));
+        expect(screen.queryByTestId('map3d')).not.toBeInTheDocument();
+        expect(screen.getByTitle('View map in 3D')).toBeInTheDocument();
+    });
+
+    it('does not render the 3D button for outdoor maps', async () => {
+        mockState.mapData = createMockMapData({ type: 'outdoor' });
+        await act(async () => renderMap());
+        expect(screen.queryByTitle('View map in 3D')).not.toBeInTheDocument();
+    });
+});
+
+describe('Map - fog of war role rendering', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        resetState();
+        vi.mocked(useFogOfWar).mockReturnValue(new Set());
+    });
+
+    afterEach(() => {
+        vi.mocked(useFogOfWar).mockReturnValue(new Set());
+    });
+
+    it('renders translucent fog-cell rects for the GM', async () => {
+        vi.mocked(useFogOfWar).mockReturnValue(new Set(['0,0']));
+        const { container } = await act(async () => renderMap());
+        expect(container.querySelector('.fog-cell')).toBeTruthy();
+        expect(container.querySelector('.fog-cell-player')).toBeNull();
+    });
+
+    it('renders opaque fog-cell-player rects for players', async () => {
+        vi.mocked(useFogOfWar).mockReturnValue(new Set(['0,0']));
+        const { container } = await act(async () => renderMap({ isLocalhost: false }));
+        expect(container.querySelector('.fog-cell-player')).toBeTruthy();
+        expect(container.querySelector('.fog-cell')).toBeNull();
+    });
+
+    it('renders player fog above room shapes so fogged rooms are covered', async () => {
+        vi.mocked(useFogOfWar).mockReturnValue(new Set(['0,0']));
+        mockState.mapData = createMockMapData({
+            rooms: [{ id: 'room1', type: 'common', label: 'Hall', rect: { x: 0, y: 0, w: 5, h: 5 } }],
+        });
+        const { container } = await act(async () => renderMap({ isLocalhost: false }));
+        const room = container.querySelector('.room-highlight');
+        const fogRect = container.querySelector('.fog-cell-player');
+        expect(room).toBeTruthy();
+        expect(fogRect).toBeTruthy();
+        expect(room.compareDocumentPosition(fogRect) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 });

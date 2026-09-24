@@ -13,8 +13,13 @@ function PlacedItems({
     itemDragging,
     handleItemPointerDown,
 }) {
-    const isVisible = (item) =>
-        isLocalhost || (item.visible && !fog?.has(`${item.gridX},${item.gridY}`));
+    const isVisible = (item) => {
+        // A secret door is never shown as an icon to players: hidden it is a
+        // wall (rendered by GridAndWalls), discovered it is an empty cell. The
+        // GM always sees the actual secret-door icon.
+        if (item.type === 'secretDoor') return isLocalhost;
+        return isLocalhost || (item.visible && !fog?.has(`${item.gridX},${item.gridY}`));
+    };
 
     const itemOpacity = (item) => (isLocalhost ? (item.visible ? 1 : 0.5) : 1);
 
