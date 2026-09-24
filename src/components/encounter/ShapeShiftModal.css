@@ -1,0 +1,11 @@
+.mc-overlay--shape-shift .shape-shift-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.mc-overlay--shape-shift .shape-shift-row > i {
+  margin-top: 0.2rem;
+  color: var(--accent, #c9a227);
+}

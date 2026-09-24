@@ -26,6 +26,8 @@ import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount, endSelfBuffOnTrigger, isMonsterSelfBuffRow, buildAlreadyEnlargedRefusalPopup, buildAlreadyEnlargedRefusalLog } from '../../services/encounters/monsterSelfBuff.js';
 import { resolveMonsterGrantReactionRow } from '../../services/encounters/monsterGrantReaction.js';
+import { resolveShapeShiftSelection, declineShapeShiftSelection } from '../../services/encounters/monsterShapeShift.js';
+import { ShapeShiftModal } from './ShapeShiftModal.jsx';
 import { resolveUtilitySpellCastRow } from '../../services/encounters/monsterUtilitySpellCast.js';
 import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
@@ -1694,8 +1696,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const monsterCharacter = characters?.find(c => c.name === monsterName);
   const speedyOpportunityDisadvantage = hasMonsterPassive(monsterCharacter, 'opportunity_attacks_disadvantage');
   const speedyDifficultTerrainIgnore = hasMonsterPassive(monsterCharacter, 'ignore_difficult_terrain_on_dash');
-  const monsterActiveBuffs = getRuntimeValue(monsterName, 'activeBuffs') || [];
-  const shieldOfFaithBonus = computeShieldOfFaithBonus(monsterActiveBuffs);
+  const shieldOfFaithBonus = computeShieldOfFaithBonus(getRuntimeValue(monsterName, 'activeBuffs') || []);
   const monsterSpellUses = useRuntimeValue(monsterName, MONSTER_SPELL_USES_KEY, campaignName);
   const monsterReactionUses = useRuntimeValue(monsterName, MONSTER_REACTION_USES_KEY, campaignName);
   // MA-0021: legendary uses map + round+turn latch subscription (header
@@ -1705,6 +1706,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const monsterRecharge = useRuntimeValue(monsterName, MONSTER_RECHARGE_KEY, campaignName);
   const [conePicker, setConePicker] = useState(null);
   const [animalSpiritChooser, setAnimalSpiritChooser] = useState(null);
+  // MA-1020: shape-shift form chooser state (Imp "Shape-Shift") — chip press
+  // opens the MA-0275-byte-shape chooser; one row click resolves the stamp.
+  const [shapeShiftChooser, setShapeShiftChooser] = useState(null);
 
   const monsterSensesArray = useMemo(() => {
     if (!monster?.senses) return null;
@@ -2320,6 +2324,15 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         // target with ONE rounds:1 addExpiration clock, and logs the
         // grant-reaction affordance. Rampage prerequisite stays §70 advisory.
         handleGrantReactionRow={(action) => resolveMonsterGrantReactionRow({ action, monsterName, campaignName, setPopupHtml })}
+        // MA-1020: monster-side shape-shift row (Imp "Shape-Shift") — chip press
+        // opens the form chooser (Rat 20 / Raven 20+Fly60 / Spider 20+Climb20 /
+        // True Form); one row click stamps the form's Speed dict onto the
+        // combatSummary combatant via ONE merged cs POST (§39; the card Speed
+        // row consumes it via runMonster npcClickFormHandlers.js:188 on card
+        // reopen). True Form clears the stamp and restores the stat-block Speed.
+        // At Will — no uses gate, NO expiration clock (RAW persists until it
+        // shifts back — §70 persistent self-state, GM re-click).
+        handleShapeShiftRow={(action) => setShapeShiftChooser({ action })}
       />
       {popupHtml && (
         <MonsterAttackPopup
@@ -2393,6 +2406,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         monsterName={monsterName}
         onResolve={(variant) => resolveAnimalSpiritSelection({ chooser: animalSpiritChooser, variant, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser: setAnimalSpiritChooser })}
         onSkip={() => resolveAnimalSpiritSelection({ chooser: animalSpiritChooser, variant: null, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser: setAnimalSpiritChooser })}
+      />
+      <ShapeShiftModal
+        chooser={shapeShiftChooser}
+        monsterName={monsterName}
+        onResolve={(form) => resolveShapeShiftSelection({ chooser: shapeShiftChooser, form, monsterName, campaignName, setPopupHtml, setChooser: setShapeShiftChooser })}
+        onSkip={() => declineShapeShiftSelection({ chooser: shapeShiftChooser, monsterName, campaignName, setChooser: setShapeShiftChooser })}
       />
     </>
   );

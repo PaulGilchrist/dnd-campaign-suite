@@ -10,6 +10,7 @@ import { isSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { isMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { isMonsterSelfBuffRow } from '../../services/encounters/monsterSelfBuff.js';
 import { isMonsterGrantReactionRow } from '../../services/encounters/monsterGrantReaction.js';
+import { isMonsterShapeShiftRow } from '../../services/encounters/monsterShapeShift.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -268,6 +269,24 @@ function GrantReactionLink({ action, attackerCannotAct, rechargeState, onGrantRe
   );
 }
 
+// MA-1020: monster-side shape-shift row (Imp "Shape-Shift") — automation
+// {type:"monster_shape_shift", effect:"shape_shift", forms:[...]} arms a
+// clickable chip that opens the modal's form chooser (ShapeShiftModal,
+// MA-0275 mc-overlay/sp-modal chrome); ONE form-row click stamps the form's
+// Speed dict onto the combatSummary combatant (runMonster → card Speed row
+// consumer). At Will — no uses gate (MA-0020 gate null §230); already-in-
+// form refusals route through the resolver with zero writes.
+function ShapeShiftLink({ action, attackerCannotAct, onShapeShiftRow }) {
+  if (!isMonsterShapeShiftRow(action)) return null;
+  const clickable = !attackerCannotAct && !!onShapeShiftRow;
+  const formsText = action.automation.forms.map(f => f.name).join(' / ');
+  return (
+    <span className="mc-dice-link mc-dice-link-shapeshift" onClick={clickable ? () => onShapeShiftRow(action) : undefined} role="button" tabIndex={0} title={`Shape-Shift — ${action.name}: choose ${formsText}; Speed swaps on self, At Will`}>
+      <i className="fa-solid fa-shuffle" /> Shape-Shift
+    </span>
+  );
+}
+
 // MA-1014: the spell-save_dc-only utility-row chip fork (Ice Devil "Ice
 // Wall"). Hoisted out of MonsterAction to hold the complexity ceiling — the
 // three-way choice (Spellcasting markup → spells.json-resolved utility names
@@ -304,7 +323,7 @@ function utilitySpellNamesFor(action, spellNameIndex) {
   return extractSpellNamesFromSpellcasting(action.description).filter(name => spellNameIndex.has(name));
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, spellNameIndex = null }) {
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, onShapeShiftRow, spellNameIndex = null }) {
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
   // runtime map; a spent row reads "(Recharge 6 — unavailable)" and refuses.
@@ -326,6 +345,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} />
       <SelfBuffLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSelfBuffRow={onSelfBuffRow} legendaryGate={legendaryGate} />
       <GrantReactionLink action={action} attackerCannotAct={attackerCannotAct} rechargeState={rechargeState} onGrantReactionRow={onGrantReactionRow} />
+      <ShapeShiftLink action={action} attackerCannotAct={attackerCannotAct} onShapeShiftRow={onShapeShiftRow} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
         <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>

@@ -35440,7 +35440,17 @@
       },
       {
         "name": "Shape-Shift",
-        "description": "The imp <strong>shape-shifts</strong> to resemble a rat (Speed 20 ft.), a raven (20 ft., Fly 60 ft.), or a spider (20 ft., Climb 20 ft.), or it returns to its true form. Its game statistics are the same in each form, except for its Speed. Any equipment it is wearing or carrying isn't transformed."
+        "description": "The imp <strong>shape-shifts</strong> to resemble a rat (Speed 20 ft.), a raven (20 ft., Fly 60 ft.), or a spider (20 ft., Climb 20 ft.), or it returns to its true form. Its game statistics are the same in each form, except for its Speed. Any equipment it is wearing or carrying isn't transformed.",
+        "automation": {
+          "type": "monster_shape_shift",
+          "effect": "shape_shift",
+          "forms": [
+            { "name": "Rat", "speed": 20 },
+            { "name": "Raven", "speed": 20, "fly": 60 },
+            { "name": "Spider", "speed": 20, "climb": 20 },
+            { "name": "True Form" }
+          ]
+        }
       }
     ],
     "bonus_actions": [],

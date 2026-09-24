@@ -107,10 +107,23 @@ describe('MA-1019 Imp Invisibility disk data — MA-0658/MA-0919 twin byte-shape
     expect(INVIS_ROW.automation).toEqual(HAG_PASSAGE_ROW.automation);
   });
 
-  it('Sting + Shape-Shift siblings carry no automation collateral', () => {
+  // MA-1020 stale-pin inversion (§216): Shape-Shift now authors its OWN
+  // monster_shape_shift automation (dedicated form lane — monsterSelfBuff
+  // must stay byte-inert on it; isMonsterSelfBuffRow is the discriminator).
+  it('Sting stays inert; Shape-Shift rides its own monster_shape_shift lane, never self-buff', () => {
     expect(STING_ROW.automation).toBeUndefined();
-    expect(imp.actions.find(a => a.name === 'Shape-Shift').automation).toBeUndefined();
+    expect(imp.actions.find(a => a.name === 'Shape-Shift').automation).toEqual({
+      type: 'monster_shape_shift',
+      effect: 'shape_shift',
+      forms: [
+        { name: 'Rat', speed: 20 },
+        { name: 'Raven', speed: 20, fly: 60 },
+        { name: 'Spider', speed: 20, climb: 20 },
+        { name: 'True Form' },
+      ],
+    });
     expect(isMonsterSelfBuffRow(STING_ROW)).toBe(false);
+    expect(isMonsterSelfBuffRow(imp.actions.find(a => a.name === 'Shape-Shift'))).toBe(false);
   });
 
   it('te `invisible` is the registered self-buff key (eye-slash, buff, Spells group)', () => {
