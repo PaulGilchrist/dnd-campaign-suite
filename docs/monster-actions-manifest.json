@@ -17066,7 +17066,7 @@
     "grappled"
    ],
    "description": "Melee Attack Roll: +4, reach 10 ft. Hit: 9 (2d6 + 2) Piercing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 12). Until the grapple ends, the kuo-toa can't make Pincer Staff attacks.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1071-pincer-staff.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1072",

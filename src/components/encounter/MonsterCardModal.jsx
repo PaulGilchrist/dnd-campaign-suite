@@ -109,10 +109,17 @@ function cubeCoverageFeet(action, description) {
   return originFt != null ? Number(m[1]) : null;
 }
 
+// MA-1071 twin: only a real save DC arms the area picker — the household DC0
+// decoy (Myconid Rapport Spores save_dc:0 + radius prose) never does
+// (MA-0551 Number(save_dc) > 0 convention; hasRealSaveDc hoisted for §5 cap).
+function hasRealSaveDc(action) {
+  return action?.save_dc != null && Number(action.save_dc) > 0;
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function breathAoeShape(action, spellInfo) {
   if (spellInfo) return null;
-  if (!action || action.save_dc == null) return null;
+  if (!hasRealSaveDc(action)) return null;
   // MA-0042: an authored zone (e.g. Adult Black Dragon Insect Cloud) is a
   // persisting radius area — picker centered on a GM-chosen point, so the
   // attacker-origin coverage gate does NOT apply (selection advisory).
@@ -243,7 +250,8 @@ function rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, 
 // the 'half' default — every row without one stays byte-identical.
 function resolveBlockSaveDcSuccess(spellInfo, action) {
   if (spellInfo) return spellInfo.dcSuccess || null;
-  return action.save_dc != null ? (action.dc_success ?? 'half') : null;
+  // MA-1071 twin: DC0 decoy arms no half-on-success default (MA-0551 >0 convention).
+  return Number(action?.save_dc) > 0 ? (action.dc_success ?? 'half') : null;
 }
 
 // MA-0068: authored staged sleep row (Adult Brass Dragon Sleep Breath) —
@@ -560,14 +568,16 @@ function getDamageTypeChoices(action) {
 // resolves using THAT row's attack_bonus/damage through the identical attack
 // seam (Lash → Tentacle +9 / 2d6+5), logs "Lash (Tentacle attack)".
 function legendaryRowHasNumericMechanic(action) {
-  if (action.attack_bonus != null || action.save_dc != null) return true;
+  // MA-1071 twin: a DC0 decoy is not a numeric mechanic (MA-0551 >0 convention).
+  if (action.attack_bonus != null || Number(action.save_dc) > 0) return true;
   const formula = extractDamageDiceFromDescription(action.description, action.damage_dice_primary);
   return !!(formula && canRollExpression(formula));
 }
 
 function resolveLegendaryRowMechanic(action, { monsterName, handledActionName, handleAttack, handleSaveRoll, handleDamage, setPopupHtml, campaignName }) {
   if (action.attack_bonus != null) handleAttack(handledActionName ?? action.name, action.attack_bonus, action);
-  else if (action.save_dc != null) handleSaveRoll(action, extractDamageDiceFromDescription(action.description, action.damage_dice_primary), extractConditionsFromSaveEffect(action.save_effect));
+  // MA-1071 twin: DC0 decoy never routes the save leg (MA-0551 >0 convention).
+  else if (Number(action.save_dc) > 0) handleSaveRoll(action, extractDamageDiceFromDescription(action.description, action.damage_dice_primary), extractConditionsFromSaveEffect(action.save_effect));
   else if (action.advisory) {
     // MA-0058: advisory row (Cloaked Flight self-Invisibility + movement) —
     // spend already logged by expendLegendaryUse; land the adjudication
@@ -995,7 +1005,9 @@ export function buildSaveOptions(action) {
   return {
     saveDc: action?.save_dc || null,
     saveType: action?.save_type ? toAbbr(action.save_type) : null,
-    dcSuccess: action?.save_dc != null ? (action?.dc_success ?? 'half') : null,
+    // MA-1071 twin: DC0 decoy arms no dcSuccess (saveDc already collapses to
+    // null via `|| 0`; the half-default must not ride it either — MA-0551 >0).
+    dcSuccess: Number(action?.save_dc) > 0 ? (action?.dc_success ?? 'half') : null,
     stagedPetrify: parseStagedPetrifyClause(action),
     saveConditions: extractConditionsFromSaveEffect(action?.save_effect),
     // MA-0298: Soul Tome trap arm rides the attack+save combo context to the
@@ -1959,7 +1971,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         targetName: target?.name,
         attackerName: monsterName,
       };
-      if (action?.save_dc != null) {
+      // MA-1071 twin: only a real save (DC>0) rides the plain-damage lane —
+      // the DC0 decoy must never arm saveDc/saveType/half (MA-0551 >0 convention).
+      if (Number(action?.save_dc) > 0) {
         context.saveDc = action.save_dc;
         context.saveType = toAbbr(action.save_type);
         context.dcSuccess = action?.dc_success ?? 'half';
