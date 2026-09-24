@@ -37126,20 +37126,35 @@
       {
         "name": "Toxic Ink",
         "description": "Constitution Saving Throw: DC 23, each creature in a 15-foot <strong>Emanation</strong> originating from the kraken while it is underwater. Failure: The target has the <strong>Blinded</strong> and <strong>Poisoned</strong> conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.",
+        "save_dc": 23,
         "save_type": "Constitution",
+        "range": "15-foot Emanation",
         "save_effect": "Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn."
       }
     ],
     "lair_actions": [
-      "A strong current moves through the kraken's lair. Each creature within 60 feet of the kraken must suc­ ceed on a DC 23 Strength saving throw or be pushed up to 60 feet away from the kraken. On a success, the creature is pushed 10 feet away from the kraken.",
       {
-        "description": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round.",
+        "name": "Strong Current",
+        "description": "A strong current moves through the kraken's lair. Each creature within 60 feet of the kraken must suc­ ceed on a DC 23 Strength saving throw or be pushed up to 60 feet away from the kraken. On a success, the creature is pushed 10 feet away from the kraken.",
         "save_type": "Strength",
-        "save_effect": "Failure: Each creature within 60 feet of the kraken is pushed up to 60 feet away from the kraken. Success: The creature is pushed 10 feet away from the kraken."
+        "save_dc": 23,
+        "save_effect": "Failure: The target is pushed up to 60 feet away from the kraken. Success: The target is pushed 10 feet away from the kraken."
       },
       {
+        "name": "Lightning Vulnerability",
+        "advisory": "lightning_vulnerability",
+        "advisory_message": "grants vulnerability to lightning damage to creatures in the water within 60 feet of it until initiative count 20 on the next round — advisory record: the aura and its initiative-20 expiry are GM-enforced (no vulnerability/aura consumer, CLA-325 precedent)",
+        "description": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round."
+      },
+      {
+        "name": "Charged Water",
         "description": "The water in the kraken's lair becomes electrically charged. All creatures within 120 feet of the kraken must succeed on a DC 23 Constitution saving throw, taking 10 (3d6) lightning damage on a failed save, or half as much damage on a successful one.",
-        "save_effect": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round."
+        "save_dc": 23,
+        "save_type": "Constitution",
+        "damage_dice_primary": "3d6",
+        "damage_type_primary": "Lightning",
+        "dc_success": "half",
+        "save_effect": "Failure: 10 (3d6) lightning damage. Success: half damage."
       }
     ],
     "traits": [
@@ -37269,8 +37284,8 @@
         "attack_bonus": 3,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 1",
-        "damage_type_primary": "piercing",
-        "damage_dice_secondary": "1d8 + 1"
+        "damage_dice_two_handed": "1d8 + 1",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Net",
@@ -38245,7 +38260,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "3d6 + 5",
-        "damage_type_primary": "Cold"
+        "damage_type_primary": "Cold",
+        "hit_conditions": ["paralyzed"]
       },
       {
         "name": "Spellcasting",
@@ -38290,8 +38306,10 @@
       {
         "name": "Frightening Gaze",
         "description": "The lich casts <strong>Fear</strong>, using the same spellcasting ability as Spellcasting. The lich can't take this action again until the start of its next turn.",
-        "uses": 1,
-        "recharge": false
+        "save_dc": 20,
+        "save_type": "Wisdom",
+        "save_effect": "Failure: The target drops whatever it is holding and has the Frightened condition until the spell ends, Concentration up to 1 minute. The target can repeat the Wisdom saving throw at the end of its turn if it lacks line of sight to the lich, ending the effect on itself. Success: The target is unaffected.",
+        "dc_success": "none"
       }
     ],
     "lair_actions": [

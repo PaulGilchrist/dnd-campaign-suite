@@ -42,8 +42,12 @@ function RechargeNote({ action, rechargeOut }) {
 // plain description text only — never a clickable chip that dies silently.
 // MA-0286: attack rows with no authored attack_bonus must also render text
 // only — a damage chip on an attack row is an auto-hit (no to-hit roll).
+// MA-1071: save_dc:0 empty-noise decoy (household monsters.json authoring, MA-1021
+// family) is NOT a save — mirror the MA-0551 Number(save_dc) > 0 convention so the
+// DC0 row falls to this plain flat-damage lane instead of the save chip (Modal
+// handleDamage stays save-inert at DC0 too). save_dc>0 rows byte-identical.
 function ActionDamageLinks({ action, actionDamageFormula, actionDamageTypeLabel, onDamage }) {
-  if (action.save_dc != null || action.attack_bonus != null || attackRowMissingToHit(action)) return null;
+  if (Number(action.save_dc) > 0 || action.attack_bonus != null || attackRowMissingToHit(action)) return null;
   const rollablePrimary = actionDamageFormula && canRollExpression(actionDamageFormula);
   const rollableSecondary = action.damage_dice_secondary != null && canRollExpression(action.damage_dice_secondary);
   if (!rollablePrimary && !rollableSecondary) return null;
@@ -103,7 +107,12 @@ function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast,
 }
 
 function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed, rechargeOut = false }) {
-  if (action.save_dc == null) return null;
+  // MA-1071: the DC0 decoy (save_dc:0/save_type:"" empty-noise authoring, MA-1021
+  // family) must NEVER arm the save lane — 0 ≠ null admitted every DC0 row, wiring
+  // the rollable-dice branch chip to handleSaveRoll so each hit adjudicated vs a
+  // guaranteed-success DC 0 and HALVED flat "Hit: X" damage (Pincer Staff). Mirror
+  // the MA-0551 Number(save_dc) > 0 convention: DC<=0 renders no chip at all.
+  if (action.save_dc == null || Number(action.save_dc) <= 0) return null;
   // MA-0560: rider-only composite rows (Death Dog Bite) arm NO damage on the
   // DC chip — the fixed primary pays full on the attack chip (MA-0551 fork);
   // the save adjudicates the condition rider alone. Other rows byte-identical.
@@ -178,7 +187,8 @@ function LegendaryCheckLink({ action, attackerCannotAct, legendaryGate }) {
 function LegendarySpendLink({ action, attackerCannotAct, legendaryGate }) {
   if (!legendaryGate) return null;
   const formula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
-  const numericAffordance = action.attack_bonus != null || action.save_dc != null || canRollExpression(formula);
+  // MA-1071 twin: a DC0 decoy is not a numeric affordance (MA-0551 >0 convention).
+  const numericAffordance = action.attack_bonus != null || Number(action.save_dc) > 0 || canRollExpression(formula);
   if (numericAffordance) return null;
   if (legendaryCheckRow(action)) return <LegendaryCheckLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />;
   return (
@@ -308,7 +318,8 @@ function SpellOrSaveLinks({ action, isSpellcastingRow, utilityNames, attackerCan
     const rowUsesGate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
     return <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} spellNames={utilityNames} rechargeOut={rechargeOut} rowUsesGate={rowUsesGate} />;
   }
-  if (action.save_dc != null) {
+  // MA-1071: DC0 decoy never arms the save shell (MA-0551 >0 convention twin).
+  if (Number(action.save_dc) > 0) {
     return <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />;
   }
   return null;

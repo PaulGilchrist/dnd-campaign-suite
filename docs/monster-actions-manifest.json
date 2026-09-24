@@ -16831,7 +16831,7 @@
     "poisoned"
    ],
    "description": "Constitution Saving Throw: DC 23, each creature in a 15-foot Emanation originating from the kraken while it is underwater. Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1058-toxic-ink.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1059",
@@ -16843,7 +16843,7 @@
    "category": "lair_actions",
    "actionType": "other",
    "description": "A strong current moves through the kraken's lair. Each creature within 60 feet of the kraken must suc­ ceed on a DC 23 Strength saving throw or be pushed up to 60 feet away from the kraken. On a success, the creature is pushed 10 feet away from the kraken.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1059-lair-current.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1060",
@@ -16857,7 +16857,7 @@
    "saveType": "Strength",
    "saveEffect": "Failure: Each creature within 60 feet of the kraken is pushed up to 60 feet away from the kraken. Success: The creature is pushed 10 feet away from the kraken.",
    "description": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1060-1061-lair-unnamed.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1061",
@@ -16870,7 +16870,7 @@
    "actionType": "other",
    "saveEffect": "Creatures in the water within 60 feet of the kraken have vulnerability to lightning damage until initiative count 20 on the next round.",
    "description": "The water in the kraken's lair becomes electrically charged. All creatures within 120 feet of the kraken must succeed on a DC 23 Constitution saving throw, taking 10 (3d6) lightning damage on a failed save, or half as much damage on a successful one.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1060-1061-lair-unnamed.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1062",
@@ -16903,7 +16903,7 @@
    "damageDiceSecondary": "1d8 + 1",
    "reach": "5 ft.",
    "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d6 + 1) piercing damage, or 5 (1d8 + 1) piercing damage if used with two hands to make a melee attack.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1063-spear.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1064",
@@ -17066,7 +17066,7 @@
     "grappled"
    ],
    "description": "Melee Attack Roll: +4, reach 10 ft. Hit: 9 (2d6 + 2) Piercing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 12). Until the grapple ends, the kuo-toa can't make Pincer Staff attacks.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1071-pincer-staff.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1072",
@@ -17343,7 +17343,7 @@
     "paralyzed"
    ],
    "description": "Melee Attack Roll: +12, reach 5 ft. Hit: 15 (3d6 + 5) Cold damage, and the target has the Paralyzed condition until the start of the lich's next turn.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1084-paralyzing-touch.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1085",
@@ -17424,7 +17424,7 @@
    "recharge": false,
    "uses": 1,
    "description": "The lich casts Fear, using the same spellcasting ability as Spellcasting. The lich can't take this action again until the start of its next turn.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1089-frightening-gaze.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1090",
