@@ -14980,7 +14980,7 @@
    "category": "legendary_actions",
    "actionType": "other",
    "description": "The sphinx makes one claw attack.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0956-claw-attack-legendary.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0957",

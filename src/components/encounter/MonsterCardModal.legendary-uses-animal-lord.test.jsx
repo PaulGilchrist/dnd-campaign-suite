@@ -154,12 +154,17 @@ describe('MA-0278/0279 monsters.json data: children delegate to Rend / Radiant R
     expect(legendaryDelegateAttackName(radiant, ray)).toBe('Radiant Strike (Radiant Ray attack)');
   });
 
-  it('anchor discipline: gynosphinx block and cyclops Radiant Strike row UNTOUCHED', () => {
+  // MA-0956 stale-pin inversion (was: "gynosphinx block UNTOUCHED" — the
+  // twin now carries the header uses:2 + Claw delegates_to fix; the cyclops
+  // row anchor discipline still holds).
+  it('MA-0956: gynosphinx block now carries header + Claw delegate; cyclops Radiant Strike row UNTOUCHED', () => {
     const gy = monstersData.find(m => m.index === 'gynosphinx').legendary_actions;
-    expect(gy.length).toBe(3);
-    expect(gy[0].name).toBe('Claw Attack');
-    expect(gy[0].delegates_to).toBeUndefined();
-    expect(gy[0].uses).toBeUndefined();
+    expect(gy.length).toBe(4);
+    expect(gy[0].name).toBe('Legendary Action Uses: 2');
+    expect(gy[0].uses).toBe(2);
+    expect(gy[1].name).toBe('Claw Attack');
+    expect(gy[1].delegates_to).toBe('Claw');
+    expect(gy[1].uses).toBeUndefined();
     const cyclopsRadiant = monstersData
       .find(m => (m.actions || []).some(a => a.name === 'Radiant Strike' && a.attack_bonus === 10))
       ?.actions.find(a => a.name === 'Radiant Strike');

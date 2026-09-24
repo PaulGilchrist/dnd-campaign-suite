@@ -153,12 +153,20 @@ describe('MA-0269 monsters.json data: Claw Attack delegates to Claw', () => {
     expect(legendaryDelegateAttackName(row('Claw Attack'), claw)).toBe('Claw Attack (Claw attack)');
   });
 
-  it('gynosphinx byte-identical legendary block is UNTOUCHED (MA-0209 anchor discipline)', () => {
+  // MA-0956 stale-pin inversion (was: "byte-identical block UNTOUCHED" —
+  // the gynosphinx twin hit the same prose-only defect and is now fixed the
+  // same pass with the Death-Knight byte template: header uses:2 + Claw
+  // delegates_to. Teleport/Cast a Spell stay prose-only (their own tickets).
+  it('gynosphinx legendary block carries MA-0956 header + Claw delegate', () => {
     const gy = monstersData.find(m => m.index === 'gynosphinx').legendary_actions;
-    expect(gy.length).toBe(3);
-    expect(gy[0].name).toBe('Claw Attack');
-    expect(gy[0].delegates_to).toBeUndefined();
-    expect(gy[0].uses).toBeUndefined();
+    expect(gy.length).toBe(4);
+    expect(gy[0].name).toBe('Legendary Action Uses: 2');
+    expect(gy[0].uses).toBe(2);
+    expect(gy[1].name).toBe('Claw Attack');
+    expect(gy[1].delegates_to).toBe('Claw');
+    expect(gy[1].uses).toBeUndefined();
+    expect(gy[2].delegates_to).toBeUndefined();
+    expect(gy[3].delegates_to).toBeUndefined();
   });
 });
 

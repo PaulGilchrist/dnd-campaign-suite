@@ -32829,7 +32829,13 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "The sphinx takes 2 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The sphinx regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Claw Attack",
+        "delegates_to": "Claw",
         "description": "The sphinx makes one claw attack."
       },
       {
