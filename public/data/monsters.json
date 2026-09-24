@@ -33031,7 +33031,9 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "damage_dice_primary": "1d4 + 4",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "Acid/Cold/Fire/Lightning/Poison (GM-chosen)"
       },
       {
         "name": "Dragon's Breath",

@@ -15068,7 +15068,7 @@
    "damageTypePrimary": "Slashing",
    "reach": "10 ft.",
    "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 6 (1d4 + 4) Slashing damage plus 7 (2d6) damage of the type chosen for the Draconic Origin trait.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-0962-claw.md"
+   "verified": "verified"
   },
   {
    "id": "MA-0963",
