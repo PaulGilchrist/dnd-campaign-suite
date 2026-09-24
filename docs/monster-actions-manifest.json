@@ -15955,7 +15955,7 @@
    "saveDc": 17,
    "recharge": "6",
    "description": "The devil casts Wall of Ice (level 8 version), requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 17).",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1014-ice-wall.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1015",

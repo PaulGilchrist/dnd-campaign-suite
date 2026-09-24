@@ -366,6 +366,27 @@ export function extractSpellNamesFromSpellcasting(description) {
   return names;
 }
 
+// MA-1014: spell_save_dc-only zone/utility row fingerprint (Ice Devil
+// "Ice Wall": name ≠ Spellcasting, no save_dc/attack_bonus/damage/automation/
+// zone/rays affordance, numeric spell_save_dc + <strong>/<em>-marked spell
+// name(s) in the description). The renderer arms these as spell chips ONLY
+// for names that resolve in spells.json (fake-chip guard — mid-prose
+// emphasis like <strong>Concentration</strong> never arms, §161; unresolved
+// names would log junk + console noise, §158). Recharge ("6") rides the
+// live MA-0031 gate. Every row already covered by an existing branch
+// (name "Spellcasting" → SpellCastLinks; numeric save_dc → ActionSaveRoll,
+// e.g. Doppelganger Read Thoughts; attack/dice/automation/zone rows) is
+// byte-inert here.
+export function isUtilitySpellCastRow(action) {
+  if (!action || typeof action !== 'object') return false;
+  if (/^spellcasting$/i.test(action.name || '')) return false;
+  if (action.spell_save_dc == null) return false;
+  if (action.save_dc != null || action.attack_bonus != null) return false;
+  if (action.automation || action.zone || Array.isArray(action.rays)) return false;
+  if (action.damage_dice_primary != null || action.damage_dice_secondary != null) return false;
+  return extractSpellNamesFromSpellcasting(action.description).length > 0;
+}
+
 export function extractSpellcastingSpellUses(description) {
   if (!description || typeof description !== 'string') return {};
   const uses = {};

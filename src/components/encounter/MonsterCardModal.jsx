@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
@@ -26,6 +26,7 @@ import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount, endSelfBuffOnTrigger, isMonsterSelfBuffRow, buildAlreadyEnlargedRefusalPopup, buildAlreadyEnlargedRefusalLog } from '../../services/encounters/monsterSelfBuff.js';
 import { resolveMonsterGrantReactionRow } from '../../services/encounters/monsterGrantReaction.js';
+import { resolveUtilitySpellCastRow } from '../../services/encounters/monsterUtilitySpellCast.js';
 import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
@@ -2037,6 +2038,23 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     if (gate.exhausted) {
       await addEntry(campaignName, buildMonsterSpellRefusalEntry({ monsterName, spellName, usesMax: gate.usesMax }))
         .catch((e) => { console.error('[MonsterCardModal] Error logging monster spell refusal:', e); });
+      return;
+    }
+    // MA-1014: spell_save_dc-only zone/utility row (Ice Devil "Ice Wall") —
+    // recharge gate/spend (live MA-0031, spend-at-resolve MA-0633 shape) +
+    // advisory cast record carrying the RAW clauses (DC/ability/level 8/
+    // no-components); wall objects are §70 zero-consumer → GM-enforced.
+    // Routed BEFORE the invisibility-cast ender (a refused press spent no
+    // cast) and BEFORE the block-save fork — this row's spell_save_dc never
+    // reaches the save DC (§218 family), so the save seam would land a
+    // spend-then-"DC Unknown" trap (§860 class).
+    if (isUtilitySpellCastRow(action)) {
+      const utilitySpell = await findMonsterSpell(spellName);
+      await resolveUtilitySpellCastRow({
+        action, spellName, spell: utilitySpell,
+        castLevel: spellCastLevelFromSpellcasting(action.description, spellName, utilitySpell),
+        monsterName, campaignName, setPopupHtml,
+      });
       return;
     }
     // MA-0658: Invisibility cast ender — RAW "until it … casts a spell":

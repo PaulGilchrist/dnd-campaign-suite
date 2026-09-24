@@ -2,7 +2,7 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { canRollExpression } from '../../services/dice/diceRoller.js';
 import { extractDamageDiceFromDescription, saveChipPlan } from './MonsterCardModal.jsx';
-import { attackRowMissingToHit, extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage } from './MonsterCardHelpers.js';
+import { attackRowMissingToHit, extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
 import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
 import { legendaryCheckRow, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
 import { monsterRechargeGate, rechargeDisplayText } from '../../services/encounters/monsterRecharge.js';
@@ -62,20 +62,21 @@ function ActionDamageLinks({ action, actionDamageFormula, actionDamageTypeLabel,
   );
 }
 
-function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast }) {
-  const spellNames = extractSpellNamesFromSpellcasting(action.description);
-  if (spellNames.length === 0) return null;
+function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast, spellNames = null, rechargeOut = false }) {
+  const names = spellNames ?? extractSpellNamesFromSpellcasting(action.description);
+  if (names.length === 0) return null;
   const spellUses = extractSpellcastingSpellUses(action.description);
   const clickable = !attackerCannotAct;
   return (
     <>
-      {spellNames.map(spellName => {
+      {names.map(spellName => {
         const usesMax = spellUses[spellName] ?? null;
         const remaining = usesMax == null ? null : Math.max(0, usesMax - (Number(spellUsesUsed?.[spellName]) || 0));
+        const spentClass = remaining === 0 || rechargeOut ? ' mc-dice-link-spell-spent' : '';
         return (
           <span
             key={spellName}
-            className={`mc-dice-link mc-dice-link-spell${remaining === 0 ? ' mc-dice-link-spell-spent' : ''}`}
+            className={`mc-dice-link mc-dice-link-spell${spentClass}`}
             onClick={clickable ? () => onSpellCast(action, spellName) : undefined}
             role="button"
             tabIndex={0}
@@ -255,8 +256,38 @@ function GrantReactionLink({ action, attackerCannotAct, rechargeState, onGrantRe
   );
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow }) {
-  const actionHasSave = action.save_dc != null;
+// MA-1014: the spell-save_dc-only utility-row chip fork (Ice Devil "Ice
+// Wall"). Hoisted out of MonsterAction to hold the complexity ceiling — the
+// three-way choice (Spellcasting markup → spells.json-resolved utility names
+// → generic save-shell) lives here, byte-inert for every non-utility row.
+function SpellOrSaveLinks({ action, isSpellcastingRow, utilityNames, attackerCannotAct, onSpellCast, onSaveRoll, spellUsesUsed, rechargeOut }) {
+  if (isSpellcastingRow) {
+    return <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} />;
+  }
+  if (utilityNames.length > 0) {
+    // MA-1014: chip "Wall of Ice" routes the modal's recharge-gated
+    // advisory cast (resolveUtilitySpellCastRow) on the formerly inert
+    // spell_save_dc-only row; spent recharge gets the existing
+    // mc-dice-link-spell-spent class and its click routes the honest
+    // "Not Recharged" refusal (MA-0031/MA-0963 precedents).
+    return <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} spellNames={utilityNames} rechargeOut={rechargeOut} />;
+  }
+  if (action.save_dc != null) {
+    return <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />;
+  }
+  return null;
+}
+
+// MA-1014: spell_save_dc-only zone/utility row (Ice Devil "Ice Wall") —
+// markup-marked spell names pre-filtered against the modal's spells.json
+// name index, so mid-prose emphasis (§161) and unresolvable names (§158)
+// never arm a fake chip. Null index (not yet loaded / tests) = zero chips.
+function utilitySpellNamesFor(action, spellNameIndex) {
+  if (!spellNameIndex || !isUtilitySpellCastRow(action)) return [];
+  return extractSpellNamesFromSpellcasting(action.description).filter(name => spellNameIndex.has(name));
+}
+
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, spellNameIndex = null }) {
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
   // runtime map; a spent row reads "(Recharge 6 — unavailable)" and refuses.
@@ -265,6 +296,9 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
   const actionDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
   const actionDamageTypeLabel = formatDamageTypeList(actionDamageType);
   const isSpellcastingRow = /^spellcasting$/i.test(action.name || '');
+  // MA-1014: the utility-spell arm excludes legendary-gated rows — those
+  // ride the single "Expend Legendary" chip economy (MA-0694 precedent).
+  const utilityNames = legendaryGate ? [] : utilitySpellNamesFor(action, spellNameIndex);
   const usageText = formatActionUsage(action.usage);
 
   return (
@@ -282,11 +316,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
         </span>
       )}
       <ActionDamageLinks action={action} actionDamageFormula={actionDamageFormula} actionDamageTypeLabel={actionDamageTypeLabel} onDamage={onDamage} />
-      {isSpellcastingRow ? (
-        <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} />
-      ) : (
-        actionHasSave && <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />
-      )}
+      <SpellOrSaveLinks action={action} isSpellcastingRow={isSpellcastingRow} utilityNames={utilityNames} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
       <GatedReactionSlot action={action} attackerCannotAct={attackerCannotAct} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} />
       {usageText && <em> ({usageText})</em>}
