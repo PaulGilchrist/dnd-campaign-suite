@@ -16831,7 +16831,7 @@
     "poisoned"
    ],
    "description": "Constitution Saving Throw: DC 23, each creature in a 15-foot Emanation originating from the kraken while it is underwater. Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.",
-   "verified": "broken — see .opencode/plans/bug-mon-MA-1058-toxic-ink.md"
+   "verified": "verified"
   },
   {
    "id": "MA-1059",

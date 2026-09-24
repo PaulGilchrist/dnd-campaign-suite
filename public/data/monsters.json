@@ -37126,7 +37126,9 @@
       {
         "name": "Toxic Ink",
         "description": "Constitution Saving Throw: DC 23, each creature in a 15-foot <strong>Emanation</strong> originating from the kraken while it is underwater. Failure: The target has the <strong>Blinded</strong> and <strong>Poisoned</strong> conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.",
+        "save_dc": 23,
         "save_type": "Constitution",
+        "range": "15-foot Emanation",
         "save_effect": "Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn."
       }
     ],

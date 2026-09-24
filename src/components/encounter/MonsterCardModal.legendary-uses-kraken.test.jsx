@@ -15,7 +15,8 @@
 // legendary gate as rows[1]; MA-1058 owns its own audit).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MonsterCardModal from './MonsterCardModal.jsx';
+import MonsterCardModal, { breathAoeShape } from './MonsterCardModal.jsx';
+import { extractConditionsFromSaveEffect, parseBothOutcomesClause } from './MonsterCardHelpers.js';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 import {
@@ -151,6 +152,44 @@ describe('MA-1057 monsters.json data: kraken legendary header authors uses:3', (
     expect(ti.save_effect).toBe("Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.");
     expect(ti.description).toContain('Constitution Saving Throw: DC 23');
   });
+
+  // MA-1058 DATA fix: prose "DC 23" (MA-0237 prose-DC family) + prose
+  // "15-foot Emanation" (MA-0590 reads RANGE field only, §181) now NUMERIC.
+  // save_type/save_effect byte-unchanged (ticket). save_dc arms the legendary
+  // save chip (ActionSaveRoll gate save_dc!=null, MonsterAction.jsx:106) and
+  // routes the gated click to handleSaveRoll (resolveLegendaryRowMechanic
+  // :570); range arms the picker (breathAoeShape). Twin placement mirrors the
+  // VERIFIED harpy Luring Song / vrock Spores rows: save_dc→save_type→range→save_effect.
+  it('MA-1058 Toxic Ink authors numeric save_dc:23 + range "15-foot Emanation", save_type/save_effect byte-unchanged', () => {
+    const ti = row('Toxic Ink');
+    expect(ti.save_dc).toBe(23);
+    expect(ti.range).toBe('15-foot Emanation');
+    // byte-unchanged (from MA-1057 above):
+    expect(ti.save_type).toBe('Constitution');
+    expect(ti.save_effect).toBe("Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.");
+    // key order mirrors harpy/vrock emanation save twins:
+    expect(Object.keys(ti)).toEqual(['name', 'description', 'save_dc', 'save_type', 'range', 'save_effect']);
+  });
+
+  // MA-0590 seam: range-field-only parse opens the SaveAttackAoeModal picker
+  // (Emanation→Radius, rangeGateFt = attacker-origin feet). damageless save —
+  // NO damage dice anywhere (§Actual fd==0), save_dc present pre/post-fix.
+  it('MA-1058 breathAoeShape parses Toxic Ink as a 15-ft Radius emanation picker (range field byte)', () => {
+    const ti = row('Toxic Ink');
+    expect(breathAoeShape(ti, null)).toEqual({ shape: 'Radius', feet: 15, rangeGateFt: 15 });
+  });
+
+  // §157/§160 both-outcomes marker: the "Failure or Success:" tail on this row
+  // attaches to the REUSE LIMIT ("can't take this action again"), NOT to the
+  // conditions. parseBothOutcomesClause reads the tail after the marker — the
+  // kraken tail names no canonical condition and no "can't take Reactions" →
+  // null, so SUCCESS grants NOTHING (conditions stay fail-only per RAW). The
+  // fail leg grants Blinded+Poisoned from the "Failure:" section.
+  it('MA-1058 §157 marker is byte-inert (reuse-limit tail names no condition) — success grants nothing, fail grants Blinded+Poisoned', () => {
+    const ti = row('Toxic Ink');
+    expect(parseBothOutcomesClause(ti.save_effect)).toBeNull();
+    expect(extractConditionsFromSaveEffect(ti.save_effect)).toEqual(['blinded', 'poisoned']);
+  });
 });
 
 // MA-1057 live seam: header counter mounts at 3, Storm Bolt gains the gated
@@ -186,10 +225,23 @@ describe('MA-1057 MonsterCardModal kraken gated legendary economy', () => {
     expect(chip.textContent).toContain('Expend Legendary');
   });
 
-  it('Toxic Ink child still renders its own Expend chip riding the shared gate', () => {
+  // MA-1058 STALE-PIN INVERSION (§216): pre-fix Toxic Ink had NO save_dc, so
+  // LegendarySpendLink rendered the generic "Expend Legendary" chip that spent
+  // the use then hit the resolveLegendaryRowMechanic else-branch console.error
+  // (§423 burn). Post-fix save_dc:23 arms ActionSaveRoll: LegendarySpendLink
+  // self-suppresses on numeric rows (MonsterAction.jsx:182) and the row now
+  // renders its OWN "DC 23 Constitution" save chip (mc-dice-link-save-clickable)
+  // which rides the shared legendary gate — MonsterCardBody rewires the
+  // legendary section's onSaveRoll to legendaryGate=handleLegendaryRow (:216),
+  // so the gated spend (economy) + adjudication (picker) BOTH ride one chip.
+  it('MA-1058 Toxic Ink now renders its own "DC 23 Constitution" save chip (no Expend chip), riding the shared gate', () => {
     renderAKraken({ max: 3, used: 0 });
-    const chip = krakenRow('Toxic Ink').querySelector('.mc-dice-link-legendary');
+    const r = krakenRow('Toxic Ink');
+    expect(r.querySelector('.mc-dice-link-legendary')).toBe(null);
+    const chip = r.querySelector('.mc-dice-link-save-clickable');
     expect(chip).not.toBe(null);
+    expect(chip.textContent).toContain('DC 23');
+    expect(chip.textContent).toContain('Constitution');
   });
 
   // MA-0675 live shape: Lightning Strike carries disk-truth attack_bonus:0,
