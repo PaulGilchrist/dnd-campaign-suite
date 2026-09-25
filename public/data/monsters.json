@@ -38689,6 +38689,7 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 3",
+        "damage_dice_two_handed": "1d8 + 3",
         "damage_type_primary": "Piercing"
       }
     ],
@@ -39062,11 +39063,16 @@
       },
       {
         "name": "Bite",
-        "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1dlO + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
+        "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1d10 + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 2",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 12
       },
       {
         "name": "Claws (Lizardfolk Form Only)",
@@ -39078,7 +39084,15 @@
       },
       {
         "name": "Change Shape (Recharges after a Short or Long Rest)",
-        "description": "The lizardfolk magically polymorphs into a crocodile, remaining in that form for up to 1 hour. It can revert to its true form as a bonus action. Its statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed. It reverts to its true form if it dies."
+        "description": "The lizardfolk magically polymorphs into a crocodile, remaining in that form for up to 1 hour. It can revert to its true form as a bonus action. Its statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed. It reverts to its true form if it dies.",
+        "automation": {
+          "type": "monster_shape_shift",
+          "effect": "shape_shift",
+          "forms": [
+            { "name": "Crocodile", "speed": 20 },
+            { "name": "True Form" }
+          ]
+        }
       }
     ],
     "traits": [
@@ -39195,7 +39209,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "2d6 + 3",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["prone"]
       }
     ],
     "bonus_actions": [
@@ -39345,7 +39360,15 @@
       {
         "name": "Protective Magic",
         "trigger": "The mage is targeted by a spell",
-        "description": "The mage casts <strong>Counterspell</strong> or <strong>Shield</strong> in response to the spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The mage casts <strong>Counterspell</strong> or <strong>Shield</strong> in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "enemy_spell_cast",
+          "effect": "counterspell"
+        }
       }
     ],
     "legendary_actions": [],
@@ -39671,6 +39694,7 @@
         "range": "",
         "reach": "5 ft.",
         "recharge": "",
+        "hit_target_effect": "burning",
         "damage_dice_primary": "2d4 + 2",
         "damage_type_primary": "Fire"
       }
@@ -40391,7 +40415,16 @@
       {
         "name": "Parry",
         "trigger": "The marilith is hit by a melee attack roll while holding a weapon",
-        "description": "The marilith adds 5 to its AC against that attack, possibly causing it to miss."
+        "description": "The marilith adds 5 to its AC against that attack, possibly causing it to miss.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "melee_hit",
+          "effect": "parry",
+          "acBonus": 5
+        }
       }
     ],
     "legendary_actions": [],
@@ -40500,7 +40533,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "1d6 + 1",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["prone"]
       }
     ],
     "bonus_actions": [],
@@ -40742,6 +40776,7 @@
         "attack_bonus": 2,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6",
+        "damage_dice_two_handed": "1d8",
         "damage_type_primary": "Piercing"
       }
     ],
@@ -40821,6 +40856,7 @@
         "range": "20/60 ft.",
         "reach": "5 ft.",
         "recharge": "",
+        "hit_target_effect": "speed_reduction",
         "damage_dice_primary": "1d6",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "1d4",
@@ -40934,7 +40970,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "3d10 + 4",
-        "damage_type_primary": "Cold"
+        "damage_type_primary": "Cold",
+        "hit_conditions": ["prone"]
       },
       {
         "name": "Spellcasting",
@@ -41063,7 +41100,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "1d4 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["poisoned"]
       },
       {
         "name": "Claw",
@@ -41196,7 +41234,12 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "2d4 + 4",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 14
       },
       {
         "name": "Mercurial Trident",
@@ -41339,7 +41382,13 @@
         "damage_dice_primary": "1d8 + 3",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "1d8",
-        "damage_type_secondary": "Acid"
+        "damage_type_secondary": "Acid",
+        "conditional_damage": {
+          "dice": "1d8",
+          "modifier": 0,
+          "damage_type": "Piercing",
+          "condition": "the target is Grappled by the mimic"
+        }
       },
       {
         "name": "Pseudopod",
@@ -41354,7 +41403,11 @@
         "damage_dice_primary": "1d8 + 3",
         "damage_type_primary": "Bludgeoning",
         "damage_dice_secondary": "1d8",
-        "damage_type_secondary": "Acid"
+        "damage_type_secondary": "Acid",
+        "hit_conditions": [
+          "grappled"
+        ],
+        "escape_dc": 13
       }
     ],
     "bonus_actions": [
@@ -41472,7 +41525,12 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "4d8 + 4",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "hit_conditions": [
+          "grappled",
+          "stunned"
+        ],
+        "escape_dc": 14
       },
       {
         "name": "Extract Brain",
@@ -41485,7 +41543,12 @@
         "reach": "",
         "recharge": "",
         "damage_dice_primary": "10d10",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "target_prerequisite": {
+          "conditions": [
+            "grappled"
+          ]
+        }
       },
       {
         "name": "Mind Blast",
@@ -41664,7 +41727,16 @@
       {
         "name": "Shield",
         "trigger": "The mind flayer is targeted by a spell",
-        "description": "The mind flayer casts <strong>Shield</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The mind flayer casts <strong>Shield</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "targeted_by_spell",
+          "effect": "shield",
+          "acBonus": 5
+        }
       }
     ],
     "legendary_actions": [],
@@ -41891,9 +41963,15 @@
         "save_effect": "",
         "range": "",
         "reach": "5 ft.",
-        "recharge": "5-6",
+        "recharge": "",
         "damage_dice_primary": "4d6 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "conditional_damage": {
+          "dice": "3d6",
+          "modifier": 0,
+          "damage_type": "Piercing",
+          "condition": "the minotaur moved 10 or more feet straight toward the target immediately before the hit"
+        }
       }
     ],
     "bonus_actions": [],
@@ -41978,7 +42056,13 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "2d6 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "conditional_damage": {
+          "dice": "2d8",
+          "modifier": 0,
+          "damage_type": "Piercing",
+          "condition": "the skeleton moved 20 or more feet straight toward the target immediately before the hit"
+        }
       },
       {
         "name": "Slam",

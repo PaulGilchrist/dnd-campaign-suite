@@ -1324,6 +1324,22 @@ function executeMonsterSaveSpellCast({ spell, spellName, action, handleSaveRoll,
   });
 }
 
+// MA-1150: save-lane check-before-spend refusal (see the handleSpellCast
+// call site). A spell-info cast reaches executeBlockSaveRoll with spellInfo
+// set, so breathAoeShape is null and an unarmed press ALWAYS ends in the
+// MA-0049 no-target refusal — yet handleSpellCast spends its N/Day use at
+// :2110 upstream (MA-0005), making the refusal's honest "zero spend" prose
+// false. This guard refuses before any spend, reusing the MA-0049 popup/log
+// builders byte-identically; armed presses return false and behave exactly
+// as before (spend at :2110, then the single-target save prompt).
+function refuseUnarmedMonsterSaveCast({ routesToSave, target, monsterName, spellName, campaignName, setPopupHtml }) {
+  if (!routesToSave || target?.name) return false;
+  setPopupHtml(buildNoTargetRefusalPopup({ monsterName, actionName: spellName }));
+  addEntry(campaignName, buildNoTargetRefusalLog({ monsterName, actionName: spellName }))
+    .catch((e) => { console.error('[MonsterCardModal] Error logging no-target spell refusal:', e); });
+  return true;
+}
+
 async function executeMonsterSpellAttackCast({ monsterName, spellName, plan, usesNote, campaignName, handleAttack }) {
   await addEntry(campaignName, {
     type: 'ability_use',
@@ -2104,6 +2120,15 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // damage-or-condition save clause stay advisory (CLA-325).
     const saveLegCondition = spellHasDamage(spell) ? null : spellDamagelessSaveCondition(spell);
     const routesToSave = spellHasDamage(spell) || Boolean(saveLegCondition);
+    // MA-1150: check-before-spend — mirror of the MA-0033 attack lane above.
+    // A spell-info cast never parses an AoE picker shape (breathAoeShape
+    // returns null for spellInfo casts), so an unarmed save-lane cast
+    // (Merfolk Wavebender "Control Water") always hit the MA-0049 no-target
+    // guard inside executeBlockSaveRoll — DOWNSTREAM of the :2110 spend,
+    // which had already burned the 1/Day use while the refusal popup/log
+    // swore "zero spend". Refuse HERE instead: the same MA-0049 popup +
+    // `<spell>_refused (no target)` log fire with the ledger truthful.
+    if (refuseUnarmedMonsterSaveCast({ routesToSave, target: getTarget(), monsterName, spellName, campaignName, setPopupHtml })) return;
     // MA-0276: attack and advisory paths emit their own ability_use cast log
     // carrying the usesNote — only the block-save path needs the spend log.
     const skipSpendLog = Boolean(attackPlan) || !routesToSave;

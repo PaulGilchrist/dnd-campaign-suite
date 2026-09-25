@@ -17604,7 +17604,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 6 (1d6 + 3) piercing damage, or 7 (1d8 + 3) piercing damage if used with two hands to make a melee attack.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1100-trident-two-handed-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1101",
@@ -17795,7 +17795,7 @@
         "restrained"
       ],
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1dlO + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1111-lizardfolk-shaman-bite-crocodile-ocr-grapple-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1112",
@@ -17823,7 +17823,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The lizardfolk magically polymorphs into a crocodile, remaining in that form for up to 1 hour. It can revert to its true form as a bonus action. Its statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed. It reverts to its true form if it dies.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1113-change-shape-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1114",
@@ -17887,7 +17887,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1116-sovereign-earthen-maul-prone-unauthored.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1117",
@@ -17959,7 +17959,7 @@
       "actionType": "other",
       "trigger": "The mage is targeted by a spell",
       "description": "The mage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1120-mage-protective-magic-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1121",
@@ -18064,7 +18064,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 7 (2d4 + 2) Fire damage. If the target is a creature or a flammable object that isn't being worn or carried, it starts burning.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1125-magmin-touch-burning-rider-unauthored.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1126",
@@ -18377,7 +18377,7 @@
       "actionType": "other",
       "trigger": "The marilith is hit by a melee attack roll while holding a weapon",
       "description": "The marilith adds 5 to its AC against that attack, possibly causing it to miss.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1140-parry-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1141",
@@ -18401,7 +18401,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 4 (1d6 + 1) Piercing damage. If the target is a Medium or smaller creature, it has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1141-bite-inert-prone-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1142",
@@ -18501,7 +18501,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +2 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 3 (1d6) piercing damage, or 4 (1d8) piercing damage if used with two hands to make a melee attack.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1146-spear-versatile-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1147",
@@ -18524,7 +18524,7 @@
       "range": "20/60 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +2, reach 5 ft. or range 20/60 ft. Hit: 3 (1d6) Piercing damage plus 2 (1d4) Cold damage. If the target is a creature, its Speed decreases by 10 feet until the end of its next turn. Hit or Miss: The spear magically returns to the merfolk's hand immediately after a ranged attack.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1147-ocean-spear-inert-speed-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1148",
@@ -18567,7 +18567,7 @@
         "prone"
       ],
       "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 60 ft. Hit: 20 (3d10 + 4) Cold damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1149-aquatic-burst-inert-prone-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1150",
@@ -18586,7 +18586,7 @@
       "range": "",
       "recharge": "",
       "description": "The merfolk casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15):At Will: Elementalism, Light1/Day Each: Control Water, Create or Destroy Water",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1150-spellcasting-light-dex-misstamp.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1151",
@@ -18647,7 +18647,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 6 (1d4 + 4) Piercing damage, and the target has the Poisoned condition until the end of the merrow's next turn.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1153-bite-inert-poisoned-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1154",
@@ -18733,7 +18733,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 9 (2d4 + 4) Slashing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from two of four claws, and it has the Restrained condition until the grapple ends.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1157-claws-inert-grapple-restrain-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1158",
@@ -18801,7 +18801,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the mimic), reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage\u2014or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic\u2014plus 4 (1d8) Acid damage.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1160-bite-inert-grapple-damage-clause.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1161",
@@ -18827,7 +18827,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Bludgeoning damage plus 4 (1d8) Acid damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13). Ability checks made to escape this grapple have Disadvantage.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1161-pseudopod-inert-grappled-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1162",
@@ -18852,7 +18852,7 @@
         "stunned"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 22 (4d8 + 4) Psychic damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 14) from all the mind flayer's tentacles, and the target has the Stunned condition until the grapple ends.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1162-tentacles-inert-grapple-stun-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1163",
@@ -18876,7 +18876,7 @@
         "grappled"
       ],
       "description": "Constitution Saving Throw: DC 15, one creature that is Grappled by the mind flayer's Tentacles. Failure: 55 (10d10) Piercing damage. Success: Half damage. Failure or Success: If this damage reduces the target to 0 Hit Points, the mind flayer kills it and devours its brain.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1163-extract-brain-prose-only-grapple-prereq.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1164",
@@ -19018,7 +19018,7 @@
       "actionType": "other",
       "trigger": "The mind flayer is targeted by a spell",
       "description": "The mind flayer casts Shield in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1170-shield-inert-reaction.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1171",
@@ -19097,7 +19097,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 18 (4d6 + 4) Piercing damage. If the target is a Large or smaller creature and the minotaur moved 10+ feet straight toward it immediately before the hit, the target takes an extra 10 (3d6) Piercing damage and has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1174-gore-unarmed-charge-seam-recharge-conflict.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1175",
@@ -19121,7 +19121,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage. If the target is a Large or smaller creature and the skeleton moved 20+ feet straight toward it immediately before the hit, the target takes an extra 9 (2d8) Piercing damage and has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1175-gore-unarmed-charge-seam.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1176",

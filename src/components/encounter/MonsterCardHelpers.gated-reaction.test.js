@@ -925,3 +925,53 @@ describe('MA-1048 Knight Parry — data-lock + acBonus 2', () => {
   });
 });
 
+// MA-1140: Marilith Parry — MA-0341/MA-0643/MA-0702/MA-0869/MA-0997/MA-1048
+// routine DATA twin. Disk reactions[0] was prose-only (name/trigger/description)
+// = gate-null inert (getGatedMonsterReaction MonsterCardHelpers.js:1556 keys
+// automation.effect only; no affordance, every attack effAc:16 parryAcBonus:0);
+// fix authors the MA-0341 byte-shape with acBonus 5 (row prose "adds 5" — MUST
+// be authored, buildParryBuff :1262 silently defaults 2). RAW: +5 AC vs the
+// triggering melee hit; AC 16 → 21, 16-20 window flips to miss. At Will sentinel
+// matches marilith "Reactive" RAW (unlimited, 1/round latch).
+const MARILITH_ACTION = monsters.find(m => m.index === 'marilith').reactions[0];
+const MARILITH = 'Marilith 1';
+
+describe('MA-1140 Marilith Parry — data-lock + acBonus 5', () => {
+  it('monsters.json marilith reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 5)', () => {
+    expect(MARILITH_ACTION.name).toBe('Parry');
+    expect(MARILITH_ACTION.description).toMatch(/adds 5 to its AC/);
+    expect(MARILITH_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 5 });
+    expect(MARILITH_ACTION.automation).not.toMatchObject({ acBonus: 2 });
+    expect(MARILITH_ACTION.usage).toBe('At Will');
+    expect(MARILITH_ACTION.uses).toBe(999);
+    expect(MARILITH_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(MARILITH_ACTION)?.effect).toBe('parry');
+  });
+
+  it('gate accepts unresolved melee hit on the marilith and refuses a 2nd same-round press', () => {
+    const hit = { attackerName: 'Bandit 1', targetName: MARILITH, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 13, bonus: 3, total: 16, targetAc: 16, effectiveAc: 16 };
+    const g = parryGate({ lastAttack: hit, monsterName: MARILITH, currentRound: 3, storedUses: {}, usedRound: 0, action: MARILITH_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+    const again = parryGate({ lastAttack: hit, monsterName: MARILITH, currentRound: 3, storedUses: {}, usedRound: 3, action: MARILITH_ACTION });
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('round');
+  });
+
+  it('resolve: buildParryBuff stamps acBonus 5, AC 16 → 21 flips the 16-20 window hit to miss, At Will never spends uses', async () => {
+    const hit = { attackerName: 'Bandit 1', targetName: MARILITH, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 13, bonus: 3, total: 16, targetAc: 16, effectiveAc: 16 };
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+    const result = await resolveMonsterGatedReaction({ action: MARILITH_ACTION, monsterName: MARILITH, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(5);
+    expect(result.newAc).toBe(21);
+    expect(result.newAc).toBeGreaterThan(hit.total);
+    expect(state[`${MARILITH}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 5)).toBe(true);
+    expect(state[`${MARILITH}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(false);
+    expect(state[`${MARILITH}._parry_usedRound`]).toBe(3);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: MARILITH, parryAcBonus: 5 });
+    expect(state[`${MARILITH}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 16 → 21/);
+  });
+});
+

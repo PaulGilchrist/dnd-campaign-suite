@@ -6172,10 +6172,7 @@
         "concentration": false,
         "casting_time": "1 action",
         "level": 0,
-        "dc": {
-            "dc_type": "DEX",
-            "dc_success": "none"
-        },
+        "dc": null,
         "school": "Evocation",
         "classes": [
             "Bard",
