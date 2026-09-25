@@ -40856,6 +40856,7 @@
         "range": "20/60 ft.",
         "reach": "5 ft.",
         "recharge": "",
+        "hit_target_effect": "speed_reduction",
         "damage_dice_primary": "1d6",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "1d4",

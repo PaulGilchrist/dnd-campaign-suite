@@ -582,3 +582,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §480 (2026-09-25, MA-1146) New pitfalls
 - MA-1146 (FIXED, merfolk Spear one-field damage_dice_two_handed:"1d8" modifier-less per prose): HIT-popup chooser variant buttons SHARE class `dice-roll-reroll-btn` with Done — first-`.dice-roll-reroll-btn` finder hits Two-Handed, not Done; match Done by exact text. Ocean Spear sibling MA-1147 carries live damage_dice_secondary "1d4" — two-handed byte-pins must scope to two-handed keys only.
+
+## §481 (2026-09-25, MA-1147) New pitfalls
+- MA-1147 (FIXED, merfolk-skirmisher Ocean Spear one-field hit_target_effect:"speed_reduction"): te grants live {duration:"until_start_of_next_turn"} attacker-anchored + badge "Speed -10" (has BADGE_SPEC, unlike burning §479) + log "Speed Reduced"; RAW end-of-victim-next-turn anchor stays family advisory (MA-0995 twin). PITFALL: admin clear-change-data WIPES combatSummary too — clear BEFORE EB joins, not mid-rig.
