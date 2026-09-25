@@ -18852,7 +18852,7 @@
         "stunned"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 22 (4d8 + 4) Psychic damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 14) from all the mind flayer's tentacles, and the target has the Stunned condition until the grapple ends.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1162-tentacles-inert-grapple-stun-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1163",

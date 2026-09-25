@@ -41525,7 +41525,12 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "4d8 + 4",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "hit_conditions": [
+          "grappled",
+          "stunned"
+        ],
+        "escape_dc": 14
       },
       {
         "name": "Extract Brain",
