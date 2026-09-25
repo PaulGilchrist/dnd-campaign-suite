@@ -18876,7 +18876,7 @@
         "grappled"
       ],
       "description": "Constitution Saving Throw: DC 15, one creature that is Grappled by the mind flayer's Tentacles. Failure: 55 (10d10) Piercing damage. Success: Half damage. Failure or Success: If this damage reduces the target to 0 Hit Points, the mind flayer kills it and devours its brain.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1163-extract-brain-prose-only-grapple-prereq.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1164",

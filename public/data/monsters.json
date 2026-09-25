@@ -41543,7 +41543,12 @@
         "reach": "",
         "recharge": "",
         "damage_dice_primary": "10d10",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "target_prerequisite": {
+          "conditions": [
+            "grappled"
+          ]
+        }
       },
       {
         "name": "Mind Blast",
