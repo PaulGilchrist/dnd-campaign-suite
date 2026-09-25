@@ -24,7 +24,8 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
         setMapDataGuarded((prev) => ({
              ...prev,
             players: (data.players || prev?.players || []).map(({ ...rest }) => rest),
-            walls: data.walls ? new Set(data.walls) : (prev?.walls || new Set())
+            walls: data.walls ? new Set(data.walls) : (prev?.walls || new Set()),
+            revealed: data.revealed !== undefined ? data.revealed : (prev?.revealed || [])
           }));
         if (data.placedItems !== undefined) {
             setPlacedItemsGuarded(data.placedItems);

@@ -15,284 +15,213 @@ describe('useFogOfWar', () => {
     vi.clearAllMocks();
   });
 
-  describe('early return for invalid gridSize', () => {
+  describe('return shape', () => {
+    it('returns an object with fog and visible Sets', () => {
+      computeVisibility.mockReturnValue(new Set(['1,1']));
+      const { result } = renderHook(() =>
+        useFogOfWar([{ gridX: 1, gridY: 1 }], new Set(), [], 3, [])
+      );
+      expect(result.current).toHaveProperty('fog');
+      expect(result.current).toHaveProperty('visible');
+      expect(result.current.fog).toBeInstanceOf(Set);
+      expect(result.current.visible).toBeInstanceOf(Set);
+    });
+  });
+
+  describe('invalid gridSize', () => {
     it.each([
       [undefined, 'undefined'],
       [null, 'null'],
       [0, 'zero'],
       [-1, 'negative'],
-    ])('should return empty Set when gridSize is %s', (gridSize) => {
+    ])('returns empty fog and visible when gridSize is %s', (gridSize) => {
       const { result } = renderHook(() =>
-        useFogOfWar([{ gridX: 1, gridY: 1 }], new Set(), [], gridSize)
+        useFogOfWar([{ gridX: 1, gridY: 1 }], new Set(), [], gridSize, [])
       );
-      expect(result.current).toBeInstanceOf(Set);
-      expect(result.current.size).toBe(0);
+      expect(result.current.fog.size).toBe(0);
+      expect(result.current.visible.size).toBe(0);
+      expect(computeVisibility).not.toHaveBeenCalled();
     });
   });
 
-  describe('no visible players', () => {
+  describe('no players', () => {
     it.each([
       [null, 'null'],
       [[], 'empty array'],
-    ])('should return fog covering entire grid when players=%s and gridSize=%s', (players, _label) => {
+    ])('returns empty visible and full fog when players=%s', (players) => {
       const gridSize = 5;
       const { result } = renderHook(() =>
-        useFogOfWar(players, new Set(), [], gridSize)
+        useFogOfWar(players, new Set(), [], gridSize, [])
       );
-      expect(result.current).toBeInstanceOf(Set);
-      expect(result.current.size).toBe(gridSize * gridSize);
+      expect(result.current.visible.size).toBe(0);
+      expect(result.current.fog.size).toBe(gridSize * gridSize);
       for (let x = 0; x < gridSize; x++) {
         for (let y = 0; y < gridSize; y++) {
-          expect(result.current.has(`${x},${y}`)).toBe(true);
+          expect(result.current.fog.has(`${x},${y}`)).toBe(true);
         }
       }
+      expect(computeVisibility).not.toHaveBeenCalled();
     });
   });
 
-  describe('visibility computation', () => {
-    it('should return fog set for cells not in visible', () => {
+  describe('fog = all cells - (revealed union visible)', () => {
+    it('does not fog cells that are revealed or visible', () => {
       const gridSize = 3;
       const players = [{ gridX: 1, gridY: 1 }];
-      const walls = new Set();
-      const placedItems = [];
-
-      computeVisibility.mockReturnValue(new Set(['1,1']));
+      computeVisibility.mockReturnValue(new Set(['1,1', '0,0']));
 
       const { result } = renderHook(() =>
-        useFogOfWar(players, walls, placedItems, gridSize)
+        useFogOfWar(players, new Set(), [], gridSize, ['2,2'])
       );
 
-      expect(result.current).toBeInstanceOf(Set);
-      expect(result.current.has('1,1')).toBe(false);
-      expect(result.current.has('0,0')).toBe(true);
-      expect(result.current.has('2,2')).toBe(true);
+      expect(result.current.visible.has('1,1')).toBe(true);
+      expect(result.current.visible.has('0,0')).toBe(true);
+      expect(result.current.fog.has('1,1')).toBe(false);
+      expect(result.current.fog.has('0,0')).toBe(false);
+      expect(result.current.fog.has('2,2')).toBe(false); // revealed
+      expect(result.current.fog.has('2,0')).toBe(true);
+      expect(result.current.fog.size).toBe(9 - 3);
     });
 
-    it('should pass walls Set to computeVisibility when walls is null', () => {
-      computeVisibility.mockReturnValue(new Set(['2,2']));
+    it('keeps revealed cells unfogged even when not in the current line of sight', () => {
+      const gridSize = 2;
+      const players = [{ gridX: 0, gridY: 0 }];
+      computeVisibility.mockReturnValue(new Set(['0,0']));
 
-      const gridSize = 5;
-      const players = [{ gridX: 2, gridY: 2 }];
-
-      renderHook(() =>
-        useFogOfWar(players, null, [], gridSize)
+      const { result } = renderHook(() =>
+        useFogOfWar(players, new Set(), [], gridSize, ['1,1'])
       );
+
+      expect(result.current.fog.has('1,1')).toBe(false);
+      expect(result.current.fog.has('0,1')).toBe(true);
+      expect(result.current.fog.has('1,0')).toBe(true);
+      expect(result.current.fog.size).toBe(2);
+    });
+
+    it('fogs the entire grid when there are no players and no revealed cells', () => {
+      const gridSize = 3;
+      const { result } = renderHook(() =>
+        useFogOfWar([], new Set(), [], gridSize, [])
+      );
+      expect(result.current.fog.size).toBe(gridSize * gridSize);
+    });
+  });
+
+  describe('computeVisibility inputs', () => {
+    it('passes the players array and an empty Set for null walls', () => {
+      computeVisibility.mockReturnValue(new Set(['2,2']));
+      const players = [{ gridX: 2, gridY: 2 }];
+      const gridSize = 5;
+
+      renderHook(() => useFogOfWar(players, null, [], gridSize, []));
 
       expect(computeVisibility).toHaveBeenCalledWith(
-        players,
-        new Set(),
-        new Set(),
-        gridSize
+        players, new Set(), new Set(), gridSize
       );
     });
 
-    it('should pass closed doors from placedItems as walls to computeVisibility', () => {
+    it('passes closed doors from placedItems', () => {
       computeVisibility.mockReturnValue(new Set(['2,2']));
-
-      const gridSize = 5;
       const players = [{ gridX: 2, gridY: 2 }];
       const walls = new Set(['0,0']);
       const placedItems = [
         { type: 'door', open: false, gridX: 1, gridY: 1 },
         { type: 'door', open: true, gridX: 3, gridY: 3 },
-        { type: 'wall', gridX: 0, gridY: 0 },
       ];
 
-      renderHook(() =>
-        useFogOfWar(players, walls, placedItems, gridSize)
-      );
+      renderHook(() => useFogOfWar(players, walls, placedItems, 5, []));
 
       expect(computeVisibility).toHaveBeenCalledWith(
-        players,
-        walls,
-        new Set(['1,1']),
-        gridSize
+        players, walls, new Set(['1,1']), 5
       );
     });
 
-    it('adds a hidden secret door cell to the walls passed to computeVisibility', () => {
+    it('adds a hidden secret door cell to the walls', () => {
       computeVisibility.mockReturnValue(new Set(['2,2']));
-      const gridSize = 5;
       const players = [{ gridX: 2, gridY: 2 }];
-      const walls = new Set();
       const placedItems = [{ type: 'secretDoor', gridX: 1, gridY: 1, visible: false }];
 
-      renderHook(() => useFogOfWar(players, walls, placedItems, gridSize));
+      renderHook(() => useFogOfWar(players, new Set(), placedItems, 5, []));
 
       expect(computeVisibility).toHaveBeenCalledWith(
-        players,
-        new Set(['1,1']),
-        new Set(),
-        gridSize
+        players, new Set(['1,1']), new Set(), 5
       );
     });
 
-    it('excludes a discovered secret door cell from the walls passed to computeVisibility', () => {
+    it('excludes a discovered secret door cell from the walls', () => {
       computeVisibility.mockReturnValue(new Set(['2,2']));
-      const gridSize = 5;
       const players = [{ gridX: 2, gridY: 2 }];
       const walls = new Set(['1,1']);
       const placedItems = [{ type: 'secretDoor', gridX: 1, gridY: 1, visible: true }];
 
-      renderHook(() => useFogOfWar(players, walls, placedItems, gridSize));
+      renderHook(() => useFogOfWar(players, walls, placedItems, 5, []));
 
       expect(computeVisibility).toHaveBeenCalledWith(
-        players,
-        new Set(),
-        new Set(),
-        gridSize
+        players, new Set(), new Set(), 5
       );
     });
 
-    it('should handle placedItems being null', () => {
+    it('handles placedItems being null', () => {
       computeVisibility.mockReturnValue(new Set(['1,1']));
-
-      const gridSize = 3;
       const players = [{ gridX: 1, gridY: 1 }];
 
-      renderHook(() =>
-        useFogOfWar(players, new Set(), null, gridSize)
-      );
+      renderHook(() => useFogOfWar(players, new Set(), null, 3, []));
 
       expect(computeVisibility).toHaveBeenCalledWith(
-        players,
-        new Set(),
-        new Set(),
-        gridSize
+        players, new Set(), new Set(), 3
       );
     });
-
-    it('should handle multiple players', () => {
-      computeVisibility.mockReturnValue(new Set(['0,0', '1,1', '2,2']));
-
-      const gridSize = 3;
-      const players = [
-        { gridX: 0, gridY: 0 },
-        { gridX: 2, gridY: 2 },
-      ];
-
-      const { result } = renderHook(() =>
-        useFogOfWar(players, new Set(), [], gridSize)
-      );
-
-      expect(computeVisibility).toHaveBeenCalledWith(
-        players,
-        new Set(),
-        new Set(),
-        gridSize
-      );
-      expect(result.current.has('0,0')).toBe(false);
-      expect(result.current.has('1,1')).toBe(false);
-      expect(result.current.has('2,2')).toBe(false);
-      expect(result.current.has('0,1')).toBe(true);
-    });
-
   });
 
   describe('memoization', () => {
-    it('should not call computeVisibility again when inputs are stable', () => {
-      const gridSize = 3;
+    it('returns the same result object when inputs do not change', () => {
+      computeVisibility.mockReturnValue(new Set(['1,1']));
       const players = [{ gridX: 1, gridY: 1 }];
       const walls = new Set();
+      const revealed = ['1,1'];
       const placedItems = [];
 
-      const { rerender } = renderHook(
-        ({ players, walls, placedItems, gridSize }) =>
-          useFogOfWar(players, walls, placedItems, gridSize),
-        { initialProps: { players, walls, placedItems, gridSize } }
+      const { result, rerender } = renderHook(
+        ({ players, walls, revealed, placedItems, gridSize }) =>
+          useFogOfWar(players, walls, placedItems, gridSize, revealed),
+        { initialProps: { players, walls, revealed, placedItems, gridSize: 3 } }
       );
-
-      expect(computeVisibility).toHaveBeenCalledTimes(1);
-
-      rerender({ players, walls, placedItems, gridSize });
-      expect(computeVisibility).toHaveBeenCalledTimes(1);
+      const first = result.current;
+      rerender({ players, walls, revealed, placedItems, gridSize: 3 });
+      expect(result.current).toBe(first);
     });
-    it('should return the same Set reference when inputs do not change', () => {
-      const gridSize = 3;
+
+    it('returns a new result when revealed changes', () => {
+      computeVisibility.mockReturnValue(new Set(['1,1']));
       const players = [{ gridX: 1, gridY: 1 }];
       const walls = new Set();
       const placedItems = [];
 
       const { result, rerender } = renderHook(
-        ({ players, walls, placedItems, gridSize }) =>
-          useFogOfWar(players, walls, placedItems, gridSize),
-        { initialProps: { players, walls, placedItems, gridSize } }
+        ({ players, walls, revealed, placedItems, gridSize }) =>
+          useFogOfWar(players, walls, placedItems, gridSize, revealed),
+        { initialProps: { players, walls, revealed: ['1,1'], placedItems, gridSize: 3 } }
       );
-
-      const firstResult = result.current;
-      rerender({ players, walls, placedItems, gridSize });
-      expect(result.current).toBe(firstResult);
+      const first = result.current;
+      rerender({ players, walls, revealed: ['1,1', '0,0'], placedItems, gridSize: 3 });
+      expect(result.current).not.toBe(first);
     });
 
-    it('should return a new Set when gridSize changes', () => {
-      const gridSize = 3;
-      const players = [{ gridX: 1, gridY: 1 }];
-      const walls = new Set();
-      const placedItems = [];
-
-      const { result, rerender } = renderHook(
-        ({ players, walls, placedItems, gridSize }) =>
-          useFogOfWar(players, walls, placedItems, gridSize),
-        { initialProps: { players, walls, placedItems, gridSize } }
-      );
-
-      const firstResult = result.current;
-      rerender({ players, walls, placedItems, gridSize: 5 });
-      expect(result.current).not.toBe(firstResult);
-    });
-
-    it('should return a new Set when players change', () => {
-      const gridSize = 3;
+    it('returns a new result when players change', () => {
+      computeVisibility.mockReturnValue(new Set(['1,1']));
       const walls = new Set();
       const placedItems = [];
       const players1 = [{ gridX: 1, gridY: 1 }];
       const players2 = [{ gridX: 2, gridY: 2 }];
 
       const { result, rerender } = renderHook(
-        ({ players, walls, placedItems, gridSize }) =>
-          useFogOfWar(players, walls, placedItems, gridSize),
-        { initialProps: { players: players1, walls, placedItems, gridSize } }
+        ({ players, walls, placedItems, revealed, gridSize }) =>
+          useFogOfWar(players, walls, placedItems, gridSize, revealed),
+        { initialProps: { players: players1, walls, placedItems, revealed: [], gridSize: 3 } }
       );
-
-      const firstResult = result.current;
-      rerender({ players: players2, walls, placedItems, gridSize });
-      expect(result.current).not.toBe(firstResult);
-    });
-
-    it('should return a new Set when walls change', () => {
-      const gridSize = 3;
-      const players = [{ gridX: 1, gridY: 1 }];
-      const placedItems = [];
-      const walls1 = new Set();
-      const walls2 = new Set(['0,0']);
-
-      const { result, rerender } = renderHook(
-        ({ players, walls, placedItems, gridSize }) =>
-          useFogOfWar(players, walls, placedItems, gridSize),
-        { initialProps: { players, walls: walls1, placedItems, gridSize } }
-      );
-
-      const firstResult = result.current;
-      rerender({ players, walls: walls2, placedItems, gridSize });
-      expect(result.current).not.toBe(firstResult);
-    });
-
-    it('should return a new Set when placedItems change', () => {
-      const gridSize = 3;
-      const players = [{ gridX: 1, gridY: 1 }];
-      const walls = new Set();
-      const placedItems1 = [];
-      const placedItems2 = [{ type: 'door', open: false, gridX: 0, gridY: 0 }];
-
-      const { result, rerender } = renderHook(
-        ({ players, walls, placedItems, gridSize }) =>
-          useFogOfWar(players, walls, placedItems, gridSize),
-        { initialProps: { players, walls, placedItems: placedItems1, gridSize } }
-      );
-
-      const firstResult = result.current;
-      rerender({ players, walls, placedItems: placedItems2, gridSize });
-      expect(result.current).not.toBe(firstResult);
+      const first = result.current;
+      rerender({ players: players2, walls, placedItems, revealed: [], gridSize: 3 });
+      expect(result.current).not.toBe(first);
     });
   });
 });

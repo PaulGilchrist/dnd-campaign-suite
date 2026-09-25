@@ -12,15 +12,10 @@ const handlers = {
     setMapData: vi.fn(),
     setPlacedItems: vi.fn(),
     setNpcImages: vi.fn(),
-    setSelectedRoom: vi.fn(),
     gridPointerDown: vi.fn(),
     gridPointerMove: vi.fn(),
     gridPointerUp: vi.fn(),
     gridPointerLeave: vi.fn(),
-    roomPointerDown: vi.fn(),
-    roomPointerMove: vi.fn(),
-    roomPointerUp: vi.fn(),
-    roomClick: vi.fn(),
     selectPointerDown: vi.fn(),
     selectPointerMove: vi.fn(),
     selectPointerUp: vi.fn(),
@@ -65,8 +60,6 @@ const mockState = {
     moveOffset: null,
     selectStart: { current: null },
     moveStartGrid: { current: null },
-    roomDrawRect: null,
-    selectedRoom: null,
     painting: false,
     dragging: null,
     itemDragging: null,
@@ -137,18 +130,6 @@ vi.mock('./hooks/useWallDrawing.js', () => ({
         handleGridPointerMove: handlers.gridPointerMove,
         handleGridPointerUp: handlers.gridPointerUp,
         handleGridPointerLeave: handlers.gridPointerLeave,
-    })),
-}));
-
-vi.mock('./hooks/useRoomDrawing.js', () => ({
-    default: vi.fn(() => ({
-        roomDrawRect: mockState.roomDrawRect,
-        selectedRoom: mockState.selectedRoom,
-        setSelectedRoom: handlers.setSelectedRoom,
-        handleRoomPointerDown: handlers.roomPointerDown,
-        handleRoomPointerMove: handlers.roomPointerMove,
-        handleRoomPointerUp: handlers.roomPointerUp,
-        handleRoomClick: handlers.roomClick,
     })),
 }));
 
@@ -244,7 +225,7 @@ vi.mock('./hooks/useSSESync.js', () => ({
 }));
 
 vi.mock('./hooks/useFogOfWar.js', () => ({
-    default: vi.fn(() => new Set()),
+    default: vi.fn(() => ({ fog: new Set(), visible: new Set() })),
 }));
 
 vi.mock('./hooks/useMapDrops.js', () => ({
@@ -256,7 +237,6 @@ vi.mock('../hex-map/HexMap.jsx', () => ({ default: vi.fn(() => <div data-testid=
 const createMockMapData = (overrides = {}) => ({
     players: [],
     walls: new Set(),
-    rooms: [],
     ...overrides,
 });
 
@@ -295,8 +275,6 @@ describe('Map - SVG pointer event routing', () => {
             selectedItems: new Set(),
             selectionRect: null,
             moveOffset: null,
-            roomDrawRect: null,
-            selectedRoom: null,
             painting: false,
             dragging: null,
             itemDragging: null,
@@ -321,7 +299,6 @@ describe('Map - SVG pointer event routing', () => {
         expect(handlers.panStart).toHaveBeenCalled();
         expect(handlers.gridPointerDown).not.toHaveBeenCalled();
         expect(handlers.selectPointerDown).not.toHaveBeenCalled();
-        expect(handlers.roomPointerDown).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -353,19 +330,6 @@ describe('Map - SVG pointer event routing', () => {
         expect(handlers.panStart).not.toHaveBeenCalled();
     });
 
-    it('routes pointer down to room pointer down for room tool', async () => {
-        const { container } = await act(async () => renderMap());
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /room/i }));
-        });
-        const svg = container.querySelector('svg');
-        await act(async () => {
-            fireEvent.pointerDown(svg, { button: 0 });
-        });
-        expect(handlers.roomPointerDown).toHaveBeenCalled();
-        expect(handlers.panStart).not.toHaveBeenCalled();
-    });
-
     it('does not route tool actions when spell drag is active', async () => {
         mockState.spellDragActiveRef.current = true;
         const { container } = await act(async () => renderMap());
@@ -376,7 +340,6 @@ describe('Map - SVG pointer event routing', () => {
         expect(handlers.panStart).not.toHaveBeenCalled();
         expect(handlers.gridPointerDown).not.toHaveBeenCalled();
         expect(handlers.selectPointerDown).not.toHaveBeenCalled();
-        expect(handlers.roomPointerDown).not.toHaveBeenCalled();
     });
 
     it('calls pointer move handlers on SVG pointer move', async () => {
@@ -389,7 +352,6 @@ describe('Map - SVG pointer event routing', () => {
         expect(handlers.itemPointerMove).toHaveBeenCalled();
         expect(handlers.gridPointerMove).toHaveBeenCalled();
         expect(handlers.selectPointerMove).toHaveBeenCalled();
-        expect(handlers.roomPointerMove).toHaveBeenCalled();
         expect(handlers.panMove).toHaveBeenCalled();
         expect(handlers.spellPointerMove).toHaveBeenCalled();
         expect(handlers.spellDragMove).toHaveBeenCalled();
@@ -406,7 +368,6 @@ describe('Map - SVG pointer event routing', () => {
         expect(handlers.itemPointerUp).toHaveBeenCalled();
         expect(handlers.gridPointerUp).toHaveBeenCalled();
         expect(handlers.selectPointerUp).toHaveBeenCalled();
-        expect(handlers.roomPointerUp).toHaveBeenCalled();
         expect(handlers.panEnd).toHaveBeenCalled();
         expect(handlers.spellPointerUp).toHaveBeenCalled();
         expect(handlers.spellDragEnd).toHaveBeenCalled();
@@ -421,27 +382,6 @@ describe('Map - SVG pointer event routing', () => {
         });
         expect(handlers.itemPointerLeave).toHaveBeenCalled();
         expect(handlers.gridPointerLeave).toHaveBeenCalled();
-    });
-
-    it.each([
-        { button: 0, shouldRoute: true, shouldClose: true },
-        { button: 2, shouldRoute: false, shouldClose: false },
-    ])('routes room click $button: shouldRoute=$shouldRoute, shouldClose=$shouldClose', async ({ button, shouldRoute, shouldClose }) => {
-        const { container } = await act(async () => renderMap());
-        const svg = container.querySelector('svg');
-        await act(async () => {
-            fireEvent.click(svg, { button });
-        });
-        if (shouldRoute) {
-            expect(handlers.roomClick).toHaveBeenCalled();
-        } else {
-            expect(handlers.roomClick).not.toHaveBeenCalled();
-        }
-        if (shouldClose) {
-            expect(handlers.setSelectedRoom).toHaveBeenCalledWith(null);
-        } else {
-            expect(handlers.setSelectedRoom).not.toHaveBeenCalled();
-        }
     });
 
     it('prevents default context menu on SVG', async () => {
@@ -539,7 +479,7 @@ describe('Map - toolbar interactions', () => {
     });
 });
 
-describe('Map - selection, room draw and move previews', () => {
+describe('Map - selection and move previews', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         clearRuntimeState('test-campaign');
@@ -550,7 +490,6 @@ describe('Map - selection, room draw and move previews', () => {
             selectedItems: new Set(),
             selectionRect: null,
             moveOffset: null,
-            roomDrawRect: null,
         });
         mockState.selectStart.current = null;
         mockState.moveStartGrid.current = null;
@@ -567,23 +506,10 @@ describe('Map - selection, room draw and move previews', () => {
         expect(preview).toBeTruthy();
     });
 
-    it('renders a room draw preview when roomDrawRect is set', async () => {
-        mockState.roomDrawRect = { minX: 1, maxX: 3, minY: 2, maxY: 4 };
-        const { container } = await act(async () => renderMap());
-        const preview = container.querySelector('rect.room-draw-preview');
-        expect(preview).toBeTruthy();
-    });
-
     it('does not render selection preview when selectStart is null', async () => {
         mockState.selectStart.current = null;
         mockState.selectionRect = { minX: 2, maxX: 4, minY: 3, maxY: 5 };
         const { container } = await act(async () => renderMap());
         expect(container.querySelector('rect.selection-preview')).toBeFalsy();
-    });
-
-    it('does not render room draw preview when roomDrawRect is null', async () => {
-        mockState.roomDrawRect = null;
-        const { container } = await act(async () => renderMap());
-        expect(container.querySelector('rect.room-draw-preview')).toBeFalsy();
     });
 });

@@ -18,7 +18,7 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                 const existing = await mapsService.loadMapData(campaignName, mapName);
                 if (existing) {
                     const walls = existing.walls ? new Set(existing.walls) : new Set();
-                    setMapData({ ...existing, walls });
+                    setMapData({ ...existing, walls, revealed: existing.revealed || [] });
                     setGridSize(existing.gridSize || DEFAULT_GRID_SIZE);
                     setPlacedItems(existing.placedItems || []);
 
@@ -36,7 +36,7 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                 // ignore, fall through to empty map creation
             }
 
-            const newData = { players: [], walls: new Set(), rooms: [] };
+            const newData = { players: [], walls: new Set() };
             setMapData(newData);
             const dataToSave = {
                 ...newData,
@@ -58,7 +58,6 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
             gridSize,
             walls: Array.from(mapData.walls || []),
             placedItems: placedItems,
-            rooms: mapData.rooms || [],
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
     }, [mapData, campaignName, gridSize, placedItems, mapName]);

@@ -58,17 +58,20 @@ There is no freeform dice input field. All dice formulas come from your characte
 
 ## Fog of War — Indoor Maps Only
 
-Fog of war is a DM-only feature that hides map areas until player characters move into line of sight. It works by drawing imaginary rays from each player token to every cell on the grid using a Bresenham line-of-sight algorithm. Walls and closed doors block visibility.
+Fog of war hides map areas until they are seen. It works by drawing imaginary rays from each player token to every cell on the grid using a Bresenham line-of-sight algorithm. Walls and closed doors block visibility.
 
 ### How to reveal areas
 
-Drag player tokens around the map. Areas come into view when no wall or closed door blocks LOS. Opening doors (via right-click context menu) also reveals what's behind them.
+Any player can drag a character token around the map. Areas come into view when no wall or closed door blocks line of sight; opening doors (via right-click context menu) also reveals what's behind them. Revealed areas are **remembered** — once uncovered, they stay uncovered for everyone, and the revealed set is saved with the map.
+
+### Roles
+
+- **GM (localhost)** sees a translucent veil over uncovered areas, so the whole map remains visible underneath. The GM's toolbar has a **Reset Fog** button that wipes the exploration memory back to the starting state (everything fogged except the current line of sight) and re-centers the view.
+- **Players** see opaque fog over uncovered areas and a **Reset View** button that re-centers the view.
 
 ### Limitations
 
-- **No exploration memory** — moving a token away instantly re-covers visible areas with fog
-- **No vision range** — LOS extends infinitely until blocked; darkness, dim light, and spell effects like *darkness* are not modeled
-- **DM-only** — remote players (non-localhost connections) see the full map without fog
+- **No vision range** — vision extends infinitely until blocked; darkness, dim light, and spell effects like *darkness* are not modeled
 
 ---
 

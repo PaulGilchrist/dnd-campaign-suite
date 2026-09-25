@@ -7,7 +7,6 @@ import {
     createDefaultMocks,
     createZoomPanMocks,
     createWallDrawingMocks,
-    createRoomDrawingMocks,
     createSelectMoveMocks,
     createRulerMocks,
     createSpellOverlayMocks,
@@ -65,13 +64,12 @@ describe('mapTestUtils', () => {
             expect(mocks).toHaveProperty('setPlacedItems');
         });
 
-        it('should initialize mapData with empty players, empty walls Set, and empty rooms', () => {
+        it('should initialize mapData with empty players and empty walls Set', () => {
             const { mapData } = createDefaultMocks();
 
             expect(mapData.players).toEqual([]);
             expect(mapData.walls).toBeInstanceOf(Set);
             expect(mapData.walls.size).toBe(0);
-            expect(mapData.rooms).toEqual([]);
         });
 
         it('should initialize placedItems as empty array', () => {
@@ -90,13 +88,12 @@ describe('mapTestUtils', () => {
 
         it('should replace mapData when override is provided', () => {
             const overrides = {
-                mapData: { players: [{ name: 'Test' }], walls: new Set(['1,1-2,2']), rooms: [{ id: 'r1' }] },
+                mapData: { players: [{ name: 'Test' }], walls: new Set(['1,1-2,2']) },
             };
             const { mapData } = createDefaultMocks(overrides);
 
             expect(mapData.players).toEqual([{ name: 'Test' }]);
             expect(mapData.walls.has('1,1-2,2')).toBe(true);
-            expect(mapData.rooms).toEqual([{ id: 'r1' }]);
         });
 
         it('should replace placedItems when override is provided', () => {
@@ -122,7 +119,6 @@ describe('mapTestUtils', () => {
             expect(placedItems).toEqual([{ id: 'x' }]);
             expect(mapData.players).toEqual([]);
             expect(mapData.walls.size).toBe(0);
-            expect(mapData.rooms).toEqual([]);
             expect(setMapData).toBeInstanceOf(Function);
             expect(setPlacedItems).toBeInstanceOf(Function);
         });
@@ -243,45 +239,6 @@ describe('mapTestUtils', () => {
             const mocksB = createWallDrawingMocks();
 
             expect(mocksA.handleGridPointerDown).not.toBe(mocksB.handleGridPointerDown);
-        });
-    });
-
-    describe('createRoomDrawingMocks', () => {
-        it('should return an object with room drawing state and handlers', () => {
-            const mocks = createRoomDrawingMocks();
-
-            expect(mocks).toHaveProperty('roomDrawRect');
-            expect(mocks).toHaveProperty('selectedRoom');
-            expect(mocks).toHaveProperty('setSelectedRoom');
-            expect(mocks).toHaveProperty('handleRoomPointerDown');
-            expect(mocks).toHaveProperty('handleRoomPointerMove');
-            expect(mocks).toHaveProperty('handleRoomPointerUp');
-            expect(mocks).toHaveProperty('handleRoomClick');
-        });
-
-        it('should initialize roomDrawRect and selectedRoom to null', () => {
-            const { roomDrawRect, selectedRoom } = createRoomDrawingMocks();
-
-            expect(roomDrawRect).toBeNull();
-            expect(selectedRoom).toBeNull();
-        });
-
-        it('should create mock functions that track calls', () => {
-            const { setSelectedRoom, handleRoomPointerDown, handleRoomClick } = createRoomDrawingMocks();
-
-            setSelectedRoom({ id: 'r1' });
-            handleRoomClick({ target: 'room' });
-
-            expect(setSelectedRoom).toHaveBeenCalledWith({ id: 'r1' });
-            expect(handleRoomClick).toHaveBeenCalledWith({ target: 'room' });
-            expect(handleRoomPointerDown).not.toHaveBeenCalled();
-        });
-
-        it('should return independent mock objects on each call', () => {
-            const mocksA = createRoomDrawingMocks();
-            const mocksB = createRoomDrawingMocks();
-
-            expect(mocksA.setSelectedRoom).not.toBe(mocksB.setSelectedRoom);
         });
     });
 
@@ -720,10 +677,6 @@ describe('mapTestUtils', () => {
             const wallDrawingResult = useWallDrawing();
             expect(wallDrawingResult.painting).toBe(false);
 
-            const useRoomDrawing = (await import('./hooks/useRoomDrawing.js')).default;
-            const roomDrawingResult = useRoomDrawing();
-            expect(roomDrawingResult.roomDrawRect).toBeNull();
-
             const useSelectMove = (await import('./hooks/useSelectMove.js')).default;
             const selectMoveResult = useSelectMove();
             expect(selectMoveResult.selectionRect).toBeNull();
@@ -759,7 +712,10 @@ describe('mapTestUtils', () => {
 
             const fogModule = await import('./hooks/useFogOfWar.js');
             const fogResult = fogModule.default();
-            expect(fogResult).toBeInstanceOf(Set);
+            expect(fogResult).toHaveProperty('fog');
+            expect(fogResult).toHaveProperty('visible');
+            expect(fogResult.fog).toBeInstanceOf(Set);
+            expect(fogResult.visible).toBeInstanceOf(Set);
 
             const useMapDrops = (await import('./hooks/useMapDrops.js')).default;
             const mapDropsResult = useMapDrops();
