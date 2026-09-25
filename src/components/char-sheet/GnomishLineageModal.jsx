@@ -5,10 +5,7 @@ function GnomishLineageModal({ gnomishLineageModal, handleGnomishLineageConfirm,
     const { action, playerStats, campaignName } = gnomishLineageModal;
     const options = action?.automation?.options || [];
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            handleGnomishLineageSkip?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {action?.name || 'Gnomish Lineage'}

@@ -2,11 +2,6 @@ import { useState } from 'react';
 import { applyTypeChoice } from '../../../services/automation/handlers/class-warlock/fiendishResilienceHandler.js';
 import '../CharSheet.css';
 
-function handleOverlayDismiss(e, onClose) {
-    if (e.target.closest('.sp-modal')) return;
-    onClose?.();
-}
-
 function ResistanceHeader({ title, icon, action }) {
     return (
         <div className="sp-header">
@@ -17,7 +12,7 @@ function ResistanceHeader({ title, icon, action }) {
 
 function ResistanceAppliedView({ title, icon, action, result, onClose }) {
     return (
-        <div className="sp-overlay" onClick={(e) => handleOverlayDismiss(e, onClose)}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <ResistanceHeader title={title} icon={icon} action={action} />
                 <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
@@ -74,7 +69,7 @@ function SingleResistanceSelectionModal({ title, icon, action, playerStats, camp
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => handleOverlayDismiss(e, onClose)}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <ResistanceHeader title={title} icon={icon} action={action} />
                 <div className="sp-body">

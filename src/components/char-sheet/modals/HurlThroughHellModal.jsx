@@ -276,10 +276,7 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
         }
 
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-dragon"></i> {featureName}

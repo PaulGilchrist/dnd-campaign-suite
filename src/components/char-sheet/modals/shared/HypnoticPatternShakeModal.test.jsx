@@ -101,12 +101,13 @@ describe('HypnoticPatternShakeModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('closes when the overlay background is clicked', () => {
+    it('does not close when the overlay background is clicked', () => {
       const onClose = vi.fn();
       const { container } = render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
       const overlay = container.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(container.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('does not close when the modal inner content is clicked', () => {

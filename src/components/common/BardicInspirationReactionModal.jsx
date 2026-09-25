@@ -67,13 +67,6 @@ function BardicInspirationReactionModal({ campaignName }) {
         });
     }, [campaignName]);
 
-    const handleDismiss = useCallback(() => {
-        if (current) {
-            clearBardicInspirationPrompt(campaignName, current.mode === 'offense' ? current.attackerName : current.targetName);
-            advance();
-        }
-    }, [campaignName, current, advance]);
-
     const handleUseReaction = useCallback(async () => {
         if (!current) return;
         const promptId = current.promptId;
@@ -117,10 +110,7 @@ function BardicInspirationReactionModal({ campaignName }) {
                 />
             )}
             {current && (
-                <div className="sp-overlay" onClick={(e) => {
-                    if (e.target.closest('.sp-modal')) return;
-                    handleDismiss?.();
-                }}>
+                <div className="sp-overlay">
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bard"></i> {current.mode === 'defense' ? 'Combat Inspiration - Defense' : 'Combat Inspiration - Offense'}

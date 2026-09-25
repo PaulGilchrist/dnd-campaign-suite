@@ -189,11 +189,12 @@ describe('WeaponMasteryChoiceModal', () => {
       expect(onClose).not.toHaveBeenCalled();
     });
 
-    it('calls onClose when clicking the overlay background', () => {
+    it('does not call onClose when clicking the overlay background', () => {
       const onClose = vi.fn();
       render(<WeaponMasteryChoiceModal {...makeProps({ onClose })} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     });
   });
 });

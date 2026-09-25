@@ -202,12 +202,13 @@ describe('MistyWandererModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when clicking the modal overlay background', () => {
+    it('does not call onClose when clicking the modal overlay background', () => {
       const onClose = vi.fn();
       render(<MistyWandererModal {...makeProps({ onClose })} />);
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
   });
 });

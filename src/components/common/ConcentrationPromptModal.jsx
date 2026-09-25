@@ -154,8 +154,8 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
         />
       )}
       {current && (
-        <div className="cnp-overlay" onClick={handleDismiss}>
-          <div className="cnp-modal" onClick={e => e.stopPropagation()}>
+        <div className="cnp-overlay">
+          <div className="cnp-modal">
             <div className="cnp-header">
               <i className="fa-solid fa-spinner"></i> Concentration Check
               {queueCount > 1 && (

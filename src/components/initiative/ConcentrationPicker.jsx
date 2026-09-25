@@ -1,8 +1,8 @@
 
 function ConcentrationPicker({ targetName, spellName, dc, onSpellNameChange, onDcChange, onCancel, onApply }) {
     return (
-        <div className='condition-picker-overlay' onClick={onCancel}>
-            <div className='condition-picker-modal' onClick={e => e.stopPropagation()}>
+        <div className='condition-picker-overlay'>
+            <div className='condition-picker-modal'>
                 <h3>Concentration for {targetName}</h3>
                 <div className='condition-picker-fields'>
                     <label>

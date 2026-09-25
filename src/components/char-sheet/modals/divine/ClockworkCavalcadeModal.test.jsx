@@ -66,15 +66,14 @@ describe('ClockworkCavalcadeModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when clicking the overlay background but not when clicking inside the modal content', () => {
+  it('does not call onClose when clicking the overlay background or inside the modal content', () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
     const overlay = document.querySelector('.sp-overlay');
     fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
-
-    onClose.mockClear();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 
     const modal = document.querySelector('.sp-modal');
     fireEvent.click(modal);

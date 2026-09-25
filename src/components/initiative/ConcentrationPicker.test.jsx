@@ -138,11 +138,12 @@ describe('ConcentrationPicker', () => {
             expect(props.onCancel).toHaveBeenCalled();
         });
 
-        it('should call onCancel when overlay background is clicked', () => {
+        it('should NOT call onCancel when overlay background is clicked', () => {
             render(<ConcentrationPicker {...props} />);
             const overlay = document.querySelector('.condition-picker-overlay');
             fireEvent.click(overlay);
-            expect(props.onCancel).toHaveBeenCalled();
+            expect(props.onCancel).not.toHaveBeenCalled();
+            expect(document.querySelector('.condition-picker-modal')).toBeInTheDocument();
         });
 
         it('should NOT call onCancel when modal content is clicked', () => {

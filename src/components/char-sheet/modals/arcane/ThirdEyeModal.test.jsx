@@ -72,12 +72,13 @@ describe('ThirdEyeModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when overlay outside the modal is clicked', () => {
+    it('does not call onClose when overlay outside the modal is clicked', () => {
       const onClose = vi.fn();
       render(<ThirdEyeModal {...makeProps({ onClose })} />);
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('does not close when clicking inside the modal content', () => {

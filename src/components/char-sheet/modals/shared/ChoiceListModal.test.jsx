@@ -322,12 +322,13 @@ describe('ChoiceListModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when overlay is clicked', () => {
+    it('does not call onClose when overlay is clicked', () => {
       const { onClose } = makeProps();
       render(<ChoiceListModal {...makeProps({ onClose })} />);
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('does not close when an option label is clicked', () => {
@@ -351,7 +352,7 @@ describe('ChoiceListModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('closes when overlay is clicked in result view', async () => {
+    it('does not call onClose when overlay is clicked in result view', async () => {
       const onClose = vi.fn();
       const { onConfirm } = makeProps();
       onConfirm.mockResolvedValue({ payload: { description: 'Done' } });
@@ -362,7 +363,8 @@ describe('ChoiceListModal', () => {
         expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
       });
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
   });
 

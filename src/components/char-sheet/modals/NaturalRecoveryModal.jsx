@@ -46,8 +46,8 @@ function NaturalRecoveryModal({ playerStats, campaignName, onClose }) {
     }, [onClose]);
 
     return (
-        <div className="nr-overlay no-print" onClick={onClose}>
-            <div className="nr-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="nr-overlay no-print">
+            <div className="nr-modal">
                 <h3><i className="fa-solid fa-leaf"></i> Natural Recovery</h3>
                 <p className="nr-subtitle">Free Cast &mdash; 1/Long Rest</p>
 

@@ -162,9 +162,12 @@ describe('DeathSavePromptModal', () => {
     await waitFor(() => {
       expect(screen.getByText(/\(1 of 3\)/)).toBeInTheDocument();
     });
-    // Click overlay to advance to next prompt
-    const overlay = document.querySelector('.dsp-overlay');
-    if (overlay) fireEvent.click(overlay);
+    // Roll, then advance via the Next button
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => {
       expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
     });
@@ -335,7 +338,7 @@ describe('DeathSavePromptModal', () => {
     });
   });
 
-  it('advances to next prompt when overlay is clicked, dismisses on single prompt', async () => {
+  it('does not advance when the overlay is clicked', async () => {
     render(<DeathSavePromptModal campaignName="test-campaign" />);
     fireEvent.click(screen.getByTestId('trigger-prompt-1'));
     await waitForPromptVisible();
@@ -345,20 +348,17 @@ describe('DeathSavePromptModal', () => {
     });
     const overlay = document.querySelector('.dsp-overlay');
     if (overlay) fireEvent.click(overlay);
-    await waitFor(() => {
-      expect(screen.getByText('target2')).toBeInTheDocument();
-    });
+    expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
+    expect(screen.getByText('target1')).toBeInTheDocument();
   });
 
-  it('dismisses modal entirely when overlay is clicked with single prompt', async () => {
+  it('keeps the modal open when the overlay is clicked with a single prompt', async () => {
     render(<DeathSavePromptModal campaignName="test-campaign" />);
     fireEvent.click(screen.getByTestId('trigger-prompt-1'));
     await waitForPromptVisible();
     const overlay = document.querySelector('.dsp-overlay');
     if (overlay) fireEvent.click(overlay);
-    await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
-    });
+    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
   });
 
   // ── Roll result variants ──

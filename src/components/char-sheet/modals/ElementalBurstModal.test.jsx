@@ -183,11 +183,12 @@ describe('ElementalBurstModal', () => {
     // ── Overlay interaction ──
 
     describe('overlay interaction', () => {
-        it('calls onClose when the overlay background is clicked', () => {
+        it('does not call onClose when the overlay background is clicked', () => {
             const { handleClose } = renderModal();
             const overlay = document.querySelector('.sp-overlay');
             fireEvent.click(overlay);
-            expect(handleClose).toHaveBeenCalledTimes(1);
+            expect(handleClose).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
         });
 
         it('does not call onClose when modal content is clicked', () => {

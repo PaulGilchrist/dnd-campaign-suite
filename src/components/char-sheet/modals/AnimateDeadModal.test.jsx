@@ -223,10 +223,11 @@ describe('AnimateDeadModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when clicking the overlay', () => {
+    it('does not call onClose when clicking the overlay', () => {
       const { onClose } = renderModal();
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(getCancelButton()).toBeInTheDocument();
     });
 
     it('does not call onClose when clicking the modal content', () => {

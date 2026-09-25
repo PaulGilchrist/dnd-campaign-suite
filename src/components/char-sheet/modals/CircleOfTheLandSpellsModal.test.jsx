@@ -141,7 +141,7 @@ describe('CircleOfTheLandSpellsModal', () => {
   });
 
   describe('close behavior', () => {
-    it('calls onClose via cancel button, overlay click, or escape key', () => {
+    it('calls onClose via cancel button or escape key, but not via overlay click', () => {
       const { unmount } = render(<CircleOfTheLandSpellsModal {...makeProps()} />);
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(mockOnClose).toHaveBeenCalledTimes(1);
@@ -150,7 +150,8 @@ describe('CircleOfTheLandSpellsModal', () => {
       vi.clearAllMocks();
       const { unmount: unmount2 } = render(<CircleOfTheLandSpellsModal {...makeProps()} />);
       fireEvent.click(document.querySelector('.cotl-overlay'));
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
       unmount2();
 
       vi.clearAllMocks();

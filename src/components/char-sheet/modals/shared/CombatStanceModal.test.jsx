@@ -282,12 +282,13 @@ describe('CombatStanceModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when overlay is clicked but not when modal content is clicked', () => {
+    it('does not close when overlay or modal content is clicked', () => {
       const onClose = vi.fn();
       render(<CombatStanceModal {...makeProps({ onClose })} />);
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
 
       document.body.innerHTML = '';
 

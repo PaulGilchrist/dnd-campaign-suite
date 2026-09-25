@@ -229,8 +229,8 @@ function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
   }, [onClose])
 
   return (
-    <div className="resource-pool-overlay no-print" onClick={onClose}>
-      <div className="resource-pool-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="resource-pool-overlay no-print">
+      <div className="resource-pool-modal">
         <h3><i className="fas fa-leaf"></i> Wild Resurgence</h3>
         <p className="resource-pool-subtitle">Convert between Wild Shape uses and spell slots</p>
 

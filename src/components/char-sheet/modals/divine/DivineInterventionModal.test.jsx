@@ -364,13 +364,14 @@ describe('DivineInterventionModal', () => {
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when clicking the overlay background outside the modal content', () => {
+  it('does not call onClose when clicking the overlay background outside the modal content', () => {
     const props = makeProps();
     render(<DivineInterventionModal {...props} />);
     const overlay = document.querySelector('.sp-overlay');
     expect(overlay).toBeInTheDocument();
     fireEvent.click(overlay);
-    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(screen.getByText('Cancel')).toBeInTheDocument();
   });
 
   it('does not close when clicking inside the modal content', () => {

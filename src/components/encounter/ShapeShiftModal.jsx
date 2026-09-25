@@ -22,10 +22,7 @@ export function ShapeShiftModal({ chooser, monsterName, onResolve, onSkip }) {
   const forms = chooser?.action?.automation?.forms;
   if (!Array.isArray(forms)) return null;
   return (
-    <div className="mc-overlay mc-overlay--shape-shift" onClick={(e) => {
-      if (e.target.closest('.sp-modal')) return;
-      onSkip?.();
-    }}>
+    <div className="mc-overlay mc-overlay--shape-shift">
       <div className="sp-modal">
         <div className="sp-header">
           <i className="fa-solid fa-shuffle"></i> Shape-Shift — Choose Form

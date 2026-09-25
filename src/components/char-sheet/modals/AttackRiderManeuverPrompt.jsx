@@ -20,10 +20,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
     if (applied && result) {
         if (result.isMissResult) {
             return (
-                <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onSkip?.();
-    }}>
+                <div className="sp-overlay">
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bolt"></i> Precision Attack
@@ -39,10 +36,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
         }
         if (result.payload) {
             return (
-                <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onSkip?.();
-    }}>
+                <div className="sp-overlay">
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bolt"></i> {result.payload.name || 'Maneuver'}
@@ -57,10 +51,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
             );
         }
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onSkip?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-bolt"></i> Maneuver Applied
@@ -85,10 +76,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
         : 'Choose an attack rider maneuver to use on this hit:';
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onSkip?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {headerText}

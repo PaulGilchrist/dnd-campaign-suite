@@ -44,8 +44,8 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
     };
 
     return (
-        <div className="maps-manager-modal-overlay" onClick={onClose}>
-            <div className="maps-manager-modal terrain-gen-modal" onClick={e => e.stopPropagation()}>
+        <div className="maps-manager-modal-overlay">
+            <div className="maps-manager-modal terrain-gen-modal">
                 <h3>Generate Terrain Map</h3>
 
                 {error && <div className="maps-manager-error">{error}</div>}

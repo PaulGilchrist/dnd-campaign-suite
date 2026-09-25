@@ -2278,7 +2278,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   return (
     <>
-    <div className={`mc-overlay${evasionSelection !== null ? ' mc-overlay--dimmed' : ''}`} onClick={onClose}>
+    <div className={`mc-overlay${evasionSelection !== null ? ' mc-overlay--dimmed' : ''}`}>
       <MonsterCardBody
         monster={monster}
         monsterName={monsterName}

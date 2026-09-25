@@ -39,12 +39,13 @@ describe('EffectAdder - rendering', () => {
       expect(screen.getByRole('button', { name: 'Concentration' })).toBeInTheDocument();
     });
 
-    it('should call onCancel when the overlay background is clicked', () => {
+    it('should NOT call onCancel when the overlay background is clicked', () => {
       const onCancel = vi.fn();
       render(<EffectAdder {...props} onCancel={onCancel} />);
       const overlay = document.querySelector('.ea-overlay');
       overlay.click();
-      expect(onCancel).toHaveBeenCalled();
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(document.querySelector('.ea-modal')).toBeInTheDocument();
     });
 
     it('should NOT call onCancel when the modal content is clicked', () => {

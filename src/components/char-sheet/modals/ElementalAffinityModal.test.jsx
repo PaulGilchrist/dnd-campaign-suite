@@ -283,7 +283,7 @@ describe('ElementalAffinityModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when overlay is clicked in result view', async () => {
+    it('does not call onClose when overlay is clicked in result view', async () => {
       const onClose = vi.fn();
       render(<ElementalAffinityModal {...makeProps({ onClose })} />);
       selectType('Fire');
@@ -291,7 +291,8 @@ describe('ElementalAffinityModal', () => {
       await waitForResult();
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
 
     it('does not call onClose when result modal content is clicked', async () => {

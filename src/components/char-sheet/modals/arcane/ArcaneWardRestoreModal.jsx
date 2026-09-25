@@ -38,8 +38,8 @@ function ArcaneWardRestoreModal({ action, playerStats, campaignName, onClose, on
     };
 
     return (
-        <div className="arcane-ward-restore-overlay" onClick={onClose}>
-            <div className="arcane-ward-restore-modal" onClick={e => e.stopPropagation()}>
+        <div className="arcane-ward-restore-overlay">
+            <div className="arcane-ward-restore-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield-halved"></i> {action.name}
                 </div>

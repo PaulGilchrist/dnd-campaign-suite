@@ -27,10 +27,7 @@ function SacredWeaponModal({ action, playerStats, campaignName, onClose, onCance
 
     if (applied && result) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-                if (e.target.closest('.sp-modal')) return;
-                onClose?.();
-            }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-sun"></i> {action.name}
@@ -46,10 +43,7 @@ function SacredWeaponModal({ action, playerStats, campaignName, onClose, onCance
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            handleCancel();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-sun"></i> {action.name}

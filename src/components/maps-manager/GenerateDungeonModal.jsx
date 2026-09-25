@@ -91,8 +91,8 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
     };
 
     return (
-        <div className="maps-manager-modal-overlay" onClick={onClose}>
-            <div className="maps-manager-modal dungeon-gen-modal" onClick={e => e.stopPropagation()}>
+        <div className="maps-manager-modal-overlay">
+            <div className="maps-manager-modal dungeon-gen-modal">
                 <h3>Generate Dungeon Map</h3>
 
                 {error && <div className="maps-manager-error">{error}</div>}

@@ -451,7 +451,7 @@ describe('ShortRestModal', () => {
   });
 
   describe('closing', () => {
-    it('calls onClose when Cancel is clicked, Escape key is pressed, or overlay is clicked', () => {
+    it('calls onClose when Cancel is clicked or Escape key is pressed', () => {
       const { onClose } = renderModal();
       // Cancel button
       fireEvent.click(screen.getByText('Cancel'));
@@ -460,11 +460,14 @@ describe('ShortRestModal', () => {
       // Escape key
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(onClose).toHaveBeenCalledTimes(2);
+    });
 
-      // Overlay click
+    it('does not close when the overlay is clicked', () => {
+      const { onClose } = renderModal();
       const overlay = document.querySelector('.short-rest-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(3);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('heading', { name: /Short Rest/ })).toBeInTheDocument();
     });
 
     it('does not close when clicking inside the modal content', () => {

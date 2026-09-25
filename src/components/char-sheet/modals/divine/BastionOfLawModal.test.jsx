@@ -242,7 +242,7 @@ describe('BastionOfLawModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose and not onConfirm when overlay is clicked', async () => {
+    it('does not call onClose or onConfirm when overlay is clicked', async () => {
       const onClose = vi.fn();
       const onConfirm = vi.fn();
       render(<BastionOfLawModal {...makeProps({ onClose, onConfirm })} />);
@@ -254,8 +254,9 @@ describe('BastionOfLawModal', () => {
         fireEvent.click(document.querySelector('.sp-overlay'));
       });
 
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
       expect(onConfirm).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
   });
 

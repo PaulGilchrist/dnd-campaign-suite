@@ -182,11 +182,12 @@ describe('ShieldBashChoiceModal - skip flow', () => {
 // ── Overlay click behavior ──
 
 describe('ShieldBashChoiceModal - overlay click', () => {
-  it('calls onClose when overlay background is clicked', () => {
+  it('does not call onClose when overlay background is clicked', () => {
     const onClose = vi.fn();
     const { container } = render(<ShieldBashChoiceModal {...makeProps({ onClose })} />);
     fireEvent.click(container.querySelector('.sp-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Apply Effect/ })).toBeInTheDocument();
   });
 
   it('does not close when clicking inside the modal', () => {

@@ -520,10 +520,11 @@ describe('CreatureSelectionModal', () => {
       expect(mockOnSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onSkip when clicking the overlay background', () => {
+    it('does not call onSkip when clicking the overlay background', () => {
       render(<CreatureSelectionModal {...makeProps()} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(mockOnSkip).toHaveBeenCalledTimes(1);
+      expect(mockOnSkip).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('does not call onSkip when clicking inside the modal body', () => {

@@ -84,8 +84,8 @@ function ArcaneVigorModal({ hitDieSize, spellcastingAbility, spellcastingAbility
     const projectedHealing = rollTotal + spellcastingAbilityModifier;
 
     return (
-        <div className="arcane-vigor-overlay" onClick={onClose}>
-            <div className="arcane-vigor-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="arcane-vigor-overlay">
+            <div className="arcane-vigor-modal">
                 <h3><i className="fa-solid fa-wand-sparkles"></i> Arcane Vigor</h3>
                 <p className="arcane-vigor-description">
                     Roll your unexpended Hit Point Dice and regain HP equal to the roll total + {spellcastingAbilityModifier} ({spellcastingAbility} modifier).

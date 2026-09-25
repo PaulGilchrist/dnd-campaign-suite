@@ -42,8 +42,8 @@ function CommandModal({ spell, metaCtx, targetName, playerStats, campaignName, m
     };
 
     return (
-        <div className="command-overlay" onClick={onClose}>
-            <div className="command-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="command-overlay">
+            <div className="command-modal">
                 <h3>
                     <i className="fa-solid fa-volume-high"></i> Command
                 </h3>

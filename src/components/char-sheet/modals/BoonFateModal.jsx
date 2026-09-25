@@ -20,10 +20,7 @@ function BoonFateModal({ action, playerStats, campaignName, roll2d4, lastAttack,
 
     if (result) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand"></i> {action.name || 'Improve Fate'}
@@ -39,10 +36,7 @@ function BoonFateModal({ action, playerStats, campaignName, roll2d4, lastAttack,
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand"></i> {action.name || 'Improve Fate'}

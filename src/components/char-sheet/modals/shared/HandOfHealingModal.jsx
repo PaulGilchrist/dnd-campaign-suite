@@ -106,8 +106,8 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
     const rollValues = Array.isArray(rolls) ? rolls : [];
 
     return (
-          <div className="short-rest-overlay no-print" onClick={onClose}>
-              <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="short-rest-overlay no-print">
+              <div className="short-rest-modal">
                   <h3><i className="fas fa-hand-sparkles"></i> {healName}</h3>
 
                   <div className="short-rest-section">

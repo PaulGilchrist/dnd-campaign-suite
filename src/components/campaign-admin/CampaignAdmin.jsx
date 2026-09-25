@@ -60,8 +60,8 @@ function StatusDisplay({ status }) {
 
 function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit }) {
     return (
-        <div className="ct-modal-overlay" onClick={onClose}>
-            <div className="ct-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="ct-modal-overlay">
+            <div className="ct-modal">
                 <div className="ct-modal-header">
                     <h3>Rename Campaign</h3>
                     <button className="ct-modal-close" onClick={onClose}>
@@ -95,8 +95,8 @@ function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit
 
 function ConfirmModal({ modal, onClose }) {
     return (
-        <div className="ct-modal-overlay" onClick={onClose}>
-            <div className="ct-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="ct-modal-overlay">
+            <div className="ct-modal">
                 <div className="ct-modal-header">
                     <h3>{modal.title}</h3>
                     <button className="ct-modal-close" onClick={onClose}>

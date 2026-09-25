@@ -164,11 +164,12 @@ describe('MetamagicPopup', () => {
       expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onSkip when the overlay background is clicked', () => {
+    it('does not call onSkip when the overlay background is clicked', () => {
       const { onSkip } = renderPopup();
       const overlay = document.querySelector('.popup-overlay');
       fireEvent.click(overlay);
-      expect(onSkip).toHaveBeenCalledTimes(1);
+      expect(onSkip).not.toHaveBeenCalled();
+      expect(screen.getByText('Cast Without Metamagic')).toBeInTheDocument();
     });
   });
 

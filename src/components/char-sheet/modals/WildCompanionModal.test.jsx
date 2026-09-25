@@ -262,11 +262,12 @@ describe('WildCompanionModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when the overlay background is clicked', () => {
+  it('does not call onClose when the overlay background is clicked', () => {
     const onClose = vi.fn();
     render(<WildCompanionModal {...makeProps({ onClose })} />);
     fireEvent.click(document.querySelector('.resource-pool-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
   });
 
   // ── Null safety ──

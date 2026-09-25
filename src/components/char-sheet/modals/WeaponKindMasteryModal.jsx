@@ -53,10 +53,7 @@ function WeaponKindMasteryModal({ action, playerStats, campaignName, meleeOnly, 
 
     if (result) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-crosshairs"></i> Weapon Mastery
@@ -72,10 +69,7 @@ function WeaponKindMasteryModal({ action, playerStats, campaignName, meleeOnly, 
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-crosshairs"></i> Weapon Mastery — Choose Weapon Kinds

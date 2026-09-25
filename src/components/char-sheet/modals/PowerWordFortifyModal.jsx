@@ -53,10 +53,7 @@ export default function PowerWordFortifyModal({
     }, [selected, allocations, onConfirm]);
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onSkip?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield"></i> Power Word Fortify

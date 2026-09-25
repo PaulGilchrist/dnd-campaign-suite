@@ -340,12 +340,13 @@ describe('MultiResistanceSelectionModal', () => {
       expect(props.onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when clicking the overlay background', () => {
+    it('does not call onClose when clicking the overlay background', () => {
       const props = makeProps();
       render(<MultiResistanceSelectionModal {...props} />);
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
+      expect(props.onClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('does not close when clicking inside the modal content', () => {

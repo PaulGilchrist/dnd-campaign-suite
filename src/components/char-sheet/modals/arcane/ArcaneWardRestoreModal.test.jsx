@@ -212,11 +212,12 @@ describe('ArcaneWardRestoreModal', () => {
     // "does not call onClose when modal content clicked", "calls onClose when Cancel clicked".
     // The "modal content click" test was removed: e.stopPropagation() on the modal container
     // is a standard React pattern; testing it separately adds no behavioral confidence.
-    it('calls onClose on overlay click', () => {
+    it('does not call onClose on overlay click', () => {
       const onClose = vi.fn();
       render(<ArcaneWardRestoreModal {...makeProps({ onClose })} />);
       fireEvent.click(document.querySelector('.arcane-ward-restore-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('calls onClose on Cancel button click', () => {

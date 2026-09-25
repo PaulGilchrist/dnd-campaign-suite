@@ -110,10 +110,11 @@ describe('GenerateTerrainModal', () => {
       expect(props.onClose).toHaveBeenCalled();
     });
 
-    it('calls onClose when the overlay background is clicked', () => {
+    it('does not call onClose when the overlay background is clicked', () => {
       render(<GenerateTerrainModal {...props} />);
       fireEvent.click(findOverlay());
-      expect(props.onClose).toHaveBeenCalled();
+      expect(props.onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('Generate Terrain Map')).toBeInTheDocument();
     });
 
     it('does not close when clicking inside the modal content', () => {

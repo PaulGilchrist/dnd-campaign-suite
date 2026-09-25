@@ -141,11 +141,12 @@ describe('GenerateDungeonModal', () => {
       expect(props.onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when the overlay background is clicked', () => {
+    it('does not call onClose when the overlay background is clicked', () => {
       render(<GenerateDungeonModal {...props} />);
       const overlay = screen.getByText('Generate Dungeon Map').closest('.maps-manager-modal-overlay');
       fireEvent.click(overlay);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
+      expect(props.onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('Generate Dungeon Map')).toBeInTheDocument();
     });
   });
 

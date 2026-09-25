@@ -140,9 +140,12 @@ describe('WarMagicCantripModal', () => {
             fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
         }
 
-        it('closes when Done is clicked or overlay backdrop is clicked', async () => {
+        it('closes when Done is clicked but not when the overlay backdrop is clicked', async () => {
             renderWithResult()
             await waitFor(() => screen.getByText('Done'))
+            fireEvent.click(document.querySelector('.sp-overlay'))
+            expect(mockOnClose).not.toHaveBeenCalled()
+            expect(screen.getByText('Done')).toBeInTheDocument()
             fireEvent.click(screen.getByText('Done'))
             expect(mockOnClose).toHaveBeenCalledOnce()
         })

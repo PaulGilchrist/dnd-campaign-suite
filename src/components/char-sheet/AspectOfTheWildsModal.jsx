@@ -8,10 +8,7 @@ const aspectOptions = [
 function AspectOfTheWildsModal({ aspectOfTheWildsModal, handleAspectOfTheWildsConfirm, handleAspectOfTheWildsSkip }) {
     if (!aspectOfTheWildsModal) return null;
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            handleAspectOfTheWildsSkip?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-paw"></i> Aspect of the Wilds

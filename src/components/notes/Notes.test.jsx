@@ -223,7 +223,7 @@ describe('Notes', () => {
       expect(screen.getByText(String(expectedLevel))).toBeInTheDocument();
     });
 
-    it('closes modal via cancel button, close button, or overlay click', () => {
+    it('closes modal via cancel button', () => {
       renderNotes();
       const modalOpen = screen.getByRole('button', { name: /new note/i });
       fireEvent.click(modalOpen);
@@ -243,7 +243,7 @@ describe('Notes', () => {
       expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
     });
 
-    it('closes modal via overlay click', () => {
+    it('does not close modal via overlay click', () => {
       renderNotes();
       const modalOpen = screen.getByRole('button', { name: /new note/i });
       fireEvent.click(modalOpen);
@@ -251,7 +251,7 @@ describe('Notes', () => {
 
       const overlay = document.querySelector('.ct-modal-overlay');
       fireEvent.click(overlay);
-      expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'New Note' })).toBeInTheDocument();
     });
   });
 

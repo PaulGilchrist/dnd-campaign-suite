@@ -148,16 +148,18 @@ describe('QuiveringPalmModal', () => {
     });
 
     describe('overlay click behavior', () => {
-        it('calls onClose when overlay background is clicked in both modes', () => {
-            document.body.innerHTML = '';
+        it('calls onClose when overlay background is clicked in default mode', () => {
             const { handleClose } = renderModal();
             fireEvent.click(document.querySelector('.sp-overlay'));
             expect(handleClose).toHaveBeenCalledTimes(1);
+        });
 
+        it('does not call onClose when overlay background is clicked in release-only mode', () => {
             document.body.innerHTML = '';
-            const { handleClose: handleCloseRelease } = renderModal({ isRelease: true });
+            const { handleClose } = renderModal({ isRelease: true });
             fireEvent.click(document.querySelector('.sp-overlay'));
-            expect(handleCloseRelease).toHaveBeenCalledTimes(1);
+            expect(handleClose).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
         });
 
         it('does not call onClose when modal content is clicked', () => {

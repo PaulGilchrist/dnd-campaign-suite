@@ -610,7 +610,7 @@ describe('MapsManager', () => {
             expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
         });
 
-        it('closes the modal when the overlay is clicked', async () => {
+        it('keeps the modal open when the overlay is clicked', async () => {
             mapsService.loadMaps.mockResolvedValue({ maps: [makeMap({ name: 'Dungeon Level 1' })] });
             render(<MapsManager {...props} />);
             await waitFor(() => {
@@ -622,7 +622,7 @@ describe('MapsManager', () => {
 
             // Click on the overlay (outside the modal content)
             fireEvent.click(screen.getByRole('heading', { name: 'Delete Map' }).closest('.maps-manager-modal-overlay'));
-            expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('heading', { name: 'Delete Map' })).toBeInTheDocument();
         });
 
         it('shows a generic error message when deletion fails without a message', async () => {
@@ -704,7 +704,7 @@ describe('MapsManager', () => {
             expect(screen.queryByText(/Edit Description/)).not.toBeInTheDocument();
         });
 
-        it('closes the modal when the overlay is clicked', async () => {
+        it('keeps the modal open when the overlay is clicked', async () => {
             mapsService.loadMaps.mockResolvedValue({ maps: [makeMap({ name: 'Dungeon Level 1' })] });
             mapsService.loadMapData.mockResolvedValue({ description: '' });
             render(<MapsManager {...props} />);
@@ -720,7 +720,7 @@ describe('MapsManager', () => {
             // Click on the overlay (outside the modal content)
             const overlay = screen.getByRole('heading', { name: /Edit Description/ }).closest('.maps-manager-modal-overlay');
             fireEvent.click(overlay);
-            expect(screen.queryByText(/Edit Description/)).not.toBeInTheDocument();
+            expect(screen.queryByText(/Edit Description/)).toBeInTheDocument();
         });
 
         it('shows an error message when loading map data fails', async () => {

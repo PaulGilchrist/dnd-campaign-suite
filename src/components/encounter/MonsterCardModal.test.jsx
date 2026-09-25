@@ -413,7 +413,7 @@ describe('MonsterCardModal', () => {
     });
 
     describe('overlay and interaction behavior', () => {
-        it('closes when the overlay background is clicked but not when the card is clicked', () => {
+        it('does not close when the overlay background or the card is clicked', () => {
             renderModal();
 
             const overlay = document.querySelector('.mc-overlay');
@@ -421,7 +421,8 @@ describe('MonsterCardModal', () => {
 
             mockOnClose.mockClear();
             overlay.click();
-            expect(mockOnClose).toHaveBeenCalled();
+            expect(mockOnClose).not.toHaveBeenCalled();
+            expect(card).toBeInTheDocument();
 
             mockOnClose.mockClear();
             card.click();

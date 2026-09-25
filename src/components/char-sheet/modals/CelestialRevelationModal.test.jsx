@@ -127,16 +127,18 @@ describe('CelestialRevelationModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when clicking the overlay after transformation', async () => {
+    it('does not close when clicking the overlay after transformation', async () => {
       const onClose = vi.fn();
       celestialRevelationHandler.confirmCelestialRevelation.mockResolvedValue(mockSuccessResult('Inner Radiance'));
       const { container } = render(<CelestialRevelationModal {...createProps({ onClose })} />);
       fireEvent.click(screen.getByText('Inner Radiance'));
       fireEvent.click(screen.getByRole('button', { name: /Transform/ }));
       await waitFor(() => {
-        fireEvent.click(container.querySelector('.sp-overlay'));
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
       });
-      expect(onClose).toHaveBeenCalledTimes(1);
+      fireEvent.click(container.querySelector('.sp-overlay'));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
 
     it('does not close when clicking inside the result modal', async () => {

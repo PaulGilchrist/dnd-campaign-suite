@@ -3,10 +3,7 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 function FeatureChoiceModal({ featureChoiceModal, handleFeatureChoiceConfirm, handleFeatureChoiceSkip }) {
     if (!featureChoiceModal) return null;
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            handleFeatureChoiceSkip?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {featureChoiceModal.action.name}

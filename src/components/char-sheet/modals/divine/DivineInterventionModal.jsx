@@ -104,10 +104,7 @@ function DivineInterventionModal({ eligibleSpells, isGreater, featureName, onSel
     };
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-star-of-life"></i> {featureName}

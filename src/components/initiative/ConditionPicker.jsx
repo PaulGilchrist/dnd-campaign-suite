@@ -2,8 +2,8 @@
 
 function ConditionPicker({ targetName, selected, dc, ability, onSelect, onDcChange, onAbilityChange, onCancel, onApply }) {
     return (
-        <div className='condition-picker-overlay' onClick={onCancel}>
-            <div className='condition-picker-modal' onClick={e => e.stopPropagation()}>
+        <div className='condition-picker-overlay'>
+            <div className='condition-picker-modal'>
                 <h3>Add Condition to {targetName}</h3>
                 <div className='condition-picker-grid'>
                     {CONDITIONS.map(({ key, label }) => (

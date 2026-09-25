@@ -35,10 +35,7 @@ function SoulstitchSpellsModal({ action, playerStats, campaignName, maxSelection
 
     if (applied && result) {
         return (
-            <div className="sp-overlay soulstitch-result-overlay" onClick={(e) => {
-                if (e.target.closest('.sp-modal')) return;
-                handleClose();
-            }}>
+            <div className="sp-overlay soulstitch-result-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-shield-halved"></i> {featureName}
@@ -54,10 +51,7 @@ function SoulstitchSpellsModal({ action, playerStats, campaignName, maxSelection
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            handleClose();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield-halved"></i> {featureName}

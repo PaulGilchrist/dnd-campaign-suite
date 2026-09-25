@@ -139,10 +139,7 @@ function AnimalShapesSelectionModal({ targets, maxCR, campaignName, title = 'Ani
     const selectedCount = Object.keys(selectedBeasts).length;
 
     return (
-        <div className="sp-overlay sp-overlay--evasion" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            onCancel();
-        }}>
+        <div className="sp-overlay sp-overlay--evasion">
             <div className="sp-modal">
                 <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
                 <div className="sp-body">

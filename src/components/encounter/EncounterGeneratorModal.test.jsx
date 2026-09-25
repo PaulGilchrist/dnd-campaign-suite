@@ -269,13 +269,14 @@ describe('EncounterGeneratorModal', () => {
       expect(onClose).toHaveBeenCalled();
     });
 
-    it('calls onClose when the backdrop is clicked', () => {
+    it('does not call onClose when the backdrop is clicked', () => {
       const { onClose, container } = renderModal();
 
       const overlay = container.querySelector('.gen-modal-overlay');
       fireEvent.click(overlay);
 
-      expect(onClose).toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(container.querySelector('.gen-modal')).toBeInTheDocument();
     });
 
     it('does not call onClose when the modal content is clicked', () => {

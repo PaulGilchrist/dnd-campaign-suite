@@ -23,8 +23,8 @@ const GENERATE_BUTTONS = {
 function DeleteMapModal({ maps, fileName, onCancel, onConfirm }) {
     const mapName = maps.find(m => m.fileName === fileName)?.name || fileName;
     return (
-        <div className="maps-manager-modal-overlay" onClick={onCancel}>
-            <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
+        <div className="maps-manager-modal-overlay">
+            <div className="maps-manager-modal">
                 <h3>Delete Map</h3>
                 <p>
                     This will permanently delete the map &apos;<strong>{mapName}</strong>&apos; and all its
@@ -44,10 +44,8 @@ function DeleteMapModal({ maps, fileName, onCancel, onConfirm }) {
 function DescriptionEditModal({ map, description, onDescriptionChange, loading, saving, onCancel, onSave }) {
     if (!map) return null;
     return (
-        <div className="maps-manager-modal-overlay" onClick={(e) => {
-            if (e.target === e.currentTarget) onCancel();
-        }}>
-            <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
+        <div className="maps-manager-modal-overlay">
+            <div className="maps-manager-modal">
                 <div className="ct-modal-header">
                     <h3>Edit Description — {map.name}</h3>
                     <button className="ct-modal-close" onClick={onCancel} aria-label="Close">

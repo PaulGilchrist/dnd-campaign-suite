@@ -32,10 +32,7 @@ function RevelationInFleshModal({ action, playerStats, campaignName, onClose }) 
 
     if (applied && result) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-dna"></i> {action.name}
@@ -51,10 +48,7 @@ function RevelationInFleshModal({ action, playerStats, campaignName, onClose }) 
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-dna"></i> {action.name}

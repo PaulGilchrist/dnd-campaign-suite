@@ -93,11 +93,12 @@ describe('WarMagicSpellModal', () => {
     })
 
     describe('overlay interactions', () => {
-        it('calls onClose when the overlay background is clicked', () => {
+        it('does not call onClose when the overlay background is clicked', () => {
             renderModal()
             const overlay = document.querySelector('.sp-overlay')
             fireEvent.click(overlay)
-            expect(mockOnClose).toHaveBeenCalledOnce()
+            expect(mockOnClose).not.toHaveBeenCalled()
+            expect(screen.getByText('Cancel')).toBeInTheDocument()
         })
 
         it('does NOT close when clicking inside the modal content', () => {

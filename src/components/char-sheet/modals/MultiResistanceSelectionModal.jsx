@@ -3,10 +3,7 @@ import '../CharSheet.css';
 
 function AppliedResultModal({ title, icon, result, onClose }) {
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${icon || 'fa-shield-halved'}`}></i> {title || 'Resistance Selection'}
@@ -46,10 +43,7 @@ function MultiResistanceSelectionModal({ title, icon, action: _action, playerSta
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${icon || 'fa-shield-halved'}`}></i> {title || 'Resistance Selection'}

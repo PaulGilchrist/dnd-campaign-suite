@@ -119,11 +119,12 @@ describe('HandOfHealingModal', () => {
       expect(totalEl.textContent).toContain('HP restored');
     });
 
-    it('closes the modal when the overlay background is clicked', () => {
+    it('does not close the modal when the overlay background is clicked', () => {
       const onClose = vi.fn();
       render(<HandOfHealingModal {...makeProps({ onClose })} />);
       fireEvent.click(document.querySelector('.short-rest-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.short-rest-modal')).toBeInTheDocument();
     });
 
     it('does not close the modal when the modal content area is clicked', () => {

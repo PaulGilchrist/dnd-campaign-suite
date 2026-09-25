@@ -19,10 +19,7 @@ export default function UpcastPopup({ spell, levels, onConfirm, onCancel }) {
   }, [onCancel]);
 
   return (
-    <div className="popup-overlay" onClick={(e) => {
-      if (e.target.closest('.popup-modal')) return;
-      onCancel?.();
-    }}>
+    <div className="popup-overlay">
       <div className="popup-modal upcast-popup">
         <div className="upcast-popup-inner">
           <h3><i className="fa-solid fa-arrow-up"></i> Upcast {spell.name}?</h3>

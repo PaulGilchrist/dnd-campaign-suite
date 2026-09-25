@@ -115,10 +115,11 @@ describe('SoulstitchSpellsModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('CLA-321: resolves the cast confirmation promise with empty selection on background click', () => {
+    it('CLA-321: does not resolve the cast confirmation promise on background click', () => {
       render(<SoulstitchSpellsModal {...baseProps} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(confirmSoulstitchSelection).toHaveBeenCalledWith([]);
+      expect(confirmSoulstitchSelection).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('CLA-321: does not re-resolve the promise when Done closes an already-applied result', async () => {

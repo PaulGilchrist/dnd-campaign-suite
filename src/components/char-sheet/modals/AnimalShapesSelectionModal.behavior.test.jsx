@@ -126,7 +126,7 @@ describe('AnimalShapesSelectionModal - behavior', () => {
             expect(baseProps.onCancel).toHaveBeenCalled();
         });
 
-        it('calls onCancel when clicking the overlay background', async () => {
+        it('does not call onCancel when clicking the overlay background', async () => {
             render(<AnimalShapesSelectionModal {...baseProps} />);
             await waitFor(() => {
                 expect(screen.getByText('Animal Shapes')).toBeInTheDocument();
@@ -134,7 +134,8 @@ describe('AnimalShapesSelectionModal - behavior', () => {
 
             const overlay = document.querySelector('.sp-overlay');
             fireEvent.click(overlay);
-            expect(baseProps.onCancel).toHaveBeenCalled();
+            expect(baseProps.onCancel).not.toHaveBeenCalled();
+            expect(screen.getByText('Animal Shapes')).toBeInTheDocument();
         });
 
         it('calls onCancel when Escape key is pressed', async () => {

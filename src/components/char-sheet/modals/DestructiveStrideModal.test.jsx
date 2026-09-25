@@ -163,20 +163,15 @@ describe('DestructiveStrideModal', () => {
     // ── Overlay click behavior ──
 
     describe('overlay click behavior', () => {
-        it('calls skipTargetChoice and onClose when the overlay background is clicked', async () => {
+        it('does not call skipTargetChoice or onClose when the overlay background is clicked', () => {
             skipTargetChoice.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
 
             render(<DestructiveStrideModal {...makeProps()} />);
             fireEvent.click(document.querySelector('.sp-overlay'));
 
-            await waitFor(() => {
-                expect(skipTargetChoice).toHaveBeenCalledWith(
-                    mockAction,
-                    mockPlayerStats,
-                    'test-campaign',
-                );
-                expect(mockOnClose).toHaveBeenCalledTimes(1);
-            });
+            expect(skipTargetChoice).not.toHaveBeenCalled();
+            expect(mockOnClose).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: /Skip Target/ })).toBeInTheDocument();
         });
     });
 });

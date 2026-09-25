@@ -40,10 +40,7 @@ function HypnoticPatternShakeModal({ attackerName, campaignName, targets, rangeF
     }, [selected, attackerName, campaignName, rangeFeet, featureName, onClose]);
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            onClose?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-brain"></i> {featureName || 'Shake Out Stupor'}

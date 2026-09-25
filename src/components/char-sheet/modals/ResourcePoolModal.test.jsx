@@ -105,12 +105,13 @@ describe('ResourcePoolModal', () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when clicking the overlay background', () => {
+  it('does not call onClose when clicking the overlay background', () => {
     const handleClose = vi.fn();
     renderModal(makePlayerStats(), makeAutomation(), 'test-campaign', handleClose);
     const overlay = document.querySelector('.resource-pool-overlay');
     fireEvent.click(overlay);
-    expect(handleClose).toHaveBeenCalledTimes(1);
+    expect(handleClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
   });
 
   it('does not close when clicking the modal content', () => {

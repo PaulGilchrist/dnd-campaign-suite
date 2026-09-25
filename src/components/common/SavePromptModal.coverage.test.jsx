@@ -208,9 +208,9 @@ describe('SavePromptModal — Additional Coverage', () => {
     });
   });
 
-  // ── Evasion overlay: dismiss by clicking overlay background ──
+  // ── Evasion overlay: overlay background click is inert ──
 
-  it('dismisses evasion overlay when clicking the dimmed background', async () => {
+  it('keeps evasion overlay visible when clicking the dimmed background', async () => {
     vi.mocked(circleOfPowerHandler.isCircleOfPowerActive).mockImplementation((targetName, campaign) => {
       if (targetName === 'testTarget2' && campaign === 'test-campaign') return true;
       return false;
@@ -246,12 +246,8 @@ describe('SavePromptModal — Additional Coverage', () => {
       fireEvent.click(evasionOverlay);
     }
 
-    await waitFor(() => {
-      expect(screen.queryByText(/Leading Evasion/)).not.toBeInTheDocument();
-    });
-
-    // The original save prompt should reappear
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    // The evasion overlay should still be visible
+    expect(screen.getByText(/Leading Evasion — Choose Allies/)).toBeInTheDocument();
   });
 
   // ── Evasion overlay: stopPropagation on modal click ──

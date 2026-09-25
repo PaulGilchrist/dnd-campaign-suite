@@ -11,10 +11,7 @@ function getCreatureTargets(campaignName) {
 
 function NoOptionsView({ onSkip }) {
   return (
-    <div className="popup-overlay" onClick={(e) => {
-      if (e.target.closest('.popup-modal')) return;
-      onSkip?.();
-    }}>
+    <div className="popup-overlay">
       <div className="popup-modal metamagic-popup">
         <div className="metamagic-popup-inner">
           <h3>Metamagic</h3>
@@ -161,10 +158,7 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
 
 
    return (
-      <div className="popup-overlay" onClick={(e) => {
-        if (e.target.closest('.popup-modal')) return;
-        onSkip?.();
-      }}>
+       <div className="popup-overlay">
         <div className="popup-modal metamagic-popup">
          <div className="metamagic-popup-inner">
            <h3><i className="fa-solid fa-wand-magic-sparkles"></i> Metamagic</h3>

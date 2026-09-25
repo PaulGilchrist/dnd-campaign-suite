@@ -16,8 +16,8 @@ function AvatarModal({ name, imagePath, campaignName, onClose }) {
     const src = imagePath && imagePath.startsWith('http') ? imagePath : (campaignName && imagePath ? `campaigns/${campaignName}/${imagePath}` : imagePath);
 
     return (
-        <div className="avatar-modal-overlay" data-testid="avatar-modal-overlay" role="presentation" onClick={handleOnClose}>
-            <div className="avatar-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="avatar-modal-overlay" data-testid="avatar-modal-overlay" role="presentation">
+            <div className="avatar-modal">
                 <button className="avatar-modal-close" onClick={handleOnClose} aria-label="Close">&times;</button>
                 {src ? (
                     <img src={src} alt={name} className="avatar-modal-image" />

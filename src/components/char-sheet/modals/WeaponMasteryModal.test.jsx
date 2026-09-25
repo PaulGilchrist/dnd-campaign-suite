@@ -239,12 +239,13 @@ describe('WeaponMasteryModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when clicking outside the modal overlay', () => {
+    it('does not call onClose when clicking outside the modal overlay', () => {
       const onClose = vi.fn();
       const { container } = render(<WeaponMasteryModal {...makeProps({ onClose })} />);
       const overlay = container.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     });
   });
 

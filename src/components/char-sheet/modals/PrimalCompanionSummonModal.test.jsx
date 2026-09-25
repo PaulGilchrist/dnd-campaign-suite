@@ -269,12 +269,13 @@ describe('PrimalCompanionSummonModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('closes when clicking the overlay background', () => {
+    it('does not close when clicking the overlay background', () => {
       const onClose = vi.fn();
       renderModal({ onClose });
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('does not close when clicking inside the modal content', () => {
@@ -303,7 +304,7 @@ describe('PrimalCompanionSummonModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('closes when clicking the overlay in result screen', async () => {
+    it('does not close when clicking the overlay in result screen', async () => {
       const onClose = vi.fn();
       primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(mockPopupResult);
       renderModal({ onClose });
@@ -314,9 +315,13 @@ describe('PrimalCompanionSummonModal', () => {
         fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
       });
       await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+      });
+      await act(async () => {
         fireEvent.click(document.querySelector('.sp-overlay'));
       });
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
 
     it('does not close when clicking the modal in result screen', async () => {

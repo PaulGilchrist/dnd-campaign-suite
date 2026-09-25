@@ -111,12 +111,13 @@ describe('StealthAttackModal', () => {
         });
     });
 
-    describe('overlay dismiss behavior', () => {
-        it('calls onClose when overlay background is clicked', () => {
+    describe('dismiss behavior', () => {
+        it('does not call onClose when overlay background is clicked', () => {
             const onClose = vi.fn();
             render(<StealthAttackModal {...makeProps({ onClose })} />);
             fireEvent.click(document.querySelector('.sp-overlay'));
-            expect(onClose).toHaveBeenCalledTimes(1);
+            expect(onClose).not.toHaveBeenCalled();
+            expect(document.querySelector('.sp-modal')).toBeInTheDocument();
         });
 
         it('calls onClose when Cancel button is clicked', () => {
@@ -190,7 +191,7 @@ describe('StealthAttackModal', () => {
             expect(onClose).toHaveBeenCalledTimes(1);
         });
 
-        it('calls onClose when overlay is clicked in applied state', async () => {
+        it('does not call onClose when overlay is clicked in applied state', async () => {
             const onClose = vi.fn();
             render(<StealthAttackModal {...makeProps({ onClose })} />);
             fireEvent.click(screen.getByRole('button', { name: /Activate Stealth Attack/ }));
@@ -200,7 +201,8 @@ describe('StealthAttackModal', () => {
             });
 
             fireEvent.click(document.querySelector('.sp-overlay'));
-            expect(onClose).toHaveBeenCalledTimes(1);
+            expect(onClose).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
     });
 

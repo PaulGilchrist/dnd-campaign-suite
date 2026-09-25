@@ -33,9 +33,7 @@ function QuestEmptyState({ searchQuery }) {
 
 function QuestFormModal({ editingQuest, formData, saving, deleting, onChange, onClose, onSave, onDelete }) {
   return (
-    <div className="ct-modal-overlay" onClick={(e) => {
-      if (e.target === e.currentTarget) onClose();
-    }}>
+    <div className="ct-modal-overlay">
       <div className="ct-modal quests-modal">
         <div className="ct-modal-header no-print">
           <h3>{editingQuest ? 'Edit Quest' : 'New Quest'}</h3>

@@ -52,10 +52,7 @@ function riderCanApply(multiSelect, selectedMulti, selected) {
 
 function RiderResultOverlay({ title, description, onClose }) {
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            onClose?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {title}
@@ -249,10 +246,7 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     const canApply = riderCanApply(multiSelect, selectedMulti, selected);
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            onClose?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {action.name}

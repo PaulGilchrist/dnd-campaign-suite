@@ -744,8 +744,8 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     }, [onClose]);
 
     return (
-        <div className="short-rest-overlay no-print" onClick={onClose}>
-            <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="short-rest-overlay no-print">
+            <div className="short-rest-modal">
                 <h3><i className="fa-solid fa-bed"></i> Short Rest</h3>
 
                 <div className="short-rest-section">

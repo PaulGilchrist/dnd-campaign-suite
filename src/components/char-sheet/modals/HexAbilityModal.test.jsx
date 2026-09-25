@@ -116,10 +116,11 @@ describe('HexAbilityModal', () => {
       expect(baseProps.onCancel).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onCancel when the overlay is clicked', () => {
+    it('does not call onCancel when the overlay is clicked', () => {
       render(<HexAbilityModal {...baseProps} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(baseProps.onCancel).toHaveBeenCalledTimes(1);
+      expect(baseProps.onCancel).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
   });
 });

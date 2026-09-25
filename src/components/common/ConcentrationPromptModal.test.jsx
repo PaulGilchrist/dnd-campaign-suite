@@ -160,7 +160,7 @@ describe('ConcentrationPromptModal', () => {
 
   // ── Dismiss / overlay behavior ──
 
-  it('dismisses the modal when clicking the overlay', async () => {
+  it('dismisses the modal when the Dismiss button is clicked', async () => {
     render(<ConcentrationPromptModal campaignName="test-campaign" characters={[]} activeMapName={null} />);
     fireEvent.click(screen.getByTestId('subscriber-trigger'));
     await waitFor(() => { expect(screen.getByText(/must make a/)).toBeInTheDocument() });

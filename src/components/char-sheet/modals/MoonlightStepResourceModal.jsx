@@ -70,8 +70,8 @@ function MoonlightStepResourceModal({ playerStats, campaignName, automation, onC
   }, [onClose])
 
   return (
-    <div className="resource-pool-overlay no-print" onClick={onClose}>
-      <div className="resource-pool-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="resource-pool-overlay no-print">
+      <div className="resource-pool-modal">
         <h3><i className="fas fa-moon"></i> Moonlight Step — Restore Uses</h3>
         <p className="resource-pool-subtitle">Expend a level 2+ spell slot to regain 1 use of Moonlight Step</p>
 

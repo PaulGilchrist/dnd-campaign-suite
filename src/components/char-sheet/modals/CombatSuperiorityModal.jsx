@@ -88,12 +88,9 @@ function groupManeuversByType(maneuverList) {
     return grouped;
 }
 
-function SpOverlay({ onClose, wide, children }) {
+function SpOverlay({ wide, children }) {
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            onClose?.();
-        }}>
+        <div className="sp-overlay">
             <div className={wide ? 'sp-modal sp-modal--wide' : 'sp-modal'}>
                 {children}
             </div>
@@ -103,7 +100,7 @@ function SpOverlay({ onClose, wide, children }) {
 
 function AppliedResultView({ result, onClose }) {
     return (
-        <SpOverlay onClose={onClose}>
+        <SpOverlay>
             <div className="sp-header">
                 <i className="fa-solid fa-bolt"></i> {result.payload.name || 'Maneuver'}
             </div>
@@ -118,7 +115,7 @@ function AppliedResultView({ result, onClose }) {
 
 function SimpleNoticeView({ title, message, onClose }) {
     return (
-        <SpOverlay onClose={onClose}>
+        <SpOverlay>
             <div className="sp-header">
                 <i className="fa-solid fa-bolt"></i> {title}
             </div>
@@ -214,7 +211,7 @@ function ManeuverRadioItem({ maneuver, isSelected, onSelect }) {
 function SelectionView({ isPrompt, knownManeuvers, maxOptions, selectedForSelection, groupedManeuvers, toggleSelection, handleConfirmSelection, handleClearSelection, onClose }) {
     const isKnown = knownManeuvers.length > 0;
     return (
-        <SpOverlay onClose={onClose} wide>
+        <SpOverlay wide>
             <div className="sp-header">
                 <i className="fa-solid fa-bolt"></i> {isPrompt ? 'Combat Superiority — Choose Maneuver' : 'Combat Superiority — Select Maneuvers'}
             </div>
@@ -266,7 +263,7 @@ function SelectionView({ isPrompt, knownManeuvers, maxOptions, selectedForSelect
 
 function UseView({ isPrompt, groupedManeuvers, knownManeuvers, selectedForUse, setSelectedForUse, handleUseManeuver, handleReopenSelection, onClose }) {
     return (
-        <SpOverlay onClose={onClose}>
+        <SpOverlay>
             <div className="sp-header">
                 <i className="fa-solid fa-bolt"></i> {isPrompt ? 'Combat Superiority — Use Maneuver' : 'Combat Superiority — Choose Maneuver'}
             </div>

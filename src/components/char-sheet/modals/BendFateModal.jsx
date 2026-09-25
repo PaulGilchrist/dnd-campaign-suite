@@ -2,11 +2,6 @@ import { useState } from 'react';
 import { applyBendFateChoice } from '../../../services/automation/handlers/reactions/reactionBonusHandler.js';
 import '../../common/SavePromptModal.css';
 
-function handleOverlayDismiss(e, onClose) {
-    if (e.target.closest('.sp-modal')) return;
-    onClose?.();
-}
-
 function resolveBendFateBonus(lastAttack) {
     if (typeof lastAttack.bonus === 'object') {
         return lastAttack.bonus?.modifier || lastAttack.bonus?.total || 0;
@@ -33,7 +28,7 @@ function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, 
 
     if (result) {
         return (
-            <div className="sp-overlay" onClick={(e) => handleOverlayDismiss(e, onClose)}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand"></i> {action.name || 'Bend Luck'}
@@ -49,7 +44,7 @@ function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, 
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => handleOverlayDismiss(e, onClose)}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand"></i> {action.name || 'Bend Luck'}

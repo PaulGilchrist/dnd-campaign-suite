@@ -185,17 +185,16 @@ describe('SummonSpiritModal', () => {
             expect(onClose).toHaveBeenCalledTimes(1);
         });
 
-        it('calls onClose when the overlay background is clicked but not when clicking inside the modal', () => {
+        it('does not call onClose when the overlay background or the modal inside is clicked', () => {
             const onClose = vi.fn();
             render(<SummonSpiritModal {...makeProps({ onClose })} />);
 
             fireEvent.click(document.querySelector('.sp-overlay'));
-            expect(onClose).toHaveBeenCalledTimes(1);
+            expect(onClose).not.toHaveBeenCalled();
 
-            onClose.mockClear();
-            render(<SummonSpiritModal {...makeProps({ onClose })} />);
             fireEvent.click(document.querySelector('.sp-modal'));
             expect(onClose).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
         });
     });
 });

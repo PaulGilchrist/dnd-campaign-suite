@@ -52,14 +52,15 @@ describe('MA-1020 ShapeShiftModal chooser', () => {
     expect(onSkip).not.toHaveBeenCalled();
   });
 
-  it('Cancel and backdrop click skip; clicks inside the .sp-modal body do not', () => {
+  it('Cancel skips; backdrop and clicks inside the .sp-modal body do not', () => {
     const { container, onSkip, onResolve } = renderModal();
     fireEvent.click(container.querySelector('.sp-dismiss-btn'));
     expect(onSkip).toHaveBeenCalledTimes(1);
     fireEvent.click(container.querySelector('.mc-overlay--shape-shift'));
-    expect(onSkip).toHaveBeenCalledTimes(2);
+    expect(onSkip).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.sp-modal')).toBeTruthy();
     fireEvent.click(container.querySelector('.sp-modal p'));
-    expect(onSkip).toHaveBeenCalledTimes(2);
+    expect(onSkip).toHaveBeenCalledTimes(1);
     expect(onResolve).not.toHaveBeenCalled();
   });
 });

@@ -57,12 +57,13 @@ describe('TruePolymorphPathModal', () => {
       expect(mockOnCancel).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onCancel when clicking the overlay background', () => {
+    it('does not call onCancel when clicking the overlay background', () => {
       renderModal();
       const modal = screen.getByText('Choose the type of transformation:').closest('.sp-modal');
       const overlayEl = modal.parentElement;
       fireEvent.click(overlayEl);
-      expect(mockOnCancel).toHaveBeenCalledTimes(1);
+      expect(mockOnCancel).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
   });
 

@@ -100,10 +100,7 @@ function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featur
     };
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            onSkip?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${iconClass}`}></i> {title}

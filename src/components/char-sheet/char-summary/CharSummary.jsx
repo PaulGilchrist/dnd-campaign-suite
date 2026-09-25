@@ -147,7 +147,7 @@ function SpeedSummary({ ctx, conditionEffects, exhaustionLevel }) {
 
 function XpModal({ xpDelta, setXpDelta, displayXp, isInXpMode, handleXpSave, handleXpModeToggle, onClose }) {
     return (
-        <div className='xp-modal-overlay' onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        <div className='xp-modal-overlay'>
             <div className='xp-modal'>
                 <h3>Experience Points</h3>
                 <div className='xp-modal-section'>

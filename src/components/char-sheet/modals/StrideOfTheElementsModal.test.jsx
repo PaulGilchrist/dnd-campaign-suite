@@ -107,11 +107,12 @@ describe('StrideOfTheElementsModal', () => {
       expect(mockOnConfirm).not.toHaveBeenCalled();
     });
 
-    it('calls onClose when the overlay is clicked without calling onConfirm', () => {
+    it('does not call onClose or onConfirm when the overlay is clicked', () => {
       render(<StrideOfTheElementsModal {...makeProps()} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(mockOnClose).not.toHaveBeenCalled();
       expect(mockOnConfirm).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
   });
 

@@ -299,8 +299,8 @@ function MagicInitiateModal({ formData, allSpells, onArrayFieldChange, onClose }
   };
 
   return (
-    <div className="mi-overlay" onClick={onClose}>
-      <div className="mi-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="mi-overlay">
+      <div className="mi-modal">
         <div className="mi-header">
           <i className="fa-solid fa-hat-wizard"></i> Magic Initiate
           <button type="button" className="mi-header-close" onClick={onClose} aria-label="Close" title="Close (configure later from the Spells step)">

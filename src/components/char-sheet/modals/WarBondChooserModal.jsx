@@ -22,10 +22,7 @@ function WarBondChooserModal({ title, icon, options, maxChoices, existing, confi
 
     if (result) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-                if (e.target.closest('.sp-modal')) return;
-                onClose?.();
-            }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className={`fa-solid ${icon || 'fa-link'}`}></i> {title}
@@ -42,10 +39,7 @@ function WarBondChooserModal({ title, icon, options, maxChoices, existing, confi
     const capReached = selected.length >= maxChoices;
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            onClose?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${icon || 'fa-link'}`}></i> {title}

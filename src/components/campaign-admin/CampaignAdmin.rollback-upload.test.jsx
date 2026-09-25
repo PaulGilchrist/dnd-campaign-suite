@@ -55,13 +55,13 @@ describe('CampaignAdmin - Rollback & Upload', () => {
             expect(screen.queryByRole('heading', { name: 'Rollback Campaign' })).not.toBeInTheDocument();
         });
 
-        it('closes modal via overlay click', () => {
+        it('does not close modal via overlay click', () => {
             render(<CampaignAdmin {...defaultProps} />);
             fireEvent.click(getActionButton('Rollback to Snapshot'));
 
             const modalEl = screen.getByRole('heading', { name: 'Rollback Campaign' }).closest('.ct-modal');
             fireEvent.click(modalEl.parentElement);
-            expect(screen.queryByRole('heading', { name: 'Rollback Campaign' })).not.toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Rollback Campaign' })).toBeInTheDocument();
         });
 
         it('displays the campaign name and confirm button styling in the rollback confirmation', () => {
@@ -268,7 +268,7 @@ describe('CampaignAdmin - Rollback & Upload', () => {
             expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
         });
 
-        it('closes upload modal via overlay click', () => {
+        it('does not close upload modal via overlay click', () => {
             render(<CampaignAdmin {...defaultProps} />);
             const file = new File(['test'], 'backup.zip', { type: 'application/zip' });
 
@@ -276,7 +276,7 @@ describe('CampaignAdmin - Rollback & Upload', () => {
             const modalEl = screen.getByRole('heading', { name: 'Upload Campaign' }).closest('.ct-modal');
             fireEvent.click(modalEl.parentElement);
 
-            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Upload Campaign' })).toBeInTheDocument();
         });
 
         it('prevents closing upload modal when clicking inside the modal content', () => {

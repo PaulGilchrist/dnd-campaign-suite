@@ -141,11 +141,12 @@ describe('ObjectTransformModal', () => {
       expect(mockOnCancel).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onCancel when overlay is clicked', () => {
+    it('does not call onCancel when overlay is clicked', () => {
       renderModal();
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(mockOnCancel).toHaveBeenCalledTimes(1);
+      expect(mockOnCancel).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('does not call onCancel when modal content is clicked', () => {

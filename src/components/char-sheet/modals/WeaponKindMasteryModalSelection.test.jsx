@@ -108,13 +108,14 @@ describe('WeaponKindMasteryModal', () => {
   });
 
   describe('close behavior', () => {
-    it('calls onClose when the overlay background is clicked', async () => {
+    it('does not call onClose when the overlay background is clicked', async () => {
       const onClose = vi.fn();
       renderWithWeapons({ onClose });
       await waitFor(() => screen.getByText('Battleaxe'));
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     });
   });
 });

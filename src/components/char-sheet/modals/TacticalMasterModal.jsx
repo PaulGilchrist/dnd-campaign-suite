@@ -38,10 +38,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
 
     if (applied) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-crosshairs"></i> Tactical Master
@@ -58,10 +55,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-crosshairs"></i> Tactical Master — {attackName}

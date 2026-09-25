@@ -216,12 +216,13 @@ describe('MagicInitiateModal', () => {
   });
 
   describe('overlay interaction', () => {
-    it('should call onClose when clicking the overlay background (outside the modal)', () => {
+    it('should NOT call onClose when clicking the overlay background (outside the modal)', () => {
       const props = createProps();
       render(<MagicInitiateModal {...props} />);
       const overlay = document.querySelector('.mi-overlay');
       fireEvent.click(overlay);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
+      expect(props.onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('Magic Initiate')).toBeInTheDocument();
     });
 
     it('should NOT call onClose when clicking inside the modal', () => {

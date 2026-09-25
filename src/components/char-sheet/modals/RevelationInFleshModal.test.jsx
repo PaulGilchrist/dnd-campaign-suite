@@ -302,11 +302,12 @@ describe('RevelationInFleshModal', () => {
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when clicking outside the modal overlay', () => {
+    it('does not call onClose when clicking outside the modal overlay', () => {
       render(<RevelationInFleshModal {...makeProps()} />);
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
   });
 });

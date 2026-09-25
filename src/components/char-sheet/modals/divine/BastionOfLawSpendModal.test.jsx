@@ -176,7 +176,7 @@ describe('BastionOfLawSpendModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when overlay is clicked', async () => {
+    it('does not call onClose when overlay is clicked', async () => {
       const onClose = vi.fn();
       render(<BastionOfLawSpendModal {...makeProps({ onClose })} />);
 
@@ -184,7 +184,8 @@ describe('BastionOfLawSpendModal', () => {
         fireEvent.click(document.querySelector('.sp-overlay'));
       });
 
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
     });
   });
 

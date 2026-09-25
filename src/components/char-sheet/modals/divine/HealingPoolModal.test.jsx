@@ -221,12 +221,13 @@ describe('HealingPoolModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('closes when clicking the overlay background', async () => {
+  it('does not close when clicking the overlay background', async () => {
     const onClose = vi.fn();
     await renderModal({ current: 15, max: 20 }, { onClose });
     const overlay = document.querySelector('.short-rest-overlay');
     fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText('Done')).toBeInTheDocument();
   });
 
   // ── Default feature name ──

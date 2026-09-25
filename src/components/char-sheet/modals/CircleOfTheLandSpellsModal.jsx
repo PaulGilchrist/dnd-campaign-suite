@@ -36,8 +36,8 @@ function CircleOfTheLandSpellsModal({ playerStats, campaignName, onClose }) {
     }, [onClose])
 
     return (
-        <div className="cotl-overlay no-print" onClick={onClose}>
-            <div className="cotl-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cotl-overlay no-print">
+            <div className="cotl-modal">
                 <h3><i className="fa-solid fa-leaf"></i> Circle of the Land Spells</h3>
                 <p className="cotl-subtitle">Choose your land type to determine bonus prepared spells. You can change this after each Long Rest.</p>
 

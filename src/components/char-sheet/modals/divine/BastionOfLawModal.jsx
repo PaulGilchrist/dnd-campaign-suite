@@ -33,10 +33,7 @@ function BastionOfLawModal({ featureName, creatureTargets, playerName, campaignN
     const rangeDisplay = auto?.range ? auto.range.replace(/_/g, ' ') : '30 ft';
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield-halved"></i> {featureName}

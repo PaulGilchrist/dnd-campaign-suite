@@ -39,8 +39,8 @@ function RitualMasterModal({ formData, allSpells, onArrayFieldChange, onClose })
   };
 
   return (
-    <div className="mi-overlay" onClick={onClose}>
-      <div className="mi-modal ritual-master-modal" onClick={(e) => { e.stopPropagation(); }}>
+    <div className="mi-overlay">
+      <div className="mi-modal ritual-master-modal">
         <div className="mi-header">
           <i className="fa-solid fa-scroll"></i> Ritual Spells
           <button type="button" className="mi-header-close" onClick={onClose} aria-label="Close" title="Close (configure later from the Spells step)">

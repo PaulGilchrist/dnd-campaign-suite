@@ -70,18 +70,24 @@ describe('DicePopup', () => {
       },
     );
 
-    it('renders the rolled value, die label, and dismiss hint', () => {
+    it('renders the rolled value and die label', () => {
       renderPopup();
       expect(screen.getByText('15')).toBeInTheDocument();
       expect(screen.getByText('d20')).toBeInTheDocument();
-      expect(screen.getByText('click anywhere to dismiss')).toBeInTheDocument();
     });
   });
 
   describe('interaction', () => {
-    it('calls onClose when the overlay is clicked', () => {
+    it('does not call onClose when the overlay is clicked', () => {
       const { container, onClose } = renderPopup();
       fireEvent.click(container.querySelector('.dice-tray-popup-overlay'));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(container.querySelector('.dice-tray-popup-modal')).toBeInTheDocument();
+    });
+
+    it('calls onClose when the close button is clicked', () => {
+      const { onClose } = renderPopup();
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 

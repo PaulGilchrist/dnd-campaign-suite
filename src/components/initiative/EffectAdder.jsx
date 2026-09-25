@@ -105,8 +105,8 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
   }
 
   return (
-    <div className='ea-overlay' onClick={onCancel}>
-      <div className='ea-modal' onClick={e => e.stopPropagation()}>
+    <div className='ea-overlay'>
+      <div className='ea-modal'>
         <h3>{targetName}</h3>
 
         {/* ── Tab Bar ── */}

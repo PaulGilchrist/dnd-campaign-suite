@@ -90,12 +90,13 @@ describe('AvatarModal', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when overlay is clicked', () => {
+    it('does not call onClose when overlay is clicked', () => {
       const handleClose = vi.fn();
       render(<AvatarModal name="Gandalf" onClose={handleClose} />);
 
       fireEvent.click(screen.getByTestId('avatar-modal-overlay'));
-      expect(handleClose).toHaveBeenCalledTimes(1);
+      expect(handleClose).not.toHaveBeenCalled();
+      expect(screen.getByText('G')).toBeInTheDocument();
     });
 
     it('does not call onClose when the inner modal is clicked', () => {

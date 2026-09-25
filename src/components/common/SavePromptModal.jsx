@@ -577,10 +577,7 @@ function withToggledAlly(selection, targetName) {
 function EvasionSelectionOverlay({ prompts, evasionSelection, onSelectionChange, onConfirm, onSkip }) {
   const selected = evasionSelection?.selectedAllies || [];
   return (
-    <div className="sp-overlay sp-overlay--evasion" onClick={(e) => {
-      if (e.target.closest('.sp-modal')) return;
-      onSkip?.();
-    }}>
+    <div className="sp-overlay sp-overlay--evasion">
       <div className="sp-modal">
         <div className="sp-header">
           <i className="fa-solid fa-shield-halved"></i> Leading Evasion — Choose Allies
@@ -593,16 +590,11 @@ function EvasionSelectionOverlay({ prompts, evasionSelection, onSelectionChange,
               <label
                 key={i}
                 className={`secondary-target-row ${selected.includes(prompt.targetName) ? 'secondary-target-selected' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectionChange(withToggledAlly(evasionSelection, prompt.targetName));
-                }}
+                onClick={() => onSelectionChange(withToggledAlly(evasionSelection, prompt.targetName))}
               >
                 <input
                   type="checkbox"
                   checked={selected.includes(prompt.targetName)}
-                  onChange={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
                 />
                 <span className="secondary-target-name">
                   <strong>{prompt.targetName}</strong>
@@ -614,19 +606,13 @@ function EvasionSelectionOverlay({ prompts, evasionSelection, onSelectionChange,
         <div className="sp-actions">
           <button
             className="sp-roll-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onConfirm(selected);
-            }}
+            onClick={() => onConfirm(selected)}
             disabled={selected.length === 0}
             type="button"
           >
             <i className="fa-solid fa-shield-halved"></i> Apply Evasion ({selected.length})
           </button>
-          <button className="sp-dismiss-btn" onClick={(e) => {
-            e.stopPropagation();
-            onSkip();
-          }} type="button">
+          <button className="sp-dismiss-btn" onClick={onSkip} type="button">
             Skip
           </button>
         </div>
@@ -656,10 +642,7 @@ function SavePromptDialog({
   const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = display;
   const queueCount = prompts.length;
   return (
-    <div className={`sp-overlay${dimmed ? ' sp-overlay--dimmed' : ''}`} onClick={(e) => {
-      if (e.target.closest('.sp-modal')) return;
-      handlers.dismiss?.();
-    }}>
+    <div className={`sp-overlay${dimmed ? ' sp-overlay--dimmed' : ''}`}>
       <div className="sp-modal">
         <div className="sp-header">
           <i className="fa-solid fa-shield-halved"></i> Saving Throw Required

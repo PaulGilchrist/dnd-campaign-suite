@@ -128,11 +128,12 @@ describe('CreateUndeadModal', () => {
       expect(props.onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when clicking the overlay', () => {
+    it('does not call onClose when clicking the overlay', () => {
       const props = makeProps();
       render(<CreateUndeadModal {...props} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(props.onClose).toHaveBeenCalledTimes(1);
+      expect(props.onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
 
     it('does not call onClose when clicking the modal content', () => {

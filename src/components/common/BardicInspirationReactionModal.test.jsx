@@ -267,9 +267,9 @@ describe('BardicInspirationReactionModal', () => {
     cleanup();
   });
 
-  // ── Dismiss (clicking overlay) ──
+  // ── Overlay click is inert ──
 
-  it('clears the prompt and advances when dismissing via overlay click', async () => {
+  it('does not clear or advance the prompt when the overlay is clicked', async () => {
     renderModal();
 
     fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
@@ -281,14 +281,11 @@ describe('BardicInspirationReactionModal', () => {
     const overlay = document.querySelector('.sp-overlay');
     fireEvent.click(overlay);
 
-    await waitFor(() => {
-      expect(clearBardicInspirationPrompt).toHaveBeenCalledWith('test-campaign', 'TargetOne');
-    });
-
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
+    expect(clearBardicInspirationPrompt).not.toHaveBeenCalled();
+    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
   });
 
-  it('does not clear bardicInspiration state on dismiss (only on useReaction)', async () => {
+  it('does not clear bardicInspiration state on overlay click (only on useReaction)', async () => {
     renderModal();
 
     fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
@@ -301,6 +298,7 @@ describe('BardicInspirationReactionModal', () => {
     fireEvent.click(overlay);
 
     expect(clearBardicInspiration).not.toHaveBeenCalled();
+    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
   });
 
   // ── Queue advancement ──
@@ -314,8 +312,7 @@ describe('BardicInspirationReactionModal', () => {
       expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
     });
 
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();

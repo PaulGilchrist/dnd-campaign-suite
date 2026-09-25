@@ -146,10 +146,11 @@ describe('ElementalAttunementModal', () => {
             expect(handleClose).toHaveBeenCalledTimes(1);
         });
 
-        it('calls onClose when overlay is clicked (element phase)', () => {
+        it('does not call onClose when overlay is clicked (element phase)', () => {
             const { handleClose } = renderModal();
             fireEvent.click(document.querySelector('.sp-overlay'));
-            expect(handleClose).toHaveBeenCalledTimes(1);
+            expect(handleClose).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
         });
 
         it('does not call onClose when modal content is clicked', () => {

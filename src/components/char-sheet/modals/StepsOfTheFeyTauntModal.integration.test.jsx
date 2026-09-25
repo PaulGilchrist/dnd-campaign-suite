@@ -98,12 +98,13 @@ describe('StepsOfTheFeyTauntModal - Integration', () => {
     });
 
     describe('overlay interactions', () => {
-        it('does not call onClose when overlay is clicked in choice step', () => {
+        it('does not call onClose or transition to result view when overlay is clicked in choice step', () => {
             const onClose = vi.fn();
             render(<StepsOfTheFeyTauntModal {...makeProps({ onClose })} />);
             const overlay = document.querySelector('.sp-overlay');
             fireEvent.click(overlay);
             expect(onClose).not.toHaveBeenCalled();
+            expect(screen.getByText(/Choose how you use/)).toBeInTheDocument();
         });
     });
 

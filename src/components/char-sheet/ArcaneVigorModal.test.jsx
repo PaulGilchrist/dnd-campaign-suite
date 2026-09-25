@@ -343,12 +343,13 @@ describe('ArcaneVigorModal', () => {
       expect(setRuntimeValueMock).not.toHaveBeenCalled();
     });
 
-    it('closes the modal when the overlay background is clicked', () => {
+    it('does not close when the overlay background is clicked', () => {
       const onClose = vi.fn();
       renderModal({ onClose });
       const overlay = document.querySelector('.arcane-vigor-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('Arcane Vigor')).toBeInTheDocument();
     });
 
     it('does not close when modal content is clicked', () => {

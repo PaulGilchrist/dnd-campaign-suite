@@ -103,14 +103,14 @@ describe('EffectAdder - conditions tab', () => {
     });
   });
 
-  it('should call onCancel when Cancel is clicked or clicking outside the modal', () => {
+  it('should call onCancel when Cancel is clicked but NOT when the overlay is clicked', () => {
     render(<EffectAdder {...props} initialTab='conditions' />);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(props.onCancel).toHaveBeenCalled();
-    props.onApply.mockClear();
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
     const overlay = document.querySelector('.ea-overlay');
     fireEvent.click(overlay);
-    expect(props.onCancel).toHaveBeenCalledTimes(2);
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+    expect(overlay).toBeInTheDocument();
   });
 
   it('should not call onApply when Apply is clicked without a selection', () => {

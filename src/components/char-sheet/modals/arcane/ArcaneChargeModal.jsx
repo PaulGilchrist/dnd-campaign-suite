@@ -14,10 +14,7 @@ function ArcaneChargeModal({ action, playerStats, campaignName, distance, onClos
 
     if (applied && result) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-wind"></i> {action.name}
@@ -33,10 +30,7 @@ function ArcaneChargeModal({ action, playerStats, campaignName, distance, onClos
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-wind"></i> {action.name}

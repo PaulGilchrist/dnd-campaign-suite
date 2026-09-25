@@ -561,10 +561,7 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
 
     if (phase === 'element') {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        handleSkip?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement
@@ -655,10 +652,7 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
 
     if (phase === 'summary' && results.length > 0) {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-                if (e.target.closest('.sp-modal')) return;
-                handleSkip?.();
-            }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement ({chosenElement}) — Results

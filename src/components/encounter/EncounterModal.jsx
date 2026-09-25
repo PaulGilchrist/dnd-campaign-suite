@@ -57,14 +57,8 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
     }
   };
 
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <div className="encounter-modal-overlay" onClick={handleBackdropClick}>
+    <div className="encounter-modal-overlay">
       <div className="encounter-modal">
         <div className="encounter-modal-header">
           <h3>

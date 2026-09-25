@@ -133,7 +133,7 @@ describe('BonusActionChoiceModal', () => {
       });
     });
 
-    it.each(['Done button', 'overlay'])('calls onClose when %s is clicked in applied state', async (trigger) => {
+    it('calls onClose when Done button is clicked in applied state', async () => {
       const onClose = vi.fn();
       bonusActionHandler.applyBonusActionChoice.mockResolvedValue({
         type: 'popup',
@@ -150,12 +150,30 @@ describe('BonusActionChoiceModal', () => {
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
       });
-      if (trigger === 'Done button') {
-        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-      } else {
-        fireEvent.click(document.querySelector('.sp-overlay'));
-      }
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call onClose when overlay is clicked in applied state', async () => {
+      const onClose = vi.fn();
+      bonusActionHandler.applyBonusActionChoice.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Cunning Action',
+          description: 'Dash selected.',
+          automation: baseAction.automation,
+        },
+      });
+      render(<BonusActionChoiceModal {...makeProps({ onClose })} />);
+      selectOption(0);
+      fireEvent.click(screen.getByRole('button', { name: /Use Bonus Action/ }));
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+      });
+      fireEvent.click(document.querySelector('.sp-overlay'));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
 
     it.each(['initial state', 'applied state'])('does not close when modal inner content is clicked in %s', async (state) => {
@@ -195,15 +213,19 @@ describe('BonusActionChoiceModal', () => {
   // ── Cancel / close behavior ──
 
   describe('cancel / close behavior', () => {
-    it.each(['Cancel button', 'overlay'])('calls onClose when %s is clicked in initial state', async (trigger) => {
+    it('calls onClose when Cancel button is clicked in initial state', async () => {
       const onClose = vi.fn();
       render(<BonusActionChoiceModal {...makeProps({ onClose })} />);
-      if (trigger === 'Cancel button') {
-        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      } else {
-        fireEvent.click(document.querySelector('.sp-overlay'));
-      }
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call onClose when overlay is clicked in initial state', async () => {
+      const onClose = vi.fn();
+      render(<BonusActionChoiceModal {...makeProps({ onClose })} />);
+      fireEvent.click(document.querySelector('.sp-overlay'));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
   });
 

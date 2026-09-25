@@ -135,7 +135,7 @@ describe('Quests', () => {
       expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
     });
 
-    it('closes the modal via Cancel, X (Close), or overlay click', () => {
+    it('closes the modal via Cancel or X (Close), but not via overlay click', () => {
       renderWithQuests([]);
       fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
       expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
@@ -154,7 +154,7 @@ describe('Quests', () => {
 
       const overlay = document.querySelector('.ct-modal-overlay');
       fireEvent.click(overlay);
-      expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
     });
 
     it('allows changing all form fields', () => {

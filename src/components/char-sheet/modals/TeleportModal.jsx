@@ -2,12 +2,9 @@ import { useState } from 'react';
 import { confirmTeleport, isExtendedAvailable } from '../../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
 import '../CharSheet.css';
 
-function TeleportShell({ onClose, children }) {
+function TeleportShell({ children }) {
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 {children}
             </div>
@@ -17,7 +14,7 @@ function TeleportShell({ onClose, children }) {
 
 function TeleportAppliedView({ result, action, isSwap, triggeredByElementalStride, onClose }) {
     return (
-        <TeleportShell onClose={onClose}>
+        <TeleportShell>
             <div className="sp-header">
                 <i className={`fa-solid ${isSwap ? 'fa-arrows-rotate' : triggeredByElementalStride ? 'fa-wind' : 'fa-tree'}`}></i> {action.name}
             </div>
@@ -32,7 +29,7 @@ function TeleportAppliedView({ result, action, isSwap, triggeredByElementalStrid
 
 function TeleportElementalView({ action, elementalDistance, handleConfirm, onClose }) {
     return (
-        <TeleportShell onClose={onClose}>
+        <TeleportShell>
             <div className="sp-header">
                 <i className="fa-solid fa-wind"></i> {action.name} — Thunder
             </div>
@@ -51,7 +48,7 @@ function TeleportElementalView({ action, elementalDistance, handleConfirm, onClo
 
 function TeleportSwapView({ action, auto, handleConfirm, onClose }) {
     return (
-        <TeleportShell onClose={onClose}>
+        <TeleportShell>
             <div className="sp-header">
                 <i className="fa-solid fa-arrows-rotate"></i> {action.name}
             </div>
@@ -113,7 +110,7 @@ function TeleportStandardView({ action, auto, isMoonlightStep, useExtended, exte
     const extendedDistance = (auto && auto.extendedDistance) || '150 ft';
     const showBringAllies = !isMoonlightStep && !!auto && !!auto.bringAllies && auto.allyCount > 0;
     return (
-        <TeleportShell onClose={onClose}>
+        <TeleportShell>
             <div className="sp-header">
                 <i className={isMoonlightStep ? "fa-solid fa-moon" : "fa-solid fa-tree"}></i> {action.name}
             </div>

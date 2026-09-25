@@ -240,10 +240,11 @@ describe('FeyReinforcementsModal', () => {
             expect(mockOnClose).toHaveBeenCalledTimes(1);
         });
 
-        it('calls onClose when clicking the overlay background', () => {
+        it('does not call onClose when clicking the overlay background', () => {
             render(<FeyReinforcementsModal {...makeProps()} />);
             fireEvent.click(document.querySelector('.sp-overlay'));
-            expect(mockOnClose).toHaveBeenCalledTimes(1);
+            expect(mockOnClose).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: /Summon Fey/ })).toBeInTheDocument();
         });
 
         it('does not close when clicking inside the modal content', () => {

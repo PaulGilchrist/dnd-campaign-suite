@@ -278,11 +278,12 @@ describe('InspiringSmiteModal', () => {
             expect(mockOnSkip).toHaveBeenCalledTimes(1);
         });
 
-        it('calls onSkip when overlay is clicked', () => {
+        it('does not call onSkip when overlay is clicked', () => {
             render(<InspiringSmiteModal {...makeProps()} />);
             const overlay = document.querySelector('.sp-overlay');
             fireEvent.click(overlay);
-            expect(mockOnSkip).toHaveBeenCalledTimes(1);
+            expect(mockOnSkip).not.toHaveBeenCalled();
+            expect(document.querySelector('.sp-modal')).toBeInTheDocument();
         });
 
         it('does not call onSkip when clicking inside the modal', () => {

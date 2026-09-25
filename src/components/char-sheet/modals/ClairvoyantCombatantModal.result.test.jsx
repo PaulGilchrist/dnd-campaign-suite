@@ -107,7 +107,7 @@ describe('ClairvoyantCombatantModal - result screen', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('closes when overlay is clicked', async () => {
+    it('does not close when overlay is clicked', async () => {
       const onClose = vi.fn();
       const props = makeProps({ currentUses: 1, maxUses: 3, onClose });
       renderModal(props);
@@ -117,10 +117,11 @@ describe('ClairvoyantCombatantModal - result screen', () => {
       dispatchSaveEvent(false);
 
       await waitFor(() => {
-        const overlay = document.querySelector('.sp-overlay');
-        fireEvent.click(overlay);
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
       });
-      expect(onClose).toHaveBeenCalledTimes(1);
+      fireEvent.click(document.querySelector('.sp-overlay'));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
 
     it('does not close when modal content is clicked', async () => {

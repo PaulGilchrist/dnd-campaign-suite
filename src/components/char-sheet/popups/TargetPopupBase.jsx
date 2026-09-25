@@ -20,10 +20,7 @@ export default function TargetPopupBase({
     : `\u2014 Level ${spell?.level ?? defaultLevel} ${school}`;
 
   return (
-    <div className="popup-overlay" onClick={(e) => {
-      if (e.target.closest('.popup-modal')) return;
-      onSkip?.();
-    }}>
+    <div className="popup-overlay">
       <div className="popup-modal metamagic-popup">
         <div className="metamagic-popup-inner">
           <h3><i className={icon}></i> {title}</h3>

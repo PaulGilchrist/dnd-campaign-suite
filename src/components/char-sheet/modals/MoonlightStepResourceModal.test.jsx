@@ -123,7 +123,7 @@ describe('MoonlightStepResourceModal', () => {
   });
 
   describe('user interaction', () => {
-    it('closes the modal via Escape key, overlay click, or Cancel button', () => {
+    it('closes the modal via Escape key or button, and does not close on overlay click', () => {
       const onClose = vi.fn();
 
       const { container: c1 } = render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
@@ -133,12 +133,13 @@ describe('MoonlightStepResourceModal', () => {
 
       const { container: c2 } = render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
       fireEvent.click(c2.querySelector('.resource-pool-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(2);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(c2.querySelector('.resource-pool-modal')).toBeInTheDocument();
       c2.remove();
 
       const { container: c3 } = render(<MoonlightStepResourceModal {...makeProps({ onClose })} />);
       fireEvent.click(c3.querySelector('button.char-btn'));
-      expect(onClose).toHaveBeenCalledTimes(3);
+      expect(onClose).toHaveBeenCalledTimes(2);
       c3.remove();
     });
   });

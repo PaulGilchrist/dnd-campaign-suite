@@ -185,7 +185,7 @@ function HealingLogSection({ log }) {
 
 function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, applyHeal, effectiveMaxDicePerUse, rolledFaces, accumulatedTotal, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, log, handleClose, featureName }) {
     return (
-        <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="short-rest-modal">
             <h3><i className="fas fa-hands-helping"></i> {featureName}</h3>
 
             {loading && (
@@ -592,8 +592,8 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
     if (showTargetSelection) {
         return (
-            <div className="short-rest-overlay no-print" onClick={handleClose}>
-                <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="short-rest-overlay no-print">
+                <div className="short-rest-modal">
                     <SecondaryTargetModal
                         title={`Choose target for ${featureName}`}
                         targets={creatureTargets}
@@ -610,7 +610,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     }
 
     return (
-        <div className="short-rest-overlay no-print" onClick={handleClose}>
+        <div className="short-rest-overlay no-print">
             <HealingPoolMain
                 loading={loading}
                 safePool={safePool}

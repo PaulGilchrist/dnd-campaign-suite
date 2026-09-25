@@ -78,8 +78,8 @@ function FontOfMagicModal({ playerStats, campaignName, onClose }) {
   }, [onClose]);
 
   return (
-    <div className="font-of-magic-overlay no-print" onClick={onClose}>
-      <div className="font-of-magic-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="font-of-magic-overlay no-print">
+      <div className="font-of-magic-modal">
         <h3><i className="fas fa-fire"></i> Font of Magic</h3>
         <p className="font-of-magic-subtitle">Bonus Action &mdash; Convert between spell slots and sorcery points</p>
 

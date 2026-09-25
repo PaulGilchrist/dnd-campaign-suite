@@ -77,8 +77,8 @@ function WildCompanionModal({ playerStats, campaignName, onClose }) {
   }, [onClose])
 
   return (
-    <div className="resource-pool-overlay no-print" onClick={onClose}>
-      <div className="resource-pool-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="resource-pool-overlay no-print">
+      <div className="resource-pool-modal">
         <h3><i className="fas fa-leaf"></i> Wild Companion</h3>
         <p className="resource-pool-subtitle">Cast Find Familiar without Material components</p>
 

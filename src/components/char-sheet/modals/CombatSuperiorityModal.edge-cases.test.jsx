@@ -51,7 +51,7 @@ describe('CombatSuperiorityModal - null/undefined payload', () => {
 // ── Overlay click behavior (unique: not in test.jsx) ──
 
 describe('CombatSuperiorityModal - overlay clicks', () => {
-  it('closes when clicking the overlay background but not when clicking modal content', () => {
+  it('does not close when clicking the overlay background or modal content', () => {
     const onClose = vi.fn();
     renderModal({
       payload: { selectionMode: true },
@@ -62,13 +62,14 @@ describe('CombatSuperiorityModal - overlay clicks', () => {
     expect(overlay).toBeTruthy();
     expect(modal).toBeTruthy();
 
-    // Clicking modal content should NOT close (stopPropagation)
+    // Clicking modal content should NOT close
     fireEvent.click(modal);
     expect(onClose).not.toHaveBeenCalled();
 
-    // Clicking overlay should close
+    // Clicking overlay should not close
     fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 });
 

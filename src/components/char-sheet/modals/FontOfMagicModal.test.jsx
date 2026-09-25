@@ -470,11 +470,12 @@ describe('FontOfMagicModal', () => {
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when overlay background is clicked', () => {
+  it('does not call onClose when overlay background is clicked', () => {
     render(<FontOfMagicModal {...makeProps()} />);
     const overlay = document.querySelector('.font-of-magic-overlay');
     fireEvent.click(overlay);
-    expect(mockOnClose).toHaveBeenCalledTimes(1);
+    expect(mockOnClose).not.toHaveBeenCalled();
+    expect(document.querySelector('.font-of-magic-modal')).toBeInTheDocument();
   });
 
   it('does not close when modal content is clicked', () => {

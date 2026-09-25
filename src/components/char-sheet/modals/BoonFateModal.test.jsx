@@ -401,7 +401,7 @@ describe('BoonFateModal', () => {
   // ── Result view close behavior ──
 
   describe('result view close behavior', () => {
-    it('calls onClose when overlay is clicked in result view', async () => {
+    it('does not close when overlay is clicked in result view', async () => {
       boonOfFateHandler.applyBoonFateChoice.mockResolvedValue({
         type: 'popup',
         payload: {
@@ -414,22 +414,24 @@ describe('BoonFateModal', () => {
       renderModal(makeProps({ onClose }));
       fireEvent.click(screen.getByRole('button', { name: 'Apply +5 (Bonus)' }));
       await waitFor(() => {
-        const overlay = document.querySelector('.sp-overlay');
-        fireEvent.click(overlay);
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
       });
-      expect(onClose).toHaveBeenCalledTimes(1);
+      fireEvent.click(document.querySelector('.sp-overlay'));
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
   });
 
   // ── Initial render close behavior ──
 
   describe('initial render close behavior', () => {
-    it('calls onClose when overlay is clicked on initial render', () => {
+    it('does not call onClose when overlay is clicked on initial render', () => {
       const onClose = vi.fn();
       renderModal(makeProps({ onClose }));
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('does not call onClose when modal content is clicked', () => {

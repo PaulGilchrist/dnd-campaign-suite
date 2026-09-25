@@ -160,7 +160,7 @@ describe('AttackRiderManeuverPrompt - use maneuver', () => {
         expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onSkip when overlay is clicked in result state', async () => {
+    it('does not call onSkip when overlay is clicked in result state', async () => {
         const onSkip = vi.fn();
         const onUse = vi.fn().mockResolvedValue({
             payload: { name: 'Disarming Attack', description: 'Desc.' },
@@ -173,7 +173,8 @@ describe('AttackRiderManeuverPrompt - use maneuver', () => {
             expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
         });
         fireEvent.click(document.querySelector('.sp-overlay'));
-        expect(onSkip).toHaveBeenCalledTimes(1);
+        expect(onSkip).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
     });
 });
 
@@ -187,12 +188,13 @@ describe('AttackRiderManeuverPrompt - skip and cancel', () => {
         expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onSkip when overlay is clicked', () => {
+    it('does not call onSkip when overlay is clicked', () => {
         const onSkip = vi.fn();
         renderPrompt({ onSkip });
         const overlay = document.querySelector('.sp-overlay');
         fireEvent.click(overlay);
-        expect(onSkip).toHaveBeenCalledTimes(1);
+        expect(onSkip).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: /Skip/ })).toBeInTheDocument();
     });
 
     it('does not close when clicking inside modal', () => {
@@ -245,7 +247,7 @@ describe('AttackRiderManeuverPrompt - isMiss path', () => {
         expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onSkip when overlay is clicked in isMissResult state', async () => {
+    it('does not call onSkip when overlay is clicked in isMissResult state', async () => {
         const onSkip = vi.fn();
         const onUse = vi.fn().mockResolvedValue({
             isMissResult: true,
@@ -259,7 +261,8 @@ describe('AttackRiderManeuverPrompt - isMiss path', () => {
             expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
         });
         fireEvent.click(document.querySelector('.sp-overlay'));
-        expect(onSkip).toHaveBeenCalledTimes(1);
+        expect(onSkip).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
     });
 });
 

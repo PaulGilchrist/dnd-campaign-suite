@@ -74,8 +74,8 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
   };
 
   return (
-    <div className="encounter-modal-overlay gen-modal-overlay" onClick={onClose}>
-      <div className="encounter-modal gen-modal" onClick={e => e.stopPropagation()}>
+    <div className="encounter-modal-overlay gen-modal-overlay">
+      <div className="encounter-modal gen-modal">
         <div className="encounter-modal-header">
           <h3><i className="fa-solid fa-wand-magic-sparkles"></i> Generate Encounter</h3>
           <button className="encounter-modal-close" onClick={onClose}>&times;</button>

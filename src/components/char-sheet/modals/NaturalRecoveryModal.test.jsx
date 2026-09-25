@@ -158,11 +158,12 @@ describe('NaturalRecoveryModal', () => {
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when the overlay background is clicked', () => {
+    it('does not call onClose when the overlay background is clicked', () => {
       renderModal();
       const overlay = document.querySelector('.nr-overlay');
       fireEvent.click(overlay);
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.nr-modal')).toBeInTheDocument();
     });
 
     it('does not call onClose when the modal content is clicked', () => {

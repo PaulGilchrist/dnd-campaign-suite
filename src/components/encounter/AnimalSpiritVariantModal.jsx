@@ -19,10 +19,7 @@ const VARIANT_DESCRIPTIONS = {
 export function AnimalSpiritVariantModal({ chooser, monsterName, onResolve, onSkip }) {
   if (!chooser || !chooser.variants) return null;
   return (
-    <div className="mc-overlay mc-overlay--spirit-variant" onClick={(e) => {
-      if (e.target.closest('.sp-modal')) return;
-      onSkip?.();
-    }}>
+    <div className="mc-overlay mc-overlay--spirit-variant">
       <div className="sp-modal">
         <div className="sp-header">
           <i className="fa-solid fa-paw"></i> Animal Spirit — Choose Form

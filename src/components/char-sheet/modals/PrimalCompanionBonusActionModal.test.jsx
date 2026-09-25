@@ -91,11 +91,12 @@ describe('PrimalCompanionBonusActionModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('closes when clicking the overlay on initial render', () => {
+    it('does not close when clicking the overlay on initial render', () => {
       const onClose = vi.fn();
       render(<PrimalCompanionBonusActionModal {...makeProps({ onClose })} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('does not close when clicking inside the modal content', () => {
@@ -218,7 +219,7 @@ describe('PrimalCompanionBonusActionModal', () => {
       );
     });
 
-    it('shows the result screen after a successful apply and closes on Done or overlay click', async () => {
+    it('shows the result screen after a successful apply and closes on Done button', async () => {
       const onClose = vi.fn();
       render(<PrimalCompanionBonusActionModal {...makeProps({ onClose })} />);
       await act(async () => { fireEvent.click(screen.getByText('Dash')); });

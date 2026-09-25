@@ -96,10 +96,7 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
     if (mode === 'tamedSurge') {
         const availableSurges = getAvailableSurges();
         return (
-            <div className="sp-overlay" onClick={(e) => {
-                if (e.target.closest('.sp-modal')) return;
-                onClose?.();
-            }}>
+            <div className="sp-overlay">
                 <div className="sp-modal sp-modal--wide" data-testid="wild-magic-surge-modal" onClick={(e) => {
                     if (isInteractive(e.target)) return;
                     onClose?.();
@@ -143,10 +140,7 @@ function WildMagicSurgeModal({ featureName, surgeTable, campaignName, playerStat
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-            if (e.target.closest('.sp-modal')) return;
-            onClose?.();
-        }}>
+        <div className="sp-overlay">
             <div className="sp-modal sp-modal--wide" data-testid="wild-magic-surge-modal" onClick={(e) => {
                 if (isInteractive(e.target)) return;
                 onClose?.();

@@ -1,6 +1,5 @@
 import { Fragment } from 'react';
 import { applyTypeChoice as applyBoonOfEnergyResistance } from '../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js';
-import { isInteractive } from '../../services/ui/modalDismissUtils.js';
 import TeleportModal from './modals/TeleportModal.jsx';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
 import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
@@ -55,10 +54,7 @@ const TeleportBlock = ({ modal, onClose }) => (
 );
 
 const MoonlightStepFallbackBlock = ({ fallback, onConfirm, onDismiss }) => (
-    <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onDismiss();
-    }}>
+    <div className="sp-overlay">
         <div className="sp-modal">
             <div className="sp-header">
                 <i className="fa-solid fa-moon"></i> {fallback.action.name}
@@ -79,14 +75,8 @@ const MoonlightStepFallbackBlock = ({ fallback, onConfirm, onDismiss }) => (
 );
 
 const PortentBlock = ({ portentModal, handlePortentModalClose, handlePortentDieChoice }) => (
-    <div className="portent-modal-overlay" onClick={(e) => {
-        if (e.target.closest('.portent-modal')) return;
-        handlePortentModalClose?.();
-    }}>
-        <div className="portent-modal" onClick={(e) => {
-            if (isInteractive(e.target)) return;
-            handlePortentModalClose?.();
-        }}>
+    <div className="portent-modal-overlay">
+        <div className="portent-modal">
             <h3>Portent</h3>
             <div className="portent-modal-section">
                 <div className="portent-modal-label">Creature: <span className="portent-modal-target">{portentModal.targetName}</span></div>

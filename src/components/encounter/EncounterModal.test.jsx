@@ -58,8 +58,12 @@ describe('EncounterModal', () => {
             expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
         });
 
-        it('closes when the close button or backdrop is clicked', () => {
-            render(<EncounterModal {...createProps()} />);
+        it('closes when the close button is clicked but not when the backdrop is clicked', () => {
+            const { container } = render(<EncounterModal {...createProps()} />);
+            fireEvent.click(container.querySelector('.encounter-modal-overlay'));
+            expect(mockOnClose).not.toHaveBeenCalled();
+            expect(container.querySelector('.encounter-modal')).toBeInTheDocument();
+
             fireEvent.click(screen.getByRole('button', { name: 'Close' }));
             expect(mockOnClose).toHaveBeenCalledTimes(1);
         });

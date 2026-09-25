@@ -67,19 +67,15 @@ function DicePopup({ result, onClose }) {
       };
 
     return (
-            <div className="dice-tray-popup-overlay" onClick={(e) => {
-                if (e.target.closest('.dice-tray-popup-modal')) return;
-                onClose?.();
-            }}>
+            <div className="dice-tray-popup-overlay">
                 <div className="dice-tray-popup-modal">
                    <button className="dice-tray-popup-close" onClick={onClose} aria-label="Close">
                        <i className="fa-solid fa-xmark"></i>
                    </button>
                    <div className="dice-tray-result">
                        <div className="dice-tray-result-icon">{getResultIcon(result.label)}</div>
-                       <div className="dice-tray-result-value">{result.value}</div>
-                       <div className="dice-tray-result-label">{result.label}</div>
-                       <div className="dice-tray-result-dismiss">click anywhere to dismiss</div>
+                        <div className="dice-tray-result-value">{result.value}</div>
+                        <div className="dice-tray-result-label">{result.label}</div>
                    </div>
                </div>
            </div>

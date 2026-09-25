@@ -317,10 +317,11 @@ describe('MassHealModal', () => {
   // ── Confirm behavior ──
 
   describe('confirm', () => {
-    it('calls onSkip when clicking the overlay', () => {
+    it('does not call onSkip when clicking the overlay', () => {
       render(<MassHealModal {...makeProps()} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(mockOnSkip).toHaveBeenCalledTimes(1);
+      expect(mockOnSkip).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
 
     it('does not call onConfirm when confirm clicked with targets but zero allocation', async () => {

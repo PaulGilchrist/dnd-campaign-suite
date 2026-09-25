@@ -262,12 +262,13 @@ describe('BendFateModal', () => {
       expect(baseProps.onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when overlay is clicked on initial render', () => {
+    it('does not call onClose when overlay is clicked on initial render', () => {
       const onClose = vi.fn();
       renderModal(makeProps({ onClose }));
       const overlay = document.querySelector('.sp-overlay');
       fireEvent.click(overlay);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('prevents modal content clicks from closing', () => {

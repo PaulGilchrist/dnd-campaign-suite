@@ -225,11 +225,12 @@ describe('AttackRiderModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when overlay is clicked', () => {
+    it('does not call onClose when overlay is clicked', () => {
       const onClose = vi.fn();
       render(<AttackRiderModal {...makeProps({ onClose })} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     });
   });
 
