@@ -41963,9 +41963,15 @@
         "save_effect": "",
         "range": "",
         "reach": "5 ft.",
-        "recharge": "5-6",
+        "recharge": "",
         "damage_dice_primary": "4d6 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "conditional_damage": {
+          "dice": "3d6",
+          "modifier": 0,
+          "damage_type": "Piercing",
+          "condition": "the minotaur moved 10 or more feet straight toward the target immediately before the hit"
+        }
       }
     ],
     "bonus_actions": [],

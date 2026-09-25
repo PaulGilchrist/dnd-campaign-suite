@@ -19097,7 +19097,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 18 (4d6 + 4) Piercing damage. If the target is a Large or smaller creature and the minotaur moved 10+ feet straight toward it immediately before the hit, the target takes an extra 10 (3d6) Piercing damage and has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1174-gore-unarmed-charge-seam-recharge-conflict.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1175",
