@@ -18733,7 +18733,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 9 (2d4 + 4) Slashing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from two of four claws, and it has the Restrained condition until the grapple ends.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1157-claws-inert-grapple-restrain-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1158",

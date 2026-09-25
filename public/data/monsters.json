@@ -41234,7 +41234,12 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "2d4 + 4",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 14
       },
       {
         "name": "Mercurial Trident",
