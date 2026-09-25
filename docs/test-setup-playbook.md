@@ -450,3 +450,115 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - MA-1126 (PASS-subset, mammoth Multiattack, §440 triple-twin sovereign/mage): §440 header chip opens DISMISS-ONLY popup ("click to dismiss", no Done) that INTERCEPTS the next chip press — dismiss before every subsequent press. chips are `span.mc-dice-link[role=button]` NOT `<button>` (querySelectorAll('button') empty; 2-phase id-tag via strong.startsWith anchor §121). EB join path "+ NPC → autocomplete li.monster-autocomplete-item, exact `li:text-is()` click" (Bandit→4-row prefix family). Unsuffixed cs name at qty=1 (renameNpc→applyNpcMonsterData sets no suffix/monsterIndex) — §444 flip-side: names sometimes unsuffixed; dump both. §414 mis-stamp family extends to attack-log `rolls:[prior-totals]` dupe values + weaponType:"ranged" on reach-melee — core lastAttack fields exact, cite family only.
 - MA-1127 (PASS-subset, mammoth Gore, MA-0903 honest-unexpressible frame): charge-gated Prone = ZERO transport app-wide (maybeApplyRamProne gate context.ramActive ← ONLY PC stance applyStanceOption optionName:'Ram' combatStanceHandler:100/:300; no monster-disk vocabulary; no movement-distance subsystem — in-source comment Helpers:583; ChargeBonusOffer needs conditional_damage.dice :599) → PASS-subset, NOT FAIL(a). PITFALLS: +NPC-autocomplete joins ship cs entries with NO monsterIndex key at all (qty1 unsuffixed §449 further) — identity proof = disk-exact HP/AC + card content; joined card retains stale autocomplete <li> under name textbox — hasText audits hit it, scope strong.startsWith; "+NPC" second press opens fresh NPC row while old keeps text — target input:focus.
 - MA-1131 (PASS, manticore Rend single-primary clean): NEW PITFALLS: `mc-ally-badge.clickable` on monster card opens lingering `sp-overlay` (Select Allies) that INTERCEPTS attack-popup pointer events (5s timeout) — Cancel natively then el.click popup dismiss; NO `<select>` exists inside `.mc-overlay` — "own-card arm" in practice = initiative tracker row-select (self-excluded dropdown, native value-setter+change sticks via tracker route); card modal arms only via sp-overlay picker. EB Join auto-numbers even singletons — verify monsterIndex never name (§244). Attack-log `total`=nat only (bonus separate) — §881 re-confirmed.
+
+## §442 (2026-09-24, MA-1132/MA-1133) New pitfalls
+- AttackResultPopup stage-1 does NOT live inside `.popup-overlay` — poll `button.dice-roll-reroll-btn` visibility, not overlay presence; Done click may auto-dismiss stage-2, so log-count is the sole ledger.
+- A chip click landing in "no-popup" state can fire ZERO log entries — verify log-count delta after EVERY chip click and re-fire if zero.
+- Init-card max-HP `click()` is intercepted by an open mc-overlay (§91) — use `fill()`+Enter, or set HP before opening the stat card; currentHp accepts unclamped 999 while max stays authored (cosmetic).
+- Multiattack headers with authored `attack_bonus` render a spurious "+N" header chip (§440/§441 family, e.g. Marid) — cosmetic, exclude from component ledger.
+- `lastAttack.weaponType:"melee"` mislabel observed on ranged rows (Marid/Tail-Spike family) — cosmetic advisory.
+- Admin-panel clear dialogs need `browser_handle_dialog` (page.once dialog handler misses them).
+
+## §443 (2026-09-24, MA-1135) New pitfalls
+- Save rows whose prose says "is pushed up to N feet" arm a LIVE instant push marker te via the AoE picker (§101 attack-row-zero-push does NOT extend to save-picker rows).
+- AoE picker title leads with a stray space — anchor innerText.trim().startsWith for shape asserts.
+- Results .sp-modal lingers after Close and absorbs the next chip click firelessly — log-delta after every confirm (§442 family).
+- EB qty stepper read needs post-click re-read (React async).
+
+## §444 (2026-09-24, MA-1136) New pitfalls
+- Spellcasting rows with attack_bonus:0 (zero not null) arm a stray clickable "+0" mc-dice-link chip — audit rows by .mc-dice-link selector, don't press junk chips.
+- Row-text /DC\s*N/ regex false-positives on authored prose — assert DC-chip absence via .mc-dice-link-save selector only (§532 proof fix).
+- "Join Encounter" auto-navigates to Initiative; monster card overlay is .mc-overlay (no "modal" substring) and intercepts pointer clicks behind it.
+- browser_handle_dialog errors "no modal" when page.once already auto-accepted — treat error + post-state GET as accept proof.
+
+## §445 (2026-09-24, MA-1137) New pitfalls
+- Spurious '+0' junk chip extends to multiattack-component save rows (attack_bonus:0) — Marilith Constrict; never press chips not owned by the row under test.
+- Open a specific monster's stat card deterministically via img.avatar-image[alt="<Name>"] click — innerText card filter mis-hits adjacent cards.
+- Multiattack header text may carry trailing empty '()' range artifact.
+
+## §446 (2026-09-24, MA-1138) Pitfall updates
+- Init-card max-HP input now ACCEPTS unclamped 999 (both aria max/current inputs) — §442 note 'max stays authored' stale; hp_change log still stamps authored maxHp cosmetically.
+- browser_run_code_unsafe outer scope lacks window/location — use page.url(); capture popup text inside the SAME evaluate that clicks Done (stage auto-dismiss races).
+
+## §447 (2026-09-24, MA-1139) New pitfalls
+- HP-rig fill+Enter POSTs a FULL-store snapshot: an HP write issued AFTER arming a target reverts cs.targetName to null → the next save-chip fire is an honest `<feature>_refused` zero-spend (§5 same-endpoint clobber, live-caught on Marilith Constrict). Order: rig HP first, then selectOption arm, then verify cs.targetName server-side before pressing chips.
+- Save-chip on attack+save row auto-rolls inline to a click-to-dismiss result popup — NO reroll button appears; to land a specific save face, re-fire the chip for a fresh roll (dismiss popup-overlay between attempts, log-delta ledger §442).
+- GET /combatSummary can omit activeConditions/activeConditionMeta keys even after `condition applied` logged + DOM badges live — judge grants via condition-applied log + initiative-card badges, not cs GET.
+- mc-overlay survives popup-overlay dismiss and intercepts initiative `Next →` pointer clicks — press Escape (or click overlay) before walk clicks.
+
+## §448 (2026-09-24, MA-1140) New pitfalls
+- Opening defender .mc-overlay over a live attacker pending popup orphans the Done damage resolver (HP unchanged on committed hit) — press Done while attacker modal is live, re-shoot otherwise.
+- Parry consumer chain exists (resolveMonsterParry Helpers:1284 → acBonus fold hitResolution.js:284) but only reached when automation.effect='parry' authored — prose-only Parry = inert FAIL(b) family (MA-0643 twin).
+
+## §449 (2026-09-24, MA-1141) New pitfalls
+- Condition-on-hit grant transport = hit_conditions/hit_target_effect/hit_condition_roll (buildHitConditionClause Helpers:648 -> handlePlainDamage:543/614); raw action.conditions has ZERO attack-path consumers — prose-derived manifest conditions are honest data gaps, file FAIL(a) not 'works'.
+- Initiative-card target-select self-exclusion read: the card whose options EXCLUDE the attacker is the attacker's own card; scope selects via ancestor-of input[aria-label='<Name> current HP'].
+
+## §450 (2026-09-24, MA-1142) Pitfall updates
+- Init-card max-HP input may stay authored while DOM shows 999; current-HP 999 sticks and resolver does NOT clamp — judge ledger by hp_change deltas (MA-0874 build-dependent).
+
+## §451 (2026-09-24, MA-1143) New pitfalls
+- Initiative-page "+NPC"+autocomplete joins monsters into cs DIRECTLY (disk-exact AC/HP, no monsterIndex key, no "Join Encounter" button needed) — but tracker name/HP inputs stay stale 10/10 placeholders forever; cs GET is the sole identity/HP truth post-join.
+- Dismissed MISS popup DOM lingers hidden inside `.popup-overlay` retaining the previous press's exact text — text-only polls can re-read stale rolls; poll `.dice-roll-result` host offsetParent + log-entry timestamps instead (§442 complement: stage-1 host = .dice-roll-result, miss popups never carry dice-roll-reroll-btn §1115 re-confirmed).
+- Two real consecutive nat1 miss logs can print IDENTICAL `rolls:[1,14]` second-die display value (rolls[0]+bonus is the adjudicated to-hit; second die cosmetic) — distinguish presses by log timestamp, not rolls array.
+- Attacker init-card Target `<select>` sits 2+ generic levels below the aria HP input — `div:has(> input[aria-label=...])` fails; ancestor depth-walk to nearest row containing the select, native value setter + change dispatch arms cs.targetName (§447 order preserved).
+
+## §452 (2026-09-24, MA-1144) New pitfalls
+- Armed target lands on `cs.creatures[attacker].targetName` — cs ROOT `targetName` key absent this build; §451 "arms cs.targetName" proofs must read the attacker's creature entry, not root (root read returns undefined → false NOT-armed).
+- Attack popup leading number is the TOTAL (nat+bonus), the `d20 N` token is the nat — adjudicate `total (nat+bonus) vs AC` by leading digit + explicit "✓/✗ (N vs AC)" stamp; earlier nat-first readings of MA-1143 popups were the same chrome.
+
+## §453 (2026-09-24, MA-1146) New pitfall
+- .popup-overlay is position:fixed → offsetParent ALWAYS null even when visible; poll getComputedStyle display/visibility + rect, NOT offsetParent (§451 refinement); log-delta is the press truth.
+
+## §454 (2026-09-24, MA-1147) New pitfalls
+- Init-card HP rig needs TRUSTED keyboard (real click, Meta+A, type, trusted Enter); synthetic input/change/blur/Enter displays 999 but cs frozen — refines §450.
+- Secondary damage rides the SAME primary damage log entry via secondaryFormula/secondaryRolls/secondaryTotal/secondaryDamageType/secondaryFinalDamage keys — read secondary* off the single entry, don't await a second rollType:damage entry.
+
+## §455 (2026-09-24, MA-1150) New pitfalls
+- Advisory spell-cast log stamps spell-side dc_type even when dc_success:'none' — verify ability stamp vs ROW-authored save_type, not just DC number.
+- Damage-bearing Spellcasting sub-spells route routesToSave and spend N/Day BEFORE MA-0049 no-target refusal — refusal text 'nothing spent' is false for the uses counter.
+
+## §456 (2026-09-24, MA-1151) New pitfalls
+- dc_success defaults to 'half' via resolveBlockSaveDcSuccess when RAW success is silent-zero — strict zero-on-success needs explicit dc_success:'none'; half-on-silence is app convention.
+- Single-target save rows with push prose have NO push te on any leg (registerTargetEffect is AoE-picker only) — zero-fire is structural, GM-adjudicated.
+- Save rows with authored damage_dice_primary render twin chips (plain dice + DC chip) — press only the save-clickable chip.
+
+## §457 (2026-09-25, MA-1153) New pitfall
+- Whole-store /poisoned/gi zero-grant scans false-positive on combat-ui-viewingMonster.actions[i].description echoes — exclude viewingMonster keys when adjudicating grants.
+
+## §460 (2026-09-25, MA-1160) New pitfalls
+- conditional_damage seam is LIVE (buildChargeBonusOffer Helpers:597 -> chargeBonusOffer -> HIT popup grant/decline) and condition-text-agnostic: grapple-damage clauses ARE expressible (Chimera MA-0485 byte-shape) — absence on such a row = FAIL(a)/DATA, not §679-class advisory.
+- ea-overlay GM Add grants grappled cleanly (cd+log) while cs GET omits activeConditions — use it as state-probe substrate.
+- Crit secondary doubles silently in resolveSecondaryRoll (handlePlainDamage.js:87) while secondaryFormula text stays undoubled — judge by secondaryTotal==2xdie.
+- MA-1167 (PASS, mind flayer arcanist Arcane Tentacles standalone): dual authored single-value reach+range → chip/chooser/ledger byte-identical to MA-1166 twin — rangeReason:null ×12 rides ALSO rows whose attack log omits the `range` key entirely (fingerprint judge on rangeReason only); optional-positional teleport rider grep-zero consumer app-wide (attack seam rg teleport exit-1; registered tels 1266/1276 are PC-class producers) = §205/MA-0679 advisory; admin-confirm capture: shim window.confirm BEFORE press when handle_dialog state absent — captured verbatim dialog string is the proof artifact (§148 sharpened) (2026-09-25)
+
+## §466 (2026-09-25, MA-1168) New pitfalls
+- Range-empty emanation rows still spend recharge at fire-time (inline fire, Modal:411->434) — no picker != no spend.
+- Initiative 'Next' bottom-clipped below viewport: pointer clicks time out silently; native el.click() in evaluate walks reliably.
+- Round-wrap recharge recovery lands on first Next after array end; judge recovery by recharge/recharge_failed log dice, not gate mirror.
+
+## §467 (2026-09-25, MA-1172) New pitfalls
+- MA-1171 "Minotaur triplet ALL CR3/700XP" partially stale: Minotaur Skeleton is CR2/450XP on current disk — exact td-text anchor remains mandatory (Baphomet twin IS CR3/700 non-discriminating).
+- run_code_unsafe Node-scope: a var computed via one awaited evaluate (`pre=…length`) is NOT visible inside a returned-object literal's `post.slice(preLen)` in the same call unless assigned in that same Node scope — inline `post.slice(pre.length)`; mid-script ReferenceError still lands prior chip-click side-effects (audit log post-error).
+- EB join idx order NOT stable across sessions (MA-1171 Minotaur idx0 vs MA-1172 Bandit idx0, same join order) — name-anchor, never carry idx.
+- Crit formula surfaces for "XdY+M" rows: popup prints per-die "6*2, 2*2 +4", log stamps collapsed "2d8*2+4 (6, 2)" — both are the §32 shape; literal "2d8*2 + 4" with spaces exists on NEITHER surface.
+
+## §470 (2026-09-25, MA-1175) New pitfalls
+- EB name cell is td[1] not td[0]; first-td exact-match fails.
+- Identical '+N' chip texts across Gore/Slam rows — row-scope via strong.startsWith mandatory.
+
+## §472 (2026-09-25, MA-1179) New pitfalls
+- 'Gear'/'Gear Flinger' prefix-pair: strong.startsWith('Gear') matches BOTH — use exact text match on prefix-family rows.
+- Popup total==20 with nat<20 is NOT crit — judge crit from nat token + log isCrit only.
+
+## §473 (2026-09-25, MA-1180) New pitfalls
+- Attack log total stamps NAT ONLY (bonus/targetAc separate fields); the nat+bonus total lives only in popup chrome — never assert log.total==nat+bonus.
+- .mc-overlay chip absorb-count is NOT reusable across rows/sessions (MA-1179 Gear first-click 10/10 vs MA-1180 Gear Flinger 4/7): flush-click on hidden retained popup or select churn absorbs the next press 0-popup/0-log-delta — log-delta §442 arbiter mandatory every press.
+- Single-die crit formula collapses as "1d8*2+2 (N)" keeping the 1d8 token doubled-in-place, flat mod undoubled; "2d8" spelling appears on NEITHER popup nor log (§467 extension).
+
+## §474 (2026-09-25, MA-1184) New pitfalls
+- Multi-victim picker volleys can drop the SECOND victim's activeConditionMeta (MA-0063 sequential un-awaited per-target writes; victim1 byte-full, victim2 meta KEY-ABSENT through reload+re-select) — §39/§46/MA-0877 family; adjudicate grants by condition-log dc/ability stamp + activeConditions, not by demanding symmetric meta.
+- EB qty value renders in span.qty-value, not an input — input-lookup false-nulls; native aria-label 'Increase quantity of X' click lands qty 2 one-shot (re-read post-click §443).
+- full-word saveBonuses.constitution ±19 flips picker determinism MID-fight via full cs-store POST {value:cs} on the live tab — survives initiative walks and shares the POST body with the TRUSTED-HP-999 rig without clobbering it (§160/§629 twins, no re-join needed).
+- Reload mid-round resumes walker mid-round (lastApplied reappears at a PC idx) — round-wrap recharge may already have fired pre-reload; judge recharge economy by log faces only (this session recharged d6:6 hit + recharge_failed d6:1 miss, threshold-5 honest both directions).
+- Damageless picker rows stamp NO roll-save/save_result/hp_change entries on ANY leg (§196+§279 complete); zero-cd victim-key absence (§1116) is the clean PASS-leg proof — fire the +rig leg FIRST, before any fail contaminates the victims.
