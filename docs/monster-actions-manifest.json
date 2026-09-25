@@ -19718,7 +19718,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The mummy uses Dreadful Glare. The mummy can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1205-lord-glare-legendary.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1206",
