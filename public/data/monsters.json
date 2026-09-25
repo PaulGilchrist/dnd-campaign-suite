@@ -39694,6 +39694,7 @@
         "range": "",
         "reach": "5 ft.",
         "recharge": "",
+        "hit_target_effect": "burning",
         "damage_dice_primary": "2d4 + 2",
         "damage_type_primary": "Fire"
       }
