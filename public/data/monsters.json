@@ -43278,11 +43278,13 @@
         "description": "Each undead in the lair has advantage on saving throws against effects that turn undead until initiative count 20 on the next round."
       },
       {
+        "name": "Spellcasting Pain",
         "description": "Until initiative count 20 on the next round, any non-undead creature that tries to cast a spell of 4th level or lower in the mummy lord's lair is wracked with pain. The creature can choose another action, but if it tries to cast the spell, it must make a DC 16 Constitution saving throw. On a failed save, it takes 1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted.",
         "save_dc": 16,
         "save_type": "Constitution",
-        "save_effect": "The creature takes 1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted.",
-        "damage_dice_primary": "1d6 per level",
+        "dc_success": "none",
+        "save_effect": "The creature takes 1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted. — advisory: the save chip rolls a flat 1d6 Necrotic (zero on a successful save, dc_success none); the 1d6-per-spell-level multiplier, the spell-wasted clause, the non-undead spell-cast trigger and the initiative-20 expiry are GM-adjudicated at the RAW moment (no spell-slot multiplier, no lair-spellcast-trigger consumer, no initiative lair seam, CLA-325 precedent)",
+        "damage_dice_primary": "1d6",
         "damage_type_primary": "Necrotic"
       }
     ],

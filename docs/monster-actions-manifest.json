@@ -19773,7 +19773,7 @@
       "damageDicePrimary": "1d6 per level",
       "damageTypePrimary": "Necrotic",
       "description": "Until initiative count 20 on the next round, any non-undead creature that tries to cast a spell of 4th level or lower in the mummy lord's lair is wracked with pain. The creature can choose another action, but if it tries to cast the spell, it must make a DC 16 Constitution saving throw. On a failed save, it takes 1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1209-lair-spellcast-pain.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1210",

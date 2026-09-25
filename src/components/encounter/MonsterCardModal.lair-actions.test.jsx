@@ -225,16 +225,17 @@ describe('MA-0024 MonsterCardModal lair rows', () => {
 // save prompt); sibling nameless dicts stay inert static prose — and the
 // static branch no longer emits the orphan leading "." from
 // <strong>{la.name}.</strong> when !la.name. (Chip count widened 1→2 when
-// MA-1208 armed lair_actions[1].)
+// MA-1208 armed lair_actions[1]; MA-1209 armed [2]'s DC 16 Constitution
+// save chip → 3.)
 describe('MA-1207 mummy-lord lair advisory chip + nameless-dot guard', () => {
   const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
 
-  it('named advisory row renders a chip; remaining nameless rows stay chip-less (MA-1208 widened 1→2)', () => {
+  it('named advisory rows render chips; [2] save row now armed too (MA-1209 widened 2→3)', () => {
     const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
     const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
     const links = lairLinks();
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(3);
     expect(links[0].textContent).toContain('Pinpoint Living Creatures');
     expect(links[0].getAttribute('role')).toBe('button');
     expect(links[0].getAttribute('title')).toMatch(/initiative 20/);
@@ -274,25 +275,22 @@ describe('MA-1207 mummy-lord lair advisory chip + nameless-dot guard', () => {
 });
 
 // MA-1208: mummy-lord lair_actions[1] twin nameless raw dict fixed to a
-// named advisory row → card now shows TWO mc-dice-link-lair chips; press
-// of the warding chip = record-only advisory ability_use with the honest
-// GM-enforced note, zero save prompt; [2] stays inert static prose.
+// named advisory row → press of the warding chip = record-only advisory
+// ability_use with the honest GM-enforced note, zero save prompt.
+// (Chip census widened by MA-1209: [2] Spellcasting Pain now arms its own
+// DC 16 Constitution save chip — see MA-1209 lock below.)
 describe('MA-1208 mummy-lord turn-undead warding chip render lock', () => {
   const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
 
-  it('two advisory rows arm two mc-dice-link-lair chips; [2] save dict stays inert', () => {
+  it('advisory chips armed; [2] now arms a save chip too (MA-1209 widened 2→3)', () => {
     const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
     const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
     const links = lairLinks();
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(3);
     const ward = lairLinkWithName('Turn Undead Warding');
     expect(ward.getAttribute('role')).toBe('button');
     expect(ward.getAttribute('title')).toMatch(/initiative 20/);
-    const row2 = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('wracked with pain'));
-    expect(row2).toBeTruthy();
-    expect(row2.querySelector('.mc-dice-link-lair')).toBeNull();
-    expect(row2.querySelector('[role="button"]')).toBeNull();
   });
 
   it('warding chip press logs ONE advisory ability_use with honest note, opens no save prompt', async () => {
@@ -307,6 +305,62 @@ describe('MA-1208 mummy-lord turn-undead warding chip render lock', () => {
     expect(entries[0].abilityName).toBe('Turn Undead Warding');
     expect(entries[0].description).toMatch(/grants each undead in the lair advantage on saving throws against effects that turn undead/i);
     expect(entries[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+});
+
+// MA-1209: mummy-lord lair_actions[2] nameless raw dict + unparseable
+// "1d6 per level" fixed to a named SAVE row → THREE mc-dice-link-lair
+// chips on the card; the Spellcasting Pain chip renders "DC 16 Constitution"
+// and its press rides the untouched block-save seam (saveDc 16 / CON,
+// autoDamageFormula honest static "1d6", dc_success "none" — zero-on-success,
+// MV-20 half-default closed), zero advisory entries.
+describe('MA-1209 mummy-lord spellcasting-pain save chip render + press lock', () => {
+  const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('THREE lair chips armed incl. DC 16 Constitution save chip on the wracked-with-pain row', () => {
+    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
+    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
+    const links = lairLinks();
+    expect(links).toHaveLength(3);
+    const chip = lairLinkWithName('DC 16 Constitution');
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute('role')).toBe('button');
+    expect(chip.getAttribute('title')).toMatch(/initiative 20/);
+    const row = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('wracked with pain'));
+    expect(row.querySelector('.mc-dice-link-lair')).toBeTruthy();
+    expect(row.textContent).toContain('Spellcasting Pain');
+    // per-level wording preserved byte in the row prose
+    expect(row.textContent).toMatch(/1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted/i);
+  });
+
+  it('chip press opens DC 16 CON save at the seam: autoDamageFormula 1d6, dcSuccess none, zero advisory log', async () => {
+    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
+    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
+    addEntry.mockClear();
+    fireEvent.click(lairLinkWithName('DC 16 Constitution'));
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const call = ROLLERS.rollSavingThrow.mock.calls[0];
+    expect(call[0]).toBe('CON');
+    expect(call[2]).toMatchObject({ saveDc: 16, saveType: 'Constitution', dcSuccess: 'none', autoDamageFormula: '1d6', attackerName: 'Mummy Lord 1', targetName: 'TestPC' });
+    expect(call[2].saveConditions).toEqual([]);
+    const entries = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
+    expect(entries).toHaveLength(0);
+  });
+
+  it('advisory twins still record-only after MA-1209 (no save prompt from [0]/[1])', async () => {
+    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
+    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
+    fireEvent.click(lairLinkWithName('Pinpoint Living Creatures'));
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });

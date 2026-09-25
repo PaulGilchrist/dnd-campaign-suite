@@ -4508,8 +4508,8 @@ describe('MA-1061 kraken lair charged water save row data lock', () => {
 // would claim "casts … concentration", false for this lair-wide senses boon).
 // No lair-senses te exists and no initiative-20 consumer (§70 accepted
 // residual) — record-only advisory log at the CLA-325 floor is the honest
-// fit. Rows [1] (nameless dict) and [2] (nameless save_dc row) are
-// separate tickets (MA-1208/MA-1209) — byte-untouched here.
+// fit. Rows [1] and [2] were separate tickets (MA-1208 advisory twin,
+// MA-1209 save-lane row) — both landed since; see their locks below.
 describe('MA-1207 mummy-lord living prey sense advisory data lock', () => {
   const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
   const senses = mummyLord.lair_actions[0];
@@ -4570,10 +4570,10 @@ describe('MA-1207 mummy-lord living prey sense advisory data lock', () => {
     expect(getEffectDefinition('lair_undead_senses')).toBeFalsy();
   });
 
-  it('sibling scope guard: [2] nameless save row stays byte-untouched (MA-1209 ticket; [1] fixed MA-1208)', () => {
-    expect(mummyLord.lair_actions[2].name).toBeUndefined();
+  it('sibling scope guard: [2] armed by MA-1209 in its own pass (§216 stale-pin inversion)', () => {
+    expect(mummyLord.lair_actions[2].name).toBe('Spellcasting Pain');
     expect(mummyLord.lair_actions[2].save_dc).toBe(16);
-    expect(isLairRowClickable(mummyLord.lair_actions[2])).toBe(false);
+    expect(isLairRowClickable(mummyLord.lair_actions[2])).toBe(true);
   });
 });
 
@@ -4648,11 +4648,106 @@ describe('MA-1208 mummy-lord turn-undead warding advisory data lock', () => {
     expect(getEffectDefinition('lair_turn_undead_advantage')).toBeFalsy();
   });
 
-  it('whole-block census: exactly TWO advisory rows armed ([0]+[1]), [2] still inert nameless save dict', () => {
+  // MA-1209 narrowed the census: [2] Spellcasting Pain now arms a SAVE
+  // affordance (save_dc 16 rides handleSaveRoll, not advisory) — advisory
+  // rows remain exactly [0]+[1].
+  it('whole-block census: exactly TWO advisory rows armed ([0]+[1]); [2] arms the SAVE lane (MA-1209)', () => {
+    const advisoryRows = mummyLord.lair_actions.filter(r => lairRowAffordance(r) === 'advisory');
+    expect(advisoryRows).toHaveLength(2);
+    expect(advisoryRows.map(r => r.name)).toEqual(['Pinpoint Living Creatures', 'Turn Undead Warding']);
     const clickable = mummyLord.lair_actions.filter(isLairRowClickable);
-    expect(clickable).toHaveLength(2);
-    expect(mummyLord.lair_actions[2].name).toBeUndefined();
+    expect(clickable).toHaveLength(3);
+    expect(mummyLord.lair_actions[2].name).toBe('Spellcasting Pain');
     expect(mummyLord.lair_actions[2].save_dc).toBe(16);
-    expect(isLairRowClickable(mummyLord.lair_actions[2])).toBe(false);
+    expect(lairRowAffordance(mummyLord.lair_actions[2])).toBe('save');
+    expect(isLairRowClickable(mummyLord.lair_actions[2])).toBe(true);
+  });
+});
+
+// MA-1209: Mummy Lord lair_actions[2] was the third nameless raw dict
+// (MV-24) AND carried unparseable "1d6 per level" dice (§6 family) — zero
+// affordance, zero log-delta on press ×2 (live-confirmed). Fix rides the
+// SAVE lane (the only lair row of the three with a complete authored save
+// spec): named, damage_dice_primary honest static "1d6" (per-level multiplier
+// stays byte in save_effect/description prose — the save chip has no
+// spell-slot multiplier consumer, §70 GM-adjudicated), dc_success:"none"
+// authored (RAW success = no damage; seam defaults 'half' MV-20 —
+// Thunderclap precedent for named lair save + none + damage). An `advisory`
+// key would hijack routing at lairRowAffordance:41 before save:42 —
+// advisory_message cannot coexist with the save lane, so the honest
+// GM-enforced note lives in save_effect prose (Liquid Mud/Cold Wind
+// clause family). No te, no initiative-20 dispatcher, no spell-cast-trigger
+// consumer (§70 accepted residual — GM presses the chip vs the triggering
+// caster at the RAW moment).
+describe('MA-1209 mummy-lord spellcasting-pain save-row data lock', () => {
+  const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
+  const pain = mummyLord.lair_actions[2];
+
+  it('[2] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(pain.name).toBe('Spellcasting Pain');
+    expect(isLairRowClickable(pain)).toBe(true);
+    expect(lairRowAffordance(pain)).toBe('save');
+  });
+
+  it('[2] authored save spec intact: DC 16 Constitution, dc_success none (seam half-default MV-20 closed)', () => {
+    expect(pain.save_dc).toBe(16);
+    expect(pain.save_type).toBe('Constitution');
+    expect(pain.dc_success).toBe('none');
+    expect(pain.damage_type_primary).toBe('Necrotic');
+  });
+
+  it('[2] damage_dice_primary honest static "1d6" rolls; old "1d6 per level" token grep-zero on the row', () => {
+    expect(pain.damage_dice_primary).toBe('1d6');
+    expect(canRollExpression(pain.damage_dice_primary)).toBe(true);
+    expect(canRollExpression('1d6 per level')).toBe(false);
+    expect(pain.damage_dice_primary).not.toMatch(/per level/i);
+  });
+
+  it('[2] per-level + spell-wasted + trigger wording kept byte-verbatim in prose', () => {
+    expect(pain.description).toBe('Until initiative count 20 on the next round, any non-undead creature that tries to cast a spell of 4th level or lower in the mummy lord\'s lair is wracked with pain. The creature can choose another action, but if it tries to cast the spell, it must make a DC 16 Constitution saving throw. On a failed save, it takes 1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted.');
+    expect(pain.save_effect).toMatch(/^The creature takes 1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted\./);
+    expect(pain.save_effect).toMatch(/1d6-per-spell-level multiplier.*GM-adjudicated/i);
+    expect(pain.save_effect).toMatch(/spell-wasted clause/i);
+    expect(pain.save_effect).toMatch(/spell-cast trigger.*GM-enforced|GM-adjudicated/i);
+  });
+
+  it('[2] save_effect sprays NO conditions (§52) and no until-duration note', () => {
+    expect(extractConditionsFromSaveEffect(pain.save_effect)).toEqual([]);
+  });
+
+  it('[2] press routes handleSaveRoll(action, "1d6", []) once — zero advisory/refusal log', async () => {
+    const logs = [];
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: pain,
+      monsterName: 'Mummy Lord 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: '1d6',
+      saveConditions: [],
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledTimes(1);
+    expect(handleSaveRoll.mock.calls[0][0]).toBe(pain);
+    expect(handleSaveRoll.mock.calls[0][1]).toBe('1d6');
+    expect(handleSaveRoll.mock.calls[0][2]).toEqual([]);
+    expect(logs).toHaveLength(0);
+  });
+
+  it('no new te registered: lair_spellcast_pain is NOT a target-effect key', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    expect(getEffectDefinition('lair_spellcast_pain')).toBeFalsy();
+  });
+
+  it('[0]/[1] advisory twins byte-untouched by MA-1209', () => {
+    expect(mummyLord.lair_actions[0].advisory).toBe('lair_undead_senses');
+    expect(mummyLord.lair_actions[1].advisory).toBe('lair_turn_undead_advantage');
+    expect(mummyLord.lair_actions[0].save_dc).toBeUndefined();
+    expect(mummyLord.lair_actions[1].save_dc).toBeUndefined();
   });
 });
