@@ -118,8 +118,9 @@ describe('MA-1071 gate sweep: DC0 inert, DC>0 boundary arms', () => {
     const rapport = monsters.find((m) => m.name === 'Myconid Adult').actions[2];
     expect(rapport.save_dc).toBe(0);
     expect(breathAoeShape(rapport, null)).toBeNull();
-    // DC>0 boundary twin must still parse (cone wording; the emanation-in-
-    // description never parsed — MA-0590 reads the range field only).
-    expect(breathAoeShape({ ...rapport, save_dc: 13, description: 'A 30-foot Cone of spores.' }, null)).toEqual({ shape: 'Cone', feet: 30, rangeGateFt: 30 });
+    // MA-1212: the row now authors a zone dict (save-less zone picker route) —
+    // with a save_dc it would parse Radius (MA-0042 zone-precedence), so the
+    // hypothetical DC>0 cone twin strips the zone to pin the wording parse.
+    expect(breathAoeShape({ ...rapport, save_dc: 13, zone: null, description: 'A 30-foot Cone of spores.' }, null)).toEqual({ shape: 'Cone', feet: 30, rangeGateFt: 30 });
   });
 });

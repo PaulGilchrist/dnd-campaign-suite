@@ -2372,6 +2372,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         // At Will — no uses gate, NO expiration clock (RAW persists until it
         // shifts back — §70 persistent self-state, GM re-click).
         handleShapeShiftRow={(action) => setShapeShiftChooser({ action })}
+        // MA-1212: save-less ACTION-category zone row (Myconid Adult "Rapport
+        // Spores") reuses the untouched MA-0043 zoneOnly area picker — confirm
+        // registers the pre-registered te on each picker-SELECTED creature with
+        // NO save/damage. save_dc nulled so the MA-1071 DC0 decoy never re-arms
+        // a save shell (zone picker reads only zone).
+        handleZonePickerRow={(action) => handleLairZone({ ...action, save_dc: null })}
       />
       {popupHtml && (
         <MonsterAttackPopup

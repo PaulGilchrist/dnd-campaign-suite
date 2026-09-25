@@ -2,7 +2,7 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { formatDamageTypes } from '../../services/rules/combat/damageUtils.js';
 import { canRollExpression } from '../../services/dice/diceRoller.js';
 import { extractDamageDiceFromDescription, saveChipPlan } from './MonsterCardModal.jsx';
-import { attackRowMissingToHit, extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
+import { attackRowMissingToHit, extractConditionsFromSaveEffect, extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, getGatedMonsterReaction, monsterReactionUsesRemaining, formatActionUsage, isUtilitySpellCastRow, isZonePickerRow } from './MonsterCardHelpers.js';
 import { monsterAbilitySaveUsesGate } from '../../services/encounters/monsterAbilityUses.js';
 import { legendaryCheckRow, legendaryCheckLabel } from '../../services/encounters/monsterLegendaryUses.js';
 import { monsterRechargeGate, rechargeDisplayText } from '../../services/encounters/monsterRecharge.js';
@@ -297,6 +297,25 @@ function ShapeShiftLink({ action, attackerCannotAct, onShapeShiftRow }) {
   );
 }
 
+// MA-1212: monster-side save-less zone-grant row (Myconid Adult "Rapport Spores") —
+// the ACTION-category twin of the MA-0043/MA-0595/MA-0596 lair zone rows:
+// zone:{radius_ft,no_save:true,effect_key,noun,advisory} arms a clickable chip
+// that opens the modal's zoneOnly area picker (handleLairZone — picker multi-selects
+// creatures in the area, confirm registers the pre-registered te on each picker-
+// SELECTED target with NO save and NO damage; §42 selection advisory gridless).
+// NOT self-origin (MA-0554 self-aura grants on the monster itself — the picker
+// excludes the caster) and never a save DC (the MA-1071 DC0 decoy gate stays).
+function ZonePickerLink({ action, attackerCannotAct, onZonePickerRow }) {
+  if (!isZonePickerRow(action)) return null;
+  const radiusFt = Number(action.zone.radius_ft);
+  const clickable = !attackerCannotAct && !!onZonePickerRow;
+  return (
+    <span className="mc-dice-link mc-dice-link-zone" onClick={clickable ? () => onZonePickerRow(action) : undefined} role="button" tabIndex={0} title={`Zone grant — ${action.name}: te ${action.zone.effect_key} on creatures in the ${radiusFt}-ft ${action.zone.noun || 'area'}, no save; picker selects targets (selection advisory)`}>
+      <i className="fa-solid fa-cloud" /> {radiusFt}-ft Zone
+    </span>
+  );
+}
+
 // MA-1014: the spell-save_dc-only utility-row chip fork (Ice Devil "Ice
 // Wall"). Hoisted out of MonsterAction to hold the complexity ceiling — the
 // three-way choice (Spellcasting markup → spells.json-resolved utility names
@@ -334,7 +353,7 @@ function utilitySpellNamesFor(action, spellNameIndex) {
   return extractSpellNamesFromSpellcasting(action.description).filter(name => spellNameIndex.has(name));
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, onShapeShiftRow, spellNameIndex = null }) {
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, onShapeShiftRow, onZonePickerRow, spellNameIndex = null }) {
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
   // runtime map; a spent row reads "(Recharge 6 — unavailable)" and refuses.
@@ -353,6 +372,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <strong>{action.name}.</strong>{' '}
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
       <ZoneAuraLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onZoneAuraRow={onZoneAuraRow} />
+      <ZonePickerLink action={action} attackerCannotAct={attackerCannotAct} onZonePickerRow={onZonePickerRow} />
       <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} />
       <SelfBuffLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSelfBuffRow={onSelfBuffRow} legendaryGate={legendaryGate} />
       <GrantReactionLink action={action} attackerCannotAct={attackerCannotAct} rechargeState={rechargeState} onGrantReactionRow={onGrantReactionRow} />

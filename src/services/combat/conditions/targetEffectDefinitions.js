@@ -287,6 +287,23 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Defensive',
     fields: ['source'],
   },
+  {
+    // MA-1212: Myconid Adult Rapport Spores — save-less 30-ft emanation zone te
+    // (MA-0043/MA-0595 Stifling Mortality byte-twin shape) armed by the ACTION-category
+    // zone picker chip over the picker-selected creatures. No saving throw (RAW —
+    // the MA-1071 DC0 decoy never arms the save lane), no damage, no roll. The
+    // telepathy itself has no in-engine channel (§70-class): the te records the
+    // grant; the INT≥2 / no-Construct-Elemental-Undead exclusion and the 1-hour
+    // expiry are GM-enforced (the MA-0043 picker grant carries no addExpiration
+    // clock — §165 residual, inherited not invented).
+    effect: 'rapport_spores',
+    label: 'Telepathic Rapport (Rapport Spores)',
+    description: 'Affected by a myconid Rapport Spores emanation (30-foot radius, no save): the creature gains telepathy with the myconid with a range of 30 feet for 1 hour. Only creatures with an Intelligence score of 2 or higher that aren\'t Constructs, Elementals, or Undead are affected — eligibility and the 1-hour expiry are GM-enforced (no telepathy channel in this engine; picker grants lack expiry clocks, §165).',
+    icon: 'fa-comment-dots',
+    cls: 'effect-buff',
+    group: 'Defensive',
+    fields: ['source'],
+  },
 
   // ── Saves & Checks ──────────────────────────────────────
   {

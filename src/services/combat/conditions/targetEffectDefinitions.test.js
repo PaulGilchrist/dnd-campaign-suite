@@ -123,6 +123,25 @@ describe('targetEffectDefinitions', () => {
           expect(def.fields).toBeUndefined();
         }
       });
+
+      // MA-1212: Myconid Adult Rapport Spores save-less zone te (armed by the
+      // ACTION-category zone picker, MA-0043/MA-0595 byte-twin consumers).
+      it('MA-1212 rapport_spores registered Defensive buff, source field only', () => {
+        expect(defensiveEffects.map((d) => d.effect)).toContain('rapport_spores');
+        const def = getEffectDefinition('rapport_spores');
+        expect(def.label).toBe('Telepathic Rapport (Rapport Spores)');
+        expect(def.cls).toBe('effect-buff');
+        expect(def.group).toBe('Defensive');
+        expect(def.fields).toEqual(['source']);
+        expect(def.description).toMatch(/telepathy/i);
+        expect(def.description).toMatch(/GM-enforced/);
+      });
+
+      it('MA-1212 Defensive labels stay localeCompare-sorted (healingBlock.test.js pin)', () => {
+        const labels = defensiveEffects.map((d) => d.label);
+        const sorted = [...labels].sort((a, b) => a.localeCompare(b));
+        expect(labels).toEqual(sorted);
+      });
     });
 
     describe('Saves & Checks group', () => {

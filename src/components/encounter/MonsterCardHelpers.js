@@ -513,6 +513,31 @@ export function attackRowMissingToHit(action) {
   return ATTACK_ROW_WORDING.test(String(action.description || ''));
 }
 
+// MA-1212: save-less ACTION-category zone row (Myconid Adult "Rapport Spores")
+// arms the MA-0043/MA-0595 zone picker over picker-SELECTED creatures (te
+// effect_key on each, no save/damage). Mirrors the demilich lair zone byte-shape
+// ({radius_ft, no_save:true, effect_key, noun, advisory}) but on an actions[] row.
+// Narrowly gated so every other row stays byte-inert:
+//   - requires an authored zone with radius_ft AND effect_key AND no_save:true;
+//   - excludes self-aura rows (self:true → resolveSelfAuraRow, MA-0554);
+//   - excludes every row that already arms a save/attack/damage chip or carries an
+//     automation.type (summon/selfbuff/grantreaction) — the zone-only picker is the
+//     sole affordance, so a save_dc or automation never double-arms.
+const ZONE_PICKER_WORDING = /\bemanation\b/i;
+function isNoSaveZoneDict(zone) {
+  return !!zone && typeof zone === 'object' && zone.self !== true
+    && Number(zone.radius_ft) > 0 && zone.no_save === true && !!zone.effect_key;
+}
+export function isZonePickerRow(action) {
+  if (!action || typeof action !== 'object') return false;
+  if (!isNoSaveZoneDict(action.zone)) return false;
+  if (action.attack_bonus != null) return false;
+  if (Number(action.save_dc) > 0) return false;
+  if (action.automation) return false;
+  if (/attack/i.test(String(action.attackType || ''))) return false;
+  return ZONE_PICKER_WORDING.test(String(action.description || ''));
+}
+
 export function spellDamageFormulaAtLevel(spell, level) {
   if (!spellHasDamage(spell)) return null;
   const atLevel = spell.damage.damage_at_slot_level?.[String(level)];
