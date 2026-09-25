@@ -42056,7 +42056,13 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "2d6 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "conditional_damage": {
+          "dice": "2d8",
+          "modifier": 0,
+          "damage_type": "Piercing",
+          "condition": "the skeleton moved 20 or more feet straight toward the target immediately before the hit"
+        }
       },
       {
         "name": "Slam",

@@ -19121,7 +19121,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage. If the target is a Large or smaller creature and the skeleton moved 20+ feet straight toward it immediately before the hit, the target takes an extra 9 (2d8) Piercing damage and has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1175-gore-unarmed-charge-seam.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1176",
