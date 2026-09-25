@@ -609,3 +609,28 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §486 (2026-09-25, MA-1189) New pitfalls
 - MA-1189 (PASS, modron-tridrone Clockwork Spear standalone): §475 +NPC-autocomplete clobber REPRODUCED on a board with an EB-joined monster — every initiative card carries its own .monster-autocomplete-input, so the FIRST card's name box (Modron Tridrone 1) is the autocomplete host when "+NPC" is pressed after existing creatures; li-click renamed it to "Bandit" AC12 HP11 with STALE mIdx modron-tridrone + orphan bare NPC 1. Repair recipe (live-clean): window.confirm=()=>true override + remove cards anchored on their own `input[type=text]:not(.hp-inline-input)` value (§484 anchor) → EB re-join monster → second "+NPC" pass filling `.monster-autocomplete-input:visible` LAST (new row) + scope li pick to the VISIBLE dropdown (offsetParent) → cs clean. Save-less save_dc:0 rows render ZERO DC chip (MA-1071 gate census extends to modron family). Gridless dual-mode reach+range single chip: rangeReason:null is the only range fingerprint; 120 ft band never consulted (§147/§190) — 6/6 first-click presses, press-to-log 1:1, sum|hpΔ|==sum fd exact.
+
+## §487 (2026-09-25, MA-1192) New pitfall
+- "+NPC" autocomplete dropdown STAYS OPEN after clicking the exact li and physically covers the new NPC's HP input — TRUSTED HP fill fails silently; send Escape keydown + blur() on the name input FIRST, then fill HP (§454 order). MA-1192 Mud Mephit PASS (crit 1d6*2+1 live).
+- MA-1194 (PASS, mule Hooves pure-melee): plain +4 single-chip attack row never absorbs a click (75/75 first-press 1:1 log-delta — absorbed-first-click family is chip-specific §138/§166, simple attack chips land first try like versatile/self-buff twins); attack-log disk key `name:"Hooves"` not abilityName (§147 twin) with rollType attack/damage discriminator on same `roll` type — filter rollType for chip-vs-damage ledger; boundary tie nat8→total12 vs AC12 logs hit:true (§199 twin) and nat7→11 hit:false x7; crit ×5 ride same chip, formula "1d4*2+2 (N)" flat undoubled; admin clear via UI buttons: a page.on('dialog') listener registered INSIDE the same run_code_unsafe call auto-accepts BOTH native confirms sequentially — browser_handle_dialog then finds no pending modal (consistent-mechanism caveat: pick listener OR handle tool, never both); +0 initiative chip "+0 (10)" + six ability-mod chips are the §444/§445 disk-noise surface on every low-CR card — never pressed, log stays clean (zero non-attack roll entries beyond join-noise initiative roll).
+
+## §488 (2026-09-25, MA-1200) New pitfall
+- Absorbed-looking clicks can still FIRE with late log flush: a log-delta of 0 immediately after a press is not proof of absorb — re-fire once + tail-count to distinguish absorb from flush lag (MA-1200 Channel chip ~37% absorb rate, heavier than plain +4 twins).
+
+## §489 (2026-09-25, MA-1211) New pitfalls
+- Recharge threshold "1": recovery d6≥1 = structural certainty — every own-turn-start recovers; judge recharge economy by spend/refuse faces, never by recovery probability. Refusal press produces popup+`<feature>_refused` log with ZERO victim roll entries (refusal rides inline save rows too).
+- `armRepeatSaveClause` (saveProcessing.js:623) arms ONLY on structured `context.repeat_save`/FP service — prose "repeats the save at end of turn" has no parser = §70 advisory family (MA-1211 PASS-subset with MA-1193/0063/0910 twins accepted).
+
+## §490 (2026-09-25, MA-1212) New pitfalls
+- Zero-number narrative rows with authored attack_bonus:0 STILL render a clickable "+0" junk chip (MonsterAction.jsx:338 attack_bonus!=null gate; MA-0551 save-leg nulling was never mirrored to the attack leg) — pressing it adjudicates a bogus zero-damage to-hit and pollutes lastAttackRoll/_lastRollContext. Never press; treat chip-census>0 on narrative rows as §117 VIOLATION evidence, not affordance.
+- +NPC autocomplete input shares class .monster-autocomplete-input with combatant NAME-rename fields — Escape+typing into the FIRST such input renames an existing combatant (board corruption). Anchor the NEW empty-valued NPC card's input; remove junk +NPC cards individually via Remove NPC confirms.
+
+## §491 (2026-09-25, MA-1213) New pitfall
+- Full-store cs POST CLOBBERS armed targetName — always re-arm targetName inside the same POST body when rigging HP/save stamps (§447 sharpen).
+
+## §492 (2026-09-25, MA-1219) New pitfalls
+- NEGATIVE-damage-modifier rows parse clean: parseExpression regex `(?:[+-]\d+)+` folds " - 1" into modifier -1 (diceRoller.js:42), so "1d4 - 1" rolls nat1 -> total 0 -> finalDamage 0 with ZERO clamp-to-1 anywhere in applyDamage - hpΔ==sfd-only on fd-0 legs is RAW-honest (MA-1219 Sprout 2/6 hits observed). Crit doubles DICE only: log formula "1d4*2-1 (4)" flat stays negative, sTotal 2x on rider; rolls collapse to single die on crit entries (§145 twin).
+- Low-CR +1 chip absorbs every OTHER press in a rapid loop (6/15 clicks zero-popup zero-log, alternating pattern) — tail-count per press (§488), re-fire absorbed ones; Bandit AC12 survives 11-HP grind but nat20 crit x2d4-1 can still kill an unreved 7-HP victim mid-session — revive via direct fill+Enter on input[aria-label] (card .mc-overlay intercepts the click itself, §142 revived) writes cs 999 TRUSTED, no hp_change entry (§147 twin).
+
+## §493 (2026-09-25, MA-1222) New pitfall
+- scrollIntoView vertical-only can leave avatar x negative off-screen → real-pointer click lands nowhere; use scrollIntoView({inline:'center'}) before pointer press (§112 ext).

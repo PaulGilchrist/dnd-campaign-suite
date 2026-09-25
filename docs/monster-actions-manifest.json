@@ -19440,7 +19440,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +2 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 3 (1d6) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1192",
@@ -19461,7 +19461,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 4 (1d6 + 1) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1193",
@@ -19483,7 +19483,7 @@
         "restrained"
       ],
       "description": "Dexterity Saving Throw: DC 11, one creature the mephit can see within 15 feet. Failure: The target has the Restrained condition until the end of the mephit's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1194",
@@ -19504,7 +19504,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1195",
@@ -19523,7 +19523,7 @@
       "range": "",
       "recharge": "",
       "description": "The mummy makes two Rotting Fist attacks and uses Dreadful Glare.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1196",
@@ -19546,7 +19546,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Bludgeoning damage plus 10 (3d6) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1197",
@@ -19568,7 +19568,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 11, one creature the mummy can see within 60 feet. Failure: The target has the Frightened condition until the end of the mummy's next turn. Success: The target is immune to this mummy's Dreadful Glare for 24 hours.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1198",
@@ -19587,7 +19587,7 @@
       "range": "",
       "recharge": "",
       "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack, and it uses Dreadful Glare.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1199",
@@ -19610,7 +19610,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 15 (2d10 + 4) Bludgeoning damage plus 10 (3d6) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1200",
@@ -19631,7 +19631,7 @@
       "range": "60 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +9, range 60 ft. Hit: 25 (6d6 + 4) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1201",
@@ -19655,7 +19655,7 @@
         "paralyzed"
       ],
       "description": "Wisdom Saving Throw: DC 17, one creature the mummy can see within 60 feet. Failure: 25 (6d6 + 4) Psychic damage, and the target has the Paralyzed condition until the end of the mummy's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1202",
@@ -19674,7 +19674,7 @@
       "range": "",
       "recharge": "",
       "description": "The mummy casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):At Will: Dispel Magic, Thaumaturgy1/Day Each: Animate Dead, Harm, Insect Plague (level 7 version)",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1202-lord-spellcasting.md"
     },
     {
       "id": "MA-1203",
@@ -19690,7 +19690,7 @@
         "blinded"
       ],
       "description": "The mummy adds 2 to its AC against the attack, possibly causing the attack to miss, and the mummy teleports up to 60 feet to an unoccupied space it can see. Each creature of its choice that it can see within 5 feet of its destination space has the Blinded condition until the end of the mummy's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1203-whirlwind-of-sand.md"
     },
     {
       "id": "MA-1204",
@@ -19704,7 +19704,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The mummy casts Command (level 2 version), using the same spellcasting ability as Spellcasting. The mummy can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1204-dread-command.md"
     },
     {
       "id": "MA-1205",
@@ -19718,7 +19718,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The mummy uses Dreadful Glare. The mummy can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1205-lord-glare-legendary.md"
     },
     {
       "id": "MA-1206",
@@ -19732,7 +19732,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1206-necrotic-strike-legendary.md"
     },
     {
       "id": "MA-1207",
@@ -19744,7 +19744,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Each undead creature in the lair can pinpoint the loca\u00adtion of each living creature within 120 feet of it until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1207-lair-unnamed-senses.md"
     },
     {
       "id": "MA-1208",
@@ -19756,7 +19756,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Each undead in the lair has advantage on saving throws against effects that turn undead until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1208-lair-turn-undead-advantage.md"
     },
     {
       "id": "MA-1209",
@@ -19773,7 +19773,7 @@
       "damageDicePrimary": "1d6 per level",
       "damageTypePrimary": "Necrotic",
       "description": "Until initiative count 20 on the next round, any non-undead creature that tries to cast a spell of 4th level or lower in the mummy lord's lair is wracked with pain. The creature can choose another action, but if it tries to cast the spell, it must make a DC 16 Constitution saving throw. On a failed save, it takes 1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1209-lair-spellcast-pain.md"
     },
     {
       "id": "MA-1210",
@@ -19796,7 +19796,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 4 (1d8) Bludgeoning damage plus 3 (1d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1211",
@@ -19818,7 +19818,7 @@
         "stunned"
       ],
       "description": "Constitution Saving Throw: DC 11, one creature the myconid can see within 10 feet. Failure: The target has the Stunned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1212",
@@ -19837,7 +19837,7 @@
       "range": "",
       "recharge": "",
       "description": "The myconid expels spores in a 30-foot Emanation originating from itself. Creatures in that area with an Intelligence score of 2 or higher that aren't Constructs, Elementals, or Undead gain telepathy with a range of 30 feet for 1 hour.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1212-rapport-spores.md"
     },
     {
       "id": "MA-1213",
@@ -19856,7 +19856,7 @@
       "range": "",
       "recharge": "",
       "description": "The myconid makes one Slam attack and uses Pacifying Spores.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1214",
@@ -19879,7 +19879,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 6 (2d4 + 1) Bludgeoning damage plus 5 (2d4) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1215",
@@ -19898,7 +19898,7 @@
       "range": "",
       "recharge": "3",
       "description": "The myconid releases spores at a Medium or Small corpse within 5 feet of it that wasn't a Construct or an Undead. In 24 hours, the corpse rises as a Myconid Spore Servant. The corpse stays animate for 1d4 + 1 weeks or until destroyed, and it can't be animated again in this way.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1215-animating-spores.md"
     },
     {
       "id": "MA-1216",
@@ -19920,7 +19920,7 @@
         "stunned"
       ],
       "description": "Constitution Saving Throw: DC 12, one creature the myconid can see within 10 feet. Failure: The target has the Stunned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1217",
@@ -19939,7 +19939,7 @@
       "range": "",
       "recharge": "",
       "description": "The myconid expels spores in a 30-foot Emanation originating from itself. Creatures in that area with an Intelligence score of 2 or higher that aren't Constructs, Elementals, or Undead gain telepathy with a range of 30 feet for 1 hour.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1217-sovereign-rapport-spores.md"
     },
     {
       "id": "MA-1218",
@@ -19962,7 +19962,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Bludgeoning damage plus 2 (1d4) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1219",
@@ -19985,7 +19985,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 - 1) Bludgeoning damage plus 2 (1d4) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1220",
@@ -20004,7 +20004,7 @@
       "range": "",
       "recharge": "",
       "description": "The myconid expels spores in a 30-foot Emanation originating from itself. Creatures in that area with an Intelligence score of 2 or higher that aren't Constructs, Elementals, or Undead gain telepathy with a range of 30 feet for 1 hour.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1220-sprout-rapport-spores.md"
     },
     {
       "id": "MA-1221",
@@ -20023,7 +20023,7 @@
       "range": "",
       "recharge": "",
       "description": "The nalfeshnee makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1222",
@@ -20046,7 +20046,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 16 (2d10 + 5) Slashing damage plus 11 (2d10) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1223",
@@ -20065,7 +20065,7 @@
       "range": "",
       "recharge": "",
       "description": "The nalfeshnee teleports up to 120 feet to an unoccupied space it can see.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1223-nalfeshnee-teleport.md"
     },
     {
       "id": "MA-1224",
@@ -20078,7 +20078,7 @@
       "actionType": "other",
       "trigger": "Another creature the nalfeshnee can see ends its move within 120 feet of the nalfeshnee",
       "description": "The nalfeshnee uses Teleport, but its destination space must be within 10 feet of the triggering creature.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1224-pursuit-reaction.md"
     },
     {
       "id": "MA-1225",
