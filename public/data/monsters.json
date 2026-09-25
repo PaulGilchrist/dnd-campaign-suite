@@ -41403,7 +41403,11 @@
         "damage_dice_primary": "1d8 + 3",
         "damage_type_primary": "Bludgeoning",
         "damage_dice_secondary": "1d8",
-        "damage_type_secondary": "Acid"
+        "damage_type_secondary": "Acid",
+        "hit_conditions": [
+          "grappled"
+        ],
+        "escape_dc": 13
       }
     ],
     "bonus_actions": [

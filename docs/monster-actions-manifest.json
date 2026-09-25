@@ -18827,7 +18827,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Bludgeoning damage plus 4 (1d8) Acid damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13). Ability checks made to escape this grapple have Disadvantage.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1161-pseudopod-inert-grappled-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1162",
