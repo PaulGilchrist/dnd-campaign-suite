@@ -19704,7 +19704,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The mummy casts Command (level 2 version), using the same spellcasting ability as Spellcasting. The mummy can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1204-dread-command.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1205",

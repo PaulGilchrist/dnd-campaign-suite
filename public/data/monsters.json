@@ -43240,22 +43240,28 @@
     ],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "The mummy lord takes 3 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The mummy lord regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Dread Command",
         "description": "The mummy casts Command (level 2 version), using the same spellcasting ability as Spellcasting. The mummy can't take this action again until the start of its next turn.",
-        "uses": 1,
-        "recharge": false
+        "save_dc": 17,
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "range": "60 feet",
+        "save_effect": "Failure: The target obeys the mummy lord's one-word command on its next turn (GM-enforced — obey-the-command is not a registered condition and no command-word-to-condition consumer exists; Death Knight Dread Authority advisory twin MA-0058). Success: The target is unaffected."
       },
       {
         "name": "Glare",
         "description": "The mummy uses Dreadful Glare. The mummy can't take this action again until the start of its next turn.",
-        "uses": 1,
-        "recharge": false
+        "delegates_to": "Dreadful Glare"
       },
       {
         "name": "Necrotic Strike",
-        "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack.",
-        "uses": 1,
-        "recharge": false
+        "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack. Delegates to Rotting Fist (the primary damage attack it mirrors; the Channel Negative Energy alternative is GM-enforced at the delegate seam, MA-1057 twin).",
+        "delegates_to": "Rotting Fist"
       }
     ],
     "lair_actions": [
