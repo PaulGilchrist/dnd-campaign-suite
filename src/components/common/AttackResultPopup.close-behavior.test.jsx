@@ -43,7 +43,7 @@ describe('AttackResultPopup', () => {
   // ── Done button visibility ──
 
   describe('Done button visibility', () => {
-    it('shows Done button when autoDamage and hit are both true', async () => {
+    it('shows exactly one Done button when autoDamage and hit are both true (DiceRollResult only, standard footer suppressed)', async () => {
       renderPopup({
         popupHtml: {
           name: 'Test Attack',
@@ -55,7 +55,38 @@ describe('AttackResultPopup', () => {
         },
       });
 
-      expect(screen.getByRole('button', { name: /Done/i })).toBeInTheDocument();
+      const doneButtons = screen.getAllByRole('button', { name: /Done/i });
+      expect(doneButtons).toHaveLength(1);
+    });
+
+    it('shows the standard footer Done button in the non-autoDamage case', async () => {
+      renderPopup({
+        popupHtml: {
+          name: 'Test Attack',
+          type: 'd20',
+          rolls: [15],
+          bonus: 3,
+          hit: true,
+        },
+      });
+
+      const doneButtons = screen.getAllByRole('button', { name: /Done/i });
+      expect(doneButtons).toHaveLength(1);
+    });
+
+    it('shows the standard footer Done button in the miss (no autoDamage) case', async () => {
+      renderPopup({
+        popupHtml: {
+          name: 'Test Attack',
+          type: 'd20',
+          rolls: [3],
+          bonus: 3,
+          hit: false,
+        },
+      });
+
+      const doneButtons = screen.getAllByRole('button', { name: /Done/i });
+      expect(doneButtons).toHaveLength(1);
     });
   });
 

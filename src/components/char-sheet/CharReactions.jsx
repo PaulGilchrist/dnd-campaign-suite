@@ -199,7 +199,6 @@ function ReactiveSpellPicker({ reactiveSpellEligible, onPick, onDismiss }) {
                         </div>
                     ))}
                 </div>
-                <div className="dice-roll-hint">click to dismiss</div>
             </div>
         </Popup>
     );
@@ -790,7 +789,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
              */}
             <div className='sectionHeader'>Reactions</div>
             {selectedSpell && (
-                <Popup onClickOrKeyDown={() => { setSelectedSpell(null); setIsReactiveSpellFlow(false); }}>
+                <Popup onClickOrKeyDown={() => { setSelectedSpell(null); setIsReactiveSpellFlow(false); }} showCloseButton={false}>
                     <SpellDetailPopup
                         spell={selectedSpell}
                         playerStats={playerStats}

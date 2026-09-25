@@ -35,10 +35,10 @@ export const renderPopup = ({ popupHtml, setPopupHtml, isLocalhost, playerStats,
     if (popupHtml.type === 'shield_of_faith_target_selection') return null;
     if (popupHtml.type === 'barkskin_target_selection') return null;
     if (popupHtml.html) {
-        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.html) }}></div><div className="dice-roll-hint">click to dismiss</div></div></Popup>;
+        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.html) }}></div></div></Popup>;
     }
     if (popupHtml.type === 'automation_info') {
-        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div></Popup>;
+        return <Popup onClickOrKeyDown={() => setPopupHtml(null)}><div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div></div></Popup>;
     }
     if (popupHtml.type === 'wild_shape_select') {
         return (
@@ -177,7 +177,6 @@ const HealMultiPopup = ({ popupHtml, setPopupHtml }) => {
                         ))}
                     </div>
                 )}
-                <div className="dice-roll-hint">click to dismiss</div>
             </div>
         </Popup>
     );

@@ -19,10 +19,7 @@ export default function PsionicChoicePopup({ spellName, spellLevel, sorceryPoint
   }, [onCancel]);
 
   return (
-    <div className="popup-overlay" onClick={(e) => {
-      if (e.target.closest('.popup-modal')) return;
-      onCancel?.();
-    }}>
+    <div className="popup-overlay">
       <div className="popup-modal psionic-choice-popup">
         <div className="psionic-choice-inner">
           <h3><i className="fa-solid fa-brain"></i> Psionic Sorcery</h3>
@@ -53,6 +50,9 @@ export default function PsionicChoicePopup({ spellName, spellLevel, sorceryPoint
                 <span className="psionic-choice-option-desc">Standard spell slot expenditure. Verbal, Somatic, and Material components apply normally.</span>
               </div>
             </label>
+          </div>
+          <div className="psionic-choice-actions">
+            <button type="button" className="psionic-choice-cancel" onClick={onCancel}>Cancel</button>
           </div>
         </div>
       </div>

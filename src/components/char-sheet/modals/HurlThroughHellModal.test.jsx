@@ -153,16 +153,31 @@ describe('HurlThroughHellModal', () => {
   // ── Overlay / close behavior ──
 
   describe('overlay and close behavior', () => {
-    it('calls onClose when overlay is clicked', () => {
+    it('does not call onClose when overlay is clicked', () => {
       render(<HurlThroughHellModal {...makeProps()} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
     it('calls onClose when Cancel button is clicked', () => {
       const onClose = vi.fn();
       render(<HurlThroughHellModal {...makeProps({ onClose })} />);
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when Done button is clicked in the no-uses remaining branch', () => {
+      const onClose = vi.fn();
+      render(<HurlThroughHellModal {...makeProps({
+        currentUses: 3,
+        maxUses: 3,
+        pactMagicRecharge: true,
+        pactSlotsAvailable: false,
+        onClose,
+      })} />);
+      expect(screen.getByText(/No uses remaining/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
   });

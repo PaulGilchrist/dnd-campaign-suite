@@ -38,7 +38,7 @@ function SpellCastPopups({ selectedBonusSpell, setSelectedBonusSpell, playerStat
     return (
         <>
             {selectedBonusSpell && (
-                <Popup onClickOrKeyDown={() => setSelectedBonusSpell(null)}>
+                <Popup onClickOrKeyDown={() => setSelectedBonusSpell(null)} showCloseButton={false}>
                     <SpellDetailPopup
                         spell={selectedBonusSpell}
                         playerStats={playerStats}

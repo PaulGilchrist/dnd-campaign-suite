@@ -13,7 +13,7 @@
     border: 1px solid var(--color-header);
     border-radius: 10px;
     color: var(--color-header-inner);
-    cursor: pointer;
+    cursor: default;
     font-size: 1.0em;
     height: fit-content;
     max-height: 95vh;
@@ -33,6 +33,22 @@
     /* max-height: 55vh;
     max-width:55vh; */
     width: 500px;
+}
+
+.popup-close-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.popup-close-btn {
+    background: transparent;
+    border: 1px solid var(--color-header);
+    border-radius: 4px;
+    color: var(--color-header-inner);
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 4px 10px;
 }
 
 .avatar-modal-overlay {

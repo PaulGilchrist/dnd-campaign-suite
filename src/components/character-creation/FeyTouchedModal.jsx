@@ -64,10 +64,13 @@ function FeyTouchedModal({ formData, allSpells, onArrayFieldChange, onClose }) {
   };
 
   return (
-    <div className="mi-overlay" onClick={onClose}>
-      <div className="mi-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="mi-overlay">
+      <div className="mi-modal">
         <div className="mi-header">
           <i className="fa-solid fa-leaf"></i> Fey Magic
+          <button type="button" className="mi-header-close" onClick={onClose} aria-label="Close" title="Close without saving — configure later from the Spells step">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
         </div>
         <div className="mi-body">
           <p className="mi-description">
@@ -174,10 +177,13 @@ function ShadowTouchedModal({ formData, allSpells, onArrayFieldChange, onClose }
   };
 
   return (
-    <div className="mi-overlay" onClick={onClose}>
-      <div className="mi-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="mi-overlay">
+      <div className="mi-modal">
         <div className="mi-header">
           <i className="fa-solid fa-mask"></i> Shadow Magic
+          <button type="button" className="mi-header-close" onClick={onClose} aria-label="Close" title="Close without saving — configure later from the Spells step">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
         </div>
         <div className="mi-body">
           <p className="mi-description">

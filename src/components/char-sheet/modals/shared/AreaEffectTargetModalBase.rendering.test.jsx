@@ -67,13 +67,12 @@ describe('AreaEffectTargetModalBase - Rendering & Context', () => {
       expect(container.querySelector('.sp-actions')).toBeInTheDocument();
     });
 
-    it('closes on overlay click but not on modal content click', () => {
+    it('does not close on overlay or modal content click', () => {
       getRuntimeValue.mockReturnValue([]);
       const onClose = vi.fn();
       render(<AreaEffectTargetModalBase {...baseProps} onClose={onClose} />);
       fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-      onClose.mockClear();
+      expect(onClose).not.toHaveBeenCalled();
       fireEvent.click(document.querySelector('.sp-modal'));
       expect(onClose).not.toHaveBeenCalled();
     });

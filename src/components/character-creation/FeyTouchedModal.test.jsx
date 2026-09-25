@@ -395,12 +395,13 @@ describe.each(modalConfigs)('$name', (config) => {
   });
 
   describe('overlay interaction', () => {
-    it('should call onClose when clicking the overlay (outside the modal)', () => {
+    it('should not call onClose when clicking the overlay (outside the modal)', () => {
       const props = createProps(config);
       render(<Component {...props} />);
       const overlay = document.querySelector('.mi-overlay');
       fireEvent.click(overlay);
-      expect(props.onClose).toHaveBeenCalledTimes(1);
+      expect(props.onClose).not.toHaveBeenCalled();
+      expect(screen.getByText(header)).toBeInTheDocument();
     });
 
     it('should not call onClose when clicking inside the modal', () => {
@@ -409,6 +410,13 @@ describe.each(modalConfigs)('$name', (config) => {
       const modal = document.querySelector('.mi-modal');
       fireEvent.click(modal);
       expect(props.onClose).not.toHaveBeenCalled();
+    });
+
+    it('should call onClose when clicking the header close button', () => {
+      const props = createProps(config);
+      render(<Component {...props} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      expect(props.onClose).toHaveBeenCalledTimes(1);
     });
   });
 });

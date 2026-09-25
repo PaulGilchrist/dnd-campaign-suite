@@ -217,10 +217,7 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
     // Info screen — shows error message when can't use
     if (step === 'info') {
         return (
-            <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+            <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-dragon"></i> {featureName}
@@ -252,11 +249,16 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
                                 </div>
                             </>
                         ) : (
-                            <p className="sp-note" style={{ color: '#f87171' }}>
-                                {pactMagicRecharge
-                                    ? 'No uses remaining. Recharges on a Long Rest, or expend a Pact Magic spell slot to restore a use. No Pact Magic slots available.'
-                                    : 'No uses remaining. Recharges on a Long Rest.'}
-                            </p>
+                            <>
+                                <p className="sp-note" style={{ color: '#f87171' }}>
+                                    {pactMagicRecharge
+                                        ? 'No uses remaining. Recharges on a Long Rest, or expend a Pact Magic spell slot to restore a use. No Pact Magic slots available.'
+                                        : 'No uses remaining. Recharges on a Long Rest.'}
+                                </p>
+                                <div className="sp-actions">
+                                    <button className="sp-roll-btn" onClick={onClose} type="button">Done</button>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>

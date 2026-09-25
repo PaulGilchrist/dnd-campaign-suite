@@ -49,24 +49,24 @@ describe('Popup', () => {
     });
   });
 
-  // ── Overlay click behavior ──
+  // ── No click-to-dismiss behavior ──
 
-  describe('overlay click', () => {
-    it('calls onClickOrKeyDown when the overlay background is clicked', () => {
+  describe('no click dismissal', () => {
+    it('does NOT call onClickOrKeyDown when the overlay background is clicked', () => {
       const handleClose = vi.fn();
       render(<Popup html="<b>Test Content</b>" onClickOrKeyDown={handleClose} />);
 
       fireEvent.click(screen.getByTestId('popup-overlay'));
-      expect(handleClose).toHaveBeenCalledTimes(1);
+      expect(handleClose).not.toHaveBeenCalled();
     });
 
-    it('calls onClickOrKeyDown when non-interactive modal content is clicked', () => {
+    it('does NOT call onClickOrKeyDown when non-interactive modal content is clicked', () => {
       const handleClose = vi.fn();
       render(<Popup html="<b>Test Content</b>" onClickOrKeyDown={handleClose} />);
 
       const modal = screen.getByTestId('popup-overlay').querySelector('.popup-modal');
       fireEvent.click(modal);
-      expect(handleClose).toHaveBeenCalledTimes(1);
+      expect(handleClose).not.toHaveBeenCalled();
     });
 
     it('does NOT call onClickOrKeyDown when a button inside the modal is clicked', () => {
@@ -92,6 +92,36 @@ describe('Popup', () => {
       const input = screen.getByRole('textbox');
       fireEvent.click(input);
       expect(handleClose).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Footer Done button ──
+
+  describe('footer Done button', () => {
+    it('renders a Done button by default when onClickOrKeyDown is provided', () => {
+      render(<Popup html="<b>Test Content</b>" onClickOrKeyDown={vi.fn()} />);
+
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    });
+
+    it('calls onClickOrKeyDown when the Done button is clicked', () => {
+      const handleClose = vi.fn();
+      render(<Popup html="<b>Test Content</b>" onClickOrKeyDown={handleClose} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT render a Done button when showCloseButton is false', () => {
+      render(<Popup html="<b>Test Content</b>" onClickOrKeyDown={vi.fn()} showCloseButton={false} />);
+
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    });
+
+    it('does NOT render a Done button when onClickOrKeyDown is not provided', () => {
+      render(<Popup html="<b>Test Content</b>" />);
+
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
     });
   });
 });

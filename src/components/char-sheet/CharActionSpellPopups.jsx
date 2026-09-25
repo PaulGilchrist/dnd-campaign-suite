@@ -316,7 +316,7 @@ export default function CharActionSpellPopups(props) {
     return (
         <>
             {selectedActionSpell && (
-                <Popup onClickOrKeyDown={() => setSelectedActionSpell(null)}>
+                <Popup onClickOrKeyDown={() => setSelectedActionSpell(null)} showCloseButton={false}>
                     <SpellDetailPopup
                         spell={selectedActionSpell}
                         playerStats={playerStats}

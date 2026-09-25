@@ -90,10 +90,17 @@ describe('PsionicChoicePopup', () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
-  it('calls onCancel when clicking the overlay', () => {
+  it('does not call onCancel when clicking the overlay', () => {
     const { onCancel, container } = renderPopup();
     const overlay = container.querySelector('.popup-overlay');
     fireEvent.click(overlay);
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByText('Psionic Sorcery')).toBeInTheDocument();
+  });
+
+  it('calls onCancel when Cancel button is clicked', () => {
+    const { onCancel } = renderPopup();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 

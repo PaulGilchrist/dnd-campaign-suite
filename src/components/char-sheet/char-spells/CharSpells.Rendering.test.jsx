@@ -591,7 +591,7 @@ describe('CharSpells - Rendering Edge Cases', () => {
   });
 
   describe('spell popup close', () => {
-    it('closes the spell detail popup when the popup overlay is clicked', () => {
+    it('does not close the spell detail popup when the popup overlay is clicked', () => {
       renderWithProps({});
       const lightCell = screen.getByText('Light');
       fireEvent.click(lightCell);
@@ -599,7 +599,7 @@ describe('CharSpells - Rendering Edge Cases', () => {
 
       const popupOverlay = screen.getByTestId('popup-overlay');
       fireEvent.click(popupOverlay);
-      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     });
   });
 

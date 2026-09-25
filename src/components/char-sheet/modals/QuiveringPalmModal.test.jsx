@@ -132,11 +132,11 @@ describe('QuiveringPalmModal', () => {
             expect(screen.getByText('My Quivering Palm')).toBeInTheDocument();
         });
 
-        it('shows both action buttons and no Cancel in default mode', () => {
+        it('shows both action buttons and Cancel in default mode', () => {
             renderModal();
             expect(screen.getByRole('button', { name: /Trigger the Lethal Shockwave/ })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: /Release the Harmless Vibrations/ })).toBeInTheDocument();
-            expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
         });
 
         it('shows only release and Cancel buttons in release-only mode', () => {
@@ -148,10 +148,11 @@ describe('QuiveringPalmModal', () => {
     });
 
     describe('overlay click behavior', () => {
-        it('calls onClose when overlay background is clicked in default mode', () => {
+        it('does not call onClose when overlay background is clicked in default mode', () => {
             const { handleClose } = renderModal();
             fireEvent.click(document.querySelector('.sp-overlay'));
-            expect(handleClose).toHaveBeenCalledTimes(1);
+            expect(handleClose).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
         });
 
         it('does not call onClose when overlay background is clicked in release-only mode', () => {
@@ -172,6 +173,14 @@ describe('QuiveringPalmModal', () => {
     describe('release-only mode close behaviors', () => {
         it('calls onClose when Cancel button is clicked', () => {
             const { handleClose } = renderModal({ isRelease: true });
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+            expect(handleClose).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('default mode close behavior', () => {
+        it('calls onClose when Cancel button is clicked in default mode', () => {
+            const { handleClose } = renderModal();
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
             expect(handleClose).toHaveBeenCalledTimes(1);
         });

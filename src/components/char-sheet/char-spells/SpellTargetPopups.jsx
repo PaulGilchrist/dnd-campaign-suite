@@ -34,7 +34,7 @@ const SpellTargetPopups = function SpellTargetPopups({
     return (
         <>
             {(playerStats.spellAbilities.spells.length > 0) && selectedSpell && (
-                <Popup onClickOrKeyDown={() => setSelectedSpell(null)}>
+                <Popup onClickOrKeyDown={() => setSelectedSpell(null)} showCloseButton={false}>
                     <SpellDetailPopup
                         spell={selectedSpell}
                         playerStats={playerStats}

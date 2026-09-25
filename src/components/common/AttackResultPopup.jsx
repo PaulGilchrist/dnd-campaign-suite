@@ -97,8 +97,10 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
     }
   }, [popupHtml, campaignName, attackerName, setPopupHtml, onBeforeBiDefense, onAfterBiDefense]);
 
+  const showsOwnDone = typeof popupHtml === 'object' && !!popupHtml?.autoDamage && !popupHtml?.isAutoMiss && (missToHitApplied || !!popupHtml?.hit);
+
   return (
-    <Popup onClickOrKeyDown={onClose}>
+    <Popup onClickOrKeyDown={onClose} showCloseButton={!showsOwnDone}>
       {typeof popupHtml === 'string' ? (
         <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }} />
       ) : (

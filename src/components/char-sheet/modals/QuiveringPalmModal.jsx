@@ -83,10 +83,7 @@ function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isR
     }
 
     return (
-        <div className="sp-overlay" onClick={(e) => {
-        if (e.target.closest('.sp-modal')) return;
-        onClose?.();
-    }}>
+        <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand-fist"></i> {action.name}
@@ -102,6 +99,7 @@ function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isR
                     <button className="sp-dismiss-btn" onClick={handleRelease} disabled={loading}>
                         <i className="fa-solid fa-hand"></i> Release the Harmless Vibrations
                     </button>
+                    <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
                 </div>
             </div>
         </div>
