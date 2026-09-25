@@ -4570,11 +4570,89 @@ describe('MA-1207 mummy-lord living prey sense advisory data lock', () => {
     expect(getEffectDefinition('lair_undead_senses')).toBeFalsy();
   });
 
-  it('sibling scope guards: [1] nameless dict and [2] nameless save row stay byte-untouched (MA-1208/MA-1209 tickets)', () => {
-    expect(mummyLord.lair_actions[1]).toEqual({ description: 'Each undead in the lair has advantage on saving throws against effects that turn undead until initiative count 20 on the next round.' });
+  it('sibling scope guard: [2] nameless save row stays byte-untouched (MA-1209 ticket; [1] fixed MA-1208)', () => {
     expect(mummyLord.lair_actions[2].name).toBeUndefined();
     expect(mummyLord.lair_actions[2].save_dc).toBe(16);
-    expect(isLairRowClickable(mummyLord.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(mummyLord.lair_actions[2])).toBe(false);
+  });
+});
+
+// MA-1208: Mummy Lord lair_actions[1] was the twin nameless raw dict
+// (MV-24) — name-gate killed clickability → inert static prose, zero
+// affordance, zero log-delta on press ×2 (live-confirmed). Fix: named
+// ADVISORY row mirroring the MA-1207 [0] byte-shape (advisory snake-key +
+// honest advisory_message; the default MA-0024 copy would claim "casts …
+// concentration", false for this lair-wide warding boon). No te registered,
+// no initiative-20 dispatcher, PC Turn Undead seam untouched (§70 accepted
+// residual — advisory is the RAW-honest floor: GM positions lair and
+// adjudicates advantage). Row [2] (nameless save_dc row) stays MA-1209's
+// ticket — byte-untouched here.
+describe('MA-1208 mummy-lord turn-undead warding advisory data lock', () => {
+  const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
+  const warding = mummyLord.lair_actions[1];
+
+  it('[1] is now a named clickable ADVISORY row (was nameless inert dict)', () => {
+    expect(typeof warding).toBe('object');
+    expect(warding.name).toBe('Turn Undead Warding');
+    expect(warding.advisory).toBe('lair_turn_undead_advantage');
+    expect(isLairRowClickable(warding)).toBe(true);
+    expect(lairRowAffordance(warding)).toBe('advisory');
+  });
+
+  it('[1] description kept byte-verbatim, NO U+00AD soft hyphen on this row', () => {
+    expect(warding.description).toBe('Each undead in the lair has advantage on saving throws against effects that turn undead until initiative count 20 on the next round.');
+    expect(warding.description).not.toContain('\u00ad');
+  });
+
+  it('[1] advisory_message carries honest GM-enforced copy (no fake cast/concentration claim)', () => {
+    expect(warding.advisory_message).toMatch(/grants each undead in the lair advantage on saving throws against effects that turn undead/i);
+    expect(warding.advisory_message).toMatch(/initiative-20 expiry are GM-enforced/i);
+    expect(warding.advisory_message).toMatch(/no lair-advantage consumer/i);
+    expect(warding.advisory_message).not.toMatch(/casts/i);
+    expect(warding.advisory_message).not.toMatch(/concentration/i);
+  });
+
+  it('[1] carries NO fabricated save/attack/damage/zone fields', () => {
+    expect(warding.save_dc).toBeUndefined();
+    expect(warding.save_type).toBeUndefined();
+    expect(warding.save_effect).toBeUndefined();
+    expect(warding.attack_bonus).toBeUndefined();
+    expect(warding.damage_dice_primary).toBeUndefined();
+    expect(warding.zone).toBeUndefined();
+  });
+
+  it('[1] advisory press logs ONE ability_use record with advisory_message + initiative-20 note, zero handlers', async () => {
+    const logs = [];
+    const res = await resolveLairRow({
+      action: warding,
+      monsterName: 'Mummy Lord 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].characterName).toBe('Mummy Lord 1');
+    expect(logs[0].abilityName).toBe('Turn Undead Warding');
+    expect(logs[0].description).toContain(warding.advisory_message);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+  });
+
+  it('no new te registered: lair_turn_undead_advantage is NOT a target-effect key', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    expect(getEffectDefinition('lair_turn_undead_advantage')).toBeFalsy();
+  });
+
+  it('whole-block census: exactly TWO advisory rows armed ([0]+[1]), [2] still inert nameless save dict', () => {
+    const clickable = mummyLord.lair_actions.filter(isLairRowClickable);
+    expect(clickable).toHaveLength(2);
+    expect(mummyLord.lair_actions[2].name).toBeUndefined();
+    expect(mummyLord.lair_actions[2].save_dc).toBe(16);
     expect(isLairRowClickable(mummyLord.lair_actions[2])).toBe(false);
   });
 });

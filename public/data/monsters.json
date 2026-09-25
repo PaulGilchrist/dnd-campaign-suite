@@ -43272,6 +43272,9 @@
         "description": "Each undead creature in the lair can pinpoint the loca­tion of each living creature within 120 feet of it until initiative count 20 on the next round."
       },
       {
+        "name": "Turn Undead Warding",
+        "advisory": "lair_turn_undead_advantage",
+        "advisory_message": "grants each undead in the lair advantage on saving throws against effects that turn undead until initiative count 20 on the next round — advisory record: the lair-side turn-undead save advantage and its initiative-20 expiry are GM-enforced (no lair-advantage consumer, CLA-325 precedent)",
         "description": "Each undead in the lair has advantage on saving throws against effects that turn undead until initiative count 20 on the next round."
       },
       {

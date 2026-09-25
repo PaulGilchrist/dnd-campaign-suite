@@ -19756,7 +19756,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Each undead in the lair has advantage on saving throws against effects that turn undead until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1208-lair-turn-undead-advantage.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1209",

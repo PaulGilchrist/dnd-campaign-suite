@@ -220,20 +220,21 @@ describe('MA-0024 MonsterCardModal lair rows', () => {
   });
 });
 
-// MA-1207: mummy-lord lair_actions[0] named advisory row arms the ONE
+// MA-1207: mummy-lord lair_actions[0] named advisory row arms the
 // mc-dice-link-lair chip (press = record-only advisory ability_use, zero
 // save prompt); sibling nameless dicts stay inert static prose — and the
 // static branch no longer emits the orphan leading "." from
-// <strong>{la.name}.</strong> when !la.name.
+// <strong>{la.name}.</strong> when !la.name. (Chip count widened 1→2 when
+// MA-1208 armed lair_actions[1].)
 describe('MA-1207 mummy-lord lair advisory chip + nameless-dot guard', () => {
   const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
 
-  it('named advisory row renders a chip; the two nameless rows stay chip-less', () => {
+  it('named advisory row renders a chip; remaining nameless rows stay chip-less (MA-1208 widened 1→2)', () => {
     const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
     const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
     const links = lairLinks();
-    expect(links).toHaveLength(1);
+    expect(links).toHaveLength(2);
     expect(links[0].textContent).toContain('Pinpoint Living Creatures');
     expect(links[0].getAttribute('role')).toBe('button');
     expect(links[0].getAttribute('title')).toMatch(/initiative 20/);
@@ -269,5 +270,43 @@ describe('MA-1207 mummy-lord lair advisory chip + nameless-dot guard', () => {
     const row = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('Keeping Row'));
     expect(row.querySelector('strong')).toBeTruthy();
     expect(row.querySelector('strong').textContent).toBe('Keeping Row.');
+  });
+});
+
+// MA-1208: mummy-lord lair_actions[1] twin nameless raw dict fixed to a
+// named advisory row → card now shows TWO mc-dice-link-lair chips; press
+// of the warding chip = record-only advisory ability_use with the honest
+// GM-enforced note, zero save prompt; [2] stays inert static prose.
+describe('MA-1208 mummy-lord turn-undead warding chip render lock', () => {
+  const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
+
+  it('two advisory rows arm two mc-dice-link-lair chips; [2] save dict stays inert', () => {
+    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
+    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
+    const links = lairLinks();
+    expect(links).toHaveLength(2);
+    const ward = lairLinkWithName('Turn Undead Warding');
+    expect(ward.getAttribute('role')).toBe('button');
+    expect(ward.getAttribute('title')).toMatch(/initiative 20/);
+    const row2 = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('wracked with pain'));
+    expect(row2).toBeTruthy();
+    expect(row2.querySelector('.mc-dice-link-lair')).toBeNull();
+    expect(row2.querySelector('[role="button"]')).toBeNull();
+  });
+
+  it('warding chip press logs ONE advisory ability_use with honest note, opens no save prompt', async () => {
+    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
+    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
+    addEntry.mockClear();
+    fireEvent.click(lairLinkWithName('Turn Undead Warding'));
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    const entries = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
+    expect(entries).toHaveLength(1);
+    expect(entries[0].abilityName).toBe('Turn Undead Warding');
+    expect(entries[0].description).toMatch(/grants each undead in the lair advantage on saving throws against effects that turn undead/i);
+    expect(entries[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });
