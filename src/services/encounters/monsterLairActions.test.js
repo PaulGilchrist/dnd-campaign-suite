@@ -4499,3 +4499,82 @@ describe('MA-1061 kraken lair charged water save row data lock', () => {
     expect(lairRowAffordance(current)).toBe('save');
   });
 });
+
+// MA-1207: Mummy Lord lair_actions[0] was a NAMELESS raw dict (MV-24) —
+// name-gate (isLairRowClickable :26) killed clickability → inert static
+// prose with orphan "." prefix, zero affordance, zero log-delta on press
+// (live-confirmed). Fix: named ADVISORY row (Kraken MA-1060 byte-shape —
+// advisory snake-key + honest advisory_message; the default MA-0024 copy
+// would claim "casts … concentration", false for this lair-wide senses boon).
+// No lair-senses te exists and no initiative-20 consumer (§70 accepted
+// residual) — record-only advisory log at the CLA-325 floor is the honest
+// fit. Rows [1] (nameless dict) and [2] (nameless save_dc row) are
+// separate tickets (MA-1208/MA-1209) — byte-untouched here.
+describe('MA-1207 mummy-lord living prey sense advisory data lock', () => {
+  const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
+  const senses = mummyLord.lair_actions[0];
+
+  it('[0] is now a named clickable ADVISORY row (was nameless inert dict)', () => {
+    expect(typeof senses).toBe('object');
+    expect(senses.name).toBe('Pinpoint Living Creatures');
+    expect(senses.advisory).toBe('lair_undead_senses');
+    expect(isLairRowClickable(senses)).toBe(true);
+    expect(lairRowAffordance(senses)).toBe('advisory');
+  });
+
+  it('[0] description kept byte-verbatim incl. the U+00AD soft hyphen in loca­tion', () => {
+    expect(senses.description).toBe('Each undead creature in the lair can pinpoint the loca\u00adtion of each living creature within 120 feet of it until initiative count 20 on the next round.');
+  });
+
+  it('[0] advisory_message carries honest GM-enforced copy (no fake cast/concentration claim)', () => {
+    expect(senses.advisory_message).toMatch(/grants each undead creature in the lair/i);
+    expect(senses.advisory_message).toMatch(/pinpoint the location of each living creature within 120 feet/i);
+    expect(senses.advisory_message).toMatch(/initiative-20 expiry are GM-enforced/i);
+    expect(senses.advisory_message).not.toMatch(/casts/i);
+    expect(senses.advisory_message).not.toMatch(/concentration/i);
+  });
+
+  it('[0] carries NO fabricated save/attack/damage/zone fields', () => {
+    expect(senses.save_dc).toBeUndefined();
+    expect(senses.save_type).toBeUndefined();
+    expect(senses.save_effect).toBeUndefined();
+    expect(senses.attack_bonus).toBeUndefined();
+    expect(senses.damage_dice_primary).toBeUndefined();
+    expect(senses.zone).toBeUndefined();
+  });
+
+  it('[0] advisory press logs ONE ability_use record with advisory_message + initiative-20 note, zero handlers', async () => {
+    const logs = [];
+    const res = await resolveLairRow({
+      action: senses,
+      monsterName: 'Mummy Lord 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].characterName).toBe('Mummy Lord 1');
+    expect(logs[0].abilityName).toBe('Pinpoint Living Creatures');
+    expect(logs[0].description).toContain(senses.advisory_message);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+  });
+
+  it('no new te registered: lair_undead_senses is NOT a target-effect key', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    expect(getEffectDefinition('lair_undead_senses')).toBeFalsy();
+  });
+
+  it('sibling scope guards: [1] nameless dict and [2] nameless save row stay byte-untouched (MA-1208/MA-1209 tickets)', () => {
+    expect(mummyLord.lair_actions[1]).toEqual({ description: 'Each undead in the lair has advantage on saving throws against effects that turn undead until initiative count 20 on the next round.' });
+    expect(mummyLord.lair_actions[2].name).toBeUndefined();
+    expect(mummyLord.lair_actions[2].save_dc).toBe(16);
+    expect(isLairRowClickable(mummyLord.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(mummyLord.lair_actions[2])).toBe(false);
+  });
+});

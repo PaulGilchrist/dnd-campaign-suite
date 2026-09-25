@@ -349,7 +349,7 @@ function MonsterLairAction({ la, attackerCannotAct, handleLairRow }) {
           <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la) }} />
         ) : (
           <>
-            <strong>{la.name}.</strong>{' '}
+            {la.name ? <><strong>{la.name}.</strong>{' '}</> : null}
             <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
           </>
         )}

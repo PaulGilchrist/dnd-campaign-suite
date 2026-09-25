@@ -43266,6 +43266,9 @@
     ],
     "lair_actions": [
       {
+        "name": "Pinpoint Living Creatures",
+        "advisory": "lair_undead_senses",
+        "advisory_message": "grants each undead creature in the lair the ability to pinpoint the location of each living creature within 120 feet of it until initiative count 20 on the next round — advisory record: the lair-wide senses boon and its initiative-20 expiry are GM-enforced (no lair-senses consumer, CLA-325 precedent)",
         "description": "Each undead creature in the lair can pinpoint the loca­tion of each living creature within 120 feet of it until initiative count 20 on the next round."
       },
       {

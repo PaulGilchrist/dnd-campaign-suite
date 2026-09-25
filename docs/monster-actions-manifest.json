@@ -19744,7 +19744,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Each undead creature in the lair can pinpoint the loca\u00adtion of each living creature within 120 feet of it until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1207-lair-unnamed-senses.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1208",
