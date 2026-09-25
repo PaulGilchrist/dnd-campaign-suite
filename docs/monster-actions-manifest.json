@@ -19732,7 +19732,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1206-necrotic-strike-legendary.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1207",
