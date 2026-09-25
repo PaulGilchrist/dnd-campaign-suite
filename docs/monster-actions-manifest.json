@@ -17604,7 +17604,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 6 (1d6 + 3) piercing damage, or 7 (1d8 + 3) piercing damage if used with two hands to make a melee attack.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1100-trident-two-handed-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1101",
