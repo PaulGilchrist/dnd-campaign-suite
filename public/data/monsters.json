@@ -39063,11 +39063,16 @@
       },
       {
         "name": "Bite",
-        "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1dlO + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
+        "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1d10 + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 2",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 12
       },
       {
         "name": "Claws (Lizardfolk Form Only)",

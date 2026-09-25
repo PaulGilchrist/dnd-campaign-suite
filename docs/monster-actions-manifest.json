@@ -17795,7 +17795,7 @@
         "restrained"
       ],
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1dlO + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1111-lizardfolk-shaman-bite-crocodile-ocr-grapple-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1112",

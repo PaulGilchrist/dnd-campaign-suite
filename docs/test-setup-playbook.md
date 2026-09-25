@@ -565,3 +565,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §475 (2026-09-25, MA-1186) New pitfalls
 - Initiative "+NPC" fill: `page.locator('input').nth(1)` counts the hidden file input at DOM pos 0, so nth(1) filled the FIRST creature's name box — autocomplete-select then replaced it with the typed NPC (clobber, EB re-join required). Filter visible text inputs or scope by row before fill; stray joined NPC removed via `button[title="Remove NPC"]` + confirm dialog (§470-family extension).
+
+## §476 (2026-09-25, MA-1111) New pitfalls
+- MA-1111 (FIXED, lizardfolk-shaman Bite): OCR "1dlO + 2"→"1d10 + 2" + hit_conditions:["grappled","restrained"] + escape_dc:12 (MA-0801 byte-shape) — rider grants live w/ meta {source,dc:12,ability:str} + badges "Grappled DC 12". Cosmetic: grapple condition-applied log note hardcodes "held by a tentacle" app-wide regardless of attacker species (§217-class prose cosmetic — judge by condition/reason "Bite (escape DC 12)"). Crocodile-form alternate dice stays prose-only (§70 form-state zero gating consumers, MA-1110 note).
