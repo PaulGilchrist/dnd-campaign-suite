@@ -18567,7 +18567,7 @@
         "prone"
       ],
       "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 60 ft. Hit: 20 (3d10 + 4) Cold damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1149-aquatic-burst-inert-prone-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1150",
