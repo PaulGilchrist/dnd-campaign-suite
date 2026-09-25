@@ -18,6 +18,7 @@ export default [
       globals: {
         process: 'readonly',
         console: 'readonly',
+        URL: 'readonly',
       },
     },
   },
