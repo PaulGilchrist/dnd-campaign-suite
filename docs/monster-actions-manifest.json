@@ -17959,7 +17959,7 @@
       "actionType": "other",
       "trigger": "The mage is targeted by a spell",
       "description": "The mage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1120-mage-protective-magic-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1121",

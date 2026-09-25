@@ -39360,7 +39360,15 @@
       {
         "name": "Protective Magic",
         "trigger": "The mage is targeted by a spell",
-        "description": "The mage casts <strong>Counterspell</strong> or <strong>Shield</strong> in response to the spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The mage casts <strong>Counterspell</strong> or <strong>Shield</strong> in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "enemy_spell_cast",
+          "effect": "counterspell"
+        }
       }
     ],
     "legendary_actions": [],
