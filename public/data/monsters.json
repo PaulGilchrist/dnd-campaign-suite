@@ -41727,7 +41727,16 @@
       {
         "name": "Shield",
         "trigger": "The mind flayer is targeted by a spell",
-        "description": "The mind flayer casts <strong>Shield</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
+        "description": "The mind flayer casts <strong>Shield</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "targeted_by_spell",
+          "effect": "shield",
+          "acBonus": 5
+        }
       }
     ],
     "legendary_actions": [],

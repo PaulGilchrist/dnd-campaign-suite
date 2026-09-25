@@ -37,6 +37,13 @@ export async function processAttackAfterResult({ hit, isAutoMiss: _isAutoMiss, t
     // defender resolves (hit or miss), mirroring the CLA-320 one-shot consume.
     consumeParryAcBonus({ targetName, characterName, campaignName });
 
+    // MA-1170: Mind Flayer Arcanist Shield's +5 AC defends the triggering
+    // attack — the ONE-SHOT monster reaction stamp is consumed once the next
+    // attack against the defended monster resolves (hit or miss), parry
+    // consume lineage (MA-0341). oneShot:true guards the PC Shield-spell
+    // buff (shieldHandler), which must survive until its own turn-start expiry.
+    consumeShieldAcBonus({ targetName, characterName, campaignName });
+
     // Miss effects (vex, etc.)
     grantMissAdvantageEffects({ finalHit, finalAutoMiss, targetName, context, characterName, campaignName });
 
@@ -206,6 +213,27 @@ function consumeParryAcBonus({ targetName, characterName, campaignName }) {
         targetName: targetName,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[MA-0341 Parry] Error logging consume:', e); });
+}
+
+// MA-1170: consume the monster reaction Shield stamp (oneShot:true) after the
+// next resolved attack against the defended target — mirrors consumeParryAcBonus
+// (MA-0341). PC Shield-spell buffs (no oneShot flag, shieldHandler.js) are
+// NEVER stripped here; they expire on their own turn-start clock.
+function consumeShieldAcBonus({ targetName, characterName, campaignName }) {
+    if (!targetName) return;
+    const buffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    if (!Array.isArray(buffs) || !buffs.some(b => b && b.effect === 'shield' && b.oneShot === true)) return;
+    const armed = buffs.filter(b => b && b.effect === 'shield' && b.oneShot === true);
+    const bonus = Number(armed[0].acBonus) || 5;
+    setRuntimeValue(targetName, 'activeBuffs', buffs.filter(b => !(b && b.effect === 'shield' && b.oneShot === true)), campaignName);
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'shield_consumed',
+        characterName: targetName,
+        description: `${targetName}'s Shield +${bonus} AC was consumed by ${characterName}'s resolved attack — AC returns to base for further attacks.`,
+        targetName: targetName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[MA-1170 Shield] Error logging consume:', e); });
 }
 
 function consumeOneShotAdvantage({ characterName, campaignName, finalAutoMiss }) {

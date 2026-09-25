@@ -980,6 +980,25 @@ const GATED_MONSTER_REACTIONS = {
   // (usage:'At Will'+uses:999) — RAW unlimited, no uses/day; 1/round latch
   // (_parry_usedRound, MA-0013 counterspell shape).
   parry: { effect: 'parry', trigger: 'melee_hit', label: 'Parry', icon: 'fa-shield-halved' },
+  // MA-1170: Mind Flayer Arcanist Shield — reactive +5 AC defense reaction
+  // (2024 Monster Core: reaction when targeted by a spell, cast Shield, +5 AC
+  // against the triggering attack roll; AC 16 → 21). Gate keys off the RAW
+  // campaign lastAttack spell-origin (isSpellOriginLastAttack MA-0013 seam,
+  // MA-0245 storeCampaignLastAttack fallback makes weaponType useless here)
+  // with this monster as target, damage NOT yet committed (limited_foresight
+  // MA-0548 pending-window — the shield hardens the roll before Done). Press
+  // stamps activeBuffs {effect:'shield', acBonus:5, oneShot:true} — the +5
+  // fold is the EXISTING generic channel getShieldAcBonus
+  // (loggedDiceRollUtils.js:49) read at useLoggedDiceRollAttack.js:481 against
+  // ANY acTargetName; zero new AC math. OneShot flag separates the monster
+  // reaction buff from the persistent PC Shield-spell buff (shieldHandler.js —
+  // that one survives every attack until its turn-start expiry). Consumed by
+  // the next resolved attack against the defender in attackPostProcessing
+  // (consumeShieldAcBonus, parry_consumed MA-0341 lineage). At Will sentinel
+  // (usage:'At Will'+uses:999, MA-1140 shape) — the chip counter stays honest:
+  // every press spends MONSTER_REACTION_USES[shield] (999→998…) + 1/round
+  // latch (_shield_usedRound, MA-0013 shape) + lastAttack.shieldResolved stamp.
+  shield: { effect: 'shield', trigger: 'targeted_by_spell', label: 'Shield', icon: 'fa-shield' },
   // MA-0895: Goblin Hexer Jinx — reactive miss-negation reaction. RAW trigger:
   // a creature the hexer can see hits it with an attack roll (seen is
   // GM-enforced advisory, CLA-325); response: the ATTACKER makes a WIS save
@@ -1313,6 +1332,113 @@ export async function resolveMonsterParry({ action, monsterName, campaignName, l
   return { ok: true, message: entry.description, acBonus: buff.acBonus, newAc: (Number(lastAttack.targetAc) || 0) + buff.acBonus };
 }
 
+// MA-1170: Mind Flayer Arcanist Shield — event-identity probe mirroring
+// limitedForesightIdentityRefusal (MA-0548) + isSpellOriginLastAttack
+// (MA-0013): the trigger is a SPELL targeting this monster, so spell-origin is
+// REQUIRED (a plain weapon attack never satisfies it), the target must be this
+// monster, and damageApplied:true is the too-late boundary (the shield hardens
+// the roll before Done commits it). Returns a refusal reason token or null.
+export function shieldIdentityRefusal(lastAttack, monsterName) {
+  if (!lastAttack || lastAttack.targetName !== monsterName) return 'trigger';
+  if (!isSpellOriginLastAttack(lastAttack)) return 'spell';
+  if (lastAttack.damageApplied === true) return 'resolved';
+  if (lastAttack.shieldResolved === true) return 'reacted';
+  if (!lastAttack.attackerName || lastAttack.attackerName === monsterName) return 'attacker';
+  return null;
+}
+
+const SHIELD_REFUSAL_MESSAGES = {
+  trigger: (m) => `Shield: no spell has targeted ${m} — Shield is a reaction to being targeted by a spell.`,
+  spell: (m) => `Shield: the last attack against ${m} was not spell-origin — Shield answers spells only.`,
+  resolved: () => 'Shield: damage is already applied on that spell — too late to raise the shield.',
+  reacted: () => 'Shield: already responded to that spell — one shield per triggering spell.',
+  attacker: () => 'Shield: no identifiable spellcaster to shield against — refused.',
+  round: () => 'Shield: Reaction already used this round — refused.',
+  uses: (limit) => `Shield: ${limit} uses already spent today — refused.`,
+};
+
+export function shieldGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action }) {
+  const identity = shieldIdentityRefusal(lastAttack, monsterName);
+  if (identity) {
+    return { ok: false, reason: identity, message: SHIELD_REFUSAL_MESSAGES[identity](monsterName) };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: SHIELD_REFUSAL_MESSAGES.round() };
+  }
+  const used = Number((storedUses && storedUses.shield) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: SHIELD_REFUSAL_MESSAGES.uses(limit) };
+  }
+  return { ok: true, used, limit, attackerName: lastAttack.attackerName };
+}
+
+// MA-1170: one-shot armed buff — oneShot:true marks the MONSTER reaction stamp
+// so consumeShieldAcBonus never strips a PC Shield-spell buff (shieldHandler
+// buff survives every attack until its own turn-start expiry). acBonus MUST
+// come from the authored row (RAW Shield = +5); default 5 matches the spell.
+function buildShieldBuff(action, lastAttack) {
+  const acBonus = Number(action?.automation?.acBonus) || 5;
+  return {
+    effect: 'shield',
+    acBonus,
+    oneShot: true,
+    source: 'Shield',
+    vsAttack: `${lastAttack.attackerName}:${lastAttack.attackName || 'spell attack'}`,
+    appliedRoundContext: { d20: lastAttack.d20, total: lastAttack.total, targetAc: lastAttack.targetAc },
+    timestamp: Date.now(),
+  };
+}
+
+function buildShieldSpendLog({ monsterName, lastAttack, buff, remaining }) {
+  const newAc = (Number(lastAttack.targetAc) || 0) + buff.acBonus;
+  return {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Shield',
+    description: `${monsterName} casts Shield in response to ${lastAttack.attackerName}'s ${lastAttack.attackName || 'spell'} — +${buff.acBonus} AC against the triggering attack roll (AC ${lastAttack.targetAc} → ${newAc}). Dismiss the pending attack popup WITHOUT Done, then re-click ${lastAttack.attackerName}'s attack chip to re-resolve vs AC ${newAc}; a fresh attack against ${monsterName} also folds the +5. At Will — 1 Reaction per round. ${remaining} left on the counter.`,
+    timestamp: Date.now(),
+  };
+}
+
+async function resolveMonsterShieldReaction({ action, monsterName, campaignName, lastAttack, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const gate = shieldGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action });
+  if (!gate.ok) {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: 'shield_refused',
+      name: 'Shield',
+      description: `Shield refused (${gate.reason}): ${gate.message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message: gate.message };
+  }
+  const buff = buildShieldBuff(action, lastAttack);
+  const getRV = deps.getRuntimeValue || getRuntimeValue;
+  const buffs = getRV(monsterName, 'activeBuffs') || [];
+  const newBuffs = [...(Array.isArray(buffs) ? buffs : []), buff];
+  // Latch + spend AWAITED before the buff stamp (CLA-361) — the next click
+  // must not find the Reaction refirable, and the chip counter update rides
+  // the same awaited chain.
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, shield: gate.used + 1 }, campaignName);
+  await setRV(monsterName, 'activeBuffs', newBuffs, campaignName);
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    shieldResolved: true,
+    shieldedBy: monsterName,
+    shieldAcBonus: buff.acBonus,
+  }, campaignName);
+  const remaining = Math.max(0, gate.limit - gate.used - 1);
+  const entry = buildShieldSpendLog({ monsterName, lastAttack, buff, remaining });
+  await log(campaignName, entry);
+  return { ok: true, message: entry.description, acBonus: buff.acBonus, newAc: (Number(lastAttack.targetAc) || 0) + buff.acBonus, remaining };
+}
+
 // MA-0399: event-identity + live-state probe (mirrors hellishRebukeIdentityRefusal).
 // Bloodied reads the combatSummary snapshot (monster HP truth = cs currentHp);
 // lightning/slashing reads the campaign lastAttack damageTypes stamp — an
@@ -1634,6 +1760,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'parry') {
     return resolveMonsterParry({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV } });
+  }
+
+  if (def.effect === 'shield') {
+    return resolveMonsterShieldReaction({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV } });
   }
 
   if (def.effect === 'split') {

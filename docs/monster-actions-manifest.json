@@ -19018,7 +19018,7 @@
       "actionType": "other",
       "trigger": "The mind flayer is targeted by a spell",
       "description": "The mind flayer casts Shield in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1170-shield-inert-reaction.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1171",
