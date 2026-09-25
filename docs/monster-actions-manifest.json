@@ -18586,7 +18586,7 @@
       "range": "",
       "recharge": "",
       "description": "The merfolk casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15):At Will: Elementalism, Light1/Day Each: Control Water, Create or Destroy Water",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1150-spellcasting-light-dex-misstamp.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1151",
