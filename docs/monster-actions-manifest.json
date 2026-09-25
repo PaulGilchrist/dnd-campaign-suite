@@ -19326,7 +19326,7 @@
       "range": "",
       "recharge": "",
       "description": "The modron makes four Slam attacks or four Gears Launcher attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1186",
@@ -19347,7 +19347,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1187",

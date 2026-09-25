@@ -5265,5 +5265,15 @@
       "date": "2026-09-25"
     },
     "MA-1184": "MA-1184 Paralysis Gas PASS-subset (2026-09-25): disk actions[3] DC11 Constitution recharge 5-6 damageless by construction no damage fields, save_effect byte-carries repeats-the-save + after-1-minute; picker title ' 30-ft Cone (GM positions tokens; selection advisory)' trim §443; multi-select 2 Bandits; PASS-leg +19 full-word cs stamp both Saved zero grants (cd victim keys ABSENT §1116); FAIL-leg -19 both Failed, Paralyzed x2 condition-log dc11+Constitution stamp, cd meta{dc:11,ability:con,source} victim1 full / victim2 meta KEY-ABSENT §39/§46/MA-0877 write-race family note; ZERO damage entries zero hp_change both legs damageless confirmed; recharge 5-6 full cycle: picker-open spend stamp, refusal .mc-recharge-refusal + paralysis_gas_refused zero-spend picker-never-opens, chip mc-dice-link-spell-spent, recovery walk own-turn-start recharged (d6: 6) round-2 + recharge_failed (d6: 1) round-3 threshold-5 honest both faces, spent<->restored; repeat-save probe round-3 crossed both paralyzed victims turn boundaries zero auto CON save zero removals pendingExpirations [] = MA-0063/MA-0910 GM-enforced advisory codified PASS-subset §84/§70; junk '+0' chip never pressed §445; console 0; admin clears confirms verbatim, post-GET log=[] cd={} immediate+quiet"
+  },
+  "Modron Quadrone": {
+    "monsterIndex": "modron-quadrone",
+    "placedIn": "test-campaign initiative via EB Join Encounter (2026-09-25)",
+    "config": {
+      "name": "Modron Quadrone 1",
+      "joinNotes": "EB exact-name search 1-row, cb.click checked=true first try, qty 1; victim via initiative +NPC autocomplete exact li:text-is('Bandit') join (unsuffixed 'Bandit' AC12 HP11); arm via ancestor-depth-walk select[data-testid=target-select] native setter+change; cs envelope {combatSummary:{creatures:[...]}} array-form double-unwrap; Admin real-pointer clicks absorbed x2, native el.click() landed; init-card Remove NPC button has title attr only (empty textContent); admin clears via nav Admin native el.click() + handle_dialog",
+      "verifiedRow": "MA-1186 Slam PASS (2026-09-25): +4 chip/5ft/no-DC-chip; nat20→24✓AC12 crit 1d4*2+2 (flat+2 undoubled) fd4 hp11→7; nat4→8✗AC12 noDone; nat20→24✓ fd6 hp7→1; HP-rig 11; nat13→17✓ formula \"1d4 + 2\" fd3 hp11→8; Σ13==Σ|Δ|; admin cleared log=[] cd={}"
+    },
+    "date": "2026-09-25"
   }
 }
