@@ -43210,7 +43210,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The mummy casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):<br><strong>At Will:</strong> Dispel Magic, Thaumaturgy<br><strong>1/Day Each:</strong> Animate Dead, Harm, Insect Plague (level 7 version)",
+        "description": "The mummy casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):<br><strong>At Will:</strong> <strong>Dispel Magic</strong>, <strong>Thaumaturgy</strong><br><strong>1/Day Each:</strong> <strong>Animate Dead</strong>, <strong>Harm</strong>, <strong>Insect Plague</strong> (level 7 version)",
         "attack_bonus": 0,
         "save_dc": 17,
         "save_type": "Wisdom",

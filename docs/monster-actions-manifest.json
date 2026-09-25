@@ -19674,7 +19674,7 @@
       "range": "",
       "recharge": "",
       "description": "The mummy casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):At Will: Dispel Magic, Thaumaturgy1/Day Each: Animate Dead, Harm, Insect Plague (level 7 version)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1202-lord-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1203",
