@@ -489,6 +489,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §448 (2026-09-24, MA-1140) New pitfalls
 - Opening defender .mc-overlay over a live attacker pending popup orphans the Done damage resolver (HP unchanged on committed hit) — press Done while attacker modal is live, re-shoot otherwise.
 - Parry consumer chain exists (resolveMonsterParry Helpers:1284 → acBonus fold hitResolution.js:284) but only reached when automation.effect='parry' authored — prose-only Parry = inert FAIL(b) family (MA-0643 twin).
+- MA-1140 (FIXED, marilith Parry acBonus 5 one-field twin live): post-fix chip "Parry (999 left)" mc-dice-link; §235c refinement — cs full-store round-bump POST + ~2.2s SSE settle re-armed parry WITHOUT reload twice; flip budget brutal on +3 vs AC16 (nat20 pierced AC21 twice, nat3 vacuous-consume) — embedded arm→abandon→resolve loop in one run_code call completes first try (§217 flow byte-held: avatar el.click over pending, link.click parry, backdrop-dismiss w/o Done, popup "MISS (18 vs AC 21 (+5 Parry))" effAc:21 hit:false HP held; >20 crit 23 Done −9 exact).
 
 ## §449 (2026-09-24, MA-1141) New pitfalls
 - Condition-on-hit grant transport = hit_conditions/hit_target_effect/hit_condition_roll (buildHitConditionClause Helpers:648 -> handlePlainDamage:543/614); raw action.conditions has ZERO attack-path consumers — prose-derived manifest conditions are honest data gaps, file FAIL(a) not 'works'.

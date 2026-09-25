@@ -18377,7 +18377,7 @@
       "actionType": "other",
       "trigger": "The marilith is hit by a melee attack roll while holding a weapon",
       "description": "The marilith adds 5 to its AC against that attack, possibly causing it to miss.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1140-parry-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1141",
