@@ -2,15 +2,6 @@ import { mulberry32, pick } from './rng.js';
 import { rectCenter, rectIntersects } from './bspTree.js';
 import { generateName, generateDescription } from './dungeonNamegen.js';
 
-const ROOM_TYPE_POOL = {
-  entrance: { label: 'Entrance Hall', furnishing: 'entrance' },
-  common: { label: 'Common Room', furnishing: 'common' },
-  utility: { label: 'Storage', furnishing: 'utility' },
-  private: { label: 'Chamber', furnishing: 'private' },
-  grand: { label: 'Grand Hall', furnishing: 'grand' },
-  hall: { label: 'Hallway', furnishing: 'hall' },
-};
-
 function buildWalledGrid(gridSize) {
   const grid = [];
   for (let y = 0; y < gridSize; y++) {
@@ -502,16 +493,6 @@ function collectWalls(grid, gridSize) {
   return walls;
 }
 
-function serializeRooms(rooms) {
-  return rooms.map(r => ({
-    id: r.id,
-    rect: { ...r.rect },
-    type: r.type,
-    label: ROOM_TYPE_POOL[r.type] ? ROOM_TYPE_POOL[r.type].label : '',
-    connectedTo: [...r.connected],
-  }));
-}
-
 export function generateAdjacentDungeon(opts) {
   opts = opts || {};
   const gridSize = opts.gridSize || 30;
@@ -578,7 +559,6 @@ export function generateAdjacentDungeon(opts) {
     zoom: 1,
     panX: 0,
     panY: 0,
-    rooms: serializeRooms(rooms),
     generationMode: 'adjacent',
   };
 }

@@ -1,4 +1,4 @@
-import { CELL_SIZE, ROOM_TYPE_COLORS } from '../../../config/mapConfig.js';
+import { CELL_SIZE } from '../../../config/mapConfig.js';
 import { getAssetUrl } from './map3dAssets.js';
 import { createOverlayGroup } from './map3dSpellOverlays.js';
 import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
@@ -45,7 +45,6 @@ export class Map3DScene {
         this.mapGroup = null;
         this.wallMat = null;
         this.half = 0;
-        this.showRooms = true;
         this.showLabels = true;
         this.showTorch = true;
         this.disposed = false;
@@ -143,8 +142,7 @@ export class Map3DScene {
         this.renderer.setSize(width, height);
     }
 
-    setToggles({ showRooms, showLabels, showTorch }) {
-        if (showRooms !== undefined) this.showRooms = showRooms;
+    setToggles({ showLabels, showTorch }) {
         if (showLabels !== undefined) this.showLabels = showLabels;
         if (showTorch !== undefined) this.showTorch = showTorch;
     }
@@ -363,7 +361,7 @@ export class Map3DScene {
         if (!this.renderer) return;
         const gen = ++this.buildGen;
         const {
-            gridSize, walls, rooms, items, players, fog, isLocalhost,
+            gridSize, walls, items, players, fog, isLocalhost,
             npcImages, playerAvatars, bgFill, overlays,
         } = data;
         this.gridSize = gridSize;
@@ -375,7 +373,6 @@ export class Map3DScene {
         this._buildFloorAndGrid(gridSize, bgFill);
         const effectiveWalls = computeEffectiveWalls(walls, items);
         this._buildWalls(effectiveWalls, fog, isLocalhost);
-        this._buildRooms(rooms);
         await this._buildPlacedItems(items, fog, isLocalhost);
         if (gen !== this.buildGen || this.disposed) return;
         this._buildPlayers(players, fog, isLocalhost, playerAvatars, gen);
@@ -426,32 +423,6 @@ export class Map3DScene {
         inst.castShadow = true;
         inst.receiveShadow = true;
         this.mapGroup.add(inst);
-    }
-
-    // Room patches + labels are drawn under the fog volume, so fogged portions of a
-    // room are covered exactly like the 2D fog layers above the room outlines.
-    _buildRooms(rooms) {
-        if (!this.showRooms) return;
-        const THREE = this.THREE;
-        for (const room of rooms || []) {
-            const r = room.rect;
-            const color = new THREE.Color(ROOM_TYPE_COLORS[room.type] || ROOM_TYPE_COLORS.common);
-            const w = r.w * CELL_SIZE;
-            const h = r.h * CELL_SIZE;
-            const x = r.x * CELL_SIZE + w / 2 - this.half;
-            const z = r.y * CELL_SIZE + h / 2 - this.half;
-            const patch = new THREE.Mesh(
-                new THREE.PlaneGeometry(w, h),
-                new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.13, depthWrite: false }));
-            patch.rotation.x = -Math.PI / 2;
-            patch.position.set(x, 0.6, z);
-            this.mapGroup.add(patch);
-            if (this.showLabels) {
-                const label = this._makeLabel(room.label || room.type);
-                label.position.set(x, 8, z);
-                this.mapGroup.add(label);
-            }
-        }
     }
 
     // World position/rotation for a placed prop. Two-cell props extend from the

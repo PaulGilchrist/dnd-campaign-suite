@@ -25,8 +25,6 @@ const mockState = {
     moveOffset: null,
     selectStart: { current: null },
     moveStartGrid: { current: null },
-    roomDrawRect: null,
-    selectedRoom: null,
     painting: false,
     dragging: null,
     itemDragging: null,
@@ -112,18 +110,6 @@ vi.mock('./hooks/useWallDrawing.js', () => ({
         handleGridPointerMove: vi.fn(),
         handleGridPointerUp: vi.fn(),
         handleGridPointerLeave: vi.fn(),
-    })),
-}));
-
-vi.mock('./hooks/useRoomDrawing.js', () => ({
-    default: vi.fn(() => ({
-        roomDrawRect: mockState.roomDrawRect,
-        selectedRoom: mockState.selectedRoom,
-        setSelectedRoom: vi.fn(),
-        handleRoomPointerDown: vi.fn(),
-        handleRoomPointerMove: vi.fn(),
-        handleRoomPointerUp: vi.fn(),
-        handleRoomClick: vi.fn(),
     })),
 }));
 
@@ -253,7 +239,6 @@ vi.mock('../encounter/MonsterCardModal.jsx', () => ({
 const createMockMapData = (overrides = {}) => ({
     players: [],
     walls: new Set(),
-    rooms: [],
     ...overrides,
 });
 
@@ -288,8 +273,6 @@ const resetState = () => {
         selectedItems: new Set(),
         selectionRect: null,
         moveOffset: null,
-        roomDrawRect: null,
-        selectedRoom: null,
         painting: false,
         dragging: null,
         itemDragging: null,
@@ -375,50 +358,6 @@ describe('Map - outdoor map type returns HexMap', () => {
     });
 });
 
-describe('Map - room rendering', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        resetState();
-    });
-
-    it('renders room highlights with type-based CSS classes', async () => {
-        mockState.mapData = createMockMapData({
-            rooms: [
-                { id: 'room1', type: 'entrance', label: 'Entrance', rect: { x: 0, y: 0, w: 10, h: 10 } },
-                { id: 'room2', type: 'private', label: 'Bedroom', rect: { x: 10, y: 10, w: 5, h: 5 } },
-            ],
-        });
-        const { container } = await act(async () => renderMap());
-        expect(container.querySelector('.room-highlight')).toBeTruthy();
-        expect(container.querySelector('.room-type-entrance')).toBeTruthy();
-        expect(container.querySelector('.room-type-private')).toBeTruthy();
-    });
-
-    it('renders room labels from room.label property', async () => {
-        mockState.mapData = createMockMapData({
-            rooms: [{ id: 'room1', type: 'common', label: 'Great Hall', rect: { x: 0, y: 0, w: 10, h: 10 } }],
-        });
-        await act(async () => renderMap());
-        expect(screen.getByText('Great Hall')).toBeInTheDocument();
-    });
-
-    it('falls back to room.type when label is missing', async () => {
-        mockState.mapData = createMockMapData({
-            rooms: [{ id: 'room1', type: 'common', rect: { x: 0, y: 0, w: 10, h: 10 } }],
-        });
-        await act(async () => renderMap());
-        expect(screen.getByText('common')).toBeInTheDocument();
-    });
-
-    it('renders room hit areas when tool is none', async () => {
-        mockState.mapData = createMockMapData({
-            rooms: [{ id: 'room1', type: 'common', rect: { x: 0, y: 0, w: 10, h: 10 } }],
-        });
-        const { container } = await act(async () => renderMap());
-        expect(container.querySelector('.room-hit-area')).toBeTruthy();
-    });
-});
-
 describe('Map - 3D view toggle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -481,18 +420,5 @@ describe('Map - fog of war role rendering', () => {
         const { container } = await act(async () => renderMap({ isLocalhost: false }));
         expect(container.querySelector('.fog-cell-player')).toBeTruthy();
         expect(container.querySelector('.fog-cell')).toBeNull();
-    });
-
-    it('renders player fog above room shapes so fogged rooms are covered', async () => {
-        vi.mocked(useFogOfWar).mockReturnValue(new Set(['0,0']));
-        mockState.mapData = createMockMapData({
-            rooms: [{ id: 'room1', type: 'common', label: 'Hall', rect: { x: 0, y: 0, w: 5, h: 5 } }],
-        });
-        const { container } = await act(async () => renderMap({ isLocalhost: false }));
-        const room = container.querySelector('.room-highlight');
-        const fogRect = container.querySelector('.fog-cell-player');
-        expect(room).toBeTruthy();
-        expect(fogRect).toBeTruthy();
-        expect(room.compareDocumentPosition(fogRect) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 });

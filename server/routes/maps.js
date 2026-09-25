@@ -73,7 +73,6 @@ const buildIndoorMapData = (name, body) => ({
   items: body.items ?? [],
   players: body.players ?? [],
   fog: body.fog ?? [],
-  rooms: body.rooms ?? [],
   generationMode: body.generationMode,
   description: body.description,
   seed: body.seed,

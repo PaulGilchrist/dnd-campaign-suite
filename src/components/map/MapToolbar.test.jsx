@@ -80,7 +80,6 @@ describe('MapToolbar', () => {
             expect(screen.getByText('Paint')).toBeInTheDocument();
             expect(screen.getByText('Erase')).toBeInTheDocument();
             expect(screen.getByText('Select')).toBeInTheDocument();
-            expect(screen.getByText('Room')).toBeInTheDocument();
             expect(screen.getByText('Items')).toBeInTheDocument();
         });
 
@@ -89,7 +88,6 @@ describe('MapToolbar', () => {
             expect(screen.queryByText('Paint')).not.toBeInTheDocument();
             expect(screen.queryByText('Erase')).not.toBeInTheDocument();
             expect(screen.queryByText('Select')).not.toBeInTheDocument();
-            expect(screen.queryByText('Room')).not.toBeInTheDocument();
             expect(screen.queryByText('Items')).not.toBeInTheDocument();
         });
 
@@ -125,7 +123,7 @@ describe('MapToolbar', () => {
 
     describe('tool button active states', () => {
         it('should apply active class to tool buttons when their tool is active', () => {
-            const tools = ['paint', 'erase', 'select', 'room'];
+            const tools = ['paint', 'erase', 'select'];
             for (const tool of tools) {
                 const { container } = renderMapToolbar({ tool });
                 const btn = within(container).getByText(tool.charAt(0).toUpperCase() + tool.slice(1));
@@ -243,8 +241,8 @@ describe('MapToolbar', () => {
             expect(mockSetSpellMode).toHaveBeenCalledWith(OverlayShape.SPHERE);
         });
 
-        it('should toggle paint, erase, select, and room tools on and off when clicked', () => {
-            const tools = ['paint', 'erase', 'select', 'room'];
+        it('should toggle paint, erase, and select tools on and off when clicked', () => {
+            const tools = ['paint', 'erase', 'select'];
             for (const tool of tools) {
                 const mockSetTool = vi.fn();
                 const { container: c1 } = renderMapToolbar({ tool, setTool: mockSetTool });

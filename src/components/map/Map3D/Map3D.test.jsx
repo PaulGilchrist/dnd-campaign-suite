@@ -36,7 +36,6 @@ const createMapData = (overrides = {}) => ({
     displayName: 'Test Map',
     gridSize: 10,
     walls: new Set(['0,0', '1,1']),
-    rooms: [{ id: 'r1', type: 'common', label: 'Hall', rect: { x: 0, y: 0, w: 5, h: 5 } }],
     players: [{ id: 'p1', name: 'Aria', gridX: 1, gridY: 1 }],
     bgFill: '#1a1a1a',
     ...overrides,
@@ -72,7 +71,7 @@ describe('Map3D', () => {
     it('renders the 3D top bar with title, counts, and 2D button', () => {
         renderMap3D();
         expect(screen.getByText('Test Map')).toBeInTheDocument();
-        expect(screen.getByText('2 walls · 1 items · 1 players · 1 npcs · 1 rooms')).toBeInTheDocument();
+        expect(screen.getByText('2 walls · 1 items · 1 players · 1 npcs')).toBeInTheDocument();
         expect(screen.getByTitle('Back to 2D map')).toBeInTheDocument();
     });
 
@@ -98,7 +97,6 @@ describe('Map3D', () => {
         expect(buildMapMock).toHaveBeenCalledWith(expect.objectContaining({
             gridSize: 10,
             walls: ['0,0', '1,1'],
-            rooms: expect.any(Array),
             items: expect.any(Array),
             players: expect.any(Array),
             fog: fogSet,
@@ -163,9 +161,9 @@ describe('Map3D', () => {
         renderMap3D();
         await act(async () => {});
         setTogglesMock.mockClear();
-        fireEvent.click(screen.getByRole('checkbox', { name: 'Rooms' }));
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Labels' }));
         await act(async () => {});
-        expect(setTogglesMock).toHaveBeenCalledWith({ showRooms: false, showLabels: true, showTorch: true });
+        expect(setTogglesMock).toHaveBeenCalledWith({ showLabels: false, showTorch: true });
     });
 
     it('calls topDown when the Top-down button is clicked', async () => {

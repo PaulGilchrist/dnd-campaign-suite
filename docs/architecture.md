@@ -276,7 +276,6 @@ Two parallel systems:
 - `bspTree.js` — Binary Space Partitioning for room placement
 - `adjacentDungeonGenerator.js` — Alternative layout: balanced, linear, forking, winding
 - `lineOfSight.js` — Bresenham-based visibility computation
-- `mapRoomUtils.js` — Room editing utilities
 - `dungeonNamegen.js` — Dungeon name generation
 
 **Hex (outdoor):**

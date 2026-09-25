@@ -6,7 +6,6 @@ const TOGGLE_TOOLS = [
     { tool: 'paint', icon: 'fa-paint-brush', label: 'Paint' },
     { tool: 'erase', icon: 'fa-eraser', label: 'Erase' },
     { tool: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
-    { tool: 'room', icon: 'fa-vector-square', label: 'Room' },
 ];
 
 const MapToolbar = ({

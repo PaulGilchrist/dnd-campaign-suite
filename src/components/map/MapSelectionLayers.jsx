@@ -1,4 +1,4 @@
-import { CELL_SIZE, TOOL_NONE, TOOL_SELECT } from '../../config/mapConfig';
+import { CELL_SIZE } from '../../config/mapConfig';
 import { getSelectionBounds } from './selectionBounds.js';
 
 const WIDE_ITEM_TYPES = ['table', 'bed', 'altar', 'bookshelf'];
@@ -14,42 +14,6 @@ export function SelectionPreviewRect({ visible = true, rect, className }) {
             height={(maxY - minY + 1) * CELL_SIZE}
             className={className}
         />
-    );
-}
-
-export function RoomShape({ room, tool, selectedRoom }) {
-    const r = room.rect;
-    const isSelected = selectedRoom && selectedRoom.id === room.id;
-    const typeClass = 'room-type-' + (room.type || 'common');
-    return (
-        <g>
-            <rect
-                x={r.x * CELL_SIZE}
-                y={r.y * CELL_SIZE}
-                width={r.w * CELL_SIZE}
-                height={r.h * CELL_SIZE}
-                className={`room-highlight ${typeClass} ${isSelected ? 'room-selected' : ''}`}
-            />
-            {(tool === TOOL_NONE || tool === TOOL_SELECT) && (
-                <rect
-                    x={r.x * CELL_SIZE}
-                    y={r.y * CELL_SIZE}
-                    width={r.w * CELL_SIZE}
-                    height={r.h * CELL_SIZE}
-                    fill="transparent"
-                    className="room-hit-area"
-                />
-            )}
-            <text
-                x={(r.x + r.w / 2) * CELL_SIZE}
-                y={(r.y + r.h / 2) * CELL_SIZE}
-                className="room-label"
-                textAnchor="middle"
-                dominantBaseline="central"
-            >
-                {room.label || room.type || 'common'}
-            </text>
-        </g>
     );
 }
 

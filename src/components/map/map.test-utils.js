@@ -4,7 +4,7 @@ export const mockGridCenterX = (gx) => gx * 40 + 20;
 export const mockGridCenterY = (gy) => gy * 40 + 20;
 
 export const createDefaultMocks = (overrides = {}) => ({
-    mapData: { players: [], walls: new Set(), rooms: [] },
+    mapData: { players: [], walls: new Set() },
     setMapData: vi.fn(),
     placedItems: [],
     setPlacedItems: vi.fn(),
@@ -36,16 +36,6 @@ export const createWallDrawingMocks = () => ({
     handleGridPointerMove: vi.fn(),
     handleGridPointerUp: vi.fn(),
     handleGridPointerLeave: vi.fn(),
-});
-
-export const createRoomDrawingMocks = () => ({
-    roomDrawRect: null,
-    selectedRoom: null,
-    setSelectedRoom: vi.fn(),
-    handleRoomPointerDown: vi.fn(),
-    handleRoomPointerMove: vi.fn(),
-    handleRoomPointerUp: vi.fn(),
-    handleRoomClick: vi.fn(),
 });
 
 export const createSelectMoveMocks = () => ({
@@ -168,10 +158,6 @@ export const setupMapMocks = (overrides = {}) => {
 
     _vi.mock('./hooks/useWallDrawing.js', () => ({
         default: _vi.fn(() => createWallDrawingMocks()),
-    }));
-
-    _vi.mock('./hooks/useRoomDrawing.js', () => ({
-        default: _vi.fn(() => createRoomDrawingMocks()),
     }));
 
     _vi.mock('./hooks/useSelectMove.js', () => ({

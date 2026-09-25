@@ -25,8 +25,6 @@ const mockState = {
     moveOffset: null,
     selectStart: { current: null },
     moveStartGrid: { current: null },
-    roomDrawRect: null,
-    selectedRoom: null,
     painting: false,
     dragging: null,
     itemDragging: null,
@@ -108,18 +106,6 @@ vi.mock('./hooks/useWallDrawing.js', () => ({
         handleGridPointerMove: vi.fn(),
         handleGridPointerUp: vi.fn(),
         handleGridPointerLeave: vi.fn(),
-    })),
-}));
-
-vi.mock('./hooks/useRoomDrawing.js', () => ({
-    default: vi.fn(() => ({
-        roomDrawRect: mockState.roomDrawRect,
-        selectedRoom: mockState.selectedRoom,
-        setSelectedRoom: vi.fn(),
-        handleRoomPointerDown: vi.fn(),
-        handleRoomPointerMove: vi.fn(),
-        handleRoomPointerUp: vi.fn(),
-        handleRoomClick: vi.fn(),
     })),
 }));
 
@@ -236,7 +222,6 @@ vi.mock('../encounter/MonsterCardModal.jsx', () => ({
 const createMockMapData = (overrides = {}) => ({
     players: [],
     walls: new Set(),
-    rooms: [],
     ...overrides,
 });
 
@@ -271,8 +256,6 @@ const resetState = () => {
         selectedItems: new Set(),
         selectionRect: null,
         moveOffset: null,
-        roomDrawRect: null,
-        selectedRoom: null,
         painting: false,
         dragging: null,
         itemDragging: null,

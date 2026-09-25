@@ -25,11 +25,10 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
     const sceneRef = useRef(null);
     const [ready, setReady] = useState(false);
     const [initError, setInitError] = useState(null);
-    const [showRooms, setShowRooms] = useState(true);
     const [showLabels, setShowLabels] = useState(true);
     const [showTorch, setShowTorch] = useState(true);
 
-    const { gridSize, walls, players, rooms, bgFill, displayName } = mapData || {};
+    const { gridSize, walls, players, bgFill, displayName } = mapData || {};
 
     const playerAvatars = useMemo(
         () => computePlayerAvatars(players, characters, campaignName),
@@ -64,11 +63,10 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
     useEffect(() => {
         const scene = sceneRef.current;
         if (!ready || !scene || !mapData) return;
-        scene.setToggles({ showRooms, showLabels, showTorch });
+        scene.setToggles({ showLabels, showTorch });
         scene.buildMap({
             gridSize: gridSize || 30,
             walls: walls ? Array.from(walls) : [],
-            rooms: rooms || [],
             items: placedItems || [],
             players: players || [],
             fog: fog || new Set(),
@@ -78,7 +76,7 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
             bgFill,
             overlays: overlays || [],
         });
-    }, [ready, mapData, gridSize, walls, rooms, bgFill, placedItems, players, fog, isLocalhost, npcImages, playerAvatars, overlays, showRooms, showLabels, showTorch]);
+    }, [ready, mapData, gridSize, walls, bgFill, placedItems, players, fog, isLocalhost, npcImages, playerAvatars, overlays, showLabels, showTorch]);
 
     const handleTopDown = useCallback(() => {
         sceneRef.current?.topDown();
@@ -89,9 +87,8 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
         const items = (placedItems || []).filter((i) => i.type !== 'npc').length;
         const npcs = (placedItems || []).filter((i) => i.type === 'npc').length;
         const playerCount = (players || []).length;
-        const roomCount = (rooms || []).length;
-        return `${wallCount} walls · ${items} items · ${playerCount} players · ${npcs} npcs · ${roomCount} rooms`;
-    }, [walls, placedItems, players, rooms]);
+        return `${wallCount} walls · ${items} items · ${playerCount} players · ${npcs} npcs`;
+    }, [walls, placedItems, players]);
 
     return (
         <div className="map3d">
@@ -105,9 +102,6 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
                     <button onClick={handleTopDown} title="Top-down view">
                         <i className="fa-solid fa-arrow-down"></i> Top-down
                     </button>
-                    <label className="map3d-toggle">
-                        <input type="checkbox" checked={showRooms} onChange={(e) => setShowRooms(e.target.checked)} /> Rooms
-                    </label>
                     <label className="map3d-toggle">
                         <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} /> Labels
                     </label>

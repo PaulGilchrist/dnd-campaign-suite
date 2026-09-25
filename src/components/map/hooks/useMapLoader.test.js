@@ -94,7 +94,6 @@ describe('useMapLoader', () => {
       return {
         players: [],
         walls: ['1,1-2,1', '2,1-2,2'],
-        rooms: [{ id: 'room1', name: 'Hall' }],
         placedItems: [{ id: 'item1', gridX: 3, gridY: 4 }],
         gridSize: 40,
         ...overrides,
@@ -177,7 +176,6 @@ describe('useMapLoader', () => {
       return {
         players: [{ name: 'Thorin' }, { name: 'Elaria' }, { name: 'Grimjaw' }],
         walls: [],
-        rooms: [],
         placedItems: [],
         gridSize: 30,
         ...overrides,
@@ -272,7 +270,6 @@ describe('useMapLoader', () => {
       expect(result.current.mapData.players).toEqual([]);
       expect(result.current.mapData.walls).toBeInstanceOf(Set);
       expect(Array.from(result.current.mapData.walls)).toEqual([]);
-      expect(result.current.mapData.rooms).toEqual([]);
 
       expect(saveMapDataSpy).toHaveBeenCalledWith(
         defaultCampaignName,
@@ -280,7 +277,6 @@ describe('useMapLoader', () => {
         expect.objectContaining({
           players: [],
           walls: [],
-          rooms: [],
         }),
       );
     });
@@ -306,7 +302,6 @@ describe('useMapLoader', () => {
       loadMapDataSpy.mockResolvedValue({
         players: [],
         walls: [],
-        rooms: [],
         placedItems: [],
         gridSize: 30,
       });
@@ -337,7 +332,6 @@ describe('useMapLoader', () => {
       loadMapDataSpy.mockResolvedValue({
         players: [],
         walls: [],
-        rooms: [],
         placedItems: [],
         gridSize: 30,
       });
@@ -367,7 +361,6 @@ describe('useMapLoader', () => {
       loadMapDataSpy.mockResolvedValue({
         players: [{ name: 'Thorin' }, { name: 'Elaria' }, { name: 'Grimjaw' }],
         walls: [],
-        rooms: [],
         placedItems: [],
         gridSize: 30,
       });
@@ -401,7 +394,6 @@ describe('useMapLoader', () => {
       loadMapDataSpy.mockResolvedValue({
         players: [],
         walls: [],
-        rooms: [],
         placedItems: [],
         gridSize: 30,
       });

@@ -613,7 +613,7 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
         expect(mapData.pois).toEqual(pois);
     });
 
-    it('should preserve optional indoor fields (fog, paintCells, items, players, rooms)', async () => {
+    it('should preserve optional indoor fields (fog, paintCells, items, players)', async () => {
         const mapsDir = '/mock/campaigns/test-campaign/maps';
         MOCK_FS.set(mapsDir, []);
 
@@ -627,7 +627,6 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
                 paintCells: [{ x: 1, y: 1, color: 'red' }],
                 items: [{ type: 'token' }],
                 players: [{ name: 'Hero', x: 0, y: 0 }],
-                rooms: [{ name: 'Room 1', cells: [[0, 0, 5, 5]] }],
             });
 
         const mapPath = `${mapsDir}/complex-map.json`;
@@ -636,7 +635,6 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
         expect(mapData.paintCells).toEqual([{ x: 1, y: 1, color: 'red' }]);
         expect(mapData.items).toEqual([{ type: 'token' }]);
         expect(mapData.players).toEqual([{ name: 'Hero', x: 0, y: 0 }]);
-        expect(mapData.rooms).toEqual([{ name: 'Room 1', cells: [[0, 0, 5, 5]] }]);
     });
 
     it('should preserve parentHex, parentTerrain, bgFill, generationMode, description, seed on indoor maps', async () => {
@@ -760,7 +758,6 @@ describe('maps - GET /api/campaigns/:campaign/maps/:mapname', () => {
             items: [],
             players: [],
             fog: [],
-            rooms: [],
             zoom: 2,
             panX: 100,
             panY: 200,

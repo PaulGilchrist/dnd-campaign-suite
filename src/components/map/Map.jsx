@@ -48,21 +48,18 @@ import RulerOverlay from './RulerOverlay.jsx';
 import { OverlayShape, DEFAULTS } from '../../models/SpellOverlay.js';
 import HexMap from '../hex-map/HexMap';
 import '../hex-map/HexMap.css';
-import RoomContextMenu from './RoomContextMenu.jsx';
 import PlayerContextMenu from './PlayerContextMenu.jsx';
 import useMapLoader from './hooks/useMapLoader';
 import useZoomPan from './hooks/useZoomPan';
 import Map3D from './Map3D/Map3D.jsx';
 import useWallDrawing from './hooks/useWallDrawing';
-import useRoomDrawing from './hooks/useRoomDrawing';
 import useSelectMove from './hooks/useSelectMove';
 import useRuler from './hooks/useRuler';
 import useSpellHandlers from './hooks/useSpellHandlers';
 import useMapDrops from './hooks/useMapDrops';
-import { CELL_SIZE, TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_SELECT, TOOL_ROOM } from '../../config/mapConfig';
+import { CELL_SIZE, TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_SELECT } from '../../config/mapConfig';
 import {
     SelectionPreviewRect,
-    RoomShape,
     SelectionOutline,
     MovePreview,
     SelectedWalls,
@@ -74,17 +71,12 @@ function getCursor({ panning, rulerMode, tool, moveOffset }) {
     if (rulerMode) return 'crosshair';
     if (tool === TOOL_NONE) return 'grab';
     if (tool === TOOL_SELECT) return moveOffset ? 'grabbing' : 'crosshair';
-    if (tool === TOOL_ROOM) return 'crosshair';
     return 'default';
 }
 
 function buildPendingOverlay(spellDraft, spellMode, shapeParams) {
     if (!spellDraft) return null;
     return { ...spellDraft, shape: spellMode, ...shapeParams, id: 'pending' };
-}
-
-function getRooms(mapData) {
-    return mapData?.rooms || [];
 }
 
 function getWalls(mapData) {
@@ -129,11 +121,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         handleGridPointerUp,
         handleGridPointerLeave,
     } = useWallDrawing({ isLocalhost, tool, getGridFromEvent, svgRef });
-
-    const {
-        roomDrawRect, selectedRoom, setSelectedRoom,
-        handleRoomPointerDown, handleRoomPointerMove, handleRoomPointerUp, handleRoomClick,
-    } = useRoomDrawing({ isLocalhost, tool, getGridFromEvent, svgRef });
 
     const {
         selectionRect, selectedWalls, selectedItems, moveOffset,
@@ -250,9 +237,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const handleCloseMenu = useCallback(() => {
         setSelectedItem(null);
         setSelectedPlayer(null);
-        setSelectedRoom(null);
         setRenamePopover(null);
-    }, [setSelectedItem, setSelectedPlayer, setSelectedRoom, setRenamePopover]);
+    }, [setSelectedItem, setSelectedPlayer, setRenamePopover]);
 
     const handleRenameClicked = (event, item, defaultName) => {
         if (!svgRef.current) return;
@@ -285,36 +271,30 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             handleSelectPointerDown(e, placedItems, mapData);
             return;
         }
-        if (tool === TOOL_ROOM) {
-            handleRoomPointerDown(e);
-            return;
-        }
         handlePanStart(e, panX, panY);
-    }, [tool, panX, panY, handleGridPointerDown, handleSelectPointerDown, handleRoomPointerDown, handlePanStart, placedItems, mapData, setMapData, spellDragActiveRef]);
+    }, [tool, panX, panY, handleGridPointerDown, handleSelectPointerDown, handlePanStart, placedItems, mapData, setMapData, spellDragActiveRef]);
 
     const handleToolPointerMove = useCallback((e) => {
         handlePointerMove(e);
         handleItemPointerMove(e);
         handleGridPointerMove(e, setMapData, painting, tool);
         handleSelectPointerMove(e);
-        handleRoomPointerMove(e);
         handlePanMove(e);
         handleSpellPointerMove(e, spellDraft);
         handleSpellDragMove(e, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlay);
         handleRulerPointerMove(e, rulerMode, rulerStart, rulerEnd, getGridFromEvent);
-    }, [handlePointerMove, handleItemPointerMove, handleGridPointerMove, handleSelectPointerMove, handleRoomPointerMove, handlePanMove, handleSpellPointerMove, handleSpellDragMove, handleRulerPointerMove, setMapData, painting, tool, spellDraft, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlay, rulerMode, rulerStart, rulerEnd]);
+    }, [handlePointerMove, handleItemPointerMove, handleGridPointerMove, handleSelectPointerMove, handlePanMove, handleSpellPointerMove, handleSpellDragMove, handleRulerPointerMove, setMapData, painting, tool, spellDraft, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlay, rulerMode, rulerStart, rulerEnd]);
 
     const handleToolPointerUp = useCallback((e) => {
         handlePointerUp(e);
         handleItemPointerUpHook(e);
         handleGridPointerUp(e);
         handleSelectPointerUp(e, placedItems, mapData, setMapData, setPlacedItems);
-        handleRoomPointerUp(e, gridSize, setMapData);
         handlePanEnd(e);
         handleSpellPointerUp(e, spellDraft, spellMode, addOverlay, shapeParams);
         handleSpellDragEnd(e, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, svgRef);
         handleRulerPointerUp(e, rulerMode, svgRef);
-    }, [handlePointerUp, handleItemPointerUpHook, handleGridPointerUp, handleSelectPointerUp, handleRoomPointerUp, handlePanEnd, handleSpellPointerUp, handleSpellDragEnd, handleRulerPointerUp, placedItems, mapData, setMapData, setPlacedItems, gridSize, spellDraft, spellMode, addOverlay, shapeParams, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, rulerMode, svgRef]);
+    }, [handlePointerUp, handleItemPointerUpHook, handleGridPointerUp, handleSelectPointerUp, handlePanEnd, handleSpellPointerUp, handleSpellDragEnd, handleRulerPointerUp, placedItems, mapData, setMapData, setPlacedItems, spellDraft, spellMode, addOverlay, shapeParams, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, rulerMode, svgRef]);
 
     const handleToolPointerLeave = useCallback((e) => {
         handleItemPointerLeave();
@@ -396,7 +376,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 onContextMenu={(e) => e.preventDefault()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
-                onClick={(e) => { if (e.button === 0) handleCloseMenu(); handleRoomClick(e, mapData, tool); }}
+                onClick={(e) => { if (e.button === 0) handleCloseMenu(); }}
                 style={{ cursor: getCursor({ panning, rulerMode, tool, moveOffset }) }}
             >
                 <defs>
@@ -461,19 +441,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
                 <SelectionPreviewRect visible={selectStart.current} rect={selectionRect} className="selection-preview" />
 
-                <SelectionPreviewRect rect={roomDrawRect} className="room-draw-preview" />
-
-                {getRooms(mapData).map(room => (
-                    <RoomShape
-                        key={'room-' + room.id}
-                        room={room}
-                        tool={tool}
-                        selectedRoom={selectedRoom}
-                    />
-                ))}
-
-                {/* Above map content (incl. room outlines) so fogged areas cover
-                    their walls/rooms/labels for players; GM sees through the veil */}
+                {/* Above map content so fogged areas cover their walls/items
+                    for players; GM sees through the veil */}
                 <FogOverlay
                     fog={fog}
                     isLocalhost={isLocalhost}
@@ -511,16 +480,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     monsterFound={monsterFound}
                     onRenameClicked={handleRenameClicked}
                     onClose={handleCloseMenu}
-                />
-
-                <RoomContextMenu
-                    selectedRoom={selectedRoom}
-                    isLocalhost={isLocalhost}
-                    gridSize={gridSize}
-                    gridCenterX={gridCenterX}
-                    gridCenterY={gridCenterY}
-                    setMapData={setMapData}
-                    setSelectedRoom={setSelectedRoom}
                 />
 
                 <PlayerContextMenu
