@@ -19368,7 +19368,7 @@
       "range": "320 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +4, range 320 ft. Hit: 4 (1d4 + 2) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1188",
@@ -19387,7 +19387,7 @@
       "range": "",
       "recharge": "",
       "description": "The modron makes three Clockwork Spear attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1189",
@@ -19408,7 +19408,7 @@
       "range": "120 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +3, reach 5 ft. or range 120 ft. Hit: 4 (1d6 + 1) Force damage. Hit or Miss: The spear magically returns to the modron's hand immediately after a ranged attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1190",
@@ -19424,7 +19424,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1191",
