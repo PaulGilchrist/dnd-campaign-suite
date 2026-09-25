@@ -17823,7 +17823,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The lizardfolk magically polymorphs into a crocodile, remaining in that form for up to 1 hour. It can revert to its true form as a bonus action. Its statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed. It reverts to its true form if it dies.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1113-change-shape-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1114",
