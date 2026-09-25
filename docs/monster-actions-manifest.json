@@ -17887,7 +17887,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1116-sovereign-earthen-maul-prone-unauthored.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1117",
