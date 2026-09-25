@@ -41100,7 +41100,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "1d4 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["poisoned"]
       },
       {
         "name": "Claw",
