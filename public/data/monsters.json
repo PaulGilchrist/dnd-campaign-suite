@@ -41382,7 +41382,13 @@
         "damage_dice_primary": "1d8 + 3",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "1d8",
-        "damage_type_secondary": "Acid"
+        "damage_type_secondary": "Acid",
+        "conditional_damage": {
+          "dice": "1d8",
+          "modifier": 0,
+          "damage_type": "Piercing",
+          "condition": "the target is Grappled by the mimic"
+        }
       },
       {
         "name": "Pseudopod",

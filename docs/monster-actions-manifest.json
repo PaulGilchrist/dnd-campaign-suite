@@ -18801,7 +18801,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the mimic), reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage\u2014or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic\u2014plus 4 (1d8) Acid damage.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1160-bite-inert-grapple-damage-clause.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1161",
