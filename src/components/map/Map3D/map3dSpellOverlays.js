@@ -1,4 +1,4 @@
-import { toGrid, OverlayShape, DEFAULTS } from '../../../models/SpellOverlay.js';
+import { toGrid, OverlayShape, DEFAULTS, OVERLAY_STROKE_ALPHA } from '../../../models/SpellOverlay.js';
 import { CELL_SIZE } from '../../../config/mapConfig.js';
 
 // 1 grid cell = 5 feet; toGrid() * CELL_SIZE converts feet to world units (1 ft = 8 units).
@@ -32,7 +32,7 @@ export function parseOverlayColor(THREE, color) {
 function addOutline(THREE, group, geometry, color) {
     const line = new THREE.LineSegments(
         new THREE.EdgesGeometry(geometry, 15),
-        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8, depthTest: false }));
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity: OVERLAY_STROKE_ALPHA, depthTest: false }));
     line.renderOrder = OUTLINE_RENDER_ORDER;
     group.add(line);
 }

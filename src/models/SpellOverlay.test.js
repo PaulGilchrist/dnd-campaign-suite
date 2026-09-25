@@ -5,7 +5,7 @@
 // @cleaned-by-ai
 // @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
-import { toGrid, createOverlay, hitTestOverlay, svgOrigin, OverlayShape, DEFAULTS } from './SpellOverlay.js';
+import { toGrid, createOverlay, hitTestOverlay, svgOrigin, OverlayShape, DEFAULTS, OVERLAY_FILL_ALPHA } from './SpellOverlay.js';
 
 // Grid geometry: CELL = 40px per 5ft grid unit, hit-testing is done in
 // screen pixels. Helpers below express positions in feet so each test
@@ -37,20 +37,20 @@ describe('DEFAULTS', () => {
   it('has correct default values per shape', () => {
     expect(DEFAULTS.sphere).toEqual({
       radiusFt: 20, coneAngle: 0, widthFt: 0, distanceFt: 0, sizeFt: 0,
-      color: 'rgba(255,80,60,0.35)',
+      color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
     });
     expect(DEFAULTS.cylinder).toEqual(DEFAULTS.sphere);
     expect(DEFAULTS.cube).toEqual({
       radiusFt: 0, coneAngle: 0, widthFt: 0, distanceFt: 0, sizeFt: 15,
-      color: 'rgba(255,80,60,0.35)',
+      color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
     });
     expect(DEFAULTS.cone).toEqual({
       radiusFt: 0, coneAngle: 53, widthFt: 0, distanceFt: 60, sizeFt: 0,
-      color: 'rgba(255,80,60,0.35)',
+      color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
     });
     expect(DEFAULTS.line).toEqual({
       radiusFt: 0, coneAngle: 0, widthFt: 5, distanceFt: 60, sizeFt: 0,
-      color: 'rgba(255,80,60,0.35)',
+      color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
     });
   });
 });
@@ -86,7 +86,7 @@ describe('createOverlay', () => {
     expect(overlay.startGridY).toBe(4);
     expect(overlay.angle).toBe(0);
     expect(overlay.radiusFt).toBe(20);
-    expect(overlay.color).toBe('rgba(255,80,60,0.35)');
+    expect(overlay.color).toBe(`rgba(255,80,60,${OVERLAY_FILL_ALPHA})`);
     uuidSpy.mockRestore();
   });
 

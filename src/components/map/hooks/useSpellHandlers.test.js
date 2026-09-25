@@ -3,7 +3,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useSpellHandlers from './useSpellHandlers.js';
-import { OverlayShape, createOverlay } from '../../../models/SpellOverlay.js';
+import { OverlayShape, createOverlay, OVERLAY_FILL_ALPHA } from '../../../models/SpellOverlay.js';
 
 describe('useSpellHandlers', () => {
   const mockShapeParams = {};
@@ -95,7 +95,7 @@ describe('useSpellHandlers', () => {
       expect(overlay.startGridX).toBe(5);
       expect(overlay.startGridY).toBe(7);
       expect(overlay.radiusFt).toBe(20);
-      expect(overlay.color).toBe('rgba(255,80,60,0.35)');
+      expect(overlay.color).toBe(`rgba(255,80,60,${OVERLAY_FILL_ALPHA})`);
     });
 
     it('should create cylinder overlay instantly with no draft', () => {

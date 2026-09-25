@@ -1,7 +1,9 @@
-import { OverlayShape, toGrid, svgOrigin } from '../../models/SpellOverlay.js';
+import { OverlayShape, toGrid, svgOrigin, OVERLAY_STROKE_ALPHA } from '../../models/SpellOverlay.js';
 import { CELL_SIZE } from '../../config/mapConfig';
 
 const HANDLE_RADIUS = 6;
+
+const overlayStroke = (color) => color.replace(/,\d+(?:\.\d+)?\)$/, `,${OVERLAY_STROKE_ALPHA})`);
 
 const DragHandle = ({ cx, cy, cursor = 'grab' }) => (
     <circle
@@ -26,7 +28,7 @@ const renderSphere = (overlay) => {
                 cy={cy}
                 r={r}
                 fill={overlay.color}
-                stroke={overlay.color.replace('0.35', '0.8')}
+                stroke={overlayStroke(overlay.color)}
                 strokeWidth={2}
                 className="spell-overlay"
             />
@@ -47,7 +49,7 @@ const renderCube = (overlay) => {
                     width={size}
                     height={size}
                     fill={overlay.color}
-                    stroke={overlay.color.replace('0.35', '0.8')}
+                    stroke={overlayStroke(overlay.color)}
                     strokeWidth={2}
                     className="spell-overlay"
                 />
@@ -76,7 +78,7 @@ const renderCone = (overlay) => {
             <path
                 d={d}
                 fill={overlay.color}
-                stroke={overlay.color.replace('0.35', '0.8')}
+                stroke={overlayStroke(overlay.color)}
                 strokeWidth={2}
                 className="spell-overlay"
             />
@@ -102,7 +104,7 @@ const renderLine = (overlay) => {
                     width={dist}
                     height={w}
                     fill={overlay.color}
-                    stroke={overlay.color.replace('0.35', '0.8')}
+                    stroke={overlayStroke(overlay.color)}
                     strokeWidth={2}
                     className="spell-overlay"
                 />

@@ -3,7 +3,7 @@
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
-import { OverlayShape } from '../../models/SpellOverlay.js';
+import { OverlayShape, OVERLAY_STROKE_ALPHA } from '../../models/SpellOverlay.js';
 import { CELL_SIZE } from '../../config/mapConfig.js';
 
 const toGrid = (ft) => ft / 5;
@@ -22,7 +22,7 @@ const makeSphereOverlay = (overrides = {}) => ({
     widthFt: 0,
     distanceFt: 0,
     sizeFt: 0,
-    color: 'rgba(255,80,60,0.35)',
+    color: 'rgba(255,80,60,0.07)',
     ...overrides,
 });
 
@@ -37,7 +37,7 @@ const makeCylinderOverlay = (overrides = {}) => ({
     widthFt: 0,
     distanceFt: 0,
     sizeFt: 0,
-    color: 'rgba(100,150,255,0.35)',
+    color: 'rgba(100,150,255,0.07)',
     ...overrides,
 });
 
@@ -52,7 +52,7 @@ const makeCubeOverlay = (overrides = {}) => ({
     widthFt: 0,
     distanceFt: 0,
     sizeFt: 15,
-    color: 'rgba(255,200,50,0.35)',
+    color: 'rgba(255,200,50,0.07)',
     ...overrides,
 });
 
@@ -67,7 +67,7 @@ const makeConeOverlay = (overrides = {}) => ({
     widthFt: 0,
     distanceFt: 60,
     sizeFt: 0,
-    color: 'rgba(255,100,100,0.35)',
+    color: 'rgba(255,100,100,0.07)',
     ...overrides,
 });
 
@@ -82,7 +82,7 @@ const makeLineOverlay = (overrides = {}) => ({
     widthFt: 5,
     distanceFt: 30,
     sizeFt: 0,
-    color: 'rgba(100,255,100,0.35)',
+    color: 'rgba(100,255,100,0.07)',
     ...overrides,
 });
 
@@ -176,6 +176,14 @@ describe('SpellOverlayRenderer', () => {
             const { container } = renderComponent({}, [sphere]);
             const circle = getSpellOverlay(container);
             expect(circle.getAttribute('fill')).toBe('rgba(0,255,0,0.35)');
+        });
+
+        it('should keep a 0.8 alpha stroke regardless of fill alpha', () => {
+            const sphere = makeSphereOverlay();
+            const { container } = renderComponent({}, [sphere]);
+            const circle = getSpellOverlay(container);
+            expect(circle.getAttribute('fill')).toBe('rgba(255,80,60,0.07)');
+            expect(circle.getAttribute('stroke')).toBe(`rgba(255,80,60,${OVERLAY_STROKE_ALPHA})`);
         });
 
         it('should render a sphere with a drag handle at the center', () => {

@@ -6,6 +6,9 @@ export const OverlayShape = {
   LINE: 'line',
 };
 
+export const OVERLAY_FILL_ALPHA = 0.07;
+export const OVERLAY_STROKE_ALPHA = 0.2;
+
 export const DEFAULTS = {
   sphere: {
     radiusFt: 20,
@@ -13,7 +16,7 @@ export const DEFAULTS = {
     widthFt: 0,
     distanceFt: 0,
     sizeFt: 0,
-    color: 'rgba(255,80,60,0.35)',
+    color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
   },
   cylinder: {
     radiusFt: 20,
@@ -21,7 +24,7 @@ export const DEFAULTS = {
     widthFt: 0,
     distanceFt: 0,
     sizeFt: 0,
-    color: 'rgba(255,80,60,0.35)',
+    color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
   },
   cube: {
     radiusFt: 0,
@@ -29,7 +32,7 @@ export const DEFAULTS = {
     widthFt: 0,
     distanceFt: 0,
     sizeFt: 15,
-    color: 'rgba(255,80,60,0.35)',
+    color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
   },
   cone: {
     radiusFt: 0,
@@ -37,7 +40,7 @@ export const DEFAULTS = {
     widthFt: 0,
     distanceFt: 60,
     sizeFt: 0,
-    color: 'rgba(255,80,60,0.35)',
+    color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
   },
   line: {
     radiusFt: 0,
@@ -45,7 +48,7 @@ export const DEFAULTS = {
     widthFt: 5,
     distanceFt: 60,
     sizeFt: 0,
-    color: 'rgba(255,80,60,0.35)',
+    color: `rgba(255,80,60,${OVERLAY_FILL_ALPHA})`,
   },
 };
 
