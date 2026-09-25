@@ -562,3 +562,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - full-word saveBonuses.constitution ±19 flips picker determinism MID-fight via full cs-store POST {value:cs} on the live tab — survives initiative walks and shares the POST body with the TRUSTED-HP-999 rig without clobbering it (§160/§629 twins, no re-join needed).
 - Reload mid-round resumes walker mid-round (lastApplied reappears at a PC idx) — round-wrap recharge may already have fired pre-reload; judge recharge economy by log faces only (this session recharged d6:6 hit + recharge_failed d6:1 miss, threshold-5 honest both directions).
 - Damageless picker rows stamp NO roll-save/save_result/hp_change entries on ANY leg (§196+§279 complete); zero-cd victim-key absence (§1116) is the clean PASS-leg proof — fire the +rig leg FIRST, before any fail contaminates the victims.
+
+## §475 (2026-09-25, MA-1186) New pitfalls
+- Initiative "+NPC" fill: `page.locator('input').nth(1)` counts the hidden file input at DOM pos 0, so nth(1) filled the FIRST creature's name box — autocomplete-select then replaced it with the typed NPC (clobber, EB re-join required). Filter visible text inputs or scope by row before fill; stray joined NPC removed via `button[title="Remove NPC"]` + confirm dialog (§470-family extension).
