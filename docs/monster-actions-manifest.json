@@ -17794,8 +17794,8 @@
     "grappled",
     "restrained"
    ],
-   "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1dlO + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
-   "verified": "not verified"
+    "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1dlO + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
+    "verified": "broken — see .opencode/plans/bug-mon-MA-1111-lizardfolk-shaman-bite-crocodile-ocr-grapple-inert.md"
   },
   {
    "id": "MA-1112",
@@ -17810,8 +17810,8 @@
    "damageDicePrimary": "1d4 + 2",
    "damageTypePrimary": "Slashing",
    "reach": "5 ft.",
-   "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) slashing damage.",
-   "verified": "not verified"
+    "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) slashing damage.",
+    "verified": "verified"
   },
   {
    "id": "MA-1113",
@@ -17819,11 +17819,11 @@
    "monsterIndex": "lizardfolk-shaman",
    "monster": "Lizardfolk Shaman",
    "actionIndex": 3,
-   "actionName": "Change Shape (Recharges after a Short or Long Rest)",
-   "category": "actions",
-   "actionType": "other",
-   "description": "The lizardfolk magically polymorphs into a crocodile, remaining in that form for up to 1 hour. It can revert to its true form as a bonus action. Its statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed. It reverts to its true form if it dies.",
-   "verified": "not verified"
+    "actionName": "Change Shape (Recharges after a Short or Long Rest)",
+    "category": "actions",
+    "actionType": "other",
+    "description": "The lizardfolk magically polymorphs into a crocodile, remaining in that form for up to 1 hour. It can revert to its true form as a bonus action. Its statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed. It reverts to its true form if it dies.",
+    "verified": "broken — see .opencode/plans/bug-mon-MA-1113-change-shape-inert.md"
   },
   {
    "id": "MA-1114",
@@ -17841,8 +17841,8 @@
    "reach": "",
    "range": "",
    "recharge": "",
-   "description": "The lizardfolk makes one Bite attack and one Earthen Maul attack.",
-   "verified": "not verified"
+    "description": "The lizardfolk makes one Bite attack and one Earthen Maul attack.",
+    "verified": "verified"
   },
   {
    "id": "MA-1115",
@@ -17862,8 +17862,8 @@
    "reach": "5 ft.",
    "range": "",
    "recharge": "",
-   "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Piercing damage. If the target is a creature that isn't a Construct or an Undead, the lizardfolk gains Temporary Hit Points equal to the damage dealt.",
-   "verified": "not verified"
+    "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Piercing damage. If the target is a creature that isn't a Construct or an Undead, the lizardfolk gains Temporary Hit Points equal to the damage dealt.",
+    "verified": "verified"
   },
   {
    "id": "MA-1116",
@@ -17886,8 +17886,8 @@
    "conditions": [
     "prone"
    ],
-   "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
-   "verified": "not verified"
+    "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
+    "verified": "broken — see .opencode/plans/bug-mon-MA-1116-sovereign-earthen-maul-prone-unauthored.md"
   },
   {
    "id": "MA-1117",
@@ -17905,8 +17905,8 @@
    "reach": "",
    "range": "",
    "recharge": "",
-   "description": "The mage makes three Arcane Burst attacks.",
-   "verified": "not verified"
+    "description": "The mage makes three Arcane Burst attacks.",
+    "verified": "verified"
   },
   {
    "id": "MA-1118",
@@ -17926,8 +17926,8 @@
    "reach": "5 ft.",
    "range": "120 ft.",
    "recharge": "",
-   "description": "Melee or Ranged Attack Roll: +6, reach 5 ft. or range 120 ft. Hit: 16 (3d8 + 3) Force damage.",
-   "verified": "not verified"
+    "description": "Melee or Ranged Attack Roll: +6, reach 5 ft. or range 120 ft. Hit: 16 (3d8 + 3) Force damage.",
+    "verified": "verified"
   },
   {
    "id": "MA-1119",
@@ -17945,8 +17945,8 @@
    "reach": "",
    "range": "",
    "recharge": "",
-   "description": "The mage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):At Will: Detect Magic, Light, Mage Armor (included in AC), Mage Hand, Prestidigitation2/Day Each: Fireball (level 4 version), Invisibility1/Day Each: Cone of Cold, Fly",
-   "verified": "not verified"
+    "description": "The mage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):At Will: Detect Magic, Light, Mage Armor (included in AC), Mage Hand, Prestidigitation2/Day Each: Fireball (level 4 version), Invisibility1/Day Each: Cone of Cold, Fly",
+    "verified": "verified"
   },
   {
    "id": "MA-1120",
@@ -17958,8 +17958,8 @@
    "category": "reactions",
    "actionType": "other",
    "trigger": "The mage is targeted by a spell",
-   "description": "The mage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
-   "verified": "not verified"
+    "description": "The mage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
+    "verified": "broken — see .opencode/plans/bug-mon-MA-1120-mage-protective-magic-inert.md"
   },
   {
    "id": "MA-1121",
@@ -17979,8 +17979,8 @@
    "reach": "5 ft.",
    "range": "120 ft.",
    "recharge": "",
-   "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 120 ft. Hit: 14 (2d10 + 3) Force damage.",
-   "verified": "not verified"
+    "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 120 ft. Hit: 14 (2d10 + 3) Force damage.",
+    "verified": "verified"
   },
   {
    "id": "MA-1122",
@@ -17998,8 +17998,8 @@
    "reach": "",
    "range": "",
    "recharge": "",
-   "description": "The mage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 13, +5 to hit with spell attacks):At Will: Mage Hand, Prestidigitation1/Day Each: Disguise Self, Ice Knife, Mage Armor (included in AC), Thunderwave",
-   "verified": "not verified"
+    "description": "The mage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 13, +5 to hit with spell attacks):At Will: Mage Hand, Prestidigitation1/Day Each: Disguise Self, Ice Knife, Mage Armor (included in AC), Thunderwave",
+    "verified": "verified"
   },
   {
    "id": "MA-1123",
@@ -18021,8 +18021,8 @@
    "reach": "5 ft.",
    "range": "",
    "recharge": "",
-   "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 3 (1d4 + 1) Slashing damage plus 3 (1d6) Fire damage.",
-   "verified": "not verified"
+    "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 3 (1d4 + 1) Slashing damage plus 3 (1d6) Fire damage.",
+    "verified": "verified"
   },
   {
    "id": "MA-1124",
@@ -18042,8 +18042,8 @@
    "reach": "",
    "range": "",
    "recharge": "6",
-   "description": "Dexterity Saving Throw: DC 11, each creature in a 15-foot Cone. Failure: 7 (2d6) Fire damage. Success: Half damage.",
-   "verified": "not verified"
+    "description": "Dexterity Saving Throw: DC 11, each creature in a 15-foot Cone. Failure: 7 (2d6) Fire damage. Success: Half damage.",
+    "verified": "verified"
   },
   {
    "id": "MA-1125",
@@ -18063,8 +18063,8 @@
    "reach": "5 ft.",
    "range": "",
    "recharge": "",
-   "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 7 (2d4 + 2) Fire damage. If the target is a creature or a flammable object that isn't being worn or carried, it starts burning.",
-   "verified": "not verified"
+    "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 7 (2d4 + 2) Fire damage. If the target is a creature or a flammable object that isn't being worn or carried, it starts burning.",
+    "verified": "broken — see .opencode/plans/bug-mon-MA-1125-magmin-touch-burning-rider-unauthored.md"
   },
   {
    "id": "MA-1126",
@@ -18082,8 +18082,8 @@
    "reach": "",
    "range": "",
    "recharge": "",
-   "description": "The mammoth makes two Gore attacks.",
-   "verified": "not verified"
+    "description": "The mammoth makes two Gore attacks.",
+    "verified": "verified"
   },
   {
    "id": "MA-1127",
@@ -18106,8 +18106,8 @@
    "conditions": [
     "prone"
    ],
-   "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 18 (2d10 + 7) Piercing damage. If the target is a Huge or smaller creature and the mammoth moved 20+ feet straight toward it immediately before the hit, the target has the Prone condition.",
-   "verified": "not verified"
+    "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 18 (2d10 + 7) Piercing damage. If the target is a Huge or smaller creature and the mammoth moved 20+ feet straight toward it immediately before the hit, the target has the Prone condition.",
+    "verified": "verified"
   },
   {
    "id": "MA-1128",
@@ -18127,8 +18127,8 @@
    "reach": "5 ft.",
    "range": "",
    "recharge": "",
-   "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 5 (2d4) Slashing damage.",
-   "verified": "not verified"
+    "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 5 (2d4) Slashing damage.",
+    "verified": "verified"
   },
   {
    "id": "MA-1129",
@@ -18150,8 +18150,8 @@
    "reach": "5 ft.",
    "range": "",
    "recharge": "",
-   "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage plus 5 (2d4) Necrotic damage.",
-   "verified": "not verified"
+    "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage plus 5 (2d4) Necrotic damage.",
+    "verified": "verified"
   },
   {
    "id": "MA-1130",
@@ -18169,29 +18169,29 @@
    "reach": "",
    "range": "",
    "recharge": "",
-   "description": "The manticore makes three attacks, using Rend or Tail Spike in any combination.",
-   "verified": "not verified"
+    "description": "The manticore makes three attacks, using Rend or Tail Spike in any combination.",
+    "verified": "verified"
   },
   {
    "id": "MA-1131",
-   "stableKey": "manticore|actions|1",
-   "monsterIndex": "manticore",
-   "monster": "Manticore",
-   "actionIndex": 1,
-   "actionName": "Rend",
-   "category": "actions",
-   "actionType": "attack+save",
-   "attackBonus": 5,
-   "saveDc": 0,
-   "saveType": "",
-   "saveEffect": "",
-   "damageDicePrimary": "1d8 + 3",
-   "damageTypePrimary": "Slashing",
-   "reach": "5 ft.",
-   "range": "",
-   "recharge": "",
-   "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Slashing damage.",
-   "verified": "not verified"
+    "stableKey": "manticore|actions|1",
+    "monsterIndex": "manticore",
+    "monster": "Manticore",
+    "actionIndex": 1,
+    "actionName": "Rend",
+    "category": "actions",
+    "actionType": "attack+save",
+    "attackBonus": 5,
+    "saveDc": 0,
+    "saveType": "",
+    "saveEffect": "",
+    "damageDicePrimary": "1d8 + 3",
+    "damageTypePrimary": "Slashing",
+    "reach": "5 ft.",
+    "range": "",
+    "recharge": "",
+    "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Slashing damage.",
+    "verified": "verified"
   },
   {
    "id": "MA-1132",
