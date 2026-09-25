@@ -1289,13 +1289,20 @@ function buildParryBuff(action, lastAttack) {
   };
 }
 
-function buildParrySpendLog({ monsterName, lastAttack, buff }) {
+// MA-1203: an authored row may carry its RAW advisory legs (e.g. Mummy Lord
+// Whirlwind of Sand's teleport + Blinded burst, gridless §70 advisory) in
+// automation.description and a non-'Parry' row name — both are threaded into
+// the spend log so the GM-enforced instruction lands in the campaign log.
+// Byte-inert for the existing parry twins (name 'Parry', no description).
+function buildParrySpendLog({ monsterName, lastAttack, buff, action }) {
   const newAc = (Number(lastAttack.targetAc) || 0) + buff.acBonus;
+  const label = action?.name || 'Parry';
+  const advisory = action?.automation?.description ? ` ${action.automation.description}` : '';
   return {
     type: 'ability_use',
     characterName: monsterName,
-    abilityName: 'Parry',
-    description: `${monsterName} uses Parry — +${buff.acBonus} AC against ${lastAttack.attackerName}'s ${lastAttack.attackName || 'melee attack'} (AC ${lastAttack.targetAc} → ${newAc}). Dismiss the pending attack popup WITHOUT Done, then re-click the attacker's ${lastAttack.attackName || 'attack'} chip to re-resolve vs AC ${newAc}. Wielding a melee weapon is GM-enforced (no equip model). At Will — unlimited uses, 1 Reaction per round.`,
+    abilityName: label,
+    description: `${monsterName} uses ${label} — +${buff.acBonus} AC against ${lastAttack.attackerName}'s ${lastAttack.attackName || 'melee attack'} (AC ${lastAttack.targetAc} → ${newAc}). Dismiss the pending attack popup WITHOUT Done, then re-click the attacker's ${lastAttack.attackName || 'attack'} chip to re-resolve vs AC ${newAc}. Wielding a melee weapon is GM-enforced (no equip model). At Will — unlimited uses, 1 Reaction per round.${advisory}`,
     timestamp: Date.now(),
   };
 }
@@ -1327,7 +1334,7 @@ export async function resolveMonsterParry({ action, monsterName, campaignName, l
     parriedBy: monsterName,
     parryAcBonus: buff.acBonus,
   }, campaignName);
-  const entry = buildParrySpendLog({ monsterName, lastAttack, buff });
+  const entry = buildParrySpendLog({ monsterName, lastAttack, buff, action });
   await log(campaignName, entry);
   return { ok: true, message: entry.description, acBonus: buff.acBonus, newAc: (Number(lastAttack.targetAc) || 0) + buff.acBonus };
 }

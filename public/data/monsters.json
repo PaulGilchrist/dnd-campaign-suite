@@ -43225,7 +43225,17 @@
       {
         "name": "Whirlwind of Sand",
         "trigger": "The mummy is hit by an attack roll",
-        "description": "The mummy adds 2 to its AC against the attack, possibly causing the attack to miss, and the mummy teleports up to 60 feet to an unoccupied space it can see. Each creature of its choice that it can see within 5 feet of its destination space has the <strong>Blinded</strong> condition until the end of the mummy's next turn."
+        "description": "The mummy adds 2 to its AC against the attack, possibly causing the attack to miss, and the mummy teleports up to 60 feet to an unoccupied space it can see. Each creature of its choice that it can see within 5 feet of its destination space has the <strong>Blinded</strong> condition until the end of the mummy's next turn.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "melee_hit",
+          "effect": "parry",
+          "acBonus": 2,
+          "description": "GM-enforced advisory legs (gridless): the mummy teleports up to 60 feet to an unoccupied space it can see, then each creature of its choice it can see within 5 feet of its destination has the Blinded condition until the end of the mummy's next turn — no token-move or position-burst consumer; GM moves the token and grants Blinded manually. The +2 AC against the triggering attack is automated (MA-0341 parry channel)."
+        }
       }
     ],
     "legendary_actions": [

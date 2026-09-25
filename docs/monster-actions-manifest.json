@@ -19690,7 +19690,7 @@
         "blinded"
       ],
       "description": "The mummy adds 2 to its AC against the attack, possibly causing the attack to miss, and the mummy teleports up to 60 feet to an unoccupied space it can see. Each creature of its choice that it can see within 5 feet of its destination space has the Blinded condition until the end of the mummy's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1203-whirlwind-of-sand.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1204",
