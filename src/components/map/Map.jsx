@@ -83,6 +83,23 @@ function getWalls(mapData) {
     return mapData?.walls;
 }
 
+// Returns the revealed set (as an array) with every cell from `visible` merged
+// in, or null when nothing new was revealed. Fog of war is persistent: a cell
+// that has ever been seen stays seen, so we only ever grow the revealed set.
+function mergeNewlyRevealed(visible, revealed) {
+    const current = new Set(revealed || []);
+    let grew = false;
+    for (const key of visible) {
+        if (!current.has(key)) {
+            grew = true;
+            break;
+        }
+    }
+    if (!grew) return null;
+    for (const key of visible) current.add(key);
+    return Array.from(current);
+}
+
 function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(30);
     const SVG_SIZE = gridSize * CELL_SIZE;
@@ -203,7 +220,23 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
     });
 
-    const fog = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize);
+    // Exploration memory: merge newly revealed cells into the persisted set so
+    // uncovered areas stay uncovered. Runs on every client (any player may move
+    // a character); the write is idempotent and synced across clients via SSE.
+    const revealed = mapData?.revealed;
+    const { fog, visible } = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize, revealed);
+    useEffect(() => {
+        const next = mergeNewlyRevealed(visible, revealed);
+        if (next) {
+            setMapData(prev => ({ ...prev, revealed: next }));
+        }
+    }, [visible, revealed, setMapData]);
+
+    // GM: wipe exploration memory, leaving only the current line of sight
+    // uncovered (the map's starting state).
+    const resetFog = useCallback(() => {
+        setMapData(prev => ({ ...prev, revealed: Array.from(visible) }));
+    }, [visible, setMapData]);
 
     const { npcImages, setNpcImages } = useNpcImageCache(placedItems, campaignName);
 
@@ -312,7 +345,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     if (!mapData) return null;
 
-    if (mapData?.type === 'outdoor') {
+    if (mapData.type === 'outdoor') {
         return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} isLocalhost={isLocalhost} onPoiEntered={onPoiEntered} />;
     }
 
@@ -348,6 +381,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 zoomIn={zoomIn}
                 zoomOut={zoomOut}
                 resetView={resetView}
+                resetFog={resetFog}
                 onBack={onBack}
                 rulerMode={rulerMode}
                 setRulerMode={handleSetRulerMode}

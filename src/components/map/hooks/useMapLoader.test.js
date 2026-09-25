@@ -111,6 +111,7 @@ describe('useMapLoader', () => {
       expect(loaded).toEqual({
         ...existingData,
         walls: new Set(existingData.walls),
+        revealed: [],
       });
       expect(loaded.walls).toBeInstanceOf(Set);
       expect(Array.from(loaded.walls)).toEqual(existingData.walls);

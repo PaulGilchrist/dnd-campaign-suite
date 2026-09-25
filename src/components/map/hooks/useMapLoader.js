@@ -18,7 +18,7 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                 const existing = await mapsService.loadMapData(campaignName, mapName);
                 if (existing) {
                     const walls = existing.walls ? new Set(existing.walls) : new Set();
-                    setMapData({ ...existing, walls });
+                    setMapData({ ...existing, walls, revealed: existing.revealed || [] });
                     setGridSize(existing.gridSize || DEFAULT_GRID_SIZE);
                     setPlacedItems(existing.placedItems || []);
 

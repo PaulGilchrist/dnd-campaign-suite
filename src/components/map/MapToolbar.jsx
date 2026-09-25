@@ -19,6 +19,7 @@ const MapToolbar = ({
     zoomIn,
     zoomOut,
     resetView,
+    resetFog,
     onBack,
     rulerMode,
     setRulerMode,
@@ -111,9 +112,15 @@ const MapToolbar = ({
                     <button onClick={zoomOut}>
                         <i className="fa-solid fa-magnifying-glass-minus"></i>
                     </button>
-                    <button onClick={resetView}>
-                        <i className="fa-solid fa-rotate-left"></i> Reset View
-                    </button>
+                    {isLocalhost ? (
+                        <button onClick={() => { resetView(); resetFog(); }} title="Reset fog of war and view">
+                            <i className="fa-solid fa-rotate-left"></i> Reset Fog
+                        </button>
+                    ) : (
+                        <button onClick={resetView} title="Reset view">
+                            <i className="fa-solid fa-rotate-left"></i> Reset View
+                        </button>
+                    )}
                 </div>
             </div>
             {spellMode !== null && spellMode !== undefined && (

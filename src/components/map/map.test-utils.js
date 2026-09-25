@@ -193,7 +193,7 @@ export const setupMapMocks = (overrides = {}) => {
     }));
 
     _vi.mock('./hooks/useFogOfWar.js', () => ({
-        default: _vi.fn(() => new Set()),
+        default: _vi.fn(() => ({ fog: new Set(), visible: new Set() })),
     }));
 
     _vi.mock('./hooks/useMapDrops.js', () => ({

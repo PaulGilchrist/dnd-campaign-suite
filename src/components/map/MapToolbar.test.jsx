@@ -30,6 +30,7 @@ const renderMapToolbar = (props = {}) => {
         zoomIn: vi.fn(),
         zoomOut: vi.fn(),
         resetView: vi.fn(),
+        resetFog: vi.fn(),
         onBack: vi.fn(),
         rulerMode: false,
         setRulerMode: vi.fn(),
@@ -189,11 +190,22 @@ describe('MapToolbar', () => {
             expect(mockZoomOut).toHaveBeenCalledTimes(1);
         });
 
-        it('should call resetView when reset view button is clicked', () => {
+        it('should call resetView and resetFog when the GM clicks reset fog', () => {
             const mockResetView = vi.fn();
-            renderMapToolbar({ resetView: mockResetView });
+            const mockResetFog = vi.fn();
+            renderMapToolbar({ resetView: mockResetView, resetFog: mockResetFog });
+            fireEvent.click(screen.getByText('Reset Fog'));
+            expect(mockResetView).toHaveBeenCalledTimes(1);
+            expect(mockResetFog).toHaveBeenCalledTimes(1);
+        });
+
+        it('should call resetView (not resetFog) when a player clicks reset view', () => {
+            const mockResetView = vi.fn();
+            const mockResetFog = vi.fn();
+            renderMapToolbar({ isLocalhost: false, resetView: mockResetView, resetFog: mockResetFog });
             fireEvent.click(screen.getByText('Reset View'));
             expect(mockResetView).toHaveBeenCalledTimes(1);
+            expect(mockResetFog).not.toHaveBeenCalled();
         });
 
         it('should toggle items panel open when items button is clicked', () => {

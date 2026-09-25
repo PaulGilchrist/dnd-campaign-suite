@@ -201,7 +201,7 @@ vi.mock('./hooks/useSSESync.js', () => ({
 }));
 
 vi.mock('./hooks/useFogOfWar.js', () => ({
-    default: vi.fn(() => new Set()),
+    default: vi.fn(() => ({ fog: new Set(), visible: new Set() })),
 }));
 
 vi.mock('./hooks/useMapDrops.js', () => ({

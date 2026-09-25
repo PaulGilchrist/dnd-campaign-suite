@@ -712,7 +712,10 @@ describe('mapTestUtils', () => {
 
             const fogModule = await import('./hooks/useFogOfWar.js');
             const fogResult = fogModule.default();
-            expect(fogResult).toBeInstanceOf(Set);
+            expect(fogResult).toHaveProperty('fog');
+            expect(fogResult).toHaveProperty('visible');
+            expect(fogResult.fog).toBeInstanceOf(Set);
+            expect(fogResult.visible).toBeInstanceOf(Set);
 
             const useMapDrops = (await import('./hooks/useMapDrops.js')).default;
             const mapDropsResult = useMapDrops();

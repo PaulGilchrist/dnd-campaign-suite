@@ -207,7 +207,7 @@ vi.mock('./hooks/useSSESync.js', () => ({
 }));
 
 vi.mock('./hooks/useFogOfWar.js', () => ({
-    default: vi.fn(() => new Set()),
+    default: vi.fn(() => ({ fog: new Set(), visible: new Set() })),
 }));
 
 vi.mock('./hooks/useMapDrops.js', () => ({
@@ -401,22 +401,22 @@ describe('Map - fog of war role rendering', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         resetState();
-        vi.mocked(useFogOfWar).mockReturnValue(new Set());
+        vi.mocked(useFogOfWar).mockReturnValue({ fog: new Set(), visible: new Set() });
     });
 
     afterEach(() => {
-        vi.mocked(useFogOfWar).mockReturnValue(new Set());
+        vi.mocked(useFogOfWar).mockReturnValue({ fog: new Set(), visible: new Set() });
     });
 
     it('renders translucent fog-cell rects for the GM', async () => {
-        vi.mocked(useFogOfWar).mockReturnValue(new Set(['0,0']));
+        vi.mocked(useFogOfWar).mockReturnValue({ fog: new Set(['0,0']), visible: new Set() });
         const { container } = await act(async () => renderMap());
         expect(container.querySelector('.fog-cell')).toBeTruthy();
         expect(container.querySelector('.fog-cell-player')).toBeNull();
     });
 
     it('renders opaque fog-cell-player rects for players', async () => {
-        vi.mocked(useFogOfWar).mockReturnValue(new Set(['0,0']));
+        vi.mocked(useFogOfWar).mockReturnValue({ fog: new Set(['0,0']), visible: new Set() });
         const { container } = await act(async () => renderMap({ isLocalhost: false }));
         expect(container.querySelector('.fog-cell-player')).toBeTruthy();
         expect(container.querySelector('.fog-cell')).toBeNull();
