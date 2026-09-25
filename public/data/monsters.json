@@ -40533,7 +40533,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "1d6 + 1",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["prone"]
       }
     ],
     "bonus_actions": [],
