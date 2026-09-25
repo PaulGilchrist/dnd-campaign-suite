@@ -40776,6 +40776,7 @@
         "attack_bonus": 2,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6",
+        "damage_dice_two_handed": "1d8",
         "damage_type_primary": "Piercing"
       }
     ],

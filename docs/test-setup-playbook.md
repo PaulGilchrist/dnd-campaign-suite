@@ -579,3 +579,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §479 (2026-09-25, MA-1125) New pitfalls
 - MA-1125 (FIXED, magmin Touch §215 hit_target_effect one-field): te `burning` grants live via hit-clause passthrough (top-level targetEffects {target,effect,source,duration:"until_start_of_next_turn"} + condition-applied "Burning" registry-label log + anchor addExpiration under ATTACKER cd key `pendingExpirations`, expiryRounds:null) — BUT no "Burning" badge on initiative cards: ConditionEffectBadges BADGE_SPECS is spec-driven (:583, no burning spec) = §224 enlarged-class residual; state proof = top-level te + log + expiry walk (te survives victim's R2 start, clears at anchor's R2 start, stamp `2:<attacker>`). EB-rejoin cs-HP full-store POST can be clobbered by tab's stale snapshot ~immediately post-join — settle ~10s, re-stamp, GET-confirm before rolling (§15 twin).
+
+## §480 (2026-09-25, MA-1146) New pitfalls
+- MA-1146 (FIXED, merfolk Spear one-field damage_dice_two_handed:"1d8" modifier-less per prose): HIT-popup chooser variant buttons SHARE class `dice-roll-reroll-btn` with Done — first-`.dice-roll-reroll-btn` finder hits Two-Handed, not Done; match Done by exact text. Ocean Spear sibling MA-1147 carries live damage_dice_secondary "1d4" — two-handed byte-pins must scope to two-handed keys only.
