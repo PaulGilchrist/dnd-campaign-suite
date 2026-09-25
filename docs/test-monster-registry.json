@@ -4979,7 +4979,101 @@
     "config": {
       "name": "Lizardfolk Shaman 1",
       "csIndex": 1,
-      "verifiedRow": "MA-1110 (PASS-subset multiattack header: byte-exact zero-chip row §66; components Bite +4 1d6+2 Piercing / Claws +4 1d4+2 Slashing both live; ledger: Bite nat1->5 MISS done-less backdrop clean, Claws nat10->14 HIT fd5 hp999->994 exact, Bite nat9->13 HIT fd8 1d6+2 Piercing 994->986 exact; nat+4 flips vs AC12 honest x3, one attack log per press, 0 console errors 2026-09-24; 'Lizardfolk Form Only' clause inert §70 advisory: shapeShiftForm consumers only monsterShapeShift.js MA-1020 imp seam, zero ATTACK gating consumers, shaman Change Shape row no automation; count GM-adjudicated §66; admin-cleared after row)"
+      "verifiedRow": "MA-1110 (PASS-subset multiattack header: byte-exact zero-chip row §66; components Bite +4 1d6+2 Piercing / Claws +4 1d4+2 Slashing both live; ledger: Bite nat1->5 MISS done-less backdrop clean, Claws nat10->14 HIT fd5 hp999->994 exact, Bite nat9->13 HIT fd8 1d6+2 Piercing 994->986 exact; nat+4 flips vs AC12 honest x3, one attack log per press, 0 console errors 2026-09-24; 'Lizardfolk Form Only' clause inert §70 advisory: shapeShiftForm consumers only monsterShapeShift.js MA-1020 imp seam, zero ATTACK gating consumers, shaman Change Shape row no automation; count GM-adjudicated §66; admin-cleared after row) | MA-1111 Bite FAIL(a)/DATA (2026-09-24): core exact (+4 flips AC12, 1d6+2 Prc, 14 hits fd sum==|hpΔ| chain 999->917, AC19 rig flip, boundary nat7->11 miss); riders inert: OCR 1dlO alternate dice + grapple/restrained/escape_dc:12 unauthored (hit_conditions absent, giant-crocodile MA-0801 byte-twin = fix template) -> bug-mon-MA-1111. Board: Lizardfolk Shaman 1 AC13 init10 maxHp999, victim Bandit 1 AC12 maxHp999 init13; admin-cleared after row, target un-armed. | MA-1112 Claws PASS (2026-09-24): core byte-exact 6 presses (+4 vs AC12, hits nat12/13/12/17/12 + honest miss nat7->11 done-less; formula 1d4+2 Slashing fd==|hpD| chain 999->977; form-gate inert = s70 advisory). Board ADMIN-CLEARED after row (cs creatures [], change-data {}, log 0) - shamans NOT on board, re-stage needed MA-1113 onward. | MA-1113 Change Shape FAIL(b)/DATA (2026-09-24): row keys name+description only, zero affordance (all MonsterAction lanes null, row div no-onClick), 2-click probe zero log/cd delta, walk no shapeShiftForm; fix template imp MA-1020 monster_shape_shift automation, polymorph grep-zero monster-side; board admin-cleared after row. NEW discriminator: zero-affordance initiative-avatar probe leaves ONLY combat-ui-viewingMonster[+CreatureName] cosmetic cd keys."
+    }
+  },
+  "Lizardfolk Sovereign": {
+    "config": {
+      "name": "Lizardfolk Sovereign 1",
+      "csIndex": 1,
+      "monsterIndex": "lizardfolk-sovereign",
+      "ac": 15,
+      "init": 7,
+      "hp": "all four keys 999",
+      "victim": "Bandit 1 csIdx0 AC12 init19 HP999",
+      "verifiedRow": "MA-1114 Multiattack PASS-subset (2026-09-24): header zero-affordance + spurious \"+5\" header chip (disk attack_bonus:5 arms MonsterAction.jsx:338, rolls to-hit ZERO damage, noise roll/attack entry excluded from counts) = s411-class cosmetic, byte-twin lizard-king-queen omits attack_bonus MA-1097; components Bite +5 1d10+3 Piercing nat19->24 fd13 999->986 / Earthen Maul +5 2d6+3 Bludgeoning nat11->16 fd11 986->975, chain exact, PB2+STR3=+5, 0 DC0 chips (s437), 0 console errors; crit unobserved s32; count GM-adjudicated s66 round=1 constancy s151; riders Bite-THP + Maul-Prone both INERT (attacker no tempHp key, victim activeConditions null, zero condition logs) = MA-1115/MA-1116 scope; board ADMIN-CLEARED after row (cd {}, log 0, cs value:null) - Sovereign NOT re-staged | MA-1115 Bite PASS-subset (2026-09-24): core exact nat9->14 & nat10->15 HIT 1d10+3 Piercing fd8/fd7 |hpD| exact, nat10->15 MISS vs AC19 rig self-validating (miss popup has NO Done btn - stage-2 el.click only); THP rider NO expressible transport (hit-path grep-zero, save-path parser static-digit-only, no attacker THP te) = s410 prose-only escape; Construct/Undead qualifier grep-zero live consumer = advisory; zero DC chips on row (DC0 gate s437); admin-cleared after. NEW PITFALLS: POST /:c/change-data falls through generic :key route writing JUNK literal 'change-data' key (invisible under exact-match GET; self-heal DELETE /:c/change-data) - rig via /combatSummary {combatSummary:cs}; EB monster-filter retains prior checkboxes across searches - enumerate checked rows pre-Join. | MA-1116 Earthen Maul FAIL(a)/DATA (2026-09-24): core exact (nat15->20 & nat19->24 vs AC12, 2d6+3 Bludgeoning fd9/fd10 |hpD| exact resisted:false, lastAttack.saveDc:null = DC0 gate held); Prone rider INERT on Medium victim 2/2 (victim cd store key never created, targetEffects key-absent, zero type:condition logs) - transport live-unarmed, one-field hit_conditions:[prone] MA-0763 byte-shape; Medium-vs-Large size-gate caveat in Notes -> bug-mon-MA-1116; admin-cleared after (cs value:null, log 0, cd {}); NEW discriminator: absent per-victim cd STORE KEY = stronger zero-grant proof than zero log lines (lag can hide a line, never a whole key once consumer ran)."
+    }
+  },
+  "Mage": {
+    "config": {
+      "name": "Mage 1",
+      "csIndex": 0,
+      "monsterIndex": "mage",
+      "ac": 15,
+      "init": 21,
+      "hp": "all four keys 999",
+      "victim": "Bandit 1 csIdx1 AC12 init18 Force-clean",
+      "verifiedRow": "MA-1117 Multiattack PASS-subset (2026-09-24): 3x Arcane Burst +6 fires, nat18->24 fd22, honest miss nat3->9 done-less, CRIT nat20 \"3d8*2+3\" fd33 flat-undoubled s32, chain 999->944 exact; header +6 spurious chip s440 to-hit-only zero-dmg excluded; Spellcasting row 9 chips + Fireball 2/Day & Cone of Cold/Fly 1/Day counters visible (MA-1119 scope); DC0 inert s437; 0 console errors; board ADMIN-CLEARED after (cd {} log 0 cs null) | MA-1118 Arcane Burst PASS-subset (2026-09-24): 4 honest presses nat7->13 HIT fd17, nat1 crit-miss + nat5->11 MISS done-less, nat17->23 HIT fd17; formula 3d8+3 Force byte-exact fd==|hpD|, chain 999->965; zero DC chips (save_dc:0 decoy gate s437), no dual-mode chooser correct (damage_dice_ranged absent s150), 0 console errors; AC never rigged; admin-cleared after | MA-1119 Spellcasting PASS-subset (2026-09-24): 9/9 spell chips zero-junk, DC14 stamped (row save_dc numeric - s218 DC-Unknown N/A), 1/Day gates live exhausted-refused automation-blocked, At-Will ungated 2/2, per-spell counters independent, spent class on 0-left only, Fireball prompt never confirmed (Dismiss), 0 console errors; residual s84 cancel-keeps-paid x2 live (spendMonsterSpellUseIfNeeded:2110 pays pre no-target-guard - refusal prose 'Zero spend' LIES, judge counter only); admin-cleared after | MA-1120 Protective Magic FAIL(b)/DATA (2026-09-24): reaction row keys name+trigger+description only, zero affordance even with s109 spell-origin lastAttack pending window seeded+survived-reload; counterspell is registered GATED_MONSTER_REACTIONS (Helpers:963, trigger enemy_spell_cast, live resolver :1977) with 4 authored twins incl ARCHMAGE same-name Protective Magic :6582 - fix block automation{type:reaction,trigger:enemy_spell_cast,effect:counterspell}+At Will sentinel; Shield half grep-zero choose-one caveat Notes; admin-cleared after. GATED census: parry x8, feather_fall x4, counterspell x4, hellish_rebuke x2, +6 singleton effects"
+    }
+  },
+  "Mage Apprentice": {
+    "config": {
+      "name": "Mage Apprentice 1",
+      "csIndex": 0,
+      "monsterIndex": "mage-apprentice",
+      "ac": 15,
+      "init": 8,
+      "hp": "all four keys 999",
+      "victim": "Bandit 1 csIdx1 AC12 Force-clean init2",
+      "verifiedRow": "MA-1121 Arcane Burst PASS-subset (2026-09-24): 5 honest presses vs AC12 - 4 HITs 2d10+3 Force fd17/14/16/15 chain 999->937 exact, honest miss nat4->9 done-less; single +5 chip, zero DC chips (s437), label-noise save axis (lastAttack.saveDc:null s117), no chooser correct (s150); 0 console errors; NOTE join suffix now on cs NAME too (\"Mage Apprentice 1\" in cs, s131 refined); admin-cleared after | MA-1122 Spellcasting PASS-subset (2026-09-24): 6/6 chips zero-junk, +5 row chip=attack_bonus text, DC13/Int stamped, gates live Disguise-Self exhausted-refused, At-Will ungated x2, Thunderwave unarmed BURN (s444 lie twin), Ice Knife spell-attack lane refuses PRE-spend true-zero (Modal:1536 vs save-lane :2110 = lane-dependent spend semantics), Mage Armor advisory self-cast no-state s69; 0 resolution console errors (1 guard console.error legitimate); admin-cleared after"
+    }
+  },
+  "Magma Mephit": {
+    "config": {
+      "name": "Magma Mephit 1",
+      "monsterIndex": "magma-mephit",
+      "ac": 11,
+      "init": 13,
+      "hp": "all four keys 999",
+      "victim": "Bandit x2 (qty stepper in td.col-qty, native aria-label click 1-shot)",
+      "verifiedRow": "MA-1123 Claw PASS (see prior stamp) | MA-1124 Fire Breath PASS-subset (2026-09-24): cone picker 2/2, DC11 Dex both legs exact (fail full 8/11, success half floor 2/5 - full-word dex ±19 rig both bandits), recharge FULL cycle (spend-at-picker, .mc-recharge-refusal refused zero-volley, recovery d6 walk 5,3,2,4,1,6 at turn-start, re-armed re-spent fresh stamp); residual: prose \"(Recharge 6)\" token absent vs field recharge:6 canonical-5-6 = cosmetic wording drift Notes-only, no file; row attack_bonus:0 spurious +0 chip s411; admin-cleared after; NOTE threshold-6 walk-hog ~17 clicks/wrap split into <=8-chunk polls"
+    }
+  },
+  "Magmin": {
+    "config": {
+      "name": "Magmin 1",
+      "monsterIndex": "magmin",
+      "hp": "all four keys 999",
+      "victim": "Bandit 1 AC12 Fire-clean 999",
+      "verifiedRow": "MA-1125 Touch FAIL(a)/DATA (2026-09-24): core exact 2/2 hits 2d4+2 Fire fd5/6 |hpD| exact nat12->16/nat17->21 vs AC12 honest, crit unobserved, zero DC chips s437 label-noise s117 (saveDc absent lastAttack); burning rider inert 2/2 - victim cd key ABSENT value:null gold-standard zero-grant, top te null, zero condition/tick entries even post walk x2; transport LIVE-unarmed: burning te registered :150 + hit_target_effect generic passthrough (Helpers:651, handlePlainDamage:611/:654) twins MA-0995/0733/1012 -> one-field hit_target_effect:\"burning\"; NOTE adjudication shortcut: registry-member te + row lacks field = FAIL(a) full stop; burn tick consumer zero app-wide Notes s87; admin-cleared after"
+    }
+  },
+  "Mammoth": {
+    "config": {
+      "name": "Mammoth (unsuffixed cs name at qty=1 - renameNpc no suffix/monsterIndex unset)",
+      "monsterIndex": "mammoth",
+      "hp": "all four keys 999",
+      "victim": "Bandit AC12 Medium 999",
+      "verifiedRow": "MA-1126 Multiattack PASS-subset (2026-09-24): 2x Gore chips fire exact - nat6->16 fd14, nat4->14 fd17, chain 999->968, 2d10+7 Piercing byte-exact, rig ac:19 miss nat4->14 effAc19 honest, restored; header +10 s440 to-hit-only dismiss-only popup (MUST dismiss pre-next-press, intercepts); PB3+STR7=+10; zero DC chips s437; MA-1127 charge/prone rider zero-fired (recorded, row-scope); 0 console errors; board admin-cleared players-only after; NOTE join path +NPC autocomplete li:text-is exact (Bandit 4-row family), chips span.mc-dice-link[role=button] not button - 2-phase id-tag §121 | MA-1127 Gore PASS-subset (2026-09-24): 3/3 hits incl CRIT nat20 2d10*2+7 fd25, nat8->18 fd23, nat19->29 fd17, chain 999->934 Piercing resisted:false exact, formula byte-exact; charge-prone rider HONEST-unexpressible MA-0903 verbatim frame (maybeApplyRamProne ramActive gated PC stance only, no monster-disk vocabulary, no movement-distance subsystem Helpers:583, no conditional_damage so no ChargeBonusOffer - popup btn audit Done-only x3); zero DC chips, victim cd absent-key x3, 0 console errors; NOTE +NPC autocomplete joins ship cs entries WITHOUT monsterIndex key at all - prove identity via disk-exact HP/AC not cs.monsterIndex"
+    }
+  },
+  "Manes": {
+    "config": {
+      "name": "Manes 1",
+      "monsterIndex": "manes",
+      "ac": 9,
+      "hp": "9/9 disk, 999 staged",
+      "victim": "Bandit 1 AC12 Slashing-clean",
+      "verifiedRow": "MA-1128 Claw PASS (2026-09-24): 6 presses 2 HITs bare \"2d4\" Slashing fd3/fd7 |hpD| exact nat16->18/nat13->15, 4 honest misses incl nat9->11 near, +2=PB2+STR0 (DEX -1, STR-based), zero DC chips decoy lastAttack.saveDc null, no Multiattack row (clean, s440 N/A), EB checkbox route monsterIndex present both, 0 console errors; admin-cleared after"
+    }
+  },
+  "Manes Vaporspawn": {
+    "config": {
+      "name": "Manes Vaporspawn 1",
+      "monsterIndex": "manes-vaporspawn",
+      "hp": "all four keys 999",
+      "victim": "Bandit 1 AC12 necrotic-clean disk+cs",
+      "verifiedRow": "MA-1129 Claw PASS exact (2026-09-24): 2/2 hits both legs sum-exact incl CRIT nat20 both doubled 1d6*2+2 fd14 + 2d4 sfd14 =28 |hpD|, non-crit fd4+sfd4=8 exact, 2 honest misses done-less; +4=STR2+PB2; \"plus\" additive secondary byte-clean MA-1123 twin; zero DC chips s437, no Multiattack row, 0 console errors, s414 not observed this read; admin-cleared after"
+    }
+  },
+  "Manticore": {
+    "config": {
+      "name": "Manticore 1",
+      "monsterIndex": "manticore",
+      "ac": "disk",
+      "hp": "all four keys 999",
+      "victim": "Bandit 1 AC12 Slash/Pierce-clean 999",
+      "verifiedRow": "MA-1130 Multiattack PASS-subset (2026-09-24): components byte-split correct Rend 1d8+3 Slashing fd8, Tail Spike 1d8+3 Piercing fd10 chain 999->981, TS 100/200 band rangeReason:null s150, header +5 s440 benign probe, PB2+STR3=+5, count GM s66 satisfied, 0 console errors; NOTE EB checkbox proxy-clicks silent no-op - native cb.click evaluate + checked-set enum only; Join!=Save (Save opens name-modal disk-only); EB selection ephemeral across view switches; player-card selects list all NPCs - match cards img[alt]; admin-cleared after | MA-1131 Rend PASS (2026-09-24): 4 presses nat7->12 exact-boundary HIT fd9, nat19->24 HIT fd8, 1d8+3 Slashing byte-exact |hpD| exact chain 999->982, crit-miss nat1 + 1 miss done-less; zero DC chips s437 lastAttack.saveDc null s117; 0 console errors. NEW PITFALLS: mc-ally-badge.clickable opens lingering sp-overlay intercepting popup pointers - Cancel natively first; NO select inside mc-overlay - arming = initiative tracker row-select (self-excluded, native setter+change); card chips: 3 attack rows Multiattack/Rend/Tail Spike"
     }
   }
 }
