@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createOverlayGroup, parseOverlayColor, ftToUnits, EFFECT_HEIGHT } from './map3dSpellOverlays.js';
-import { OverlayShape } from '../../../models/SpellOverlay.js';
+import { OverlayShape, OVERLAY_FILL_ALPHA, OVERLAY_STROKE_ALPHA } from '../../../models/SpellOverlay.js';
 
 const makeOverlay = (overrides = {}) => ({
     id: 'o1',
@@ -54,7 +54,7 @@ describe('parseOverlayColor', () => {
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const { color, alpha } = parseOverlayColor(THREE, 'not-a-color');
         expect(color).toEqual(expectedColor);
-        expect(alpha).toBeCloseTo(0.35);
+        expect(alpha).toBeCloseTo(OVERLAY_FILL_ALPHA);
         expect(spy).toHaveBeenCalled();
     });
 });
@@ -110,7 +110,7 @@ describe('createOverlayGroup', () => {
             expect(box.max.y).toBeCloseTo(80);
             const outline = getOutline(group);
             expect(outline).toBeInstanceOf(THREE.LineSegments);
-            expect(outline.material.opacity).toBeCloseTo(0.8);
+            expect(outline.material.opacity).toBeCloseTo(OVERLAY_STROKE_ALPHA);
             expect(outline.renderOrder).toBe(1002);
         });
     });
