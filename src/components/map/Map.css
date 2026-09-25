@@ -135,6 +135,14 @@
     stroke-width: 3;
 }
 
+/* Invalid drop target during drag (wall, closed door, or unreachable cell) */
+.map .creature-circle.drag-invalid {
+    fill: #e74c3c;
+    stroke: #ff7675;
+    stroke-width: 4;
+    filter: drop-shadow(0 0 6px rgba(231, 76, 60, 0.9));
+}
+
 /* Selected state (context menu) */
 .map .creature-circle.selected {
     stroke: #FFD700;
@@ -181,6 +189,13 @@
 [data-theme="light"] .map .creature-circle.dragging {
     fill: #ff6b6b;
     stroke: #c0392b;
+}
+
+[data-theme="light"] .map .creature-circle.drag-invalid {
+    fill: #e74c3c;
+    stroke: #ff7675;
+    stroke-width: 4;
+    filter: drop-shadow(0 0 6px rgba(231, 76, 60, 0.9));
 }
 
 [data-theme="light"] .map .creature-circle.selected {
@@ -232,6 +247,13 @@
     body:not([data-theme="dark"]) .map .creature-circle.dragging {
         fill: #ff6b6b;
         stroke: #c0392b;
+    }
+
+    body:not([data-theme="dark"]) .map .creature-circle.drag-invalid {
+        fill: #e74c3c;
+        stroke: #ff7675;
+        stroke-width: 4;
+        filter: drop-shadow(0 0 6px rgba(231, 76, 60, 0.9));
     }
 
     body:not([data-theme="dark"]) .map .creature-circle.selected {

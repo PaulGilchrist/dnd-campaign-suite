@@ -1,18 +1,13 @@
 import { useMemo } from 'react';
 import { computeVisibility } from '../../../services/maps/lineOfSight.js';
 import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
+import { computeClosedDoors } from '../../../services/maps/reachability.js';
 
 function useFogOfWar(players, walls, placedItems, gridSize) {
     return useMemo(() => {
         if (!gridSize) return new Set();
 
-        const closedDoors = new Set();
-        for (const item of placedItems || []) {
-            if (item.type === 'door' && !item.open) {
-                closedDoors.add(`${item.gridX},${item.gridY}`);
-            }
-        }
-
+        const closedDoors = computeClosedDoors(placedItems);
         const fogSet = new Set();
 
         if (!players || players.length === 0) {

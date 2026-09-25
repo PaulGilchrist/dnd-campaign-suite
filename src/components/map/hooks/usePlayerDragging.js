@@ -1,6 +1,11 @@
 import { useState, useCallback } from 'react';
 import { CELL_SIZE } from '../../../config/mapConfig';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import {
+    computeMovementObstacles,
+    computeReachable,
+    findNearestValid,
+} from '../../../services/maps/reachability.js';
 
 function toSvgPoint(svg, clientX, clientY) {
     const pt = svg.createSVGPoint();
@@ -16,36 +21,13 @@ function clampToGrid(v, gridSize) {
 }
 
 function findFreeSquare(startX, startY, occupiedSquares, gridSize) {
-    if (!occupiedSquares.has(`${startX},${startY}`)) {
-        return { targetX: startX, targetY: startY };
-    }
-
-    const visited = new Set([`${startX},${startY}`]);
-    const queue = [[startX, startY]];
-
-    while (queue.length > 0) {
-        const [x, y] = queue.shift();
-        if (!occupiedSquares.has(`${x},${y}`)) {
-            return { targetX: x, targetY: y };
-        }
-        const neighbors = [
-            [x + 1, y],
-            [x - 1, y],
-            [x, y + 1],
-            [x, y - 1],
-        ];
-        for (const [nx, ny] of neighbors) {
-            const clampedNx = clampToGrid(nx, gridSize);
-            const clampedNy = clampToGrid(ny, gridSize);
-            const clampedKey = `${clampedNx},${clampedNy}`;
-            if (!visited.has(clampedKey) && !occupiedSquares.has(clampedKey)) {
-                visited.add(clampedKey);
-                queue.push([clampedNx, clampedNy]);
-            }
-        }
-    }
-
-    return { targetX: startX, targetY: startY };
+    const found = findNearestValid(
+        startX,
+        startY,
+        (x, y) => !occupiedSquares.has(`${x},${y}`),
+        gridSize
+    );
+    return { targetX: found ? found.x : startX, targetY: found ? found.y : startY };
 }
 
 export default function usePlayerDragging({
@@ -58,6 +40,9 @@ export default function usePlayerDragging({
     rulerMode,
     spellMode,
     campaignName,
+    isLocalhost,
+    walls,
+    placedItems,
 }) {
     const [dragging, setDragging] = useState(null);
 
@@ -78,13 +63,23 @@ export default function usePlayerDragging({
         const cx = gridCenterX(player.gridX);
         const cy = gridCenterY(player.gridY);
 
+        // The GM can hold Shift to bypass the walkable-cell constraint
+        // (narrative teleports); everyone else may only drag the token
+        // through cells it could actually walk through.
+        const unconstrained = Boolean(isLocalhost && e.shiftKey);
+        const reachable = unconstrained
+            ? null
+            : computeReachable(player.gridX, player.gridY, computeMovementObstacles(walls, placedItems), gridSize);
+
         setDragging({
             playerId,
             pointerId: e.pointerId,
             offsetX: svgPt.x - cx,
-            offsetY: svgPt.y - cy
+            offsetY: svgPt.y - cy,
+            unconstrained,
+            reachable,
         });
-    }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef]);
+    }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef, isLocalhost, walls, placedItems, gridSize]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;
@@ -104,6 +99,19 @@ export default function usePlayerDragging({
 
         const clampedGridX = clampToGrid(Math.floor(cx / CELL_SIZE), gridSize);
         const clampedGridY = clampToGrid(Math.floor(cy / CELL_SIZE), gridSize);
+
+        if (!dragging.unconstrained) {
+            // Keep the token inside its walkable region so the fog of war
+            // cannot be lifted across walls or closed doors.
+            const valid = dragging.reachable.has(`${clampedGridX},${clampedGridY}`);
+            if (!valid) {
+                setDragging((prev) => (prev && !prev.invalid ? { ...prev, invalid: true } : prev));
+                return;
+            }
+            if (dragging.invalid) {
+                setDragging((prev) => (prev && prev.invalid ? { ...prev, invalid: false } : prev));
+            }
+        }
 
         setMapData((prev) => ({
             ...prev,
@@ -141,7 +149,24 @@ export default function usePlayerDragging({
                 .map((c) => `${c.gridX},${c.gridY}`)
         );
 
-        const { targetX, targetY } = findFreeSquare(clampedGridX, clampedGridY, occupiedSquares, gridSize);
+        let targetX;
+        let targetY;
+        if (dragging.unconstrained) {
+            ({ targetX, targetY } = findFreeSquare(clampedGridX, clampedGridY, occupiedSquares, gridSize));
+        } else {
+            // The drop must be a cell the player could walk to: reachable
+            // from where the drag started, not a wall or closed door, and
+            // unoccupied. Otherwise snap to the nearest such cell, falling
+            // back to the player's current cell if none exists.
+            const found = findNearestValid(
+                clampedGridX,
+                clampedGridY,
+                (x, y) => dragging.reachable.has(`${x},${y}`) && !occupiedSquares.has(`${x},${y}`),
+                gridSize
+            );
+            targetX = found ? found.x : player.gridX;
+            targetY = found ? found.y : player.gridY;
+        }
 
         setMapData((prev) => ({
             ...prev,

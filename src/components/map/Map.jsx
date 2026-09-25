@@ -87,6 +87,10 @@ function getRooms(mapData) {
     return mapData?.rooms || [];
 }
 
+function getWalls(mapData) {
+    return mapData?.walls;
+}
+
 function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(30);
     const SVG_SIZE = gridSize * CELL_SIZE;
@@ -166,7 +170,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         addOverlay, shapeParams, updateOverlay, updateOverlayImmediate, svgRef,
     });
 
-    const { handleDrop } = useMapDrops({ isLocalhost, getGridFromEvent, setMapData, setPlacedItems });
+    const { handleDrop } = useMapDrops({ isLocalhost, getGridFromEvent, setMapData, setPlacedItems, placedItems, gridSize });
 
     useEffect(() => {
         loadMonsters().then(setMonstersLoaded).catch((e) => { console.error("[Map] Error:", e); });
@@ -205,6 +209,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     const { dragging, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
         svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
+        isLocalhost, walls: getWalls(mapData), placedItems,
     });
 
     const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({

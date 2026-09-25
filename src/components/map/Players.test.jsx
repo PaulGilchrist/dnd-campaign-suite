@@ -258,6 +258,32 @@ describe('Players', () => {
         });
     });
 
+    describe('drag invalid state', () => {
+        it('should apply drag-invalid class when the dragged player is over an invalid cell', () => {
+            const player = makePlayer({ id: 'player-1' });
+            const dragging = { playerId: 'player-1', invalid: true };
+            const { container } = renderComponent({ dragging }, [player], []);
+            const circle = container.querySelector('circle.creature-circle');
+            expect(circle).toHaveClass('drag-invalid');
+        });
+
+        it('should not apply drag-invalid class when the dragged player is over a valid cell', () => {
+            const player = makePlayer({ id: 'player-1' });
+            const dragging = { playerId: 'player-1', invalid: false };
+            const { container } = renderComponent({ dragging }, [player], []);
+            const circle = container.querySelector('circle.creature-circle');
+            expect(circle).not.toHaveClass('drag-invalid');
+        });
+
+        it('should not apply drag-invalid class when a different player is dragged', () => {
+            const player = makePlayer({ id: 'player-1' });
+            const dragging = { playerId: 'player-2', invalid: true };
+            const { container } = renderComponent({ dragging }, [player], []);
+            const circle = container.querySelector('circle.creature-circle');
+            expect(circle).not.toHaveClass('drag-invalid');
+        });
+    });
+
     describe('selected state', () => {
         it('should apply selected class when player is selected', () => {
             const player = makePlayer({ id: 'player-1' });

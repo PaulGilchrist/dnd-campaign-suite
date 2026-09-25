@@ -142,6 +142,76 @@ describe('useMapDrops', () => {
       });
     });
 
+    it('should snap a character drop onto a wall cell to the nearest passable cell', () => {
+      const walls = new Set(['5,3']);
+      setMapData = vi.fn((fn) => {
+        if (typeof fn === 'function') {
+          const prev = { players: [], walls };
+          return fn(prev);
+        }
+        return fn;
+      });
+      getGridFromEvent.mockReturnValue({ gridX: 5, gridY: 3 });
+      const result = getHook({ gridSize: 30, placedItems: [] });
+      act(() => {
+        result.current.handleDrop({
+          preventDefault: vi.fn(),
+          dataTransfer: { getData: () => 'character:Gandalf' },
+        });
+      });
+      const callArg = setMapData.mock.calls[0][0];
+      const updated = callArg({ players: [], walls });
+      expect(updated.players).toHaveLength(1);
+      expect(updated.players[0].gridX).toBe(6);
+      expect(updated.players[0].gridY).toBe(3);
+    });
+
+    it('should snap a character drop onto a closed door cell to the nearest passable cell', () => {
+      const doorItems = [{ type: 'door', open: false, gridX: 5, gridY: 3 }];
+      setMapData = vi.fn((fn) => {
+        if (typeof fn === 'function') {
+          const prev = { players: [], walls: new Set() };
+          return fn(prev);
+        }
+        return fn;
+      });
+      getGridFromEvent.mockReturnValue({ gridX: 5, gridY: 3 });
+      const result = getHook({ gridSize: 30, placedItems: doorItems });
+      act(() => {
+        result.current.handleDrop({
+          preventDefault: vi.fn(),
+          dataTransfer: { getData: () => 'character:Gandalf' },
+        });
+      });
+      const callArg = setMapData.mock.calls[0][0];
+      const updated = callArg({ players: [], walls: new Set() });
+      expect(updated.players).toHaveLength(1);
+      expect(updated.players[0].gridX).toBe(6);
+      expect(updated.players[0].gridY).toBe(3);
+    });
+
+    it('should not move a character drop that lands on a passable cell', () => {
+      setMapData = vi.fn((fn) => {
+        if (typeof fn === 'function') {
+          const prev = { players: [], walls: new Set(['0,0']) };
+          return fn(prev);
+        }
+        return fn;
+      });
+      getGridFromEvent.mockReturnValue({ gridX: 5, gridY: 3 });
+      const result = getHook({ gridSize: 30, placedItems: [] });
+      act(() => {
+        result.current.handleDrop({
+          preventDefault: vi.fn(),
+          dataTransfer: { getData: () => 'character:Gandalf' },
+        });
+      });
+      const callArg = setMapData.mock.calls[0][0];
+      const updated = callArg({ players: [], walls: new Set(['0,0']) });
+      expect(updated.players[0].gridX).toBe(5);
+      expect(updated.players[0].gridY).toBe(3);
+    });
+
     it('should not add a duplicate character (same name)', () => {
       setMapData = vi.fn((fn) => {
         if (typeof fn === 'function') {

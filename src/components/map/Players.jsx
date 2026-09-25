@@ -38,7 +38,7 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                             cx={cx}
                             cy={cy}
                             r={RADIUS}
-                            className={`creature-circle ${dragging?.creatureId === player.id ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+                            className={`creature-circle ${dragging?.creatureId === player.id ? 'dragging' : ''} ${dragging?.playerId === player.id && dragging?.invalid ? 'drag-invalid' : ''} ${isSelected ? 'selected' : ''}`}
                             onContextMenu={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();

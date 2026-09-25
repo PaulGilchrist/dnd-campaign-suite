@@ -66,16 +66,19 @@ describe('usePlayerDragging', () => {
         rulerMode: false,
         spellMode: false,
         campaignName,
+        isLocalhost: false,
+        walls: new Set(),
+        placedItems: [],
         ...overrides,
       })
     );
     return result;
   };
 
-  const setupDrag = (playerId, svgOverrides = {}) => {
-    const mockEvent = createMockEvent();
+  const setupDrag = (playerId, svgOverrides = {}, hookOverrides = {}, dragEventOverrides = {}) => {
+    const mockEvent = createMockEvent(dragEventOverrides);
     svgRef.current = defaultSvgMock(svgOverrides);
-    const result = getHook();
+    const result = getHook(hookOverrides);
     act(() => {
       result.current.handlePointerDown(mockEvent, playerId);
     });
@@ -624,6 +627,153 @@ describe('usePlayerDragging', () => {
       const player = updated.players.find((p) => p.id === 'p1');
       expect(player.gridX).toBe(1);
       expect(player.gridY).toBe(2);
+    });
+  });
+
+  describe('movement constraints (walls, closed doors, reachability)', () => {
+    const fullWallX = (x) => {
+      const wall = new Set();
+      for (let y = 0; y < gridSize; y++) wall.add(`${x},${y}`);
+      return wall;
+    };
+
+    it('should not move the player onto a wall cell during drag', () => {
+      const { result } = setupDrag('p1', {}, { walls: fullWallX(3) });
+      // p1 is at (1,2); pointer at (260,100) → target cell (6,3) across the wall
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 260, y: 100 }));
+      act(() => {
+        result.current.handlePointerMove({ preventDefault: vi.fn(), clientX: 260, clientY: 100 });
+      });
+      expect(setMapData).not.toHaveBeenCalled();
+      expect(result.current.dragging.invalid).toBe(true);
+    });
+
+    it('should clear the invalid flag when the pointer returns to a walkable cell', () => {
+      const { result } = setupDrag('p1', {}, { walls: fullWallX(3) });
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 260, y: 100 }));
+      act(() => {
+        result.current.handlePointerMove({ preventDefault: vi.fn(), clientX: 260, clientY: 100 });
+      });
+      expect(result.current.dragging.invalid).toBe(true);
+      // pointer at (100,100) → target cell (2,3), still on the walkable side
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 100, y: 100 }));
+      act(() => {
+        result.current.handlePointerMove({ preventDefault: vi.fn(), clientX: 100, clientY: 100 });
+      });
+      expect(setMapData).toHaveBeenCalledTimes(1);
+      const updated = setMapData.mock.calls[0][0](mapDataHolder.current);
+      const player = updated.players.find((p) => p.id === 'p1');
+      expect(player.gridX).toBe(2);
+      expect(player.gridY).toBe(3);
+      expect(result.current.dragging.invalid).toBe(false);
+    });
+
+    it('should block movement through a closed door in a wall line', () => {
+      const wall = new Set();
+      for (let y = 0; y < gridSize; y++) {
+        if (y !== 2) wall.add(`3,${y}`);
+      }
+      const { result } = setupDrag('p1', {}, {
+        walls: wall,
+        placedItems: [{ type: 'door', open: false, gridX: 3, gridY: 2 }],
+      });
+      // pointer at (220,80) → target cell (5,2), across the closed door
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 220, y: 80 }));
+      act(() => {
+        result.current.handlePointerMove({ preventDefault: vi.fn(), clientX: 220, clientY: 80 });
+      });
+      expect(setMapData).not.toHaveBeenCalled();
+      expect(result.current.dragging.invalid).toBe(true);
+    });
+
+    it('should allow movement through an open door in a wall line', () => {
+      const wall = new Set();
+      for (let y = 0; y < gridSize; y++) {
+        if (y !== 2) wall.add(`3,${y}`);
+      }
+      const { result } = setupDrag('p1', {}, {
+        walls: wall,
+        placedItems: [{ type: 'door', open: true, gridX: 3, gridY: 2 }],
+      });
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 220, y: 80 }));
+      act(() => {
+        result.current.handlePointerMove({ preventDefault: vi.fn(), clientX: 220, clientY: 80 });
+      });
+      expect(setMapData).toHaveBeenCalledTimes(1);
+      const updated = setMapData.mock.calls[0][0](mapDataHolder.current);
+      const player = updated.players.find((p) => p.id === 'p1');
+      expect(player.gridX).toBe(5);
+      expect(player.gridY).toBe(2);
+    });
+
+    it('should let the GM move the token freely while Shift is held', () => {
+      const { result } = setupDrag('p1', {}, { isLocalhost: true, walls: fullWallX(3) }, { shiftKey: true });
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 260, y: 100 }));
+      act(() => {
+        result.current.handlePointerMove({ preventDefault: vi.fn(), clientX: 260, clientY: 100 });
+      });
+      expect(setMapData).toHaveBeenCalledTimes(1);
+      const updated = setMapData.mock.calls[0][0](mapDataHolder.current);
+      const player = updated.players.find((p) => p.id === 'p1');
+      expect(player.gridX).toBe(6);
+      expect(player.gridY).toBe(3);
+      expect(result.current.dragging.invalid).toBeFalsy();
+    });
+
+    it('should let the GM drop on a wall cell while Shift is held', () => {
+      const { result } = setupDrag('p1', {}, { isLocalhost: true, walls: fullWallX(3) }, { shiftKey: true });
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 220, y: 80 }));
+      const upEvent = { preventDefault: vi.fn(), pointerId: 1, clientX: 220, clientY: 80 };
+      act(() => {
+        result.current.handlePointerUp(upEvent);
+      });
+      expect(setMapData).toHaveBeenCalledTimes(1);
+      const updated = setMapData.mock.calls[0][0](mapDataHolder.current);
+      const player = updated.players.find((p) => p.id === 'p1');
+      expect(player.gridX).toBe(5);
+      expect(player.gridY).toBe(2);
+    });
+
+    it('should not grant the Shift bypass to non-GM clients', () => {
+      const { result } = setupDrag('p1', {}, { isLocalhost: false, walls: fullWallX(3) }, { shiftKey: true });
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 260, y: 100 }));
+      act(() => {
+        result.current.handlePointerMove({ preventDefault: vi.fn(), clientX: 260, clientY: 100 });
+      });
+      expect(setMapData).not.toHaveBeenCalled();
+    });
+
+    it('should snap a drop beyond a wall to the nearest reachable cell', () => {
+      const { result } = setupDrag('p1', {}, { walls: fullWallX(3) });
+      // Drop target (5,2) is across the wall; nearest reachable cell is (2,2)
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 220, y: 80 }));
+      const upEvent = { preventDefault: vi.fn(), pointerId: 1, clientX: 220, clientY: 80 };
+      act(() => {
+        result.current.handlePointerUp(upEvent);
+      });
+      expect(setMapData).toHaveBeenCalledTimes(1);
+      const updated = setMapData.mock.calls[0][0](mapDataHolder.current);
+      const player = updated.players.find((p) => p.id === 'p1');
+      expect(player.gridX).toBe(2);
+      expect(player.gridY).toBe(2);
+    });
+
+    it('should keep a player pinned when its own cell is blocked (legacy data)', () => {
+      mapDataHolder.current = {
+        players: [{ id: 'p1', name: 'Player1', gridX: 5, gridY: 5 }],
+      };
+      const { result } = setupDrag('p1', {}, { walls: new Set(['5,5']) });
+      // Drop far away; the only reachable cell is the start cell itself
+      svgRef.current = createSvgMockWithTransform(() => ({ x: 500, y: 500 }));
+      const upEvent = { preventDefault: vi.fn(), pointerId: 1, clientX: 500, clientY: 500 };
+      act(() => {
+        result.current.handlePointerUp(upEvent);
+      });
+      expect(setMapData).toHaveBeenCalledTimes(1);
+      const updated = setMapData.mock.calls[0][0](mapDataHolder.current);
+      const player = updated.players.find((p) => p.id === 'p1');
+      expect(player.gridX).toBe(5);
+      expect(player.gridY).toBe(5);
     });
   });
 
