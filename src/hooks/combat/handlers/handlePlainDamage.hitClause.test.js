@@ -4128,3 +4128,101 @@ describe('MA-1084 Lich Paralyzing Touch paralyzed-on-hit grant (one-field DATA f
     });
 });
 
+const NOBLE = monsters.find(m => m.index === 'noble-prodigy');
+const BEGUILING_ACTION = NOBLE.actions.find(a => a.name === 'Beguiling Strike');
+
+describe('MA-1240 Noble Prodigy Beguiling Strike charmed-on-hit grant (one-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Noble Prodigy 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Noble Prodigy 1', computedStats: { armorClass: 16 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 19, newHp: 980, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function strikeContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Psychic',
+            attackerName: 'Noble Prodigy 1',
+            hitClause: buildHitConditionClause(BEGUILING_ACTION),
+        };
+    }
+
+    it('data-lock: disk row carries hit_conditions ["charmed"] after damage_type_primary (MA-1116 byte-shape), NO escape_dc (condition, not grapple)', () => {
+        expect(BEGUILING_ACTION.attack_bonus).toBe(8);
+        expect(BEGUILING_ACTION.hit_conditions).toEqual(['charmed']);
+        const keys = Object.keys(BEGUILING_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(BEGUILING_ACTION.escape_dc).toBeUndefined();
+        expect(BEGUILING_ACTION.damage_dice_primary).toBe('4d6 + 4');
+        expect(BEGUILING_ACTION.damage_type_primary).toBe('Psychic');
+    });
+
+    it('buildHitConditionClause arms the Charmed rider (was null pre-fix)', () => {
+        const clause = buildHitConditionClause(BEGUILING_ACTION);
+        expect(clause).toEqual({
+            conditions: ['charmed'],
+            escapeDc: null,
+            attackName: 'Beguiling Strike',
+            targetEffect: null,
+        });
+    });
+
+    it('grants Charmed on the resolved hit via the canonical activeConditions write path', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beguiling Strike', formula: '4d6 + 4', total: 19, rolls: [6, 6, 1, 2], modifier: 4, context: strikeContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['charmed']);
+    });
+
+    it('stamps source meta WITHOUT dc/ability and logs condition-applied naming the attack', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beguiling Strike', formula: '4d6 + 4', total: 19, rolls: [6, 6, 1, 2], modifier: 4, context: strikeContext() });
+
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({ charmed: { source: 'Noble Prodigy 1' } });
+        expect(metaCall[2].charmed.dc).toBeUndefined();
+        expect(metaCall[2].charmed.ability).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Charmed',
+            reason: 'Beguiling Strike (escape DC —)',
+        }));
+    });
+
+    it('until-next-turn latch: static-list grant rides the STANDARD latch, no custom clock (§153 accepted residual)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beguiling Strike', formula: '4d6 + 4', total: 19, rolls: [6, 6, 1, 2], modifier: 4, context: strikeContext() });
+
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Beguiling Strike', formula: '4d6 + 4', total: 19, rolls: [6, 6, 1, 2], modifier: 4, context: strikeContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+

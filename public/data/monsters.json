@@ -44688,7 +44688,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "4d6 + 4",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "hit_conditions": ["charmed"]
       },
       {
         "name": "Spellcasting",

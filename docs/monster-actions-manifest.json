@@ -20373,7 +20373,7 @@
         "charmed"
       ],
       "description": "Melee or Ranged Attack Roll: +8, reach 5 ft. or range 60 ft. Hit: 18 (4d6 + 4) Psychic damage, and the target has the Charmed condition until the start of the noble's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1240-beguiling-strike.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1241",
