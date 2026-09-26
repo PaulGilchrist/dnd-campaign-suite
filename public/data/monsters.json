@@ -46313,7 +46313,9 @@
         "reach": "10 ft.",
         "recharge": "",
         "damage_dice_primary": "2d8 + 3",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 13
       },
       {
         "name": "Tentacle Slam",

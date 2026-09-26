@@ -4425,3 +4425,117 @@ describe('MA-1273 Otyugh Bite poisoned-on-hit grant (one-field DATA fix)', () =>
     });
 });
 
+const OTYUGH_TENTACLE_ACTION = OTYUGH.actions[2];
+
+describe('MA-1274 Otyugh Tentacle grappled-on-hit grant (two-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Otyugh 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Otyugh 1', computedStats: { armorClass: 14 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: 984, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function tentacleContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Otyugh 1',
+            hitClause: buildHitConditionClause(OTYUGH_TENTACLE_ACTION),
+        };
+    }
+
+    it('MA-1274 data-lock: disk row carries hit_conditions:["grappled"] + escape_dc:13 after damage_type_primary (MA-0010/MA-0909 byte-shape)', () => {
+        expect(OTYUGH_TENTACLE_ACTION.name).toBe('Tentacle');
+        expect(OTYUGH_TENTACLE_ACTION.attack_bonus).toBe(6);
+        expect(OTYUGH_TENTACLE_ACTION.reach).toBe('10 ft.');
+        expect(OTYUGH_TENTACLE_ACTION.damage_dice_primary).toBe('2d8 + 3');
+        expect(OTYUGH_TENTACLE_ACTION.damage_type_primary).toBe('Piercing');
+        expect(OTYUGH_TENTACLE_ACTION.hit_conditions).toEqual(['grappled']);
+        expect(OTYUGH_TENTACLE_ACTION.escape_dc).toBe(13);
+        const keys = Object.keys(OTYUGH_TENTACLE_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('hit_conditions') + 1);
+    });
+
+    it('MA-1273 twin byte-unchanged: Bite keeps poisoned rider, no escape_dc; Tentacle Slam save row untouched', () => {
+        expect(OTYUGH_BITE_ACTION.hit_conditions).toEqual(['poisoned']);
+        expect(OTYUGH_BITE_ACTION.escape_dc).toBeUndefined();
+        const SLAM = OTYUGH.actions[3];
+        expect(SLAM.name).toBe('Tentacle Slam');
+        expect(SLAM.save_dc).toBe(14);
+        expect(SLAM.hit_conditions).toBeUndefined();
+        expect(SLAM.escape_dc).toBeUndefined();
+    });
+
+    it('builds the grappled clause with escape DC 13 (prose escape DC 13; statblock STR 16/+3)', () => {
+        expect(OTYUGH.ability_score_modifiers.str).toBe(3);
+        expect(buildHitConditionClause(OTYUGH_TENTACLE_ACTION)).toEqual({
+            conditions: ['grappled'],
+            escapeDc: 13,
+            attackName: 'Tentacle',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + escape-meta + condition log on a resolved Tentacle hit (Bandit Medium = clean size-gate probe)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Tentacle', formula: '2d8 + 3', total: 15, rolls: [6, 6], modifier: 3, context: tentacleContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 13, ability: 'str', source: 'Otyugh 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Grappled',
+            reason: 'Tentacle (escape DC 13)',
+        }));
+    });
+
+    it('size-gate honesty: consumer gate is Large-or-smaller vs RAW "Medium or smaller" — Large victim over-applies (accepted §59 nuance)', () => {
+        // isLargeOrSmallerTarget (handlePlainDamage.js) admits Large; RAW otyugh
+        // tentacle grapples only Medium-or-smaller. Bandit ("Medium or Small") is
+        // the clean probe; Large victims over-grapple — documented residual.
+        const row = OTYUGH_TENTACLE_ACTION;
+        expect(row.hit_conditions).toEqual(['grappled']);
+        expect(OTYUGH.size).toBe('Large');
+    });
+
+    it('sustained-grapple state machine stays §59 zero-producer — no te/clock authored by the rider', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Tentacle', formula: '2d8 + 3', total: 15, rolls: [6, 6], modifier: 3, context: tentacleContext() });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Tentacle', formula: '2d8 + 3', total: 15, rolls: [6, 6], modifier: 3, context: tentacleContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+

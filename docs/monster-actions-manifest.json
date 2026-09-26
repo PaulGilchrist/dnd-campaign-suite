@@ -21003,7 +21003,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 12 (2d8 + 3) Piercing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13) from one of two tentacles.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1274-tentacle.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1275",
