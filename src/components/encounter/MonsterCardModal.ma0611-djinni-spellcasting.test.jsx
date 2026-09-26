@@ -25,9 +25,19 @@ const NAMES = ['Detect Evil and Good', 'Detect Magic', 'Create Food and Water', 
 const TWO_DAY = ['Create Food and Water', 'Tongues', 'Wind Walk'];
 const ONE_DAY = ['Creation', 'Gaseous Form', 'Invisibility', 'Major Image', 'Plane Shift'];
 const AT_WILL = ['Detect Evil and Good', 'Detect Magic'];
-const SPELLS = Object.fromEntries(NAMES.map(n => [n, spells5e.find(s => s.name === n)]));
+
+// MA-1230 night-hag extension (same MA-0421/MA-0524 markup-gap family):
+// all five spell names were plain text on the night-hag Spellcasting row.
+const nightHag = monsters.find(m => m.index === 'night-hag');
+const nightHagRow = nightHag.actions.find(a => a.name === 'Spellcasting');
+const NH_NAMES = ['Detect Magic', 'Etherealness', 'Magic Missile', 'Phantasmal Killer', 'Plane Shift'];
+const NH_TWO_DAY = ['Phantasmal Killer', 'Plane Shift'];
+const NH_AT_WILL = ['Detect Magic', 'Etherealness', 'Magic Missile'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES])];
+const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]));
 
 const DJINNI_PLAIN_ORIGINAL = 'The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\nAt Will: Detect Evil and Good, Detect Magic\n2/Day Each: Create Food and Water (can create wine instead of water), Tongues, Wind Walk\n1/Day Each: Creation, Gaseous Form, Invisibility, Major Image, Plane Shift';
+const NH_PLAIN_ORIGINAL = 'The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):\nAt Will: Detect Magic, Etherealness, Magic Missile (level 4 version)\n2/Day Each: Phantasmal Killer, Plane Shift (self only)';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -45,7 +55,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve(NAMES.map(n => SPELLS[n]))),
+  loadSpells: vi.fn(() => Promise.resolve(ALL_NAMES.map(n => SPELLS[n]))),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
@@ -152,6 +162,17 @@ function renderDjinni() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: MONSTER_NAME, creatures })} />);
+}
+
+const NH_MONSTER_NAME = 'Night Hag 1';
+
+function renderNightHag() {
+  const m = makeMonster({ name: 'Night Hag', actions: [nightHagRow] });
+  const creatures = [
+    { name: NH_MONSTER_NAME, type: 'npc', monsterType: 'fey', targetName: 'Bandit', ac: 17, currentHp: 112, maxHp: 112, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: NH_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -267,5 +288,87 @@ describe('MA-0611 MonsterCardModal Djinni Spellcasting chips', () => {
     await waitFor(() => expect(refusals('Plane Shift').length).toBe(1));
     expect(abilityUseEntries('Plane Shift').length).toBe(0);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+});
+
+// ── MA-1230 data lock: Night Hag Spellcasting row ───────────────────────────
+
+describe('MA-1230 monsters.json data lock: Night Hag Spellcasting row', () => {
+  it('extracts all five spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(nightHagRow.description);
+    expect(names).toEqual(NH_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('2/Day Each');
+  });
+
+  it('binds 2/Day Each to Phantasmal Killer + Plane Shift; At Will names ungated', () => {
+    const uses = extractSpellcastingSpellUses(nightHagRow.description);
+    expect(uses).toEqual({ 'Phantasmal Killer': 2, 'Plane Shift': 2 });
+    NH_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 14 + save_type Intelligence pair intact (§89 gate pre-met)', () => {
+    expect(nightHagRow.save_dc).toBe(14);
+    expect(nightHagRow.save_type).toBe('Intelligence');
+    expect(nightHagRow.description).toMatch(/spell save DC 14/);
+    expect(nightHagRow.description).toMatch(/<strong>Magic Missile<\/strong> \(level 4 version\)/);
+    expect(nightHagRow.description).toMatch(/<strong>Plane Shift<\/strong> \(self only\)/);
+  });
+
+  it('no fake chips: qualifier parentheticals stay plain text', () => {
+    expect(nightHagRow.description).not.toMatch(/<(?:strong|em)>[^<]*level 4 version[^<]*<\/(?:strong|em)>/);
+    expect(nightHagRow.description).not.toMatch(/<(?:strong|em)>[^<]*self only[^<]*<\/(?:strong|em)>/);
+  });
+
+  it('DC 14 = 8 + INT +3 + PB +3 for the night hag', () => {
+    expect(nightHag.ability_score_modifiers.int).toBe(3);
+    expect(nightHag.proficiency_bonus).toBe(3);
+    expect(8 + nightHag.ability_score_modifiers.int + nightHag.proficiency_bonus).toBe(14);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(nightHagRow.description)).toBe(NH_PLAIN_ORIGINAL);
+  });
+
+  it('all five spells exist in 5e spells.json', () => {
+    NH_NAMES.forEach(n => expect(spells5e.some(s => s.name === n)).toBe(true));
+  });
+});
+
+// ── MA-1230 Modal: five chips, counters, gates ──────────────────────────────
+
+describe('MA-1230 MonsterCardModal Night Hag Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders five spell chips — the zero-chip inert row is gone', () => {
+    renderNightHag();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(NH_NAMES);
+  });
+
+  it('the two 2/Day names carry counters; the three At Will names do not', () => {
+    renderNightHag();
+    NH_TWO_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(2\/Day · 2 left\)/));
+    NH_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('At Will Detect Magic casts ungated twice — zero uses, advisory log prints row DC 14', async () => {
+    renderNightHag();
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
+    expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/\(spell save DC 14/);
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(2));
+    expect(runtime.store[`${NH_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Plane Shift (spells.json attack_type melee) refuses honestly — zero uses spent', async () => {
+    renderNightHag();
+    await act(async () => { fireEvent.click(linkByText('Plane Shift')); });
+    await waitFor(() => expect(refusals('Plane Shift').length).toBe(1));
+    expect(abilityUseEntries('Plane Shift').length).toBe(0);
+    expect(runtime.store[`${NH_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });

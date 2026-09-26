@@ -44174,7 +44174,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):<br><strong>At Will:</strong> Detect Magic, Etherealness, Magic Missile (level 4 version)<br><strong>2/Day Each:</strong> Phantasmal Killer, Plane Shift (self only)",
+        "description": "The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):<br><strong>At Will:</strong> <strong>Detect Magic</strong>, <strong>Etherealness</strong>, <strong>Magic Missile</strong> (level 4 version)<br><strong>2/Day Each:</strong> <strong>Phantasmal Killer</strong>, <strong>Plane Shift</strong> (self only)",
         "attack_bonus": 0,
         "save_dc": 14,
         "save_type": "Intelligence",

@@ -20198,7 +20198,7 @@
       "range": "",
       "recharge": "",
       "description": "The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):At Will: Detect Magic, Etherealness, Magic Missile (level 4 version)2/Day Each: Phantasmal Killer, Plane Shift (self only)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1230-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1231",
