@@ -20405,7 +20405,7 @@
       "actionType": "other",
       "trigger": "The noble is targeted by a spell",
       "description": "The noble casts Shield in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1242-shield.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1243",

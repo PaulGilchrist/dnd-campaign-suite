@@ -27,6 +27,9 @@ import {
 import monsters from '../../../public/data/monsters.json';
 
 const SHIELD_ACTION = monsters.find(m => m.index === 'mind-flayer-arcanist').reactions[0];
+// MA-1242: Noble Prodigy Shield — prose-only row fixed with the Arcanist block verbatim.
+const NP_SHIELD_ACTION = monsters.find(m => m.index === 'noble-prodigy').reactions[0];
+const NOBLE_PRODIGY = 'Noble Prodigy 1';
 const ARCANIST = 'Mind Flayer Arcanist 1';
 const CASTER = 'Bandit 1';
 const CAMPAIGN = 'test-campaign';
@@ -71,6 +74,45 @@ describe('MA-1170 Shield data-lock + registry shape', () => {
     expect(def).toMatchObject({ effect: 'shield', trigger: 'targeted_by_spell', label: 'Shield', icon: 'fa-shield' });
     expect(getGatedMonsterReaction({ name: 'Tentacle Attack', description: 'Hit: 2d6+6 bludgeoning.' })).toBeNull();
     expect(getGatedMonsterReaction({ name: 'Shield', description: 'prose only' })).toBeNull();
+  });
+});
+
+describe('MA-1242 Noble Prodigy Shield — data-lock + arms (Arcanist block verbatim)', () => {
+  it('monsters.json noble-prodigy reactions[0] keeps name/trigger/description + carries the Arcanist automation block verbatim', () => {
+    expect(NP_SHIELD_ACTION.name).toBe('Shield');
+    expect(NP_SHIELD_ACTION.trigger).toBe('The noble is targeted by a spell');
+    expect(NP_SHIELD_ACTION.description).toMatch(/The noble casts <strong>Shield<\/strong> in response/);
+    expect(NP_SHIELD_ACTION.automation).toEqual({ type: 'reaction', trigger: 'targeted_by_spell', effect: 'shield', acBonus: 5 });
+    expect(NP_SHIELD_ACTION.automation).toEqual(SHIELD_ACTION.automation);
+    expect(NP_SHIELD_ACTION.usage).toBe('At Will');
+    expect(NP_SHIELD_ACTION.uses).toBe(999);
+    expect(NP_SHIELD_ACTION.maxUses).toBe(999);
+  });
+
+  it('arms the same Shield chip def + gate accepts a pending spell-origin attack on the noble (NP AC 16 → 21)', () => {
+    const def = getGatedMonsterReaction(NP_SHIELD_ACTION);
+    expect(def).toMatchObject({ effect: 'shield', trigger: 'targeted_by_spell', label: 'Shield', icon: 'fa-shield' });
+    const g = shieldGate({
+      lastAttack: { attackerName: CASTER, targetName: NOBLE_PRODIGY, attackName: 'Fire Bolt', rollType: 'spell-attack', attackType: 'spell', hit: true, d20: 13, bonus: 6, total: 19, targetAc: 16, effectiveAc: 16 },
+      monsterName: NOBLE_PRODIGY, currentRound: 1, storedUses: {}, usedRound: 0, action: NP_SHIELD_ACTION,
+    });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+  });
+
+  it('resolves: one-shot shield buff acBonus 5 on the noble, spends MONSTER_REACTION_USES 999→998', async () => {
+    const lastAttack = { attackerName: CASTER, targetName: NOBLE_PRODIGY, attackName: 'Fire Bolt', rollType: 'spell-attack', attackType: 'spell', hit: true, d20: 13, bonus: 6, total: 19, targetAc: 16, effectiveAc: 16 };
+    const { state, campaignWrites, deps } = makeShieldDeps({ round: 2, lastAttack });
+    const result = await resolveMonsterGatedReaction({ action: NP_SHIELD_ACTION, monsterName: NOBLE_PRODIGY, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(5);
+    expect(result.newAc).toBe(21);
+    expect(result.remaining).toBe(998);
+    const buffs = state[`${NOBLE_PRODIGY}.activeBuffs`];
+    expect(buffs.some(b => b.effect === 'shield' && b.acBonus === 5 && b.oneShot === true)).toBe(true);
+    expect(state[`${NOBLE_PRODIGY}._shield_usedRound`]).toBe(2);
+    expect(state[`${NOBLE_PRODIGY}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ shield: 1 });
+    expect(campaignWrites[0]).toMatchObject({ shieldResolved: true, shieldedBy: NOBLE_PRODIGY, shieldAcBonus: 5 });
   });
 });
 
