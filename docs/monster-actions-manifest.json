@@ -20576,7 +20576,7 @@
       "actionType": "other",
       "trigger": "A creature ends its turn within 5 feet of the octopus while underwater",
       "description": "The octopus releases ink that fills a 5-foot Cube centered on itself, and the octopus moves up to its Swim Speed. The Cube is Heavily Obscured for 1 minute or until a strong current or similar effect disperses the ink.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1251-ink-cloud.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1252",

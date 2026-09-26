@@ -45222,7 +45222,15 @@
       {
         "name": "Ink Cloud",
         "trigger": "A creature ends its turn within 5 feet of the octopus while underwater",
-        "description": "The octopus releases ink that fills a 5-foot <strong>Cube</strong> centered on itself, and the octopus moves up to its Swim Speed. The Cube is <strong>Heavily Obscured</strong> for 1 minute or until a strong current or similar effect disperses the ink."
+        "description": "The octopus releases ink that fills a 5-foot <strong>Cube</strong> centered on itself, and the octopus moves up to its Swim Speed. The Cube is <strong>Heavily Obscured</strong> for 1 minute or until a strong current or similar effect disperses the ink.",
+        "zone": {
+          "self": true,
+          "radius_ft": 3,
+          "no_save": true,
+          "effect_key": "ink_cloud",
+          "noun": "ink",
+          "advisory": "Cube NOT parsed (§62): 5-foot Cube modeled at centered radius, heavily obscured 1 minute or until strong current disperses — GM-enforced; octopus moves up to its Swim Speed; end-turn-within-5ft + underwater trigger preconditions GM-enforced. No vision model (§70)."
+        }
       }
     ],
     "legendary_actions": [],

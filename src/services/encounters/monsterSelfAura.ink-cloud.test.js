@@ -6,6 +6,10 @@
 // and the exhausted second click refuses with `ink_cloud_refused` + zero
 // spend/zero te. Cube shape, swim-speed move, 1-minute/dispel clock and the
 // underwater trigger stay advisory (GM-enforced) on the arm log + popup.
+// MA-1251: plain Octopus Ink Cloud (reactions[0], formerly prose-only zero
+// affordance, RAW At-Will) — byte-twin zone dict at centered radius 3
+// (5-foot Cube, MA-0919 decision-pin precedent), NO uses/maxUses so the
+// uses-gate returns null and the press arms with zero spend (honest ungated).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isSelfAuraRow,
@@ -17,6 +21,8 @@ import monstersData from '../../../public/data/monsters.json';
 
 const octopus = monstersData.find(m => m.name === 'Giant Octopus');
 const REACTION_ROW = octopus.reactions[0];
+const smallOctopus = monstersData.find(m => m.name === 'Octopus');
+const SMALL_OCTOPUS_ROW = smallOctopus.reactions[0];
 
 function makeDeps(stored = {}) {
   const store = { ...stored };
@@ -125,5 +131,63 @@ describe('MA-0813 activation', () => {
     const logs = deps.addEntry.mock.calls.map(c => c[1]);
     expect(logs.some(l => l.automationType === 'ink_cloud_refused')).toBe(true);
     expect(setPopupHtml.mock.calls[0][0]).toMatch(/Uses Exhausted/);
+  });
+});
+
+describe('MA-1251 Octopus disk data shape', () => {
+  it('octopus Ink Cloud reaction carries the self-zone dict byte-twin of its siblings, ungated', () => {
+    expect(SMALL_OCTOPUS_ROW.name).toBe('Ink Cloud');
+    expect(SMALL_OCTOPUS_ROW.trigger).toBe('A creature ends its turn within 5 feet of the octopus while underwater');
+    expect(SMALL_OCTOPUS_ROW.description).toMatch(/5-foot <strong>Cube<\/strong> centered on itself/);
+    expect(SMALL_OCTOPUS_ROW.zone).toEqual({
+      self: true,
+      radius_ft: 3,
+      no_save: true,
+      effect_key: 'ink_cloud',
+      noun: 'ink',
+      advisory: expect.stringContaining('GM-enforced'),
+    });
+    expect(SMALL_OCTOPUS_ROW.save_dc).toBeUndefined();
+    expect(SMALL_OCTOPUS_ROW.attack_bonus).toBeUndefined();
+    expect(isSelfAuraRow(SMALL_OCTOPUS_ROW)).toBe(true);
+  });
+
+  it('RAW At-Will: no uses/maxUses authored, so the uses-gate is null (no counter, no spend)', () => {
+    expect(SMALL_OCTOPUS_ROW.uses).toBeUndefined();
+    expect(SMALL_OCTOPUS_ROW.maxUses).toBeUndefined();
+    expect(monsterAbilitySaveUsesGate(SMALL_OCTOPUS_ROW, {})).toBeNull();
+    expect(monsterAbilitySaveUsesGate(SMALL_OCTOPUS_ROW, { 'Ink Cloud': 7 })).toBeNull();
+  });
+});
+
+describe('MA-1251 Octopus activation', () => {
+  it('press arms ink_cloud te on self radius 3 with ZERO spend — ungated, no counter, no decrement', async () => {
+    const deps = makeDeps();
+    const setPopupHtml = vi.fn();
+    const result = await resolveSelfAuraRow({
+      action: SMALL_OCTOPUS_ROW,
+      monsterName: 'Octopus 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: {},
+      deps,
+    });
+    expect(result).toEqual({ resolved: true, effectKey: 'ink_cloud', radiusFt: 3, remaining: null });
+    expect(deps.registerTargetEffect).toHaveBeenCalledWith(
+      'test-campaign',
+      'Octopus 1',
+      'ink_cloud',
+      'Octopus 1',
+      expect.objectContaining({ radiusFt: 3, noun: 'ink' }),
+    );
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    const logs = deps.addEntry.mock.calls.map(c => c[1]);
+    expect(logs.some(l => l.type === 'ability_use')).toBe(false);
+    const arm = logs.find(l => l.automationType === 'self_aura_armed');
+    expect(arm.characterName).toBe('Octopus 1');
+    expect(arm.description).toMatch(/ink_cloud self aura armed on Octopus 1 \(radius 3 ft, no save\)/);
+    expect(arm.description).toMatch(/GM-enforced/);
+    expect(setPopupHtml.mock.calls[0][0]).toMatch(/Ink Cloud — 3-ft Aura/);
+    expect(setPopupHtml.mock.calls[0][0]).not.toMatch(/use\(s\) left/);
   });
 });
