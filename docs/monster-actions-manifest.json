@@ -20788,7 +20788,7 @@
         "charmed"
       ],
       "description": "The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):1/Day Each: Charm Person (level 2 version), Darkness, Gaseous Form, Sleep",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1261-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1262",

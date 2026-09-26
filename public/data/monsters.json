@@ -45698,7 +45698,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):<br><strong>1/Day Each:</strong> Charm Person (level 2 version), Darkness, Gaseous Form, Sleep",
+        "description": "The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):<br><strong>1/Day Each:</strong> <strong>Charm Person</strong> (level 2 version), <strong>Darkness</strong>, <strong>Gaseous Form</strong>, <strong>Sleep</strong>",
         "attack_bonus": 0,
         "save_dc": 13,
         "save_type": "Charisma",

@@ -43,7 +43,15 @@ const nobleProdigyRow = nobleProdigy.actions.find(a => a.name === 'Spellcasting'
 const NP_NAMES = ['Mage Armor', 'Mage Hand', 'Minor Illusion', 'Befuddlement', 'Detect Thoughts', 'Fly', 'Scrying', 'Shatter'];
 const NP_ONE_DAY = ['Befuddlement', 'Detect Thoughts', 'Fly', 'Scrying', 'Shatter'];
 const NP_AT_WILL = ['Mage Armor', 'Mage Hand', 'Minor Illusion'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES])];
+// MA-1261 oni extension (same MA-0421/MA-1230/MA-1241 markup-gap family):
+// all four spell names were plain text, headers only carried <strong>; the
+// numeric save_dc 13 + Charisma pair was already authored, so the row needed
+// markup only (§89 gate pre-met; junk attack_bonus 0 rides the row, out of scope).
+const oni = monsters.find(m => m.index === 'oni');
+const oniRow = oni.actions.find(a => a.name === 'Spellcasting');
+const OI_NAMES = ['Charm Person', 'Darkness', 'Gaseous Form', 'Sleep'];
+const OI_ONE_DAY = OI_NAMES;
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries(NP_NAMES.map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -52,6 +60,7 @@ const NH_PLAIN_ORIGINAL = 'The hag casts one of the following spells, requiring 
 // Pre-fix disk text (all names plain + "Befuddle ment" typo); the fix is
 // markup + typo only, so stripped text equals this with the typo repaired.
 const NP_PLAIN_ORIGINAL = 'The noble casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\nAt Will: Mage Armor (included in AC), Mage Hand, Minor Illusion\n1/Day Each: Befuddle ment, Detect Thoughts, Fly, Scrying, Shatter (level 7 version)';
+const OI_PLAIN_ORIGINAL = 'The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n1/Day Each: Charm Person (level 2 version), Darkness, Gaseous Form, Sleep';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -202,6 +211,17 @@ function renderNobleProdigy() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: NP_MONSTER_NAME, creatures })} />);
+}
+
+const OI_MONSTER_NAME = 'Oni 1';
+
+function renderOni() {
+  const m = makeMonster({ name: 'Oni', actions: [oniRow] });
+  const creatures = [
+    { name: OI_MONSTER_NAME, type: 'npc', monsterType: 'giant', targetName: 'Bandit', ac: 16, currentHp: 119, maxHp: 119, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: OI_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -503,5 +523,83 @@ describe('MA-1241 MonsterCardModal Noble Prodigy Spellcasting chips', () => {
     await waitFor(() => expect(refusals('Fly').length).toBe(1));
     expect(abilityUseEntries('Fly').length).toBe(1);
     expect(runtime.store[`${NP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fly': 1 });
+  });
+});
+
+// ── MA-1261 data lock: Oni Spellcasting row ──────────────────────────────────
+
+describe('MA-1261 monsters.json data lock: Oni Spellcasting row', () => {
+  it('extracts all four spell names as chips — headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(oniRow.description);
+    expect(names).toEqual(OI_NAMES);
+    expect(names).not.toContain('1/Day Each');
+    expect(names).not.toContain('Charm Person (level 2 version)');
+  });
+
+  it('binds 1/Day Each to all four marked names (§57 tier header gate)', () => {
+    const uses = extractSpellcastingSpellUses(oniRow.description);
+    expect(uses).toEqual(Object.fromEntries(OI_ONE_DAY.map(n => [n, 1])));
+  });
+
+  it('row-level numeric save_dc 13 + save_type Charisma pair intact (§89 gate pre-met)', () => {
+    expect(oniRow.save_dc).toBe(13);
+    expect(oniRow.save_type).toBe('Charisma');
+    expect(oniRow.description).toMatch(/spell save DC 13/);
+    expect(oniRow.description).toMatch(/<strong>Charm Person<\/strong> \(level 2 version\)/);
+  });
+
+  it('no fake chips: the level-2 parenthetical stays plain text (djinni/night-hag convention)', () => {
+    expect(oniRow.description).not.toMatch(/<(?:strong|em)>[^<]*level 2 version[^<]*<\/(?:strong|em)>/);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(oniRow.description)).toBe(OI_PLAIN_ORIGINAL);
+  });
+
+  it('DC 13 = 8 + CHA +2 + PB +3 for the oni', () => {
+    expect(oni.ability_score_modifiers.cha).toBe(2);
+    expect(oni.proficiency_bonus).toBe(3);
+    expect(8 + oni.ability_score_modifiers.cha + oni.proficiency_bonus).toBe(13);
+  });
+
+  it('all four spells exist in BOTH 5e and 2024 spells.json, none an attack spell', () => {
+    OI_NAMES.forEach(n => {
+      expect(spells5e.some(s => s.name === n)).toBe(true);
+      expect(spells2024.some(s => s.name === n)).toBe(true);
+    });
+  });
+});
+
+// ── MA-1261 Modal: four chips, counters, 1/Day gate ──────────────────────────
+
+describe('MA-1261 MonsterCardModal Oni Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders four spell chips — the zero-chip inert row is gone', () => {
+    renderOni();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(OI_NAMES);
+  });
+
+  it('all four names carry 1/Day counters; the tier header renders no chip', () => {
+    renderOni();
+    OI_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    expect(linkByText('1/Day Each')).toBeNull();
+  });
+
+  it('Darkness 1/Day: cast spends the single use with DC 13/Charisma advisory, re-fire refused (§57/§204)', async () => {
+    renderOni();
+    await act(async () => { fireEvent.click(linkByText('Darkness')); });
+    await waitFor(() => expect(abilityUseEntries('Darkness').length).toBe(1));
+    expect(runtime.store[`${OI_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Darkness': 1 });
+    expect(abilityUseEntries('Darkness')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Darkness')[0].description).toMatch(/\(spell save DC 13/);
+
+    await act(async () => { fireEvent.click(linkByText('Darkness')); });
+    await waitFor(() => expect(refusals('Darkness').length).toBe(1));
+    expect(abilityUseEntries('Darkness').length).toBe(1);
+    expect(runtime.store[`${OI_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Darkness': 1 });
   });
 });
