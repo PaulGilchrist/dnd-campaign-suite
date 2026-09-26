@@ -20004,7 +20004,7 @@
       "range": "",
       "recharge": "",
       "description": "The myconid expels spores in a 30-foot Emanation originating from itself. Creatures in that area with an Intelligence score of 2 or higher that aren't Constructs, Elementals, or Undead gain telepathy with a range of 30 feet for 1 hour.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1220-sprout-rapport-spores.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1221",

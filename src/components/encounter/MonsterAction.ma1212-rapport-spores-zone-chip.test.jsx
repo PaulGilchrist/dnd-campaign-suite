@@ -10,8 +10,9 @@
 // zoneOnly picker → armZoneTargets registers rapport_spores te on each
 // picker-SELECTED creature, no save/roll/damage). MA-1217: the Sovereign
 // byte-twin (actions[4]) now mirrors the SAME fix — identical zone dict and
-// advisory, verified byte-equal to the adult twin. Sprout sibling stays
-// byte-stale (separate ticket MA-1220).
+// advisory, verified byte-equal to the adult twin. MA-1220: the Sprout
+// sibling byte-twin (actions[1]) completes the family — byte-equal zone dict,
+// family now fully fixed.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -23,6 +24,8 @@ const ADULT = monsters.find((m) => m.name === 'Myconid Adult');
 const RAPPORT = ADULT.actions[2];
 const SOVEREIGN = monsters.find((m) => m.name === 'Myconid Sovereign');
 const SOV_RAPPORT = SOVEREIGN.actions[4];
+const SPROUT = monsters.find((m) => m.name === 'Myconid Sprout');
+const SPR_RAPPORT = SPROUT.actions[1];
 const DARKMANTLE_AURA = monsters.find((m) => m.name === 'Darkmantle').actions[1];
 const DJINNI_WHIRLWIND = monsters.find((m) => m.name === 'Djinni').actions[3];
 
@@ -68,7 +71,7 @@ describe('MA-1212 disk lock: junk to-hit stripped, save-less zone dict authored'
   // §216 STALE-PIN INVERSION (MA-1217): this pin formerly held the Sovereign
   // byte-dirty (attack_bonus:0, zone:undefined) as adult-only-fix territory.
   // MA-1217 lands the same byte-mirror fix on sovereign actions[4] — the pin
-  // flips: sovereign now FIXES alongside adult; ONLY sprout stays stale (MA-1220).
+  // flips: sovereign now FIXES alongside adult.
   it('MA-1217 sovereign rapport twin byte-mirrors the adult fix (attack_bonus:null, identical zone dict)', () => {
     expect(SOV_RAPPORT.name).toBe('Rapport Spores');
     expect(SOV_RAPPORT.attack_bonus).toBeNull();
@@ -77,10 +80,19 @@ describe('MA-1212 disk lock: junk to-hit stripped, save-less zone dict authored'
     expect(SOV_RAPPORT.duration).toBe('1 hour');
   });
 
-  it('sprout Rapport Spores sibling stays byte-stale (attack_bonus:0, no zone — MA-1220 territory)', () => {
-    const row = monsters.find((m) => m.name === 'Myconid Sprout')?.actions?.find(a => a.name === 'Rapport Spores');
-    expect(row.attack_bonus).toBe(0);
-    expect(row.zone).toBeUndefined();
+  // §216 STALE-PIN INVERSION (MA-1220): this pin formerly held the Sprout
+  // sibling byte-stale (attack_bonus:0, zone:undefined — "MA-1220 territory").
+  // MA-1220 lands the same byte-mirror fix on sprout actions[1] — the pin
+  // flips: the whole myconid rapport family (adult/sovereign/sprout) is fixed.
+  it('MA-1220 sprout rapport twin byte-mirrors the adult+sovereign fix (attack_bonus:null, byte-equal zone dict, save_dc:0 MA-1071 pin)', () => {
+    expect(SPR_RAPPORT.name).toBe('Rapport Spores');
+    expect(SPR_RAPPORT.attack_bonus).toBeNull();
+    expect(SPR_RAPPORT.save_dc).toBe(0);
+    expect(SPR_RAPPORT.range).toBe('');
+    expect(SPR_RAPPORT.zone).toEqual(RAPPORT.zone);
+    expect(SPR_RAPPORT.zone).toEqual(SOV_RAPPORT.zone);
+    expect(SPR_RAPPORT.duration).toBe('1 hour');
+    expect(SPROUT.actions[0].attack_bonus).toBe(1); // Slam untouched
   });
 });
 
@@ -96,6 +108,12 @@ describe('MA-1212 isZonePickerRow: narrowly arms the zone picker chip', () => {
     // sovereign's other rows never arm the zone picker:
     expect(isZonePickerRow(SOVEREIGN.actions[2])).toBe(false); // Animating Spores (automation)
     expect(isZonePickerRow(SOVEREIGN.actions[3])).toBe(false); // Pacifying Spores (save lane)
+  });
+
+  it('MA-1220: arms the sprout byte-twin identically (same seam, zero code change)', () => {
+    expect(isZonePickerRow(SPR_RAPPORT)).toBe(true);
+    // sprout's Slam never arms the zone picker (attack lane owns it):
+    expect(isZonePickerRow(SPROUT.actions[0])).toBe(false);
   });
 
   it('inert guards: no zone / no_save absent / save_dc armed / automation / attack bonus / no emanation wording', () => {
@@ -124,6 +142,20 @@ describe('MA-1212 render: zone picker chip arms, bogus attack chip is gone', () 
 
   it('MA-1217 sovereign row: NO "+0" attack chip, exactly one "30-ft Zone" chip; press routes onZonePickerRow, zero attack/save calls', () => {
     const { container, onAttack, onSaveRoll, onZonePickerRow } = renderRow(SOV_RAPPORT);
+    expect(container.textContent).not.toContain('+0');
+    const zoneChips = container.querySelectorAll('.mc-dice-link-zone');
+    expect(zoneChips.length).toBe(1);
+    expect(zoneChips[0].textContent).toContain('30-ft Zone');
+    fireEvent.click(zoneChips[0]);
+    expect(onZonePickerRow).toHaveBeenCalledTimes(1);
+    expect(onZonePickerRow.mock.calls[0][0].name).toBe('Rapport Spores');
+    expect(onZonePickerRow.mock.calls[0][0].zone.effect_key).toBe('rapport_spores');
+    expect(onAttack).not.toHaveBeenCalled();
+    expect(onSaveRoll).not.toHaveBeenCalled();
+  });
+
+  it('MA-1220 sprout row: NO "+0" attack chip, exactly one "30-ft Zone" chip; press routes onZonePickerRow, zero attack/save calls', () => {
+    const { container, onAttack, onSaveRoll, onZonePickerRow } = renderRow(SPR_RAPPORT, { index: 1 });
     expect(container.textContent).not.toContain('+0');
     const zoneChips = container.querySelectorAll('.mc-dice-link-zone');
     expect(zoneChips.length).toBe(1);

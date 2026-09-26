@@ -84,6 +84,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 const CREATURES = [
   { name: 'Myconid Adult 1', type: 'npc', monsterType: 'plant', targetName: 'Bandit', currentHp: 16, maxHp: 16, ac: 12, conditions: [] },
   { name: 'Myconid Sovereign 1', type: 'npc', monsterType: 'plant', targetName: 'Bandit', currentHp: 45, maxHp: 45, ac: 13, conditions: [] },
+  { name: 'Myconid Sprout 1', type: 'npc', monsterType: 'plant', targetName: 'Bandit', currentHp: 3, maxHp: 3, ac: 10, conditions: [] },
   { name: 'Bandit', type: 'npc', currentHp: 999, maxHp: 11, ac: 12, conditions: [] },
 ];
 
@@ -157,6 +158,29 @@ describe('MA-1212 rapport spores ACTION row → zoneOnly picker (no save, no rol
     expect(p.damage ?? null).toBeNull();
     expect(p.range).toBe(30);
     expect(p.excludeNames).toEqual(['Myconid Sovereign 1']);
+    expect(p.storeLastAttack).toBe(false);
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  // MA-1220: sprout byte-twin drives the SAME untouched picker seam.
+  it('MA-1220 sprout disk row drives the picker: 30-ft zoneOnly, save_dc normalized null, sprout caster excluded', async () => {
+    renderMyconid('myconid-sprout', 'Myconid Sprout 1');
+    const chip = document.querySelector('.mc-dice-link-zone');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('30-ft Zone');
+    const rapportRow = [...document.querySelectorAll('.mc-overlay *')].find(e => e.querySelector(':scope > strong')?.textContent.includes('Rapport Spores'));
+    const attackChips = [...rapportRow.querySelectorAll('.mc-dice-link:not(.mc-dice-link-zone)')].map(c => c.textContent.trim());
+    expect(attackChips).toEqual([]);
+    fireEvent.click(chip);
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    const p = aoeProps.current;
+    expect(p.zoneOnly).toBe(true);
+    expect(p.saveDc ?? null).toBeNull();
+    expect(p.saveType ?? null).toBeNull();
+    expect(p.damage ?? null).toBeNull();
+    expect(p.range).toBe(30);
+    expect(p.excludeNames).toEqual(['Myconid Sprout 1']);
     expect(p.storeLastAttack).toBe(false);
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
