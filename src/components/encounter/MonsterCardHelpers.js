@@ -1528,14 +1528,26 @@ export function splitGate({ lastAttack, monster, monsterName, currentRound, used
   return { ok: true, ...trigger, eachHp: Math.floor(trigger.hp / 2) };
 }
 
-function buildSplitAdvisoryPopup({ monsterName, gate, newSize, eachHp }) {
+// MA-1249: species-threaded Split prose (MA-0869 hardcoded-label lineage).
+// Default fallback 'Black Pudding' keeps pudding prose byte-identical;
+// Ochre Jelly prints "Ochre Jellies"/"jellies" (last-word pluralization).
+function splitSpeciesNames(species) {
+  const base = String(species || 'Black Pudding').replace(/\s+\d+$/, '');
+  const pluralize = (w) => (/[bcdfghjklmnpqrstvwxz]y$/i.test(w) ? `${w.slice(0, -1)}ies` : `${w}s`);
+  const i = base.lastIndexOf(' ');
+  const lastPlural = pluralize(i === -1 ? base : base.slice(i + 1));
+  return { plural: i === -1 ? lastPlural : `${base.slice(0, i + 1)}${lastPlural}`, nounLower: lastPlural.toLowerCase() };
+}
+
+function buildSplitAdvisoryPopup({ monsterName, gate, newSize, eachHp, species }) {
   const triggerText = gate.via === 'bloodied'
     ? `Bloodied at ${gate.hp}/${gate.maxHp} HP`
     : `subjected to ${gate.damageType} damage (at ${gate.hp}/${gate.maxHp} HP)`;
-  return `<div class="mc-prerequisite-refusal"><h3>Split — GM-Executed Duplication</h3><p>${monsterName} Split trigger confirmed (${triggerText}). Response: replace ${monsterName} with <strong>two ${newSize} Black Puddings</strong>, Hit Points divided evenly — <strong>${eachHp}/${eachHp} HP each</strong> — each on its own Initiative. No monster-duplication subsystem exists: add the two puddings via the Encounter Builder and stamp ${eachHp} HP on each card (GM-enforced, advisory record).</p></div>`;
+  const names = splitSpeciesNames(species);
+  return `<div class="mc-prerequisite-refusal"><h3>Split — GM-Executed Duplication</h3><p>${monsterName} Split trigger confirmed (${triggerText}). Response: replace ${monsterName} with <strong>two ${newSize} ${names.plural}</strong>, Hit Points divided evenly — <strong>${eachHp}/${eachHp} HP each</strong> — each on its own Initiative. No monster-duplication subsystem exists: add the two ${names.nounLower} via the Encounter Builder and stamp ${eachHp} HP on each card (GM-enforced, advisory record).</p></div>`;
 }
 
-function buildSplitSpendLog({ monsterName, gate, newSize, eachHp }) {
+function buildSplitSpendLog({ monsterName, gate, newSize, eachHp, species }) {
   const triggerText = gate.via === 'bloodied'
     ? `Bloodied at ${gate.hp}/${gate.maxHp} HP`
     : `subjected to ${gate.damageType} damage (at ${gate.hp}/${gate.maxHp} HP)`;
@@ -1543,12 +1555,12 @@ function buildSplitSpendLog({ monsterName, gate, newSize, eachHp }) {
     type: 'ability_use',
     characterName: monsterName,
     abilityName: 'Split',
-    description: `${monsterName} uses Split (${triggerText}) — GM duplication instruction: replace ${monsterName} with two ${newSize} Black Puddings at ${eachHp}/${eachHp} HP each (floor(${gate.hp}/2)), each on its own Initiative. No monster-duplication subsystem — add via Encounter Builder + stamp HP (GM-enforced, advisory record). At Will — unlimited, 1 Reaction per round.`,
+    description: `${monsterName} uses Split (${triggerText}) — GM duplication instruction: replace ${monsterName} with two ${newSize} ${splitSpeciesNames(species).plural} at ${eachHp}/${eachHp} HP each (floor(${gate.hp}/2)), each on its own Initiative. No monster-duplication subsystem — add via Encounter Builder + stamp HP (GM-enforced, advisory record). At Will — unlimited, 1 Reaction per round.`,
     timestamp: Date.now(),
   };
 }
 
-export async function resolveMonsterSplit({ action, monsterName, campaignName, lastAttack, cs, currentRound, usedRound, latchKey, deps }) {
+export async function resolveMonsterSplit({ action, monsterName, campaignName, lastAttack, cs, currentRound, usedRound, latchKey, species, deps }) {
   const setRV = deps.setRuntimeValue || setRuntimeValue;
   const log = deps.addEntry || addEntry;
   const monster = (cs?.creatures || []).find(c => c.name === monsterName) || null;
@@ -1575,9 +1587,9 @@ export async function resolveMonsterSplit({ action, monsterName, campaignName, l
       splitIntoHp: gate.eachHp,
     }, campaignName);
   }
-  const entry = buildSplitSpendLog({ monsterName, gate, newSize, eachHp: gate.eachHp });
+  const entry = buildSplitSpendLog({ monsterName, gate, newSize, eachHp: gate.eachHp, species });
   await log(campaignName, entry);
-  return { ok: true, message: entry.description, eachHp: gate.eachHp, newSize, popupHtml: buildSplitAdvisoryPopup({ monsterName, gate, newSize, eachHp: gate.eachHp }) };
+  return { ok: true, message: entry.description, eachHp: gate.eachHp, newSize, popupHtml: buildSplitAdvisoryPopup({ monsterName, gate, newSize, eachHp: gate.eachHp, species }) };
 }
 
 // MA-0681: Elemental Cultist Elemental Absorption (1/Day) — damage-taken
@@ -1777,7 +1789,7 @@ async function readGatedReactionContext({ def, campaignName, monsterName, deps }
   return { getRV, setRV, log, latchKey, lastAttack, rawLastAttack, cs, currentRound, storedUses, usedRound };
 }
 
-export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, deps = {} }) {
+export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, species, deps = {} }) {
   const def = getGatedMonsterReaction(action);
   if (!def) return null;
   const ctx = await readGatedReactionContext({ def, campaignName, monsterName, deps });
@@ -1799,7 +1811,7 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
   }
 
   if (def.effect === 'split') {
-    return resolveMonsterSplit({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, setRuntimeValue: ctx.setRV } });
+    return resolveMonsterSplit({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, usedRound: ctx.usedRound, latchKey: ctx.latchKey, species, deps: { ...deps, setRuntimeValue: ctx.setRV } });
   }
 
   if (def.effect === 'heal') {

@@ -2167,6 +2167,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       action,
       monsterName,
       campaignName,
+      // MA-1249: species base name so Split advisory prose names the acting
+      // monster's kind (default fallback keeps Black Pudding byte-identical).
+      species: monster?.species || monster?.name,
       // MA-0467: getTarget arms the Healing Touch touch target (the card's
       // armed target-select); the resolver falls back to self unarmed.
       // MA-0516: Berserk Lashing routes its folded Slam attack through the
@@ -2176,7 +2179,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // MA-0399: Split — the resolver's popupHtml carries the trigger verdict
     // plus the GM duplication instruction; refusals surface the honest message.
     if (result?.popupHtml) setPopupHtml(result.popupHtml);
-  }, [campaignName, monsterName, spellAbilityMod, getTarget, setPopupHtml]);
+  }, [campaignName, monsterName, monster, spellAbilityMod, getTarget, setPopupHtml]);
 
   // MA-0021: legendary-row gated click — expend 1 use (round+turn latch,
   // refusal popup + legendary_use_refused zero-spend log) then resolve the

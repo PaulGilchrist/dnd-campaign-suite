@@ -15,6 +15,7 @@ import {
   oneSizeSmaller,
   splitTriggerEvidence,
   splitGate,
+  monsterReactionUsesRemaining,
   MONSTER_REACTION_USES_KEY,
 } from './MonsterCardHelpers.js';
 import monsters from '../../../public/data/monsters.json';
@@ -212,5 +213,73 @@ describe('MA-0399 resolveMonsterSplit via resolveMonsterGatedReaction', () => {
     expect(logs[0].automationType).toBe('split_refused');
     expect(logs[0].description).toMatch(/round/);
     expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+  });
+});
+
+// MA-1249: Ochre Jelly Split — prose-only disk row armed with the Black
+// Pudding automation block verbatim (FAIL(b)/DATA zero-affordance fix), and
+// species-threaded advisory prose (MA-0869 hardcoded-label lineage): puddings
+// stay byte-identical, Ochre Jelly prints "Ochre Jellies"/"jellies".
+describe('MA-1249 Ochre Jelly Split data lock + species-threaded prose', () => {
+  const OCHRE = 'Ochre Jelly 1';
+
+  function ochreRow() {
+    return monsters.find(m => m.index === 'ochre-jelly').reactions[0];
+  }
+  function puddingRow() {
+    return monsters.find(m => m.index === 'black-pudding').reactions[0];
+  }
+
+  it('disk row carries the Black Pudding automation block verbatim + At Will sentinel', () => {
+    const row = ochreRow();
+    expect(row.name).toBe('Split');
+    expect(row.automation).toEqual(puddingRow().automation);
+    expect(row.automation).toEqual({ type: 'reaction', trigger: 'bloodied_or_lightning_slashing', effect: 'split', minHp: 10, damageTypes: ['Lightning', 'Slashing'] });
+    expect(row.uses).toBe(999);
+    expect(row.maxUses).toBe(999);
+    expect(row.usage).toBe('At Will');
+    expect(row.description).toMatch(/^The jelly splits into two new <strong>Ochre Jellies<\/strong>/);
+  });
+
+  it('gated reaction arms: registry def + RAW-unlimited "999 left" counter', () => {
+    const row = ochreRow();
+    expect(getGatedMonsterReaction(row)?.effect).toBe('split');
+    expect(monsterReactionUsesRemaining(row, {})).toBe(999);
+  });
+
+  it('bloodied press prints OCHRE JELLY prose (popup + spend log), never Black Puddings', async () => {
+    const { state, logs, deps } = makeDeps({
+      lastAttack: null,
+      round: 2,
+      creatures: [{ name: OCHRE, type: 'npc', size: 'Large', maxHp: 52, currentHp: 26 }],
+    });
+    const result = await resolveMonsterGatedReaction({ action: ochreRow(), monsterName: OCHRE, campaignName: CAMPAIGN, species: 'Ochre Jelly 1', deps });
+    expect(result.ok).toBe(true);
+    expect(result.eachHp).toBe(13);
+    expect(state[`${OCHRE}._split_usedRound`]).toBe(2);
+    const spend = logs.find(l => l.type === 'ability_use');
+    expect(spend.description).toMatch(/two Medium Ochre Jellies at 13\/13 HP each/);
+    expect(spend.description).not.toMatch(/pudding/i);
+    expect(result.popupHtml).toMatch(/two Medium Ochre Jellies/);
+    expect(result.popupHtml).toMatch(/add the two jellies via the Encounter Builder/);
+    expect(result.popupHtml).not.toMatch(/pudding/i);
+  });
+
+  it('pudding prose stays BYTE-IDENTICAL (default species fallback)', async () => {
+    const { logs, deps } = makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] });
+    const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    const spend = logs.find(l => l.type === 'ability_use');
+    expect(spend.description).toBe(`${MONSTER} uses Split (Bloodied at 30/68 HP) — GM duplication instruction: replace ${MONSTER} with two Medium Black Puddings at 15/15 HP each (floor(30/2)), each on its own Initiative. No monster-duplication subsystem — add via Encounter Builder + stamp HP (GM-enforced, advisory record). At Will — unlimited, 1 Reaction per round.`);
+    expect(result.popupHtml).toContain('two Medium Black Puddings');
+    expect(result.popupHtml).toContain('add the two puddings via the Encounter Builder');
+  });
+
+  it('EB-suffixed species:"Black Pudding 1" threads to the same byte-identical prose', async () => {
+    const { logs, deps } = makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] });
+    const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, species: 'Black Pudding 1', deps });
+    const defaultLogs = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps: makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] }).deps });
+    expect(logs.find(l => l.type === 'ability_use').description).toBe(defaultLogs.message);
+    expect(result.popupHtml).toBe(defaultLogs.popupHtml);
   });
 });

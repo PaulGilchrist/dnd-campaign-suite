@@ -45087,7 +45087,20 @@
       {
         "name": "Split",
         "trigger": "While the jelly is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or Slashing damage",
-        "description": "The jelly splits into two new <strong>Ochre Jellies</strong>. Each new jelly is one size smaller than the original jelly and acts on its Initiative. The original jelly's Hit Points are divided evenly between the new jellies (round down)."
+        "description": "The jelly splits into two new <strong>Ochre Jellies</strong>. Each new jelly is one size smaller than the original jelly and acts on its Initiative. The original jelly's Hit Points are divided evenly between the new jellies (round down).",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "bloodied_or_lightning_slashing",
+          "effect": "split",
+          "minHp": 10,
+          "damageTypes": [
+            "Lightning",
+            "Slashing"
+          ]
+        }
       }
     ],
     "legendary_actions": [],
