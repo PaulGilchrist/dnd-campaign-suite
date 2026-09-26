@@ -371,3 +371,102 @@ describe('MA-1309 builders + resolver on Defensive Stance — record-only contra
     expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
   });
 });
+
+// MA-1313: Pirate Captain "Riposte" reactions[0] — same FAIL(b)
+// zero-affordance fingerprint (name/trigger/description only, §60) fixed via
+// the SAME Option A one-field advisory seam (MA-1285/MA-1309 byte-shape twin).
+// Two-stage +3 AC hit-negation → conditional Rapier counter (Option B) stays
+// out of scope — orchestrator binding decision. Mirrors the sibling blocks.
+const PIRATE_CAPTAIN = monstersData.find((m) => m.index === 'pirate-captain');
+const PIRATE_RIPOSTE = PIRATE_CAPTAIN.reactions[0];
+
+describe('MA-1313 disk lock: Pirate Captain Riposte carries the advisory one-field fix', () => {
+  it('reactions[0] name/trigger/description byte-identical to the RAW row', () => {
+    expect(PIRATE_RIPOSTE.name).toBe('Riposte');
+    expect(PIRATE_RIPOSTE.trigger).toBe('The pirate is hit by a melee attack roll while holding a weapon');
+    expect(PIRATE_RIPOSTE.description).toBe('The pirate adds 3 to its AC against that attack, possibly causing it to miss. On a miss, the pirate makes one Rapier attack against the triggering creature if within range.');
+  });
+
+  it('row carries EXACTLY advisory:"monster_riposte" (Option A one-field)', () => {
+    expect(PIRATE_RIPOSTE.advisory).toBe('monster_riposte');
+    expect(PIRATE_RIPOSTE.automation).toBeUndefined();
+    expect(PIRATE_RIPOSTE.attack_bonus).toBeUndefined();
+    expect(PIRATE_RIPOSTE.save_dc).toBeUndefined();
+    expect(PIRATE_RIPOSTE.zone).toBeUndefined();
+    expect(PIRATE_RIPOSTE.usage).toBeUndefined();
+  });
+
+  it('placement mirrors MA-1285 siblings: advisory sits after description, unique on disk', () => {
+    const shape = '"trigger": "The pirate is hit by a melee attack roll while holding a weapon",\n        "description": "The pirate adds 3 to its AC against that attack, possibly causing it to miss. On a miss, the pirate makes one Rapier attack against the triggering creature if within range.",\n        "advisory": "monster_riposte"';
+    expect(RAW.split(shape).length - 1).toBe(1);
+    expect(RAW.split('"advisory": "monster_riposte"').length - 1).toBe(1);
+  });
+});
+
+describe('MA-1313 advisory detection + render on the Riposte reaction', () => {
+  it('arms via the pure truthiness detector', () => {
+    expect(isMonsterActionAdvisoryRow(PIRATE_RIPOSTE)).toBe(true);
+  });
+
+  it('row renders the labelled advisory chip', () => {
+    const { container } = renderRow(PIRATE_RIPOSTE);
+    const chip = container.querySelector('.mc-dice-link-advisory');
+    expect(chip).not.toBe(null);
+    expect(chip.textContent).toContain('Riposte');
+    expect(chip.getAttribute('title')).toMatch(/GM-enforced/);
+  });
+
+  it('chip press routes onAdvisoryRow with the row, never onAttack', () => {
+    const { container, onAttack, onAdvisoryRow } = renderRow(PIRATE_RIPOSTE);
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
+    expect(onAdvisoryRow.mock.calls[0][0]).toBe(PIRATE_RIPOSTE);
+    expect(onAttack).not.toHaveBeenCalled();
+  });
+
+  it('incapacitated advisory chip is inert (no click route)', () => {
+    const { container, onAdvisoryRow } = renderRow(PIRATE_RIPOSTE, { attackerCannotAct: true });
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).not.toHaveBeenCalled();
+  });
+});
+
+describe('MA-1313 builders + resolver on Riposte — record-only contract', () => {
+  it('popup is honest record chrome with the fallback GM-enforced copy', () => {
+    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Pirate Captain 1', action: PIRATE_RIPOSTE });
+    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Riposte<\/h3>/);
+    expect(html).toMatch(/Riposte is GM-enforced \(no engine consumer for this mechanic\)/);
+  });
+
+  it('log is an ability_use record naming Riposte, no roll fields', () => {
+    const log = buildMonsterActionAdvisoryLog({ monsterName: 'Pirate Captain 1', action: PIRATE_RIPOSTE });
+    expect(log.type).toBe('ability_use');
+    expect(log.characterName).toBe('Pirate Captain 1');
+    expect(log.abilityName).toBe('Riposte');
+    expect(log.rollType).toBeUndefined();
+    expect(log.roll).toBeUndefined();
+  });
+
+  it('one press = popup + exactly ONE ability_use log; no other writes', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    const res = await resolveMonsterActionAdvisoryRow({ action: PIRATE_RIPOSTE, monsterName: 'Pirate Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(res.resolved).toBe(true);
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.abilityName).toBe('Riposte');
+    expect(entry.description).toMatch(/GM-enforced/);
+  });
+
+  it('refire press stays record-only: two logs, zero spends', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    await resolveMonsterActionAdvisoryRow({ action: PIRATE_RIPOSTE, monsterName: 'Pirate Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    await resolveMonsterActionAdvisoryRow({ action: PIRATE_RIPOSTE, monsterName: 'Pirate Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(addEntry).toHaveBeenCalledTimes(2);
+    expect(setPopupHtml).toHaveBeenCalledTimes(2);
+    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
+  });
+});

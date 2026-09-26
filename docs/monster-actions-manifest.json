@@ -21787,7 +21787,7 @@
       "actionType": "other",
       "trigger": "The pirate is hit by a melee attack roll while holding a weapon",
       "description": "The pirate adds 3 to its AC against that attack, possibly causing it to miss. On a miss, the pirate makes one Rapier attack against the triggering creature if within range.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1313-riposte.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1314",
