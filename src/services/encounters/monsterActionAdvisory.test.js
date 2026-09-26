@@ -19,6 +19,10 @@ const SPHINX_TELEPORT = monstersData.find((m) => m.index === 'androsphinx').lege
 const NIGHTMARE = monstersData.find((m) => m.index === 'nightmare');
 const ETHEREAL_STRIDE = NIGHTMARE.actions[1];
 const HOOFES = NIGHTMARE.actions[0];
+const ORC_WAR_CHIEF = monstersData.find((m) => m.index === 'orc-war-chief');
+const BATTLE_CRY = ORC_WAR_CHIEF.actions[3];
+const ORC_GREATAXE = ORC_WAR_CHIEF.actions[1];
+const ORC_SPEAR = ORC_WAR_CHIEF.actions[2];
 
 describe('MA-1223 disk lock: nalfeshnee Teleport is a pure advisory row', () => {
   it('attack_bonus:null (junk "+0" lane dead), save_dc:0 decoy KEPT (MA-1071 pin)', () => {
@@ -140,5 +144,64 @@ describe('MA-1232 disk lock: nightmare Ethereal Stride rides the MA-1223 advisor
     expect(entry.abilityName).toBe('Ethereal Stride');
     expect(entry.rollType).toBeUndefined();
     expect(entry.roll).toBeUndefined();
+  });
+});
+
+describe('MA-1268 disk lock: orc war chief Battle Cry rides the MA-1223 advisory seam', () => {
+  it('advisory + advisory_message authored in the MA-1232 Ethereal Stride byte-shape (Option A one-field)', () => {
+    expect(BATTLE_CRY.name).toBe('Battle Cry');
+    expect(BATTLE_CRY.advisory).toBe('monster_battle_cry');
+    expect(typeof BATTLE_CRY.advisory_message).toBe('string');
+    expect(BATTLE_CRY.advisory_message).toMatch(/advisory record/);
+    expect(BATTLE_CRY.advisory_message).toMatch(/GM-enforced/);
+    expect(isMonsterActionAdvisoryRow(BATTLE_CRY)).toBe(true);
+  });
+
+  it('name/description/usage KEPT byte-identical — cosmetic (1/Day) usage untouched, no mechanical gate', () => {
+    expect(BATTLE_CRY.description).toMatch(/Each creature of the war chief's choice that is within 30 feet/);
+    expect(BATTLE_CRY.usage).toEqual({ type: 'per day', times: 1 });
+    expect(BATTLE_CRY.attack_bonus).toBeUndefined();
+    expect(BATTLE_CRY.save_dc).toBeUndefined();
+    expect(BATTLE_CRY.automation).toBeUndefined();
+    expect(BATTLE_CRY.uses).toBeUndefined();
+  });
+
+  it('sibling Greataxe/Spear rows byte-inert — no advisory authored', () => {
+    expect(isMonsterActionAdvisoryRow(ORC_GREATAXE)).toBe(false);
+    expect(isMonsterActionAdvisoryRow(ORC_SPEAR)).toBe(false);
+    expect(ORC_GREATAXE.attack_bonus).toBe(6);
+    expect(ORC_SPEAR.attack_bonus).toBe(6);
+    expect(ORC_GREATAXE.advisory).toBeUndefined();
+    expect(ORC_SPEAR.advisory).toBeUndefined();
+  });
+
+  it('resolver press is record-only: popup + ONE ability_use, zero rolls, zero spends/refusals', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    const res = await resolveMonsterActionAdvisoryRow({ action: BATTLE_CRY, monsterName: 'Orc War Chief 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(res.resolved).toBe(true);
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.abilityName).toBe('Battle Cry');
+    expect(entry.rollType).toBeUndefined();
+    expect(entry.roll).toBeUndefined();
+  });
+
+  it('popup carries the honest advisory copy, no fabricated rules text', () => {
+    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Orc War Chief 1', action: BATTLE_CRY });
+    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Battle Cry<\/h3>/);
+    expect(html).toMatch(/grants advantage on ATTACK ROLLS to creatures of the war chief's choice within 30 ft/);
+    expect(html).toMatch(/advantage is not auto-applied because targets are GM-chosen per RAW/);
+  });
+
+  it('refire press stays record-only: another honest log, no mechanical double-dip', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    await resolveMonsterActionAdvisoryRow({ action: BATTLE_CRY, monsterName: 'Orc War Chief 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    await resolveMonsterActionAdvisoryRow({ action: BATTLE_CRY, monsterName: 'Orc War Chief 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(addEntry).toHaveBeenCalledTimes(2);
+    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
   });
 });

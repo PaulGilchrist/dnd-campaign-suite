@@ -20892,7 +20892,7 @@
       "category": "actions",
       "actionType": "attack",
       "description": "Each creature of the war chief's choice that is within 30 feet ofit, can hear it, and not already affected by Battle Cry gain advantage on attack rolls until the start of the war chief's next turn. The war chief can then make one attack as a bonus action.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1268-battle-cry.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1269",

@@ -46085,7 +46085,9 @@
         "usage": {
           "type": "per day",
           "times": 1
-        }
+        },
+        "advisory": "monster_battle_cry",
+        "advisory_message": "grants advantage on ATTACK ROLLS to creatures of the war chief's choice within 30 ft that can hear it and are not already affected, until the start of the war chief's next turn, then one weapon attack as a bonus action — advisory record: ally selection, can-hear, and the bonus-action attack leg are GM-enforced (§42 choice/enforcement + §123 bonus-action zero-consumer); advantage is not auto-applied because targets are GM-chosen per RAW. 1/Day tracked by GM (cosmetic usage)."
       }
     ],
     "traits": [
