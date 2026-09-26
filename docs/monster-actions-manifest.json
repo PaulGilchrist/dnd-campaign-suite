@@ -21713,7 +21713,7 @@
       "actionType": "attack",
       "trigger": "The pirate is hit by a melee attack roll while holding a weapon",
       "description": "The pirate adds 4 to its AC against melee attack rolls (including the triggering attack) until the start of its next turn, possibly causing the attacks to miss.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1309-defensive-stance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1310",

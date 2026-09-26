@@ -47941,7 +47941,8 @@
       {
         "name": "Defensive Stance",
         "trigger": "The pirate is hit by a melee attack roll while holding a weapon",
-        "description": "The pirate adds 4 to its AC against melee attack rolls (including the triggering attack) until the start of its next turn, possibly causing the attacks to miss."
+        "description": "The pirate adds 4 to its AC against melee attack rolls (including the triggering attack) until the start of its next turn, possibly causing the attacks to miss.",
+        "advisory": "monster_defensive_stance"
       }
     ],
     "legendary_actions": [],

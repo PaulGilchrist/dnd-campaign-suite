@@ -272,3 +272,102 @@ describe('MA-1290 builders + resolver on Warding Charm — record-only contract'
     expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
   });
 });
+
+// MA-1309: Pirate Admiral "Defensive Stance" reactions[0] — same FAIL(b)
+// zero-affordance fingerprint (name/trigger/description only, §60) fixed via
+// the SAME Option A one-field advisory seam (MA-1285 byte-shape twin).
+// Sustained +4 AC hit-negation clock (Option B) stays out of scope —
+// orchestrator binding decision. Mirrors the MA-1285/MA-1290 blocks.
+const PIRATE_ADMIRAL = monstersData.find((m) => m.index === 'pirate-admiral');
+const PIRATE_DS = PIRATE_ADMIRAL.reactions[0];
+
+describe('MA-1309 disk lock: Pirate Admiral Defensive Stance carries the advisory one-field fix', () => {
+  it('reactions[0] name/trigger/description byte-identical to the RAW row', () => {
+    expect(PIRATE_DS.name).toBe('Defensive Stance');
+    expect(PIRATE_DS.trigger).toBe('The pirate is hit by a melee attack roll while holding a weapon');
+    expect(PIRATE_DS.description).toBe('The pirate adds 4 to its AC against melee attack rolls (including the triggering attack) until the start of its next turn, possibly causing the attacks to miss.');
+  });
+
+  it('row carries EXACTLY advisory:"monster_defensive_stance" (Option A one-field)', () => {
+    expect(PIRATE_DS.advisory).toBe('monster_defensive_stance');
+    expect(PIRATE_DS.automation).toBeUndefined();
+    expect(PIRATE_DS.attack_bonus).toBeUndefined();
+    expect(PIRATE_DS.save_dc).toBeUndefined();
+    expect(PIRATE_DS.zone).toBeUndefined();
+    expect(PIRATE_DS.usage).toBeUndefined();
+  });
+
+  it('placement mirrors MA-1285 siblings: advisory sits after description, unique on disk', () => {
+    const shape = '"trigger": "The pirate is hit by a melee attack roll while holding a weapon",\n        "description": "The pirate adds 4 to its AC against melee attack rolls (including the triggering attack) until the start of its next turn, possibly causing the attacks to miss.",\n        "advisory": "monster_defensive_stance"';
+    expect(RAW.split(shape).length - 1).toBe(1);
+    expect(RAW.split('"advisory": "monster_defensive_stance"').length - 1).toBe(1);
+  });
+});
+
+describe('MA-1309 advisory detection + render on the Defensive Stance reaction', () => {
+  it('arms via the pure truthiness detector', () => {
+    expect(isMonsterActionAdvisoryRow(PIRATE_DS)).toBe(true);
+  });
+
+  it('row renders the labelled advisory chip', () => {
+    const { container } = renderRow(PIRATE_DS);
+    const chip = container.querySelector('.mc-dice-link-advisory');
+    expect(chip).not.toBe(null);
+    expect(chip.textContent).toContain('Defensive Stance');
+    expect(chip.getAttribute('title')).toMatch(/GM-enforced/);
+  });
+
+  it('chip press routes onAdvisoryRow with the row, never onAttack', () => {
+    const { container, onAttack, onAdvisoryRow } = renderRow(PIRATE_DS);
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
+    expect(onAdvisoryRow.mock.calls[0][0]).toBe(PIRATE_DS);
+    expect(onAttack).not.toHaveBeenCalled();
+  });
+
+  it('incapacitated advisory chip is inert (no click route)', () => {
+    const { container, onAdvisoryRow } = renderRow(PIRATE_DS, { attackerCannotAct: true });
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).not.toHaveBeenCalled();
+  });
+});
+
+describe('MA-1309 builders + resolver on Defensive Stance — record-only contract', () => {
+  it('popup is honest record chrome with the fallback GM-enforced copy', () => {
+    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Pirate Admiral 1', action: PIRATE_DS });
+    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Defensive Stance<\/h3>/);
+    expect(html).toMatch(/Defensive Stance is GM-enforced \(no engine consumer for this mechanic\)/);
+  });
+
+  it('log is an ability_use record naming Defensive Stance, no roll fields', () => {
+    const log = buildMonsterActionAdvisoryLog({ monsterName: 'Pirate Admiral 1', action: PIRATE_DS });
+    expect(log.type).toBe('ability_use');
+    expect(log.characterName).toBe('Pirate Admiral 1');
+    expect(log.abilityName).toBe('Defensive Stance');
+    expect(log.rollType).toBeUndefined();
+    expect(log.roll).toBeUndefined();
+  });
+
+  it('one press = popup + exactly ONE ability_use log; no other writes', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    const res = await resolveMonsterActionAdvisoryRow({ action: PIRATE_DS, monsterName: 'Pirate Admiral 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(res.resolved).toBe(true);
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.abilityName).toBe('Defensive Stance');
+    expect(entry.description).toMatch(/GM-enforced/);
+  });
+
+  it('refire press stays record-only: two logs, zero spends', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    await resolveMonsterActionAdvisoryRow({ action: PIRATE_DS, monsterName: 'Pirate Admiral 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    await resolveMonsterActionAdvisoryRow({ action: PIRATE_DS, monsterName: 'Pirate Admiral 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(addEntry).toHaveBeenCalledTimes(2);
+    expect(setPopupHtml).toHaveBeenCalledTimes(2);
+    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
+  });
+});
