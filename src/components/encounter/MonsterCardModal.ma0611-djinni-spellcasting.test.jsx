@@ -87,7 +87,18 @@ const pixieRow = pixie.actions.find(a => a.name === 'Spellcasting');
 const PX_NAMES = ['Dancing Lights', 'Druidcraft', 'Invisibility', 'Detect Thoughts', 'Fly', 'Sleep'];
 const PX_ONE_DAY = ['Detect Thoughts', 'Fly', 'Sleep'];
 const PX_AT_WILL = ['Dancing Lights', 'Druidcraft', 'Invisibility'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES])];
+// MA-1323 pixie-wonderbringer extension (exact MA-1320 twin, markup-gap family):
+// all six spell names were plain text, headers only carried <strong>; the numeric
+// save_dc 15 + Charisma pair was already authored — caster-channel label riding the
+// XOR fork (§676, never renders a DC chip); junk attack_bonus 0 out of scope (§490).
+// §158 trap INACTIVE: all six names byte-match BOTH spell indexes. The DC 15 byte
+// discriminates vs the MA-1320 pixie row (DC 12 + Sleep) sharing the lead-in.
+const pixieWb = monsters.find(m => m.index === 'pixie-wonderbringer');
+const pixieWbRow = pixieWb.actions.find(a => a.name === 'Spellcasting');
+const WB_NAMES = ['Dancing Lights', 'Druidcraft', 'Invisibility', 'Detect Thoughts', 'Fly', 'Major Image'];
+const WB_ONE_DAY = ['Detect Thoughts', 'Fly', 'Major Image'];
+const WB_AT_WILL = ['Dancing Lights', 'Druidcraft', 'Invisibility'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -100,6 +111,7 @@ const OI_PLAIN_ORIGINAL = 'The oni casts one of the following spells, requiring 
 const PL_PLAIN_ORIGINAL = 'The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\nAt Will: Mage Hand, Minor Illusion, Prestidigitation\n1/Day Each: Major Image, Project Image';
 const PM_PLAIN_ORIGINAL = 'The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\nAt Will: Minor Illusion, Prestidigitation\n1/Day: Tasha\'s Hideous Laughter (level 3 version)';
 const PX_PLAIN_ORIGINAL = 'The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 12):\nAt Will: Dancing Lights, Druidcraft, Invisibility (self only)\n1/Day Each: Detect Thoughts, Fly, Sleep';
+const WB_PLAIN_ORIGINAL = 'The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\nAt Will: Dancing Lights, Druidcraft, Invisibility (self only)\n1/Day Each: Detect Thoughts, Fly, Major Image';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -294,6 +306,17 @@ function renderPixie() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: PX_MONSTER_NAME, creatures })} />);
+}
+
+const PXWB_MONSTER_NAME = 'Pixie Wonderbringer 1';
+
+function renderPixieWonderbringer() {
+  const m = makeMonster({ name: 'Pixie Wonderbringer', actions: [pixieWbRow] });
+  const creatures = [
+    { name: PXWB_MONSTER_NAME, type: 'npc', monsterType: 'fey', targetName: 'Bandit', ac: 15, currentHp: 60, maxHp: 60, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: PXWB_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -997,5 +1020,116 @@ describe('MA-1320 MonsterCardModal Pixie Spellcasting chips', () => {
     await act(async () => { fireEvent.click(linkByText('Druidcraft')); });
     await waitFor(() => expect(abilityUseEntries('Druidcraft').length).toBe(2));
     expect(runtime.store[`${PX_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+});
+
+// ── MA-1323 data lock: Pixie Wonderbringer Spellcasting row ──────────────────
+
+describe('MA-1323 monsters.json data lock: Pixie Wonderbringer Spellcasting row', () => {
+  it('extracts all six spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(pixieWbRow.description);
+    expect(names).toEqual(WB_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day Each');
+  });
+
+  it('disk description carries all six name-wrapped <strong> tokens in authored order', () => {
+    const d = pixieWbRow.description;
+    WB_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = WB_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day Each to Detect Thoughts + Fly + Major Image; At Will trio ungated (§57)', () => {
+    const uses = extractSpellcastingSpellUses(pixieWbRow.description);
+    expect(uses).toEqual(Object.fromEntries(WB_ONE_DAY.map(n => [n, 1])));
+    WB_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 15 + save_type Charisma pair intact — caster-channel label, XOR fork keeps it unrendered (§676)', () => {
+    expect(pixieWbRow.save_dc).toBe(15);
+    expect(pixieWbRow.save_type).toBe('Charisma');
+    expect(pixieWbRow.description).toMatch(/spell save DC 15/);
+  });
+
+  it('"Invisibility (self only)" — name wrapped, qualifier parenthetical OUTSIDE the mark (§1320 twin convention)', () => {
+    expect(pixieWbRow.description).toMatch(/<strong>Invisibility<\/strong> \(self only\)/);
+    expect(pixieWbRow.description).not.toMatch(/<(?:strong|em)>[^<]*self only[^<]*<\/(?:strong|em)>/);
+  });
+
+  it('emphasis census: ONLY the two tier headers + six spell names carry markup — no fake-chip decoys (§161)', () => {
+    const tokens = (pixieWbRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Dancing Lights</strong>', '<strong>Druidcraft</strong>', '<strong>Invisibility</strong>', '<strong>1/Day Each:</strong>', '<strong>Detect Thoughts</strong>', '<strong>Fly</strong>', '<strong>Major Image</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(pixieWbRow.description)).toBe(WB_PLAIN_ORIGINAL);
+  });
+
+  it('pixie twin (MA-1320, DC 12 + Sleep) untouched — DC 15 byte discriminates the shared lead-in', () => {
+    expect(pixieWbRow.description).toContain('spell save DC 15');
+    expect(pixieRow.description).toContain('spell save DC 12');
+    expect(pixieRow.description).toContain('<strong>Sleep</strong>');
+    expect(pixieWbRow.description).not.toContain('Sleep');
+    expect(pixieWbRow.description).not.toBe(pixieRow.description);
+    expect(stripTags(pixieRow.description)).toBe(PX_PLAIN_ORIGINAL);
+  });
+
+  it('DC 15 = 8 + CHA +4 + PB +3 for the pixie wonderbringer', () => {
+    expect(pixieWb.ability_score_modifiers.cha).toBe(4);
+    expect(pixieWb.proficiency_bonus).toBe(3);
+    expect(8 + pixieWb.ability_score_modifiers.cha + pixieWb.proficiency_bonus).toBe(15);
+  });
+
+  it('§158 trap INACTIVE: all six spells byte-match BOTH 5e and 2024 indexes', () => {
+    WB_NAMES.forEach(n => {
+      expect(spells5e.some(s => s.name === n)).toBe(true);
+      expect(spells2024.some(s => s.name === n)).toBe(true);
+    });
+  });
+});
+
+// ── MA-1323 Modal: six chips, counters, 1/Day gate ───────────────────────────
+
+describe('MA-1323 MonsterCardModal Pixie Wonderbringer Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders six spell chips — the zero-chip inert row is gone', () => {
+    renderPixieWonderbringer();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(WB_NAMES);
+  });
+
+  it('the three 1/Day names carry counters; the At Will trio does not (§57 gate binds)', () => {
+    renderPixieWonderbringer();
+    WB_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    WB_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('Major Image 1/Day: cast spends the single use with DC 15 advisory, re-fire refused — zero extra spend (§57)', async () => {
+    renderPixieWonderbringer();
+    await act(async () => { fireEvent.click(linkByText('Major Image')); });
+    await waitFor(() => expect(abilityUseEntries('Major Image').length).toBe(1));
+    expect(runtime.store[`${PXWB_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Major Image': 1 });
+    expect(abilityUseEntries('Major Image')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Major Image')[0].description).toMatch(/\(spell save DC 15/);
+
+    await act(async () => { fireEvent.click(linkByText('Major Image')); });
+    await waitFor(() => expect(refusals('Major Image').length).toBe(1));
+    expect(abilityUseEntries('Major Image').length).toBe(1);
+    expect(runtime.store[`${PXWB_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Major Image': 1 });
+  });
+
+  it('At Will Druidcraft casts ungated twice — zero uses, advisory log prints row DC 15 (§204)', async () => {
+    renderPixieWonderbringer();
+    await act(async () => { fireEvent.click(linkByText('Druidcraft')); });
+    await waitFor(() => expect(abilityUseEntries('Druidcraft').length).toBe(1));
+    expect(abilityUseEntries('Druidcraft')[0].description).toMatch(/\(spell save DC 15/);
+    await act(async () => { fireEvent.click(linkByText('Druidcraft')); });
+    await waitFor(() => expect(abilityUseEntries('Druidcraft').length).toBe(2));
+    expect(runtime.store[`${PXWB_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });
