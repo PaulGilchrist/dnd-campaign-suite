@@ -62,9 +62,22 @@ const performerLegendRow = performerLegend.actions.find(a => a.name === 'Spellca
 const PL_NAMES = ['Mage Hand', 'Minor Illusion', 'Prestidigitation', 'Major Image', 'Project Image'];
 const PL_ONE_DAY = ['Major Image', 'Project Image'];
 const PL_AT_WILL = ['Mage Hand', 'Minor Illusion', 'Prestidigitation'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES])];
+// MA-1294 performer-maestro extension (same MA-0421/MA-1230/MA-1241/MA-1289
+// markup-gap family): all three spell names were plain text, headers only carried
+// <strong>; the numeric save_dc 15 + Charisma pair was already authored (family
+// caster-channel label — §676 SpellCastLinks XOR suppresses the row DC chip).
+// §158 canonical-name decision: RAW "Tasha's Hideous Laughter" wrapped AS-IS —
+// absent from the 5e index (which names it "Hideous Laughter") but present in
+// 2024/spells.json EXACTLY, and findMonsterSpell is 5e-first with a 2024-name
+// fallback (§207 live twin) → resolvable under both rulesets.
+const performerMaestro = monsters.find(m => m.index === 'performer-maestro');
+const performerMaestroRow = performerMaestro.actions.find(a => a.name === 'Spellcasting');
+const PM_NAMES = ['Minor Illusion', 'Prestidigitation', "Tasha's Hideous Laughter"];
+const PM_ONE_DAY = ["Tasha's Hideous Laughter"];
+const PM_AT_WILL = ['Minor Illusion', 'Prestidigitation'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
-const SPELLS_2024 = Object.fromEntries(NP_NAMES.map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
+const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
 const DJINNI_PLAIN_ORIGINAL = 'The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\nAt Will: Detect Evil and Good, Detect Magic\n2/Day Each: Create Food and Water (can create wine instead of water), Tongues, Wind Walk\n1/Day Each: Creation, Gaseous Form, Invisibility, Major Image, Plane Shift';
 const NH_PLAIN_ORIGINAL = 'The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):\nAt Will: Detect Magic, Etherealness, Magic Missile (level 4 version)\n2/Day Each: Phantasmal Killer, Plane Shift (self only)';
@@ -73,6 +86,7 @@ const NH_PLAIN_ORIGINAL = 'The hag casts one of the following spells, requiring 
 const NP_PLAIN_ORIGINAL = 'The noble casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\nAt Will: Mage Armor (included in AC), Mage Hand, Minor Illusion\n1/Day Each: Befuddle ment, Detect Thoughts, Fly, Scrying, Shatter (level 7 version)';
 const OI_PLAIN_ORIGINAL = 'The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n1/Day Each: Charm Person (level 2 version), Darkness, Gaseous Form, Sleep';
 const PL_PLAIN_ORIGINAL = 'The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\nAt Will: Mage Hand, Minor Illusion, Prestidigitation\n1/Day Each: Major Image, Project Image';
+const PM_PLAIN_ORIGINAL = 'The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\nAt Will: Minor Illusion, Prestidigitation\n1/Day: Tasha\'s Hideous Laughter (level 3 version)';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -245,6 +259,17 @@ function renderPerformerLegend() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: PL_MONSTER_NAME, creatures })} />);
+}
+
+const PM_MONSTER_NAME = 'Performer Maestro 1';
+
+function renderPerformerMaestro() {
+  const m = makeMonster({ name: 'Performer Maestro', actions: [performerMaestroRow] });
+  const creatures = [
+    { name: PM_MONSTER_NAME, type: 'npc', monsterType: 'humanoid', targetName: 'Bandit', ac: 15, currentHp: 110, maxHp: 110, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: PM_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -722,5 +747,121 @@ describe('MA-1289 MonsterCardModal Performer Legend Spellcasting chips', () => {
     await act(async () => { fireEvent.click(linkByText('Mage Hand')); });
     await waitFor(() => expect(abilityUseEntries('Mage Hand').length).toBe(2));
     expect(runtime.store[`${PL_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+});
+
+// ── MA-1294 data lock: Performer Maestro Spellcasting row ────────────────────
+
+describe('MA-1294 monsters.json data lock: Performer Maestro Spellcasting row', () => {
+  it('extracts all three spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(performerMaestroRow.description);
+    expect(names).toEqual(PM_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day');
+  });
+
+  it('disk description carries all three name-wrapped <strong> tokens in authored order', () => {
+    const d = performerMaestroRow.description;
+    PM_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = PM_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day to Tasha\'s Hideous Laughter; At Will pair ungated (§57)', () => {
+    const uses = extractSpellcastingSpellUses(performerMaestroRow.description);
+    expect(uses).toEqual({ "Tasha's Hideous Laughter": 1 });
+    PM_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 15 + save_type Charisma pair intact — family caster-channel label, XOR fork keeps it unrendered (§676)', () => {
+    expect(performerMaestroRow.save_dc).toBe(15);
+    expect(performerMaestroRow.save_type).toBe('Charisma');
+    expect(performerMaestroRow.description).toMatch(/spell save DC 15/);
+  });
+
+  it('emphasis census: ONLY the two tier headers + three spell names carry markup — no fake-chip decoys (§161)', () => {
+    const tokens = (performerMaestroRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Minor Illusion</strong>', '<strong>Prestidigitation</strong>', '<strong>1/Day:</strong>', "<strong>Tasha's Hideous Laughter</strong>"]);
+  });
+
+  it('"(level 3 version)" parenthetical stays OUTSIDE the wrap (MA-1241 twin convention)', () => {
+    expect(performerMaestroRow.description).toMatch(/<strong>Tasha's Hideous Laughter<\/strong> \(level 3 version\)/);
+    expect(performerMaestroRow.description).not.toMatch(/<(?:strong|em)>[^<]*level 3 version[^<]*<\/(?:strong|em)>/);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(performerMaestroRow.description)).toBe(PM_PLAIN_ORIGINAL);
+  });
+
+  it('§158 resolution: Minor Illusion + Prestidigitation in BOTH indexes; RAW "Tasha\'s Hideous Laughter" absent 5e ("Hideous Laughter" there), exact in 2024 — findMonsterSpell 5e→2024 fallback resolves it (§207)', () => {
+    PM_AT_WILL.forEach(n => {
+      expect(spells5e.some(s => s.name === n)).toBe(true);
+      expect(spells2024.some(s => s.name === n)).toBe(true);
+    });
+    expect(spells5e.some(s => s.name === "Tasha's Hideous Laughter")).toBe(false);
+    expect(spells5e.some(s => s.name === 'Hideous Laughter')).toBe(true);
+    const t = spells2024.find(s => s.name === "Tasha's Hideous Laughter");
+    expect(t).toBeDefined();
+    expect(t.level).toBe(1);
+    expect(t.school).toBe('Enchantment');
+    expect(t.dc.dc_type).toBe('WIS');
+  });
+
+  it('DC 15 = 8 + CHA +4 + PB +3 for the performer maestro', () => {
+    expect(performerMaestro.ability_score_modifiers.cha).toBe(4);
+    expect(performerMaestro.proficiency_bonus).toBe(3);
+    expect(8 + performerMaestro.ability_score_modifiers.cha + performerMaestro.proficiency_bonus).toBe(15);
+  });
+});
+
+// ── MA-1294 Modal: three chips, counters, 1/Day gate ─────────────────────────
+
+describe('MA-1294 MonsterCardModal Performer Maestro Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders three spell chips — the zero-chip inert row is gone', () => {
+    renderPerformerMaestro();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(PM_NAMES);
+  });
+
+  it('the 1/Day laughter name carries the counter; the At Will pair does not', () => {
+    renderPerformerMaestro();
+    PM_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    PM_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('At Will Minor Illusion casts ungated twice — zero uses, advisory log prints row DC 15 (§204)', async () => {
+    renderPerformerMaestro();
+    await act(async () => { fireEvent.click(linkByText('Minor Illusion')); });
+    await waitFor(() => expect(abilityUseEntries('Minor Illusion').length).toBe(1));
+    expect(abilityUseEntries('Minor Illusion')[0].description).toMatch(/\(spell save DC 15/);
+    await act(async () => { fireEvent.click(linkByText('Minor Illusion')); });
+    await waitFor(() => expect(abilityUseEntries('Minor Illusion').length).toBe(2));
+    expect(runtime.store[`${PM_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Tasha\'s Hideous Laughter 1/Day: cast spends the single use with DC 15 advisory, re-fire refused "0 left" — zero extra spend (§57)', async () => {
+    renderPerformerMaestro();
+    await act(async () => { fireEvent.click(linkByText("Tasha's Hideous Laughter")); });
+    await waitFor(() => expect(abilityUseEntries("Tasha's Hideous Laughter").length).toBe(1));
+    expect(runtime.store[`${PM_MONSTER_NAME}.monsterSpellUses`]).toEqual({ "Tasha's Hideous Laughter": 1 });
+    expect(abilityUseEntries("Tasha's Hideous Laughter")[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries("Tasha's Hideous Laughter")[0].description).toMatch(/\(spell save DC 15/);
+
+    await act(async () => { fireEvent.click(linkByText("Tasha's Hideous Laughter")); });
+    await waitFor(() => expect(refusals("Tasha's Hideous Laughter").length).toBe(1));
+    expect(abilityUseEntries("Tasha's Hideous Laughter").length).toBe(1);
+    expect(runtime.store[`${PM_MONSTER_NAME}.monsterSpellUses`]).toEqual({ "Tasha's Hideous Laughter": 1 });
+  });
+
+  it('At Will Prestidigitation casts ungated — zero uses, no chip counter', async () => {
+    renderPerformerMaestro();
+    await act(async () => { fireEvent.click(linkByText('Prestidigitation')); });
+    await waitFor(() => expect(abilityUseEntries('Prestidigitation').length).toBe(1));
+    expect(runtime.store[`${PM_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });

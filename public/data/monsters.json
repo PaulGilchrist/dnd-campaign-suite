@@ -47234,7 +47234,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> Minor Illusion, Prestidigitation<br><strong>1/Day:</strong> Tasha's Hideous Laughter (level 3 version)",
+        "description": "The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):<br><strong>At Will:</strong> <strong>Minor Illusion</strong>, <strong>Prestidigitation</strong><br><strong>1/Day:</strong> <strong>Tasha's Hideous Laughter</strong> (level 3 version)",
         "attack_bonus": 0,
         "save_dc": 15,
         "save_type": "Charisma",

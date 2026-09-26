@@ -21401,7 +21401,7 @@
       "range": "",
       "recharge": "",
       "description": "The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):At Will: Minor Illusion, Prestidigitation1/Day: Tasha's Hideous Laughter (level 3 version)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1294-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1295",
