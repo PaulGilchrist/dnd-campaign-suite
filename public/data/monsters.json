@@ -46067,7 +46067,7 @@
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 15 (1d12 + 4 plus 1d8) slashing damage.",
         "attack_bonus": 6,
         "reach": "5 ft.",
-        "damage_dice_primary": "1d12 + 4",
+        "damage_dice_primary": "1d12 + 4 plus 1d8",
         "damage_type_primary": "Slashing"
       },
       {

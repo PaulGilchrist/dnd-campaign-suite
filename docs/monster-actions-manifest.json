@@ -20864,7 +20864,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 15 (1d12 + 4 plus 1d8) slashing damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1266-greataxe.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1267",
