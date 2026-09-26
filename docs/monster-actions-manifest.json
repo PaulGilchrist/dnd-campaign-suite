@@ -20880,7 +20880,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +6 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 12 (1d6 + 4 plus 1d8) piercing damage, or 13 (2d8 + 4) piercing damage if used with two hands to make a melee attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1267-spear.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1268",
