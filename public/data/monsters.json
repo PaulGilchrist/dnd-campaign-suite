@@ -43574,13 +43574,21 @@
       {
         "name": "Rapport Spores",
         "description": "The myconid expels spores in a 30-foot <strong>Emanation</strong> originating from itself. Creatures in that area with an Intelligence score of 2 or higher that aren't Constructs, Elementals, or Undead gain telepathy with a range of 30 feet for 1 hour.",
-        "attack_bonus": 0,
+        "attack_bonus": null,
         "save_dc": 0,
         "save_type": "",
         "save_effect": "",
         "range": "",
         "reach": "",
-        "recharge": ""
+        "recharge": "",
+        "duration": "1 hour",
+        "zone": {
+          "radius_ft": 30,
+          "no_save": true,
+          "noun": "rapport spores",
+          "effect_key": "rapport_spores",
+          "advisory": "30-foot Emanation originating from the myconid — picker multi-selects creatures in the area (selection advisory; gridless selection is lenient, §42). Creatures with Intelligence 2 or higher that aren't Constructs, Elementals, or Undead gain telepathy with a range of 30 feet for 1 hour — the INT/type exclusion and the 1-hour expiry are GM-enforced (the MA-0043 zone picker grant carries no addExpiration clock — §165 residual)."
+        }
       }
     ],
     "bonus_actions": [],

@@ -83,13 +83,14 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 const CREATURES = [
   { name: 'Myconid Adult 1', type: 'npc', monsterType: 'plant', targetName: 'Bandit', currentHp: 16, maxHp: 16, ac: 12, conditions: [] },
+  { name: 'Myconid Sovereign 1', type: 'npc', monsterType: 'plant', targetName: 'Bandit', currentHp: 45, maxHp: 45, ac: 13, conditions: [] },
   { name: 'Bandit', type: 'npc', currentHp: 999, maxHp: 11, ac: 12, conditions: [] },
 ];
 
-function renderMyconid() {
-  const adult = monstersData.find(m => m.index === 'myconid-adult');
-  const m = makeMonster({ name: 'Myconid Adult', actions: adult.actions, traits: adult.traits });
-  return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Myconid Adult 1', creatures: CREATURES })} />);
+function renderMyconid(index = 'myconid-adult', creatureName = 'Myconid Adult 1') {
+  const monster = monstersData.find(m => m.index === index);
+  const m = makeMonster({ name: monster.name, actions: monster.actions, traits: monster.traits });
+  return render(<MonsterCardModal {...makeProps(m, { creatureName, creatures: CREATURES })} />);
 }
 
 beforeEach(() => {
@@ -133,6 +134,43 @@ describe('MA-1212 rapport spores ACTION row → zoneOnly picker (no save, no rol
     expect(zt.noun).toBe('rapport spores');
     expect(zt.clause).toMatch(/GM-enforced/);
     renderMyconid();
+    fireEvent.click(document.querySelector('.mc-dice-link-zone'));
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    expect(aoeProps.current.zoneTe).toEqual(zt);
+  });
+
+  // MA-1217: sovereign byte-twin drives the SAME untouched picker seam.
+  it('MA-1217 sovereign disk row drives the picker: 30-ft zoneOnly, save_dc normalized null, sovereign caster excluded', async () => {
+    renderMyconid('myconid-sovereign', 'Myconid Sovereign 1');
+    const chip = document.querySelector('.mc-dice-link-zone');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('30-ft Zone');
+    const rapportRow = [...document.querySelectorAll('.mc-overlay *')].find(e => e.querySelector(':scope > strong')?.textContent.includes('Rapport Spores'));
+    const attackChips = [...rapportRow.querySelectorAll('.mc-dice-link:not(.mc-dice-link-zone)')].map(c => c.textContent.trim());
+    expect(attackChips).toEqual([]);
+    fireEvent.click(chip);
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    const p = aoeProps.current;
+    expect(p.zoneOnly).toBe(true);
+    expect(p.saveDc ?? null).toBeNull();
+    expect(p.saveType ?? null).toBeNull();
+    expect(p.damage ?? null).toBeNull();
+    expect(p.range).toBe(30);
+    expect(p.excludeNames).toEqual(['Myconid Sovereign 1']);
+    expect(p.storeLastAttack).toBe(false);
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('MA-1217 sovereign zoneTe payload: rapport_spores, duration 1 hour, advisory clause rides the arm log', async () => {
+    const sovRapport = monstersData.find(m => m.index === 'myconid-sovereign').actions[4];
+    const zt = zoneTeForAction(sovRapport);
+    expect(zt.effectKey).toBe('rapport_spores');
+    expect(zt.radiusFt).toBe(30);
+    expect(zt.damage).toBeNull();
+    expect(zt.duration).toBe('1 hour');
+    expect(zt.clause).toMatch(/GM-enforced/);
+    renderMyconid('myconid-sovereign', 'Myconid Sovereign 1');
     fireEvent.click(document.querySelector('.mc-dice-link-zone'));
     await waitFor(() => expect(aoeProps.current).toBeTruthy());
     expect(aoeProps.current.zoneTe).toEqual(zt);

@@ -77,7 +77,8 @@ import { rollExpression } from '../../../../services/dice/diceRoller.js';
 
 const RAPPORT = monstersData.find(m => m.index === 'myconid-adult').actions[2];
 const ACTION = { ...RAPPORT, save_dc: null };
-const ZONE_TE = zoneTeForAction(RAPPORT);
+// MA-1217: sovereign byte-twin row — same payload through the same consumer.
+const SOV_RAPPORT = monstersData.find(m => m.index === 'myconid-sovereign').actions[4];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -85,11 +86,11 @@ beforeEach(() => {
   seenTargets.current = [];
 });
 
-function renderRapportZone() {
+function renderRapportZone(action = ACTION, caster = 'Myconid Adult 1') {
   return render(
     <SaveAttackAoeModal
-      action={ACTION}
-      playerStats={{ name: 'Myconid Adult 1' }}
+      action={action}
+      playerStats={{ name: caster }}
       campaignName="test-campaign"
       range={30}
       damage={null}
@@ -98,9 +99,9 @@ function renderRapportZone() {
       saveDc={null}
       dcSuccess={null}
       titleOverride="30-foot radius (GM positions; selection advisory)"
-      excludeNames={['Myconid Adult 1']}
+      excludeNames={[caster]}
       rangeGateFt={null}
-      zoneTe={ZONE_TE}
+      zoneTe={zoneTeForAction(action)}
       zoneOnly={true}
       storeLastAttack={false}
       onClose={vi.fn()}
@@ -139,5 +140,39 @@ describe('MA-1212 rapport_spores zoneOnly confirm: te grant, zero rolls, zero da
     expect(log.description).toMatch(/no save/);
     expect(log.description).toMatch(/Duration 1 hour — GM-enforced/);
     expect(log.description).toMatch(/GM-enforced/);
+  });
+
+  // MA-1217: sovereign byte-twin confirm — same te grant through the same consumer.
+  it('MA-1217 sovereign confirm registers rapport_spores te per selected creature (source sovereign, dc null) with NO save/attack/damage rolls', async () => {
+    const { getByText } = renderRapportZone({ ...SOV_RAPPORT, save_dc: null }, 'Myconid Sovereign 1');
+    // sovereign is not on the mocked board — only it would be excluded, so all 3 stand
+    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Myconid Adult 1', 'Bandit', 'Thug 1']));
+    fireEvent.click(getByText('Confirm'));
+    await waitFor(() => expect(runtime.store['campaign.targetEffects']).toBeTruthy());
+    const te = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'rapport_spores');
+    expect(te.map(t => t.target).sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
+    expect(te[0].source).toBe('Myconid Sovereign 1');
+    expect(te[0].dc ?? null).toBeNull();
+    expect(te[0].radiusFt).toBe(30);
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(rollExpression).not.toHaveBeenCalled();
+  });
+
+  it('MA-1217 sovereign caster tracking + grant log: "no save", GM-enforced clause, zero rolls', async () => {
+    const { getByText } = renderRapportZone({ ...SOV_RAPPORT, save_dc: null }, 'Myconid Sovereign 1');
+    await waitFor(() => expect(seenTargets.current.length).toBe(3));
+    fireEvent.click(getByText('Confirm'));
+    await waitFor(() => expect(runtime.store['Myconid Sovereign 1._rapport_spores_Myconid_Sovereign_1']).toBeTruthy());
+    const tracking = runtime.store['Myconid Sovereign 1._rapport_spores_Myconid_Sovereign_1'];
+    expect(tracking.saveDc).toBeNull();
+    expect(tracking.radiusFt).toBe(30);
+    expect(tracking.damage).toBeNull();
+    expect(tracking.duration).toBe('1 hour');
+    expect(tracking.affectedNames.sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
+    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && (e.description || '').includes('rapport_spores zone armed'));
+    expect(log).toBeTruthy();
+    expect(log.description).toMatch(/no save/);
+    expect(log.description).toMatch(/GM-enforced/);
+    expect(rollExpression).not.toHaveBeenCalled();
   });
 });
