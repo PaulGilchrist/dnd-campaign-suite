@@ -46324,6 +46324,12 @@
         "save_dc": 14,
         "save_type": "Constitution",
         "save_effect": "Failure: 16 (3d8 + 3) Bludgeoning damage, and the target has the Stunned condition until the start of the otyugh's next turn. Success: Half damage only.",
+        "target_prerequisite": {
+          "conditions": [
+            "grappled"
+          ],
+          "by_attacker": true
+        },
         "range": "",
         "reach": "",
         "recharge": "",

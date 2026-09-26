@@ -21028,7 +21028,7 @@
         "stunned"
       ],
       "description": "Constitution Saving Throw: DC 14, each creature Grappled by the otyugh. Failure: 16 (3d8 + 3) Bludgeoning damage, and the target has the Stunned condition until the start of the otyugh's next turn. Success: Half damage only.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1275-tentacle-slam.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1276",
