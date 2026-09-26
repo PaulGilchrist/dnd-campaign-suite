@@ -1023,3 +1023,55 @@ describe('MA-1236 Nimblewright Parry — data-lock + acBonus 2', () => {
   });
 });
 
+// MA-1238: Noble Parry — MA-0341/MA-0643/MA-0702/MA-0869/MA-0997/MA-1048/
+// MA-1140/MA-1236 routine DATA twin. Disk reactions[0] was prose-only
+// (name/trigger/description) = gate-null inert (§114 fingerprint:
+// getGatedMonsterReaction MonsterCardHelpers.js:1714 keys automation.effect
+// only; GatedReactionSlot MonsterAction.jsx:165 returns null; live row-scoped
+// census 0 mc-dice-link, row-click log delta 0). Fix authors the MA-0341
+// byte-shape with acBonus 2 (row prose "adds 2" — buildParryBuff defaults 2
+// but MUST be authored for the honest disk record). RAW: +2 AC vs the
+// triggering melee hit; AC 15 → 17 flips the 15-16 window hit to miss.
+// At Will sentinel (unlimited, 1/round latch). Wielded-weapon clause stays
+// GM-enforced advisory (§235 spend-log copy).
+const NOBLE_ACTION = monsters.find(m => m.index === 'noble').reactions[0];
+const NOBLE = 'Noble 1';
+
+describe('MA-1238 Noble Parry — data-lock + acBonus 2', () => {
+  it('monsters.json noble reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 2)', () => {
+    expect(NOBLE_ACTION.name).toBe('Parry');
+    expect(NOBLE_ACTION.trigger).toMatch(/hit by a melee attack roll/);
+    expect(NOBLE_ACTION.description).toMatch(/adds 2 to its AC/);
+    expect(NOBLE_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
+    expect(NOBLE_ACTION.usage).toBe('At Will');
+    expect(NOBLE_ACTION.uses).toBe(999);
+    expect(NOBLE_ACTION.maxUses).toBe(999);
+    expect(getGatedMonsterReaction(NOBLE_ACTION)?.effect).toBe('parry');
+  });
+
+  it('gate arms the chip for the noble: accepts unresolved melee hit, refuses a 2nd same-round press', () => {
+    const hit = { attackerName: 'Bandit 1', targetName: NOBLE, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 3, total: 15, targetAc: 15, effectiveAc: 15 };
+    const g = parryGate({ lastAttack: hit, monsterName: NOBLE, currentRound: 3, storedUses: {}, usedRound: 0, action: NOBLE_ACTION });
+    expect(g.ok).toBe(true);
+    expect(g.limit).toBe(999);
+    const again = parryGate({ lastAttack: hit, monsterName: NOBLE, currentRound: 3, storedUses: {}, usedRound: 3, action: NOBLE_ACTION });
+    expect(again.ok).toBe(false);
+    expect(again.reason).toBe('round');
+  });
+
+  it('resolve: +2 AC stamp, AC 15 → 17 flips the 15-16 window hit to miss, At Will never spends uses', async () => {
+    const hit = { attackerName: 'Bandit 1', targetName: NOBLE, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 3, total: 15, targetAc: 15, effectiveAc: 15 };
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+    const result = await resolveMonsterGatedReaction({ action: NOBLE_ACTION, monsterName: NOBLE, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(2);
+    expect(result.newAc).toBe(17);
+    expect(result.newAc).toBeGreaterThan(hit.total);
+    expect(state[`${NOBLE}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(true);
+    expect(state[`${NOBLE}._parry_usedRound`]).toBe(3);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: NOBLE, parryAcBonus: 2 });
+    expect(state[`${NOBLE}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 15 → 17/);
+  });
+});
+
