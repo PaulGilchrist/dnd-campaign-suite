@@ -21550,7 +21550,7 @@
       "range": "",
       "recharge": "",
       "description": "The piercer falls. Dexterity Saving Throw: DC 11, one creature directly underneath the piercer. Failure: 10 (3d6) Piercing damage. Failure or Success: The piercer reduces any damage it takes from the fall by 20.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1301-drop.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1302",

@@ -47590,6 +47590,7 @@
         "save_dc": 11,
         "save_type": "Dexterity",
         "save_effect": "Failure: 10 (3d6) Piercing damage",
+        "dc_success": "none",
         "range": "",
         "reach": "",
         "recharge": "",
