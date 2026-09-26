@@ -47099,7 +47099,8 @@
         "trigger": "A creature hits the performer with an attack roll",
         "description": "Wisdom Saving Throw: DC 17, the triggering creature. Failure: The attack roll misses the performer, and the target has the <strong>Charmed</strong> condition until the end of the performer's next turn.",
         "save_type": "Wisdom",
-        "save_effect": "Failure: The attack roll misses the performer, and the target has the Charmed condition until the end of the performer's next turn."
+        "save_effect": "Failure: The attack roll misses the performer, and the target has the Charmed condition until the end of the performer's next turn.",
+        "advisory": "monster_warding_charm"
       }
     ],
     "legendary_actions": [],

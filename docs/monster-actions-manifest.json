@@ -21316,7 +21316,7 @@
         "charmed"
       ],
       "description": "Wisdom Saving Throw: DC 17, the triggering creature. Failure: The attack roll misses the performer, and the target has the Charmed condition until the end of the performer's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1290-warding-charm.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1291",

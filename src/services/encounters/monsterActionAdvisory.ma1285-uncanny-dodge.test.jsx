@@ -171,3 +171,104 @@ describe('MA-1285 builders + resolver on the Uncanny Dodge rows — record-only 
     expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
   });
 });
+
+// MA-1290: Performer Legend "Warding Charm" reactions[0] — same FAIL(b)
+// zero-affordance fingerprint (name/trigger/description/save_type/save_effect
+// only, §60) fixed via the SAME Option A one-field advisory seam. Hit-
+// negation (Option B) stays out of scope — no consumer semantics for
+// negating a committed hit. Mirrors the MA-1285 blocks byte-for-byte.
+const LEGEND = monstersData.find((m) => m.index === 'performer-legend');
+const LEGEND_WC = LEGEND.reactions[0];
+
+describe('MA-1290 disk lock: Warding Charm carries the advisory one-field fix', () => {
+  it('reactions[0] name/trigger/description/save_type/save_effect byte-identical to the RAW row', () => {
+    expect(LEGEND_WC.name).toBe('Warding Charm');
+    expect(LEGEND_WC.trigger).toBe('A creature hits the performer with an attack roll');
+    expect(LEGEND_WC.description).toBe('Wisdom Saving Throw: DC 17, the triggering creature. Failure: The attack roll misses the performer, and the target has the <strong>Charmed</strong> condition until the end of the performer\'s next turn.');
+    expect(LEGEND_WC.save_type).toBe('Wisdom');
+    expect(LEGEND_WC.save_effect).toBe('Failure: The attack roll misses the performer, and the target has the Charmed condition until the end of the performer\'s next turn.');
+  });
+
+  it('row carries EXACTLY advisory:"monster_warding_charm" (Option A one-field, no save_dc)', () => {
+    expect(LEGEND_WC.advisory).toBe('monster_warding_charm');
+    expect(LEGEND_WC.automation).toBeUndefined();
+    expect(LEGEND_WC.attack_bonus).toBeUndefined();
+    expect(LEGEND_WC.save_dc).toBeUndefined();
+    expect(LEGEND_WC.zone).toBeUndefined();
+    expect(LEGEND_WC.usage).toBeUndefined();
+  });
+
+  it('placement: advisory sits after save_effect, unique on disk', () => {
+    const shape = '"save_effect": "Failure: The attack roll misses the performer, and the target has the Charmed condition until the end of the performer\'s next turn.",\n        "advisory": "monster_warding_charm"';
+    expect(RAW.split(shape).length - 1).toBe(1);
+    expect(RAW.split('"advisory": "monster_warding_charm"').length - 1).toBe(1);
+  });
+});
+
+describe('MA-1290 advisory detection + render on the Warding Charm reaction', () => {
+  it('arms via the pure truthiness detector', () => {
+    expect(isMonsterActionAdvisoryRow(LEGEND_WC)).toBe(true);
+  });
+
+  it('row renders the labelled advisory chip', () => {
+    const { container } = renderRow(LEGEND_WC);
+    const chip = container.querySelector('.mc-dice-link-advisory');
+    expect(chip).not.toBe(null);
+    expect(chip.textContent).toContain('Warding Charm');
+    expect(chip.getAttribute('title')).toMatch(/GM-enforced/);
+  });
+
+  it('chip press routes onAdvisoryRow with the row, never onAttack', () => {
+    const { container, onAttack, onAdvisoryRow } = renderRow(LEGEND_WC);
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
+    expect(onAdvisoryRow.mock.calls[0][0]).toBe(LEGEND_WC);
+    expect(onAttack).not.toHaveBeenCalled();
+  });
+
+  it('incapacitated advisory chip is inert (no click route)', () => {
+    const { container, onAdvisoryRow } = renderRow(LEGEND_WC, { attackerCannotAct: true });
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).not.toHaveBeenCalled();
+  });
+});
+
+describe('MA-1290 builders + resolver on Warding Charm — record-only contract', () => {
+  it('popup is honest record chrome with the fallback GM-enforced copy', () => {
+    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Performer Legend 1', action: LEGEND_WC });
+    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Warding Charm<\/h3>/);
+    expect(html).toMatch(/Warding Charm is GM-enforced \(no engine consumer for this mechanic\)/);
+  });
+
+  it('log is an ability_use record naming Warding Charm, no roll fields', () => {
+    const log = buildMonsterActionAdvisoryLog({ monsterName: 'Performer Legend 1', action: LEGEND_WC });
+    expect(log.type).toBe('ability_use');
+    expect(log.characterName).toBe('Performer Legend 1');
+    expect(log.abilityName).toBe('Warding Charm');
+    expect(log.rollType).toBeUndefined();
+    expect(log.roll).toBeUndefined();
+  });
+
+  it('one press = popup + exactly ONE ability_use log; no other writes', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    const res = await resolveMonsterActionAdvisoryRow({ action: LEGEND_WC, monsterName: 'Performer Legend 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(res.resolved).toBe(true);
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.abilityName).toBe('Warding Charm');
+    expect(entry.description).toMatch(/GM-enforced/);
+  });
+
+  it('refire press stays record-only: two logs, zero spends', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    await resolveMonsterActionAdvisoryRow({ action: LEGEND_WC, monsterName: 'Performer Legend 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    await resolveMonsterActionAdvisoryRow({ action: LEGEND_WC, monsterName: 'Performer Legend 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(addEntry).toHaveBeenCalledTimes(2);
+    expect(setPopupHtml).toHaveBeenCalledTimes(2);
+    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
+  });
+});
