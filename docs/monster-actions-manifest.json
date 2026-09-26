@@ -20065,7 +20065,7 @@
       "range": "",
       "recharge": "",
       "description": "The nalfeshnee teleports up to 120 feet to an unoccupied space it can see.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1223-nalfeshnee-teleport.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1224",

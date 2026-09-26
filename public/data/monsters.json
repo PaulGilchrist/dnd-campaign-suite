@@ -43901,13 +43901,15 @@
       {
         "name": "Teleport",
         "description": "The nalfeshnee teleports up to 120 feet to an unoccupied space it can see.",
-        "attack_bonus": 0,
+        "attack_bonus": null,
         "save_dc": 0,
         "save_type": "",
         "save_effect": "",
         "range": "",
         "reach": "",
-        "recharge": ""
+        "recharge": "",
+        "advisory": "monster_teleport",
+        "advisory_message": "teleports up to 120 feet to an unoccupied space it can see — advisory record: relocation to an unoccupied visible space ≤120 ft is GM-enforced, GM moves the token; no grid-position consumer app-wide (CLA-320). No attack roll, no saving throw, no dice."
       }
     ],
     "bonus_actions": [

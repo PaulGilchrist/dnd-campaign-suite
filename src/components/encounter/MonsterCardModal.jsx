@@ -23,6 +23,7 @@ import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
+import { resolveMonsterActionAdvisoryRow } from '../../services/encounters/monsterActionAdvisory.js';
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount, endSelfBuffOnTrigger, isMonsterSelfBuffRow, buildAlreadyEnlargedRefusalPopup, buildAlreadyEnlargedRefusalLog } from '../../services/encounters/monsterSelfBuff.js';
 import { resolveMonsterGrantReactionRow } from '../../services/encounters/monsterGrantReaction.js';
@@ -2378,6 +2379,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         // NO save/damage. save_dc nulled so the MA-1071 DC0 decoy never re-arms
         // a save shell (zone picker reads only zone).
         handleZonePickerRow={(action) => handleLairZone({ ...action, save_dc: null })}
+        // MA-1223: normal-action advisory row (Nalfeshnee "Teleport") — press
+        // routes the record-only advisory seam (popup + ability_use log, zero
+        // rolls, zero lastAttack writes); relocation stays GM-enforced (CLA-320).
+        handleAdvisoryRow={(action) => resolveMonsterActionAdvisoryRow({ action, monsterName, campaignName, setPopupHtml })}
       />
       {popupHtml && (
         <MonsterAttackPopup

@@ -11,6 +11,7 @@ import { isMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { isMonsterSelfBuffRow } from '../../services/encounters/monsterSelfBuff.js';
 import { isMonsterGrantReactionRow } from '../../services/encounters/monsterGrantReaction.js';
 import { isMonsterShapeShiftRow } from '../../services/encounters/monsterShapeShift.js';
+import { isMonsterActionAdvisoryRow } from '../../services/encounters/monsterActionAdvisory.js';
 
 function formatDamageTypeList(types) {
   return types.length > 0 ? formatDamageTypes(types) : '';
@@ -322,6 +323,25 @@ function ZonePickerLink({ action, attackerCannotAct, onZonePickerRow }) {
   );
 }
 
+// MA-1223: normal-action advisory row (Nalfeshnee "Teleport" — RAW pure
+// self-relocation, formerly junk attack_bonus:0 → "+0" chip rolling bogus
+// to-hit). The ACTION-category twin of the legendary advisory seam
+// (LegendarySpendLink → resolveLegendaryRowMechanic :581) and the lair
+// advisory seam: the advisory field arms a clickable chip routed to
+// resolveMonsterActionAdvisoryRow in the modal — record-only ability_use
+// popup + log, zero rolls, zero lastAttack pollution (CLA-320 GM-enforced).
+// Gated on the advisory field AND !legendaryGate: legendary advisory rows
+// keep riding the single gated "Expend Legendary" chip byte-identical (§37).
+function AdvisoryLink({ action, attackerCannotAct, onAdvisoryRow, legendaryGate }) {
+  if (!isMonsterActionAdvisoryRow(action) || legendaryGate) return null;
+  const clickable = !attackerCannotAct && !!onAdvisoryRow;
+  return (
+    <span className="mc-dice-link mc-dice-link-advisory" onClick={clickable ? () => onAdvisoryRow(action) : undefined} role="button" tabIndex={0} title={`Advisory — ${action.name}: ${action.advisory_message || 'GM-enforced (no engine consumer)'}`}>
+      <i className="fa-solid fa-wind" /> {action.name}
+    </span>
+  );
+}
+
 // MA-1014: the spell-save_dc-only utility-row chip fork (Ice Devil "Ice
 // Wall"). Hoisted out of MonsterAction to hold the complexity ceiling — the
 // three-way choice (Spellcasting markup → spells.json-resolved utility names
@@ -359,7 +379,7 @@ function utilitySpellNamesFor(action, spellNameIndex) {
   return extractSpellNamesFromSpellcasting(action.description).filter(name => spellNameIndex.has(name));
 }
 
-export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, onShapeShiftRow, onZonePickerRow, spellNameIndex = null }) {
+export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, onShapeShiftRow, onZonePickerRow, onAdvisoryRow, spellNameIndex = null }) {
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
   // runtime map; a spent row reads "(Recharge 6 — unavailable)" and refuses.
@@ -383,6 +403,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <SelfBuffLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSelfBuffRow={onSelfBuffRow} legendaryGate={legendaryGate} />
       <GrantReactionLink action={action} attackerCannotAct={attackerCannotAct} rechargeState={rechargeState} onGrantReactionRow={onGrantReactionRow} />
       <ShapeShiftLink action={action} attackerCannotAct={attackerCannotAct} onShapeShiftRow={onShapeShiftRow} />
+      <AdvisoryLink action={action} attackerCannotAct={attackerCannotAct} onAdvisoryRow={onAdvisoryRow} legendaryGate={legendaryGate} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
         <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
