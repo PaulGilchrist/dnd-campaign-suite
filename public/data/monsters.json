@@ -46299,7 +46299,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "2d8 + 3",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["poisoned"]
       },
       {
         "name": "Tentacle",

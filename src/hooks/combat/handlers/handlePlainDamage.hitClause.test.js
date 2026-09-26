@@ -4324,3 +4324,104 @@ describe('MA-1259 Oni Nightmare Ray frightened-on-hit grant (one-field DATA fix)
     });
 });
 
+const OTYUGH = monsters.find(m => m.index === 'otyugh');
+const OTYUGH_BITE_ACTION = OTYUGH.actions[1];
+
+describe('MA-1273 Otyugh Bite poisoned-on-hit grant (one-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Otyugh 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Otyugh 1', computedStats: { armorClass: 14 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: 984, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function biteContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Otyugh 1',
+            hitClause: buildHitConditionClause(OTYUGH_BITE_ACTION),
+        };
+    }
+
+    it('data-lock: disk row carries hit_conditions ["poisoned"] after damage_type_primary (MA-1240/1259 byte-shape), NO escape_dc (condition, not grapple)', () => {
+        expect(OTYUGH_BITE_ACTION.name).toBe('Bite');
+        expect(OTYUGH_BITE_ACTION.attack_bonus).toBe(6);
+        expect(OTYUGH_BITE_ACTION.reach).toBe('5 ft.');
+        expect(OTYUGH_BITE_ACTION.hit_conditions).toEqual(['poisoned']);
+        const keys = Object.keys(OTYUGH_BITE_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(OTYUGH_BITE_ACTION.escape_dc).toBeUndefined();
+        expect(OTYUGH_BITE_ACTION.damage_dice_primary).toBe('2d8 + 3');
+        expect(OTYUGH_BITE_ACTION.damage_type_primary).toBe('Piercing');
+    });
+
+    it('buildHitConditionClause arms the Poisoned rider (was null pre-fix)', () => {
+        const clause = buildHitConditionClause(OTYUGH_BITE_ACTION);
+        expect(clause).toEqual({
+            conditions: ['poisoned'],
+            escapeDc: null,
+            attackName: 'Bite',
+            targetEffect: null,
+        });
+    });
+
+    it('grants Poisoned on the resolved hit via the canonical activeConditions write path', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 3', total: 15, rolls: [6, 6], modifier: 3, context: biteContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['poisoned']);
+    });
+
+    it('stamps source meta WITHOUT dc/ability and logs condition-applied naming the attack', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 3', total: 15, rolls: [6, 6], modifier: 3, context: biteContext() });
+
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({ poisoned: { source: 'Otyugh 1' } });
+        expect(metaCall[2].poisoned.dc).toBeUndefined();
+        expect(metaCall[2].poisoned.ability).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Poisoned',
+            reason: 'Bite (escape DC —)',
+        }));
+    });
+
+    it('long-rest DC15 hp-max-reduction + can\'t-regain-HP clauses stay §70 advisory — no te/clock authored', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 3', total: 15, rolls: [6, 6], modifier: 3, context: biteContext() });
+
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(OTYUGH_BITE_ACTION.hit_target_effect).toBeUndefined();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '2d8 + 3', total: 15, rolls: [6, 6], modifier: 3, context: biteContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+
