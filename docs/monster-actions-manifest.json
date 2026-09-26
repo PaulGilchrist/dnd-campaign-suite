@@ -21939,7 +21939,7 @@
       "range": "",
       "recharge": "",
       "description": "The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 12):At Will: Dancing Lights, Druidcraft, Invisibility (self only)1/Day Each: Detect Thoughts, Fly, Sleep",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1320-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1321",
