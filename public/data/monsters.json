@@ -43924,7 +43924,12 @@
       {
         "name": "Pursuit",
         "trigger": "Another creature the nalfeshnee can see ends its move within 120 feet of the nalfeshnee",
-        "description": "The nalfeshnee uses Teleport, but its destination space must be within 10 feet of the triggering creature."
+        "description": "The nalfeshnee uses Teleport, but its destination space must be within 10 feet of the triggering creature.",
+        "advisory": "monster_teleport",
+        "advisory_message": "RAW trigger — a visible creature ending its move within 120 ft — has no move-end producer app-wide, and teleport relocation is GM-enforced gridless (CLA-320); pressing this chip records the reaction use: the GM adjudicates trigger and lands the nalfeshnee within 10 ft of the triggering creature. No attack roll, no saving throw, no dice.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999
       }
     ],
     "legendary_actions": [],

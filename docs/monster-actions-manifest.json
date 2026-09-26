@@ -20078,7 +20078,7 @@
       "actionType": "other",
       "trigger": "Another creature the nalfeshnee can see ends its move within 120 feet of the nalfeshnee",
       "description": "The nalfeshnee uses Teleport, but its destination space must be within 10 feet of the triggering creature.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1224-pursuit-reaction.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1225",
