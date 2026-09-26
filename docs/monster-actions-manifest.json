@@ -20099,7 +20099,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 6 (2d4 + 1) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1226",
@@ -20120,7 +20120,7 @@
       "range": "30/60 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +3, range 30/60 ft. Hit: 6 (2d4 + 1) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1227",
@@ -20139,7 +20139,7 @@
       "range": "",
       "recharge": "",
       "description": "The hag makes two Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1228",
@@ -20160,7 +20160,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1229",
@@ -20179,7 +20179,7 @@
       "range": "",
       "recharge": "1",
       "description": "While on the Ethereal Plane, the hag casts Dream, using the same spellcasting ability as Spellcasting. Only the hag can serve as the spell's messenger, and the target must be a creature the hag can see on the Material Plane. The spell fails and is wasted if the target is under the effect of the Protection from Evil and Good spell or within a Magic Circle spell. If the target takes damage from the Dream spell, the target's Hit Point maximum decreases by an amount equal to that damage. If the spell kills the target, its soul is trapped in the hag's soul bag, and the target can't be raised from the dead until its soul is released.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1230",
@@ -20198,7 +20198,7 @@
       "range": "",
       "recharge": "",
       "description": "The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):At Will: Detect Magic, Etherealness, Magic Missile (level 4 version)2/Day Each: Phantasmal Killer, Plane Shift (self only)",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1230-spellcasting.md"
     },
     {
       "id": "MA-1231",
@@ -20221,7 +20221,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage plus 10 (3d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1232",
@@ -20240,7 +20240,7 @@
       "range": "",
       "recharge": "",
       "description": "The nightmare and up to three willing creatures within 5 feet of it teleport to the Ethereal Plane from the Material Plane or vice versa.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1232-ethereal-stride.md"
     },
     {
       "id": "MA-1233",
@@ -20252,7 +20252,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The nimblewright makes three attacks: two with its rapie r and one with its dagger.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1234",
@@ -20268,7 +20268,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +6 to hiti reach 5 ft., one target. Hit: 8 (1d8 + 4) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1235",
@@ -20284,7 +20284,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack~+6 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 6 (1d4 + 4) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1236",
@@ -20296,7 +20296,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The nimblewright adds 2 to its AC against one melee attack that would hit it. To do so, the nimblewright must see the attacker and be wielding a melee weapon.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1236-parry.md"
     },
     {
       "id": "MA-1237",
@@ -20317,7 +20317,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d8 + 1) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1238",
@@ -20330,7 +20330,7 @@
       "actionType": "other",
       "trigger": "The noble is hit by a melee attack roll while holding a weapon",
       "description": "The noble adds 2 to its AC against that attack, possibly causing it to miss.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1238-parry.md"
     },
     {
       "id": "MA-1239",
@@ -20349,7 +20349,7 @@
       "range": "",
       "recharge": "",
       "description": "The noble makes three Beguiling Strike attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1240",
@@ -20373,7 +20373,7 @@
         "charmed"
       ],
       "description": "Melee or Ranged Attack Roll: +8, reach 5 ft. or range 60 ft. Hit: 18 (4d6 + 4) Psychic damage, and the target has the Charmed condition until the start of the noble's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1240-beguiling-strike.md"
     },
     {
       "id": "MA-1241",
@@ -20392,7 +20392,7 @@
       "range": "",
       "recharge": "",
       "description": "The noble casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):At Will: Mage Armor (included in AC), Mage Hand, Minor Illusion1/Day Each: Befuddle ment, Detect Thoughts, Fly, Scrying, Shatter (level 7 version)",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1241-spellcasting.md"
     },
     {
       "id": "MA-1242",
@@ -20405,7 +20405,7 @@
       "actionType": "other",
       "trigger": "The noble is targeted by a spell",
       "description": "The noble casts Shield in response to that spell's trigger, using the same spellcasting ability as Spellcasting.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1242-shield.md"
     },
     {
       "id": "MA-1243",
@@ -20424,7 +20424,7 @@
       "range": "",
       "recharge": "",
       "description": "The nothic makes two Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1244",
@@ -20445,7 +20445,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1245",
@@ -20466,7 +20466,7 @@
       "range": "",
       "recharge": "",
       "description": "Constitution Saving Throw: DC 13, one creature the nothic can see within 120 feet. Failure: 17 (5d6) Necrotic damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1246",
@@ -20485,7 +20485,7 @@
       "range": "",
       "recharge": "",
       "description": "The nycaloth makes two Mercurial Axe attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1247",
@@ -20508,7 +20508,7 @@
       "range": "30/90 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +9, reach 10 ft. or range 30/90 ft. Hit: 18 (2d12 + 5) Slashing damage plus 10 (3d6) Force damage. Hit or Miss: The axe magically returns to the nycaloth's hand immediately after a ranged attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1248",
@@ -20529,7 +20529,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 12 (3d6 + 2) Acid damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1249",
@@ -20542,7 +20542,7 @@
       "actionType": "other",
       "trigger": "While the jelly is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or Slashing damage",
       "description": "The jelly splits into two new Ochre Jellies. Each new jelly is one size smaller than the original jelly and acts on its Initiative. The original jelly's Hit Points are divided evenly between the new jellies (round down).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1249-split.md"
     },
     {
       "id": "MA-1250",
@@ -20563,7 +20563,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 1 Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1251",
@@ -20576,7 +20576,7 @@
       "actionType": "other",
       "trigger": "A creature ends its turn within 5 feet of the octopus while underwater",
       "description": "The octopus releases ink that fills a 5-foot Cube centered on itself, and the octopus moves up to its Swim Speed. The Cube is Heavily Obscured for 1 minute or until a strong current or similar effect disperses the ink.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1251-ink-cloud.md"
     },
     {
       "id": "MA-1252",
@@ -20597,7 +20597,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1253",
@@ -20618,7 +20618,7 @@
       "range": "30/120 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +6, reach 5 ft. or range 30/120 ft. Hit: 11 (2d6 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1254",
@@ -20639,7 +20639,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1255",
@@ -20660,7 +20660,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1256",
@@ -20681,7 +20681,7 @@
       "range": "30/120 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 30/120 ft. Hit: 6 (1d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1257",
@@ -20700,7 +20700,7 @@
       "range": "",
       "recharge": "",
       "description": "The oni makes two Claw or Nightmare Ray attacks. It can replace one attack with a use of Spellcasting.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1258",
@@ -20723,7 +20723,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 10 (1d12 + 4) Slashing damage plus 9 (2d8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1259",
@@ -20747,7 +20747,7 @@
         "frightened"
       ],
       "description": "Ranged Attack Roll: +5, range 60 ft. Hit: 9 (2d6 + 2) Psychic damage, and the target has the Frightened condition until the start of the oni's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1259-nightmare-ray.md"
     },
     {
       "id": "MA-1260",
@@ -20766,7 +20766,7 @@
       "range": "",
       "recharge": "",
       "description": "The oni shape-shifts into a Small or Medium Humanoid or a Large Giant, or it returns to its true form. Other than its size, its game statistics are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1260-shape-shift.md"
     },
     {
       "id": "MA-1261",
@@ -20788,7 +20788,7 @@
         "charmed"
       ],
       "description": "The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):1/Day Each: Charm Person (level 2 version), Darkness, Gaseous Form, Sleep",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1261-spellcasting.md"
     },
     {
       "id": "MA-1262",
@@ -20804,7 +20804,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 9 (1d12 + 3) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1263",
@@ -20820,7 +20820,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1264",
@@ -20836,7 +20836,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 20/60 ft.. one target. Hit: 11 (1d6 + 3 plus 1d8) piercing damage, or 12 (2d8 + 3) piercing damage if used with two hands to make a melee attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1264-spear.md"
     },
     {
       "id": "MA-1265",
@@ -20848,7 +20848,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The orc makes two attacks with its greataxe or its spear.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1266",
@@ -20864,7 +20864,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 15 (1d12 + 4 plus 1d8) slashing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1266-greataxe.md"
     },
     {
       "id": "MA-1267",
@@ -20880,7 +20880,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +6 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 12 (1d6 + 4 plus 1d8) piercing damage, or 13 (2d8 + 4) piercing damage if used with two hands to make a melee attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1267-spear.md"
     },
     {
       "id": "MA-1268",
@@ -20892,7 +20892,7 @@
       "category": "actions",
       "actionType": "attack",
       "description": "Each creature of the war chief's choice that is within 30 feet ofit, can hear it, and not already affected by Battle Cry gain advantage on attack rolls until the start of the war chief's next turn. The war chief can then make one attack as a bonus action.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1268-battle-cry.md"
     },
     {
       "id": "MA-1269",
@@ -20904,7 +20904,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The orog makes two greataxe attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1270",
@@ -20920,7 +20920,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 10 (1d12 + 4) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1271",
@@ -20936,7 +20936,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +6 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 7 (1d6 + 4) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1272",
@@ -20955,7 +20955,7 @@
       "range": "",
       "recharge": "",
       "description": "The otyugh makes one Bite attack and two Tentacle attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1273",
@@ -20979,7 +20979,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 12 (2d8 + 3) Piercing damage, and the target has the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it is subjected to the following effect. Constitution Saving Throw: DC 15. Failure: The target's Hit Point maximum decreases by 5 (1d10) and doesn't return to normal until the Poisoned condition ends on the target. Success: The Poisoned condition ends.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1273-bite.md"
     },
     {
       "id": "MA-1274",
@@ -21003,7 +21003,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 12 (2d8 + 3) Piercing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13) from one of two tentacles.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1274-tentacle.md"
     },
     {
       "id": "MA-1275",
@@ -21028,7 +21028,7 @@
         "stunned"
       ],
       "description": "Constitution Saving Throw: DC 14, each creature Grappled by the otyugh. Failure: 16 (3d8 + 3) Bludgeoning damage, and the target has the Stunned condition until the start of the otyugh's next turn. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1275-tentacle-slam.md"
     },
     {
       "id": "MA-1276",
@@ -21048,7 +21048,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 1 Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1277",
@@ -21067,7 +21067,7 @@
       "range": "",
       "recharge": "",
       "description": "The owlbear makes two Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1278",
@@ -21088,7 +21088,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 14 (2d8 + 5) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1279",
@@ -21109,7 +21109,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1280",
@@ -21132,7 +21132,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 7 (1d6 + 4) Bludgeoning damage plus 5 (2d4) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1281",
@@ -21144,7 +21144,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The pentadrone makes five arm attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1282",
@@ -21160,7 +21160,7 @@
       "damageTypePrimary": "bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1283",
@@ -21178,7 +21178,7 @@
         "paralyzed"
       ],
       "description": "The pentadrone exhales a 30 foot cone of gas. Each creature in that area must succeed on a DC 11 Constitution saving throw or be paralyzed for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1284",
@@ -21199,7 +21199,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1285",
@@ -21212,7 +21212,7 @@
       "actionType": "other",
       "trigger": "The performer is hit by an attack roll",
       "description": "The performer halves the damage (round down) it takes from that attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1285-uncanny-dodge.md"
     },
     {
       "id": "MA-1286",
@@ -21231,7 +21231,7 @@
       "range": "",
       "recharge": "",
       "description": "The performer makes three Bejeweled Baton attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1287",
@@ -21254,7 +21254,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 10 (2d4 + 5) Bludgeoning damage plus 10 (3d6) Psychic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1288",
@@ -21279,7 +21279,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 17, each creature in a 20-foot-radius Sphere centered on a point within 120 feet. Failure: 22 (4d8 + 4) Psychic damage, and the target has the Charmed or Frightened condition (performer's choice) until the end of the performer's next turn. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1289",
@@ -21298,7 +21298,7 @@
       "range": "",
       "recharge": "",
       "description": "The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):At Will: Mage Hand, Minor Illusion, Prestidigitation1/Day Each: Major Image, Project Image",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1289-spellcasting.md"
     },
     {
       "id": "MA-1290",
@@ -21316,7 +21316,7 @@
         "charmed"
       ],
       "description": "Wisdom Saving Throw: DC 17, the triggering creature. Failure: The attack roll misses the performer, and the target has the Charmed condition until the end of the performer's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1290-warding-charm.md"
     },
     {
       "id": "MA-1291",
@@ -21335,7 +21335,7 @@
       "range": "",
       "recharge": "",
       "description": "The performer makes three Rapier attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1292",
@@ -21358,7 +21358,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage plus 7 (2d6) Psychic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1293",
@@ -21382,7 +21382,7 @@
         "charmed"
       ],
       "description": "Wisdom Saving Throw: DC 15, each creature in a 20-foot-radius Sphere centered on a point within 120 feet. Failure: 20 (3d10 + 4) Psychic damage, and the target has the Charmed condition until the end of the performer's next turn. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1294",
@@ -21401,7 +21401,7 @@
       "range": "",
       "recharge": "",
       "description": "The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):At Will: Minor Illusion, Prestidigitation1/Day: Tasha's Hideous Laughter (level 3 version)",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1294-spellcasting.md"
     },
     {
       "id": "MA-1295",
@@ -21420,7 +21420,7 @@
       "range": "",
       "recharge": "",
       "description": "The peryton makes one Gore attack and one Talons attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1296",
@@ -21441,7 +21441,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage. If the peryton moved 30+ feet straight toward the target immediately before the hit, the target takes an extra 9 (2d8) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1297",
@@ -21462,7 +21462,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (2d4 + 3) Piercing damage. If the attack reduces a Humanoid target to 0 Hit Points, the peryton kills the target by removing its heart.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1298",
@@ -21481,7 +21481,7 @@
       "range": "",
       "recharge": "",
       "description": "The spider makes two Bite attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1299",
@@ -21508,7 +21508,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Piercing damage plus 9 (2d8) Poison damage. If this damage reduces the target to 0 Hit Points, the target becomes Stable, and it has the Poisoned condition for 1 hour. While Poisoned, the target also has the Paralyzed condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1300",
@@ -21529,7 +21529,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d8 + 1) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1301",
@@ -21550,7 +21550,7 @@
       "range": "",
       "recharge": "",
       "description": "The piercer falls. Dexterity Saving Throw: DC 11, one creature directly underneath the piercer. Failure: 10 (3d6) Piercing damage. Failure or Success: The piercer reduces any damage it takes from the fall by 20.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1301-drop.md"
     },
     {
       "id": "MA-1302",
@@ -21571,7 +21571,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. Hit: 1 Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1303",
@@ -21590,7 +21590,7 @@
       "range": "",
       "recharge": "",
       "description": "The pirate makes two Dagger attacks. It can replace one attack with a use of Enthralling Panache.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1304",
@@ -21611,7 +21611,7 @@
       "range": "20/60 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 20/60 ft. Hit: 5 (1d4 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1305",
@@ -21633,7 +21633,7 @@
         "charmed"
       ],
       "description": "Wisdom Saving Throw: DC 12, one creature the pirate can see within 30 feet. Failure: The target has the Charmed condition until the start of the pirate's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1306",
@@ -21652,7 +21652,7 @@
       "range": "",
       "recharge": "",
       "description": "The pirate makes three attacks, using Scimitar or Pistol in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1307",
@@ -21679,7 +21679,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 16 (3d6 + 6) Slashing damage plus 7 (2d6) Poison damage, and the target suffers one of the following effects of the pirate's choice:Awestruck. The target has the Charmed condition until the start of the pirate's next turn.Poison. The target has the Poisoned condition until the start of the pirate's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1308",
@@ -21700,7 +21700,7 @@
       "range": "30/90 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +10, range 30/90 ft. Hit: 28 (4d10 + 6) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1309",
@@ -21713,7 +21713,7 @@
       "actionType": "attack",
       "trigger": "The pirate is hit by a melee attack roll while holding a weapon",
       "description": "The pirate adds 4 to its AC against melee attack rolls (including the triggering attack) until the start of its next turn, possibly causing the attacks to miss.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1309-defensive-stance.md"
     },
     {
       "id": "MA-1310",
@@ -21732,7 +21732,7 @@
       "range": "",
       "recharge": "",
       "description": "The pirate makes three attacks, using Rapier or Pistol in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1311",
@@ -21753,7 +21753,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Piercing damage, and the pirate has Advantage on the next attack roll it makes before the end of this turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1312",
@@ -21774,7 +21774,7 @@
       "range": "30/90 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +7, range 30/90 ft. Hit: 15 (2d10 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1313",
@@ -21787,7 +21787,7 @@
       "actionType": "other",
       "trigger": "The pirate is hit by a melee attack roll while holding a weapon",
       "description": "The pirate adds 3 to its AC against that attack, possibly causing it to miss. On a miss, the pirate makes one Rapier attack against the triggering creature if within range.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1313-riposte.md"
     },
     {
       "id": "MA-1314",
@@ -21806,7 +21806,7 @@
       "range": "",
       "recharge": "",
       "description": "The pit fiend makes one Bite attack, two Devilish Claw attacks, and one Fiery Mace attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1315",
@@ -21830,7 +21830,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 18 (3d6 + 8) Piercing damage. If the target is a creature, it must make the following saving throw. Constitution Saving Throw: DC 21. Failure: The target has the Poisoned condition. While Poisoned, the target can't regain Hit Points and takes 21 (6d6) Poison damage at the start of each of its turns, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1316",
@@ -21851,7 +21851,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 26 (4d8 + 8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1317",
@@ -21874,7 +21874,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 22 (4d6 + 8) Force damage plus 21 (6d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1318",
@@ -21896,7 +21896,7 @@
         "paralyzed"
       ],
       "description": "The pit fiend casts Fireball (level 5 version) twice, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21). It can replace one Fireball with Hold Monster (level 7 version) or Wall of Fire",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1319",
@@ -21920,7 +21920,7 @@
         "poisoned"
       ],
       "description": "Melee or Ranged Attack Roll: +4, reach 5 ft. or range 60 ft. Hit: 1 Radiant damage, and the target has the Charmed or Poisoned condition (pixie's choice) until the start of the pixie's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1320",
@@ -21939,7 +21939,7 @@
       "range": "",
       "recharge": "",
       "description": "The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 12):At Will: Dancing Lights, Druidcraft, Invisibility (self only)1/Day Each: Detect Thoughts, Fly, Sleep",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1320-spellcasting.md"
     },
     {
       "id": "MA-1321",
@@ -21958,7 +21958,7 @@
       "range": "",
       "recharge": "",
       "description": "The pixie makes two Faerie Dust attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1322",
@@ -21983,7 +21983,7 @@
         "poisoned"
       ],
       "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 60 ft. Hit: 15 (2d10 + 4) Radiant damage, and the target has the Charmed or Poisoned condition (pixie's choice) until the start of the pixie's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1323",
@@ -22002,7 +22002,7 @@
       "range": "",
       "recharge": "",
       "description": "The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):At Will: Dancing Lights, Druidcraft, Invisibility (self only)1/Day Each: Detect Thoughts, Fly, Major Image",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1323-spellcasting.md"
     },
     {
       "id": "MA-1324",
@@ -22021,7 +22021,7 @@
       "range": "",
       "recharge": "",
       "description": "The planetar makes three Radiant Sword attacks or uses Holy Burst twice.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1325",

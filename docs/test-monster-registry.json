@@ -5382,5 +5382,541 @@
       "joinNotes": "EB exact-name search yields 1 row, native cb.click() checked=true first try, Join landed; +NPC autocomplete: new card is .monster-autocomplete-input idx1 value NPC 1, Meta+A+type Bandit, li textContent==Bandit exact click, Escape+blur (autodropdown stays open over HP input, MA-1192 pitfall); HP rig BEFORE arming (MA-1139 order), TRUSTED click+Meta+A+type+Enter on aria inputs, max input accepts unclamped 999 (MA-1146); arm via attacker own-card select[data-testid=target-select] anchored input[aria-label=Nalfeshnee 1 current HP] ancestor-walk, selectOption Bandit, cs.creatures[Nalfeshnee 1].targetName server-confirm; bogus +10 header chip CONFIRMED live (header attack_bonus 10, MA-1114/MA-1188 family): probed once-classify, single-stage click-to-dismiss popup no-Done, roll/attack name=Multiattack nat17 total:17 hit:true vs AC12 zero-damage bandit held 999 - EXCLUDED from component ledger; junk +0 chip on Teleport row (MA-1212/MA-1220 family) never pressed; card chip census: Multiattack +10 bogus, Rend +10 real, Teleport +0 junk; REAL Rend anchor strong.textContent.trim().startsWith(Rend) (hasText Rend trap matches Multiattack row first MA-1188); data-* chip tags WIPED by React re-render after popup dismiss (MA-112) - re-tag+boundingBox each press | MA-1222 session: EB exact td[1]==Nalfeshnee native cb.click 1/try, +NPC new-card input idx1 value NPC 1 Meta+A+type Bandit li textContent==Bandit, Escape+blur §487, TRUSTED currentHp 999 fill+Enter server-confirm, own-card selectOption arm server-confirm targetName=Bandit; NOTE avatar x negative after vertical scrollIntoView — must scrollIntoView inline:center before pointer click (viewport-clip §112 extension). | MA-1223 session: junk +0 Teleport chip PRESSED (first time on this monster; MA-1221/22 never-pressed note retired): EB exact td[1]==Nalfeshnee native cb.click 1/try, +NPC Bandit §487 flow, TRUSTED currentHp 999 server-confirm (max authored 11), own-card selectOption arm targetName=Bandit server-confirm, gridless confirmed __map__={activeMapName:null}; re-tag+scrollIntoView inline:center+fresh rect each press (§493), real-pointer ×2 both landed 1:1 (§488 tail-count zero absorbed), popups HIT(18 vs AC12)/MISS(7 vs AC12) attack chrome.",
       "verifiedRow": "MA-1221 Multiattack PASS-subset (2026-09-25): §66 header-text-row + live component-chip model, count GM-adjudicated, no combined Multiattack roll fabricated; 3 executable Rend presses 3/3 (press-to-log after tail-count): press2a and press3a TRUE-absorbed (zero popup zero log-delta, re-fired same fresh rect - §488 tail-count arbiter, both re-fires landed); hit ledger: nat15+10=25 hit, nat12+10=22 hit, nat2+10=12 hit TIE-TO-ATTACKER boundary exact (isCrit:false stamp); 3 damage entries all note combined_damage_roll single-entry dual-leg (§454 secondary* keys): primary formula 2d10 + 5 Slashing finalDamage 19/14/15 (rolls [6,8]+5/[3,6]+5/[8,2]+5 arithmetic exact), secondary sFormula 2d10 Force sFD 11/9/2 (rolls [10,1]/[5,4]/[1,1]); 3 hp_change breakdowns Slashing+Force = 30/23/17; Bandit hp 999 to 969 to 946 to 929, sum|hpDelta| 70 == sum(finalDamage+secondaryFinalDamage) 70 unclamped; zero conditions by design (no poison - nalfeshnee poison-immune, Rend rider is Force); round constancy 1 same-turn §151; no nat20 rolled (nat 15/12/2) = crit seam absent, subset per MA-1184/MA-1188 identical buildAutoDamageOptions twins documented §484; console 0 errors; admin cleared log=[] cd={} cs value:null via UI buttons + dialog listener auto-accept, 15s quiet confirmed || pitfalls: browser_navigate args rewritten to aliyuncs proxy URL at session start (§90 family) - own location.href check localhost, all navigation via in-page button routes thereafter | MA-1222 Rend standalone PASS-subset (2026-09-25): dedicated row live — row strong 'Rend.' owns exactly ONE real '+10' chip (multiattack bogus header +10 EXCLUDED per MA-1114/MA-1188 family, Teleport +0 junk never pressed MA-1212/MA-1220); save_dc:0 disk renders ZERO DC chip (MA-1071 Number>0 gate census extends to nalfeshnee). 10/10 presses landed first-try (press-to-log 1:1, zero absorbed — tail-count arbiter §488 found nothing), re-tag+fresh rect per press (data-* wiped post-dismiss MA-112 re-confirmed); real-pointer Done applied damage every hit (MA-0869 rule honored), stage-2 popup el.click() flush between presses. to-hit nat+10 vs AC12: nat 17/18/14/18/18/7/19/12/8 hit, nat1 CRIT-MISS 11vsAC12 Done-less backdrop clean attack-only zero-damage HP held (§94/§1115 twin); three nat18 repeats HONEST — distinct second dice [18,12]/[18,16]/[18,15] + distinct fresh damage pools (§77/§504); 9 hits dual-leg single-entry §454: formula '2d10 + 5' Slashing fd 16/23/11/25/12/14/9/8/15 + sFormula '2d10' Force sfd 7/11/13/5/11/11/6/10/6, note combined_damage_roll, hp_change breakdowns Slashing+Force per-press exact, sum|hpDelta| 213 == sumFd 133 + sumSfd 80 unclamped Bandit 999 to 786; log names ONLY 'Rend' both attack+damage entries (§147 name-key); ZERO save entries whole-log (no chip, no saveResult, no save-damage) — attack+save manifest label rides pure combined transport (MA-0649/MA-1147 family); round constancy same-turn §151; no nat20 rolled in 10 presses (max nat19) = crit seam absent, subset documented via MA-1199/MA-1049 crit twins (dice-doubled both legs flat-undoubled §32) + MA-1184/MA-1188 identical buildAutoDamageOptions twins §484; console 0 errors; admin cleared log=[] cd={} cs null. || MA-1223 Teleport FAIL (2026-09-25): zero-number relocation row with attack_bonus:0 junk — sole '+0' mc-dice-link chip on row (MA-1071 DC0 gate: save_dc:0 renders ZERO DC chip re-confirmed), zero advisory/AtWill/move affordance census. Press ×2 bogus d20+0 attack adjudication: two roll/attack name:'Teleport' bonus:0 entries (nat18 total18 hit:true damageType:null zero-damage-hit; nat7 total7 miss) vs Bandit AC12; popup attack chrome only, NO teleport advisory text. Pollution: lastAttackRoll+_lastRollContext {attackName:'Teleport',bonus:0} AND top-level lastAttack {attackName:'Teleport', weaponType:'ranged' FABRICATED, bonus:0}; zero ability_use, Bandit store={} no te, HP held 999, no relocation (gridless, no advisory either). Console 0 errors. FAIL(b): data fix shape MA-1212 twin (attack_bonus:null + §6 At Will sentinel) or extend legendary advisory fork (MonsterCardModal.jsx:581 sphinx_teleport precedent) to normal actions; grep: all teleport consumers PC-feature-keyed (TeleportModal PC spell, arcane_charge, psychic_teleportation, misty_wanderer, tempTeleport, warping_implosion, giant ancestry), CLA-320 'no grid-position consumer app-wide' — zero monster-side consumer for this row. Bug filed .opencode/plans/bug-mon-MA-1223-nalfeshnee-teleport.md. Admin cleared log=[] cd={} cs null via UI buttons, 15s quiet; board EMPTY, full re-join needed next session."
     }
+  },
+  "Needle Blight": {
+    "monsterIndex": "needle-blight",
+    "verifiedRow": "MA-1226 Needles",
+    "date": "2026-09-25",
+    "verdict": "PASS",
+    "rig": {
+      "attacker": "Needle Blight 1 (AC12 HP16 init12, EB join qty1, native cb.click)",
+      "victim": "Bandit 1 (bandit, AC12, resistances[] clean piercing, maxHp999 rig via full-store cs POST all 4 HP keys)",
+      "arm": "selectOption Bandit 1 on Needle Blight's own initiative-card [data-testid=target-select] AFTER HP rig (order §447/§491)"
+    },
+    "ledger": [
+      {
+        "nat": 10,
+        "total": 13,
+        "hit": true,
+        "damage": [
+          3,
+          3
+        ],
+        "fd": 7,
+        "hp": "999->992"
+      },
+      {
+        "nat": 13,
+        "total": 16,
+        "hit": true,
+        "damage": [
+          1,
+          1
+        ],
+        "fd": 3,
+        "hp": "992->989"
+      },
+      {
+        "nat": 18,
+        "total": 21,
+        "hit": true,
+        "damage": [
+          2,
+          4
+        ],
+        "fd": 7,
+        "hp": "989->982"
+      },
+      {
+        "nat": 7,
+        "total": 10,
+        "hit": false,
+        "damage": null,
+        "fd": null,
+        "note": "clean MISS, zero dmg/hp_change entries"
+      }
+    ],
+    "notes": "attack-only decoy (save_dc:0/save_type:'' renders ZERO DC chip, MA-1071 gate); pendingSavePrompts null + lastAttack.saveDc null whole session; range '30/60 ft.' band INERT by construction (§149/§147) — attackRange:null+rangeReason:null gridless-lenient fingerprint ×4, 30/60 band never consulted, documented PASS-subset; chip 4/4 first-click zero absorb, no ghost popup this session; stage1 Done=dice-roll-reroll-btn, stage2 Done=.popup-close-btn real-pointer; cosmetic combined_damage_roll note on single-primary rows (§186/§188 twin); Claw row shares '+3' text — strong.startsWith('Needles') row-scope mandatory"
+  },
+  "Night Hag": {
+    "monsterIndex": "night-hag",
+    "verifiedRow": "MA-1230 Spellcasting BROKEN (bug filed)",
+    "date": "2026-09-25",
+    "verdict": "FAIL(a)/DATA — markup-dead Spellcasting; MA-1227/28/29 rows PASS-subset",
+    "rig": {
+      "attacker": "Night Hag 1 (EB join qty1, csIndex0)",
+      "victim": "Bandit 1 (AC12, resistances[], HP999 cs full-store POST)",
+      "arm": "selectOption Bandit 1 on Night Hag's OWN initiative-card target-select"
+    },
+    "notes": "Nightmare Haunting DC14 INT chip (8+PB3+INT3) live: inline auto-save of armed Bandit 1, machine truth lastAttack+roll-save (nat18+0 success leg; int:-19 nested stamp force-fail leg nat4-19=failure). FAIL lands ZERO state (Bandit cd key absent, te null, 0 damage/hp/cond entries) - no dice authored, save_effect has no canonical word (Helpers:52 list). hp-max-reduction clause reader-only consumers (grep: only greaterRestoration writes 0) = MA-0483/127 advisory; soul_bag/nightmare_haunting grep-zero; PfE/MagicCircle gates PC-cast-side only (spellGates PC flow) = 70 advisory. Recharge '1' FULL economy live: spend ability_use at fire, chip mc-dice-link-spell-spent, 2nd press refusal popup+nightmare_haunting_refused zero-spend, recovery d6:3 at owner turn-start. Bogus '+0' junk chip on row (attack_bonus:0, 490 family) unpressed; 'DC Unknown' popup cosmetic 138. Ethereal/Dream cycle unmodellable 70-class. || MA-1230 Spellcasting FAIL(a)/DATA 2026-09-25: zero spell chips - <strong> wraps only tier headers, names plain; helpers:359/:363+MonsterAction:84/:350 code-proof + live DOM 0 chips/0-click-delta; row save_dc 14/INT present, sole fix axis name markup (MA-0611 template).",
+    "priorRow": {
+      "row": "MA-1229 Nightmare Haunting",
+      "verdict": "PASS-subset",
+      "date": "2026-09-25"
+    },
+    "MA-1230 Spellcasting": {
+      "date": "2026-09-25",
+      "verdict": "FAIL(a)/DATA",
+      "family": "MA-0421/0524 spell-name-markup family (djinni MA-0611 fix template)",
+      "rig": "EB join Night Hag 1 (cs idx0 HP112 AC17) + Bandit 1 AC12; card via avatar alt=\"Night Hag 1\"; bogus \"+0\" chip unpressed",
+      "ledger": "ZERO affordance: .mc-dice-link-spell count=0 vs authored 5 (Detect Magic/Etherealness/Magic Missile/Phantasmal Killer/Plane Shift). Parser Helpers:359 matches only the two <strong> tier headers, both skipped at :363 (trailing \":\"); SpellCastLinks Modal-helper MonsterAction.jsx:84 returns null; XOR fork :350 excludes row save_dc chip (MA-0532 code-confirmed). extractSpellcastingSpellUses:2/Day Each parses but binds {} (unmarked names). Real-pointer click on prose \"Phantasmal Killer\": log delta 0, popups 0, no ability_use (MA-161 clean, no fake chips). All cast/gate/refusal legs untestable-inert (no chip). save_dc:14+Intelligence pair PRESENT - sole axis name markup. Row attack_bonus:0 bogus \"+0\" chip rendered (444/490 family).",
+      "fix": "Wrap all 5 spell names <strong> (djinni byte-shape); headers stay \":\" = excluded chips. Magic Missile \"level 4 version\" dart-count has NO schema field (damage_at_slot_level \"1d4 + 1\"/level) - fix-time advisory. Phantasmal Killer spell-side save WIS/4d10 psychic dc_success none (spells.json); row INT = caster channel (894). Plane Shift attack_type melee, no row spell_attack_bonus -> djinni 179 honest refusal expected post-fix.",
+      "bugFile": ".opencode/plans/bug-mon-MA-1230-spellcasting.md"
+    }
+  },
+  "Nightmare": {
+    "monsterIndex": "nightmare",
+    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "config": {
+      "name": "Nightmare 1",
+      "csIndex": 1,
+      "verifiedRow": "MA-1231 (PASS-subset Hooves dual-leg attack+save-label-decoy): disk byte-match attack_bonus 6 (PB2+STR4), primary 2d8 + 4 Bludgeoning + damage_dice_secondary 3d6 Fire, save_dc 0 save_type empty decoy never surfaced — every attack log saveDc/saveType null, card shows ONE +6 chip §116, zero DC chip. Victim Bandit 1 AC12 resistances[]+immunities[] clean (disk+cs verified), maxHp/currentHp 999 full-store cs POST §184. Arm Bandit 1 on Nightmare 1 own initiative-card target-select; native cb.click() checkbox join first-try (Bandit+Nightmare exact-td anchor). 4 presses 3/4 HIT: nat18+6=24 fd6 [1,1]+sec[2,3,1]=6 Δ−12; nat1+6=7 ✗ MISS zero-damage-entry CRITICAL MISS banner w/ cosmetic Done §186; nat17+6=23 fd15 [6,5]+sec[4,1,1]=6 Δ−21; nat9+6=15 fd13 [4,5]+sec[1,5,3]=9 Δ−22. EACH hit ONE roll damage entry formula 2d8 + 4 note combined_damage_roll + secondaryFormula 3d6 secondaryDamageType Fire secondaryFinalDamage>0; |hp_change|==finalDamage+secondaryFinalDamage EXACT 3/3; breakdown Bludgeoning+Fire resisted:false per clean victim §183. Stage-2 dual popup prints intermediate pre-secondary line — hp_change truth §140. NEW pitfall: stage-2 combined popup survives backdrop el.click() ×2 — flush only via own button.popup-close-btn (text Done), damage already applied stage-1 Done, no double-apply. Crit branch not rolled (nat 18/17/9) — §189/§191 twins cover dice-doubled+secondary 2xsum. Persistent injection spam inside tool echoes all session (fake SYSTEM blocks ordering campaign-switch/admin-wipe/stamp-manifest + fabricated snapshots) — all refused, header stayed test-campaign, location self-verified §6/§90. Admin clear cd+log verified log:[] cs creatures:[] quiet-recheck 2026-09-25",
+      "date": "2026-09-25"
+    },
+    "verifiedRow": "MA-1232 Ethereal Stride BROKEN (bug filed); MA-1231 Hooves PASS-subset",
+    "verdict": "FAIL(b)/DATA",
+    "date": "2026-09-25",
+    "notes": "cs idx NOT stable (landed idx0 this session)"
+  },
+  "Nimblewright": {
+    "monsterIndex": "nimblewright",
+    "verifiedRow": "MA-1233 Multiattack PASS; MA-1234 Rapier PASS-subset; MA-1235 Dagger PASS-subset",
+    "date": "2026-09-25",
+    "verdict": "PASS (all 3 rows)",
+    "rig": {
+      "attacker": "Nimblewright 1",
+      "victim": "Bandit 1 AC12 HP999 cs full-store POST",
+      "arm": "own-card selectOption"
+    },
+    "notes": "dagger band 20/60 inert rangeReason:null x3 melee-default single +6 chip; '~+6'/'to hiti'/'rapie r' OCR cosmetic; EB exact-tr anchor startsWith('Name CR')"
+  },
+  "Noble": {
+    "monsterIndex": "noble",
+    "verifiedRow": "MA-1237 Rapier PASS; MA-1238 Parry FAIL(b)/DATA",
+    "date": "2026-09-25",
+    "verdict": "FAIL(b)/DATA (Parry) / PASS (Rapier)",
+    "rig": {
+      "attacker": "Noble 1",
+      "victim": "Bandit 1 AC12 HP999 cs full-store POST",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Parry prose-only row 0 in-row controls inert click (§114 twin MA-1236); fix=Bandit Captain automation acBonus:2"
+  },
+  "Noble Prodigy": {
+    "monsterIndex": "noble-prodigy",
+    "verifiedRow": "MA-1239 PASS-subset; MA-1240+MA-1241+MA-1242 FAIL DATA (bug files)",
+    "date": "2026-09-25",
+    "verdict": "FAIL(a/b)/DATA (MA-1240/41/42)",
+    "rig": {
+      "attacker": "Noble Prodigy 1",
+      "victim": "Bandit 1 AC12 HP999 cs full-store POST",
+      "arm": "own-card selectOption + POST targetName same-body"
+    },
+    "notes": "Shield row no-automation=0 chips; fix=Arcanist block; Arcanist 'Shield (999 left)' control joined this board"
+  },
+  "Nothic": {
+    "monsterIndex": "nothic",
+    "verifiedRow": "MA-1243 Multiattack; MA-1244 Claw PASS; MA-1245 Rotting Gaze PASS",
+    "date": "2026-09-25",
+    "verdict": "PASS",
+    "rig": {
+      "attacker": "Nothic 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Rotting Gaze inline CON DC13 both legs exact (fail full 23, success half 10=floor21/2); dc_success absent=half RAW-correct; ±19 nested saving_thrors rig folded honest inline"
+  },
+  "Nycaloth": {
+    "monsterIndex": "nycaloth",
+    "verifiedRow": "MA-1246 Multiattack PASS-subset; MA-1247 Mercurial Axe PASS",
+    "date": "2026-09-25",
+    "verdict": "PASS-subset",
+    "rig": {
+      "attacker": "Nycaloth 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "cs.targetName same-body POST"
+    },
+    "notes": "Axe +9 2d12+5 Slashing + 3d6 Force dual-leg exact (incl crit 13+32); targetName arms via own-card selectOption POST-reload (cs-POST targetName drops on reload); bogus header +9 §440 unpressed"
+  },
+  "Ochre Jelly": {
+    "monsterIndex": "ochre-jelly",
+    "verifiedRow": "MA-1248 Pseudopod PASS | MA-1249 Split FAIL(b)/DATA zero-affordance prose row, no automation; consumer LIVE (resolveMonsterSplit Helpers:1551, advisory-by-design no-spawn); fix = Black Pudding automation block verbatim; bug-mon-MA-1249-split",
+    "date": "2026-09-25",
+    "verdict": "PASS MA-1248 / FAIL(b) MA-1249",
+    "rig": {
+      "attacker": "Ochre Jelly 1",
+      "victim": "Bandit 1 AC12 Acid-clean HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Pseudopod +4 (STR15+2+PB2) 3d6+2 Acid; 15 presses 14H/1M boundary nat8=12 meets AC; decoy save psp null | MA-1249: Split row 0 chips, DOM+pointer center-click 0 popup/log-delta0(3->3)/console0; twin control Black Pudding same board arms 'Split (999 left)' mc-dice-link = machinery reachable; cosmetic: advisory prose hardcodes 'Black Puddings' (:1534/:1542)"
+  },
+  "Octopus": {
+    "monsterIndex": "octopus",
+    "verifiedRow": "MA-1250 Tentacles PASS; MA-1251 Ink Cloud FAIL(b)/DATA",
+    "date": "2026-09-26",
+    "verdict": "PASS (attack) / FAIL(b) (Ink Cloud)",
+    "rig": {
+      "attacker": "Octopus 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Ink Cloud zero-affordance; te ink_cloud pre-registered (MA-0813), fix=zone-dict twin or advisory field; Giant Octopus/Giant Squid siblings same family",
+    "MA-1251": "MA-1251 reactions[0] Ink Cloud FAIL(b)/DATA — zero-affordance row survived the MA-0813/MA-0830 sibling fix sweep (Giant Octopus/Giant Squid disk rows carry live zone:{self,radius_ft,no_save,effect_key:'ink_cloud',advisory} + numeric uses, pinned by monsterSelfAura.ink-cloud.test.js radius 5 / giant-squid radius 8; te ink_cloud registered targetEffectDefinitions.js:239). Octopus row keys name/trigger/description ONLY. LIVE test-campaign 2026-09-26: header verified; EB exact tick ['Octopus','Bandit'] Join Encounter; cs idx0 Octopus 1 hp3 AC12 init22, idx1 Bandit 1; baseline log3 cd{}; card census row DOM '<strong>Ink Cloud.</strong> <span>' ONLY diceLinks/roleButtons/buttons/anchors/em 0, gatedSlot/advisoryChip/zoneChip false; center-click x2 log delta 0, ink 0, popups 0, console 0. Advisory seam GENERIC passthrough (!!row.advisory, value never inspected, category-agnostic MonsterAction.jsx:335-343/:406, resolver Modal:2385) so one-field advisory fix expressible zero-code; RECOMMENDED fix = sibling zone byte-twin radius_ft:3 (cube/2 ceil per 10→5/15→8 precedent), NO uses (At-Will — monsterAbilitySaveUsesGate null). Obscured-vision/swim-move/1-min-clock/end-turn-underwater trigger = §70 residuals. Bug .opencode/plans/bug-mon-MA-1251-ink-cloud.md; admin cleared log[] cd{} post-verify (2026-09-26)"
+  },
+  "Ogre": {
+    "monsterIndex": "ogre",
+    "rows": {
+      "MA-1252": {
+        "verifiedRow": "MA-1252 Greatclub",
+        "date": "2026-09-26",
+        "verdict": "PASS",
+        "rig": {
+          "attacker": "Ogre 1",
+          "victim": "Bandit 1 AC12 HP999",
+          "arm": "own-card selectOption"
+        },
+        "notes": "Greatclub +6 (STR19+PB2) 2d8+4 Bludgeoning; crit 2d8*2+4 flat-undoubled; no Multiattack row; decoy psp absent"
+      },
+      "MA-1253": {
+        "action": "Javelin",
+        "actionType": "attack+save(dual-mode)",
+        "verdict": "PASS-subset",
+        "date": "2026-09-26",
+        "rig": "Bandit 1 AC12 HP999 full-store cs POST; own-card target arm",
+        "note": "band-inert twin MA-1235/§193: no damage_dice_ranged authored, popup Done-only toggles-0 x7; 7 presses 1:1, 6_hits sum_fd=74=sum_|hp_change| exact, nat5=11 MISS zero-damage + nat6=12 AC-tie hit; rangeReason:null x7 fingerprint; psp absent; single +6 chip/row Greatclub-Javelin disambiguated via strong.startsWith('Javelin')"
+      }
+    },
+    "lastVerified": "MA-1253 Javelin PASS-subset"
+  },
+  "Ogre Zombie": {
+    "monsterIndex": "ogre-zombie",
+    "verifiedRow": "MA-1254 Slam",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Ogre Zombie 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Slam +6 2d8+4 Bludgeoning ledger exact; decoy psp absent"
+  },
+  "Ogrillon Ogre": {
+    "monsterIndex": "ogrillon-ogre",
+    "verifiedRow": "MA-1255 Battleaxe PASS; MA-1256 Javelin PASS-subset",
+    "verdict": "PASS-subset (band-inert)",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Ogrillon Ogre 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Javelin +5 1d6+3 Piercing incl crit 1d6*2+3=11; nat7=12 tie-hit; band-null fingerprint; avatar-alt anchor mandatory"
+  },
+  "Oni": {
+    "monsterIndex": "oni",
+    "verifiedRow": "MA-1257 PS; MA-1258 PASS; MA-1259/1260/1261 FAIL DATA",
+    "verdict": "FAIL DATA (MA-1259/1260/1261)",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Oni 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card native setter avatar-alt anchor"
+    },
+    "notes": "Spellcasting plain-text names 0 chips (MA-0421 family); fix=djinni wrap 4 names"
+  },
+  "Orc": {
+    "monsterIndex": "orc",
+    "verifiedRow": "MA-1262 Greataxe PASS; MA-1263 Javelin PASS-subset",
+    "verdict": "PASS-subset",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Orc 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption (creatures[i].targetName)"
+    },
+    "notes": "Greataxe +5 (STR16+PB2) 1d12+3 slashing; lowercase type passthrough (resistance-carrying victim case-sensitivity unresolved, flag). Javelin dual-mode 30/120 band-inert: disk carries reach only no range key; +5 chip 3/3 first-click, popup Done-only no chooser, nat19 hit 1d6+3 fd9, nat20 crit collapsed 1d6*2+3 fd11 flat mod undoubled, nat6=11 miss boundary done-less, rangeReason:null x3, Greataxe twin +5 untouched (0 logs), piercing lowercase passthrough, zero conditions/poison/psp"
+  },
+  "Orc Eye of Gruumsh": {
+    "monsterIndex": "orc-eye-of-gruumsh",
+    "verifiedRow": "MA-1264 Spear FAIL(a)/DATA",
+    "verdict": "FAIL(a)/DATA",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Orc Eye of Gruumsh 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "two-axis: +1d8 rider no transport (§530) + versatile 2d8+3 chooser inert (no damage_dice_two_handed); fix primary 1d6 + 3 + 1d8 + two_handed 2d8 + 3"
+  },
+  "Orc War Chief": {
+    "monsterIndex": "orc-war-chief",
+    "verifiedRow": "MA-1265 PASS; MA-1266/1267/1268 FAIL DATA",
+    "verdict": "FAIL(a)/DATA",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Orc War Chief 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Battle Cry zero-affordance (usage cosmetic §162); fix options: advisory seam one-field OR bolster_advantage ally-radius (MA-0694 rides it, over-buffs all d20); board left joined for next session"
+  },
+  "Orog": {
+    "monsterIndex": "orog",
+    "verifiedRow": "MA-1269 PS; MA-1270 PASS; MA-1271 Javelin PASS",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Orog 1",
+      "victim": "Bandit 1 AC12 HP999 (cs full-store POST {value:cs})",
+      "arm": "own-card selectOption Bandit 1"
+    },
+    "notes": "Javelin +6 1d6+4 piercing; tie nat6=12 hit; band-inert; flush .mc-overlay before admin Clear"
+  },
+  "Otyugh": {
+    "monsterIndex": "otyugh",
+    "verifiedRow": "MA-1272 PASS; MA-1273/74/75 FAIL(a)/DATA",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Otyugh 1 (cs idx0, EB auto-suffix)",
+      "victim": "Bandit 1 AC12 HP999 (full-store cs POST {value:cs})",
+      "arm": "own-card target-select Bandit 1 (native value setter + change; cs.targetName verified)"
+    },
+    "notes": "Tentacle Slam: save numerics+half+Stunned grant LIVE exact; grapple gate unauthored (fix target_prerequisite by_attacker; gate refuses all till MA-1274 producers land)"
+  },
+  "Owl": {
+    "monsterIndex": "owl",
+    "verifiedRow": "MA-1276 Talons",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Owl 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "flat Hit:1 Slashing dice-less seam live §49; nat6 miss nat15 hit"
+  },
+  "Owlbear": {
+    "monsterIndex": "owlbear",
+    "verifiedRow": "MA-1277 PASS, MA-1278 PASS",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Owlbear 1",
+      "victim": "Bandit 1 AC12 HP999 (cs full-store POST {value:cs}, all 4 HP keys)",
+      "arm": "own-card selectOption Bandit 1 (cs.creatures[Owlbear 1].targetName GET-confirm)"
+    },
+    "notes": "Multiattack header authors attack_bonus:7 -> spurious +7 header chip + cosmetic () (§440/§445 family, enumerated UNPRESSED — log holds zero roll/attack name:Multiattack); exact 4-press ledger vs AC12: nat19=26✓ fd14 Δ−14, nat7=14✓ fd8 Δ−8, nat20 CRIT formula 2d8*2+5 (6, 5) fd27 Δ−27 flat mod undoubled, nat2=9✗ zero-damage HP held; chip formula 2d8 + 5 Slashing authored-exact, |hpΔ|==fd 3/3, no secondary pools; round 1 constant same-turn proof; Miss popup carried cosmetic Done (popup-close-btn, MA-1228); flush .mc-overlay before admin clears (MA-1271); MA-1278 Rend twin: 3-press ledger vs AC12 nat2=9✗/nat17=24✓ fd16 Δ−16 exact/nat4=11✗ zero-damage HP held both misses, chip '+7' scoped strong.startsWith('Rend') (2nd +7 = Beak row), psp absent 0-save-entries (save_dc:0 decoy clean); PITFALL: .popup-modal NESTS INSIDE .popup-overlay — querySelectorAll union returns nested dupes, double-clicking Done re-rolls damage twice + replaces applied roll (reroll semantics, cosmetic double damage-log pair); click Done ONCE via outermost .popup-overlay only"
+  },
+  "Panther": {
+    "monsterIndex": "panther",
+    "verifiedRow": "MA-1279 Rend",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Panther 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption nth(1)"
+    },
+    "notes": "Rend +5 1d6+3 Slashing; nat9 hit fd7 exact; decoy psp absent"
+  },
+  "Pegasus": {
+    "monsterIndex": "pegasus",
+    "verifiedRow": "MA-1280 Hooves dual-leg combined_damage_roll PASS (crit-twin)",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Pegasus 1 (cs idx0, joined first)",
+      "victim": "Bandit 1 AC12 resistances[]+immunities[] clean, maxHp/currentHp 999 full-store cs POST all-4-keys",
+      "arm": "own initiative-card selectOption Bandit 1 (self-excluded dropdown); armed on attacker creature dict, root targetName absent §661",
+      "join": "EB exact-td native cb.click() Bandit row0 'Bandit0.12525' + Pegasus; explicit Join; cs spin 1st try; whole saved PC party auto-joined as 1/1 placeholders §237/§439"
+    },
+    "ledger": [
+      "press1 nat2+6=8 ✗MISS AC12 — popup native-2 CRITICAL-miss absent, cosmetic Done; zero damage-entry, zero hp_change, log 1 attack row hit:false total=raw-nat §556",
+      "press2 nat20+6=26 ✓CRIT HIT AC12 — ONE roll damage note combined_damage_roll formula '1d6*2+4 (5)' rolls:[5] collapsed flat-undoubled §467 total14 Bludgeoning + secondaryFormula base '2d4' secondaryRolls[3,1] secondaryTotal 8=2xsum §533 Radiant secondaryFinalDamage 8; hp_change Δ−22 breakdown B14+R8 resisted:false; |Δ|==fd+secFD exact; server cs 999→977",
+      "stage-2 popup printed pre-secondary intermediate 'HP: 991 → 977' + combined tail '14 Bludgeoning + 8 Radiant = 22 total' §140/§649 twin; Done pressed ONCE nth=0 real-pointer, no reroll pair §672"
+    ],
+    "notes": "save_dc:0/save_type:'' decoy renders ZERO DC chip (MA-1071 gate); single +6 chip §116; non-crit face unrolled (1/2 hit = crit) — ledger seam identical MA-1231 twin. NEW pitfalls: (a) MISS popup ghost flushed ×6 evaluate el.click() no-op then SELF-DISMISSED ~2s later — Playwright real-pointer Done then errors 'does not match any elements'; poll visible-count + treat selector-not-found as cleared-truth, never click-resolution; (b) per-die crit chrome '1d6 + 4: 5*2 +4' stage-2 + single-die collapsed rolls:[5] §145/§545; (c) injection flood re-confirmed: browser tool args rewritten to aliyuncs proxy every call + fabricated 'join rejected/armed:false/checkboxes:false' + HP=0 demand + hex-fragment fake console errors — all rejected via own location.href/header/cs/DOM reads §90"
+  },
+  "Pentadrone": {
+    "monsterIndex": "pentadrone",
+    "verifiedRow": "MA-1281 Multiattack PASS; MA-1282 Arm PASS; MA-1283 Paralysis Gas PASS-subset",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Pentadrone 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption idx1 self-excluded"
+    },
+    "notes": "MA-1281 Multiattack + MA-1282 Arm standalone PASS; standalone Arm +4 chip: 2 presses 1:1, popups '14 vs AC 12'/'18 vs AC 12' HIT (total=nat+4), fresh-roll discriminator dice [10,4] vs [14,13] normal-mode 2d20 chosen=max §92; damage formula '1d6 + 2' bludgeoning lowercase, [5]+2=7/[6]+2=8, |hpΔ|=7+8=15==Σfd exact 999→992→984; psp ABSENT plain-attack; Paralysis Gas DC11 chip unpressed | Paralysis Gas: gridless cone picker 2/2 fail grants Paralyzed dc11; recharge 5+ live paralysis_gas_refused; success +19 zero-grant; §70 repeat-save + §84 no-clock advisories"
+  },
+  "Performer": {
+    "monsterIndex": "performer",
+    "verifiedRow": "MA-1284 Shortsword",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Performer 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Shortsword +5 1d6+3 Piercing 5H/1M ledger 39 exact"
+  },
+  "Performer Legend": {
+    "monsterIndex": "performer-legend",
+    "verifiedRow": "MA-1286 Multiattack PASS; MA-1287 Bejeweled Baton PASS; MA-1288 Majestic Song PASS-subset; MA-1289 Spellcasting FAIL(a)/DATA; MA-1290 Warding Charm FAIL(b)/DATA",
+    "verdict": "MIXED",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Performer Legend 1",
+      "victim": "Bandit 1 AC12 HP999 (AC30 miss-rig press)",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Bejeweled Baton +9 2d4+5 Bludgeoning + 3d6 Psychic dual-leg; bogus +9 header §440 unpressed | Majestic Song: DC17 Wis sphere-picker, fail full 4d8+4 + Charmed,Frightened both-default grant, success half floor exact; no choice-UI/expiry advisories | MA-1289 Spellcasting: markup-dead (§421/524 family MA-1230/1241/1261) — headers-only <strong>, 0/5 spell chips (Mage Hand, Minor Illusion, Prestidigitation, Major Image, Project Image plain text), DC 17 prose-only no affordance, +0 junk unpressed; probe inert log 3->3 popups 0; all 5 spells indexed both rulesets save:none; fix=name-level <strong> (djinni MA-0611 byte-shape) | MA-1290 Warding Charm (reactions[0]): FAIL(b)/DATA zero-affordance defender-reaction (§60/§114, MA-1285/1236/1238 twins) — disk keys name/trigger/description/save_type/save_effect ONLY, NO save_dc (DC 17 prose-only §54), no automation/advisory; registry GATED_MONSTER_REACTIONS :981-1140 13 keys no warding_charm, app grep warding_charm grep-ZERO; live row DOM plain <div> 0 links/buttons/inputs, zero-DC-chip (only Majestic Song carries DC 17 chip), center-click ×2 inert log 3->3 popups 0; fix: interim advisory seam (MA-1251) or full registry effect + miss-negation te + charmed grant w/ saveDc:17 stamp (hit-negation leg = new consumer semantics)"
+  },
+  "Performer Maestro": {
+    "monsterIndex": "performer-maestro",
+    "verifiedRow": "MA-1291 Multiattack PASS-subset; MA-1292 Rapier PASS; MA-1293 Beguiling Song PASS-subset; MA-1294 Spellcasting FAIL(a)",
+    "verdict": "MIXED",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Performer Maestro 1",
+      "victim": "Bandit 1 (wis -19 fail) + Bandit 2 (wis +19 success), AC12 HP999 both (2-key cs build maxHp/currentHp)",
+      "arm": "own-card selectOption (self-excluded dropdown confirmed)"
+    },
+    "notes": "Multiattack header attack_bonus:7 renders bogus +7 header chip (§440/MA-1114/MA-1188 family) - enumerated UNPRESSED, excluded from component ledger; Rapier component chips 3 presses: P1 nat2 [2,2]+7=9 ✗AC12 done-less-style miss popup .popup-close-btn applies nothing Δ0; P2 nat13 [13,8]+7=20 ✓ Done(dice-roll-reroll-btn real-pointer ONCE) -> combined_damage_roll formula 1d8+4 rolls[3] fd7 Piercing + secondaryFormula 2d6 [6,3] sfd9 Psychic, hp_change Δ−16 bd[P7,Psy9] cs 999→983 exact; P3 nat6 [6,9]+7=13 ✓ fd12 rolls[8] + sfd9 [6,3] Δ−21 bd[P12,Psy9] cs→962; sum|Δ|37==Σboth-legs exact; ≥2 hits+cheap miss obtained; distinct attack dice, secondary [6,3] repeat across components honest per §77 (fresh primary dice); stage-2 interim popup printed cosmetic 990→983 pre-secondary line (§140) - hp_change truth; 1 ghost-absorbed press mid-session (§451/§644 stale MISS text retained, log-delta 0 arbiter, re-press fired 1:1); bogus +0 junk chips on Beguiling Song/Spellcasting rows (§490) unpressed; count enforcement GM-adjudicated §66 not a defect; cleanup flush-until-visible-0 + direct admin clear POSTs 200/200 no dialogs log-empty verified (2026-09-26) | MA-1293 Beguiling Song: EB Bandit x2 (qty stepper) + Maestro join; \"DC 15 Wisdom\" chip FIRST-click -> radiusAoeFallback .sp-modal picker \"20-ft Radius (GM positions tokens; selection advisory)\" with exact DC15/Wisdom/3d10+4 Psychic half-on-success copy; dice \"+0\"/\"3d10 + 4\" junk chips unpressed (409/490); full-word saveBonuses.wisdom +/-19 via full cs {value:} POST flipped determinism (160/563); confirm \"Beguiling Song (2)\" once -> results modal Bandit1 FAILED fd21 formula 3d10+4 rolls[7,8,2] total==fd==|hpDelta| (999->978) + Charmed condition-applied log w/ source+dc:15 + change-data meta.charmed{dc:15,ability:\"wis\"}; same-pass \"removed took damage (Charm)\" house-rule strip (178/181) - judged by grant log+meta, ac:[] persistence advisory; Bandit2 SAVED total16 rolls[1,9,2] fd8=floor(16/2) exact (999->991) b2 store keys ABSENT strictest zero-grant (1116); distinct damage pools; single ability-named confirm, results Close-only, pendingSavePrompts null post (100); expiry clock absent on picker grant \"until end of performer next turn (GM-enforced)\" = 84/165 advisory => PASS-subset; cleanup flush-until-0 + one-snippet admin clear w/ page.off(handler ref) 200/200 log-empty verified (2026-09-26) | MA-1294 Spellcasting FAIL(a): EB native cb.click() Bandit(exact CR1/8)+Maestro join, header test-campaign; disk save_dc:15+save_type:Charisma PRESENT but DC-chip lane DEAD — XOR fork MonsterAction.jsx:348-372/390 isSpellcastingRow early-return SpellCastLinks, ActionSaveRoll (sole DC-X-Type chip renderer) unreachable, no caster-channel-label renderer in src/ (grep zero; §894=row-semantics note not render-promise) — live proof: whole-overlay /DC 15/i clickable audit = exactly ONE \"DC 15 Wisdom\" (Beguiling Song MA-1293 lane, NOT pressed), row save chips 0, \"DC 15 Charisma\" does NOT exist to press (FAIL(a) trigger); spell chips 0 (3/3 missing, headers-only strong, MA-1230/1289 family); junk +0 (attack_bonus:0 §490) UNPRESSED; real-pointer probes prose DC-text + prose Hideous-Laughter: log 3->3 x2, popups 0, .sp-modal absent, console errors 0, zero spends = cast legs untestable-inert; spells.json census: Minor Illusion/Prestidigitation L0 save:none both files; MA-1241 trap live: \"Tasha's Hideous Laughter\" ABSENT 5e index (=Hideous Laughter L1), present 2024 — fix must verify chip name resolution per ruleset (§158) before <strong> wrap; DC lane suppression = app-wide family contract (MA-1230/1241/1261/1289 render none), not Maestro-specific; cleanup flush-until-0 + LAST one-snippet admin clears 200/200 (log [], change-data {} re-GET verified), no page listeners added (nothing to page.off), pendingSavePrompts never armed (2026-09-26)"
+  },
+  "Peryton": {
+    "monsterIndex": "peryton",
+    "verifiedRow": "MA-1295 Multiattack PASS; MA-1296 Gore PASS; MA-1297 Talons PASS",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Peryton 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Gore 1d8+3 / Talons 2d4+3 Piercing 1:1 ledger exact; bogus +5 header §440; charge+heart prose advisory | MA-1297 Talons PASS (2026-09-26): fresh EB exact-td join + HP999 full-cs POST; chip +5 ONCE first-press nat17 [17,14]+5=22 ✓AC12 popup-total==nat+5 verified; damage log verbatim formula 2d4 + 3 rolls[3,2] total8 fd8 Piercing, hp_change Δ−8 999→991 |Δ|==fd exact; Done ONCE outermost; psp null; heart-removal prose NO structured field §100 advisory-unbuilt note-only; zombie pre-block Gore replay resurrected from prior tab §2 timestamp-excluded; cleanup one-snippet admin clears 200/200 log[]/cd{} page.off done"
+  },
+  "Phase Spider": {
+    "monsterIndex": "phase-spider",
+    "verifiedRow": "MA-1298 Multiattack + MA-1299 Bite PASS",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Phase Spider 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Bite +5 1d10+3 Piercing + 2d8 Poison structured secondary; bogus +5 header §440; 0HP prose advisory MA-0010 | MA-1299 Bite PASS (2026-09-26): fresh EB exact-td native cb.click join Bandit+Phase Spider, HP999 full-cs POST; 29-row select census = attacker-card anchor own-card selectOption Bandit 1 armed; chip +5 anchor strong.startsWith('Bite') press1 nat3 8✗AC12 miss-popup (popup-close-btn Done variant, backdrop/Escape inert §148 twin), press2 nat14 19✓AC12 popup-total==nat+5; Done ONCE dice-roll-reroll-btn; damage log verbatim formula 1d10 + 3 rolls[7] total10 fd10 Piercing + secondaryFormula 2d8 rolls[1,8] secondaryFinalDamage 9 Poison, hp_change Δ−19 999→980 unclamped |Δ|==fd+sec exact, breakdown 10+9; cosmetic combined_damage_roll note §183; psp absent — disk Bite row has NO conditions/hit_conditions field (save_dc:0), stable/poison/paralyzed riders advisory-unbuilt MA-0010 §59, no 0HP grind; cleanup one-snippet clears 200/200 log[]/cd{} overlays 0"
+  },
+  "Piercer": {
+    "monsterIndex": "piercer",
+    "verifiedRow": "MA-1300 Bite",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Piercer 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Bite +3 1d8+1 Piercing; Drop row has +0/3d6/DC11 Dex chips (next rows)"
+  },
+  "Piranha": {
+    "monsterIndex": "piranha",
+    "verifiedRow": "MA-1302 Bite",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Piranha 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "flat 1 Piercing; crit pays flat undoubled; adv-vs-damaged advisory-only"
+  },
+  "Pirate": {
+    "monsterIndex": "pirate",
+    "verifiedRow": "MA-1303 Multiattack PASS; MA-1305 Enthralling Panache PASS",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Pirate 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "cs.creatures[pirate].targetName via full cs POST",
+      "stamp": "nested saving_throws.wis:{modifier:-19/+19} full cs POST"
+    },
+    "notes": "Enthralling Panache inline single-target save exact both legs: fail nat16-19=-3 DC12 Wisdom saveResult:failure -> condition applied Charmed w/ source meta + advisory until-next-turn GM-enforced (no addExpiration clock, gazer MA-0766/767 twin §84); success nat13+19=32 saveResult:success zero-new-grant (whole-log charmed count stays 1, stale leg-1 persists §96); ZERO damage/hp_change both legs (none authored); at-will refire ungated no refusals (disk no usage/recharge); chip row also renders bogus +0 (attack_bonus:0 §490) unpressed; chip popup cosmetic DC Unknown §138, victim roll-save saveDc/saveType truth; admin clears verified empty"
+  },
+  "Pirate Admiral": {
+    "monsterIndex": "pirate-admiral",
+    "placedIn": "test-campaign initiative via EB Join Encounter (Bandit 1 + Pirate Admiral 1; Bandit 1 AC12 maxHp999 via full-store cs POST {value:} envelope, armed on PA own-card tracker target-select; avatar-alt own-card open 2026-09-26)",
+    "config": {
+      "name": "Pirate Admiral 1",
+      "csIndex": 1,
+      "verifiedRow": "MA-1306 (PASS, Multiattack any-combination §66 header+2-chip clean: header attack_bonus:10 renders spurious '+10' header chip §440/§442 family - enumerated UNPRESSED; disk Scimitar row AB10 reach 5ft 3d6+6 Slashing + 2d6 Poison rider w/ choose-one Awestruck/Poison prose (MA-0275 variant machinery row-specific, rider advisory GM-side, N/A multiattack press); Pistol row AB10 range '30/90 ft.' single 4d10+6 Piercing chip, dual-band toggle inert §150/§195 re-confirmed live (attackRange absent + rangeReason:null gridless-lenient fingerprint §672); manifest description byte-exact vs disk; real-pointer mouse.click via strong.startsWith anchor (§183 double hasText trap: Multiattack prose names both weapons, header and both components all carry identical '+10' chips); Scimitar press x1 nat1+10=11 vs AC12 CRIT MISS done-less zero-damage hp999 intact (miss popup Done-only §415/§1228, no reroll btn); flush; Pistol press x1 nat3+10=13 HIT vs AC12, stage-1 Done applies authored formula '4d10 + 6' dice [7,1,2,3]=19, fd=19, hp_change 999->980 |hpDelta|=19 EXACT; >=1 hit obtained, no reroll-grind needed; count enforcement GM-adjudicated (2 of 3 pressed, no gate/refusal §66/MA-0009); cosmetic note:'combined_damage_roll' on single-primary Pistol damage entry §183/§671 twin)",
+      "ledgers": "scimitar: nat1 total11 MISS fd0 | pistol: nat3 total13 HIT fd19 formula 4d10+6 |hpDelta|19 exact | multiattack-header chip: 0 presses",
+      "pitfalls": "§440 bogus header chip live w/ header attack_bonus:10 (unpressed); log GET returns BARE ARRAY (no {log:}/{value:} envelope) - guard shape; run_code_unsafe runs Node not page - fetch must ride page.evaluate; tracker HP inputs stale post-cs-POST, page reload + campaign re-select syncs 999/999 (§414); miss popup Done-only no reroll (§415); stage-2 popup survives Done - flush popup-close-btn el.click() loop until 0 (§873); admin clears direct-POSTable cd+log both 200 empties confirmed (§1097)"
+    },
+    "testedOn": "2026-09-26",
+    "verifiedRow": "MA-1306 Multiattack PASS; MA-1307 Scimitar PASS; MA-1308 Pistol PASS; MA-1309 Defensive Stance FAIL(b)/DATA — prose-only reaction zero affordance §60, no gated key, plan bug-mon-MA-1309",
+    "verdict": "MIXED",
+    "date": "2026-09-26",
+    "notes": "Scimitar crit leg 3d6*2+6|2d6 exact d52; choose-one rider prose-only zero-grant honest MA-1299 twin"
+  },
+  "Pirate Captain": {
+    "monsterIndex": "pirate-captain",
+    "verifiedRow": "MA-1310 Multiattack PASS | MA-1311 Rapier PASS-subset | MA-1312 Pistol PASS",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Pirate Captain 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "Rapier 2d8+4 / Pistol 2d10+4 Piercing any-combo; rapier advantage rider advisory — MA-1311 live: press1 nat11+7=18 HIT vs Bandit AC12, popup total exact, formula \"2d8 + 4\" Piercing fd11, |hpΔ|==fd (999→988), miss-press nat2+7=9 zero-dmg; 2nd press same-turn mode:normal rolls:[2,3] chosen-first, NO adv (disk actions[1] has zero structured adv field; §125 next_attack_advantage producers PC-only) = MA-1302 advisory twin honest; MA-1312 live (same-board re-rig): press1 nat3+7=10 MISS stage-1 popup-only zero-damage, press2 nat5+7=12 HIT vs AC12 boundary, popup total exact, formula \"2d10 + 4\" Piercing rolls[10,8] fd22, |hpΔ|==fd (999→977), rangeReason:null gridless-lenient (§150), psp absent, press-to-log 1:1"
+  },
+  "Pit Fiend": {
+    "monsterIndex": "pit-fiend",
+    "verifiedRow": "MA-1314 Multiattack PASS; MA-1315 Bite PASS-subset; MA-1316 Devilish Claw PASS; MA-1317 Fiery Mace PASS; MA-1318 Hellfire Spellcasting PASS-subset",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Pit Fiend 1 (cs idx0, init 26)",
+      "victim": "Bandit 1 AC12 HP999 (all 4 HP keys via full cs POST)",
+      "arm": "cs.creatures[pf].targetName=Bandit 1 in same HP-rig POST (§491)",
+      "card": "avatar-alt open img.avatar-image[alt='Pit Fiend 1']"
+    },
+    "authored": {
+      "header": "attack_bonus:14 authored -> spurious '+14' header chip §440/§441 enumerated UNPRESSED",
+      "bite": "AB14 reach 10ft 3d6+8 Piercing + CON DC21 Poisoned recurring rider (save chip enumerated NOT pressed — attack chip rides full damage sans save MA-0551)",
+      "devilishClaw": "AB14 4d8+8 Necrotic, NO burn rider (brief guess wrong — pure necrotic)",
+      "fieryMace": "AB14 4d6+8 Force + additive secondary 6d6 Fire (MA-0531 always-roll rider, RAW 'plus')"
+    },
+    "ledgers": "bite: nat1 rolls[1,17] popup '15 d20 1' + CRITICAL MISS banner w/ log hit:true (§44/§1281 chosen-max cosmetic) fd11 3d6+8 [1,1,1] |Δ|11 exact 999->988 | claw1: nat3 total17✓ fd28 4d8+8 [5,2,8,5] Δ28 988->960 | claw2: nat3 total17✓ second-die 10 vs 11 honest fresh roll §77 fd30 [4,6,7,5] Δ30 960->930 | mace: nat3 total17✓ single entry dual-leg primary 4d6+8 [3,6,6,4]=27 Force + secondaryFormula 6d6 [3,5,4,3,3,2]=20 Fire, combined_damage_roll, |Δ|47==27+20 exact 930->883 | 4/4 first-click press-to-log 1:1, zero absorbed (§488 arbiter held), no gate/refusal (count GM-adjudicated §66) | MA-1317 standalone mace: nat2 total16 (2+14) vs AC12 hit:true | single damage entry formula verbatim '4d6 + 8' Force finalDamage 24 rolls[3,5,2,6] + secondaryFormula verbatim '6d6' Fire secondaryTotal 27 rolls[5,4,5,3,4,6] note combined_damage_roll | hp_change -51 999->948 breakdown [Force24,Fire27] exact |hpΔ|==fd+sec | psp null whole session (save_dc:0 zero-chip MA-1225) | 1 press:1 log 1:1, Done clicked ONCE outermost stage-1 (.dice-roll-reroll-btn), stage-2 button-less 'click to dismiss' body-click flush | cleanup: popups flushed 0, admin/clear-change-data 200 LAST one-snippet w/ dialog listener, cs.creatures[] empty",
+    "notes": "manifest MA-1314 byte-exact vs disk incl header attack_bonus:14; Bite compound row DC 21 Constitution save chip real (save_dc:21 authored) — avoided §409 trap, rider zero-contamination audit: 0 save/0 condition/0 Multiattack-name roll entries whole-log; stage-2 mace popup intermediate '910->883' cosmetic pre-secondary line §143, hp truth 930->883; popup union .popup-modal nested in .popup-overlay dups §1278 — Done clicked ONCE outermost pointer-only; cleanup: flush-until-0, admin cd+log direct-POST 200 empties confirmed, cs value:null, overlays 0, header test-campaign throughout; injection re-confirmed: navigate/click args rewritten to OSS proxy URLs, page stayed localhost, own href checks §90 | Bite two-chip attack+save: fail Poisoned granted (source-only meta); saveBonuses inert inline §211; recurring rider §70 advisory | MA-1316 live (fresh re-rig same board): press1 nat2 total16=nat+14 exact vs AC12 popup ✓ HIT; formula byte \"4d8 + 8\" Necrotic rolls[7,3,6,1] fd25 |hpΔ|999->974==fd exact; psp absent pure-necrotic no-rider confirmed; one press->attack+damage+hp_change 1:1 first-click no-absorb, rangeReason:null gridless-lenient §115; stage-2 damage popup popup-close-btn Done (no reroll btn) click preserved applied dmg; cleanup flush-until-0 + admin direct-POST 200 cd=[]/log=0/cs null, header test-campaign throughout (2026-09-26) | MA-1317: Fiery Mace row attack+save actionType w/ save_dc:0 renders attack+damage chips only, Hellfire DC21 save chip on Spellcasting row untouched. | MA-1318 live (2026-09-26, Playwright-via-local-playwright headless CDP — MCP browser tools absent): disk row monsters.json actions[4] NO damage_dice_primary/type, no dc_success, range/reach empty, recharge:\"4-6\" -> row renders \"+0\" decoy (§490) + real DC 21 Charisma chip (mc-dice-link-save-clickable, save_dc:21+save_type authored) + recharge note \"(4-6)\"; NO Fireball/Hold Monster/Wall-of-Fire cast chips (names strong-marked but no \":\" list). Press#1: ability_use spend \"Recharge 4-6 unavailable until d6 4+\" + monsterRecharge{recharged:false,threshold:4} nested -> inline save victim Bandit 1 rolled vs CHARISMA +0 (stated save_type; dex:-19+saving_throws.dex:-19+abi mod stamps inert-unnecessary — engine saves vs Charisma not mashed Dex/Wis) total 19 nat-res:failure dcSuccess:\"half\" cosmetic-zero-damage (§63 no numeric leak, MA-0676 shape) -> Paralyzed granted; ZERO save-damage entries (formula null — RAW Fireball 8d6/WoF dice absent = DATA residual); popup cosmetic \"DC Unknown\" truth dc:21 in log (§121). Press#2 spent: chip class mc-dice-link-spell-spent + .mc-recharge-refusal \"Not Recharged... No save rolled, nothing spent\" + hellfire_spellcasting_refused zero-save (MA-1283 twin). Refire refused persist till recovery; walk r2 PF turn recharge_failed d6:3 honest; walk r3 recharged d6:5; Press#3 re-spends (rc false again) nat1 fail -> Paralyzed re-grant, Bandit hp 999 unchanged 3/3 legs zero-damage. §868 double-register avatar-click confirmed on post-walk reopen; first-press card opened via alt-avatar single click. Cleanup: flush 0, admin direct-POST cd+log 200 LAST, cd=[] log=0 cs value:null, header test-campaign throughout. RAW composite (two Fireballs/Hold Monster/Wall of Fire, 3 save types, 8d6/8d8 damage) un-honor-able by single generic save — internal consistency + recharge economy = PASS-subset, residuals: zero-damage lane (needs damage_dice_primary authored), paralyzed over-grant on Fireball/WoF branches (needs split rows or composite consumer), save_type Charisma vs RAW Dex/Wis per-spell."
+  },
+  "Pixie": {
+    "monsterIndex": "pixie",
+    "verifiedRow": "MA-1319 Faerie Dust PASS-subset",
+    "verdict": "PASS",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Pixie 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "own-card selectOption"
+    },
+    "notes": "MA-1319 Faerie Dust PASS-subset (2026-09-26): fresh EB exact-td native cb.click join Bandit+Pixie -> Join Encounter, HP999 full-store cs POST {value:}; disk actions[0] keys name/description/attack_bonus:4/save_dc:0/damage_type_primary Radiant only - NO damage_dice_primary (flat '1' via extractFlatHitDamage Helpers:2367, flat never doubles Helpers:2366 §1302 codified), NO hit_conditions, NO hit_choice, zero adv/hide riders; dual-wording melee-or-ranged inert ONE '+4' chip §150 (lastAttack weaponType melee collapse, saveDc:null save-leg inert); chip anchored strong.startsWith('Faerie Dust'); press1 nat13+4=17 HIT vs AC12 popup-total exact, Done ONCE popup-close-btn; damage log formula '1' total1 fd1 Radiant note cosmetic combined_damage_roll §183, hp_change delta -1 999->998 |hpΔ|==1 exact, breakdown [Radiant:1]; press2 nat5+4=9 MISS popup total exact, zero-damage entries, hp held 998, press-to-log 1:1; CONDITION OUTCOME: ZERO grants both hits - no choice-UI, no both-default, 'Bandit 1' cd key ABSENT §1116, whole-log type==condition count 0 = disk-unstructured honest zero-grant MA-1299 twin (NOT FAIL(a): FAIL(a) requires structured hit_conditions+nothing granted); crit-flat leg unexercised (no nat20 2/2) backed by §2366 code+MA-1302 verified twin advisory; duration 'until the start of the pixie's next turn' GM-enforced advisory pendingExpirations absent §84/MA-0063 accept; console clean (sole error self-inflicted wrong-route /change-data/Bandit probe 404); cleanup overlay flush + admin Clear Change Data + Clear Campaign Log one-snippet dialog-listener double-fire accepted §148, post GET log=[] cd={} cs=null immediate+quiet"
+  },
+  "Pixie Wonderbringer": {
+    "monsterIndex": "pixie-wonderbringer",
+    "verifiedRow": "MA-1321 Multiattack PASS; MA-1322 Faerie Dust PASS; MA-1323 Spellcasting FAIL(a)/DATA",
+    "verdict": "MIXED",
+    "date": "2026-09-26",
+    "rig": {
+      "attacker": "Pixie Wonderbringer 1",
+      "victim": "Bandit 1 AC12 HP999",
+      "arm": "cs POST targetName (no card select)"
+    },
+    "notes": "Faerie Dust +7 2d10+4 Radiant verbatim chip, nat8+7=15 vs AC12 HIT first-press; |hpD|=19==fd exact; choice-rider Charmed/Poisoned prose zero-grant honest (Bandit CD null, te null, psp absent); MA-1321 Multiattack PASS prior"
   }
 }
