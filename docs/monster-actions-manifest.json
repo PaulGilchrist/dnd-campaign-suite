@@ -20747,7 +20747,7 @@
         "frightened"
       ],
       "description": "Ranged Attack Roll: +5, range 60 ft. Hit: 9 (2d6 + 2) Psychic damage, and the target has the Frightened condition until the start of the oni's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1259-nightmare-ray.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1260",

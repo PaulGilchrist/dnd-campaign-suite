@@ -4226,3 +4226,101 @@ describe('MA-1240 Noble Prodigy Beguiling Strike charmed-on-hit grant (one-field
     });
 });
 
+const ONI = monsters.find(m => m.index === 'oni');
+const NIGHTMARE_RAY_ACTION = ONI.actions.find(a => a.name === 'Nightmare Ray');
+
+describe('MA-1259 Oni Nightmare Ray frightened-on-hit grant (one-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Oni 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Oni 1', computedStats: { armorClass: 17 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 7, newHp: 992, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function rayContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Psychic',
+            attackerName: 'Oni 1',
+            hitClause: buildHitConditionClause(NIGHTMARE_RAY_ACTION),
+        };
+    }
+
+    it('data-lock: disk row carries hit_conditions ["frightened"] after damage_type_primary (MA-1240 byte-shape), NO escape_dc (condition, not grapple)', () => {
+        expect(NIGHTMARE_RAY_ACTION.attack_bonus).toBe(5);
+        expect(NIGHTMARE_RAY_ACTION.hit_conditions).toEqual(['frightened']);
+        const keys = Object.keys(NIGHTMARE_RAY_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(NIGHTMARE_RAY_ACTION.escape_dc).toBeUndefined();
+        expect(NIGHTMARE_RAY_ACTION.damage_dice_primary).toBe('2d6 + 2');
+        expect(NIGHTMARE_RAY_ACTION.damage_type_primary).toBe('Psychic');
+    });
+
+    it('buildHitConditionClause arms the Frightened rider (was null pre-fix)', () => {
+        const clause = buildHitConditionClause(NIGHTMARE_RAY_ACTION);
+        expect(clause).toEqual({
+            conditions: ['frightened'],
+            escapeDc: null,
+            attackName: 'Nightmare Ray',
+            targetEffect: null,
+        });
+    });
+
+    it('grants Frightened on the resolved hit via the canonical activeConditions write path', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Nightmare Ray', formula: '2d6 + 2', total: 7, rolls: [2, 3], modifier: 2, context: rayContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['frightened']);
+    });
+
+    it('stamps source meta WITHOUT dc/ability and logs condition-applied naming the attack', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Nightmare Ray', formula: '2d6 + 2', total: 7, rolls: [2, 3], modifier: 2, context: rayContext() });
+
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall[2]).toMatchObject({ frightened: { source: 'Oni 1' } });
+        expect(metaCall[2].frightened.dc).toBeUndefined();
+        expect(metaCall[2].frightened.ability).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Frightened',
+            reason: 'Nightmare Ray (escape DC —)',
+        }));
+    });
+
+    it('until-next-turn latch: static-list grant rides the STANDARD latch, no custom clock (§153 accepted residual)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Nightmare Ray', formula: '2d6 + 2', total: 7, rolls: [2, 3], modifier: 2, context: rayContext() });
+
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Nightmare Ray', formula: '2d6 + 2', total: 7, rolls: [2, 3], modifier: 2, context: rayContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
+

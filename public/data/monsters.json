@@ -45674,7 +45674,8 @@
         "reach": "",
         "recharge": "",
         "damage_dice_primary": "2d6 + 2",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "hit_conditions": ["frightened"]
       },
       {
         "name": "Shape-Shift",
