@@ -21212,7 +21212,7 @@
       "actionType": "other",
       "trigger": "The performer is hit by an attack roll",
       "description": "The performer halves the damage (round down) it takes from that attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1285-uncanny-dodge.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1286",

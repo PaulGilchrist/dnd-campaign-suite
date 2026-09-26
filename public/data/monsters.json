@@ -46945,7 +46945,8 @@
       {
         "name": "Uncanny Dodge",
         "trigger": "The performer is hit by an attack roll",
-        "description": "The performer halves the damage (round down) it takes from that attack."
+        "description": "The performer halves the damage (round down) it takes from that attack.",
+        "advisory": "monster_uncanny_dodge"
       }
     ],
     "legendary_actions": [],
@@ -54453,7 +54454,8 @@
       {
         "name": "Uncanny Dodge",
         "trigger": "The scout is hit by an attack roll",
-        "description": "The scout halves the damage (round down) it takes from that attack."
+        "description": "The scout halves the damage (round down) it takes from that attack.",
+        "advisory": "monster_uncanny_dodge"
       }
     ],
     "legendary_actions": [],

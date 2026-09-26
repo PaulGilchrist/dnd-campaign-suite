@@ -1,0 +1,173 @@
+// MA-1285 regression: REACTION-category advisory one-field fix on the
+// byte-identical Uncanny Dodge twins (Performer + Scout Captain —
+// name/trigger/description-only rows, zero affordance §60: no attack_bonus/
+// dice/save_dc → every MonsterAction chip lane null, no automation.effect →
+// GatedReactionSlot null, no registered uncanny_dodge gated-reaction key).
+// Binding orchestrator Option A = ONE field per row: advisory:"monster_
+// uncanny_dodge" (advisory_message optional — buildMonsterActionAdvisory*
+// fallback copy is honest). Mirrors MA-1224 Nalfeshnee Pursuit / MA-1223
+// Teleport advisory siblings; ZERO code. Locks disk shape + placement,
+// detector truthiness on both rows, AdvisoryLink chip render on the reaction
+// row, and the record-only resolver contract: popup + ONE ability_use log per
+// press, zero rolls, zero spends; parry/feather_fall te-channel twins
+// byte-inert.
+import { render, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import monstersData from '../../../public/data/monsters.json';
+import { MonsterAction } from '../../components/encounter/MonsterAction.jsx';
+import {
+  isMonsterActionAdvisoryRow,
+  buildMonsterActionAdvisoryPopup,
+  buildMonsterActionAdvisoryLog,
+  resolveMonsterActionAdvisoryRow,
+} from './monsterActionAdvisory.js';
+
+const RAW = readFileSync('public/data/monsters.json', 'utf8');
+const PERFORMER = monstersData.find((m) => m.index === 'performer');
+const SCOUT_CAPTAIN = monstersData.find((m) => m.index === 'scout-captain');
+const PERFORMER_UD = PERFORMER.reactions[0];
+const SCOUT_UD = SCOUT_CAPTAIN.reactions[0];
+const FEATHER_FALL = monstersData.find((m) => m.index === 'aarakocra-aeromancer').reactions[0];
+const PARRY = monstersData.find((m) => m.index === 'bandit-captain').reactions[0];
+
+describe('MA-1285 disk lock: Uncanny Dodge twins carry the advisory one-field fix', () => {
+  it('Performer reactions[0] name/trigger/description byte-identical to the RAW row', () => {
+    expect(PERFORMER_UD.name).toBe('Uncanny Dodge');
+    expect(PERFORMER_UD.trigger).toBe('The performer is hit by an attack roll');
+    expect(PERFORMER_UD.description).toBe('The performer halves the damage (round down) it takes from that attack.');
+  });
+
+  it('Scout Captain reactions[0] name/trigger/description byte-identical to the RAW row', () => {
+    expect(SCOUT_UD.name).toBe('Uncanny Dodge');
+    expect(SCOUT_UD.trigger).toBe('The scout is hit by an attack roll');
+    expect(SCOUT_UD.description).toBe('The scout halves the damage (round down) it takes from that attack.');
+  });
+
+  it('both rows carry EXACTLY advisory:"monster_uncanny_dodge" (Option A one-field)', () => {
+    expect(PERFORMER_UD.advisory).toBe('monster_uncanny_dodge');
+    expect(SCOUT_UD.advisory).toBe('monster_uncanny_dodge');
+    expect(PERFORMER_UD.automation).toBeUndefined();
+    expect(SCOUT_UD.automation).toBeUndefined();
+    expect(PERFORMER_UD.attack_bonus).toBeUndefined();
+    expect(SCOUT_UD.attack_bonus).toBeUndefined();
+    expect(PERFORMER_UD.save_dc).toBeUndefined();
+    expect(SCOUT_UD.save_dc).toBeUndefined();
+    expect(PERFORMER_UD.zone).toBeUndefined();
+    expect(SCOUT_UD.zone).toBeUndefined();
+  });
+
+  it('placement mirrors siblings: advisory sits after description (MA-1224 byte-shape)', () => {
+    const performerShape = '"trigger": "The performer is hit by an attack roll",\n        "description": "The performer halves the damage (round down) it takes from that attack.",\n        "advisory": "monster_uncanny_dodge"';
+    const scoutShape = '"trigger": "The scout is hit by an attack roll",\n        "description": "The scout halves the damage (round down) it takes from that attack.",\n        "advisory": "monster_uncanny_dodge"';
+    expect(RAW.split(performerShape).length - 1).toBe(1);
+    expect(RAW.split(scoutShape).length - 1).toBe(1);
+    expect(RAW.split('"advisory": "monster_uncanny_dodge"').length - 1).toBe(2);
+  });
+});
+
+describe('MA-1285 advisory detection on the reaction twins', () => {
+  it('arms on both reactions[0] via the pure truthiness detector', () => {
+    expect(isMonsterActionAdvisoryRow(PERFORMER_UD)).toBe(true);
+    expect(isMonsterActionAdvisoryRow(SCOUT_UD)).toBe(true);
+  });
+
+  it('te-channel reaction twins stay unarmed (byte-inert §37)', () => {
+    expect(FEATHER_FALL.automation.effect).toBe('feather_fall');
+    expect(PARRY.automation.effect).toBe('parry');
+    expect(isMonsterActionAdvisoryRow(FEATHER_FALL)).toBe(false);
+    expect(isMonsterActionAdvisoryRow(PARRY)).toBe(false);
+  });
+});
+
+const renderRow = (action, extra = {}) => {
+  const onAttack = vi.fn();
+  const onAdvisoryRow = vi.fn();
+  const { container } = render(
+    <MonsterAction
+      action={action}
+      index={0}
+      attackerCannotAct={false}
+      onAttack={onAttack}
+      onDamage={vi.fn()}
+      onSaveRoll={vi.fn()}
+      onSpellCast={vi.fn()}
+      reactionUsesUsed={{}}
+      onGatedReaction={vi.fn()}
+      onAdvisoryRow={onAdvisoryRow}
+      {...extra}
+    />
+  );
+  return { container, onAttack, onAdvisoryRow };
+};
+
+describe('MA-1285 MonsterAction render: advisory chip arms on the reaction row', () => {
+  it('Performer Uncanny Dodge row renders the labelled advisory chip', () => {
+    const { container } = renderRow(PERFORMER_UD);
+    const chip = container.querySelector('.mc-dice-link-advisory');
+    expect(chip).not.toBe(null);
+    expect(chip.textContent).toContain('Uncanny Dodge');
+    expect(chip.getAttribute('title')).toMatch(/GM-enforced/);
+  });
+
+  it('Scout Captain Uncanny Dodge row renders the labelled advisory chip', () => {
+    const { container } = renderRow(SCOUT_UD);
+    const chip = container.querySelector('.mc-dice-link-advisory');
+    expect(chip).not.toBe(null);
+    expect(chip.textContent).toContain('Uncanny Dodge');
+  });
+
+  it('chip press routes onAdvisoryRow with the row, never onAttack', () => {
+    const { container, onAttack, onAdvisoryRow } = renderRow(PERFORMER_UD);
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
+    expect(onAdvisoryRow.mock.calls[0][0]).toBe(PERFORMER_UD);
+    expect(onAttack).not.toHaveBeenCalled();
+  });
+
+  it('incapacitated advisory chip is inert (no click route)', () => {
+    const { container, onAdvisoryRow } = renderRow(SCOUT_UD, { attackerCannotAct: true });
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).not.toHaveBeenCalled();
+  });
+});
+
+describe('MA-1285 builders + resolver on the Uncanny Dodge rows — record-only contract', () => {
+  it('popup is honest record chrome with the fallback GM-enforced copy (no advisory_message authored)', () => {
+    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Performer 1', action: PERFORMER_UD });
+    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Uncanny Dodge<\/h3>/);
+    expect(html).toMatch(/Uncanny Dodge is GM-enforced \(no engine consumer for this mechanic\)/);
+  });
+
+  it('log is an ability_use record naming Uncanny Dodge, no roll fields', () => {
+    const log = buildMonsterActionAdvisoryLog({ monsterName: 'Scout Captain 1', action: SCOUT_UD });
+    expect(log.type).toBe('ability_use');
+    expect(log.characterName).toBe('Scout Captain 1');
+    expect(log.abilityName).toBe('Uncanny Dodge');
+    expect(log.rollType).toBeUndefined();
+    expect(log.roll).toBeUndefined();
+  });
+
+  it('one press = popup + exactly ONE ability_use log; no other writes', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    const res = await resolveMonsterActionAdvisoryRow({ action: PERFORMER_UD, monsterName: 'Performer 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(res.resolved).toBe(true);
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.abilityName).toBe('Uncanny Dodge');
+    expect(entry.description).toMatch(/GM-enforced/);
+  });
+
+  it('refire press stays record-only (no uses authored, nothing to gate): two logs, zero spends', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    await resolveMonsterActionAdvisoryRow({ action: SCOUT_UD, monsterName: 'Scout Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    await resolveMonsterActionAdvisoryRow({ action: SCOUT_UD, monsterName: 'Scout Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(addEntry).toHaveBeenCalledTimes(2);
+    expect(setPopupHtml).toHaveBeenCalledTimes(2);
+    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
+  });
+});
