@@ -21298,7 +21298,7 @@
       "range": "",
       "recharge": "",
       "description": "The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):At Will: Mage Hand, Minor Illusion, Prestidigitation1/Day Each: Major Image, Project Image",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1289-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1290",

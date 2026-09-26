@@ -47082,7 +47082,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):<br><strong>At Will:</strong> Mage Hand, Minor Illusion, Prestidigitation<br><strong>1/Day Each:</strong> Major Image, Project Image",
+        "description": "The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):<br><strong>At Will:</strong> <strong>Mage Hand</strong>, <strong>Minor Illusion</strong>, <strong>Prestidigitation</strong><br><strong>1/Day Each:</strong> <strong>Major Image</strong>, <strong>Project Image</strong>",
         "attack_bonus": 0,
         "save_dc": 17,
         "save_type": "Charisma",

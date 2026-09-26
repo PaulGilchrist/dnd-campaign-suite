@@ -51,7 +51,18 @@ const oni = monsters.find(m => m.index === 'oni');
 const oniRow = oni.actions.find(a => a.name === 'Spellcasting');
 const OI_NAMES = ['Charm Person', 'Darkness', 'Gaseous Form', 'Sleep'];
 const OI_ONE_DAY = OI_NAMES;
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES])];
+// MA-1289 performer-legend extension (same MA-0421/MA-1230/MA-1241/MA-1261
+// markup-gap family): all five spell names were plain text, headers only carried
+// <strong>; the numeric save_dc 17 + Charisma pair was already authored, so the
+// row needed markup only (§89 gate pre-met; junk attack_bonus 0 rides the row,
+// out of scope). All five spells are save:none in spells.json → chips are
+// cast-affordance only, no save-roll expected.
+const performerLegend = monsters.find(m => m.index === 'performer-legend');
+const performerLegendRow = performerLegend.actions.find(a => a.name === 'Spellcasting');
+const PL_NAMES = ['Mage Hand', 'Minor Illusion', 'Prestidigitation', 'Major Image', 'Project Image'];
+const PL_ONE_DAY = ['Major Image', 'Project Image'];
+const PL_AT_WILL = ['Mage Hand', 'Minor Illusion', 'Prestidigitation'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries(NP_NAMES.map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -61,6 +72,7 @@ const NH_PLAIN_ORIGINAL = 'The hag casts one of the following spells, requiring 
 // markup + typo only, so stripped text equals this with the typo repaired.
 const NP_PLAIN_ORIGINAL = 'The noble casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\nAt Will: Mage Armor (included in AC), Mage Hand, Minor Illusion\n1/Day Each: Befuddle ment, Detect Thoughts, Fly, Scrying, Shatter (level 7 version)';
 const OI_PLAIN_ORIGINAL = 'The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n1/Day Each: Charm Person (level 2 version), Darkness, Gaseous Form, Sleep';
+const PL_PLAIN_ORIGINAL = 'The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\nAt Will: Mage Hand, Minor Illusion, Prestidigitation\n1/Day Each: Major Image, Project Image';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -222,6 +234,17 @@ function renderOni() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: OI_MONSTER_NAME, creatures })} />);
+}
+
+const PL_MONSTER_NAME = 'Performer Legend 1';
+
+function renderPerformerLegend() {
+  const m = makeMonster({ name: 'Performer Legend', actions: [performerLegendRow] });
+  const creatures = [
+    { name: PL_MONSTER_NAME, type: 'npc', monsterType: 'humanoid', targetName: 'Bandit', ac: 20, currentHp: 162, maxHp: 162, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: PL_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -601,5 +624,103 @@ describe('MA-1261 MonsterCardModal Oni Spellcasting chips', () => {
     await waitFor(() => expect(refusals('Darkness').length).toBe(1));
     expect(abilityUseEntries('Darkness').length).toBe(1);
     expect(runtime.store[`${OI_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Darkness': 1 });
+  });
+});
+
+// ── MA-1289 data lock: Performer Legend Spellcasting row ─────────────────────
+
+describe('MA-1289 monsters.json data lock: Performer Legend Spellcasting row', () => {
+  it('extracts all five spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(performerLegendRow.description);
+    expect(names).toEqual(PL_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day Each');
+  });
+
+  it('disk description carries all five name-wrapped <strong> tokens in authored order', () => {
+    const d = performerLegendRow.description;
+    PL_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = PL_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day Each to Major Image + Project Image; At Will trio ungated (§57)', () => {
+    const uses = extractSpellcastingSpellUses(performerLegendRow.description);
+    expect(uses).toEqual(Object.fromEntries(PL_ONE_DAY.map(n => [n, 1])));
+    PL_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 17 + save_type Charisma pair intact (§89 gate pre-met)', () => {
+    expect(performerLegendRow.save_dc).toBe(17);
+    expect(performerLegendRow.save_type).toBe('Charisma');
+    expect(performerLegendRow.description).toMatch(/spell save DC 17/);
+  });
+
+  it('emphasis census: ONLY the two tier headers + five spell names carry markup — no fake-chip decoys', () => {
+    const tokens = (performerLegendRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Mage Hand</strong>', '<strong>Minor Illusion</strong>', '<strong>Prestidigitation</strong>', '<strong>1/Day Each:</strong>', '<strong>Major Image</strong>', '<strong>Project Image</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(performerLegendRow.description)).toBe(PL_PLAIN_ORIGINAL);
+  });
+
+  it('DC 17 = 8 + CHA +5 + PB +4 for the performer legend', () => {
+    expect(performerLegend.ability_score_modifiers.cha).toBe(5);
+    expect(performerLegend.proficiency_bonus).toBe(4);
+    expect(8 + performerLegend.ability_score_modifiers.cha + performerLegend.proficiency_bonus).toBe(17);
+  });
+
+  it('all five spells exist in 5e spells.json, all save:none — chips are cast-affordance only', () => {
+    PL_NAMES.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s).toBeDefined();
+      expect(s.dc == null || s.dc.dc_type == null).toBe(true);
+    });
+  });
+});
+
+// ── MA-1289 Modal: five chips, counters, 1/Day gate ──────────────────────────
+
+describe('MA-1289 MonsterCardModal Performer Legend Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders five spell chips — the zero-chip inert row is gone', () => {
+    renderPerformerLegend();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(PL_NAMES);
+  });
+
+  it('the two 1/Day names carry counters; the three At Will names do not', () => {
+    renderPerformerLegend();
+    PL_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    PL_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('Major Image 1/Day: cast spends the single use with DC 17/Charisma advisory, re-fire refused (§57)', async () => {
+    renderPerformerLegend();
+    await act(async () => { fireEvent.click(linkByText('Major Image')); });
+    await waitFor(() => expect(abilityUseEntries('Major Image').length).toBe(1));
+    expect(runtime.store[`${PL_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Major Image': 1 });
+    expect(abilityUseEntries('Major Image')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Major Image')[0].description).toMatch(/\(spell save DC 17/);
+
+    await act(async () => { fireEvent.click(linkByText('Major Image')); });
+    await waitFor(() => expect(refusals('Major Image').length).toBe(1));
+    expect(abilityUseEntries('Major Image').length).toBe(1);
+    expect(runtime.store[`${PL_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Major Image': 1 });
+  });
+
+  it('At Will Mage Hand casts ungated twice — zero uses, advisory log prints row DC 17 (§204)', async () => {
+    renderPerformerLegend();
+    await act(async () => { fireEvent.click(linkByText('Mage Hand')); });
+    await waitFor(() => expect(abilityUseEntries('Mage Hand').length).toBe(1));
+    expect(abilityUseEntries('Mage Hand')[0].description).toMatch(/\(spell save DC 17/);
+    await act(async () => { fireEvent.click(linkByText('Mage Hand')); });
+    await waitFor(() => expect(abilityUseEntries('Mage Hand').length).toBe(2));
+    expect(runtime.store[`${PL_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });
