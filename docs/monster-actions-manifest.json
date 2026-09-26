@@ -20296,7 +20296,7 @@
       "category": "reactions",
       "actionType": "other",
       "description": "The nimblewright adds 2 to its AC against one melee attack that would hit it. To do so, the nimblewright must see the attacker and be wielding a melee weapon.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1236-parry.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1237",

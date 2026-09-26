@@ -44469,7 +44469,16 @@
     "reactions": [
       {
         "name": "Parry",
-        "description": "The nimblewright adds 2 to its AC against one melee attack that would hit it. To do so, the nimblewright must see the attacker and be wielding a melee weapon."
+        "description": "The nimblewright adds 2 to its AC against one melee attack that would hit it. To do so, the nimblewright must see the attacker and be wielding a melee weapon.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "melee_hit",
+          "effect": "parry",
+          "acBonus": 2
+        }
       }
     ],
     "legendary_actions": [],
