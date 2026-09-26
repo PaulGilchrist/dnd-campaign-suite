@@ -18,6 +18,7 @@ import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from 
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
+const spells2024 = JSON.parse(readFileSync('public/data/2024/spells.json', 'utf8'));
 
 const djinni = monsters.find(m => m.index === 'djinni');
 const djinniRow = djinni.actions.find(a => a.name === 'Spellcasting');
@@ -33,11 +34,24 @@ const nightHagRow = nightHag.actions.find(a => a.name === 'Spellcasting');
 const NH_NAMES = ['Detect Magic', 'Etherealness', 'Magic Missile', 'Phantasmal Killer', 'Plane Shift'];
 const NH_TWO_DAY = ['Phantasmal Killer', 'Plane Shift'];
 const NH_AT_WILL = ['Detect Magic', 'Etherealness', 'Magic Missile'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES])];
-const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]));
+// MA-1241 noble-prodigy extension (same MA-0421/MA-0524/MA-1230 markup-gap
+// family): all eight spell names were plain text, plus the OCR typo
+// "Befuddle ment" → canonical "Befuddlement" (2024-only, §177 ruleset-branch
+// pitfall: the loadSpells mock below MUST serve it on the '2024' branch).
+const nobleProdigy = monsters.find(m => m.index === 'noble-prodigy');
+const nobleProdigyRow = nobleProdigy.actions.find(a => a.name === 'Spellcasting');
+const NP_NAMES = ['Mage Armor', 'Mage Hand', 'Minor Illusion', 'Befuddlement', 'Detect Thoughts', 'Fly', 'Scrying', 'Shatter'];
+const NP_ONE_DAY = ['Befuddlement', 'Detect Thoughts', 'Fly', 'Scrying', 'Shatter'];
+const NP_AT_WILL = ['Mage Armor', 'Mage Hand', 'Minor Illusion'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES])];
+const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
+const SPELLS_2024 = Object.fromEntries(NP_NAMES.map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
 const DJINNI_PLAIN_ORIGINAL = 'The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\nAt Will: Detect Evil and Good, Detect Magic\n2/Day Each: Create Food and Water (can create wine instead of water), Tongues, Wind Walk\n1/Day Each: Creation, Gaseous Form, Invisibility, Major Image, Plane Shift';
 const NH_PLAIN_ORIGINAL = 'The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):\nAt Will: Detect Magic, Etherealness, Magic Missile (level 4 version)\n2/Day Each: Phantasmal Killer, Plane Shift (self only)';
+// Pre-fix disk text (all names plain + "Befuddle ment" typo); the fix is
+// markup + typo only, so stripped text equals this with the typo repaired.
+const NP_PLAIN_ORIGINAL = 'The noble casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\nAt Will: Mage Armor (included in AC), Mage Hand, Minor Illusion\n1/Day Each: Befuddle ment, Detect Thoughts, Fly, Scrying, Shatter (level 7 version)';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -55,7 +69,11 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve(ALL_NAMES.map(n => SPELLS[n]))),
+  // §177 ruleset-branch pitfall: findMonsterSpell is 5e-first, falling back
+  // to loadSpells('2024') — Befuddlement (MA-1241) only resolves on that branch.
+  loadSpells: vi.fn((ruleset) => Promise.resolve(
+    ruleset === '2024' ? Object.values(SPELLS_2024) : ALL_NAMES.map(n => SPELLS[n]).filter(Boolean)
+  )),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
@@ -173,6 +191,17 @@ function renderNightHag() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: NH_MONSTER_NAME, creatures })} />);
+}
+
+const NP_MONSTER_NAME = 'Noble Prodigy 1';
+
+function renderNobleProdigy() {
+  const m = makeMonster({ name: 'Noble Prodigy', actions: [nobleProdigyRow] });
+  const creatures = [
+    { name: NP_MONSTER_NAME, type: 'npc', monsterType: 'humanoid', targetName: 'Bandit', ac: 16, currentHp: 148, maxHp: 148, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: NP_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -370,5 +399,109 @@ describe('MA-1230 MonsterCardModal Night Hag Spellcasting chips', () => {
     await waitFor(() => expect(refusals('Plane Shift').length).toBe(1));
     expect(abilityUseEntries('Plane Shift').length).toBe(0);
     expect(runtime.store[`${NH_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+});
+
+// ── MA-1241 data lock: Noble Prodigy Spellcasting row ───────────────────────
+
+describe('MA-1241 monsters.json data lock: Noble Prodigy Spellcasting row', () => {
+  it('extracts all eight spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(nobleProdigyRow.description);
+    expect(names).toEqual(NP_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day Each');
+  });
+
+  it('canonical Befuddlement — the "Befuddle ment" OCR typo is repaired', () => {
+    expect(nobleProdigyRow.description).toContain('<strong>Befuddlement</strong>');
+    expect(nobleProdigyRow.description).not.toContain('Befuddle ment');
+    expect(nobleProdigyRow.description).not.toMatch(/Befuddle[^m]/);
+    const names = extractSpellNamesFromSpellcasting(nobleProdigyRow.description);
+    expect(names).toContain('Befuddlement');
+    expect(names).not.toContain('Befuddle');
+  });
+
+  it('binds 1/Day Each to the five marked spells; At Will trio ungated (§57)', () => {
+    const uses = extractSpellcastingSpellUses(nobleProdigyRow.description);
+    expect(uses).toEqual(Object.fromEntries(NP_ONE_DAY.map(n => [n, 1])));
+    NP_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 16 + save_type Charisma pair intact (§89 gate pre-met)', () => {
+    expect(nobleProdigyRow.save_dc).toBe(16);
+    expect(nobleProdigyRow.save_type).toBe('Charisma');
+    expect(nobleProdigyRow.description).toMatch(/spell save DC 16/);
+    expect(nobleProdigyRow.description).toMatch(/<strong>Mage Armor<\/strong> \(included in AC\)/);
+    expect(nobleProdigyRow.description).toMatch(/<strong>Shatter<\/strong> \(level 7 version\)/);
+  });
+
+  it('no fake chips: qualifier parentheticals stay plain text', () => {
+    expect(nobleProdigyRow.description).not.toMatch(/<(?:strong|em)>[^<]*included in AC[^<]*<\/(?:strong|em)>/);
+    expect(nobleProdigyRow.description).not.toMatch(/<(?:strong|em)>[^<]*level 7 version[^<]*<\/(?:strong|em)>/);
+  });
+
+  it('DC 16 = 8 + CHA +4 + PB +4 for the noble prodigy', () => {
+    expect(nobleProdigy.ability_score_modifiers.cha).toBe(4);
+    expect(nobleProdigy.proficiency_bonus).toBe(4);
+    expect(8 + nobleProdigy.ability_score_modifiers.cha + nobleProdigy.proficiency_bonus).toBe(16);
+  });
+
+  it('markup+typo-only diff proof: stripped text equals pre-fix description with the typo repaired', () => {
+    expect(stripTags(nobleProdigyRow.description)).toBe(NP_PLAIN_ORIGINAL.replace('Befuddle ment', 'Befuddlement'));
+  });
+
+  it('Befuddlement resolves via findMonsterSpell 5e→2024 fallback: absent 5e, INT-save L8 Enchantment in 2024 (§207)', () => {
+    expect(spells5e.some(s => s.name === 'Befuddlement')).toBe(false);
+    expect(spells5e.some(s => s.name === 'Befuddle')).toBe(false);
+    const b = spells2024.find(s => s.name === 'Befuddlement');
+    expect(b).toBeDefined();
+    expect(b.index).toBe('befuddlement');
+    expect(b.level).toBe(8);
+    expect(b.school).toBe('Enchantment');
+    expect(b.dc.dc_type).toBe('INT');
+    NP_NAMES.filter(n => n !== 'Befuddlement').forEach(n => expect(spells5e.some(s => s.name === n)).toBe(true));
+  });
+});
+
+// ── MA-1241 Modal: eight chips, counters, 1/Day gate ────────────────────────
+
+describe('MA-1241 MonsterCardModal Noble Prodigy Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders eight spell chips — the zero-chip inert row is gone', () => {
+    renderNobleProdigy();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(NP_NAMES);
+  });
+
+  it('the five 1/Day names carry counters; the three At Will names do not', () => {
+    renderNobleProdigy();
+    NP_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    NP_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('At Will Mage Hand casts ungated twice — zero uses, advisory log prints row DC 16/Charisma (§204)', async () => {
+    renderNobleProdigy();
+    await act(async () => { fireEvent.click(linkByText('Mage Hand')); });
+    await waitFor(() => expect(abilityUseEntries('Mage Hand').length).toBe(1));
+    expect(abilityUseEntries('Mage Hand')[0].description).toMatch(/\(spell save DC 16/);
+    await act(async () => { fireEvent.click(linkByText('Mage Hand')); });
+    await waitFor(() => expect(abilityUseEntries('Mage Hand').length).toBe(2));
+    expect(runtime.store[`${NP_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Fly 1/Day: cast spends the single use, re-fire refused — zero extra spend (§57)', async () => {
+    renderNobleProdigy();
+    await act(async () => { fireEvent.click(linkByText('Fly')); });
+    await waitFor(() => expect(abilityUseEntries('Fly').length).toBe(1));
+    expect(runtime.store[`${NP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fly': 1 });
+    expect(abilityUseEntries('Fly')[0].description).toMatch(/1\/Day use spent/);
+
+    await act(async () => { fireEvent.click(linkByText('Fly')); });
+    await waitFor(() => expect(refusals('Fly').length).toBe(1));
+    expect(abilityUseEntries('Fly').length).toBe(1);
+    expect(runtime.store[`${NP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fly': 1 });
   });
 });

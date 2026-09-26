@@ -20392,7 +20392,7 @@
       "range": "",
       "recharge": "",
       "description": "The noble casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):At Will: Mage Armor (included in AC), Mage Hand, Minor Illusion1/Day Each: Befuddle ment, Detect Thoughts, Fly, Scrying, Shatter (level 7 version)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1241-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1242",

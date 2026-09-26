@@ -44693,7 +44693,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The noble casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):<br><strong>At Will:</strong> Mage Armor (included in AC), Mage Hand, Minor Illusion<br><strong>1/Day Each:</strong> Befuddle ment, Detect Thoughts, Fly, Scrying, Shatter (level 7 version)",
+        "description": "The noble casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):<br><strong>At Will:</strong> <strong>Mage Armor</strong> (included in AC), <strong>Mage Hand</strong>, <strong>Minor Illusion</strong><br><strong>1/Day Each:</strong> <strong>Befuddlement</strong>, <strong>Detect Thoughts</strong>, <strong>Fly</strong>, <strong>Scrying</strong>, <strong>Shatter</strong> (level 7 version)",
         "attack_bonus": 0,
         "save_dc": 16,
         "save_type": "Charisma",
