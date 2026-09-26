@@ -45941,7 +45941,8 @@
         "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 20/60 ft.. one target. Hit: 11 (1d6 + 3 plus 1d8) piercing damage, or 12 (2d8 + 3) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 5,
         "reach": "5 ft.",
-        "damage_dice_primary": "1d6 + 3",
+        "damage_dice_primary": "1d6 + 3 plus 1d8",
+        "damage_dice_two_handed": "2d8 + 3",
         "damage_type_primary": "Piercing"
       }
     ],
