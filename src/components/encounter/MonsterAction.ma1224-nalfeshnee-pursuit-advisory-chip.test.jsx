@@ -18,6 +18,8 @@ const NALFESHNEE = monsters.find((m) => m.index === 'nalfeshnee');
 const PURSUIT = NALFESHNEE.reactions[0];
 const FEATHER_FALL = monsters.find((m) => m.index === 'aarakocra-aeromancer').reactions[0];
 const PARRY = monsters.find((m) => m.index === 'bandit-captain').reactions[0];
+const NIGHTMARE = monsters.find((m) => m.index === 'nightmare');
+const ETHEREAL_STRIDE = NIGHTMARE.actions[1];
 
 const renderRow = (action, extra = {}) => {
   const onAttack = vi.fn();
@@ -106,5 +108,25 @@ describe('MA-1224 byte-inert discipline (§37): te-channel reaction twins unchan
     expect(gated).toBeTruthy();
     fireEvent.click(gated);
     expect(onGatedReaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MA-1232 MonsterAction render: advisory chip arms on the nightmare Ethereal Stride action row', () => {
+  it('advisory chip present labelled "Ethereal Stride", honest title, NO junk "+0" attack chip', () => {
+    const { container } = renderRow(ETHEREAL_STRIDE);
+    const chip = container.querySelector('.mc-dice-link-advisory');
+    expect(chip).not.toBe(null);
+    expect(chip.textContent).toContain('Ethereal Stride');
+    expect(chip.getAttribute('title')).toMatch(/planar travel is GM-enforced/);
+    expect(chip.getAttribute('title')).toMatch(/No attack roll, no saving throw, no dice\./);
+    expect(Array.from(container.querySelectorAll('.mc-dice-link')).filter((c) => c !== chip)).toHaveLength(0);
+  });
+
+  it('advisory chip press routes onAdvisoryRow with the row, never onAttack', () => {
+    const { container, onAttack, onAdvisoryRow } = renderRow(ETHEREAL_STRIDE);
+    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
+    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
+    expect(onAdvisoryRow.mock.calls[0][0]).toBe(ETHEREAL_STRIDE);
+    expect(onAttack).not.toHaveBeenCalled();
   });
 });

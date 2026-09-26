@@ -16,6 +16,9 @@ const NALFESHNEE = monstersData.find((m) => m.index === 'nalfeshnee');
 const TELEPORT = NALFESHNEE.actions[2];
 const REND = NALFESHNEE.actions[1];
 const SPHINX_TELEPORT = monstersData.find((m) => m.index === 'androsphinx').legendary_actions.find((a) => a.advisory === 'sphinx_teleport');
+const NIGHTMARE = monstersData.find((m) => m.index === 'nightmare');
+const ETHEREAL_STRIDE = NIGHTMARE.actions[1];
+const HOOFES = NIGHTMARE.actions[0];
 
 describe('MA-1223 disk lock: nalfeshnee Teleport is a pure advisory row', () => {
   it('attack_bonus:null (junk "+0" lane dead), save_dc:0 decoy KEPT (MA-1071 pin)', () => {
@@ -98,5 +101,44 @@ describe('MA-1223 resolveMonsterActionAdvisoryRow — record-only contract', () 
     expect(addEntry).toHaveBeenCalledTimes(2);
     expect(setPopupHtml).toHaveBeenCalledTimes(2);
     expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
+  });
+});
+
+describe('MA-1232 disk lock: nightmare Ethereal Stride rides the MA-1223 advisory seam', () => {
+  it('attack_bonus:null (junk "+0" lane dead), save_dc:0 decoy KEPT (MA-1071 pin)', () => {
+    expect(ETHEREAL_STRIDE.name).toBe('Ethereal Stride');
+    expect(ETHEREAL_STRIDE.attack_bonus).toBeNull();
+    expect(ETHEREAL_STRIDE.save_dc).toBe(0);
+  });
+
+  it('advisory + advisory_message authored in the nalfeshnee Teleport byte-shape', () => {
+    expect(ETHEREAL_STRIDE.advisory).toBe('monster_teleport');
+    expect(typeof ETHEREAL_STRIDE.advisory_message).toBe('string');
+    expect(ETHEREAL_STRIDE.advisory_message).toMatch(/GM-enforced/);
+    expect(ETHEREAL_STRIDE.advisory_message).toMatch(/No attack roll, no saving throw, no dice\./);
+    expect(ETHEREAL_STRIDE.advisory).toBe(TELEPORT.advisory);
+  });
+
+  it('NO te/zone/automation/usage/legendaryGate authored — AdvisoryLink arms, chip-arms gate open', () => {
+    expect(ETHEREAL_STRIDE.zone).toBeUndefined();
+    expect(ETHEREAL_STRIDE.automation).toBeUndefined();
+    expect(ETHEREAL_STRIDE.usage).toBeUndefined();
+    expect(ETHEREAL_STRIDE.uses).toBeUndefined();
+    expect(isMonsterActionAdvisoryRow(ETHEREAL_STRIDE)).toBe(true);
+    expect(isMonsterActionAdvisoryRow(HOOFES)).toBe(false);
+  });
+
+  it('resolver press stays record-only: popup + ONE ability_use, zero rolls', async () => {
+    const addEntry = vi.fn(() => Promise.resolve());
+    const setPopupHtml = vi.fn();
+    const res = await resolveMonsterActionAdvisoryRow({ action: ETHEREAL_STRIDE, monsterName: 'Nightmare 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    expect(res.resolved).toBe(true);
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.abilityName).toBe('Ethereal Stride');
+    expect(entry.rollType).toBeUndefined();
+    expect(entry.roll).toBeUndefined();
   });
 });

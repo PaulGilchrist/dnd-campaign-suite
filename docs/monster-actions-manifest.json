@@ -20240,7 +20240,7 @@
       "range": "",
       "recharge": "",
       "description": "The nightmare and up to three willing creatures within 5 feet of it teleport to the Ethereal Plane from the Material Plane or vice versa.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1232-ethereal-stride.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1233",

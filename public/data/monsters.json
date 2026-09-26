@@ -44299,13 +44299,15 @@
       {
         "name": "Ethereal Stride",
         "description": "The nightmare and up to three willing creatures within 5 feet of it teleport to the <strong>Ethereal Plane</strong> from the <strong>Material Plane</strong> or vice versa.",
-        "attack_bonus": 0,
+        "attack_bonus": null,
         "save_dc": 0,
         "save_type": "",
         "save_effect": "",
         "range": "",
         "reach": "",
-        "recharge": ""
+        "recharge": "",
+        "advisory": "monster_teleport",
+        "advisory_message": "shifts itself and up to three willing creatures within 5 feet to/from the Ethereal Plane — advisory record: planar travel is GM-enforced, no Ethereal-plane state consumer app-wide (§70). Up-to-three passenger selection GM-adjudicated. No attack roll, no saving throw, no dice."
       }
     ],
     "bonus_actions": [],
