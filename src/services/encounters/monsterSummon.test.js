@@ -15,6 +15,7 @@ import {
   buildSummonSpawnLog,
   buildSummonSelfDamageLog,
 } from './monsterSummon.js';
+import { MONSTER_RECHARGE_KEY } from './monsterRecharge.js';
 import monstersData from '../../../public/data/monsters.json';
 
 const drowMage = monstersData.find(m => m.index === 'drow-mage');
@@ -709,5 +710,177 @@ describe('MA-0759 galib-duhr constant-count self-summon resolution', () => {
     expect(deps.store.cs.creatures).toHaveLength(1);
     expect(deps.logs.find(e => e.automationType === 'animate_boulders_refused')).toBeTruthy();
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
+  });
+});
+
+// MA-1215: Myconid Sovereign "Animating Spores" (actions[2]) — formerly the
+// junk "+0" attack chip adjudicating bogus zero-damage to-hit rolls while
+// burning the Recharge-3 economy, with no consumer for the RAW corpse→Spore
+// Servant spawn. DATA: attack_bonus:null kills the junk chip; automation
+// {monster_summon, options:[myconid-spore-servant], range_ft:5, advisory}
+// routes the spawn through the canonical MA-0648 seam. CODE: recharge-gated
+// summon clicks — gateSummonRecharge consults the live MA-0031 recharge map
+// FIRST (spent refuses `animating_spores_refused` + "Not Recharged" popup,
+// zero flip/spend/spawn); fresh spends via spendMonsterRecharge (ability_use
+// log) then spawns the disk servant block guaranteed (chance-less: zero
+// dice). Unauthored duration_minutes → advisory rides log/popup verbatim —
+// no fabricated "10 minutes"; te duration stamp gm_adjudicated (§70 clocks).
+const sovereign = monstersData.find(m => m.index === 'myconid-sovereign');
+const ANIMATING_ROW = sovereign.actions.find(a => a.name === 'Animating Spores');
+const sporeServant = monstersData.find(m => m.index === 'myconid-spore-servant');
+
+const SOVEREIGN_CS = () => ({ round: 1, creatures: [
+  { name: 'Myconid Sovereign 1', type: 'npc', monsterIndex: 'myconid-sovereign', initiative: '16', currentHp: 45, maxHp: 45 },
+  { name: 'Bandit', type: 'npc', initiative: '11', currentHp: 999, maxHp: 999, ac: 12 },
+] });
+
+function makeRechargeDeps(storedRecharge = {}, cs = SOVEREIGN_CS()) {
+  const store = { logs: [], recharge: storedRecharge, cs, setKeys: [] };
+  return {
+    store,
+    monsters: [sporeServant],
+    skipDomEvents: true,
+    rollDie: vi.fn(() => { throw new Error('guaranteed summon must never flip a d100'); }),
+    rollExpression: vi.fn(() => null),
+    getCombatSummary: vi.fn(() => store.cs),
+    setCombatSummary: vi.fn(c => { store.cs = c; }),
+    registerTargetEffect: vi.fn((campaign, target, effect, source, extra) => {
+      store.te = { campaign, target, effect, source, extra };
+    }),
+    getRuntimeValue: vi.fn((name, key) => (key === MONSTER_RECHARGE_KEY ? (store.recharge || {}) : {})),
+    setRuntimeValue: vi.fn((name, key, v) => {
+      store.setKeys.push(key);
+      if (key === MONSTER_RECHARGE_KEY) store.recharge = v;
+      return Promise.resolve();
+    }),
+    addEntry: vi.fn((c, entry) => { store.logs.push(entry); return Promise.resolve(); }),
+    get logs() { return store.logs; },
+  };
+}
+
+describe('MA-1215 Animating Spores data lock', () => {
+  it('junk +0 killed (attack_bonus:null), recharge:"3" + uses-free economy preserved, narrative byte-unchanged', () => {
+    expect(ANIMATING_ROW.name).toBe('Animating Spores');
+    expect(ANIMATING_ROW.attack_bonus).toBeNull();
+    expect(ANIMATING_ROW.recharge).toBe('3');
+    expect(ANIMATING_ROW.uses).toBeUndefined();
+    expect(ANIMATING_ROW.maxUses).toBeUndefined();
+    expect(ANIMATING_ROW.description).toBe("The myconid releases spores at a Medium or Small corpse within 5 feet of it that wasn't a Construct or an Undead. In 24 hours, the corpse rises as a <strong>Myconid Spore Servant</strong>. The corpse stays animate for 1d4 + 1 weeks or until destroyed, and it can't be animated again in this way.");
+  });
+
+  it('automation rides the MA-0648 camelCase byte-shape: spore-servant option (disk index hyphenated), range 5, RAW advisory', () => {
+    expect(isMonsterSummonRow(ANIMATING_ROW)).toBe(true);
+    expect(Object.keys(ANIMATING_ROW.automation)).toEqual(['type', 'options', 'range_ft', 'advisory']);
+    expect(ANIMATING_ROW.automation.type).toBe('monster_summon');
+    expect(ANIMATING_ROW.automation.options).toEqual([{ monster: 'myconid-spore-servant' }]);
+    expect(ANIMATING_ROW.automation.range_ft).toBe(5);
+    expect(ANIMATING_ROW.automation.advisory).toContain('24 hours');
+    expect(ANIMATING_ROW.automation.advisory).toContain('1d4+1 weeks');
+    expect(ANIMATING_ROW.automation.advisory).toContain('GM-adjudicated');
+    expect(sporeServant.name).toBe('Myconid Spore Servant');
+    expect(sporeServant.hit_points).toBeGreaterThan(0);
+  });
+});
+
+describe('MA-1215 recharge-gated summon resolution', () => {
+  it('fresh press: spends Recharge-3 (ability_use), spawns disk Spore Servant right after the sovereign, te summoned @gm_adjudicated, summons log carries the RAW advisory — ZERO dice, ZERO rollType:attack', async () => {
+    const deps = makeRechargeDeps();
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: ANIMATING_ROW,
+      monsterName: 'Myconid Sovereign 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      deps,
+    });
+    expect(result).toMatchObject({ resolved: true, summonedName: 'Myconid Spore Servant', summonedNames: ['Myconid Spore Servant'], countRoll: null, verdict: { monster: 'myconid-spore-servant', roll: null, success: true }, remaining: null });
+    const spawned = deps.store.cs.creatures.find(c => c.name === 'Myconid Spore Servant');
+    expect(spawned).toMatchObject({ type: 'npc', monsterIndex: 'myconid-spore-servant', ac: 13, maxHp: 37, currentHp: 37, summonedBy: 'Myconid Sovereign 1', summonSource: 'monster_ability', initiative: '15.9' });
+    expect(spawned.actions.map(a => a.name)).toEqual(['Slam']);
+    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Myconid Spore Servant', 'summoned', 'Myconid Sovereign 1', { duration: 'gm_adjudicated' });
+    expect(deps.store.setKeys).toEqual([MONSTER_RECHARGE_KEY]);
+    expect(deps.store.recharge).toEqual({ 'Animating Spores': { recharged: false, threshold: 3 } });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.store.logs.some(e => e.rollType === 'attack')).toBe(false);
+    expect(deps.store.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
+    const spendLog = deps.logs.find(e => e.type === 'ability_use');
+    expect(spendLog.abilityName).toBe('Animating Spores');
+    expect(spendLog.description).toContain('Recharge 3');
+    const spawnLog = deps.logs.find(e => e.type === 'summons');
+    expect(spawnLog.summonedCreatures).toEqual(['Myconid Spore Servant']);
+    expect(spawnLog.description).toContain('5 ft');
+    expect(spawnLog.description).toContain('24 hours');
+    expect(spawnLog.description).toContain('1d4+1 weeks');
+    expect(spawnLog.description).not.toContain('10 minutes');
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Myconid Spore Servant'));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('cannot be re-animated'));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.not.stringContaining('10 minutes'));
+  });
+
+  it('spent press: refused with animating_spores_refused + Not Recharged popup, ZERO spawn/spend/te/dice', async () => {
+    const deps = makeRechargeDeps({ 'Animating Spores': { recharged: false, threshold: 3 } });
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: ANIMATING_ROW,
+      monsterName: 'Myconid Sovereign 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      deps,
+    });
+    expect(result).toEqual({ resolved: false, reason: 'not-recharged' });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(deps.setCombatSummary).not.toHaveBeenCalled();
+    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(deps.store.cs.creatures.some(c => c.name === 'Myconid Spore Servant')).toBe(false);
+    expect(deps.store.logs.some(e => e.type === 'ability_use')).toBe(false);
+    expect(deps.store.logs.some(e => e.rollType === 'attack')).toBe(false);
+    const refusal = deps.logs.find(e => e.automationType === 'animating_spores_refused');
+    expect(refusal).toBeTruthy();
+    expect(refusal.description).toContain('not recharged');
+    expect(refusal.description).toContain('d6 3+');
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Not Recharged'));
+  });
+
+  it('recovery walk: refused press leaves map untouched; recharge flip to recharged:true re-arms a fresh spawn+spend', async () => {
+    const spent = makeRechargeDeps({ 'Animating Spores': { recharged: false, threshold: 3 } });
+    const refused = await resolveMonsterSummonRow({ action: ANIMATING_ROW, monsterName: 'Myconid Sovereign 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), deps: spent });
+    expect(refused).toEqual({ resolved: false, reason: 'not-recharged' });
+    expect(spent.store.recharge).toEqual({ 'Animating Spores': { recharged: false, threshold: 3 } });
+    const recharged = makeRechargeDeps({ 'Animating Spores': { recharged: true, threshold: 3 } });
+    const result = await resolveMonsterSummonRow({ action: ANIMATING_ROW, monsterName: 'Myconid Sovereign 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), deps: recharged });
+    expect(result.resolved).toBe(true);
+    expect(recharged.store.recharge).toEqual({ 'Animating Spores': { recharged: false, threshold: 3 } });
+    expect(recharged.store.cs.creatures.some(c => c.name === 'Myconid Spore Servant')).toBe(true);
+    expect(recharged.logs.some(e => e.type === 'ability_use')).toBe(true);
+    expect(recharged.logs.some(e => e.type === 'summons')).toBe(true);
+  });
+});
+
+describe('MA-1215 legacy twins byte-unchanged', () => {
+  it('no-recharge summon rows never write MONSTER_RECHARGE_KEY (gate null, recharge spend skipped; uses economy intact)', async () => {
+    const twin = monstersData.find(m => m.index === 'galib-duhr');
+    const legs = [
+      [SUMMON_ROW, 'Drow Mage 1', [quasit, shadowDemon]],
+      [PRIESTESS_ROW, 'Drow Priestess of Lolth', [yochlol]],
+      [SUMMON_MEPHITS_ROW, 'Dust Mephit 1', [dustMephit]],
+      [ANIMATE_ROW, 'Galeb Duhr 1', [galebDuhr]],
+      [GALIB_ANIMATE_ROW, 'Galib Duhr 1', [twin]],
+    ];
+    for (const [action, name, monsters] of legs) {
+      expect(action.recharge).toBeUndefined();
+      const deps = makeRechargeDeps({}, { round: 1, creatures: [{ name, initiative: '12' }] });
+      deps.monsters = monsters;
+      deps.rollDie = vi.fn(() => 5);
+      deps.rollExpression = vi.fn(() => ({ total: 1, rolls: [1], modifier: 0, formula: '1d4' }));
+      const keys = [];
+      deps.setRuntimeValue = vi.fn((n, k) => { keys.push(k); return Promise.resolve(); });
+      const result = await resolveMonsterSummonRow({ action, monsterName: name, campaignName: 'test-campaign', setPopupHtml: vi.fn(), storedUses: {}, deps });
+      expect(result.resolved).toBe(true);
+      expect(keys).toContain('monsterSpellUses');
+      expect(keys).not.toContain(MONSTER_RECHARGE_KEY);
+      expect(deps.logs.some(e => e.rollType === 'attack')).toBe(false);
+    }
   });
 });

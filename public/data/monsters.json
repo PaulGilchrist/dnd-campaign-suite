@@ -43542,13 +43542,23 @@
       {
         "name": "Animating Spores",
         "description": "The myconid releases spores at a Medium or Small corpse within 5 feet of it that wasn't a Construct or an Undead. In 24 hours, the corpse rises as a <strong>Myconid Spore Servant</strong>. The corpse stays animate for 1d4 + 1 weeks or until destroyed, and it can't be animated again in this way.",
-        "attack_bonus": 0,
+        "attack_bonus": null,
         "save_dc": 0,
         "save_type": "",
         "save_effect": "",
         "range": "",
         "reach": "",
-        "recharge": "3"
+        "recharge": "3",
+        "automation": {
+          "type": "monster_summon",
+          "options": [
+            {
+              "monster": "myconid-spore-servant"
+            }
+          ],
+          "range_ft": 5,
+          "advisory": "Spores must target a Medium or Small corpse within 5 ft that was not a Construct or Undead; the corpse rises 24 hours after release and remains animate 1d4+1 weeks or until destroyed and cannot be re-animated — timers and corpse eligibility are GM-adjudicated; pressing this chip models the rise."
+        }
       },
       {
         "name": "Pacifying Spores",

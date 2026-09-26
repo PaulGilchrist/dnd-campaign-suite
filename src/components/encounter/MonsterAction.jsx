@@ -222,14 +222,20 @@ function ZoneAuraLink({ action, spellUsesUsed, attackerCannotAct, onZoneAuraRow 
 // routes the coin-flip adjudication + combatSummary spawn in the modal.
 // 1/Day counter rides the MA-0020 monsterSpellUses gate (numeric uses/
 // maxUses); exhausted chips stay clickable and route the honest refusal.
-function SummonLink({ action, spellUsesUsed, attackerCannotAct, onSummonRow }) {
+// MA-1215: recharge-economy summon rows (Myconid Sovereign "Animating Spores"
+// Recharge 3, no uses/maxUses) show the spent class from the live recharge
+// map and stay clickable so the click routes the honest "Not Recharged"
+// refusal; the RAW 24h/weeks clocks ride the advisory title text (§70) —
+// rows WITHOUT duration_minutes never print a fabricated "10 min".
+function SummonLink({ action, spellUsesUsed, attackerCannotAct, onSummonRow, rechargeOut = false }) {
   if (!isMonsterSummonRow(action)) return null;
   const gate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
   const usesNote = gate ? <em> ({gate.maxUses}/Day · {gate.remaining} left)</em> : null;
-  const spentClass = gate && gate.remaining === 0 ? ' mc-dice-link-spell-spent' : '';
+  const spentClass = (gate && gate.remaining === 0) || rechargeOut ? ' mc-dice-link-spell-spent' : '';
   const clickable = !attackerCannotAct && !!onSummonRow;
+  const durationText = action.automation.duration_minutes != null ? `${action.automation.duration_minutes} min` : 'GM-adjudicated';
   return (
-    <span className={`mc-dice-link mc-dice-link-summon${spentClass}`} onClick={clickable ? () => onSummonRow(action) : undefined} role="button" tabIndex={0} title={`Summon ${action.automation.options.map(o => `${o.monster}${o.chance != null ? ` (${Math.round(o.chance * 100)}%)` : ''}`).join(' or ')} — ${action.automation.count != null ? `count ${action.automation.count}, ` : ''}${action.automation.range_ft || 60} ft, ${action.automation.duration_minutes || 10} min`}>
+    <span className={`mc-dice-link mc-dice-link-summon${spentClass}`} onClick={clickable ? () => onSummonRow(action) : undefined} role="button" tabIndex={0} title={`Summon ${action.automation.options.map(o => `${o.monster}${o.chance != null ? ` (${Math.round(o.chance * 100)}%)` : ''}`).join(' or ')} — ${action.automation.count != null ? `count ${action.automation.count}, ` : ''}${action.automation.range_ft || 60} ft, ${durationText}`}>
       <i className="fa-solid fa-hat-wizard" /> Summon{usesNote}
     </span>
   );
@@ -373,7 +379,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
       <ZoneAuraLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onZoneAuraRow={onZoneAuraRow} />
       <ZonePickerLink action={action} attackerCannotAct={attackerCannotAct} onZonePickerRow={onZonePickerRow} />
-      <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} />
+      <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} rechargeOut={rechargeOut} />
       <SelfBuffLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSelfBuffRow={onSelfBuffRow} legendaryGate={legendaryGate} />
       <GrantReactionLink action={action} attackerCannotAct={attackerCannotAct} rechargeState={rechargeState} onGrantReactionRow={onGrantReactionRow} />
       <ShapeShiftLink action={action} attackerCannotAct={attackerCannotAct} onShapeShiftRow={onShapeShiftRow} />

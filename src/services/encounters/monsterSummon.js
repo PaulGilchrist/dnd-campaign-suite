@@ -17,6 +17,14 @@
 // log lists all names + count detail, te "summoned" per spawn carrying the
 // row's duration_minutes. Rows without `count` spawn exactly one copy,
 // byte-identical to MA-0648 behavior.
+// MA-1215: Myconid Sovereign "Animating Spores" — RECHARGE-economy summon
+// row (recharge:"3", no uses/maxUses, no chance flip): the live MA-0031
+// monsterRechargeGate/spendMonsterRecharge channel (MA-0882 byte-shape) is
+// consulted/spent on the summon click — spent refuses `<slug>_refused`
+// zero-spawn, fresh spends (ability_use log) then spawns the disk
+// "myconid-spore-servant" block. Rows WITHOUT recharge stay byte-identical;
+// rows WITHOUT duration_minutes carry the authored advisory verbatim (the
+// §70 24h-rise / 1d4+1-week clocks are never fabricated as "10 minutes").
 import { addEntry } from '../ui/logService.js';
 import { registerTargetEffect } from '../combat/conditions/targetEffectDefinitions.js';
 import { rollDie, rollExpression } from '../dice/diceRoller.js';
@@ -25,6 +33,8 @@ import { getCombatSummary } from './combatData.js';
 import { getNextUniqueMonsterName, getMonsterSaveBonuses } from './encounterToInitiative.js';
 import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js';
 import { monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup } from './monsterAbilityUses.js';
+import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from './monsterRecharge.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { loadMonsters } from '../ui/dataLoader.js';
 import storage from '../ui/storage.js';
 import cloneDeep from 'lodash/cloneDeep.js';
@@ -73,17 +83,30 @@ export function buildSummonCoinFlipLog({ monsterName, action, verdict }) {
   };
 }
 
+// MA-1215: rows WITHOUT authored duration_minutes (Myconid Sovereign
+// "Animating Spores" — RAW 24-hour rise + 1d4+1 weeks, no week-clock
+// primitive, §70) never print a fabricated "10 minutes": the authored
+// advisory carries the honest RAW clocks. Rows WITH duration_minutes
+// (MA-0648/0651/0664/0757) stay byte-identical.
+function summonDurationTail({ action, plural, durationMinutes }) {
+  if (durationMinutes != null) {
+    return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (expiry clock, dismiss-as-action and "can't summon other ${plural ? 'creatures' : 'creature'}" are §70 GM-enforced residuals).` };
+  }
+  return { sep: '. ', tail: action.automation.advisory || `${plural ? 'remain' : 'remains'} animate until destroyed (GM-adjudicated, §70).` };
+}
+
 export function buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll = null, durationMinutes }) {
   const names = summonedNames.join(', ');
   const countDetail = countRoll ? `${action.automation.count} rolled ${countRoll.total} (${countRoll.rolls.join(' + ')}): ` : '';
   const plural = summonedNames.length > 1;
+  const { sep, tail } = summonDurationTail({ action, plural, durationMinutes });
   return {
     type: 'summons',
     characterName: monsterName,
     summonName: names,
     summonCount: summonedNames.length,
     countRoll,
-    description: `${monsterName} summons ${countDetail}${names} via ${action.name} — ${plural ? 'allies' : 'ally'} of ${monsterName}, ${plural ? 'appear' : 'appears'} within ${action.automation.range_ft ?? 60} ft, ${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (expiry clock, dismiss-as-action and "can't summon other ${plural ? 'creatures' : 'creature'}" are §70 GM-enforced residuals).`,
+    description: `${monsterName} summons ${countDetail}${names} via ${action.name} — ${plural ? 'allies' : 'ally'} of ${monsterName}, ${plural ? 'appear' : 'appears'} within ${action.automation.range_ft ?? 60} ft${sep}${tail}`,
     summonedCreatures: summonedNames,
     timestamp: Date.now(),
   };
@@ -146,7 +169,18 @@ function summonCountNote(countRoll) {
   return ` Count: ${countRoll.formula || 'dice'} rolled ${countRoll.total}.`;
 }
 
-export function buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll = null, durationMinutes = 10 }) {
+// MA-1215 byte-split (hoisted for the complexity cap): authored duration
+// prints the exact legacy "for N minutes" clause; an unauthored row (spore
+// servant — weeks-clock §70) rides its advisory verbatim instead of the
+// fabricated default.
+function summonPopupStay(durationMinutes, action) {
+  if (durationMinutes != null) {
+    return `, for ${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'} (§70 expiry GM-enforced).`;
+  }
+  return `. ${action?.automation?.advisory || 'Duration and corpse eligibility are GM-adjudicated (§70).'}`;
+}
+
+export function buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll = null, durationMinutes = 10, action = null }) {
   const flip = summonFlipNote(verdict);
   const usesNote = remaining != null ? ` ${remaining} use(s) left today (resets at dawn, GM-enforced).` : '';
   if (!summonedNames || summonedNames.length === 0) {
@@ -158,8 +192,8 @@ export function buildSummonPopup({ monsterName, summonedNames, verdict, remainin
   const plural = summonedNames.length > 1;
   const crowd = plural ? `${summonedNames.length} copies join` : `${names} joins`;
   const ally = plural ? 'allies' : 'an ally';
-  const minutes = durationMinutes === 1 ? 'minute' : 'minutes';
-  return `<div class="mc-prerequisite-refusal"><h3>${monsterName} summons ${names}</h3><p>${flip}${crowd} the fight as ${ally} of ${monsterName}, acting right after it, for ${durationMinutes} ${minutes} (§70 expiry GM-enforced).${summonCountNote(countRoll)}${usesNote}</p></div>`;
+  const stay = summonPopupStay(durationMinutes, action);
+  return `<div class="mc-prerequisite-refusal"><h3>${monsterName} summons ${names}</h3><p>${flip}${crowd} the fight as ${ally} of ${monsterName}, acting right after it${stay}${summonCountNote(countRoll)}${usesNote}</p></div>`;
 }
 
 function getCasterInitiativeValue(combatSummary, casterName) {
@@ -225,6 +259,23 @@ function resolveSummonMods({ action, monster, combatSummary, monsterName, verdic
   return { actions, ability_scores };
 }
 
+// MA-1215: recharge-economy summon rows (Myconid Sovereign "Animating Spores"
+// Recharge 3, no uses/maxUses) consult the live MA-0031 monsterRechargeMap
+// FIRST (MA-0882 gateRecharge byte-shape): a spent row refuses with the
+// canonical "Not Recharged" popup + `animating_spores_refused` log — zero
+// flip, zero spawn, zero spend. Rows WITHOUT a recharge spec (every legacy
+// summon) get null gates and stay byte-identical.
+async function gateSummonRecharge({ action, monsterName, campaignName, setPopupHtml, log, deps }) {
+  const getRV = deps.getRuntimeValue || getRuntimeValue;
+  const rechargeGate = monsterRechargeGate(action, getRV(monsterName, MONSTER_RECHARGE_KEY) || {});
+  if (rechargeGate && !rechargeGate.available) {
+    setPopupHtml(buildRechargeRefusalPopup({ monsterName, actionName: action.name, threshold: rechargeGate.threshold }));
+    await log(campaignName, buildRechargeRefusalLog({ monsterName, actionName: action.name, rechargeKey: rechargeGate.key, threshold: rechargeGate.threshold }));
+    return { ok: false };
+  }
+  return { ok: true, gate: rechargeGate };
+}
+
 async function gateAndSpendSummon({ action, monsterName, campaignName, setPopupHtml, storedUses, deps }) {
   const log = deps.addEntry || addEntry;
   const gate = monsterAbilitySaveUsesGate(action, storedUses);
@@ -250,7 +301,7 @@ function spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignN
       : monster.name;
     const initiativeValue = getCasterInitiativeValue(combatSummary, monsterName);
     combatSummary.creatures.push(buildSummonedCreature({ monster, name: summonedName, casterName: monsterName, initiativeValue, summonMods }));
-    register(campaignName, summonedName, 'summoned', monsterName, { duration: `${durationMinutes}_minutes` });
+    register(campaignName, summonedName, 'summoned', monsterName, { duration: durationMinutes != null ? `${durationMinutes}_minutes` : 'gm_adjudicated' });
     summonedNames.push(summonedName);
   }
   combatSummary.creatures.sort((a, b) => {
@@ -267,16 +318,22 @@ function spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignN
 }
 
 // One chip click: exhausted rows refuse with zero roll/zero spend/zero spawn;
-// otherwise spend 1/Day FIRST (double-spend guard), coin-flip, roll the
-// optional MA-0664 count dice only AFTER the flip lands, spawn N copies into
-// combatSummary as allies acting right after the caster, register te
-// "summoned" per spawn, and log attempt + count/spawn detail.
+// MA-1215: recharge rows FIRST consult the live MA-0031 recharge map (a spent
+// row refuses `<slug>_refused` zero-spawn, MA-0882 byte-shape). Otherwise
+// spend 1/Day FIRST (double-spend guard), spend the recharge (ability_use
+// log), coin-flip, roll the optional MA-0664 count dice only AFTER the flip
+// lands, spawn N copies into combatSummary as allies acting right after the
+// caster, register te "summoned" per spawn, and log attempt + count/spawn
+// detail.
 export async function resolveMonsterSummonRow({ action, monsterName, campaignName, setPopupHtml, storedUses = {}, deps = {} }) {
   if (!isMonsterSummonRow(action)) return { resolved: false, reason: 'not-monster-summon' };
   const log = deps.addEntry || addEntry;
+  const recharged = await gateSummonRecharge({ action, monsterName, campaignName, setPopupHtml, log, deps });
+  if (!recharged.ok) return { resolved: false, reason: 'not-recharged' };
   const gateResult = await gateAndSpendSummon({ action, monsterName, campaignName, setPopupHtml, storedUses, deps });
   if (!gateResult.ok) return { resolved: false, reason: 'exhausted' };
   const remaining = gateResult.remaining;
+  if (recharged.gate) await spendMonsterRecharge({ monsterName, action, campaignName, deps });
 
   const verdict = adjudicateSummonAttempt(action.automation.options, deps.rollDie || rollDie);
   // MA-0757: chance-less rows (Galeb Duhr "magically animates" — no d100
@@ -331,7 +388,7 @@ async function resolveSummonSpawn({ action, monsterName, campaignName, setPopupH
     setPopupHtml(buildSummonPopup({ monsterName, summonedNames: [], verdict, remaining }));
     return { resolved: false, reason: 'count-unparsable' };
   }
-  const durationMinutes = action.automation.duration_minutes ?? 10;
+  const durationMinutes = action.automation.duration_minutes ?? null;
 
   const getCS = deps.getCombatSummary || getCombatSummary;
   const combatSummary = getCS(campaignName) || { round: 1, creatures: [] };
@@ -340,6 +397,6 @@ async function resolveSummonSpawn({ action, monsterName, campaignName, setPopupH
   const summonedNames = spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count, durationMinutes, summonMods, deps });
 
   await log(campaignName, buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll, durationMinutes }));
-  setPopupHtml(buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll, durationMinutes }));
+  setPopupHtml(buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll, durationMinutes, action }));
   return { resolved: true, summonedName: summonedNames[0], summonedNames, countRoll, verdict, remaining };
 }

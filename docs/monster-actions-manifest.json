@@ -19898,7 +19898,7 @@
       "range": "",
       "recharge": "3",
       "description": "The myconid releases spores at a Medium or Small corpse within 5 feet of it that wasn't a Construct or an Undead. In 24 hours, the corpse rises as a Myconid Spore Servant. The corpse stays animate for 1d4 + 1 weeks or until destroyed, and it can't be animated again in this way.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1215-animating-spores.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1216",

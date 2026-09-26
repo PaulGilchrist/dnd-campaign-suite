@@ -202,3 +202,59 @@ describe('MA-0759 Galib Duhr Animate Boulders chip', () => {
     expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
   });
 });
+
+// MA-1215: Myconid Sovereign "Animating Spores" — the junk "+0" chip is dead
+// (attack_bonus:null); the row now arms the canonical MA-0648 summon chip.
+// Recharge-3 (no uses/maxUses) drives the spent class from the live recharge
+// map; exhausted chips stay clickable so the click routes the honest
+// "Not Recharged" refusal. Unauthored duration_minutes never renders a
+// fabricated "10 min" in the tooltip — the RAW clocks are GM-adjudicated.
+const sovereign = monsters.find(m => m.index === 'myconid-sovereign');
+const ANIMATING_ROW = sovereign.actions.find(a => a.name === 'Animating Spores');
+
+describe('MA-1215 Animating Spores chip', () => {
+  it('arms a clickable summon chip for the disk spore servant — NO "+0" junk chip, no uses counter', () => {
+    const { container, onSummonRow } = renderRow(ANIMATING_ROW);
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('Summon');
+    expect(chip.textContent).not.toContain('1/Day');
+    expect([...container.querySelectorAll('span')].some(s => /^\+0/.test(s.textContent.trim()))).toBe(false);
+    const title = chip.getAttribute('title');
+    expect(title).toContain('myconid-spore-servant');
+    expect(title).toContain('5 ft');
+    expect(title).toContain('GM-adjudicated');
+    expect(title).not.toContain('10 min');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+    expect(onSummonRow.mock.calls[0][0]).toBe(ANIMATING_ROW);
+  });
+
+  it('fresh recharge: plain Recharge note "(3)", no spent class', () => {
+    const { container } = renderRow(ANIMATING_ROW, { rechargeState: {} });
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip.className).not.toContain('mc-dice-link-spell-spent');
+    expect(container.textContent).toContain('(3)');
+    expect(container.textContent).not.toContain('unavailable');
+  });
+
+  it('spent recharge: chip gets the spent class + "(Recharge 3 — unavailable)" note, stays clickable for honest refusal', () => {
+    const { container, onSummonRow } = renderRow(ANIMATING_ROW, { rechargeState: { 'Animating Spores': { recharged: false, threshold: 3 } } });
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip.className).toContain('mc-dice-link-spell-spent');
+    expect(container.textContent).toContain('Recharge 3 — unavailable');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+  });
+
+  it('recharged map entry (d6 3+ at own turn-start): chip de-spent', () => {
+    const { container } = renderRow(ANIMATING_ROW, { rechargeState: { 'Animating Spores': { recharged: true, threshold: 3 } } });
+    expect(container.querySelector('.mc-dice-link-summon').className).not.toContain('mc-dice-link-spell-spent');
+  });
+
+  it('incapacitated sovereign: summon chip inert', () => {
+    const { container, onSummonRow } = renderRow(ANIMATING_ROW, { attackerCannotAct: true });
+    fireEvent.click(container.querySelector('.mc-dice-link-summon'));
+    expect(onSummonRow).not.toHaveBeenCalled();
+  });
+});
