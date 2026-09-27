@@ -50726,7 +50726,16 @@
       {
         "name": "Psionic Defense",
         "trigger": "Trigger of a spell",
-        "description": "The quaggoth casts <strong>Feather Fall</strong> or <strong>Shield</strong> in response to the spell's trigger, requiring no spell components and using the same spellcasting ability as Spellcasting."
+        "description": "The quaggoth casts <strong>Feather Fall</strong> or <strong>Shield</strong> in response to the spell's trigger, requiring no spell components and using the same spellcasting ability as Spellcasting.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "targeted_by_spell",
+          "effect": "shield",
+          "acBonus": 5
+        }
       }
     ],
     "legendary_actions": [],

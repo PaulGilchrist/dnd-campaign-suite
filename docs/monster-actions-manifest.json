@@ -22877,7 +22877,7 @@
       "actionType": "other",
       "trigger": "Trigger of a spell",
       "description": "The quaggoth casts Feather Fall or Shield in response to the spell's trigger, requiring no spell components and using the same spellcasting ability as Spellcasting.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1367-psionic-defense-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1368",
