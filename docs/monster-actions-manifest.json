@@ -23145,7 +23145,7 @@
       "range": "",
       "recharge": "",
       "description": "The rakshasa casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):At Will: Detect Magic, Detect Thoughts, Disguise Self, Mage Hand, Minor Illusion1/Day Each: Fly, Invisibility, Major Image, Plane Shift",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1380-rakshasa-spellcasting-zero-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1381",

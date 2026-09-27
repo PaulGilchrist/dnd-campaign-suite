@@ -51253,8 +51253,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The rakshasa casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):<br><strong>At Will:</strong> Detect Magic, Detect Thoughts, Disguise Self, Mage Hand, Minor Illusion<br><strong>1/Day Each:</strong> Fly, Invisibility, Major Image, Plane Shift",
-        "attack_bonus": 0,
+        "description": "The rakshasa casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):<br><strong>At Will:</strong> <strong>Detect Magic</strong>, <strong>Detect Thoughts</strong>, <strong>Disguise Self</strong>, <strong>Mage Hand</strong>, <strong>Minor Illusion</strong><br><strong>1/Day Each:</strong> <strong>Fly</strong>, <strong>Invisibility</strong>, <strong>Major Image</strong>, <strong>Plane Shift</strong>",
         "save_dc": 18,
         "save_type": "Charisma",
         "save_effect": "",

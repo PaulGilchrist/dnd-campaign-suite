@@ -165,7 +165,25 @@ const questingKnight = monsters.find(m => m.index === 'questing-knight');
 const questingKnightRow = questingKnight.actions.find(a => a.name === 'Spellcasting');
 const QK_NAMES = ['Daylight', 'Dispel Evil and Good', 'Greater Restoration', 'Phantom Steed'];
 const QK_ONE_DAY = QK_NAMES;
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES])];
+// MA-1380 rakshasa extension (same MA-0421/MA-1327/MA-1339/MA-1375 markup-gap
+// family): all nine spell names were plain text, sole emphasis span was the two
+// tier headers <strong>At Will:</strong> / <strong>1/Day Each:</strong> →
+// extractSpellNamesFromSpellcasting [] → zero chips, 1/Day-EACH tracking
+// structurally dead (§144 binds MARKED names only). Fix = djinni MA-0611
+// byte-shape <strong> wrap on all nine names (headers byte-kept, trailing ':'
+// skipped by extractor) + drop junk attack_bonus 0: armed twins (djinni +
+// MA-1375 questing-knight post-fix) carry no attack_bonus key — MA-1369/1375
+// precedent strips it here too, killing the "+0" junk attack chip (§490).
+// Row-level save_dc 18 + Charisma pair already authored (§89 gate pre-met;
+// §676 XOR keeps it unrendered as a DC chip). All nine names byte-match BOTH
+// spell indexes (§158 trap INACTIVE); Plane Shift carries attack_type melee →
+// honest refuse-zero-spend per djinni/night-hag MA-0611/MA-1230 twins.
+const rakshasa = monsters.find(m => m.index === 'rakshasa');
+const rakshasaRow = rakshasa.actions.find(a => a.name === 'Spellcasting');
+const RK_NAMES = ['Detect Magic', 'Detect Thoughts', 'Disguise Self', 'Mage Hand', 'Minor Illusion', 'Fly', 'Invisibility', 'Major Image', 'Plane Shift'];
+const RK_ONE_DAY = ['Fly', 'Invisibility', 'Major Image', 'Plane Shift'];
+const RK_AT_WILL = ['Detect Magic', 'Detect Thoughts', 'Disguise Self', 'Mage Hand', 'Minor Illusion'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES, ...QT_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -190,6 +208,9 @@ const QT_PLAIN_ORIGINAL = 'The quaggoth casts one of the following spells, requi
 // Pre-fix questing-knight disk text — the row used <br> separators (stripTags
 // folds them to \n); the fix is name-wrap markup only, prose byte-equal.
 const QK_PLAIN_ORIGINAL = 'The knight casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 16):\n1/Day Each: Daylight, Dispel Evil and Good, Greater Restoration, Phantom Steed';
+// Pre-fix rakshasa disk text — the row used <br> separators (stripTags folds
+// them to \n); the fix is name-wrap markup only, prose byte-equal.
+const RK_PLAIN_ORIGINAL = 'The rakshasa casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):\nAt Will: Detect Magic, Detect Thoughts, Disguise Self, Mage Hand, Minor Illusion\n1/Day Each: Fly, Invisibility, Major Image, Plane Shift';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -450,6 +471,17 @@ function renderQuestingKnight() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: QK_MONSTER_NAME, creatures })} />);
+}
+
+const RK_MONSTER_NAME = 'Rakshasa 1';
+
+function renderRakshasa() {
+  const m = makeMonster({ name: 'Rakshasa', index: 'rakshasa', actions: [rakshasaRow] });
+  const creatures = [
+    { name: RK_MONSTER_NAME, type: 'npc', monsterType: 'fiend', targetName: 'Bandit', ac: 17, currentHp: 221, maxHp: 221, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: RK_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -1805,5 +1837,163 @@ describe('MA-1375 MonsterCardModal Questing Knight Spellcasting chips', () => {
     await act(async () => { fireEvent.click(linkByText('Phantom Steed')); });
     await waitFor(() => expect(refusals('Phantom Steed').length).toBe(1));
     expect(abilityUseEntries('Phantom Steed').length).toBe(1);
+  });
+});
+
+// ── MA-1380 data lock: Rakshasa Spellcasting row ──────────────────────────────
+
+describe('MA-1380 monsters.json data lock: Rakshasa Spellcasting row', () => {
+  it('extracts all nine spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(rakshasaRow.description);
+    expect(names).toEqual(RK_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day Each');
+  });
+
+  it('disk description carries all nine name-wrapped <strong> tokens in authored order', () => {
+    const d = rakshasaRow.description;
+    RK_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = RK_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day Each to Fly + Invisibility + Major Image + Plane Shift each at 1; At-Will five ungated (§57)', () => {
+    const uses = extractSpellcastingSpellUses(rakshasaRow.description);
+    expect(uses).toEqual(Object.fromEntries(RK_ONE_DAY.map(n => [n, 1])));
+    RK_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 18 + save_type Charisma pair untouched (§89 gate pre-met; §676 XOR keeps DC unrendered)', () => {
+    expect(rakshasaRow.save_dc).toBe(18);
+    expect(rakshasaRow.save_type).toBe('Charisma');
+    expect(rakshasaRow.description).toMatch(/\(spell save DC 18\)/);
+  });
+
+  it('junk attack_bonus 0 STRIPPED — armed twins (djinni + MA-1375 questing-knight) carry no attack_bonus key (MA-1369/1375: strip what twins strip)', () => {
+    expect('attack_bonus' in rakshasaRow).toBe(false);
+    expect('attack_bonus' in djinniRow).toBe(false);
+    expect('attack_bonus' in questingKnightRow).toBe(false);
+  });
+
+  it('emphasis census: ONLY the two tier headers + nine spell names carry <strong> — no <em>, no fake-chip decoys (§161)', () => {
+    const tokens = (rakshasaRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Detect Magic</strong>', '<strong>Detect Thoughts</strong>', '<strong>Disguise Self</strong>', '<strong>Mage Hand</strong>', '<strong>Minor Illusion</strong>', '<strong>1/Day Each:</strong>', '<strong>Fly</strong>', '<strong>Invisibility</strong>', '<strong>Major Image</strong>', '<strong>Plane Shift</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(rakshasaRow.description)).toBe(RK_PLAIN_ORIGINAL);
+  });
+
+  it('DC 18 = 8 + CHA +5 + PB +5 for the rakshasa (computed from disk)', () => {
+    expect(rakshasa.ability_score_modifiers.cha).toBe(5);
+    expect(rakshasa.proficiency_bonus).toBe(5);
+    expect(8 + rakshasa.ability_score_modifiers.cha + rakshasa.proficiency_bonus).toBe(18);
+  });
+
+  it('§158 trap INACTIVE: all nine spells byte-match BOTH 5e and 2024 indexes; only Plane Shift carries attack_type melee', () => {
+    RK_NAMES.forEach(n => {
+      expect(spells5e.some(s => s.name === n)).toBe(true);
+      expect(spells2024.some(s => s.name === n)).toBe(true);
+    });
+    RK_NAMES.filter(n => n !== 'Plane Shift').forEach(n => {
+      expect(spells5e.find(s => s.name === n).attack_type == null).toBe(true);
+    });
+    expect(spells5e.find(s => s.name === 'Plane Shift').attack_type).toBe('melee');
+  });
+
+  it('actions[1] Cursed Touch (MA-1378, edited same day) not clobbered — hit_conditions + secondary dice intact', () => {
+    const ct = rakshasa.actions[1];
+    expect(ct.name).toBe('Cursed Touch');
+    expect(ct.hit_conditions).toEqual(['cursed']);
+    expect(ct.damage_dice_secondary).toBe('3d12');
+    expect(ct.attack_bonus).toBe(10);
+  });
+});
+
+// ── MA-1380 Modal: nine chips, counters, 1/Day-EACH gates ────────────────────
+
+describe('MA-1380 MonsterCardModal Rakshasa Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders nine spell chips — the zero-chip inert row is gone', () => {
+    renderRakshasa();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(RK_NAMES);
+  });
+
+  it('junk "+0" attack chip gone with attack_bonus stripped — nine spell links are the row\'s only controls (§490)', () => {
+    renderRakshasa();
+    const row = Array.from(document.querySelectorAll('.mc-action')).find(el => el.querySelector('strong')?.textContent.startsWith('Spellcasting'));
+    expect(row).toBeTruthy();
+    expect(row.querySelectorAll('.mc-dice-link').length).toBe(9);
+    expect(row.querySelectorAll('.mc-dice-link:not(.mc-dice-link-spell)').length).toBe(0);
+    expect(row.textContent).not.toContain('+0');
+  });
+
+  it('the four 1/Day Each names carry counters; the At-Will five do not (§57 gate binds)', () => {
+    renderRakshasa();
+    RK_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    RK_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('Fly 1/Day: cast spends the single use with DC 18/Charisma advisory, re-fire refused — zero extra spend (§57)', async () => {
+    renderRakshasa();
+    await act(async () => { fireEvent.click(linkByText('Fly')); });
+    await waitFor(() => expect(abilityUseEntries('Fly').length).toBe(1));
+    expect(runtime.store[`${RK_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fly': 1 });
+    expect(abilityUseEntries('Fly')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Fly')[0].description).toMatch(/\(spell save DC 18/);
+
+    await act(async () => { fireEvent.click(linkByText('Fly')); });
+    await waitFor(() => expect(refusals('Fly').length).toBe(1));
+    expect(abilityUseEntries('Fly').length).toBe(1);
+    expect(runtime.store[`${RK_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fly': 1 });
+  });
+
+  it('1/Day Each binds EACH name: Invisibility and Major Image spend independently after Fly — same-name re-fire refused per name', async () => {
+    renderRakshasa();
+    for (const n of ['Fly', 'Invisibility', 'Major Image']) {
+      await act(async () => { fireEvent.click(linkByText(n)); });
+      await waitFor(() => expect(abilityUseEntries(n).length).toBe(1));
+      expect(refusals(n).length).toBe(0);
+    }
+    expect(runtime.store[`${RK_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fly': 1, 'Invisibility': 1, 'Major Image': 1 });
+    await act(async () => { fireEvent.click(linkByText('Invisibility')); });
+    await waitFor(() => expect(refusals('Invisibility').length).toBe(1));
+    expect(abilityUseEntries('Invisibility').length).toBe(1);
+    await act(async () => { fireEvent.click(linkByText('Major Image')); });
+    await waitFor(() => expect(refusals('Major Image').length).toBe(1));
+    expect(abilityUseEntries('Major Image').length).toBe(1);
+  });
+
+  it('Plane Shift (spells.json attack_type melee) refuses honestly — zero uses spent (djinni MA-0611 twin)', async () => {
+    renderRakshasa();
+    await act(async () => { fireEvent.click(linkByText('Plane Shift')); });
+    await waitFor(() => expect(refusals('Plane Shift').length).toBe(1));
+    expect(abilityUseEntries('Plane Shift').length).toBe(0);
+    expect(runtime.store[`${RK_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('At Will Detect Magic casts ungated twice — zero uses, advisory log prints row DC 18 (§204)', async () => {
+    renderRakshasa();
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
+    expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/\(spell save DC 18/);
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(2));
+    expect(runtime.store[`${RK_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('At-Will five all cast ungated — zero refusals, zero uses keys written (§57)', async () => {
+    renderRakshasa();
+    for (const n of RK_AT_WILL) {
+      await act(async () => { fireEvent.click(linkByText(n)); });
+      await waitFor(() => expect(abilityUseEntries(n).length).toBe(1));
+      expect(refusals(n).length).toBe(0);
+    }
+    expect(runtime.store[`${RK_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });
