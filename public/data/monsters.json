@@ -51233,7 +51233,10 @@
         "damage_dice_primary": "2d6 + 5",
         "damage_type_primary": "Slashing",
         "damage_dice_secondary": "3d12",
-        "damage_type_secondary": "Necrotic"
+        "damage_type_secondary": "Necrotic",
+        "hit_conditions": [
+          "cursed"
+        ]
       },
       {
         "name": "Baleful Command",
