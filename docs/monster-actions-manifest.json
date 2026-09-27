@@ -23709,7 +23709,7 @@
       "actionType": "other",
       "trigger": "An attack roll hits the rust monster",
       "description": "The rust monster uses Antennae.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1407-reflexive-antennae-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1408",

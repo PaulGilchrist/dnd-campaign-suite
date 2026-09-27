@@ -1175,6 +1175,23 @@ const GATED_MONSTER_REACTIONS = {
   // + lastAttack.mindCorrosionResolved event stamp give the honest
   // 1-per-trigger limit. No range on the RAW row — no range gate.
   mind_corrosion: { effect: 'mind_corrosion', trigger: 'fails_save_vs_spell', label: 'Mind Corrosion', icon: 'fa-brain' },
+  // MA-1407: Rust Monster Reflexive Antennae — reactive defender reaction.
+  // RAW trigger: an attack roll hits the rust monster; response: the rust
+  // monster uses Antennae — the attacker makes a DC 11 Dexterity save
+  // (numerics carried from the Antennae action row: save_dc 11, Dexterity;
+  // RAW Antennae carry NO damage dice — the corrosion ladder is a
+  // GM-enforced advisory on the attacker's metal object, CLA-325 / MA-0399
+  // record-only precedent — so the resolver adjudicates the save leg via
+  // the hellish_rebuke MA-0329 createSaveListener seam with dcSuccess:'none'
+  // and logs the corrosion outcome, never fabricating HP damage).
+  // Gate keys off the campaign lastAttack identity (parry MA-0341 lineage —
+  // this monster as target with hit:true; PC attacks stamp top-level
+  // hit:true on committed attack rolls, live-verified in the MA-1407
+  // transcript). At Will sentinel (usage:'At Will'+uses:999, MA-0341 shape)
+  // — RAW unlimited; 1/round latch (_reflexive_antennae_usedRound, MA-0013
+  // shape) + lastAttack.reflexiveAntennaeResolved event stamp give the honest
+  // 1-per-trigger limit.
+  reflexive_antennae: { effect: 'reflexive_antennae', trigger: 'attacked_by_hit', label: 'Reflexive Antennae', icon: 'fa-bug' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -1338,6 +1355,57 @@ export function mindCorrosionSpec(action) {
   const formula = auto.damageExpression;
   if (!formula) return { reason: 'formula', message: 'Mind Corrosion: no authored damage formula on the row — nothing rolled, nothing spent.' };
   return { spec: { formula, damageType: auto.damageType || 'Psychic' } };
+}
+
+// MA-1407: event-identity probe (mirrors parryIdentityRefusal MA-0341 hit
+// gate + mindCorrosionIdentityRefusal MA-1351 stamp guard): the rust monster
+// must be the TARGET of the last campaign lastAttack with hit:true (the
+// attack roll HIT — committed attack rolls stamp top-level hit:true, live
+// verified MA-1407). Returns a refusal reason or null.
+export function reflexiveAntennaeIdentityRefusal(lastAttack, monsterName) {
+  if (!lastAttack || lastAttack.targetName !== monsterName) return 'trigger';
+  if (lastAttack.hit !== true) return 'miss';
+  if (lastAttack.reflexiveAntennaeResolved === true) return 'reacted';
+  if (!lastAttack.attackerName || lastAttack.attackerName === monsterName) return 'attacker';
+  return null;
+}
+
+const REFLEXIVE_ANTENNAE_REFUSAL_MESSAGES = {
+  trigger: (m) => `Reflexive Antennae: ${m} was not the target of the last attack — refused.`,
+  miss: (m) => `Reflexive Antennae: the last attack against ${m} did not hit — nothing to react to.`,
+  reacted: () => 'Reflexive Antennae: already responded to that attack — one reaction per trigger.',
+  attacker: () => 'Reflexive Antennae: no identifiable attacker to corrode — refused.',
+  round: () => 'Reflexive Antennae: Reaction already used this round — refused.',
+  uses: (limit) => `Reflexive Antennae: ${limit} uses already spent today — refused. Uses reset at a long rest; GM-enforced for monsters.`,
+};
+
+export function reflexiveAntennaeGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action }) {
+  const identity = reflexiveAntennaeIdentityRefusal(lastAttack, monsterName);
+  if (identity) {
+    return { ok: false, reason: identity, message: REFLEXIVE_ANTENNAE_REFUSAL_MESSAGES[identity](monsterName) };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: REFLEXIVE_ANTENNAE_REFUSAL_MESSAGES.round() };
+  }
+  const used = Number((storedUses && storedUses.reflexive_antennae) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: REFLEXIVE_ANTENNAE_REFUSAL_MESSAGES.uses(limit) };
+  }
+  return { ok: true, used, limit, attackerName: lastAttack.attackerName };
+}
+
+// Numeric spec read from the authored row — never a baked default before the
+// row exists (MA-0329/MA-1354 spec-read lineage). Antennae numerics carried
+// from the Antennae action row are saveDc 11 / Dexterity; RAW Antennae have
+// NO damage dice, so no formula is required here — the save leg adjudicates
+// and the corrosion ladder stays advisory (never fabricated damage).
+export function reflexiveAntennaeSpec(action) {
+  const auto = action?.automation || {};
+  const saveDc = Number(auto.saveDc ?? action?.save_dc);
+  if (!Number.isFinite(saveDc) || saveDc <= 0) return { reason: 'dc', message: 'Reflexive Antennae: no authored numeric save DC on the row — no save rolled, nothing spent.' };
+  return { spec: { saveDc, saveType: auto.saveType || 'DEX', dcSuccess: auto.dcSuccess || 'none', corrosion: auto.saveEffect || null } };
 }
 
 // MA-0341: event-identity probe (mirrors hellishRebukeIdentityRefusal) — the
@@ -1884,6 +1952,7 @@ const RAW_EVENT_GATE_RESOLVERS = {
   counterspell: resolveMonsterCounterspell,
   hellish_rebuke: resolveMonsterHellishRebuke,
   mind_corrosion: resolveMonsterMindCorrosion,
+  reflexive_antennae: resolveMonsterReflexiveAntennae,
 };
 
 export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, species, deps = {} }) {
@@ -2522,6 +2591,101 @@ async function resolveMonsterMindCorrosion({ action, monsterName, campaignName, 
   };
   await log(campaignName, entry);
   return { ok: true, message: entry.description, remaining, finalDamage };
+}
+
+// MA-1407: reactive Reflexive Antennae for monsters (Rust Monster, RAW
+// unlimited). Mirrors the MA-0329 gated-reaction economy (round latch +
+// MONSTER_REACTION_USES spend + zero-spend refusals + triggering-event
+// stamp) with the hellish_rebuke save leg (createSaveListener vs the
+// ATTACKER) minus the damage leg — the Antennae row on disk carries NO
+// damage dice (DC 11 Dexterity save, effect = object corrosion −1 AC/attack
+// penalty), so the resolver adjudicates the save and records the corrosion
+// outcome as a GM-enforced advisory (corrosion ladder not built, CLA-325).
+function reflexiveAntennaeAttackerActive(cs, attackerName) {
+  const attacker = (cs?.creatures || []).find(c => c.name === attackerName);
+  return Boolean(attacker) && Number(attacker.currentHp ?? attacker.currentHitPoints ?? 0) > 0;
+}
+
+async function resolveMonsterReflexiveAntennae({ action, monsterName, campaignName, lastAttack, cs, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const impl = {
+    createSave: deps.createSaveListener || createSaveListener,
+  };
+  const refuse = async (reason, message) => {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: 'reflexive_antennae_refused',
+      name: 'Reflexive Antennae',
+      description: `Reflexive Antennae refused (${reason}): ${message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message };
+  };
+
+  const gate = reflexiveAntennaeGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action });
+  if (!gate.ok) return refuse(gate.reason, gate.message);
+
+  const specRead = reflexiveAntennaeSpec(action);
+  if (specRead.reason) {
+    console.error(`[MA-1407] reflexive_antennae row refused (${specRead.reason})`, action);
+    return refuse(specRead.reason, specRead.message);
+  }
+  const spec = specRead.spec;
+
+  const attackerName = gate.attackerName;
+  if (!reflexiveAntennaeAttackerActive(cs, attackerName)) {
+    return refuse('attacker', `Reflexive Antennae: attacker ${attackerName} is not an active combatant — refused.`);
+  }
+
+  // Stamp the latch + spend BEFORE resolving (CLA-361 precedent) so a thrown
+  // save step cannot leave the Reaction refirable within the round.
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, reflexive_antennae: gate.used + 1 }, campaignName);
+
+  const { promise } = impl.createSave(campaignName, {
+    targetName: attackerName,
+    attackerName: monsterName,
+    saveType: spec.saveType,
+    saveDc: spec.saveDc,
+    dcSuccess: spec.dcSuccess,
+    damageFormula: null,
+    damageType: null,
+    sourceName: 'Reflexive Antennae',
+  });
+  const detail = await promise;
+  const success = detail?.success === true;
+
+  await log(campaignName, {
+    type: 'automation',
+    characterName: monsterName,
+    automationType: 'reflexive_antennae_corrosion',
+    name: 'Reflexive Antennae',
+    description: success
+      ? `Reflexive Antennae: ${attackerName} SUCCEEDED the DC ${spec.saveDc} ${spec.saveType} save — no object corroded. Antennae carry no damage dice (object corrosion only).`
+      : `Reflexive Antennae: ${attackerName} FAILED the DC ${spec.saveDc} ${spec.saveType} save — one worn/carried nonmagical metal object takes a −1 penalty to AC (armor) or attack rolls (weapon); armor destroyed at −10 total, weapon at −5; Mending removes it. Corrosion ladder is GM-enforced (no HP damage — Antennae roll no dice).`,
+    timestamp: Date.now(),
+  });
+
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    reflexiveAntennaeResolved: true,
+    antennaeTriggeredBy: monsterName,
+    antennaeTarget: attackerName,
+    antennaeSaveSuccess: success,
+  }, campaignName);
+
+  const remaining = Math.max(0, gate.limit - gate.used - 1);
+  const entry = {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Reflexive Antennae',
+    description: `${monsterName} uses Reflexive Antennae against ${attackerName} — ${attackerName} ${success ? 'succeeded' : 'failed'} their DC ${spec.saveDc} ${spec.saveType} save${success ? '' : ' and a metal object corrodes (−1 AC/attack, GM-enforced)'}. At Will — unlimited, 1 Reaction per round. ${remaining} left on the counter.`,
+    timestamp: Date.now(),
+  };
+  await log(campaignName, entry);
+  return { ok: true, message: entry.description, remaining, saveSuccess: success };
 }
 
 function buildCounterspellMessage({ monsterName, spellName, outcome, limit, remaining }) {

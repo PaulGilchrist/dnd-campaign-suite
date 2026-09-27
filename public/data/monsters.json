@@ -52703,7 +52703,19 @@
       {
         "name": "Reflexive Antennae",
         "trigger": "An attack roll hits the rust monster",
-        "description": "The rust monster uses Antennae."
+        "description": "The rust monster uses Antennae.",
+        "automation": {
+          "type": "reaction",
+          "trigger": "attacked_by_hit",
+          "effect": "reflexive_antennae",
+          "saveType": "DEX",
+          "saveDc": 11,
+          "dcSuccess": "none",
+          "saveEffect": "On a failed save, one nonmagical metal object worn or carried by the attacker takes a -1 penalty to the AC it offers (armor) or to its attack rolls (weapon). Armor is destroyed at -10 total AC penalty, a weapon at -5; Mending removes the penalty. Corrosion ladder is GM-enforced advisory."
+        },
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999
       }
     ],
     "legendary_actions": [],
