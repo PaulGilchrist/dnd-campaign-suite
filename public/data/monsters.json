@@ -52328,7 +52328,9 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "4d6 + 9",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": ["grappled", "restrained"],
+        "escape_dc": 19
       }
     ],
     "bonus_actions": [
