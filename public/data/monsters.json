@@ -48619,7 +48619,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):<br><strong>At Will:</strong> Detect Evil and Good<br><strong>1/Day Each:</strong> Commune, Control Weather, Dispel Evil and Good, Raise Dead",
+        "description": "The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):<br><strong>At Will:</strong> <strong>Detect Evil and Good</strong><br><strong>1/Day Each:</strong> <strong>Commune</strong>, <strong>Control Weather</strong>, <strong>Dispel Evil and Good</strong>, <strong>Raise Dead</strong>",
         "attack_bonus": 0,
         "save_dc": 20,
         "save_type": "Charisma",

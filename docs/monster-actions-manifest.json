@@ -22084,7 +22084,7 @@
       "range": "",
       "recharge": "",
       "description": "The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):At Will: Detect Evil and Good1/Day Each: Commune, Control Weather, Dispel Evil and Good, Raise Dead",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1327-planetar-spellcasting-no-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1328",

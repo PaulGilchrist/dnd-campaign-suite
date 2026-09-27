@@ -98,7 +98,20 @@ const pixieWbRow = pixieWb.actions.find(a => a.name === 'Spellcasting');
 const WB_NAMES = ['Dancing Lights', 'Druidcraft', 'Invisibility', 'Detect Thoughts', 'Fly', 'Major Image'];
 const WB_ONE_DAY = ['Detect Thoughts', 'Fly', 'Major Image'];
 const WB_AT_WILL = ['Dancing Lights', 'Druidcraft', 'Invisibility'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES])];
+// MA-1327 planetar extension (same MA-0421/MA-0524/MA-0532/MA-1230 markup-gap
+// family): all five spell names were plain text, tier headers only carried
+// <strong> → extractSpellNamesFromSpellcasting [] → zero chips, zero cast
+// affordance (junk "+0" attack_bonus 0 rides the row, out of scope §490 —
+// night-hag MA-1230 twin keeps it). The numeric save_dc 20 + Charisma pair was
+// already authored (§89 gate pre-met; §676 XOR fork keeps the DC unrendered).
+// §158 trap INACTIVE: all five names byte-match BOTH spell indexes, zero
+// attack_type — chips are cast-affordance only.
+const planetar = monsters.find(m => m.index === 'planetar');
+const planetarRow = planetar.actions.find(a => a.name === 'Spellcasting');
+const PT_NAMES = ['Detect Evil and Good', 'Commune', 'Control Weather', 'Dispel Evil and Good', 'Raise Dead'];
+const PT_ONE_DAY = ['Commune', 'Control Weather', 'Dispel Evil and Good', 'Raise Dead'];
+const PT_AT_WILL = ['Detect Evil and Good'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -112,6 +125,7 @@ const PL_PLAIN_ORIGINAL = 'The performer casts one of the following spells, requ
 const PM_PLAIN_ORIGINAL = 'The performer casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\nAt Will: Minor Illusion, Prestidigitation\n1/Day: Tasha\'s Hideous Laughter (level 3 version)';
 const PX_PLAIN_ORIGINAL = 'The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 12):\nAt Will: Dancing Lights, Druidcraft, Invisibility (self only)\n1/Day Each: Detect Thoughts, Fly, Sleep';
 const WB_PLAIN_ORIGINAL = 'The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\nAt Will: Dancing Lights, Druidcraft, Invisibility (self only)\n1/Day Each: Detect Thoughts, Fly, Major Image';
+const PT_PLAIN_ORIGINAL = 'The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):\nAt Will: Detect Evil and Good\n1/Day Each: Commune, Control Weather, Dispel Evil and Good, Raise Dead';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -317,6 +331,17 @@ function renderPixieWonderbringer() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: PXWB_MONSTER_NAME, creatures })} />);
+}
+
+const PT_MONSTER_NAME = 'Planetar 1';
+
+function renderPlanetar() {
+  const m = makeMonster({ name: 'Planetar', actions: [planetarRow] });
+  const creatures = [
+    { name: PT_MONSTER_NAME, type: 'npc', monsterType: 'celestial', targetName: 'Bandit', ac: 19, currentHp: 262, maxHp: 262, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: PT_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -1131,5 +1156,114 @@ describe('MA-1323 MonsterCardModal Pixie Wonderbringer Spellcasting chips', () =
     await act(async () => { fireEvent.click(linkByText('Druidcraft')); });
     await waitFor(() => expect(abilityUseEntries('Druidcraft').length).toBe(2));
     expect(runtime.store[`${PXWB_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+});
+
+// ── MA-1327 data lock: Planetar Spellcasting row ──────────────────────────────
+
+describe('MA-1327 monsters.json data lock: Planetar Spellcasting row', () => {
+  it('extracts all five spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(planetarRow.description);
+    expect(names).toEqual(PT_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day Each');
+  });
+
+  it('disk description carries all five name-wrapped <strong> tokens in authored order', () => {
+    const d = planetarRow.description;
+    PT_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = PT_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day Each to Commune + Control Weather + Dispel Evil and Good + Raise Dead; At Will name ungated (§57)', () => {
+    const uses = extractSpellcastingSpellUses(planetarRow.description);
+    expect(uses).toEqual(Object.fromEntries(PT_ONE_DAY.map(n => [n, 1])));
+    PT_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 20 + save_type Charisma pair intact (§89 gate pre-met; §676 XOR keeps DC unrendered)', () => {
+    expect(planetarRow.save_dc).toBe(20);
+    expect(planetarRow.save_type).toBe('Charisma');
+    expect(planetarRow.description).toMatch(/spell save DC 20/);
+  });
+
+  it('emphasis census: ONLY the two tier headers + five spell names carry markup — no fake-chip decoys (§161)', () => {
+    const tokens = (planetarRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Detect Evil and Good</strong>', '<strong>1/Day Each:</strong>', '<strong>Commune</strong>', '<strong>Control Weather</strong>', '<strong>Dispel Evil and Good</strong>', '<strong>Raise Dead</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(planetarRow.description)).toBe(PT_PLAIN_ORIGINAL);
+  });
+
+  it('DC 20 = 8 + CHA +7 + PB +5 for the planetar', () => {
+    expect(planetar.ability_score_modifiers.cha).toBe(7);
+    expect(planetar.proficiency_bonus).toBe(5);
+    expect(8 + planetar.ability_score_modifiers.cha + planetar.proficiency_bonus).toBe(20);
+  });
+
+  it('§158 trap INACTIVE: all five spells byte-match BOTH 5e and 2024 indexes, zero attack_type', () => {
+    PT_NAMES.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s).toBeDefined();
+      expect(s.attack_type == null).toBe(true);
+      expect(spells2024.some(sp => sp.name === n)).toBe(true);
+    });
+  });
+});
+
+// ── MA-1327 Modal: five chips, counters, 1/Day gate ───────────────────────────
+
+describe('MA-1327 MonsterCardModal Planetar Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders five spell chips — the zero-chip inert row is gone', () => {
+    renderPlanetar();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(PT_NAMES);
+  });
+
+  it('the four 1/Day names carry counters; the At Will name does not (§57 gate binds)', () => {
+    renderPlanetar();
+    PT_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    PT_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('At Will Detect Evil and Good casts ungated twice — zero uses, advisory log prints row DC 20 (§204)', async () => {
+    renderPlanetar();
+    await act(async () => { fireEvent.click(linkByText('Detect Evil and Good')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Evil and Good').length).toBe(1));
+    expect(abilityUseEntries('Detect Evil and Good')[0].description).toMatch(/\(spell save DC 20/);
+    await act(async () => { fireEvent.click(linkByText('Detect Evil and Good')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Evil and Good').length).toBe(2));
+    expect(runtime.store[`${PT_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Commune 1/Day: cast spends the single use with DC 20 advisory, re-fire refused — zero extra spend (§57)', async () => {
+    renderPlanetar();
+    await act(async () => { fireEvent.click(linkByText('Commune')); });
+    await waitFor(() => expect(abilityUseEntries('Commune').length).toBe(1));
+    expect(runtime.store[`${PT_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Commune': 1 });
+    expect(abilityUseEntries('Commune')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Commune')[0].description).toMatch(/\(spell save DC 20/);
+
+    await act(async () => { fireEvent.click(linkByText('Commune')); });
+    await waitFor(() => expect(refusals('Commune').length).toBe(1));
+    expect(abilityUseEntries('Commune').length).toBe(1);
+    expect(runtime.store[`${PT_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Commune': 1 });
+  });
+
+  it('Raise Dead 1/Day: cast spends the single use, re-fire refused; no row save chip (§676 XOR)', async () => {
+    renderPlanetar();
+    expect(document.querySelectorAll('.mc-dice-link-save').length).toBe(0);
+    await act(async () => { fireEvent.click(linkByText('Raise Dead')); });
+    await waitFor(() => expect(abilityUseEntries('Raise Dead').length).toBe(1));
+    expect(runtime.store[`${PT_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Raise Dead': 1 });
+    await act(async () => { fireEvent.click(linkByText('Raise Dead')); });
+    await waitFor(() => expect(refusals('Raise Dead').length).toBe(1));
   });
 });
