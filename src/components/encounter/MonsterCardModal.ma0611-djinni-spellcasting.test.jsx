@@ -150,7 +150,22 @@ const thonotRow = thonot.actions.find(a => a.name === 'Spellcasting');
 const QT_NAMES = ['Mage Hand', 'Minor Illusion', 'Mind Spike'];
 const QT_TWO_DAY = ['Mind Spike'];
 const QT_AT_WILL = ['Mage Hand', 'Minor Illusion'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES])];
+// MA-1375 questing-knight extension (same MA-0421/MA-1327/MA-1339 markup-gap
+// family): all four spell names were plain text, sole emphasis span was the tier
+// header <strong>1/Day Each:</strong> → extractSpellNamesFromSpellcasting [] →
+// zero chips, 1/Day tracking structurally dead (§144 binds MARKED names only).
+// Fix = djinni MA-0611 byte-shape <strong> wrap (consistent within the row; the
+// armed knight-class twin death-knight actions[3] uses <em> — extractor accepts
+// both, §57; <strong> chosen per MA-0611/MA-1230 family convention) + drop junk
+// attack_bonus 0: BOTH twins (death-knight armed row + djinni) carry NO
+// attack_bonus key, so MA-1369 precedent strips it here too, killing the "+0"
+// junk attack chip (§490). Row-level save_dc 16 + Charisma pair already authored
+// (§89 gate pre-met; §676 XOR keeps it unrendered as a DC chip).
+const questingKnight = monsters.find(m => m.index === 'questing-knight');
+const questingKnightRow = questingKnight.actions.find(a => a.name === 'Spellcasting');
+const QK_NAMES = ['Daylight', 'Dispel Evil and Good', 'Greater Restoration', 'Phantom Steed'];
+const QK_ONE_DAY = QK_NAMES;
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES, ...QT_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -172,6 +187,9 @@ const PA_PLAIN_ORIGINAL = 'The priest casts one of the following spells, using W
 // Pre-fix quaggoth-thonot disk text (names plain + decoy <strong>Invisible</strong>
 // stripped to plain by the fix — stripped prose is byte-identical).
 const QT_PLAIN_ORIGINAL = 'The quaggoth casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 12):\nAt Will: Mage Hand (the hand is Invisible), Minor Illusion\n2/Day: Mind Spike';
+// Pre-fix questing-knight disk text — the row used <br> separators (stripTags
+// folds them to \n); the fix is name-wrap markup only, prose byte-equal.
+const QK_PLAIN_ORIGINAL = 'The knight casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 16):\n1/Day Each: Daylight, Dispel Evil and Good, Greater Restoration, Phantom Steed';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -421,6 +439,17 @@ function renderQuaggothThonot() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: QT_MONSTER_NAME, creatures })} />);
+}
+
+const QK_MONSTER_NAME = 'Questing Knight 1';
+
+function renderQuestingKnight() {
+  const m = makeMonster({ name: 'Questing Knight', actions: [questingKnightRow] });
+  const creatures = [
+    { name: QK_MONSTER_NAME, type: 'npc', monsterType: 'humanoid', targetName: 'Bandit', ac: 18, currentHp: 202, maxHp: 202, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: QK_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -1660,5 +1689,121 @@ describe('MA-1366 MonsterCardModal Quaggoth Thonot Spellcasting chips', () => {
     await waitFor(() => expect(refusals('Mind Spike').length).toBe(1));
     expect(abilityUseEntries('Mind Spike').length).toBe(2);
     expect(runtime.store[`${QT_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Mind Spike': 2 });
+  });
+});
+
+// ── MA-1375 data lock: Questing Knight Spellcasting row ───────────────────────
+
+describe('MA-1375 monsters.json data lock: Questing Knight Spellcasting row', () => {
+  it('extracts all four spell names as chips — tier header skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(questingKnightRow.description);
+    expect(names).toEqual(QK_NAMES);
+    expect(names).not.toContain('1/Day Each');
+  });
+
+  it('disk description carries all four name-wrapped <strong> tokens in authored order', () => {
+    const d = questingKnightRow.description;
+    QK_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = QK_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day Each to all four marked names — tracking no longer structurally dead (§57/§144)', () => {
+    const uses = extractSpellcastingSpellUses(questingKnightRow.description);
+    expect(uses).toEqual(Object.fromEntries(QK_ONE_DAY.map(n => [n, 1])));
+  });
+
+  it('row-level numeric save_dc 16 + save_type Charisma pair intact (§89 gate pre-met)', () => {
+    expect(questingKnightRow.save_dc).toBe(16);
+    expect(questingKnightRow.save_type).toBe('Charisma');
+    expect(questingKnightRow.description).toMatch(/\(spell save DC 16\)/);
+  });
+
+  it('junk attack_bonus 0 STRIPPED — armed twins (death-knight armed row + djinni) carry no attack_bonus key (MA-1369: strip what twins strip)', () => {
+    expect('attack_bonus' in questingKnightRow).toBe(false);
+    const dk = monsters.find(m => m.index === 'death-knight');
+    const dkRow = dk.actions.find(a => a.name === 'Spellcasting');
+    expect('attack_bonus' in dkRow).toBe(false);
+    expect('attack_bonus' in djinniRow).toBe(false);
+  });
+
+  it('emphasis census: ONLY the tier header + four spell names carry <strong> — no <em>, no fake-chip decoys (§161)', () => {
+    const tokens = (questingKnightRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>1/Day Each:</strong>', '<strong>Daylight</strong>', '<strong>Dispel Evil and Good</strong>', '<strong>Greater Restoration</strong>', '<strong>Phantom Steed</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(questingKnightRow.description)).toBe(QK_PLAIN_ORIGINAL);
+  });
+
+  it('DC 16 = 8 + CHA +4 + PB +4 for the questing knight (computed from disk)', () => {
+    expect(questingKnight.ability_score_modifiers.cha).toBe(4);
+    expect(questingKnight.proficiency_bonus).toBe(4);
+    expect(8 + questingKnight.ability_score_modifiers.cha + questingKnight.proficiency_bonus).toBe(16);
+  });
+
+  it('all four spells exist in 5e spells.json, none carries attack_type — cast-affordance only', () => {
+    QK_NAMES.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s).toBeDefined();
+      expect(s.attack_type == null).toBe(true);
+    });
+  });
+});
+
+// ── MA-1375 Modal: four chips, counters, 1/Day gate ───────────────────────────
+
+describe('MA-1375 MonsterCardModal Questing Knight Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders four spell chips — the zero-chip inert row is gone', () => {
+    renderQuestingKnight();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(QK_NAMES);
+  });
+
+  it('all four names carry 1/Day counters; the "1/Day Each" header renders no chip', () => {
+    renderQuestingKnight();
+    QK_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    expect(linkByText('1/Day Each')).toBeNull();
+  });
+
+  it('junk "+0" attack chip gone with attack_bonus stripped — four spell links are the row\'s only controls (§490)', () => {
+    renderQuestingKnight();
+    const row = Array.from(document.querySelectorAll('.mc-action')).find(el => el.querySelector('strong')?.textContent.startsWith('Spellcasting'));
+    expect(row).toBeTruthy();
+    expect(row.querySelectorAll('.mc-dice-link').length).toBe(4);
+    expect(row.querySelectorAll('.mc-dice-link:not(.mc-dice-link-spell)').length).toBe(0);
+    expect(row.textContent).not.toContain('+0');
+  });
+
+  it('Daylight 1/Day: cast spends the single use with DC 16/Charisma advisory, re-fire refused — zero extra spend (§57)', async () => {
+    renderQuestingKnight();
+    await act(async () => { fireEvent.click(linkByText('Daylight')); });
+    await waitFor(() => expect(abilityUseEntries('Daylight').length).toBe(1));
+    expect(runtime.store[`${QK_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Daylight': 1 });
+    expect(abilityUseEntries('Daylight')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Daylight')[0].description).toMatch(/\(spell save DC 16/);
+
+    await act(async () => { fireEvent.click(linkByText('Daylight')); });
+    await waitFor(() => expect(refusals('Daylight').length).toBe(1));
+    expect(abilityUseEntries('Daylight').length).toBe(1);
+    expect(runtime.store[`${QK_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Daylight': 1 });
+  });
+
+  it('1/Day Each binds EACH name: four distinct casts spend one each, same-name re-fire refused', async () => {
+    renderQuestingKnight();
+    for (const n of QK_NAMES) {
+      await act(async () => { fireEvent.click(linkByText(n)); });
+      await waitFor(() => expect(abilityUseEntries(n).length).toBe(1));
+      expect(refusals(n).length).toBe(0);
+    }
+    expect(runtime.store[`${QK_MONSTER_NAME}.monsterSpellUses`]).toEqual(Object.fromEntries(QK_NAMES.map(k => [k, 1])));
+    await act(async () => { fireEvent.click(linkByText('Phantom Steed')); });
+    await waitFor(() => expect(refusals('Phantom Steed').length).toBe(1));
+    expect(abilityUseEntries('Phantom Steed').length).toBe(1);
   });
 });

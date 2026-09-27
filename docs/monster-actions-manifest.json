@@ -23045,7 +23045,7 @@
       "range": "",
       "recharge": "",
       "description": "The knight casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 16):1/Day Each: Daylight, Dispel Evil and Good, Greater Restoration, Phantom Steed",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1375-zero-chip.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1376",

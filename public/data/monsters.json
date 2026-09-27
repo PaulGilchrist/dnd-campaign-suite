@@ -51021,8 +51021,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The knight casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 16):<br><strong>1/Day Each:</strong> Daylight, Dispel Evil and Good, Greater Restoration, Phantom Steed",
-        "attack_bonus": 0,
+        "description": "The knight casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 16):<br><strong>1/Day Each:</strong> <strong>Daylight</strong>, <strong>Dispel Evil and Good</strong>, <strong>Greater Restoration</strong>, <strong>Phantom Steed</strong>",
         "save_dc": 16,
         "save_type": "Charisma",
         "save_effect": "",
