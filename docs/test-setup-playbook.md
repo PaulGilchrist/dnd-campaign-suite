@@ -688,3 +688,185 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - MA-1275 (FIXED, otyugh Tentacle Slam `target_prerequisite:{conditions:["grappled"],by_attacker:true}` MA-0019 shape live): full RAW loop verified — ungrappled refusal (`.mc-prerequisite-refusal` + `tentacle_slam_refused` single-delta §232) → Tentacle hit grants Grappled (meta.source attacker) → slam gate passes → save fires. PITFALL §39 twin: handlePlainDamage grapple lane fires TWO un-awaited setRuntimeValue POSTs to same `/changes/<Name>` — network reorder can drop `activeConditionMeta` from disk while `activeConditions` lands (in-tab client store still passes by_attacker gate); disk-level by_attacker audits need merged full-store POST re-stamp. MA-1163 extract-brain test = by_attacker test mirror; popup tail differs ("Grappled." vs "Grappled by <Name>.") — pin conditionally. (2026-09-26)
 - MA-1285 (FIXED Option A, Performer+Scout Captain reactions[0] `"advisory":"monster_uncanny_dodge"` one-field ×2 twins live): AdvisoryLink auto-renders on reaction-category rows (generic MonsterActionSection threads handleAdvisoryRow); record-only ability_use popup+log, refire zero-spend. NOTE: `advisory_message` optional — default copy "…GM-enforced (no engine consumer for this mechanic)." is honest for option-A rows. (2026-09-26)
 - MA-1294 (FIXED, performer-maestro Spellcasting markup wrap live): §158 resolution route = findMonsterSpell (MonsterCardModal.jsx:1218) 5e-exact-first then 2024-exact fallback — 2024-renamed possessive spells ("Tasha's Hideous Laughter") hit fallback exactly, RAW wrap safe; unsafe-token only when NO index carries prose form (MA-1241/MA-0780 class). PITFALL: 2024 spell text "makes a Wisdom saving throw. On a failed save…" fails SPELL_SAVE_CONDITION_CLAUSE ("must succeed… or be") → monster chip cast routes advisory lane, no save-prompt (§590 vocabulary gap, documented not filed). (2026-09-26)
+
+## §MA-1325 (2026-09-26, Planetar Radiant Sword PASS) New pitfalls
+- `.mc-action` rows are `<div>` NOT `<li>` — `chip.closest('li')` row-walk returns null and silently climbs to the Multiattack HEADER chip; scope MUST be `.mc-overlay .mc-action` whose `strong.textContent.trim().startsWith(name)` (extends §445/§1227 anchor rule with the concrete DOM reason).
+- Multiattack header spurious "+N" chip SHARES the exact "+N" text of the component weapon chip (Planetar header bonus 12 == Radiant Sword +12) — hasText("Radiant Sword") over the whole card can match header prose; strong-startsWith scoped to the component row is mandatory before the mouse.click.
+- Nat1 on +12 vs AC12 still logs `hit:true` (13≥12) yet popup prints BOTH "Critical Miss!" and "✓ HIT (13 vs AC 12)" — cosmetic stage-1 banner pair, adjudicate hit by log hit:true/targetAc only, never by the crit-miss banner.
+- Dual-leg attack ledger proof: single `combined_damage_roll` entry carries primary formula + `secondaryFormula`/`secondaryTotal`/`secondaryFinalDamage`; `finalDamage`+`secondaryFinalDamage` == |hpΔ| exactly (2d6+7 slash 15 + 4d8 ltn 24 = 39 etc.). save_dc:0 renders zero save affordance — pendingSavePrompts null all session.
+
+## §MA-1330 (2026-09-26, Polar Bear Multiattack PASS-subset) New pitfalls
+- An OPEN `.mc-overlay` intercepts pointer events over the initiative tracker rows — you CANNOT `selectOption` the own-card target combobox while the stat card is open; sequence = close card × → arm target-select → reopen card. (multiattack component chips need target armed first, §508.)
+- Max-HP init-card spinbutton edits may NOT persist server-side (CreatureHp.jsx MaxHpInput blur sets local `creature.maxHp` but `onChange(name,currentHp)` persists ONLY current HP; server max echoes authored value, `hp_change` records `maxHp:<authored>` with currentHp) — ALWAYS rig the CURRENT-HP input high (fill+Enter / full cs-store POST), never rely on the max field; verify by log delta. This build's tracker names/avatar alts may carry NO " 1" suffix — anchor by exact name.
+- Multiattack header spurious "+N" chip confirmed generically (MonsterAction.jsx:383 `attack_bonus!=null` → generic :408 chip); header text component-name + count is the ONLY mechanically-meaningful content; component chips roll independently; §66 two-count GM-adjudicated (zero auto-grant consumer).
+
+## §MA-1329 (2026-09-26, Poisonous Snake Bite FAIL(a)/DATA) New pitfall
+- ATTACK+SAVE COMPOSITE MISROUTE fingerprint: when a bite row's authored `damage_dice_primary` holds the SAVE-leg dice (e.g. "2d4" poison) and the flat attack damage ("Hit: 1 piercing") has NO field, the +5 attack chip deals `damage_dice_primary` FULL UNGATED as direct attack damage (§49 flat-damage extractor unreachable — extractDamageDiceFromDescription Modal:686 `if(existingDamageDice) return` short-circuits; baseFormula :859 never reaches extractFlatHitDamage) AND the save-gated poison leaks onto the attack leg (MA-0551 buildAttackChipSaveOptions nulls saveDc → plainDamageHandler full). Save chip alone still enforces DC full/half correctly. Fix = DATA `damage_dice_primary:"<attack flat/dice>" + attack_type + damage_dice_secondary:"<save dice>"` (Giant Poisonous Snake twin authors primary Piercing + secondary 3d6) — file FAIL(a)/DATA, not incomplete.
+- Attack+save row renders THREE chips on card: `+N` attack + a bare `XdY` sibling + `DC N <save>` — the bare dice chip is the leaked auto-damage; press only the `+N` and the `DC N` chips when adjudicating legs separately.
+- MISS popup has no backdrop/hint dismiss and a CENTER click lands on the Advantage/Disadvantage badges → accidental REROLL (logs `rolls:[a,b] hit:true total:a` with zero damage = unfinalized-reroll cosmetic artifact, safe). Flush MISS via React-fiber `onClose`; on HIT click `✓ Done` (`dice-roll-reroll-btn`) to apply autoDamage (§MA-1329 ghost family extends to miss-stage badge trap).
+
+## §MA-1326 (2026-09-26, Planetar Holy Burst AoE-save PASS) New pitfalls
+- AoE SPHERE picker has NO "Close" button — its buttons are "Holy Burst (n of N)" / "Skip"; the RESULTS modal carries "Close". Anchor picker confirm on the "(n)" action button, not a Close; missing this yields stale-modal clicks / "(0)" confirms / stuck queues.
+- Monster-card FOOTER (`mc-footer`) occludes low save chips at default viewport — `boundingClientRect` mouse.click lands on footer; use `el.click()` for chips near card bottom (refines §27).
+- NPC AoE auto-save NEVER consults rigged save bonuses — `saveBonus:0` logs even after `saveBonuses.dex`/nested `saving_throws.dex` stamped server+client. Success face for high-DC NPC AoE needs a literal nat-20 budget (~40 rolls); use a PC victim or lower DC rig instead of dex-stamps.
+- PC save-prompt "Roll Save→Next Save" from a monster-card AoE writes `saveResult-<Target>` but may apply no save-damage/hp_change — cross-cutting pre-existing seam residual, not a per-row defect when NPC-inline-legs already prove the row.
+
+## §MA-1336 (2026-09-26, MA-1336 Priest Multiattack PASS-subset) New recipe + pitfalls
+- **Recipe (Priest multiattack):** EB Join "Priest" → Initiative "+NPC" → type exact name in empty `.monster-autocomplete-input` → click exact-li; join succeeds even though follow-up reads report "none" — confirm via cs GET. TRUSTED-fill victim currentHp 999 (press Escape first — an open autocomplete li intercepts the fill, §487). Arm target via monster's OWN-card select while card closed (`tn:Bandit`). Click Mace + Radiant Flame component chips; adjudicate by log delta (multiattack count is GM-adjudicated, no auto-grant consumer — §66/§701, PASS-subset, not FAIL).
+- **Pitfall:** in `run_code_unsafe` Node scope `window` is undefined like `fetch` — return the rect from the evaluate call, do not stash it on `window`.
+- **Pitfall (re-confirm §472):** a `page.on('dialog')` listener registered mid-run auto-accepts Admin confirm dialogs, so a later `browser_handle_dialog` errors ("no dialog") — harmless; the clear already happened.
+
+## §MA-1337 (2026-09-26, MA-1337 Priest Mace PASS) New pitfalls
+- **Pitfall:** +5 vs AC12 crit-starved — nat20 ~1/20; budget ~40 clicks if you need a crit sample (MA-1337 hit 30 rolls with zero nat20; reuse a same-day crit from a prior row on the same chip as evidence).
+- **Pitfall:** in an inline auto-click loop, prefer `.dice-roll-reroll-btn` over `.popup-close-btn` as the first targeted control, or a pending-hit popup's Done press is skipped and damage stalls.
+- **Note:** manifest `attack+save` label with saveDc 0 + no save text = decoy (§117); secondary dice ride the attack path via `autoDamageSecondaryFormula` (MonsterCardModal.jsx:896-903,1817 → useLoggedDiceRollAttack.js:198) — verify both pools in one `combined_damage_roll` entry.
+
+## §MA-1338 (2026-09-26, MA-1338 Priest Radiant Flame PASS) Pitfall updates
+- **Pitfall update (§487):** autocomplete li SURVIVES Escape — Playwright fill on the HP input can still time out intercepted; `blur()` in evaluate may report li visible, but the dropdown self-closes on the next evaluate — retry the fill after a fresh state read.
+- **Note:** +4 chip press-to-log 1:1 across 67 presses (no first-click absorption unlike +5 Mace); 3 nat20 crits in 67 rolls — §MA-1337's crit-starved budget worry is bonus-dependent, not universal.
+
+## §MA-1339 (2026-09-26, MA-1339 Priest Spellcasting FAIL(b)/DATA) Pitfalls
+- **Twin fingerprint (MA-1327):** plain-text spell names with only tier headers `<strong>`-wrapped → `extractSpellNamesFromSpellcasting` (MonsterCardHelpers.js:356) returns [] → zero `.mc-dice-link-spell` chips, casts inert, 1/Day tracking dead (`extractSpellcastingSpellUses` :395 binds marked names only). Fix shape: djinni MA-0611 — wrap each spell name in `<strong>` + authored `save_dc`/`save_type` pair (Priest RAW DC 13 = 8+WIS3+PB2; save_dc:0 absent = data gap).
+- **Pitfall:** Initiative +NPC autocomplete li click can REPLACE an existing EB-joined monster slot (new name/AC/HP with stale `monsterIndex`) — recover via `.npc-remove-btn` confirm-override ×2 + EB re-join; always re-verify cs slots after any +NPC add while monsters are on board.
+
+## §MA-1340 (2026-09-26, MA-1340 Priest Acolyte Mace PASS) New pitfalls
+- **Pitfall (re-confirm §MA-1338/§487):** +NPC autocomplete li SURVIVED Escape AGAIN on Bandit join — Playwright click on HP input 30s-intercepted by `li.monster-autocomplete-item`; `inp.blur()` in evaluate cleared it (liVisible 0) then TRUSTED fill landed 999 — blur is the reliable unlock, Escape is not.
+- **Note:** +4 vs AC12 press-to-log 1:1 30/30 zero absorb (MA-1338 twin, unlike MA-1337 +5 30-roll crit-starvation — 2 nat20 landed here inside 30; crit budget is sample-size dependent, +4 rows self-serve crits).
+- **Note:** crit secondary doubling proof needs a sTotal > single-die max (sTotal 8 on 1d4 decisive; sTotal 2 ambiguous = doubled [1,1] §533) — prefer crits with high secondary totals for the doubling face.
+- Save_dc:0 decoy row rendered ZERO DC chip + pendingSavePrompts null all session (MA-1071 gate + MA-1225 machine proof surface), manifest attack+save label = §117 decoy confirmed. +NPC autocomplete join did NOT clobber the EB-joined slot this session (§MA-1339 flaky, cs re-verify mandatory either way).
+
+## §MA-1340 (2026-09-26, MA-1340 Priest Acolyte Mace PASS) Pitfall updates
+- **Pitfall re-confirm:** autocomplete li survives Escape — `blur()` in evaluate is the reliable unlock before HP fill.
+- **Note:** crit secondary-doubling proof = show sTotal > single-die max on a crit (flat mod stays undoubled, §32); +4-vs-AC12 rows self-serve crits (~2/30) — budget worry is sample-size dependent.
+
+## §MA-1341 (2026-09-26, MA-1341 Priest Acolyte Radiant Flame PASS) Notes
+- **Note:** +4 ranged 2d6 chips also press-to-log 1:1 first-click (extends no-absorb family MA-1338/1340 to ranged).
+- **Note:** cosmetic second-die (§1281) and cosmetic `combined_damage_roll` note on pure single-primary rows — judge formula only.
+- **Pitfall:** audit regexes must coerce per-field (`String(e.type).includes('save')`) — boolean+string concat makes `.filter()` always-truthy (94/94 false positive caught).
+
+## §MA-1343 (2026-09-26, MA-1343 Primal Companion Beast's Strike PASS-subset) New pitfalls
+- **Pitfall:** summoned-feature combatants resolve via the PC-FEATURE fold, not CAST — before declaring "no cast path" grep automation types (`primal_companion_*`) in `src/services/automation/index.js:417`; setup: test-campaign FeyRanger 2024 subclass → Beast Master (PUT+reload §164), click `<b class="clickable">Primal Companion:` on the PC card → chooser → variant spawns merged combatant (AC16 AC folded WIS, tokens resolved: chip "+9", damage "1d8+2+3").
+- **Pitfall:** feature fold auto-applies subclass-tier riders (Bestial Fury→Force damage type at tier) — judge damage type from the fold (`primalCompanionHandler.js:89-96`), not the monster row.
+- **Pitfall:** post-Done ghost stage-2 popup with stale text absorbs the next chip press with zero log delta — flush via its own Done button, confirm by log count.
+- **Note:** EB-direct flat copy of primal companion honestly suppressed (MA-0286 `attackRowMissingToHit` MonsterCardHelpers.js:509 + canRollExpression false on "WIS modifier") — by design, not FAIL.
+
+## §MA-1344 (2026-09-26, MA-1344 Beast of the Sea Beast's Strike FAIL(b)/DATA) New pitfalls
+- Class-data `onHit:"grappled"` (2024/classes.json primal_companion_summon companionTypes.sea attacks[0]) is grep-ZERO consumer metadata (only unrelated DiceRollResult onHitChoice) — summon-feature grapple riders are expressible ONLY via monsters.json row `hit_conditions`+`escape_dc` (MA-0010 seam); feature fold passes unknown row keys through untouched (resolved={...action}), so the two-field DATA fix (MA-1274 otyugh byte-shape, escape_dc=8+PB+WIS at summoner tier) needs zero code.
+- Feature fold half-folds the escape-DC PROSE: replaces "WIS modifier" token → cosmetic "escape DC = 8 + Proficiency Bonus + 3"; never computes the numeric DC (fold token list has no escape-channel).
+- Bestial Fury fold overwrites disk-authored damage_type_primary "Bludgeoning" → "Force" AND sprays /Piercing/→Force in description ("Force or Force damage (your choice)") + "++9" double-plus cosmetic — judge type from fold (§749), prose cosmetic §23-class.
+- Feature chooser is an inline PC-sheet panel (radio rows + "Summon Primal Companion" button), not a .mc-overlay; summon lands cs combatant at own init (caster init−0.1) with folded attack_bonus/damage_dice_primary; own initiative-card target-select arms via selectOption normally; admin-clear cs GET returns {value:null}.
+- Manifest `conditions:["grappled"]` NOT disk-true (disk row has no conditions key at all) — disk-check manifest claims before adjudicating condition-on-hit rows (§196 family extends to summon-fold rows).
+
+## §MA-1344 (2026-09-26, MA-1344 Primal Companion Beast of the Sea FAIL(b)/DATA) New pitfalls
+- **Pitfall:** class-data `onHit` is dead metadata (zero consumers); the feature fold half-folds escape-DC prose to cosmetic partial text ("escape DC = 8 + PB + 3") with no `escape_dc` field; Bestial Fury fold overwrites disk damage type→Force (cosmetic "Force or Force").
+- **Pitfall:** summon chooser is an inline panel, not an overlay; manifest `conditions` claim ≠ disk-true — verify `hit_conditions` actually authored (`buildHitConditionClause` MonsterCardHelpers.js:673-681 reads `hit_conditions` only).
+- **Fix shape:** grapple rider = two-field DATA `hit_conditions:["grappled"] + escape_dc:<8+PB+mod>` (MA-1274 otyugh byte-shape); fold spreads unknown keys — zero code needed.
+
+## §MA-1345 (2026-09-26, MA-1345 Primal Companion Beast of the Sky PASS) Pitfalls
+- **Pitfall:** summon chooser trigger is `<b class="clickable">` (not a button) and requires an existing combatSummary — join a victim to initiative BEFORE clicking the chooser.
+- **Pitfall:** fold prints cosmetic "++9" (handler :88 prepends `+` to already-prefixed token) — cosmetic only.
+- **Note:** runtime campaigns dir git-untracked; byte-clean PC restore = re-PUT parsed JSON, verify via pre-session shasum.
+
+## §MA-1346 (2026-09-26, MA-1346 Primeval Owlbear Multiattack PASS-subset) Notes
+- **Note:** +9 vs AC12 (≈10% miss face) — miss unobserved in 6 rolls is honest residual; boundary self-consistency acceptable per §260.
+
+## §MA-1347 (2026-09-26, MA-1347 Owlbear Ravage PASS-subset) Notes
+- **Framing precedent:** charge-gated Prone rider unauthored + gridless app = RAW-correct never-fire (§MA-1127/§0903) → PASS-subset advisory, NOT §MA-1344 FAIL; MA-1344 was FAIL because grapple needed no movement gate (two-field fix reachable). Distinguish: movement-gated riders advisory; ungated condition riders unauthored = FAIL(b)/DATA.
+- **Pitfall:** run_code_unsafe outer-scope var inside evaluate-returned literal SyntaxErrors AFTER chip side-effects land — audit log before re-firing (§543).
+
+## §MA-1348 (2026-09-26, MA-1348 Owlbear Scream PASS-subset) New pitfalls
+- **Note:** flat `recharge:"5-6"` IS enforced (monsterRecharge.js: inline spend, same-round refire refused `.mc-recharge-refusal` + spent chips `mc-dice-link-spell-spent`, recovery d6 at own turn-start) — do NOT assume display-only; grep monsterRecharge.js before filing recharge FAILs.
+- **Pitfall:** §409 twin-chip trap: row may show +0 junk + bare-dice auto-damage chip + real DC chip — press the DC chip only.
+- **Pitfall:** recovery d6 can starve several rounds (honest-fail faces are evidence; budget ~5 rounds to see "recharged").
+- **Pitfall (§265 twin):** keyed-shape `/change-data` POST creates literal `"change-data"` junk key — DELETE after.
+
+## §MA-1349 (2026-09-26, MA-1349 Pseudodragon Multiattack PASS-subset) New pitfalls
+- **Pitfall:** miss popups show trailing "Done" glyph but `doneBtn:false` (non-`.dice-roll-reroll-btn`) — dismiss via edge-of-overlay backdrop click (rect+12px), dodging §706 center-badge reroll trap; card survives repeated miss dismissals.
+- **Pitfall:** registry JSON append via quoted-key `json.dumps` embeds literal quotes — anchor key text raw, git-diff hunk head after every append.
+
+## §MA-1350 (2026-09-26, MA-1350 Pseudodragon Bite PASS) Pitfall corrections
+- **Pitfall UPDATE (supersedes §MA-1349 backdrop tip):** viewport-corner backdrop click (vw−5) can land OUTSIDE `.popup-overlay` rect → popup persists, absorbs next chip clicks. Reliable miss dismiss = click `button.popup-close-btn` ("Done") INSIDE the overlay.
+- **Pitfall:** Done-button class is stage-scoped: stage-1 hit = `.dice-roll-reroll-btn`; plain miss/close = `.popup-close-btn` — class queries return 0 despite visible "Done".
+- **Pitfall:** stage-2 damage modal is a FRESH node after stage-1 Done — needs a separate second flush pass before the next chip press.
+
+## §MA-1351 (2026-09-26, MA-1351 Pseudodragon Sting FAIL(b)/DATA) New pitfalls
+- **Adjudication codified:** fail-by-5 prose INSIDE save_effect with no save_margin = live OVER-GRANT, not inert advisory — extractConditionsFromSaveEffect word-scans the whole string so deep-band condition lands on fail-by-1..4; cite as MA-0904-shape FAIL(b)/DATA, fix = MA-1000 two-band (truncate save_effect shallow + save_margin{fails_by,also}) zero code. Discriminator vs zero-consumer: lastAttack.saveConditions stamps BOTH words — read it as the machine proof of spray.
+- **Note:** save margin ledger at inline seam adjudicate from total vs DC (bonus:0 cosmetic §208); boundary total 12 vs DC 12 = SAVE SUCCESS; fail-by-exactly-5 (total 7) is the only RAW-correct double-grant face.
+- **Pitfall:** extractConditionDurationNote matches `until[^.;]+` only — "for 1 hour" never lands in durationNote and the UNCONSCIOUS until-clause gets stamped on ALL saveConditions (mislabel advisory, §70).
+- **Note:** Sting triple-chip §409 press DC chip only — 11/11 first-clicks, zero absorb on this row's save chip; run_code_unsafe getComputedStyle typo inside vis-check aborts AFTER chip press lands (audit log before re-firing).
+
+## §MA-1351 (2026-09-26, MA-1351 Pseudodragon Sting FAIL(b)/DATA over-grant) New pitfalls
+- **New fingerprint:** fail-by-N rider in prose but no `save_margin` structured key → `extractConditionsFromSaveEffect` word-scans the WHOLE save_effect and grants ALL named conditions on EVERY failed save (over-grant, worse than advisory). Margin machinery exists (`parseSaveMarginClause` Helpers:332 → `applySaveMarginRider` saveProcessing:665) but is structured-key-armed only. Fix = MA-1000 two-band: shallow save_effect + `save_margin:{fails_by:5,also:"unconscious"}`.
+- **Pitfall:** `extractConditionDurationNote` grabs the LAST condition's duration clause and stamps it on ALL granted conditions (mislabel advisory §70).
+- **Note:** DC inline seam prints bonus +0 cosmetically (§208) — judge margin by total-vs-DC, never the printed bonus.
+
+## §MA-1352 (2026-09-26, MA-1352 Ooze Pseudopod FAIL(b)/DATA) Pitfalls
+- **Fingerprint:** ability-scoped save-disadvantage riders ("Disadvantage on INT saving throws") have NO generic te in targetEffectDefinitions.js — `dex_save_disadvantage`:387 fixed-DEX, `hex_save_disadvantage`:403 Hex-producer-only, `disadvantage_on_next_save`:413 wrong duration; `applyHitClauseTargetEffect` (handlePlainDamage.js:657) passes no `ability` payload ⇒ prose-only riders of this shape are inert = FAIL(b)/DATA.
+- **Pitfall:** +NPC join may land unsuffixed "Bandit" (no " 1") — §1339 clobber check by monsterIndex, not name-suffix.
+- **Recipe:** AC-flip sampling cheap trick — bump victim `ac` via full-store cs POST (AC12→15 flips boundary in 2 presses, §887 extended to +3 rows).
+
+## §MA-1353 (2026-09-26, MA-1353 Psychic Crush FAIL(a)/DATA half-leak) Pitfalls
+- **New fingerprint:** Failure-only rows (RAW success = NO damage) lacking `dc_success` leak half-damage on success — app default `dc_success ?? 'half'` (MonsterCardModal.jsx:255/:1011/:1996, applyDamage.js:88-97). Fix one-field `dc_success:"none"` (§678/MA-0481 family); §523 half-default is only RAW-correct when description says "Success: Half".
+- **Pitfall:** +NPC autocomplete joins ship `monsterIndex:null` — clobber-check via cs AC/HP disk-exactness + EB slot integrity, not suffix/name.
+- **Note:** §705 triple-chip (junk +0 / bare-dice trap / real DC chip) — press DC only.
+
+## §MA-1354 (2026-09-26, MA-1354 Mind Corrosion FAIL(b)) New pitfalls + recipe
+- **Recipe (force a monster spell-save fail):** cs full-store POST victim `saveBonuses.dex:-15` (+ nested `saving_throws.dex`) → PC caster casts cone/save spell (Burning Hands) → picker → Results modal machine-stamps `saveResult:"failure"`. Trigger state reachable — reactions are NOT auto-INCOMPLETE.
+- **Fingerprint:** monster reactions gated ONLY off `automation.effect` (`GATED_MONSTER_REACTIONS` MonsterCardHelpers.js:981, `GatedReactionSlot` MonsterAction.jsx:165); no save-fail→defender-reaction consumer app-wide (`reactionQueue|fireReaction|triggerReaction` grep-zero); reaction prose without `Hit|Failure|Success:` prefix gets no damage chip (MonsterCardModal.jsx:688). Prose-only reaction = FAIL(b).
+- **Pitfall:** casting at a combatant lacking `activeConditions:[]` throws (§138) — seed `[]` first.
+
+## §MA-1355 (2026-09-26, MA-1355 Pteranodon Bite PASS) Pitfalls
+- **Pitfall:** stage-dependent Done buttons — miss stage rides `popup-close-btn`, HIT stage-1 rides `dice-roll-reroll-btn`; a reroll-btn-only dismiss loop sticks the overlay and absorbs presses. Use poll-until-gone "click any button" loop.
+- **Pitfall:** popup big number = TOTAL, raw nat is the `d20 N` token — parse nats via `/d20 (\d+)/`, never the headline.
+- **Pitfall:** popup text-read lags a click ~2s — audit log delta before re-rolling (false "absorbed").
+
+## §MA-1356 (2026-09-26, MA-1356 Purple Worm Multiattack PASS-subset) Notes
+- **Note:** both multiattack component chips share the same "+14" text — anchor clicks with `strong.startsWith(name)` scoping.
+- **Note:** combined-row popup prints intermediate pre-secondary HP line; the `hp_change` log entry (975→928) is truth, not the popup text.
+- **Recipe:** own-card target select locator: `div:has(> div img[alt=…]) [data-testid="target-select"]`.
+- **Note:** Purple Worm Tail Stinger poison rider is structured+applied (10d6 secondary) — component defects/axes belong to each component's own row; multiattack row judges count+component-fires only.
+
+## §MA-1358 (2026-09-26, MA-1358 Purple Worm Tail Stinger PASS) Pitfalls
+- **Pitfall:** engine does NOT auto-miss on nat1 — "+14 vs AC12" logs `hit:true` even under a "CRITICAL MISS!" banner (§695 cosmetic); real miss faces need AC-rig to nat+15+.
+- **Note:** crit doubles BOTH pools on dual-damage rows — primary `2d6*2+9` flat +9 undoubled (§32), secondary `10d6→20d6` sfd=2×st (§533); all-API legs must be inside `page.evaluate` (outer `fetch` ReferenceError §130 twin).
+
+## §MA-1359 (2026-09-26, MA-1359 Quadrone Multiattack PASS-subset) Pitfalls
+- **Pitfall:** EB filter "Quadrone" returns TWO species (true `quadrone` + legacy `modron-quadrone`) — anchor the exact td[1] row or you join the wrong monsterIndex.
+- **Note:** multiattack header with NO `attack_bonus` key = true zero-chip (§440 spurious chip absent); "+80/320" range-band press vs AC-rig manufactures real miss faces cheaply (§830 auto-hit quirk does NOT apply).
+- **Note:** full cs POST ac-rig preserves armed `targetName` when re-stamped in same body (§491).
+
+## §MA-1360 (2026-09-26, MA-1360 Quadrone Fist PASS) Pitfalls
+- **Pitfall:** +NPC autocomplete typed into a prefilled "NPC 1" input CONCATENATES → junk "NPC 1Bandit" card; fix = focus + Meta+A + Backspace before typing, then exact-li click + blur.
+- **Pitfall:** victim HP input may sit off default viewport (x≈1709) — `scrollIntoView({inline:'center'})` mandatory before trusted fill (§636).
+- **Note:** +3-vs-AC12 rows self-serve real misses (nat≤8 honest) — AC-rig not needed for miss faces on low-bonus rows (contrast §830 ≥+11 rows).
+
+## §MA-1361 (2026-09-26, MA-1361 Quadrone Shortbow PASS) Pitfalls
+- **Pitfall:** sidebar `button:has-text("NPC")` matches "NPCs" nav — exact `textContent.trim()==='+ NPC'` anchor mandatory.
+- **Note:** campaign lockdown verify reads campaign name from `.sidebar` innerText when no `<header>` exists.
+- **Note:** identical dice rolls twice is honest if timestamps differ (§504); prose range band inert gridless (`rangeReason:null`, §200).
+
+## §MA-1363 (2026-09-26, MA-1363 Quaggoth Claw FAIL(a)/DATA) Pitfalls
+- **Fingerprint:** "or X dice if <condition>" variant clauses need structured `conditional_damage:{dice,type,condition}` — `buildChargeBonusOffer` Helpers:622 arms on `cd?.dice` only; prose-only Bloodied variant = zero chooser, base-only damage = FAIL(a)/DATA (MA-0485/MA-0756 twins). Force-Bloodied (cs HP≤half) still base 3/3.
+- **Pitfall:** initiative-card HP badge can render "HP|/|" empty while server cs holds the real value — adjudicate Bloodied from cs math, not DOM (§223).
+- **Pitfall:** registry multi-row monsters use `verifiedRow2..N` keys, not ticket-suffixed.
+
+## §MA-1367 (2026-09-26, MA-1367 Quaggoth Thonot Psionic Defense FAIL(b)) Pitfalls
+- **Fingerprint:** mid-reaction prose `<strong>Feather Fall</strong>/<strong>Shield</strong>` emphasis arms ZERO chips in the reactions lane (§161 fake-chip is Spellcasting-lane-only, absent here by construction); automation-less reaction row stays plain `<div class="mc-action"><strong>Name.</strong> <span>…</span></div>` even after a spell-save lastAttack (rollType spell-save, damageApplied:true, characterName:null) lands on it — zero affordance pre- AND post-trigger = FAIL(b) (§815).
+- **Pitfall:** full-store POST /api/campaigns/:c/<Char> via python urllib needs explicit `Content-Type: application/json` header — default form-encoded body = HTTP 500 (§816 seed then lands).
+- **Note:** PC caster cast seam stages: spell-detail popup (Cast Spell/Close) → Sorcerer Metamagic stage (Cast Without Metamagic) → sp-modal picker (confirm button = spell name + selected-count, Skip = secondary) → Results modal Close-only; saves auto-roll inline for EB-NPC monsters.
+- **Note:** shield gated-reaction machinery LIVE+armed only on mind-flayer-arcanist/noble-prodigy (acBonus:5 MA-1170); githzerai monk/psion/zerth carry byte-shape "Psionic Defense" feather_fall automations w/ GM-adjudicates-Shield note — Thonot row lacks any automation = one-field DATA fix (MA-1170 byte-shape).
+
+## §MA-1366..1369 (2026-09-26, Thonot+Quasit batch) Pitfalls
+- **Fingerprint:** self-buff rows arm ONLY with `automation.type:"monster_self_buff"` (monsterSelfBuff.js:25-27, imp MA-1019 byte-shape `{monster_self_buff, invisible, rounds:600}` + attack_bonus stripped); unarmed "casts X on itself" prose rows = zero affordance FAIL(b).
+- **Fingerprint:** DC chip arms only if `Number(save_dc)>0` (MonsterAction.jsx:367 MA-1071) — RAW-no-save rows honestly show zero DC chip (not FAIL(a)).
+- **Pitfall:** evaluate returned-object literals reject `??` and `/re/.test()` — split evaluates or use `String().includes` (§269 variant).
+
+## §MA-1370 (2026-09-26, Quasit Scare PASS-subset) New pitfalls
+- **Note:** recharge:"1" on a shapeless inline SAVE chip row — full economy live first-click: spend ability_use at fire (Modal :409), refusal popup prints "(1+ to recharge)" + `scare_refused` (§233), chip class `mc-dice-link-spell-spent`, recovery d6 at own turn-start certain (threshold-1, MA-1212/1229 twins); Quasit joins LAST in cs walk (17 clicks round-wrap) — pointer Next clicks silently no-op ×24 while `__initiative__.lastAppliedTurnStartCreature` stays null (el.click is the only walking route, §539 re-confirmed).
+- **Note:** inline fail-only condition grant meta shape here = `{source}` ONLY (no durationNote/duration — unlike MA-0767 gazer twin); prose repeat-save + 1-min auto-success zero-parser (§489) = §70 advisory, GM-enforced.
+- **Pitfall:** Scare row twin-chip: junk "+0" (attack_bonus:0 §490) + real "DC 10 Wisdom" `mc-dice-link-save-clickable` — press DC only; success-leg zero-effect proof via pre-cleared victim cd (`activeConditions:[]` POST) then KEY-STAYS-EMPTY after sr:success fire (§565/§1116 absent-key ladder).
+
+## §MA-1376 (2026-09-26, Quipper flat-damage PASS) Pitfalls
+- **Fingerprint:** flat-damage rows (no dice) resolve via `extractFlatHitDamage` (MonsterCardHelpers.js:2379) → `resolveAutoDamageResult` `parseConstant` (MonsterCardModal.jsx:1161) → `formula:"1" rolls:[] fd:1`; crit stays 1 (banner "DOUBLED" cosmetic §213) — adjudicate from log.
+- **Pitfall:** real-pointer chip presses can absorb 3× consecutively on some rows while native `el.click()` lands 8/8 — hybrid native-chip + real-pointer-Done is the reliable loop.
+- **Pitfall:** cs may ship only `currentHp/maxHp` (no `*HitPoints`) — don't fabricate extra HP keys (§352); popup DOM retains prior text post-flush — log-delta sole ledger.

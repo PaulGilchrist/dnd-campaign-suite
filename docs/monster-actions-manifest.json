@@ -22044,7 +22044,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +12, reach 10 ft. Hit: 14 (2d6 + 7) Slashing damage plus 18 (4d8) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1326",
@@ -22065,7 +22065,7 @@
       "range": "",
       "recharge": "",
       "description": "Dexterity Saving Throw: DC 20, each enemy in a 20-foot-radius Sphere centered on a point the planetar can see within 120 feet. Failure: 24 (7d6) Radiant damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1327",
@@ -22084,7 +22084,7 @@
       "range": "",
       "recharge": "",
       "description": "The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):At Will: Detect Evil and Good1/Day Each: Commune, Control Weather, Dispel Evil and Good, Raise Dead",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1327-planetar-spellcasting-no-chips.md"
     },
     {
       "id": "MA-1328",
@@ -22105,7 +22105,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 11 (2d6 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1329",
@@ -22124,7 +22124,7 @@
       "damageTypePrimary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 1 piercing damage, and the target must make a DC 10 Constitution saving throw, taking 5 (2d4) poison damage on a failed save, or half as much damage on a successful one.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1329-poisonous-snake-bite.md"
     },
     {
       "id": "MA-1330",
@@ -22143,7 +22143,7 @@
       "range": "",
       "recharge": "",
       "description": "The bear makes two Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1331",
@@ -22164,7 +22164,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 9 (1d8 + 5) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1332",
@@ -22183,7 +22183,7 @@
       "range": "",
       "recharge": "",
       "description": "The poltergeist makes one Object Slam attack and uses Telekinetic Thrust.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1333",
@@ -22204,7 +22204,7 @@
       "range": "30 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +4, reach 5 ft. or range 30 ft. Hit: 7 (2d4 + 2) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1334",
@@ -22225,7 +22225,7 @@
       "range": "",
       "recharge": "",
       "description": "Strength Saving Throw: DC 12, one creature the poltergeist can see within 30 feet. Failure: 9 (2d6 + 2) Force damage, and the target is pushed up to 30 feet straight away from the poltergeist.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1334-poltergeist-telekinetic-thrust-half-default.md"
     },
     {
       "id": "MA-1335",
@@ -22246,7 +22246,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1336",
@@ -22265,7 +22265,7 @@
       "range": "",
       "recharge": "",
       "description": "The priest makes two attacks, using Mace or Radiant Flame in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1337",
@@ -22288,7 +22288,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Bludgeoning damage plus 5 (2d4) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1338",
@@ -22309,7 +22309,7 @@
       "range": "60 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +4, range 60 ft. Hit: 11 (2d10) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1339",
@@ -22328,7 +22328,7 @@
       "range": "",
       "recharge": "",
       "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:At Will: Light, Thaumaturgy1/Day: Spirit Guardians",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1339-zero-spell-chips.md"
     },
     {
       "id": "MA-1340",
@@ -22351,7 +22351,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Bludgeoning damage plus 2 (1d4) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1341",
@@ -22372,7 +22372,7 @@
       "range": "60 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +4, range 60 ft. Hit: 7 (2d6) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1342",
@@ -22391,7 +22391,7 @@
       "range": "",
       "recharge": "",
       "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:At Will: Light, Thaumaturgy",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1342-acolyte-spellcasting-zero-chips.md"
     },
     {
       "id": "MA-1343",
@@ -22409,7 +22409,7 @@
         "prone"
       ],
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+2+WIS modifier Bludgeoning, Piercing, or Slashing damage (your choice). If the beast moved at least 20 feet straight toward the target before the hit, the target takes an extra 1d6 damage of the same type, and the target has the Prone condition if it is a Large or smaller creature.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1344",
@@ -22427,7 +22427,7 @@
         "grappled"
       ],
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d6+2+WIS modifier Bludgeoning or Piercing damage (your choice), and the target has the Grappled condition (escape DC = 8 + Proficiency Bonus + WIS modifier).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1344-sea-grapple-rider-unauthored.md"
     },
     {
       "id": "MA-1345",
@@ -22442,7 +22442,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d4+3+WIS modifier Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1346",
@@ -22461,7 +22461,7 @@
       "range": "",
       "recharge": "",
       "description": "The owlbear makes two Ravage attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1347",
@@ -22485,7 +22485,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 15 (2d8 + 6) Slashing damage. If the target is a Huge or smaller creature and the owlbear moved 20+ feet straight toward it immediately before the hit, the target takes an extra 9 (2d8) Slashing damage and has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1348",
@@ -22509,7 +22509,7 @@
         "incapacitated"
       ],
       "description": "Constitution Saving Throw: DC 15, each creature in a 30-foot Emanation originating from the owlbear. Failure: 27 (6d8) Thunder damage, and the target has the Incapacitated condition until the end of its next turn. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1349",
@@ -22528,7 +22528,7 @@
       "range": "",
       "recharge": "",
       "description": "The pseudodragon makes two Bite attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1350",
@@ -22549,7 +22549,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1351",
@@ -22574,7 +22574,7 @@
         "unconscious"
       ],
       "description": "Constitution Saving Throw: DC 12, one creature the pseudodragon can see within 5 feet. Failure: 5 (2d4) Poison damage, and the target has the Poisoned condition for 1 hour. Failure by 5 or more: The Poisoned target also has the Unconscious condition until it takes damage or a creature within 5 feet of it takes an action to shake it awake.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1351-sting-unconscious-overgrant.md"
     },
     {
       "id": "MA-1352",
@@ -22595,7 +22595,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 11 (3d6 + 1) Acid damage, and the target has Disadvantage on Intelligence saving throws until the end of the ooze's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1352-psychic-gray-ooze-pseudopod-int-save-disadv-inert.md"
     },
     {
       "id": "MA-1353",
@@ -22616,7 +22616,7 @@
       "range": "",
       "recharge": "",
       "description": "Intelligence Saving Throw: DC 10, one creature the ooze can see within 60 feet. Failure: 13 (3d8) Psychic damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1353-psychic-crush-half-on-success.md"
     },
     {
       "id": "MA-1354",
@@ -22629,7 +22629,7 @@
       "actionType": "other",
       "trigger": "The ooze fails a saving throw against a spell or another magical effect created by a creature",
       "description": "The triggering creature takes 3 (1d6) Psychic damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1354-mind-corrosion-zero-affordance.md"
     },
     {
       "id": "MA-1355",
@@ -22650,7 +22650,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1356",
@@ -22669,7 +22669,7 @@
       "range": "",
       "recharge": "",
       "description": "The worm makes one Bite attack and one Tail Stinger attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1357",
@@ -22694,7 +22694,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 22 (3d8 + 9) Piercing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 19), and it has the Restrained condition until the grapple ends.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1357-grapple-rider-unauthored.md"
     },
     {
       "id": "MA-1358",
@@ -22717,7 +22717,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 16 (2d6 + 9) Piercing damage plus 35 (10d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1359",
@@ -22729,7 +22729,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The quadrone makes two fist attacks or four shortbow attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1360",
@@ -22745,7 +22745,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1361",
@@ -22760,7 +22760,7 @@
       "damageDicePrimary": "1d6 + 2",
       "damageTypePrimary": "Piercing",
       "description": "Ranged Weapon Attack: +4 to hit, range 80/320 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1362",
@@ -22779,7 +22779,7 @@
       "range": "",
       "recharge": "",
       "description": "The quaggoth makes two Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1363",
@@ -22800,7 +22800,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Slashing damage, or 13 (3d6 + 3) Slashing damage if the quaggoth is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1363-claw-bloodied-variant-prose-only.md"
     },
     {
       "id": "MA-1364",
@@ -22819,7 +22819,7 @@
       "range": "",
       "recharge": "",
       "description": "The quaggoth makes two Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1365",
@@ -22842,7 +22842,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Slashing damage plus 5 (2d4) Psychic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1366",
@@ -22864,7 +22864,7 @@
         "invisible"
       ],
       "description": "The quaggoth casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 12):At Will: Mage Hand (the hand is Invisible), Minor Illusion2/Day: Mind Spike",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1366-thonot-spellcasting-decoy-chip-zero-real-chips.md"
     },
     {
       "id": "MA-1367",
@@ -22877,7 +22877,7 @@
       "actionType": "other",
       "trigger": "Trigger of a spell",
       "description": "The quaggoth casts Feather Fall or Shield in response to the spell's trigger, requiring no spell components and using the same spellcasting ability as Spellcasting.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1367-psionic-defense-zero-affordance.md"
     },
     {
       "id": "MA-1368",
@@ -22901,7 +22901,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 5 (1d4 + 3) Slashing damage, and the target has the Poisoned condition until the start of the quasit's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1368-quasit-rend-poisoned-rider-inert.md"
     },
     {
       "id": "MA-1369",
@@ -22920,7 +22920,7 @@
       "range": "",
       "recharge": "",
       "description": "The quasit casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1369-quasit-invisibility-zero-affordance.md"
     },
     {
       "id": "MA-1370",
@@ -22942,7 +22942,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 10, one creature within 20 feet. Failure: The target has the Frightened condition. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1371",
@@ -22961,7 +22961,7 @@
       "range": "",
       "recharge": "",
       "description": "The quasit shape-shifts to resemble a bat (Speed 10 ft., Fly 40 ft.), a centipede (40 ft., Climb 40 ft.), or a toad (40 ft., Swim 40 ft.), or it returns to its true form. Its game statistics are the same in each form, except for its Speed. Any equipment it is wearing or carrying isn't transformed.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1371-quasit-shape-shift.md"
     },
     {
       "id": "MA-1372",
@@ -22980,7 +22980,7 @@
       "range": "",
       "recharge": "",
       "description": "The knight makes three attacks, using Greatsword or Longbow in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1373",
@@ -23003,7 +23003,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 12 (2d6 + 5) Slashing damage plus 22 (5d8) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1374",
@@ -23026,7 +23026,7 @@
       "range": "150/600 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +7, range 150/600 ft. Hit: 12 (2d8 + 3) Piercing damage plus 22 (5d8) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1375",
@@ -23045,7 +23045,7 @@
       "range": "",
       "recharge": "",
       "description": "The knight casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 16):1/Day Each: Daylight, Dispel Evil and Good, Greater Restoration, Phantom Steed",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1375-zero-chip.md"
     },
     {
       "id": "MA-1376",
@@ -23059,7 +23059,7 @@
       "attackBonus": 5,
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 1 piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1377",
@@ -23078,7 +23078,7 @@
       "range": "",
       "recharge": "",
       "description": "The rakshasa makes three Cursed Touch attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1378",
@@ -23101,7 +23101,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 12 (2d6 + 5) Slashing damage plus 19 (3d12) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target gains no benefit from finishing a Short or Long Rest.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1378-cursed-touch-rider-unauthored.md"
     },
     {
       "id": "MA-1379",
@@ -23126,7 +23126,7 @@
         "incapacitated"
       ],
       "description": "Wisdom Saving Throw: DC 18, each enemy in a 30-foot Emanation originating from the rakshasa. Failure: 28 (8d6) Psychic damage, and the target has the Frightened and Incapacitated conditions until the start of the rakshasa's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1380",
