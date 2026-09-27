@@ -22800,7 +22800,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Slashing damage, or 13 (3d6 + 3) Slashing damage if the quaggoth is Bloodied.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1363-claw-bloodied-variant-prose-only.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1364",

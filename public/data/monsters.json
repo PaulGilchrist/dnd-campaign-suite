@@ -50590,7 +50590,12 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "1d6 + 3",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "conditional_damage": {
+          "dice": "2d6",
+          "damage_type": "Slashing",
+          "condition": "bloodied"
+        }
       }
     ],
     "bonus_actions": [],

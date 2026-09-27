@@ -613,8 +613,14 @@ function chargeClauseFeet(condition) {
   return m ? Number(m[1]) : null;
 }
 
-function chargeOfferLabel(feet, dice, modifier, damageType) {
-  const head = feet ? `${feet}+ ft Charge` : 'Charge';
+function chargeOfferLabel(feet, dice, modifier, damageType, condition) {
+  // MA-1363: movement-charge clauses keep the feet-token / "Charge" chrome
+  // (byte-identical, MA-1174/1175 pins); static-state clauses (e.g.
+  // "bloodied") carry the condition text in the offer head instead.
+  const cond = String(condition || '').trim();
+  const head = feet ? `${feet}+ ft Charge`
+    : (!cond || /feet/i.test(cond)) ? 'Charge'
+      : cond.charAt(0).toUpperCase() + cond.slice(1);
   const modText = modifier ? `+${modifier}` : '';
   return `${head}: +${dice}${modText} ${damageType}?`;
 }
@@ -632,7 +638,7 @@ export function buildChargeBonusOffer(action, name) {
     damageType,
     condition,
     formula,
-    label: chargeOfferLabel(chargeClauseFeet(condition), cd.dice, modifier, damageType),
+    label: chargeOfferLabel(chargeClauseFeet(condition), cd.dice, modifier, damageType, condition),
     attackName: name || action?.name || 'Attack',
   };
 }
