@@ -22574,7 +22574,7 @@
         "unconscious"
       ],
       "description": "Constitution Saving Throw: DC 12, one creature the pseudodragon can see within 5 feet. Failure: 5 (2d4) Poison damage, and the target has the Poisoned condition for 1 hour. Failure by 5 or more: The Poisoned target also has the Unconscious condition until it takes damage or a creature within 5 feet of it takes an action to shake it awake.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1351-sting-unconscious-overgrant.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1352",

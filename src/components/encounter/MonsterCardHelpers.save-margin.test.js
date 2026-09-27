@@ -4,7 +4,7 @@
 // save_margin dict. The margin clause ("If the saving throw fails by 5 or
 // more, the target is also unconscious while poisoned") stays prose-only.
 import { describe, it, expect } from 'vitest';
-import { parseSaveMarginClause } from './MonsterCardHelpers.js';
+import { parseSaveMarginClause, extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 
 const drow = () => monstersData.find(m => m.name === 'Drow');
@@ -49,6 +49,20 @@ describe('MA-0639 parseSaveMarginClause', () => {
         expect(row.save_margin).toEqual({ fails_by: 5, also: 'unconscious' });
         expect(row.save_effect).toBe('Failure: be poisoned for 1 hour.');
         expect(row.description).toContain('If the saving throw fails by 5 or more, the target is also unconscious while poisoned in this way.');
+        expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'unconscious' });
+    });
+
+    it('locks the MA-1351 Pseudodragon Sting row: shallow-band save_effect + save_margin twin shape', () => {
+        const pseudo = monstersData.find(m => m.name === 'Pseudodragon');
+        const row = pseudo.actions.find(a => a.name === 'Sting');
+        expect(row.save_margin).toEqual({ fails_by: 5, also: 'unconscious' });
+        expect(row.save_effect).toBe('Failure: 5 (2d4) Poison damage, and the target has the <strong>Poisoned</strong> condition for 1 hour.');
+        expect(extractConditionsFromSaveEffect(row.save_effect)).toEqual(['poisoned']);
+        expect(row.description).toContain('Failure by 5 or more: The Poisoned target also has the <strong>Unconscious</strong> condition until it takes damage or a creature within 5 feet of it takes an action to shake it awake.');
+        expect(row.save_dc).toBe(12);
+        expect(row.save_type).toBe('Constitution');
+        expect(row.damage_dice_primary).toBe('2d4');
+        expect(row.dc_success).toBeUndefined();
         expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'unconscious' });
     });
 });

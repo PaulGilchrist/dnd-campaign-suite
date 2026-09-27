@@ -1334,7 +1334,14 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
         ...buildSecondarySaveDamagePopupFields({ secondaryOutcome, effectiveD20ForSave, saveTotal, saveSuccess }),
     });
 
-    applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    const applied = applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    // MA-1351: damage-bearing save legs (Pseudodragon Sting — the save
+    // adjudicates its own 2d4 pool, unlike the MA-0560/MA-1000 rider-only
+    // composites) reach applySaveDamage, NOT applyDamagelessSaveConditions —
+    // ride the fail-by-N margin rider here too, ONLY when the base condition
+    // actually landed ("unconscious WHILE poisoned"). Byte-inert null
+    // context.saveMargin for every legacy damage+save row.
+    if (applied) applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attackerName, campaignName });
     maybeLogMemoryGainAtZeroHp({ context, combatSummary: combatSummaryForSave, applyTarget, attackerName, applyResult, saveSuccess, campaignName });
     maybeNoteEyeRayZeroHp({ context, applyResult, applyTarget, attackerName, campaignName });
 }
