@@ -23399,7 +23399,7 @@
         "paralyzed"
       ],
       "description": "Wisdom Saving Throw: DC 15, one creature the revenant can see within 30 feet. Failure: The target has the Frightened condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. If the Frightened target is cursed by the revenant (see Vow of Revenge), the target also has the Paralyzed condition for the duration.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1392-vengeful-glare-conditional-paralyzed-over-grant.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1393",

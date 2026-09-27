@@ -52013,7 +52013,7 @@
         "attack_bonus": 0,
         "save_dc": 15,
         "save_type": "Wisdom",
-        "save_effect": "The target has the Frightened condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. If the Frightened target is cursed by the revenant (see Vow of Revenge), the target also has the Paralyzed condition for the duration.",
+        "save_effect": "The target has the Frightened condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
         "range": "",
         "reach": "",
         "recharge": ""
