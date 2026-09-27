@@ -49665,7 +49665,8 @@
         "attack_bonus": null,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6+2+WIS modifier",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["grappled"]
       }
     ],
     "traits": [

@@ -119,11 +119,12 @@ describe('primalCompanionHandler', () => {
             actions: [
                 {
                     name: "Beast's Strike",
-                    description: 'Melee Weapon Attack: +spell attack modifier, reach 5 ft. Hit: 1d6+2+WIS modifier Bludgeoning/Piercing damage.',
+                    description: 'Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d6+2+WIS modifier Bludgeoning or Piercing damage (your choice), and the target has the Grappled condition (escape DC = 8 + Proficiency Bonus + WIS modifier).',
                     attack_bonus: null,
                     reach: '5 ft.',
                     damage_dice_primary: '1d6+2+WIS modifier',
                     damage_type_primary: 'bludgeoning/piercing',
+                    hit_conditions: ['grappled'],
                 },
                 {
                     name: "Beast's Strike — Grapple",
@@ -286,6 +287,9 @@ describe('primalCompanionHandler', () => {
             expect(summonedCreature.actions[0].attack_bonus).toBe(6);
             expect(summonedCreature.actions[0].damage_dice_primary).toBe('1d8+2+3');
             expect(summonedCreature.actions[0].damage_type_primary).toBe('bludgeoning/piercing/slashing');
+            // MA-1344 byte-inert: rows without authored hit_conditions never gain escape_dc.
+            expect(summonedCreature.actions[0].hit_conditions).toBeUndefined();
+            expect(summonedCreature.actions[0].escape_dc).toBeUndefined();
             expect(summonedCreature.actions[0].description).toContain('1d8+2+3');
             expect(summonedCreature.actions[0].description).toContain('+6');
             expect(summonedCreature.actions.length).toBe(3);
@@ -313,10 +317,15 @@ describe('primalCompanionHandler', () => {
             expect(summonedCreature.actions[0].name).toBe("Beast's Strike");
             expect(summonedCreature.actions[0].damage_dice_primary).toBe('1d6+2+3');
             expect(summonedCreature.actions[0].damage_type_primary).toBe('bludgeoning/piercing');
+            // MA-1344: hit_conditions passthrough + caster-folded escape DC (8 + PB 3 + WIS 3).
+            expect(summonedCreature.actions[0].hit_conditions).toEqual(['grappled']);
+            expect(summonedCreature.actions[0].escape_dc).toBe(14);
+            expect(summonedCreature.actions[0].description).toContain('escape DC = 8 + Proficiency Bonus + 3');
             expect(summonedCreature.actions.length).toBe(3);
             expect(summonedCreature.actions[1].name).toBe("Beast's Strike — Grapple");
             expect(summonedCreature.actions[1].save_dc).toBe(13);
             expect(summonedCreature.actions[1].save_type).toBe('Wis');
+            expect(summonedCreature.actions[1].escape_dc).toBeUndefined();
         });
 
         it('creates Beast of the Sky with correct stats', async () => {
@@ -338,6 +347,8 @@ describe('primalCompanionHandler', () => {
             expect(summonedCreature.actions[0].name).toBe("Beast's Strike");
             expect(summonedCreature.actions[0].damage_dice_primary).toBe('1d8+2+3');
             expect(summonedCreature.actions[0].damage_type_primary).toBe('piercing');
+            expect(summonedCreature.actions[0].hit_conditions).toBeUndefined();
+            expect(summonedCreature.actions[0].escape_dc).toBeUndefined();
             expect(summonedCreature.actions.length).toBe(2);
         });
     });

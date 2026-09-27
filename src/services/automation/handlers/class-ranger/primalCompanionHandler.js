@@ -47,7 +47,7 @@ function buildPrimalCompanionCreature({ monster, companionTypeConfig, displayNam
         adjustedSaves[key] = value + proficiencyBonus;
     }
 
-    const actions = resolveMonsterActions(monster, wisModifier, spellAttackMod, spellSaveDc, hasBestialFury);
+    const actions = resolveMonsterActions(monster, wisModifier, spellAttackMod, spellSaveDc, { hasBestialFury, proficiencyBonus });
 
     const speed = {};
     const baseSpeed = companionTypeConfig.speed || '30 ft';
@@ -79,13 +79,25 @@ function buildPrimalCompanionCreature({ monster, companionTypeConfig, displayNam
     };
 }
 
-function resolveMonsterActions(monster, wisModifier, spellAttackMod, spellSaveDc, hasBestialFury) {
+function resolveMonsterActions(monster, wisModifier, spellAttackMod, spellSaveDc, { hasBestialFury = false, proficiencyBonus = 0 } = {}) {
     const actions = (monster.actions || []).map(action => {
         const resolved = { ...action };
         resolved.damage_dice_primary = String(resolved.damage_dice_primary || '').replace(/WIS modifier/gi, String(wisModifier));
         let desc = String(resolved.description || '');
         desc = desc.replace(/WIS modifier/gi, String(wisModifier));
         desc = desc.replace(/spell attack modifier/gi, `+${spellAttackMod}`);
+        // MA-1344: caster-dependent grapple escape DC (Beast of the Sea —
+        // "escape DC = 8 + Proficiency Bonus + WIS modifier"). Same caster-
+        // fold seam as the WIS / spell-attack tokens above; the disk row
+        // authors hit_conditions only (never a baked escape_dc — the row is
+        // merged per-caster here). The MA-0010 hit-clause consumer
+        // (buildHitConditionClause → handlePlainDamage.applyHitClause-
+        // Conditions) reads escape_dc + grants Grappled with
+        // meta {dc, ability:'str', source}. Rows without authored
+        // hit_conditions stay byte-inert.
+        if (Array.isArray(resolved.hit_conditions) && resolved.hit_conditions.length > 0 && resolved.escape_dc == null) {
+            resolved.escape_dc = 8 + proficiencyBonus + wisModifier;
+        }
         if (hasBestialFury && resolved.name && resolved.name.includes("Beast's Strike")) {
             desc += ' (can be used twice per turn)';
             resolved.damage_type_primary = 'Force';

@@ -22427,7 +22427,7 @@
         "grappled"
       ],
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d6+2+WIS modifier Bludgeoning or Piercing damage (your choice), and the target has the Grappled condition (escape DC = 8 + Proficiency Bonus + WIS modifier).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1344-sea-grapple-rider-unauthored.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1345",
