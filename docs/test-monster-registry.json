@@ -6490,5 +6490,96 @@
       "verifiedRow": "MA-1420 (PASS-subset Multiattack: disk actions[0] header NO attack_bonus key = true zero-chip header sec440/sec701 - Multiattack row .mc-dice-link census [], header never pressed, zero roll/attack name:Multiattack entries whole-log multi=[]; described two-component combo fired BOTH components same turn round:1 const activeCreatureName const zero-Next clicks = sec66 count GM-adjudicated zero auto-grant consumer; Bite own-row +3 chip anchored strong.startsWith(Bite) sec824/§694 double-stack identical +3 text trap: 20 attacks, nat20 crit, formulas 1d4 + 1 Piercing byte-exact disk x9 hits non-crit, crit sec32 LIVE formula 1d4*2+1 collapsed single die flat +1 undoubled x2 (fd9 rolls[4], fd7 rolls[3]); Claws own-row +3 chip: 15 attacks, formulas 1d4 + 1 Slashing byte-exact x10 hits, honest misses nat2/3/4/5/6; boundary flips exact per component bonus +3: native AC12 misses nat<=8 + hits nat>=11, AC-rig 14 tie nat11+3=14 HIT targetAc:14 stamp sec199 + nat4->7/nat6->9/nat2->5 MISS sec806/sec887; press-to-log 1:1 35 attacks 21 hits 21 damage 21 hp_change, sumFd 98 == sum|hpD| 98 chain 999->901 unclamped maxHp999 rig sec181; zero save/DC entries whole-log sec117 (row saveDc null honored); only non-attack rollType initiative join-noise sec146; hybrid native el.click chip + Done ledger sec871; disk byte-match disk+manifest; admin clear cd+log API-verified empty quiet-recheck 2026-09-27)",
       "date": "2026-09-27"
     }
+  },
+  "Sahuagin Warrior": {
+    "monsterIndex": "sahuagin-warrior",
+    "placedIn": "test-campaign initiative via EB Join Encounter exact td Sahuagin Warrior (idx0 AC12 HP22); victim Bandit AC12 clean first via +NPC autocomplete fill→exact-li, HP→999 needs char-store POST AND full-store /combatSummary POST; armed on Warrior own-card target-select",
+    "config": {
+      "name": "Sahuagin Warrior 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1423 (PASS-subset Multiattack: header HAS authored attack_bonus:3 → clickable +3 chip, press = ONE generic roll attack name:Multiattack damageType:null zero-damage, no spray; Claw chip ×31 press↔log 1:1, 18 hits fd=die+1 1d6+1 Slashing, Σfd85==Σ|hp_change|, boundary nat9→12 tie-HIT/nat8→11 MISS, nat20 crit unobserved lineage-accepted; count-of-2 zero consumers = MA-0009 GM-adjudicated)",
+      "chips": "Multiattack header +3 chip (generic, zero dmg) + Claw +3 chip (full attack)",
+      "pitfalls": "change-data route stores under literal key — use /:CharName; cs HP needs dual POST; .creature-card not .initiative-card"
+    }
+  },
+  "Salamander": {
+    "monsterIndex": "salamander",
+    "placedIn": "test-campaign initiative via EB exact-row Salamander CR5 (substring matches Fire Snake/Inferno Master - read rows) idx0 AC15 HP90; victim Bandit 1 EB exact-row AC12 clean, HP→999 char-store+full-store /combatSummary POST+UI fill/Enter; armed on Salamander own-card combobox",
+    "config": {
+      "name": "Salamander 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1425 (PASS Multiattack: header attack_bonus:7 → +7 chip generic zero-damage one roll §MA-1423 fingerprint; Flame Spear chip ×15 both legs combined_damage_roll primary 2d8+4 Piercing + secondary 2d6 Fire split in breakdown, crit dice×2 flat+4 undoubled, Σdmg294==ΣhpΔ294; replace-with-Constrict clause consumerless MA-0009/0223 GM-adjudicated grep-proved) | MA-1426 (PASS standalone Flame Spear 19 presses both-legs) | MA-1427 Constrict FAIL(a): half-leak on success (dc_success unauthored) + attack_bonus:0 decoy drops primary Bludgeoning leg — see bug file",
+      "chips": "+7 header chip generic + Flame Spear +7 full both-legs + Constrict DC15 (own row)"
+    }
+  },
+  "Salamander Fire Snake": {
+    "monsterIndex": "salamander-fire-snake",
+    "placedIn": "test-campaign via EB exact-row Salamander Fire Snake (AC14 HP27); Bandit AC12 victim HP999 dual-POST, armed own-card",
+    "config": {
+      "name": "Salamander Fire Snake 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1428 (PASS Bite +4 46 presses, both legs combined_damage_roll 1d8+2 Piercing + 1d6 Fire, boundary nat8 tie-hit, crit 1d8*2+2 flat undoubled, Σ260==ΣhpΔ)",
+      "chips": "Bite +4 single chip both-legs"
+    }
+  },
+  "Salamander Inferno Master": {
+    "monsterIndex": "salamander-inferno-master",
+    "placedIn": "test-campaign via EB exact-row Salamander Inferno Master (AC18 HP256); victim Knight AC18 miss-rig (+NPC/EB) HP→999 dual-POST; armed own-card",
+    "config": {
+      "name": "Salamander Inferno Master 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1429 (PASS Multiattack: +12 header chip generic zero-dmg; Flame Trident ×32 comp-presses both-legs 2d8+7 Piercing + 4d6 Fire, tie nat6→18 HIT, crit 2d8*2+7=29+sec26; Σ806==ΣhpΔ)",
+      "chips": "+12 header + Flame Trident +12 both-legs + Inferno Blast DC18 Dex (own row MA-1431)"
+    }
+  },
+  "Satyr": {
+    "monsterIndex": "satyr",
+    "placedIn": "test-campaign via EB exact-row Satyr AC13 HP31; Bandit AC12 HP999 victim, armed own-card",
+    "config": {
+      "name": "Satyr 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1432 (PASS-subset Hooves +5 1d4+3 Bludgeoning, boundary nat6 miss/nat7 tie... nat6→11 miss observed, crit 1d4*2+3 undoubled flat; push clause zero-producer advisory: parsePushFeetClause reads save_effect only + regex misses 3rd-person pushes — MA-1401 lineage) | MA-1433 Mockery FAIL(a): half-leak on save success, dc_success unauthored (twin MA-1427) — data fix dc_success:none; Bandit WIS +0 not +1",
+      "chips": "Hooves +5 + Mockery DC12 Wis (own row)"
+    }
+  },
+  "Satyr Revelmaster": {
+    "monsterIndex": "satyr-revelmaster",
+    "placedIn": "test-campaign via EB exact-row Satyr Revelmaster AC17 HP82; Knight AC18 miss-rig victim HP→999; armed own-card",
+    "config": {
+      "name": "Satyr Revelmaster 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1434 (PASS-subset Multiattack +7 header chip generic zero-dmg; Prance comp ×8 honest AC18 boundary nat11 tie-hit, 2d8+4 Bludgeoning, Σ67; charm-te NOT granted on hits — note→MA-1435) | MA-1435 Prance FAIL(b)/DATA charm prose inert (hit_conditions unauthored) | MA-1436 Fey Melody FAIL(a)/DATA no chooser+spray+half-leak+fake-Line-picker; recharge 4-6 gate LIVE",
+      "chips": "+7 header + Prance +7 + Fey Melody (emanation, own row)"
+    }
+  },
+  "Scarecrow": {
+    "monsterIndex": "scarecrow",
+    "placedIn": "test-campaign via EB exact-row Scarecrow AC11 HP27; Bandit AC12 HP999 armed own-card",
+    "config": {
+      "name": "Scarecrow 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1437 FAIL(b)/DATA: attack leg +3 2d4+1 exact PASS, frightened hit-clause prose inert (hit_conditions unauthored, MA-1435 fingerprint)",
+      "chips": "Fearsome Claw +3 only"
+    }
+  },
+  "Scorpion": {
+    "monsterIndex": "scorpion",
+    "placedIn": "test-campaign via EB exact-row Scorpion CR0 (avoid Giant Scorpion over-match) AC11 HP1; Bandit AC12 HP999 full-store POST, armed Scorpion own-card",
+    "config": {
+      "name": "Scorpion 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1439 (PASS Sting: flat primary 1 Piercing via MA-0322 extractFlatHitDamage + 1d6 Poison both legs, crit flat-not-doubled sec 2d6, Σ49 exact)",
+      "chips": "Sting +2 flat+secondary"
+    }
+  },
+  "Scout": {
+    "monsterIndex": "scout",
+    "placedIn": "test-campaign via EB exact-row Scout AC13 HP16; Bandit AC12 HP999 armed own-card",
+    "config": {
+      "name": "Scout 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1440 (PASS-subset Multiattack +4 header generic zero-dmg; Shortsword 1d6+2 + Longbow 1d8+2 comp evidence Σ22)",
+      "chips": "+4 header + Shortsword +4 + Longbow +4"
+    }
   }
 }

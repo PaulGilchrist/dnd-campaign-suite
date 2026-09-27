@@ -23952,7 +23952,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1422",
@@ -23968,7 +23968,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1423",
@@ -23987,7 +23987,7 @@
       "range": "",
       "recharge": "",
       "description": "The sahuagin makes two Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1424",
@@ -24008,7 +24008,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 4 (1d6 + 1) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1425",
@@ -24027,7 +24027,7 @@
       "range": "",
       "recharge": "",
       "description": "The salamander makes two Flame Spear attacks. It can replace one attack with a use of Constrict.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1426",
@@ -24050,7 +24050,7 @@
       "range": "20/60 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 20/60 ft. Hit: 13 (2d8 + 4) Piercing damage plus 7 (2d6) Fire damage. Hit or Miss: The spear magically returns to the salamander's hand immediately after a ranged attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1427",
@@ -24077,7 +24077,7 @@
         "restrained"
       ],
       "description": "Strength Saving Throw: DC 15, one Large or smaller creature the salamander can see within 10 feet. Failure: 11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Fire damage. The target has the Grappled condition (escape DC 14), and it has the Restrained condition until the grapple ends.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1427-constrict.md"
     },
     {
       "id": "MA-1428",
@@ -24100,7 +24100,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Piercing damage plus 3 (1d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1429",
@@ -24119,7 +24119,7 @@
       "range": "",
       "recharge": "",
       "description": "The salamander makes two Flame Trident attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1430",
@@ -24142,7 +24142,7 @@
       "range": "30/90 ft.",
       "recharge": "",
       "description": "Melee or Ranged Attack Roll: +12, reach 5 ft. or range 30/90 ft. Hit: 16 (2d8 + 7) Piercing damage plus 14 (4d6) Fire damage. Hit or Miss: The trident magically returns to the salamander's hand immediately after a ranged attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1431",
@@ -24163,7 +24163,7 @@
       "range": "",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 18, each creature in a 30-foot-radius Sphere centered on a point the salamander can see within 120 feet. Failure: 35 (10d6) Fire damage, and the target starts burning, taking 5 (1d10) Fire damage at the start of each of its turns instead of the normal burning damage. The target gains 1 Exhaustion level whenever it takes this burning damage. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1432",
@@ -24184,7 +24184,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 5 (1d4 + 3) Bludgeoning damage. If the target is a Medium or smaller creature, the satyr pushes the target up to 10 feet straight away from itself.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1433",
@@ -24205,7 +24205,7 @@
       "range": "",
       "recharge": "",
       "description": "Wisdom Saving Throw: DC 12, one creature the satyr can see within 90 feet. Failure: 5 (1d6 + 2) Psychic damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1433-mockery-halfleak.md"
     },
     {
       "id": "MA-1434",
@@ -24224,7 +24224,7 @@
       "range": "",
       "recharge": "",
       "description": "The satyr makes three Prance attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1435",
@@ -24248,7 +24248,7 @@
         "charmed"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage, and the target has the Charmed condition until the start of the satyr's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1435-prance-charm-inert.md"
     },
     {
       "id": "MA-1436",
@@ -24274,7 +24274,7 @@
         "incapacitated"
       ],
       "description": "The satyr conjures a charming or frightening song. Wisdom Saving Throw: DC 14, each enemy in a 60-foot Emanation originating from the satyr. Failure: The target is subjected to the song's effect:Charming. The target has the Charmed condition for 1 minute. While Charmed, the target has the Incapacitated condition and uses all its movement to dance in place. The effect ends on the target if it takes any damage.Frightening. 10 (2d6 + 3) Psychic damage, and the target has the Frightened condition for 1 minute. If the target ends its turn out of line of sight from the satyr, the condition ends on it.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1436-fey-melody-variants.md"
     },
     {
       "id": "MA-1437",
@@ -24298,7 +24298,7 @@
         "frightened"
       ],
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 6 (2d4 + 1) Slashing damage, and the target has the Frightened condition until the end of the scarecrow's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1437-fearsome-claw.md"
     },
     {
       "id": "MA-1438",
@@ -24321,7 +24321,7 @@
         "paralyzed"
       ],
       "description": "Wisdom Saving Throw: DC 11, one creature the scarecrow can see within 30 feet. Failure: The target has the Frightened condition until the end of the scarecrow's next turn. While Frightened, the target has the Paralyzed condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1439",
@@ -24343,7 +24343,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 1 Piercing damage plus 3 (1d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1440",
@@ -24362,7 +24362,7 @@
       "range": "",
       "recharge": "",
       "description": "The scout makes two attacks, using Shortsword and Longbow in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1441",
