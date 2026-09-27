@@ -22920,7 +22920,7 @@
       "range": "",
       "recharge": "",
       "description": "The quasit casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1369-quasit-invisibility-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1370",

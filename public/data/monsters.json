@@ -50842,13 +50842,12 @@
       {
         "name": "Invisibility",
         "description": "The quasit casts <strong>Invisibility</strong> on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-        "attack_bonus": 0,
-        "save_dc": 0,
-        "save_type": "Charisma",
-        "save_effect": "",
-        "range": "",
-        "reach": "",
-        "recharge": ""
+        "spellcasting_ability": "Charisma",
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "invisible",
+          "rounds": 600
+        }
       },
       {
         "name": "Scare",
