@@ -22616,7 +22616,7 @@
       "range": "",
       "recharge": "",
       "description": "Intelligence Saving Throw: DC 10, one creature the ooze can see within 60 feet. Failure: 13 (3d8) Psychic damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1353-psychic-crush-half-on-success.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1354",

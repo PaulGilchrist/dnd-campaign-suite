@@ -50118,6 +50118,7 @@
         "save_dc": 10,
         "save_type": "Intelligence",
         "save_effect": "Failure: 13 (3d8) Psychic damage.",
+        "dc_success": "none",
         "range": "",
         "reach": "",
         "recharge": "",
