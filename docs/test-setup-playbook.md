@@ -870,3 +870,19 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - **Fingerprint:** flat-damage rows (no dice) resolve via `extractFlatHitDamage` (MonsterCardHelpers.js:2379) → `resolveAutoDamageResult` `parseConstant` (MonsterCardModal.jsx:1161) → `formula:"1" rolls:[] fd:1`; crit stays 1 (banner "DOUBLED" cosmetic §213) — adjudicate from log.
 - **Pitfall:** real-pointer chip presses can absorb 3× consecutively on some rows while native `el.click()` lands 8/8 — hybrid native-chip + real-pointer-Done is the reliable loop.
 - **Pitfall:** cs may ship only `currentHp/maxHp` (no `*HitPoints`) — don't fabricate extra HP keys (§352); popup DOM retains prior text post-flush — log-delta sole ledger.
+
+## §MA-1387..1392 (2026-09-27, batch) Pitfalls
+- **Fingerprint:** save_effect conditional prose "if cursed by X, also Paralyzed" is NEVER honest-advisory — `extractConditionsFromSaveEffect` (MonsterCardHelpers.js:341) whole-string `\bword\b` scan sprays ALL named conditions (incl. the `cursed` PRECONDITION itself) as grants on every failed save = over-grant FAIL(a). Fix = truncate save_effect + separate cursed-precondition rider mechanism (no such consumer exists app-wide).
+- **Note:** attack-hit-then-save lanes do NOT auto-fire — save on attack+save rows is a standalone inline affordance (`buildAttackChipSaveOptions` nulls saveDc on attack chip MonsterCardModal.jsx:981 MA-0551); `cursed` IS canonical (Helpers:52) and grants per-victim via save_effect word-scan without te.
+- **Note:** stage-1 popup Adv/Dis badges cosmetic (no re-adjudicate on click) — crit fishing = fresh presses only; whole-log `/DC/` substring = cheapest §117 machine-proof on pure-attack rows.
+
+## §MA-1397 (2026-09-27, Roc Talons FAIL(b)/DATA) New pitfalls
+- EB monster filter is pure substring: "Roc" matches Crocodile/"Giant Crocodile"/Vrock (cROCcodile, V-rock) — exact td-text anchor mandatory even on an apparently over-matched 4-row list; not a stale-filter bug.
+- §193 extended to DC-tokens: whole-entry `JSON.stringify(e)` `/DC/i` scans false-positive on UUID hex fragments — §117 zero-save machine-proof must enumerate log `type/rollType` + `lastAttack.saveDc/saveType/dcSuccess:null`, never a JSON-blob regex.
+- +13-vs-AC12 melee chip self-hunts crit+boundary pair in ~16 presses (nat20 crit + nat6→19 tie-HIT via AC-rig 19); +13-vs-AC12 structurally unmissable (nat1→14 §830) — miss faces ONLY via AC-rig (§887).
+
+## §MA-1395..1402 (2026-09-27, Roc/Roper/Rug batch) Pitfalls
+- **Pitfall:** earlier grep-census "armed twin (N)" notes can be WRONG on disk — `(13)` on rug was `save_dc` not `escape_dc`; always verify the exact `hit_conditions`+`escape_dc` pair directly on disk, never trust a numeric co-mention from a prior row's census.
+- **Fingerprint:** composite attack+save rows (save_dc + bare dice) wire BOTH chips to `handleSaveRoll` in the rollable branch (MonsterAction.jsx:131-142) → save-fail sprays full condition suite via `extractConditionsFromSaveEffect` with `meta{source}` but NO `dc` field (escape channel never used) + pays damage IMMEDIATE vs RAW turn-start DoT = FAIL(a)+FAIL(b)/DATA. Fix = move grants to `hit_conditions`+`escape_dc`, drop save_dc/damage from attack-row.
+- **Note:** junk "+0" press DOES stamp lastAttack (bonus:0, damageFormula:null) on some builds — adjudicate junk by bogus roll/attack + zero-damage ledger, not lastAttack presence (§MA-1232 variance).
+- **Note:** movement/pull rows (Reel MA-1401) with no distance subsystem + unreachable grapple precondition = §MA-1127/§9 RAW-advisory PASS-subset, NOT §MA-1344 (no discrete condition grant).
