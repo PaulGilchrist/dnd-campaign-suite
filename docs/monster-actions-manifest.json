@@ -22225,7 +22225,7 @@
       "range": "",
       "recharge": "",
       "description": "Strength Saving Throw: DC 12, one creature the poltergeist can see within 30 feet. Failure: 9 (2d6 + 2) Force damage, and the target is pushed up to 30 feet straight away from the poltergeist.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1334-poltergeist-telekinetic-thrust-half-default.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1335",

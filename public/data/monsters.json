@@ -49051,6 +49051,7 @@
         "save_dc": 12,
         "save_type": "Strength",
         "save_effect": "Failure: 9 (2d6 + 2) Force damage, and the target is pushed up to 30 feet straight away from the poltergeist",
+        "dc_success": "none",
         "range": "",
         "reach": "",
         "recharge": "",
