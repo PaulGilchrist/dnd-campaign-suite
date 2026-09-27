@@ -588,3 +588,67 @@ describe('sendAoePlayerSaves', () => {
     }));
   });
 });
+
+describe('MA-1352 ability_save_disadvantage (Psychic Gray Ooze Pseudopod) — AoE seams', () => {
+  const teFor = (target) => [{ target, effect: 'ability_save_disadvantage', ability: 'int', source: 'Psychic Gray Ooze 1', duration: 'until_start_of_next_turn' }];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hasEvasionForSave.mockReturnValue(false);
+    computeDamageAfterEvasion.mockReturnValue(4);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 5, damageReduced: false });
+    rollSaveForCreature.mockReturnValue({ roll: 3, total: 3, bonus: 0, success: false, rawRolls: [3, 1] });
+  });
+
+  function teRuntime(overrides = {}) {
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'campaign' && prop === 'targetEffects') return overrides.targetEffects || [];
+      return null;
+    });
+  }
+
+  it('processAoeNpcs: INT save pays Disadvantage from the ability-scoped te', () => {
+    teRuntime({ targetEffects: teFor('Bandit 1') });
+    processAoeNpcs({
+      combatSummary: makeCombatSummary([createNpcCreature('Bandit 1')]),
+      affected: [{ creature: createNpcCreature('Bandit 1'), gridX: 1, gridY: 1 }],
+      rawDamage: 8, damageType: 'Psychic', saveDc: 15, saveType: 'INT',
+      dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'Caster', characters: [],
+    });
+    expect(rollSaveForCreature).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Bandit 1' }), 'INT', 15, true, expect.anything());
+  });
+
+  it('processAoeNpcs: WIS save is unaffected by the INT te', () => {
+    teRuntime({ targetEffects: teFor('Bandit 1') });
+    processAoeNpcs({
+      combatSummary: makeCombatSummary([createNpcCreature('Bandit 1')]),
+      affected: [{ creature: createNpcCreature('Bandit 1'), gridX: 1, gridY: 1 }],
+      rawDamage: 8, damageType: 'Psychic', saveDc: 15, saveType: 'WIS',
+      dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'Caster', characters: [],
+    });
+    expect(rollSaveForCreature).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Bandit 1' }), 'WIS', 15, false, expect.anything());
+  });
+
+  it('sendAoePlayerSaves: prompt carries disadvantage on the matching save type only', () => {
+    utils.guid.mockReturnValue('guid-ability');
+    teRuntime({ targetEffects: teFor('Hero') });
+    sendAoePlayerSaves({
+      affected: [{ creature: createPlayerCreature('Hero') }], rawDamage: 8, damageType: 'Psychic', saveDc: 15, saveType: 'INT',
+      dcSuccess: 'none', campaignName: 'TestCampaign', spellName: 'Symbol', attackerName: 'Ooze', formula: '8d6',
+    });
+    expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      targetName: 'Hero', disadvantage: true,
+    }));
+
+    sendSavePrompt.mockClear();
+    sendAoePlayerSaves({
+      affected: [{ creature: createPlayerCreature('Hero') }], rawDamage: 8, damageType: 'Psychic', saveDc: 15, saveType: 'DEX',
+      dcSuccess: 'none', campaignName: 'TestCampaign', spellName: 'Symbol', attackerName: 'Ooze', formula: '8d6',
+    });
+    expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      targetName: 'Hero', disadvantage: false,
+    }));
+  });
+});

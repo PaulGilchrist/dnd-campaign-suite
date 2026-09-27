@@ -8,7 +8,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
-import { registerTargetEffect } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
+import { registerTargetEffect, abilitySaveDisadvantageActive } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../../services/rules/effects/expirationQueue.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
@@ -34,9 +34,12 @@ function computeNpcSave(targetName, ctx) {
         (Array.isArray(targetActiveConditions) && targetActiveConditions.some(c => String(c).toLowerCase() === 'slow'))
         || targetEffects.some(te => te.target === targetName && te.effect === 'dex_save_disadvantage')
     );
+    // MA-1352: ability-scoped ability_save_disadvantage te (MA-0016 hit-clause
+    // producer) — disadvantage only on saves of the te's chosen ability.
+    const abilitySaveDisadvantage = abilitySaveDisadvantageActive(targetEffects, targetName, saveType);
     const saveRollRaw1 = Math.floor(Math.random() * 20) + 1;
     const saveRollRaw2 = Math.floor(Math.random() * 20) + 1;
-    const hasSaveDisadvantage = isHeightenTarget || hasRiderDisadvantage || slowDexDisadvantage;
+    const hasSaveDisadvantage = isHeightenTarget || hasRiderDisadvantage || slowDexDisadvantage || abilitySaveDisadvantage;
     const saveRoll = hasSaveDisadvantage ? Math.min(saveRollRaw1, saveRollRaw2) : saveRollRaw1;
     const saveTotal = saveRoll + saveBonus;
     const success = saveTotal >= saveDc;

@@ -2,15 +2,19 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getAllyList } from '../../hooks/useAllySelection.js';
 import utils from '../../services/ui/utils.js';
+import { abilitySaveDisadvantageActive } from '../../services/combat/conditions/targetEffectDefinitions.js';
 
 export function getSaveDisadvantage(current, campaignName) {
   if (!current) return false;
   if (current.disadvantage) return true;
   const saveType = (current.saveType || '').toLowerCase();
+  const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+  // MA-1352: ability-scoped ability_save_disadvantage te (MA-0016 hit-clause
+  // producer) — disadvantage only on saves of the te's chosen ability.
+  if (abilitySaveDisadvantageActive(targetEffects, current.targetName, saveType)) return true;
   if (saveType !== 'dex') return false;
   const targetConditions = getRuntimeValue(current.targetName, 'activeConditions', campaignName) || [];
   if (targetConditions.some(c => String(c).toLowerCase() === 'charmed')) return true;
-  const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
   if (targetEffects.some(te => te.target === current.targetName && te.effect === 'ottos_irresistible_dance')) return true;
   // SP-109: Slow imposes disadvantage on DEX saves (house model of the RAW -2 penalty).
   if (targetConditions.some(c => String(c).toLowerCase() === 'slow')) return true;

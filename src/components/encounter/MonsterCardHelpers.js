@@ -670,10 +670,25 @@ export function hitChoiceArmed(action) {
   return Array.isArray(action?.hit_choice?.options) && action.hit_choice.options.length > 0;
 }
 
+// MA-1352: Psychic Gray Ooze Pseudopod ability-scoped save-disadv rider —
+// "the target has Disadvantage on Intelligence saving throws until the end of
+// the ooze's next turn". hit_target_effect rides the registered te key
+// (ability_save_disadvantage); hit_target_effect_ability carries the chosen
+// ability abbreviation and is validated against the six abilities. Byte-inert
+// outside authored rows (keys absent = null = no ability payload).
+const HIT_EFFECT_ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+export function parseHitTargetEffectAbility(action) {
+  const raw = action?.hit_target_effect_ability;
+  if (typeof raw !== 'string') return null;
+  const ability = toAbbr(raw.trim().toLowerCase());
+  return HIT_EFFECT_ABILITIES.includes(ability) ? ability : null;
+}
+
 export function buildHitConditionClause(action) {
   const autoGrantSuppressed = hitChoiceArmed(action);
   const conditions = !autoGrantSuppressed && Array.isArray(action?.hit_conditions) ? action.hit_conditions.map(c => String(c).toLowerCase()) : [];
   const targetEffect = action?.hit_target_effect || null;
+  const targetEffectAbility = targetEffect ? parseHitTargetEffectAbility(action) : null;
   const conditionRoll = parseHitConditionRoll(action);
   if (conditions.length === 0 && !targetEffect && !conditionRoll) return null;
   return {
@@ -681,6 +696,7 @@ export function buildHitConditionClause(action) {
     escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,
     attackName: action?.name || 'Attack',
     targetEffect,
+    ...(targetEffectAbility ? { targetEffectAbility } : {}),
     ...(conditionRoll ? { conditionRoll } : {}),
   };
 }

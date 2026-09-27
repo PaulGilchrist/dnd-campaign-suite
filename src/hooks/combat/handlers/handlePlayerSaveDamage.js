@@ -17,6 +17,7 @@ import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getHolyAuraTargets } from '../../../services/automation/handlers/buffs/holyAuraHandler.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { findTargetByContext } from './damageHandlerUtils.js';
+import { abilitySaveDisadvantageActive } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 
 function computeIndomitableMax(level) {
     return level >= 17 ? 3 : level >= 13 ? 2 : 1;
@@ -101,7 +102,7 @@ async function applyForcedSuccessSave({ context, combatSummary, target, characte
     return true;
 }
 
-async function resolvePlayerSaveDisadvantage({ context, target, campaignName, characterName, targetEffects, restoreBalance }) {
+async function resolvePlayerSaveDisadvantage({ context, target, campaignName, characterName, targetEffects, restoreBalance, saveType }) {
     const coronaDisadvantage = getCoronaSaveDisadvantage({
         targetName: target.name,
         campaignName,
@@ -114,7 +115,10 @@ async function resolvePlayerSaveDisadvantage({ context, target, campaignName, ch
         targetName: target.name,
     });
     const hasRiderSaveDisadvantage = targetEffects.some(te => te.effect === 'disadvantage_on_next_save');
-    let saveDisadvantage = (context?.metamagicHeighten || false) || coronaDisadvantage || elderChampionDisadvantage.disadvantage || hasRiderSaveDisadvantage;
+    // MA-1352: ability-scoped ability_save_disadvantage te (MA-0016 hit-clause
+    // producer) — disadvantage only on saves of the te's chosen ability.
+    const hasAbilitySaveDisadvantage = abilitySaveDisadvantageActive(targetEffects, target.name, saveType);
+    let saveDisadvantage = (context?.metamagicHeighten || false) || coronaDisadvantage || elderChampionDisadvantage.disadvantage || hasRiderSaveDisadvantage || hasAbilitySaveDisadvantage;
     if (restoreBalance && saveDisadvantage) {
         const disadvantageSources = [context?.metamagicHeighten, coronaDisadvantage, elderChampionDisadvantage.disadvantage].filter(Boolean).length;
         saveDisadvantage = disadvantageSources > 1;
@@ -296,7 +300,7 @@ export function createPlayerSaveDamageHandler(deps) {
         }
 
         const promptId = utils.guid();
-        const saveDisadvantage = await resolvePlayerSaveDisadvantage({ context, target, campaignName, characterName, targetEffects, restoreBalance });
+        const saveDisadvantage = await resolvePlayerSaveDisadvantage({ context, target, campaignName, characterName, targetEffects, restoreBalance, saveType });
         const saveAdvantage = computePlayerSaveAdvantage({ targetConditionEffects, saveType, target, campaignName });
 
         const pendingData = buildPendingData({ context, target, campaignName, characterName, setPopupHtml, name, formula, modifier, rolls, adjustedTotal, saveDc, saveType, dcSuccess, damageType, saveDisadvantage, saveAdvantage });

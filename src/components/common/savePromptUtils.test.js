@@ -89,3 +89,33 @@ describe('getSaveDisadvantage — SP-109 Slow DEX save enforcement', () => {
     expect(getSaveDisadvantage({ targetName: 'Zombie 1', saveType: 'DEX' }, 'test-campaign')).toBe(false);
   });
 });
+
+describe('MA-1352 getSaveDisadvantage — ability-scoped ability_save_disadvantage te', () => {
+  const teInt = [{ target: 'Thug 1', effect: 'ability_save_disadvantage', ability: 'int', source: 'Psychic Gray Ooze 1', duration: 'until_start_of_next_turn' }];
+
+  beforeEach(() => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'targetEffects') return teInt;
+      return null;
+    });
+  });
+
+  it('true on INT saves (full word or abbreviation)', () => {
+    expect(getSaveDisadvantage({ targetName: 'Thug 1', saveType: 'Intelligence' }, 'test-campaign')).toBe(true);
+    expect(getSaveDisadvantage({ targetName: 'Thug 1', saveType: 'INT' }, 'test-campaign')).toBe(true);
+  });
+
+  it('false on every other save type', () => {
+    expect(getSaveDisadvantage({ targetName: 'Thug 1', saveType: 'DEX' }, 'test-campaign')).toBe(false);
+    expect(getSaveDisadvantage({ targetName: 'Thug 1', saveType: 'WIS' }, 'test-campaign')).toBe(false);
+  });
+
+  it('false for a different target and byte-inert without the te', () => {
+    expect(getSaveDisadvantage({ targetName: 'Other 1', saveType: 'INT' }, 'test-campaign')).toBe(false);
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'targetEffects') return [];
+      return null;
+    });
+    expect(getSaveDisadvantage({ targetName: 'Thug 1', saveType: 'INT' }, 'test-campaign')).toBe(false);
+  });
+});

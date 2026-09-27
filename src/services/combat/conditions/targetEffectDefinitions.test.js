@@ -4,7 +4,7 @@
 // @improved-by-ai
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect } from './targetEffectDefinitions.js';
+import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect, abilitySaveDisadvantageActive } from './targetEffectDefinitions.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -576,6 +576,63 @@ describe('targetEffectDefinitions', () => {
       expect(getActiveTargetEffect(campaignName, 'Ally2', 'concentration_disadvantage')).toBeNull();
       getRuntimeValue.mockReturnValue(undefined);
       expect(getActiveTargetEffect(campaignName, 'Ally1', 'concentration_disadvantage')).toBeNull();
+    });
+  });
+
+  describe('MA-1352 ability_save_disadvantage (Psychic Gray Ooze Pseudopod)', () => {
+    const te = (over = {}) => ({
+      target: 'Bandit 1',
+      effect: 'ability_save_disadvantage',
+      ability: 'int',
+      source: 'Psychic Gray Ooze 1',
+      duration: 'until_start_of_next_turn',
+      ...over,
+    });
+
+    it('registers ability_save_disadvantage in Saves & Checks with the hex byte-shape whitelist', () => {
+      const savesChecks = TARGET_EFFECT_DEFINITIONS.filter((d) => d.group === 'Saves & Checks').map((d) => d.effect);
+      expect(savesChecks).toContain('ability_save_disadvantage');
+      const def = getEffectDefinition('ability_save_disadvantage');
+      expect(def.label).toBe('Save Disadv (Ability)');
+      expect(def.cls).toBe('effect-disadvantage');
+      expect(def.icon).toBe('fa-shield');
+      expect(def.fields).toEqual(['ability', 'source']);
+      expect(def.defaults).toBeUndefined();
+      expect(def.description).toMatch(/chosen ability/i);
+    });
+
+    it('matcher: full-word and abbreviation save types match the int te', () => {
+      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'Intelligence')).toBe(true);
+      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'INT')).toBe(true);
+      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'int')).toBe(true);
+    });
+
+    it('matcher: other save types and other targets stay unaffected', () => {
+      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'DEX')).toBe(false);
+      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'Wisdom')).toBe(false);
+      expect(abilitySaveDisadvantageActive([te()], 'Other 1', 'Intelligence')).toBe(false);
+    });
+
+    it('matcher: no te / no te-list / no saveType are all false (inert)', () => {
+      expect(abilitySaveDisadvantageActive([], 'Bandit 1', 'Intelligence')).toBe(false);
+      expect(abilitySaveDisadvantageActive(undefined, 'Bandit 1', 'Intelligence')).toBe(false);
+      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', '')).toBe(false);
+      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', undefined)).toBe(false);
+    });
+
+    it('matcher: te without an ability payload or with the wrong ability never matches', () => {
+      const noAbility = te();
+      delete noAbility.ability;
+      expect(abilitySaveDisadvantageActive([noAbility], 'Bandit 1', 'Intelligence')).toBe(false);
+      expect(abilitySaveDisadvantageActive([te({ ability: 'dex' })], 'Bandit 1', 'Intelligence')).toBe(false);
+    });
+
+    it('matcher: a separate next_save te does not leak into the ability-scoped match', () => {
+      expect(abilitySaveDisadvantageActive(
+        [{ target: 'Bandit 1', effect: 'disadvantage_on_next_save', source: 'X' }],
+        'Bandit 1',
+        'Intelligence',
+      )).toBe(false);
     });
   });
 

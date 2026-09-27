@@ -651,10 +651,16 @@ function maybeApplyHitClause({ context, target, applyResult, campaignName, logEn
 // applyHealingDirectly via healingBlock.js) and expires it anchored on the
 // spirit (attacker) — fires at the spirit's NEXT turn start (stepOfTheWind
 // until_start_of_next_turn + CLA-345 expireOnCreatureName pattern).
+// MA-1352: ability-scoped riders (ability_save_disadvantage) pass their
+// chosen ability on the te payload so save-roll consumers can scope the
+// disadvantage to the right save type; rows without hit_target_effect_ability
+// register byte-identical to the MA-0016 no_healing shape.
 function applyHitClauseTargetEffect({ hitClause, target, attackerName, campaignName, logEntry }) {
     const def = getEffectDefinition(hitClause.targetEffect);
+    const ability = hitClause.targetEffectAbility || null;
     registerTargetEffect(campaignName, target.name, hitClause.targetEffect, attackerName, {
         duration: 'until_start_of_next_turn',
+        ...(ability ? { ability } : {}),
     });
     addExpiration({
         attackerName,
@@ -668,11 +674,11 @@ function applyHitClauseTargetEffect({ hitClause, target, attackerName, campaignN
         type: 'condition',
         action: 'applied',
         characterName: target.name,
-        condition: def?.label || hitClause.targetEffect,
+        condition: `${def?.label || hitClause.targetEffect}${ability ? ` (${ability.toUpperCase()})` : ''}`,
         reason: `${hitClause.attackName} — until the start of ${attackerName}'s next turn`,
         note: hitClause.targetEffect === 'no_healing'
             ? `Healing blocked for ${target.name} (GM-enforced for direct-HP writes: turn-start ticks, rests, initiative-card HP edits).`
-            : `${def?.description || hitClause.targetEffect} applied to ${target.name} (anchor expiry fires at ${attackerName}'s next turn start; RAW end-of-turn anchor is advisory).`,
+            : `${def?.description || hitClause.targetEffect} applied to ${target.name}${ability ? ` (${ability.toUpperCase()} saves only)` : ''} (anchor expiry fires at ${attackerName}'s next turn start; RAW end-of-turn anchor is advisory).`,
         timestamp: Date.now(),
     });
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

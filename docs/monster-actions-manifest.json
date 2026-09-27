@@ -22595,7 +22595,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 11 (3d6 + 1) Acid damage, and the target has Disadvantage on Intelligence saving throws until the end of the ooze's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1352-psychic-gray-ooze-pseudopod-int-save-disadv-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1353",

@@ -8,7 +8,7 @@ import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } fro
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
-import { registerTargetEffect, getActiveTargetEffect, getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js';
+import { registerTargetEffect, getActiveTargetEffect, getEffectDefinition, abilitySaveDisadvantageActive } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRules.js';
 import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
@@ -256,9 +256,15 @@ function buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD
 }
 
 async function processNpcSave({ target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName }) {
-    const effectiveD20ForSave = applyCosmicOmenToSave(context.effectiveD20, campaignName);
-
     const allTargetEffectsForSave = getRuntimeValue('campaign', 'targetEffects') || [];
+    // MA-1352: ability-scoped ability_save_disadvantage te (Psychic Gray Ooze
+    // Pseudopod hit-clause) forces Disadvantage on saves of the chosen ability
+    // until the source's next turn — card-chip seam consumes min(r1, r2).
+    if (abilitySaveDisadvantageActive(allTargetEffectsForSave, targetName, saveType)) {
+        context.effectiveD20 = Math.min(r1, r2);
+        context.forcedMode = 'disadvantage';
+    }
+    const effectiveD20ForSave = applyCosmicOmenToSave(context.effectiveD20, campaignName);
     const { baneSavePenalty, baneSaveRoll, baneSaveDisplayLabel } = rollBaneSavePenalty(allTargetEffectsForSave, targetName);
     const { baneAttackerBonus, baneAttackerRoll, baneAttackerDisplayLabel } = rollBaneAttackerBonus(allTargetEffectsForSave, attackerName);
     const { blessSaveBonus, blessSaveRoll } = rollBlessSaveBonus(allTargetEffectsForSave, targetName);

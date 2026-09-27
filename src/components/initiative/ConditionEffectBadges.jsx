@@ -243,6 +243,11 @@ const BADGE_SPECS = [
         guard: ctx => ctx.effects.riderSaveDisadvantage,
         build: () => ({ label: 'Save Disadv', cls: 'effect-debuff', icon: 'fa-shield', removable: true, removeAction: 'target_effect', effectType: 'disadvantage_on_next_save' }),
     },
+    // MA-1352: Psychic Gray Ooze Pseudopod ability-scoped save-disadv te badge.
+    {
+        find: ctx => findDirect(ctx, 'ability_save_disadvantage'),
+        build: ctx => ({ label: `Save Disadv (${(ctx.te?.ability || '').toUpperCase()})`, cls: 'effect-debuff', icon: 'fa-shield', removable: true, removeAction: 'target_effect', effectType: 'ability_save_disadvantage', tooltip: `Disadvantage on ${(ctx.te?.ability || '').toUpperCase()} saving throws by ${ctx.te?.source || 'unknown'} until the end of the source's next turn` }),
+    },
     {
         guard: ctx => ctx.effects.saveDisadvantageCount > 0,
         build: buildSaveDisadvBadge,

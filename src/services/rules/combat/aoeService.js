@@ -5,6 +5,7 @@ import utils from '../../ui/utils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCoronaSaveDisadvantage } from '../../combat/auras/coronaAuraUtils.js';
 import { isCircleOfPowerActive } from '../../automation/handlers/buffs/circleOfPowerHandler.js';
+import { abilitySaveDisadvantageActive } from '../../combat/conditions/targetEffectDefinitions.js';
 
 function hasSoulstitchProtection(targetName, attackerName, campaignName) {
     if (!attackerName) return false;
@@ -37,7 +38,7 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
   return affected;
 }
 
-function resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget) {
+function resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget, saveType) {
   const coronaResult = getCoronaSaveDisadvantage({
     targetName: creature.name,
     campaignName,
@@ -53,6 +54,9 @@ function resolveNpcSaveDisadvantage(creature, campaignName, damageType, heighten
     setRuntimeValue('campaign', 'targetEffects', [...targetEffects], campaignName);
     return true;
   }
+  // MA-1352: ability-scoped ability_save_disadvantage te (Psychic Gray Ooze
+  // Pseudopod) — scoped to the save type being rolled, NOT consumed here.
+  if (abilitySaveDisadvantageActive(targetEffects, creature.name, saveType)) return true;
   return false;
 }
 
@@ -60,7 +64,7 @@ export function processAoeNpcs({ combatSummary, affected, rawDamage, damageType,
   const results = [];
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
-    const disadvantage = resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget);
+    const disadvantage = resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget, saveType);
     const advantage = isCircleOfPowerActive(creature.name, campaignName);
     const saveResult = rollSaveForCreature(creature, saveType, saveDc, disadvantage, advantage);
     const isSoulstitchProtected = hasSoulstitchProtection(creature.name, attackerName, campaignName);
@@ -102,7 +106,10 @@ export function sendAoePlayerSaves({ affected, rawDamage, damageType, saveDc, sa
     const heightenDisadvantage = !!(heightenTarget && creature.name === heightenTarget);
     const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const hasRiderDisadvantage = targetEffects.some(te => te.target === creature.name && te.effect === 'disadvantage_on_next_save');
-    const disadvantage = coronaResult.disadvantage || heightenDisadvantage || hasRiderDisadvantage;
+    // MA-1352: ability-scoped ability_save_disadvantage te (MA-0016 hit-clause
+    // producer) — disadvantage only on saves of the te's ability.
+    const hasAbilitySaveDisadvantage = abilitySaveDisadvantageActive(targetEffects, creature.name, saveType);
+    const disadvantage = coronaResult.disadvantage || heightenDisadvantage || hasRiderDisadvantage || hasAbilitySaveDisadvantage;
 
     sendSavePrompt(campaignName, {
       promptId,

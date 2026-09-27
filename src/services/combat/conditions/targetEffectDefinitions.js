@@ -410,6 +410,22 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { ability: 'wis' },
   },
   {
+    // MA-1352: Psychic Gray Ooze Pseudopod hit-clause rider — "the target has
+    // Disadvantage on Intelligence saving throws until the end of the ooze's
+    // next turn". Ability-scoped generic te (hex byte-shape fields): the
+    // ability rides the te payload (row hit_target_effect_ability, threaded by
+    // buildHitConditionClause + applyHitClauseTargetEffect). Save-roll
+    // consumers match via abilitySaveDisadvantageActive (non-consuming — the
+    // te survives until the attacker-anchored expiration clock).
+    effect: 'ability_save_disadvantage',
+    label: 'Save Disadv (Ability)',
+    description: 'Disadvantage on saving throws of the chosen ability until the end of the source\'s next turn.',
+    icon: 'fa-shield',
+    cls: 'effect-disadvantage',
+    group: 'Saves & Checks',
+    fields: ['ability', 'source'],
+  },
+  {
     effect: 'disadvantage_on_next_save',
     label: 'Save Disadv (Next)',
     description: 'Disadvantage on the creature\'s next saving throw.',
@@ -1356,4 +1372,18 @@ function getActiveTargetEffect(campaignName, targetName, effectKey) {
   return storedEffects.find(te => te.target === targetName && te.effect === effectKey) || null
 }
 
-export { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect }
+/**
+ * MA-1352: ability-scoped save-disadvantage consumer match. saveType arrives
+ * at the save-roll seams as a full word ('Intelligence') or abbreviation;
+ * te.ability stores the lowercase abbreviation ('int'). Non-consuming — the
+ * te persists until its anchored expiration clock clears it.
+ */
+function abilitySaveDisadvantageActive(targetEffects, targetName, saveType) {
+  const abbr = String(saveType || '').toLowerCase().slice(0, 3)
+  if (!abbr) return false
+  return (targetEffects || []).some(te => te.target === targetName
+    && te.effect === 'ability_save_disadvantage'
+    && String(te.ability || '').toLowerCase() === abbr)
+}
+
+export { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect, abilitySaveDisadvantageActive }

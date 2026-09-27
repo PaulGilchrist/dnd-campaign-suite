@@ -644,6 +644,15 @@ const LATE_TARGET_EFFECT_HANDLERS = {
       effects.saveDisadvantage.push('dex');
     }
   },
+  // MA-1352: Psychic Gray Ooze Pseudopod ability-scoped save-disadv te —
+  // pushes the chosen ability (no saveDisadvantageCount bump, mirroring the
+  // dex sibling; the dedicated ConditionEffectBadges spec renders the badge).
+  ability_save_disadvantage: (effects, te) => {
+    const ability = String(te?.ability || '').toLowerCase().slice(0, 3);
+    if (ability && !effects.saveDisadvantage.includes(ability)) {
+      effects.saveDisadvantage.push(ability);
+    }
+  },
   // Handle Heroism — Advantage on Wisdom saving throws
   wisdom_save_advantage: (effects, te) => {
     effects.saveAdvantageAbilities = [...(effects.saveAdvantageAbilities || []), 'WIS'];

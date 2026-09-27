@@ -22,6 +22,7 @@ import { triggerViciousMockeryForGeneric } from '../../../services/rules/feature
 import { grantInfernalWound } from '../../../services/rules/features/infernalWoundService.js';
 import { stagePetrifyingBiteTargets } from '../../../services/rules/features/cockatricePetrifyService.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp } from './damageHandlerUtils.js';
+import { abilitySaveDisadvantageActive } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage', 'SaveResult', 'SaveRoll', 'SaveBonus', 'SaveRawRolls', 'DcSuccess'];
 const SECONDARY_POPUP_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
@@ -88,14 +89,22 @@ function resolveSaveModifiers(characters, targetName) {
     return character?.saveModifiers || character?.computedStats?.saveModifiers || [];
 }
 
+// MA-1352: ability-scoped ability_save_disadvantage te (Psychic Gray Ooze
+// Pseudopod hit-clause) — scoped to the save type being rolled, NOT consumed
+// (the te persists until its attacker-anchored expiration clock).
+function abilityScopedSaveDisadvantage(targetName, campaignName, saveType) {
+    return abilitySaveDisadvantageActive(getRuntimeValue('campaign', 'targetEffects', campaignName) || [], targetName, saveType);
+}
+
 // Resolve save disadvantage: forced (heightened) → consumed targetEffect stamp →
-// corona aura → elder champion aura. Short-circuits on the first hit, exactly
-// mirroring the original sequential checks.
-async function resolveSaveDisadvantage({ targetName, campaignName, damageType, attackerName, attackerStats, forceDisadvantage, consumeTargetEffect }) {
+// ability-scoped te → corona aura → elder champion aura. Short-circuits on the
+// first hit, exactly mirroring the original sequential checks.
+async function resolveSaveDisadvantage({ targetName, campaignName, damageType, attackerName, attackerStats, forceDisadvantage, consumeTargetEffect, saveType }) {
     if (forceDisadvantage) return true;
     if (consumeTargetEffect && consumeDisadvantageStamp(targetName, campaignName)) {
         return true;
     }
+    if (abilityScopedSaveDisadvantage(targetName, campaignName, saveType)) return true;
     const coronaResult = getCoronaSaveDisadvantage({ targetName, campaignName, damageType, skipRangeCheck: true });
     if (coronaResult.disadvantage) return true;
     const elderChampionResult = await getElderChampionSaveDisadvantage({ attackerName, attackerStats, targetName });
@@ -169,6 +178,7 @@ async function resolveSecondarySaveResult({ target, context, saveResult, advanta
         attackerStats: context?.playerStats,
         forceDisadvantage: context.metamagicHeighten || false,
         consumeTargetEffect: false,
+        saveType: context.saveType,
     });
     return rollSaveForCreature(target, context.saveType, context.saveDc, secondaryDisadvantage, advantage);
 }
@@ -319,6 +329,7 @@ async function handleTwinSaveTarget({ name, modifier, context, combatSummary, ta
         attackerStats: playerStats,
         forceDisadvantage: context?.metamagicHeighten || false,
         consumeTargetEffect: true,
+        saveType,
     });
     const twinAdvantage = hasSpellOrigin(resolveSaveModifiers(characters, twinTarget.name), context, campaignName);
     const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage, twinAdvantage);
@@ -418,7 +429,8 @@ async function handleMultiSaveTarget({ name, modifier, context, combatSummary, t
     }
 
     const multiAdvantage = hasSpellOrigin(resolveSaveModifiers(characters, multiTarget.name), context, campaignName);
-    const multiDisadvantage = consumeDisadvantageStamp(multiTarget.name, campaignName);
+    const multiDisadvantage = consumeDisadvantageStamp(multiTarget.name, campaignName)
+        || abilityScopedSaveDisadvantage(multiTarget.name, campaignName, saveType);
     const multiSaveResult = rollSaveForCreature(multiTarget, saveType, saveDc, multiDisadvantage, multiAdvantage);
     const multiFinalDamage = applyPotentCantripHalfDamage(computeDamageAfterSave(adjustedTotal, multiSaveResult.success, dcSuccess), { isSoulstitchProtected: false, hasPotentFlag, isCantripFlag, saveSuccess: multiSaveResult.success, dcSuccess, adjustedTotal });
     logEntry(buildMultiSaveLogData({ characterName, name, modifier, context, multiTarget, saveType, saveDc, multiSaveResult, damageType, adjustedTotal, displayRolls, formula, gwfBaseRolls, gwfDisplayRolls }));
@@ -660,6 +672,7 @@ export function createNpcSaveDamageHandler(deps) {
             attackerStats: playerStats,
             forceDisadvantage: Boolean(context?.metamagicHeighten),
             consumeTargetEffect: true,
+            saveType,
         });
         const { targetCharacter, saveResult, advantage, finalDamage, isCantripFlag, hasPotentFlag, isSoulstitchProtected } = rollTargetSaveDamage({
             context, target, characters, combatSummary, campaignName, characterName, disadvantage, saveType, saveDc, dcSuccess, adjustedTotal, logEntry,

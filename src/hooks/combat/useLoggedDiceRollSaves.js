@@ -13,8 +13,9 @@ import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
 import { hasIgnoreResistance, evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import utils from '../../services/ui/utils.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
+import { abilitySaveDisadvantageActive } from '../../services/combat/conditions/targetEffectDefinitions.js';
 
-function consumeSaveDisadvantage(targetEffects, pending, campaignName) {
+function consumeSaveDisadvantage(targetEffects, pending, campaignName, saveType) {
     let disadvantage = pending.metamagicHeighten || false;
     const idx = targetEffects.findIndex(te => te.target === pending.targetName && te.effect === 'disadvantage_on_next_save');
     if (idx !== -1) {
@@ -22,6 +23,9 @@ function consumeSaveDisadvantage(targetEffects, pending, campaignName) {
         targetEffects.splice(idx, 1);
         setRuntimeValue('campaign', 'targetEffects', [...targetEffects], campaignName);
     }
+    // MA-1352: ability-scoped ability_save_disadvantage te (Psychic Gray Ooze
+    // Pseudopod) — scoped to the pending save type, NOT consumed (anchor clock).
+    if (abilitySaveDisadvantageActive(targetEffects, pending.targetName, pending.saveType || saveType)) disadvantage = true;
     return disadvantage;
 }
 
@@ -309,7 +313,7 @@ export function createSaves(deps) {
         if (!target) return;
 
         const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-        const disadvantage = consumeSaveDisadvantage(targetEffects, pending, campaignName);
+        const disadvantage = consumeSaveDisadvantage(targetEffects, pending, campaignName, saveType);
 
         const baneSave = rollBaneSavePenalty(targetEffects, pending);
         const baneAttacker = rollBaneAttackerBonus(targetEffects, pending);
