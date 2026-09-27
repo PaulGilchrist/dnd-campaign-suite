@@ -51888,7 +51888,12 @@
         "damage_dice_primary": "2d10 + 7",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "4d6",
-        "damage_type_secondary": "Fire"
+        "damage_type_secondary": "Fire",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 17
       }
     ],
     "bonus_actions": [
