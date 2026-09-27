@@ -130,7 +130,7 @@ describe('MA-1020 Imp Shape-Shift disk data — dedicated monster_shape_shift la
     expect(isUtilitySpellCastRow(SHAPE_ROW)).toBe(false);
   });
 
-  it('whole-database scan: monster_shape_shift arms imp/Shape-Shift + MA-1113 lizardfolk-shaman/Change Shape + MA-1260 oni/Shape-Shift (pin inverted post-MA-1113/MA-1260 §216)', () => {
+  it('whole-database scan: monster_shape_shift arms imp/Shape-Shift + MA-1113 lizardfolk-shaman/Change Shape + MA-1260 oni/Shape-Shift + MA-1371 quasit/Shape-Shift (pin inverted post-MA-1113/MA-1260/MA-1371 §216)', () => {
     const armed = [];
     for (const mo of monstersData) {
       for (const key of ['actions', 'legendary_actions', 'reactions']) {
@@ -139,7 +139,7 @@ describe('MA-1020 Imp Shape-Shift disk data — dedicated monster_shape_shift la
         }
       }
     }
-    expect(armed).toEqual(['imp/Shape-Shift', 'lizardfolk-shaman/Change Shape (Recharges after a Short or Long Rest)', 'oni/Shape-Shift']);
+    expect(armed).toEqual(['imp/Shape-Shift', 'lizardfolk-shaman/Change Shape (Recharges after a Short or Long Rest)', 'oni/Shape-Shift', 'quasit/Shape-Shift']);
   });
 });
 

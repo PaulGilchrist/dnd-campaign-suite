@@ -22961,7 +22961,7 @@
       "range": "",
       "recharge": "",
       "description": "The quasit shape-shifts to resemble a bat (Speed 10 ft., Fly 40 ft.), a centipede (40 ft., Climb 40 ft.), or a toad (40 ft., Swim 40 ft.), or it returns to its true form. Its game statistics are the same in each form, except for its Speed. Any equipment it is wearing or carrying isn't transformed.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1371-quasit-shape-shift.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1372",
