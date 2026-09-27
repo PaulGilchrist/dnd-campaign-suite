@@ -111,7 +111,21 @@ const planetarRow = planetar.actions.find(a => a.name === 'Spellcasting');
 const PT_NAMES = ['Detect Evil and Good', 'Commune', 'Control Weather', 'Dispel Evil and Good', 'Raise Dead'];
 const PT_ONE_DAY = ['Commune', 'Control Weather', 'Dispel Evil and Good', 'Raise Dead'];
 const PT_AT_WILL = ['Detect Evil and Good'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES])];
+// MA-1339 priest extension (same MA-0421/MA-1230/MA-1327 markup-gap family):
+// all three spell names were plain text, tier headers only carried <strong> →
+// extractSpellNamesFromSpellcasting [] → zero chips; the junk "+0" (attack_bonus
+// 0, night-hag MA-1230 twin, out of scope §490) was the row's sole clickable
+// control, and prose-only DC meant the §54/MA-0860 DC-Unknown lane. DATA fix:
+// <strong> on each name + row-level numeric save_dc 13 (8 + WIS +3 + PB +2,
+// computed from disk) + save_type "Wisdom" (§89 pair). 5e spells.json Spirit
+// Guardians carries NO damage/dc struct → routesToSave false → advisory cast
+// lane w/ spend (CLA-325), Light/Thaumaturgy At Will ungated (§57).
+const priest = monsters.find(m => m.index === 'priest');
+const priestRow = priest.actions.find(a => a.name === 'Spellcasting');
+const PR_NAMES = ['Light', 'Thaumaturgy', 'Spirit Guardians'];
+const PR_ONE_DAY = ['Spirit Guardians'];
+const PR_AT_WILL = ['Light', 'Thaumaturgy'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -126,6 +140,7 @@ const PM_PLAIN_ORIGINAL = 'The performer casts one of the following spells, requ
 const PX_PLAIN_ORIGINAL = 'The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 12):\nAt Will: Dancing Lights, Druidcraft, Invisibility (self only)\n1/Day Each: Detect Thoughts, Fly, Sleep';
 const WB_PLAIN_ORIGINAL = 'The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\nAt Will: Dancing Lights, Druidcraft, Invisibility (self only)\n1/Day Each: Detect Thoughts, Fly, Major Image';
 const PT_PLAIN_ORIGINAL = 'The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):\nAt Will: Detect Evil and Good\n1/Day Each: Commune, Control Weather, Dispel Evil and Good, Raise Dead';
+const PR_PLAIN_ORIGINAL = 'The priest casts one of the following spells, using Wisdom as the spellcasting ability:\nAt Will: Light, Thaumaturgy\n1/Day: Spirit Guardians';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -342,6 +357,17 @@ function renderPlanetar() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: PT_MONSTER_NAME, creatures })} />);
+}
+
+const PR_MONSTER_NAME = 'Priest 1';
+
+function renderPriest() {
+  const m = makeMonster({ name: 'Priest', actions: [priestRow] });
+  const creatures = [
+    { name: PR_MONSTER_NAME, type: 'npc', monsterType: 'humanoid', targetName: 'Bandit', ac: 13, currentHp: 38, maxHp: 38, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: PR_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -1265,5 +1291,106 @@ describe('MA-1327 MonsterCardModal Planetar Spellcasting chips', () => {
     expect(runtime.store[`${PT_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Raise Dead': 1 });
     await act(async () => { fireEvent.click(linkByText('Raise Dead')); });
     await waitFor(() => expect(refusals('Raise Dead').length).toBe(1));
+  });
+});
+
+// ── MA-1339 data lock: Priest Spellcasting row ────────────────────────────────
+
+describe('MA-1339 monsters.json data lock: Priest Spellcasting row', () => {
+  it('extracts all three spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(priestRow.description);
+    expect(names).toEqual(PR_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day');
+  });
+
+  it('disk description carries all three name-wrapped <strong> tokens in authored order', () => {
+    const d = priestRow.description;
+    PR_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = PR_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day to Spirit Guardians only; At Will pair ungated (§57)', () => {
+    const uses = extractSpellcastingSpellUses(priestRow.description);
+    expect(uses).toEqual({ 'Spirit Guardians': 1 });
+    PR_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 13 + save_type Wisdom pair authored (§89; prose had NO numeric DC pre-fix — §54 lane closed)', () => {
+    expect(priestRow.save_dc).toBe(13);
+    expect(priestRow.save_type).toBe('Wisdom');
+    expect(priestRow.description).not.toMatch(/\(spell save DC \d+\)/);
+  });
+
+  it('emphasis census: ONLY the two tier headers + three spell names carry markup — no fake-chip decoys (§161)', () => {
+    const tokens = (priestRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Light</strong>', '<strong>Thaumaturgy</strong>', '<strong>1/Day:</strong>', '<strong>Spirit Guardians</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(priestRow.description)).toBe(PR_PLAIN_ORIGINAL);
+  });
+
+  it('DC 13 = 8 + WIS +3 + PB +2 for the priest (computed from disk, not trusted blindly)', () => {
+    expect(priest.ability_score_modifiers.wis).toBe(3);
+    expect(priest.proficiency_bonus).toBe(2);
+    expect(8 + priest.ability_score_modifiers.wis + priest.proficiency_bonus).toBe(13);
+  });
+
+  it('§158 trap INACTIVE: all three spells byte-match BOTH 5e and 2024 indexes', () => {
+    PR_NAMES.forEach(n => {
+      expect(spells5e.some(s => s.name === n)).toBe(true);
+      expect(spells2024.some(s => s.name === n)).toBe(true);
+    });
+  });
+
+  it('no 2024 monsters.json twin exists — single-file fix scope (§3)', () => {
+    expect(() => readFileSync('public/data/2024/monsters.json', 'utf8')).toThrow();
+  });
+});
+
+// ── MA-1339 Modal: three chips, counters, 1/Day gate ──────────────────────────
+
+describe('MA-1339 MonsterCardModal Priest Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders three spell chips — the zero-chip inert row is gone', () => {
+    renderPriest();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(PR_NAMES);
+  });
+
+  it('Spirit Guardians carries the 1/Day counter; the At Will pair does not (§57 gate binds)', () => {
+    renderPriest();
+    PR_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    PR_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('At Will Light casts ungated twice — zero uses, advisory log prints row DC 13 (§204)', async () => {
+    renderPriest();
+    await act(async () => { fireEvent.click(linkByText('Light')); });
+    await waitFor(() => expect(abilityUseEntries('Light').length).toBe(1));
+    expect(abilityUseEntries('Light')[0].description).toMatch(/\(spell save DC 13/);
+    await act(async () => { fireEvent.click(linkByText('Light')); });
+    await waitFor(() => expect(abilityUseEntries('Light').length).toBe(2));
+    expect(runtime.store[`${PR_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Spirit Guardians 1/Day: cast spends the single use with DC 13 advisory, re-fire refused — zero extra spend (§57)', async () => {
+    renderPriest();
+    await act(async () => { fireEvent.click(linkByText('Spirit Guardians')); });
+    await waitFor(() => expect(abilityUseEntries('Spirit Guardians').length).toBe(1));
+    expect(runtime.store[`${PR_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Spirit Guardians': 1 });
+    expect(abilityUseEntries('Spirit Guardians')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Spirit Guardians')[0].description).toMatch(/\(spell save DC 13/);
+
+    await act(async () => { fireEvent.click(linkByText('Spirit Guardians')); });
+    await waitFor(() => expect(refusals('Spirit Guardians').length).toBe(1));
+    expect(abilityUseEntries('Spirit Guardians').length).toBe(1);
+    expect(runtime.store[`${PR_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Spirit Guardians': 1 });
   });
 });

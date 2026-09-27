@@ -22328,7 +22328,7 @@
       "range": "",
       "recharge": "",
       "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:At Will: Light, Thaumaturgy1/Day: Spirit Guardians",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1339-zero-spell-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1340",
