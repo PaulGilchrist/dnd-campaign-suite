@@ -52454,7 +52454,9 @@
         "save_effect": "",
         "range": "",
         "reach": "60 ft.",
-        "recharge": ""
+        "recharge": "",
+        "hit_conditions": ["grappled", "poisoned"],
+        "escape_dc": 14
       },
       {
         "name": "Reel",

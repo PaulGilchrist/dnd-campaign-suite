@@ -863,15 +863,25 @@ export function buildAutoDamageOptions(action, name, enlarged = false) {
   // still multiplies the doubled formula downstream unchanged. Non-STR rows
   // and every un-enlarged attack stay byte-identical.
   const autoDamageFormula = enlarged && action?.strength_based === true ? doublePrimaryDiceCount(baseFormula) : baseFormula;
+  const hitClause = buildHitConditionClause(action);
   return {
-    autoDamageFormula,
+    // MA-1400: damageless attack rows with an armed hit-clause rider (Roper
+    // Tentacle — "Hit: Grappled (escape DC 14) + Poisoned", zero damage
+    // authored) ride a dice-less constant '0' (parseConstant, MA-0322 flat
+    // lineage) so the HIT popup arms Done and the resolved hit dispatches
+    // through handlePlainDamage.maybeApplyHitClause — the clause consumer is
+    // zero-damage tolerant (applyDamageToTarget(0) passes isUsableRawDamage
+    // and returns a non-null applyResult). Grant + condition log land, HP
+    // NEVER moves. Rows without an armed clause stay byte-inert null (zero
+    // affordance unchanged); rows with damage keep their formula verbatim.
+    autoDamageFormula: autoDamageFormula || (hitClause ? '0' : null),
     autoDamageName: name,
     // MA-0427: MA-0426 secondary keys now produced by the shared transport
     // helper (name falls back to the chip name for synthesized actions).
     // MA-0551: save-leg-rider composites are stripped downstream in
     // buildAttackChipSaveOptions (spread order re-injects otherwise).
     ...buildSecondaryDamageTransport(action, name),
-    hitClause: buildHitConditionClause(action),
+    hitClause,
   };
 }
 
