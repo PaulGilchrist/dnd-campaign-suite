@@ -22629,7 +22629,7 @@
       "actionType": "other",
       "trigger": "The ooze fails a saving throw against a spell or another magical effect created by a creature",
       "description": "The triggering creature takes 3 (1d6) Psychic damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1354-mind-corrosion-zero-affordance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1355",

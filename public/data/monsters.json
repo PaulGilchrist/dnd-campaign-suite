@@ -50131,7 +50131,17 @@
       {
         "name": "Mind Corrosion",
         "trigger": "The ooze fails a saving throw against a spell or another magical effect created by a creature",
-        "description": "The triggering creature takes 3 (1d6) Psychic damage."
+        "description": "The triggering creature takes 3 (1d6) Psychic damage.",
+        "automation": {
+          "type": "reaction",
+          "trigger": "fails_save_vs_spell",
+          "effect": "mind_corrosion",
+          "damageExpression": "1d6",
+          "damageType": "Psychic"
+        },
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999
       }
     ],
     "legendary_actions": [],

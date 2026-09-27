@@ -1154,6 +1154,21 @@ const GATED_MONSTER_REACTIONS = {
   // te `redirect_attack` lands on the ALLY rounds:1. 5-ft proximity + the
   // physical position swap are gridless GM-enforced advisory (§42/§70).
   redirect_attack: { effect: 'redirect_attack', trigger: 'attacked_by_seen', label: 'Redirect Attack', icon: 'fa-right-left' },
+  // MA-1354: Psychic Gray Ooze Mind Corrosion — reactive punish-the-caster
+  // reaction. RAW trigger: the ooze fails a saving throw against a spell or
+  // other magical effect created by a creature; response: the TRIGGERING
+  // creature takes 1d6 Psychic (no save — flat). Gate keys off the RAW
+  // campaign lastAttack identity (hellish_rebuke MA-0329 lineage — read the
+  // RAW lastAttack, not the normalized wrapper): this monster as save-fail
+  // target (saveResult:'failure'), spell-origin via isSpellOriginLastAttack
+  // (MA-0013/MA-1170 seam), and an identifiable triggering creature other
+  // than the ooze (saveless flat-damage-to-triggerer channel — same
+  // applyDamageToTarget producer as hellish_rebuke MA-0725 / MA-1242).
+  // At Will sentinel (usage:'At Will'+uses:999, MA-0006/0300/0305 shape) —
+  // RAW unlimited; 1/round latch (_mind_corrosion_usedRound, MA-0013 shape)
+  // + lastAttack.mindCorrosionResolved event stamp give the honest
+  // 1-per-trigger limit. No range on the RAW row — no range gate.
+  mind_corrosion: { effect: 'mind_corrosion', trigger: 'fails_save_vs_spell', label: 'Mind Corrosion', icon: 'fa-brain' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -1264,6 +1279,59 @@ export function hellishRebukeSpec(action) {
   const formula = auto.damageExpression;
   if (!formula) return { reason: 'formula', message: 'Hellish Rebuke: no authored damage formula on the row — nothing rolled, nothing spent.' };
   return { spec: { saveDc, formula, saveType: auto.saveType || 'DEX', damageType: auto.damageType || 'Fire', dcSuccess: auto.dcSuccess || 'half', rangeFt: rangeToFeet(auto.range ?? action?.range) ?? 60 } };
+}
+
+// MA-1354: event-identity probe (mirrors hellishRebukeIdentityRefusal
+// MA-0329, swapped from damaged-target to save-fail-target): the ooze must
+// be the target of the last campaign lastAttack with a FAILED save against a
+// spell-origin effect (isSpellOriginLastAttack MA-0013 seam — saveType+saveDc
+// ride the save-prompt and NPC-save-damage stamps alike). Returns a refusal
+// reason or null.
+export function mindCorrosionIdentityRefusal(lastAttack, monsterName) {
+  if (!lastAttack || lastAttack.targetName !== monsterName) return 'trigger';
+  if (!isSpellOriginLastAttack(lastAttack)) return 'spell';
+  const saveFailed = lastAttack.saveResult === 'failure'
+    || (lastAttack.targetResults || []).some(t => t.targetName === monsterName && t.saveResult === 'failure');
+  if (!saveFailed) return 'save';
+  if (lastAttack.mindCorrosionResolved === true) return 'reacted';
+  if (!lastAttack.attackerName || lastAttack.attackerName === monsterName) return 'attacker';
+  return null;
+}
+
+const MIND_CORROSION_REFUSAL_MESSAGES = {
+  trigger: (m) => `Mind Corrosion: ${m} was not the save target of the last effect — refused.`,
+  spell: () => 'Mind Corrosion: the last save was not against a spell or magical effect — refused.',
+  save: () => 'Mind Corrosion: the last save against this monster succeeded — no corrosion.',
+  reacted: () => 'Mind Corrosion: already responded to that save failure — one corrosion per trigger.',
+  attacker: () => 'Mind Corrosion: no identifiable triggering creature — refused.',
+  round: () => 'Mind Corrosion: Reaction already used this round — refused.',
+  uses: (limit) => `Mind Corrosion: ${limit} uses already spent today — refused. Uses reset at a long rest; GM-enforced for monsters.`,
+};
+
+export function mindCorrosionGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action }) {
+  const identity = mindCorrosionIdentityRefusal(lastAttack, monsterName);
+  if (identity) {
+    return { ok: false, reason: identity, message: MIND_CORROSION_REFUSAL_MESSAGES[identity](monsterName) };
+  }
+  const round = Number(currentRound) || 0;
+  if (round > 0 && Number(usedRound) === round) {
+    return { ok: false, reason: 'round', message: MIND_CORROSION_REFUSAL_MESSAGES.round() };
+  }
+  const used = Number((storedUses && storedUses.mind_corrosion) || 0);
+  const limit = reactionMaxUses(action);
+  if (used >= limit) {
+    return { ok: false, reason: 'uses', message: MIND_CORROSION_REFUSAL_MESSAGES.uses(limit) };
+  }
+  return { ok: true, used, limit, triggererName: lastAttack.attackerName };
+}
+
+// Numeric spec read from the authored row — never a baked default before the
+// row exists (MA-0329 spec-read lineage).
+export function mindCorrosionSpec(action) {
+  const auto = action?.automation || {};
+  const formula = auto.damageExpression;
+  if (!formula) return { reason: 'formula', message: 'Mind Corrosion: no authored damage formula on the row — nothing rolled, nothing spent.' };
+  return { spec: { formula, damageType: auto.damageType || 'Psychic' } };
 }
 
 // MA-0341: event-identity probe (mirrors hellishRebukeIdentityRefusal) — the
@@ -1805,17 +1873,23 @@ async function readGatedReactionContext({ def, campaignName, monsterName, deps }
   return { getRV, setRV, log, latchKey, lastAttack, rawLastAttack, cs, currentRound, storedUses, usedRound };
 }
 
+// MA-1354: gated resolvers that consume the full RAW-lastAttack props shape.
+const RAW_EVENT_GATE_RESOLVERS = {
+  counterspell: resolveMonsterCounterspell,
+  hellish_rebuke: resolveMonsterHellishRebuke,
+  mind_corrosion: resolveMonsterMindCorrosion,
+};
+
 export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, species, deps = {} }) {
   const def = getGatedMonsterReaction(action);
   if (!def) return null;
   const ctx = await readGatedReactionContext({ def, campaignName, monsterName, deps });
 
-  if (def.effect === 'counterspell') {
-    return resolveMonsterCounterspell({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps });
-  }
-
-  if (def.effect === 'hellish_rebuke') {
-    return resolveMonsterHellishRebuke({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps });
+  // MA-1354: lastAttack-identity resolvers sharing this exact props shape —
+  // table lookup keeps the dispatcher flat as the roster grows.
+  const rawEventResolver = RAW_EVENT_GATE_RESOLVERS[def.effect];
+  if (rawEventResolver) {
+    return rawEventResolver({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps });
   }
 
   if (def.effect === 'parry') {
@@ -2342,6 +2416,106 @@ async function resolveMonsterHellishRebuke({ action, monsterName, campaignName, 
   const entry = buildHellishRebukeSpendLog({ monsterName, attackerName, saveDc: spec.saveDc, success, finalDamage, rangeFt: spec.rangeFt, limit: gate.limit, remaining });
   await log(campaignName, entry);
   return { ok: true, message: entry.description, remaining, finalDamage, saveSuccess: success };
+}
+
+// MA-1354: reactive Mind Corrosion for monsters (Psychic Gray Ooze, RAW
+// unlimited). Mirrors the MA-0329 gated-reaction economy (round latch +
+// MONSTER_REACTION_USES spend + zero-spend refusals + triggering-event
+// stamp) minus the save — RAW retaliation is FLAT 1d6 Psychic on the
+// triggering creature (no save), so the damage-to-triggerer channel is the
+// hellish_rebuke MA-0725 applyDamageToTarget producer minus
+// computeDamageAfterSave (MA-1242 flat-damage twin shape).
+function mindCorrosionTriggererActive(cs, triggererName) {
+  const creature = (cs?.creatures || []).find(c => c.name === triggererName);
+  return Boolean(creature) && Number(creature.currentHp ?? creature.currentHitPoints ?? 0) > 0;
+}
+
+async function rollAndApplyMindCorrosionDamage({ impl, log, cs, monsterName, triggererName, campaignName, spec }) {
+  const rolled = impl.rollDamage(spec.formula);
+  const finalDamage = rolled?.total ?? 0;
+  await log(campaignName, {
+    type: 'roll',
+    characterName: monsterName,
+    rollType: 'damage',
+    name: 'Mind Corrosion Damage',
+    formula: spec.formula,
+    rolls: rolled?.rolls || [],
+    total: finalDamage,
+    damageType: spec.damageType,
+    targetName: triggererName,
+    finalDamage,
+    description: `Mind Corrosion: ${spec.formula} ${spec.damageType} = ${finalDamage} to ${triggererName} — no save, flat damage.`,
+    timestamp: Date.now(),
+  });
+  if (finalDamage > 0) {
+    const characters = (cs?.creatures || []).filter(c => c.type === 'player');
+    const applyResult = await impl.applyDamage(cs, triggererName, finalDamage, [spec.damageType], { campaignName, characters, attackerName: monsterName });
+    if (!applyResult) {
+      console.error('[MA-1354] applyDamageToTarget failed — Mind Corrosion damage not applied:', { monsterName, triggererName, finalDamage });
+    }
+  }
+  return finalDamage;
+}
+
+async function resolveMonsterMindCorrosion({ action, monsterName, campaignName, lastAttack, cs, currentRound, storedUses, usedRound, latchKey, deps }) {
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const log = deps.addEntry || addEntry;
+  const impl = {
+    rollDamage: deps.rollExpression || rollExpression,
+    applyDamage: deps.applyDamageToTarget || applyDamageToTarget,
+  };
+  const refuse = async (reason, message) => {
+    await log(campaignName, {
+      type: 'automation',
+      characterName: monsterName,
+      automationType: 'mind_corrosion_refused',
+      name: 'Mind Corrosion',
+      description: `Mind Corrosion refused (${reason}): ${message}`,
+      timestamp: Date.now(),
+    });
+    return { ok: false, message };
+  };
+
+  const gate = mindCorrosionGate({ lastAttack, monsterName, currentRound, storedUses, usedRound, action });
+  if (!gate.ok) return refuse(gate.reason, gate.message);
+
+  const specRead = mindCorrosionSpec(action);
+  if (specRead.reason) {
+    console.error(`[MA-1354] mind_corrosion row refused (${specRead.reason})`, action);
+    return refuse(specRead.reason, specRead.message);
+  }
+  const spec = specRead.spec;
+
+  const triggererName = gate.triggererName;
+  if (!mindCorrosionTriggererActive(cs, triggererName)) {
+    return refuse('triggerer', `Mind Corrosion: ${triggererName} is not an active combatant — refused.`);
+  }
+
+  // Stamp the latch + spend BEFORE resolving (CLA-361 precedent) so a thrown
+  // roll/damage step cannot leave the Reaction refirable within the round.
+  await setRV(monsterName, latchKey, currentRound, campaignName);
+  await setRV(monsterName, MONSTER_REACTION_USES_KEY, { ...storedUses, mind_corrosion: gate.used + 1 }, campaignName);
+
+  const finalDamage = await rollAndApplyMindCorrosionDamage({ impl, log, cs, monsterName, triggererName, campaignName, spec });
+
+  await setRV('campaign', 'lastAttack', {
+    ...lastAttack,
+    mindCorrosionResolved: true,
+    corrodedBy: monsterName,
+    corrosionTarget: triggererName,
+    corrosionDamage: finalDamage,
+  }, campaignName);
+
+  const remaining = Math.max(0, gate.limit - gate.used - 1);
+  const entry = {
+    type: 'ability_use',
+    characterName: monsterName,
+    abilityName: 'Mind Corrosion',
+    description: `${monsterName} uses Mind Corrosion against ${triggererName} — ${triggererName} took ${finalDamage} Psychic damage (no save). At Will — unlimited, 1 Reaction per round. ${remaining} left on the counter.`,
+    timestamp: Date.now(),
+  };
+  await log(campaignName, entry);
+  return { ok: true, message: entry.description, remaining, finalDamage };
 }
 
 function buildCounterspellMessage({ monsterName, spellName, outcome, limit, remaining }) {
