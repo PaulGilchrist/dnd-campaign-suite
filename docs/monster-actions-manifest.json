@@ -22391,7 +22391,7 @@
       "range": "",
       "recharge": "",
       "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:At Will: Light, Thaumaturgy",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1342-acolyte-spellcasting-zero-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1343",

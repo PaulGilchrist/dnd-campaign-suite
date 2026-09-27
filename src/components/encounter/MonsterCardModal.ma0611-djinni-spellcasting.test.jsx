@@ -125,7 +125,18 @@ const priestRow = priest.actions.find(a => a.name === 'Spellcasting');
 const PR_NAMES = ['Light', 'Thaumaturgy', 'Spirit Guardians'];
 const PR_ONE_DAY = ['Spirit Guardians'];
 const PR_AT_WILL = ['Light', 'Thaumaturgy'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES])];
+// MA-1342 priest-acolyte extension (same MA-0421/MA-1339 markup-gap family):
+// both At-Will spell names were plain text, only the tier header carried
+// <strong> → extractSpellNamesFromSpellcasting [] → zero chips. DATA fix is
+// markup-only on the djinni MA-0611 byte-shape template: SpellCastLinks arm
+// on row NAME + tier markup alone (§674/MA-0674), so the save-less At-Will
+// pair needs NO numeric save_dc pair — row keeps save_dc 0 + save_type
+// "Wisdom" byte-unchanged; junk attack_bonus 0 out of scope (§490 family).
+const priestAcolyte = monsters.find(m => m.index === 'priest-acolyte');
+const priestAcolyteRow = priestAcolyte.actions.find(a => a.name === 'Spellcasting');
+const PA_NAMES = ['Light', 'Thaumaturgy'];
+const PA_AT_WILL = ['Light', 'Thaumaturgy'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -141,6 +152,9 @@ const PX_PLAIN_ORIGINAL = 'The pixie casts one of the following spells, requirin
 const WB_PLAIN_ORIGINAL = 'The pixie casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\nAt Will: Dancing Lights, Druidcraft, Invisibility (self only)\n1/Day Each: Detect Thoughts, Fly, Major Image';
 const PT_PLAIN_ORIGINAL = 'The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):\nAt Will: Detect Evil and Good\n1/Day Each: Commune, Control Weather, Dispel Evil and Good, Raise Dead';
 const PR_PLAIN_ORIGINAL = 'The priest casts one of the following spells, using Wisdom as the spellcasting ability:\nAt Will: Light, Thaumaturgy\n1/Day: Spirit Guardians';
+// Pre-fix priest-acolyte disk text — shares the priest lead-in verbatim, but
+// has NO 1/Day tier; the shared block plus absent tier line discriminates.
+const PA_PLAIN_ORIGINAL = 'The priest casts one of the following spells, using Wisdom as the spellcasting ability:\nAt Will: Light, Thaumaturgy';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -368,6 +382,17 @@ function renderPriest() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: PR_MONSTER_NAME, creatures })} />);
+}
+
+const PA_MONSTER_NAME = 'Priest Acolyte 1';
+
+function renderPriestAcolyte() {
+  const m = makeMonster({ name: 'Priest Acolyte', actions: [priestAcolyteRow] });
+  const creatures = [
+    { name: PA_MONSTER_NAME, type: 'npc', monsterType: 'humanoid', targetName: 'Bandit', ac: 13, currentHp: 11, maxHp: 11, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: PA_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -1392,5 +1417,101 @@ describe('MA-1339 MonsterCardModal Priest Spellcasting chips', () => {
     await waitFor(() => expect(refusals('Spirit Guardians').length).toBe(1));
     expect(abilityUseEntries('Spirit Guardians').length).toBe(1);
     expect(runtime.store[`${PR_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Spirit Guardians': 1 });
+  });
+});
+
+// ── MA-1342 data lock: Priest Acolyte Spellcasting row ───────────────────────
+
+describe('MA-1342 monsters.json data lock: Priest Acolyte Spellcasting row', () => {
+  it('extracts both spell names as chips — tier header skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(priestAcolyteRow.description);
+    expect(names).toEqual(PA_NAMES);
+    expect(names).not.toContain('At Will');
+  });
+
+  it('disk description carries both name-wrapped <strong> tokens in authored order', () => {
+    const d = priestAcolyteRow.description;
+    PA_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = PA_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('At-Will pair fully ungated — no 1/Day tier, zero uses bound (§57)', () => {
+    const uses = extractSpellcastingSpellUses(priestAcolyteRow.description);
+    expect(uses).toEqual({});
+    PA_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('save_dc 0 + save_type Wisdom byte-unchanged — save-less At Will, SpellCastLinks arm on row NAME + tier markup only (§674)', () => {
+    expect(priestAcolyteRow.save_dc).toBe(0);
+    expect(priestAcolyteRow.save_type).toBe('Wisdom');
+    expect(priestAcolyteRow.attack_bonus).toBe(0);
+    expect(priestAcolyteRow.description).not.toMatch(/spell save DC \d+/);
+  });
+
+  it('emphasis census: ONLY the tier header + two spell names carry markup — no fake-chip decoys (§161)', () => {
+    const tokens = (priestAcolyteRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Light</strong>', '<strong>Thaumaturgy</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(priestAcolyteRow.description)).toBe(PA_PLAIN_ORIGINAL);
+  });
+
+  it('already-fixed Priest twin (MA-1339) not clobbered — 1/Day Spirit Guardians tier + save_dc 13 intact', () => {
+    expect(priestRow.description).toContain('<strong>Spirit Guardians</strong>');
+    expect(priestRow.description).toContain('<strong>1/Day:</strong>');
+    expect(priestRow.save_dc).toBe(13);
+    expect(priestRow.description).not.toBe(priestAcolyteRow.description);
+  });
+
+  it('§158 trap INACTIVE: both spells byte-match BOTH 5e and 2024 indexes, save-less cantrips (§490 residual: junk attack_bonus 0 + advisory DC 0)', () => {
+    PA_NAMES.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s).toBeDefined();
+      expect(s.dc == null).toBe(true);
+      expect(s.attack_type == null).toBe(true);
+      expect(spells2024.some(sp => sp.name === n)).toBe(true);
+    });
+  });
+});
+
+// ── MA-1342 Modal: two chips, At-Will ungated ────────────────────────────────
+
+describe('MA-1342 MonsterCardModal Priest Acolyte Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders two spell chips — the zero-chip inert row is gone', () => {
+    renderPriestAcolyte();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(PA_NAMES);
+  });
+
+  it('neither At-Will name carries a counter (§57 ungated by design)', () => {
+    renderPriestAcolyte();
+    PA_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('At Will Light casts ungated twice — zero uses, advisory log rides row save_dc 0 residual (§490)', async () => {
+    renderPriestAcolyte();
+    await act(async () => { fireEvent.click(linkByText('Light')); });
+    await waitFor(() => expect(abilityUseEntries('Light').length).toBe(1));
+    expect(abilityUseEntries('Light')[0].description).toMatch(/casts Light via Spellcasting/);
+    await act(async () => { fireEvent.click(linkByText('Light')); });
+    await waitFor(() => expect(abilityUseEntries('Light').length).toBe(2));
+    expect(runtime.store[`${PA_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('At Will Thaumaturgy casts ungated — zero uses, zero refusals (§57)', async () => {
+    renderPriestAcolyte();
+    await act(async () => { fireEvent.click(linkByText('Thaumaturgy')); });
+    await waitFor(() => expect(abilityUseEntries('Thaumaturgy').length).toBe(1));
+    await act(async () => { fireEvent.click(linkByText('Thaumaturgy')); });
+    await waitFor(() => expect(abilityUseEntries('Thaumaturgy').length).toBe(2));
+    expect(refusals('Thaumaturgy').length).toBe(0);
+    expect(runtime.store[`${PA_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });

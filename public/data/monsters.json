@@ -49435,7 +49435,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:<br><strong>At Will:</strong> Light, Thaumaturgy",
+        "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:<br><strong>At Will:</strong> <strong>Light</strong>, <strong>Thaumaturgy</strong>",
         "attack_bonus": 0,
         "save_dc": 0,
         "save_type": "Wisdom",
