@@ -963,6 +963,17 @@ export function saveLegIsConditionRider(action) {
 
 // MA-0560: save-chip plan (complexity hoist, playbook §5) — the rider-only
 // composite fork + rollability/clickable shape for ActionSaveRoll.
+// MA-1329: composite flat-primary rows (Poisonous Snake Bite "Hit: 1
+// piercing … DC 10 … 2d4 poison") — the fixed primary is a constant and not
+// rollExpression-parseable, but the save leg adjudicates the authored
+// rollable secondary (MA-0816 byte-shape), so the DC chip stays CLICKABLE.
+// Byte-inert: twin composites (Giant Poisonous Snake et al.) have rollable
+// primaries — plan.rollable already renders their clickable branch — and
+// every other non-clickable fallback row never carries secondary dice.
+function saveLegHasRollableSecondary(action) {
+  return saveLegCarriesSecondaryDamage(action) && canRollExpression(String(action.damage_dice_secondary));
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function saveChipPlan(action, attackerCannotAct) {
   const riderOnly = saveLegIsConditionRider(action);
@@ -971,7 +982,7 @@ export function saveChipPlan(action, attackerCannotAct) {
     riderOnly,
     formula,
     rollable: formula != null && canRollExpression(formula),
-    clickable: (!action.attack_bonus || riderOnly) && !attackerCannotAct,
+    clickable: (!action.attack_bonus || riderOnly || saveLegHasRollableSecondary(action)) && !attackerCannotAct,
   };
 }
 

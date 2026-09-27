@@ -48846,8 +48846,10 @@
         "save_dc": 10,
         "save_type": "Constitution",
         "save_effect": "Failure: 5 (2d4) poison damage. Success: Half damage",
-        "damage_dice_primary": "2d4",
-        "damage_type_primary": "Poison"
+        "damage_dice_primary": "1",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "2d4",
+        "damage_type_secondary": "Poison"
       }
     ],
     "traits": [],
