@@ -50350,7 +50350,12 @@
         "reach": "10 ft.",
         "recharge": "",
         "damage_dice_primary": "3d8 + 9",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 19
       },
       {
         "name": "Tail Stinger",
