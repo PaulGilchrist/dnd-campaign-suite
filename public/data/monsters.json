@@ -50834,7 +50834,10 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "1d4 + 3",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": [
+          "poisoned"
+        ]
       },
       {
         "name": "Invisibility",
