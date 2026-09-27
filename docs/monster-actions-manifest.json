@@ -22864,7 +22864,7 @@
         "invisible"
       ],
       "description": "The quaggoth casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 12):At Will: Mage Hand (the hand is Invisible), Minor Illusion2/Day: Mind Spike",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1366-thonot-spellcasting-decoy-chip-zero-real-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1367",

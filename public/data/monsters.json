@@ -50711,7 +50711,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The quaggoth casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 12):<br><strong>At Will:</strong> Mage Hand (the hand is <strong>Invisible</strong>), Minor Illusion<br><strong>2/Day:</strong> Mind Spike",
+        "description": "The quaggoth casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 12):<br><strong>At Will:</strong> <strong>Mage Hand</strong> (the hand is Invisible), <strong>Minor Illusion</strong><br><strong>2/Day:</strong> <strong>Mind Spike</strong>",
         "attack_bonus": 0,
         "save_dc": 12,
         "save_type": "Wisdom",

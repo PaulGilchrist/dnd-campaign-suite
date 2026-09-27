@@ -136,9 +136,23 @@ const priestAcolyte = monsters.find(m => m.index === 'priest-acolyte');
 const priestAcolyteRow = priestAcolyte.actions.find(a => a.name === 'Spellcasting');
 const PA_NAMES = ['Light', 'Thaumaturgy'];
 const PA_AT_WILL = ['Light', 'Thaumaturgy'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES])];
+// MA-1366 quaggoth-thonot extension (same MA-0421/MA-1230/MA-1327/MA-1339
+// markup-gap family, decoy-emphasis variant §161): the three real spell names
+// were plain text AND the prose emphasis <strong>Invisible</strong> inside the
+// Mage Hand parenthetical armed a LIVE junk-cast fake chip (press logged
+// "casts Invisible via Spellcasting … GM-enforced" + console "Spell
+// 'Invisible' not found") while Mind Spike's 2/Day tracking stayed dead.
+// Fix = djinni MA-0611 byte-shape wrap + decoy strip, SAME pass; §207 twin:
+// Mind Spike is 2024-only in the spell indexes. Junk attack_bonus 0 rides
+// the row per MA-1327/1339/1342 family precedent (§490 residual).
+const thonot = monsters.find(m => m.index === 'quaggoth-thonot');
+const thonotRow = thonot.actions.find(a => a.name === 'Spellcasting');
+const QT_NAMES = ['Mage Hand', 'Minor Illusion', 'Mind Spike'];
+const QT_TWO_DAY = ['Mind Spike'];
+const QT_AT_WILL = ['Mage Hand', 'Minor Illusion'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
-const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
+const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES, ...QT_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
 const DJINNI_PLAIN_ORIGINAL = 'The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\nAt Will: Detect Evil and Good, Detect Magic\n2/Day Each: Create Food and Water (can create wine instead of water), Tongues, Wind Walk\n1/Day Each: Creation, Gaseous Form, Invisibility, Major Image, Plane Shift';
 const NH_PLAIN_ORIGINAL = 'The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):\nAt Will: Detect Magic, Etherealness, Magic Missile (level 4 version)\n2/Day Each: Phantasmal Killer, Plane Shift (self only)';
@@ -155,6 +169,9 @@ const PR_PLAIN_ORIGINAL = 'The priest casts one of the following spells, using W
 // Pre-fix priest-acolyte disk text — shares the priest lead-in verbatim, but
 // has NO 1/Day tier; the shared block plus absent tier line discriminates.
 const PA_PLAIN_ORIGINAL = 'The priest casts one of the following spells, using Wisdom as the spellcasting ability:\nAt Will: Light, Thaumaturgy';
+// Pre-fix quaggoth-thonot disk text (names plain + decoy <strong>Invisible</strong>
+// stripped to plain by the fix — stripped prose is byte-identical).
+const QT_PLAIN_ORIGINAL = 'The quaggoth casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 12):\nAt Will: Mage Hand (the hand is Invisible), Minor Illusion\n2/Day: Mind Spike';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -393,6 +410,17 @@ function renderPriestAcolyte() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: PA_MONSTER_NAME, creatures })} />);
+}
+
+const QT_MONSTER_NAME = 'Quaggoth Thonot 1';
+
+function renderQuaggothThonot() {
+  const m = makeMonster({ name: 'Quaggoth Thonot', actions: [thonotRow] });
+  const creatures = [
+    { name: QT_MONSTER_NAME, type: 'npc', monsterType: 'humanoid', targetName: 'Bandit', ac: 13, currentHp: 67, maxHp: 67, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: QT_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -1513,5 +1541,124 @@ describe('MA-1342 MonsterCardModal Priest Acolyte Spellcasting chips', () => {
     await waitFor(() => expect(abilityUseEntries('Thaumaturgy').length).toBe(2));
     expect(refusals('Thaumaturgy').length).toBe(0);
     expect(runtime.store[`${PA_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+});
+
+// ── MA-1366 data lock: Quaggoth Thonot Spellcasting row ──────────────────────
+
+describe('MA-1366 monsters.json data lock: Quaggoth Thonot Spellcasting row', () => {
+  it('extracts all three spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(thonotRow.description);
+    expect(names).toEqual(QT_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('2/Day');
+  });
+
+  it('decoy "Invisible" is NOT extracted — prose emphasis stripped, parenthetical plain text (§161)', () => {
+    const names = extractSpellNamesFromSpellcasting(thonotRow.description);
+    expect(names).not.toContain('Invisible');
+    expect(thonotRow.description).not.toMatch(/<(?:strong|em)>Invisible<\/(?:strong|em)>/);
+    expect(thonotRow.description).toContain('<strong>Mage Hand</strong> (the hand is Invisible)');
+  });
+
+  it('binds 2/Day to Mind Spike only; At Will pair ungated (§57)', () => {
+    const uses = extractSpellcastingSpellUses(thonotRow.description);
+    expect(uses).toEqual({ 'Mind Spike': 2 });
+    QT_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 12 + save_type Wisdom pair untouched (§89 gate pre-met)', () => {
+    expect(thonotRow.save_dc).toBe(12);
+    expect(thonotRow.save_type).toBe('Wisdom');
+    expect(thonotRow.description).toMatch(/\(spell save DC 12\)/);
+  });
+
+  it('emphasis census: ONLY the two tier headers + three spell names carry markup — no fake-chip decoys (§161)', () => {
+    const tokens = (thonotRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Mage Hand</strong>', '<strong>Minor Illusion</strong>', '<strong>2/Day:</strong>', '<strong>Mind Spike</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(thonotRow.description)).toBe(QT_PLAIN_ORIGINAL);
+  });
+
+  it('DC 12 = 8 + WIS +2 + PB +2 for the thonot (computed from disk)', () => {
+    expect(thonot.ability_score_modifiers.wis).toBe(2);
+    expect(thonot.proficiency_bonus).toBe(2);
+    expect(8 + thonot.ability_score_modifiers.wis + thonot.proficiency_bonus).toBe(12);
+  });
+
+  it('§207/§158: Mage Hand + Minor Illusion byte-match BOTH indexes; Mind Spike 2024-only (4e-fallback lane, absent 5e)', () => {
+    QT_AT_WILL.forEach(n => {
+      expect(spells5e.some(s => s.name === n)).toBe(true);
+      expect(spells2024.some(s => s.name === n)).toBe(true);
+    });
+    expect(spells5e.some(s => s.name === 'Mind Spike')).toBe(false);
+    expect(spells2024.some(s => s.name === 'Mind Spike')).toBe(true);
+  });
+
+  it('junk attack_bonus 0 left per MA-1327/1339/1342 family precedent — cosmetic "+0" residual (§490)', () => {
+    expect(thonotRow.attack_bonus).toBe(0);
+  });
+
+  it('Quaggoth twin Claw (MA-1363, fixed today) not clobbered — Bloodied chooser markup intact', () => {
+    const quaggoth = monsters.find(m => m.index === 'quaggoth');
+    const claw = quaggoth.actions.find(a => a.name === 'Claw');
+    expect(claw.description).toContain('<strong>Bloodied</strong>');
+    expect(claw.conditional_damage).toBeDefined();
+    expect(quaggoth.actions.some(a => a.name === 'Spellcasting')).toBe(false);
+  });
+});
+
+// ── MA-1366 Modal: three chips, 2/Day gate, decoy chip gone ───────────────────
+
+describe('MA-1366 MonsterCardModal Quaggoth Thonot Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders three spell chips — the zero-chip inert row is gone', () => {
+    renderQuaggothThonot();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(QT_NAMES);
+  });
+
+  it('no live junk-cast "Invisible" chip — the decoy affordance is dead (§161)', () => {
+    renderQuaggothThonot();
+    expect(spellLinks().some(el => el.textContent.includes('Invisible'))).toBe(false);
+    expect(linkByText('Invisible')).toBeNull();
+  });
+
+  it('Mind Spike carries the 2/Day counter; the At Will pair does not (§57 gate binds)', () => {
+    renderQuaggothThonot();
+    QT_TWO_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(2\/Day · 2 left\)/));
+    QT_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('At Will Mage Hand casts ungated twice — zero uses, advisory log prints row DC 12/Wisdom (§204)', async () => {
+    renderQuaggothThonot();
+    await act(async () => { fireEvent.click(linkByText('Mage Hand')); });
+    await waitFor(() => expect(abilityUseEntries('Mage Hand').length).toBe(1));
+    expect(abilityUseEntries('Mage Hand')[0].description).toMatch(/\(spell save DC 12/);
+    await act(async () => { fireEvent.click(linkByText('Mage Hand')); });
+    await waitFor(() => expect(abilityUseEntries('Mage Hand').length).toBe(2));
+    expect(runtime.store[`${QT_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Mind Spike 2/Day: two casts spend both uses with DC 12/Wisdom logs, third refused — zero extra spend (§57)', async () => {
+    renderQuaggothThonot();
+    await act(async () => { fireEvent.click(linkByText('Mind Spike')); });
+    await waitFor(() => expect(abilityUseEntries('Mind Spike').length).toBe(1));
+    expect(runtime.store[`${QT_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Mind Spike': 1 });
+    expect(abilityUseEntries('Mind Spike')[0].description).toMatch(/2\/Day use spent — 1 remaining/);
+
+    await act(async () => { fireEvent.click(linkByText('Mind Spike')); });
+    await waitFor(() => expect(abilityUseEntries('Mind Spike').length).toBe(2));
+    expect(runtime.store[`${QT_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Mind Spike': 2 });
+
+    await act(async () => { fireEvent.click(linkByText('Mind Spike')); });
+    await waitFor(() => expect(refusals('Mind Spike').length).toBe(1));
+    expect(abilityUseEntries('Mind Spike').length).toBe(2);
+    expect(runtime.store[`${QT_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Mind Spike': 2 });
   });
 });
