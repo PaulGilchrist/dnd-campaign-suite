@@ -23924,7 +23924,7 @@
       "range": "",
       "recharge": "",
       "description": "The sahuagin casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12):At Will: Thaumaturgy2/Day Each: Hold Person, Tongues",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1419-sahuagin-priest-spellcasting-zero-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1420",

@@ -53191,8 +53191,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The sahuagin casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12):<br><strong>At Will:</strong> Thaumaturgy<br><strong>2/Day Each:</strong> Hold Person, Tongues",
-        "attack_bonus": 0,
+        "description": "The sahuagin casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12):<br><strong>At Will:</strong> <strong>Thaumaturgy</strong><br><strong>2/Day Each:</strong> <strong>Hold Person</strong>, <strong>Tongues</strong>",
         "save_dc": 12,
         "save_type": "Wisdom",
         "save_effect": "",

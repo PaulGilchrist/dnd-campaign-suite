@@ -183,7 +183,27 @@ const rakshasaRow = rakshasa.actions.find(a => a.name === 'Spellcasting');
 const RK_NAMES = ['Detect Magic', 'Detect Thoughts', 'Disguise Self', 'Mage Hand', 'Minor Illusion', 'Fly', 'Invisibility', 'Major Image', 'Plane Shift'];
 const RK_ONE_DAY = ['Fly', 'Invisibility', 'Major Image', 'Plane Shift'];
 const RK_AT_WILL = ['Detect Magic', 'Detect Thoughts', 'Disguise Self', 'Mage Hand', 'Minor Illusion'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES])];
+// MA-1419 sahuagin-priest extension (same MA-0421/MA-1327/MA-1339/MA-1375/MA-1380
+// markup-gap family): all three spell names were plain text, sole emphasis spans were
+// the two tier headers <strong>At Will:</strong> / <strong>2/Day Each:</strong> →
+// extractSpellNamesFromSpellcasting [] → zero chips, 2/Day-EACH tracking structurally
+// dead (§144 binds MARKED names only); junk "+0" (attack_bonus 0) was the row's sole
+// clickable control (§490). Fix = djinni MA-0611 byte-shape <strong> wrap on all three
+// names (headers byte-kept, trailing ':' skipped) + drop junk attack_bonus 0: armed
+// twins (djinni + MA-1375/MA-1380 post-fix) carry no attack_bonus key — MA-1369/1375
+// precedent strips it here too. Row-level save_dc 12 + Wisdom pair already authored
+// (§89 gate pre-met; §676 XOR keeps it unrendered as a DC chip). §158 trap INACTIVE:
+// all three names byte-match BOTH spell indexes. Hold Person is the damageless WIS
+// save spell (dc_success "none", "paralyzed" clause — MA-0348 seam rides the spell
+// text); Tongues/Thaumaturgy are save-less advisory cantrip/tier-1 (§204). The
+// "The sahuagin casts" lead-in is grep-unique app-wide (Priestess shares only the
+// species lead-in with no Spellcasting row).
+const sahuaginPriest = monsters.find(m => m.index === 'sahuagin-priest');
+const sahuaginPriestRow = sahuaginPriest.actions.find(a => a.name === 'Spellcasting');
+const SP_NAMES = ['Thaumaturgy', 'Hold Person', 'Tongues'];
+const SP_TWO_DAY = ['Hold Person', 'Tongues'];
+const SP_AT_WILL = ['Thaumaturgy'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES, ...SP_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES, ...QT_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -211,6 +231,9 @@ const QK_PLAIN_ORIGINAL = 'The knight casts one of the following spells, using C
 // Pre-fix rakshasa disk text — the row used <br> separators (stripTags folds
 // them to \n); the fix is name-wrap markup only, prose byte-equal.
 const RK_PLAIN_ORIGINAL = 'The rakshasa casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):\nAt Will: Detect Magic, Detect Thoughts, Disguise Self, Mage Hand, Minor Illusion\n1/Day Each: Fly, Invisibility, Major Image, Plane Shift';
+// Pre-fix sahuagin-priest disk text — the row used <br> separators (stripTags folds
+// them to \n); the fix is name-wrap markup + attack_bonus drop only, prose byte-equal.
+const SP_PLAIN_ORIGINAL = 'The sahuagin casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12):\nAt Will: Thaumaturgy\n2/Day Each: Hold Person, Tongues';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -482,6 +505,17 @@ function renderRakshasa() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: RK_MONSTER_NAME, creatures })} />);
+}
+
+const SP_MONSTER_NAME = 'Sahuagin Priest 1';
+
+function renderSahuaginPriest() {
+  const m = makeMonster({ name: 'Sahuagin Priest', index: 'sahuagin-priest', type: 'fiend', actions: [sahuaginPriestRow] });
+  const creatures = [
+    { name: SP_MONSTER_NAME, type: 'npc', monsterType: 'fiend', targetName: 'Bandit', ac: 12, currentHp: 38, maxHp: 38, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: SP_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -1995,5 +2029,163 @@ describe('MA-1380 MonsterCardModal Rakshasa Spellcasting chips', () => {
       expect(refusals(n).length).toBe(0);
     }
     expect(runtime.store[`${RK_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+});
+
+// ── MA-1419 data lock: Sahuagin Priest Spellcasting row ──────────────────────
+
+describe('MA-1419 monsters.json data lock: Sahuagin Priest Spellcasting row', () => {
+  it('extracts all three spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(sahuaginPriestRow.description);
+    expect(names).toEqual(SP_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('2/Day Each');
+  });
+
+  it('disk description carries all three name-wrapped <strong> tokens in authored order', () => {
+    const d = sahuaginPriestRow.description;
+    SP_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = SP_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 2/Day Each to Hold Person + Tongues EACH at 2; At-Will Thaumaturgy ungated (§57/§144)', () => {
+    const uses = extractSpellcastingSpellUses(sahuaginPriestRow.description);
+    expect(uses).toEqual({ 'Hold Person': 2, 'Tongues': 2 });
+    expect(uses['Thaumaturgy']).toBeUndefined();
+  });
+
+  it('row-level numeric save_dc 12 + save_type Wisdom pair untouched (§89 gate pre-met; §676 XOR keeps DC unrendered)', () => {
+    expect(sahuaginPriestRow.save_dc).toBe(12);
+    expect(sahuaginPriestRow.save_type).toBe('Wisdom');
+    expect(sahuaginPriestRow.description).toMatch(/\(spell save DC 12\)/);
+  });
+
+  it('junk attack_bonus 0 STRIPPED — armed twins (djinni + MA-1375/MA-1380 post-fix) carry no attack_bonus key (MA-1369/1375: strip what twins strip)', () => {
+    expect('attack_bonus' in sahuaginPriestRow).toBe(false);
+    expect('attack_bonus' in djinniRow).toBe(false);
+    expect('attack_bonus' in questingKnightRow).toBe(false);
+    expect('attack_bonus' in rakshasaRow).toBe(false);
+  });
+
+  it('emphasis census: ONLY the two tier headers + three spell names carry <strong> — no <em>, no fake-chip decoys (§161)', () => {
+    const tokens = (sahuaginPriestRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Thaumaturgy</strong>', '<strong>2/Day Each:</strong>', '<strong>Hold Person</strong>', '<strong>Tongues</strong>']);
+  });
+
+  it('markup+drop-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(stripTags(sahuaginPriestRow.description)).toBe(SP_PLAIN_ORIGINAL);
+  });
+
+  it('DC 12 = 8 + WIS +2 + PB +2 for the sahuagin priest (computed from disk)', () => {
+    expect(sahuaginPriest.ability_score_modifiers.wis).toBe(2);
+    expect(sahuaginPriest.proficiency_bonus).toBe(2);
+    expect(8 + sahuaginPriest.ability_score_modifiers.wis + sahuaginPriest.proficiency_bonus).toBe(12);
+  });
+
+  it('all three spells byte-match BOTH indexes; Hold Person damageless WIS dc_success:none (MA-0348 seam), Thaumaturgy/Tongues save-less (§204)', () => {
+    SP_NAMES.forEach(n => expect(spells2024.some(s => s.name === n)).toBe(true));
+    const hp = spells5e.find(s => s.name === 'Hold Person');
+    expect(hp.dc.dc_type).toBe('WIS');
+    expect(hp.dc.dc_success).toBe('none');
+    expect(hp.attack_type == null).toBe(true);
+    expect(hp.damage == null).toBe(true);
+    SP_AT_WILL.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s.dc == null).toBe(true);
+      expect(s.attack_type == null).toBe(true);
+    });
+    expect(spells5e.find(s => s.name === 'Tongues').dc == null).toBe(true);
+  });
+
+  it('sahuagin siblings untouched — Priestess/Baron share the species prose but own NO Spellcasting row (lead-in anchor unique)', () => {
+    const priestess = monsters.find(m => m.index === 'sahuagin-priestess');
+    const baron = monsters.find(m => m.index === 'sahuagin-baron');
+    expect(priestess.actions.some(a => a.name === 'Spellcasting')).toBe(false);
+    expect(baron.actions.some(a => a.name === 'Spellcasting')).toBe(false);
+    expect(sahuaginPriest.actions[0].name).toBe('Multiattack');
+    expect(sahuaginPriest.actions[1].name).toBe('Spectral Jaws');
+    expect(sahuaginPriest.actions[1].attack_bonus).toBe(4);
+  });
+});
+
+// ── MA-1419 Modal: three chips, counters, 2/Day-EACH gates ────────────────────
+
+describe('MA-1419 MonsterCardModal Sahuagin Priest Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders three spell chips — the zero-chip inert row is gone', () => {
+    renderSahuaginPriest();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(SP_NAMES);
+  });
+
+  it('the two 2/Day Each names carry counters; At-Will Thaumaturgy does not (§57 gate binds)', () => {
+    renderSahuaginPriest();
+    SP_TWO_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(2\/Day · 2 left\)/));
+    expect(linkByText('Thaumaturgy').textContent).not.toMatch(/\/Day/);
+  });
+
+  it('junk "+0" attack chip gone with attack_bonus stripped — three spell links are the row\'s only controls (§490)', () => {
+    renderSahuaginPriest();
+    const row = Array.from(document.querySelectorAll('.mc-action')).find(el => el.querySelector('strong')?.textContent.startsWith('Spellcasting'));
+    expect(row).toBeTruthy();
+    expect(row.querySelectorAll('.mc-dice-link').length).toBe(3);
+    expect(row.querySelectorAll('.mc-dice-link:not(.mc-dice-link-spell)').length).toBe(0);
+    expect(row.textContent).not.toContain('+0');
+  });
+
+  it('Hold Person 2/Day: two casts spend both uses with DC 12/Wisdom save-leg logs, third refused — zero extra spend (§57)', async () => {
+    renderSahuaginPriest();
+    await act(async () => { fireEvent.click(linkByText('Hold Person')); });
+    await waitFor(() => expect(abilityUseEntries('Hold Person').length).toBe(1));
+    expect(runtime.store[`${SP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Hold Person': 1 });
+    expect(abilityUseEntries('Hold Person')[0].description).toMatch(/2\/Day use spent — 1 remaining/);
+
+    await act(async () => { fireEvent.click(linkByText('Hold Person')); });
+    await waitFor(() => expect(abilityUseEntries('Hold Person').length).toBe(2));
+    expect(runtime.store[`${SP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Hold Person': 2 });
+
+    await act(async () => { fireEvent.click(linkByText('Hold Person')); });
+    await waitFor(() => expect(refusals('Hold Person').length).toBe(1));
+    expect(abilityUseEntries('Hold Person').length).toBe(2);
+    expect(runtime.store[`${SP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Hold Person': 2 });
+  });
+
+  it('2/Day Each binds EACH name independently: exhausted Hold Person never blocks Tongues, which spends its own pair then refuses (§144)', async () => {
+    renderSahuaginPriest();
+    await act(async () => { fireEvent.click(linkByText('Hold Person')); });
+    await waitFor(() => expect(abilityUseEntries('Hold Person').length).toBe(1));
+    await act(async () => { fireEvent.click(linkByText('Hold Person')); });
+    await waitFor(() => expect(runtime.store[`${SP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Hold Person': 2 }));
+
+    await act(async () => { fireEvent.click(linkByText('Tongues')); });
+    await waitFor(() => expect(abilityUseEntries('Tongues').length).toBe(1));
+    expect(refusals('Tongues').length).toBe(0);
+    expect(runtime.store[`${SP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Hold Person': 2, 'Tongues': 1 });
+
+    await act(async () => { fireEvent.click(linkByText('Tongues')); });
+    await waitFor(() => expect(runtime.store[`${SP_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Hold Person': 2, 'Tongues': 2 }));
+    await act(async () => { fireEvent.click(linkByText('Tongues')); });
+    await waitFor(() => expect(refusals('Tongues').length).toBe(1));
+    expect(abilityUseEntries('Tongues').length).toBe(2);
+
+    await act(async () => { fireEvent.click(linkByText('Hold Person')); });
+    await waitFor(() => expect(refusals('Hold Person').length).toBe(1));
+    expect(abilityUseEntries('Hold Person').length).toBe(2);
+  });
+
+  it('At-Will Thaumaturgy casts ungated twice — zero uses, advisory log prints row DC 12/Wisdom (§204)', async () => {
+    renderSahuaginPriest();
+    await act(async () => { fireEvent.click(linkByText('Thaumaturgy')); });
+    await waitFor(() => expect(abilityUseEntries('Thaumaturgy').length).toBe(1));
+    expect(abilityUseEntries('Thaumaturgy')[0].description).toMatch(/\(spell save DC 12/);
+    await act(async () => { fireEvent.click(linkByText('Thaumaturgy')); });
+    await waitFor(() => expect(abilityUseEntries('Thaumaturgy').length).toBe(2));
+    expect(refusals('Thaumaturgy').length).toBe(0);
+    expect(runtime.store[`${SP_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });
