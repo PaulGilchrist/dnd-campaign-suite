@@ -56938,7 +56938,53 @@
       {
         "name": "Roar",
         "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest)",
-        "uses": "3/Day"
+        "uses": 3,
+        "maxUses": 3,
+        "staged_roar": true,
+        "save_dc": 20,
+        "save_type": "Wisdom",
+        "save_effect": "First Roar: Failure: Frightened for 1 minute. Second Roar: Failure: Paralyzed for 1 minute, repeats the save at the end of each of its turns to end; after 1 minute it succeeds automatically. Third Roar: Failure: 44 (8d10) Thunder damage and knocked prone. Success: Half damage and not knocked prone.",
+        "damage_dice_primary": "8d10",
+        "damage_type_primary": "Thunder",
+        "range": "500-foot Emanation",
+        "usage": {
+          "type": "per day",
+          "times": 3
+        },
+        "roar_stages": [
+          {
+            "stage": 1,
+            "label": "First Roar (1 of 3)",
+            "description": "First Roar (1 of 3). Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. This roar deals no damage.",
+            "save_dc": 20,
+            "save_type": "Wisdom",
+            "dc_success": "none",
+            "save_effect": "First Roar (1 of 3): Failure: frightened for 1 minute. Success: no effect. This effect deals no damage.",
+            "repeat_save": null
+          },
+          {
+            "stage": 2,
+            "label": "Second Roar (2 of 3)",
+            "description": "Second Roar (2 of 3). Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, repeating the save at the end of each of its turns, ending the effect on itself on a success; after 1 minute it succeeds automatically. This roar deals no damage.",
+            "save_dc": 20,
+            "save_type": "Wisdom",
+            "dc_success": "none",
+            "save_effect": "Second Roar (2 of 3): Failure: paralyzed for 1 minute; the target repeats the saving throw at the end of each of its turns, ending the effect on itself on a success. Success: no effect. This effect deals no damage.",
+            "repeat_save": null
+          },
+          {
+            "stage": 3,
+            "label": "Third Roar (3 of 3)",
+            "description": "Third Roar (3 of 3). Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) thunder damage and the target has the Prone condition. Success: half damage only, not prone.",
+            "save_dc": 20,
+            "save_type": "Constitution",
+            "dc_success": "half",
+            "damage_dice_primary": "8d10",
+            "damage_type_primary": "Thunder",
+            "save_effect": "Third Roar (3 of 3): Failure: 44 (8d10) Thunder damage and knocked prone. Success: half damage and not knocked prone.",
+            "repeat_save": null
+          }
+        ]
       },
       {
         "name": "First Roar",

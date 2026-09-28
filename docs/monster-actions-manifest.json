@@ -25422,7 +25422,7 @@
       "actionType": "other",
       "uses": "3/Day",
       "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1502-roar.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1503",

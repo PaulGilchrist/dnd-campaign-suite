@@ -70,6 +70,53 @@ export function isStagedRoarAction(action) {
     return action?.staged_roar === true;
 }
 
+// MA-1502: ROW-AUTHORED stage overrides (Sphinx of Valor Roar, DC 20 ladder) —
+// the §88 rays[]/§MA-1436 variants[] structured-payload convention: one new
+// key `roar_stages[]` whose dicts take precedence over the hardcoded
+// androsphinx default table above when present. Rows WITHOUT the key
+// (Androsphinx MA-0268) resolve byte-identically from ROAR_STAGES — the
+// default table never sees Valor prose and vice versa. Per-stage values live
+// IN the payload (§MA-1436: row-level save fields stay stage-neutral).
+// Row-provided stage dict → swap-mech record (§45 complexity hoist twin).
+function authoredStageMech(authored) {
+    return {
+        saveType: authored.save_type,
+        dcSuccess: authored.dc_success ?? 'none',
+        damageDice: authored.damage_dice_primary ?? null,
+        damageType: authored.damage_type_primary ?? 'Thunder',
+        description: authored.description,
+        saveEffect: authored.save_effect,
+        repeatSave: authored.repeat_save ?? null,
+        saveDc: authored.save_dc ?? null,
+        label: authored.label ?? null,
+    };
+}
+
+// MA-0268 hardcoded table → the same swap-mech shape, byte-identical output
+// (§45 complexity hoist twin — Androsphinx path).
+function defaultStageMech(action, legacy) {
+    return {
+        saveType: legacy.saveType,
+        dcSuccess: legacy.dcSuccess,
+        damageDice: legacy.damage ? (action.damage_dice_primary ?? null) : null,
+        damageType: legacy.damage ? (action.damage_type_primary ?? 'Thunder') : null,
+        description: legacy.description,
+        saveEffect: legacy.saveEffect,
+        repeatSave: legacy.repeatSaveType ? { condition: 'frightened', save_type: legacy.repeatSaveType, duration_minutes: 1 } : null,
+        saveDc: null,
+        label: null,
+    };
+}
+
+function resolveStageMechanic(action, stage) {
+    if (Array.isArray(action?.roar_stages)) {
+        const authored = action.roar_stages[stage - 1];
+        return authored ? authoredStageMech(authored) : null;
+    }
+    const legacy = ROAR_STAGES[stage];
+    return legacy ? defaultStageMech(action, legacy) : null;
+}
+
 export function stagedRoarMaxUses(action) {
     return abilitySaveMaxUses(action) ?? STAGED_ROAR_MAX_DEFAULT;
 }
@@ -94,18 +141,19 @@ export function roarStageNumber(action, storedUses) {
 // "Roar N of 3" flows into the prompt, damage/condition/spend logs via
 // context.actionName.
 export function buildRoarStageAction(action, stage) {
-    const mech = ROAR_STAGES[stage];
+    const mech = resolveStageMechanic(action, stage);
     if (!mech) return null;
     return {
         ...action,
-        name: `Roar ${stage} of ${stagedRoarMaxUses(action)}`,
+        name: mech.label ?? `Roar ${stage} of ${stagedRoarMaxUses(action)}`,
         description: mech.description,
+        ...(mech.saveDc != null ? { save_dc: mech.saveDc } : {}),
         save_type: mech.saveType,
         dc_success: mech.dcSuccess,
-        damage_dice_primary: mech.damage ? (action.damage_dice_primary ?? null) : null,
-        damage_type_primary: mech.damage ? (action.damage_type_primary ?? 'Thunder') : null,
+        damage_dice_primary: mech.damageDice,
+        damage_type_primary: mech.damageDice ? (mech.damageType ?? 'Thunder') : null,
         save_effect: mech.saveEffect,
-        repeat_save: mech.repeatSaveType ? { condition: 'frightened', save_type: mech.repeatSaveType, duration_minutes: 1 } : null,
+        repeat_save: mech.repeatSave,
     };
 }
 
