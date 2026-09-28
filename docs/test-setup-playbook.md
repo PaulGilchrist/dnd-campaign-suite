@@ -993,3 +993,9 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1450 (2026-09-28, Seahorse Bubble Dash FIXED — advisory) New pitfalls
 - Movement-row advisory fix keeps DC0 household noise — advisory hijack + MA-1071 >0 gate means row renders exactly one chip either way; chip census (not field presence) is render truth. Junk "+0" fingerprint total varies per press — judge by roll/attack name:<movement row> presence.
+
+## §MA-1451 (2026-09-28, Shadow Draining Swipe FIXED — ability-drain seam) New pitfalls
+- Ability-score-drain SEAM NOW LIVE (MA-0942 conversion): data `hit_ability_drain:{ability,dice}` on attack row → parseHitAbilityDrain (MonsterCardHelpers, structured-key-only) → handlePlainDamage.applyHitAbilityDrain (rollExpression + ledger accumulate baseScore/drained/score, registerTargetEffect te `ability_score_drain` SAVEs&Checks fields:[ability,source], no clock — until_long_rest; LR clears via LONG_REST_TARGET_EFFECT_CLEAR_KEYS in restRules-longRest.js) + ConditionEffectBadges "STR −N" + MonsterCardBody ability-cell drained overlay. Death-at-0 via canonical applyDamageToTarget clamp.
+- Done-less backdrop-flush on HIT popups silently abandons damage AND hit-clause riders while attack roll still logs — count legs by damage entries; flush only after reading HIT+Done.
+- maxHp-staging via cs POST does NOT lift currentHp — stage BOTH or victim dies of ordinary damage mid-rig.
+- Orchestrator manifest edit: python json.dump rewrites whole file AND breaks soft-hyphen escapes (§22 U+00AD) — use surgical line-number edit anchored on unique "id" line, never full re-dump.
