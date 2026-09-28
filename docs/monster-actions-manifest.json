@@ -25278,7 +25278,7 @@
         "incapacitated"
       ],
       "description": "Wisdom Saving Throw: DC 16, each enemy in a 300-foot Emanation originating from the sphinx. Failure: 35 (10d6) Psychic damage, and the target has the Incapacitated condition until the start of the sphinx's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1492-mind-rending-roar.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1493",

@@ -56679,7 +56679,8 @@
         "save_type": "Wisdom",
         "range": "300-foot Emanation",
         "recharge": "5-6",
-        "save_effect": "The target takes 35 (10d6) Psychic damage and has the Incapacitated condition until the start of the sphinx's next turn."
+        "save_effect": "The target takes 35 (10d6) Psychic damage and has the Incapacitated condition until the start of the sphinx's next turn.",
+        "dc_success": "none"
       },
       {
         "name": "Spellcasting",
