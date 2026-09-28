@@ -279,6 +279,23 @@ export function parseAnimalSpiritVariants(action) {
   };
 }
 
+// MA-1436: GM-chosen save-row variant chooser (Satyr Revelmaster Fey
+// Melody — "Charming: … Frightening: …" mutually exclusive songs, DM's
+// choice per casting). Arms ONLY on the structured `variants` array the
+// DATA now authors (≥2 complete entries with key/label/conditions) — never
+// on prose, so every unauthored row stays byte-inert null and the MA-0275
+// Animal-Spirit prose chooser is untouched. Each variant carries its own
+// conditions / damage / dc_success / duration_note; the chip press opens the
+// chooser before any roll, and the picked variant replaces the row-level
+// saveDamageFormula + saveConditions threading into the block-save seam.
+export function parseSaveVariantChooser(action) {
+  const variants = Array.isArray(action?.variants)
+    ? action.variants.filter(v => v?.key && v?.label && Array.isArray(v.conditions) && v.conditions.length > 0)
+    : [];
+  if (variants.length < 2) return null;
+  return { variants };
+}
+
 // MA-0875: failed-save temporary-hit-point grant clause (Gnoll Demoniac
 // Hunger of Yeenoghu — save_effect "The gnoll or a creature of its choice
 // it can see gains 10 Temporary Hit Points."). "Temporary Hit Points" is

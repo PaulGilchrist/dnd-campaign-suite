@@ -54053,12 +54053,34 @@
         "attack_bonus": 0,
         "save_dc": 14,
         "save_type": "Wisdom",
-        "save_effect": "Failure: The target is subjected to the song's effect. Charming: The target has the Charmed condition for 1 minute. While Charmed, the target has the Incapacitated condition and uses all its movement to dance in place. The effect ends on the target if it takes any damage. Frightening: 10 (2d6 + 3) Psychic damage, and the target has the Frightened condition for 1 minute. If the target ends its turn out of line of sight from the satyr, the condition ends on it.",
-        "range": "",
+        "save_effect": "Failure: the target is subjected to the GM-chosen song variant picked at the variant chooser — Charming (the dance) or Frightening (the fear). Per-variant conditions and damage resolve from the variants payload.",
+        "range": "60-foot Emanation",
         "reach": "",
         "recharge": "4-6",
         "damage_dice_primary": "2d6 + 3",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "variants": [
+          {
+            "key": "charming",
+            "label": "Charming",
+            "description": "The target has the Charmed condition for 1 minute. While Charmed, it has the Incapacitated condition and uses all its movement to dance in place. The effect ends on the target if it takes any damage. No damage.",
+            "conditions": ["charmed", "incapacitated"],
+            "rounds": 10,
+            "dc_success": "none",
+            "duration_note": "until the start of the satyr's next-to-next turn (1 minute); ends early if the target takes any damage (dance-in-place and end-on-damage clauses GM-enforced)"
+          },
+          {
+            "key": "frightening",
+            "label": "Frightening",
+            "description": "10 (2d6 + 3) Psychic damage, and the target has the Frightened condition for 1 minute. If the target ends its turn out of line of sight from the satyr, the condition ends on it.",
+            "conditions": ["frightened"],
+            "rounds": 10,
+            "dc_success": "half",
+            "damage_dice": "2d6 + 3",
+            "damage_type": "Psychic",
+            "duration_note": "for 1 minute; ends if the target ends its turn out of line of sight from the satyr (line-of-sight clause GM-enforced)"
+          }
+        ]
       }
     ],
     "bonus_actions": [],

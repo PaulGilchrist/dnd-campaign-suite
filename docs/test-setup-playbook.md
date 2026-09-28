@@ -968,3 +968,9 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - HIT-stage Done spawns stage-2 damage popup WITH own Done (popup-close-btn) that intercepts next chip click — full cycle = attack-Done → stage-2 own-Done; backdrop flush insufficient.
 - Post-fix lastAttack.hitConditions stays None — clause-arm truth = log type:condition + victim activeConditions/meta.source, never lastAttack.
 - curl POST /admin/clear-* = 200 NO confirm dialog (dialogs only via admin-UI nav) — scripted cleanup path.
+
+## §MA-1436 (2026-09-28, Satyr Revelmaster Fey Melody FIXED — generic variant chooser seam) New pitfalls
+- NEW GENERIC SEAM `variants[]`: structured row payload + parseSaveVariantChooser (MonsterCardHelpers, structured-key-only, byte-inert elsewhere) → SaveVariantChooserModal.jsx (first stage before picker) → saveVariant threaded through handleSaveRoll→SaveAttackAoeModal resolveSaveFailGrant → applySaveVariantClockGrant fail-only ONE §37 clock; per-variant dc_success lives IN the payload (row-level dc_success must stay variant-neutral). Recharge refusal precedes chooser (spent press never opens chooser). Skip = save_variant_declined zero-spend.
+- Joined NPC combatants snapshot master stat blocks at join — monsters.json edits need remove+re-join to take effect live.
+- Area picker confirm with 0 targets no-ops (label shows count); stacked picker resolves leave Results overlay over newer pickers — close before scripting.
+- Expiry clocks live under runtime key `pendingExpirations` (turnStartEffects KEY), not expirationQueue.

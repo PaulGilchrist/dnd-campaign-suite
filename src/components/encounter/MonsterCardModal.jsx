@@ -18,8 +18,9 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
+import { SaveVariantChooserModal } from './SaveVariantChooserModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
@@ -131,6 +132,18 @@ export function breathAoeShape(action, spellInfo) {
     return { shape: 'Radius', feet: Number(action.zone.radius_ft), rangeGateFt: null };
   }
   const description = String(action.description || '');
+  // MA-1436: an authored emanation RANGE wins over prose shape — the Satyr
+  // Revelmaster Fey Melody row ("range": "60-foot Emanation") mentions "line
+  // of sight" in its description, and the MA-0042-era prose /\bline\b/ scrape
+  // misread it as a 60-ft LINE picker (live repro fingerprint). Census: no
+  // other emanation-range row carries prose cone/line/radius/sphere tokens,
+  // so hoisting the MA-0590 RANGE-field check ahead of the prose scrape is
+  // byte-inert everywhere else; radiusAoeFallback's emanation leg below now
+  // only ever sees rows without a prose shape (unchanged output).
+  const emanationFt = emanationRadiusFeet(action);
+  if (emanationFt != null) {
+    return { shape: 'Radius', feet: emanationFt, rangeGateFt: emanationFt };
+  }
   const shape = /\bcone\b/i.test(description) ? 'Cone' : (/\bline\b/i.test(description) ? 'Line' : null);
   // MA-0084: a sphere/radius save row is an area too — route it through the
   // same area picker as the MA-0031 cones / MA-0042 zones. The GM positions
@@ -361,12 +374,26 @@ function pickerPrimaryDamageType(action, getDamageTypesForAction, secondaryType)
   return formatDamageTypes(primaryOnly.length > 0 ? primaryOnly : types);
 }
 
-function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml, animalSpiritVariant = null, animalSpiritFortifyHp = null }) {
+// MA-1436: a chosen variant's dc_success overrides the row default (the
+// row-level field describes neither song once the chooser owns the legs).
+// Hoisted to keep executeBlockSaveRoll under the §45 complexity ceiling.
+function blockSaveDcSuccess(spellInfo, action, saveVariant) {
+  return saveVariant?.dc_success || resolveBlockSaveDcSuccess(spellInfo, action);
+}
+
+// MA-0348: row save_effect until-clause wins; else the damageless spell leg's
+// honest concentration note. MA-1436: a chosen variant's duration_note wins
+// over the row (variant owns the legs). Hoisted for the §45 ceiling.
+function blockSaveConditionDurationNote(action, spellInfo, saveVariant) {
+  return saveVariant?.duration_note || extractConditionDurationNote(action?.save_effect) || spellInfo?.conditionDurationNote || null;
+}
+
+function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite, usesGate, setPopupHtml, animalSpiritVariant = null, animalSpiritFortifyHp = null, saveVariant = null }) {
   const recharge = rechargeRefusalOnSpent({ action, spellInfo, monsterName, campaignName, setPopupHtml });
   if (recharge.refused) return;
   const spellName = spellInfo?.spellName || null;
   const saveType = spellInfo?.saveType || action.save_type;
-  const dcSuccess = resolveBlockSaveDcSuccess(spellInfo, action);
+  const dcSuccess = blockSaveDcSuccess(spellInfo, action, saveVariant);
   const aoe = breathAoeShape(action, spellInfo);
   // MA-0049: safety gate — a single-target block save with no armed target
   // refuses (popup + `<action>_refused (no target)`) instead of degrading
@@ -388,9 +415,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
     rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType, animalSpiritVariant, animalSpiritFortifyHp,
-      // MA-0348: row save_effect until-clause wins; else the damageless spell
-      // leg's honest concentration note from the spell itself.
-      conditionDurationNote: extractConditionDurationNote(action?.save_effect) || spellInfo?.conditionDurationNote || null,
+      conditionDurationNote: blockSaveConditionDurationNote(action, spellInfo, saveVariant),
     }));
   };
   const sleepStaging = sleepStagingForAction(spellInfo, action);
@@ -430,7 +455,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
           timestamp: Date.now(),
         }).catch((e) => { console.error('[MonsterCardModal] Error logging Cube area advisory:', e); });
       }
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape}${aoe.shapeNote ? ` — ${aoe.shapeNote}` : ''} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant: parseTempHpGrantClause(action?.save_effect), conditionDurationNote: extractConditionDurationNote(action?.save_effect), stagedPetrify: parseStagedPetrifyClause(action) });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape}${aoe.shapeNote ? ` — ${aoe.shapeNote}` : ''} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant: parseTempHpGrantClause(action?.save_effect), conditionDurationNote: blockSaveConditionDurationNote(action, spellInfo, saveVariant), stagedPetrify: parseStagedPetrifyClause(action), saveVariant });
       return;
     }
     fire();
@@ -557,6 +582,77 @@ async function resolveAnimalSpiritSelection({ chooser, variant, monsterName, cam
     }).catch((e) => { console.error('[MonsterCardModal] Error logging animal spirit decline:', e); });
   }
   executeBlockSaveRoll({ action: chooser.action, spellInfo: chooser.spellInfo, saveDamageFormula: chooser.saveDamageFormula, saveConditions: chooser.saveConditions, monsterName, campaignName, target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite: chooser.prerequisite, usesGate: chooser.usesGate, setPopupHtml, animalSpiritVariant: variant?.key ?? null, animalSpiritFortifyHp: variant?.tempHp ?? null });
+}
+
+// MA-1436: chooser arm for handleSaveRoll (hoisted for the §45 statement
+// ceiling) — returns true when the press is consumed by the chooser or the
+// recharge pre-check, so the chip press never dangles an open chooser and
+// never prompts a save before the variant is chosen (the recharge refusal
+// here is the ONLY log — executeBlockSaveRoll re-checks silently downstream).
+// MA-0268 stage-field bundle (hoisted for the §45 statement ceiling) — the
+// staged roar swaps all three legs together; byte-identical passthrough when
+// resolveRoarStageAction is null.
+function resolveStageSaveFields({ action, usesGate, saveDamageFormula, saveConditions }) {
+  const roarAction = resolveRoarStageAction({ action, usesGate });
+  const stageAction = roarAction || action;
+  return {
+    stageAction,
+    stageFormula: roarAction ? extractDamageDiceFromDescription(stageAction.description, stageAction.damage_dice_primary) : saveDamageFormula,
+    stageConditions: roarAction ? extractConditionsFromSaveEffect(stageAction.save_effect) : saveConditions,
+  };
+}
+
+// MA-0275 chooser arm hoisted alongside the MA-1436 twin (§45 ceiling) —
+// byte-identical behavior, consumed-press return.
+function tryOpenAnimalSpiritChooser({ stageAction, spellInfo, stageFormula, stageConditions, prerequisite, usesGate, target, setAnimalSpiritChooser }) {
+  const spiritVariants = parseAnimalSpiritVariants(stageAction);
+  if (!spiritVariants) return false;
+  setAnimalSpiritChooser({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, prerequisite, usesGate, target, ...spiritVariants });
+  return true;
+}
+
+function tryOpenVariantChoosers(args) {
+  return tryOpenAnimalSpiritChooser(args) || tryOpenSaveVariantChooser(args);
+}
+
+function tryOpenSaveVariantChooser({ stageAction, spellInfo, stageFormula, stageConditions, prerequisite, usesGate, target, monsterName, campaignName, setPopupHtml, setSaveVariantChooser }) {
+  const variantChooser = parseSaveVariantChooser(stageAction);
+  if (!variantChooser) return false;
+  if (rechargeRefusalOnSpent({ action: stageAction, spellInfo, monsterName, campaignName, setPopupHtml }).refused) return true;
+  setSaveVariantChooser({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, prerequisite, usesGate, target, ...variantChooser });
+  return true;
+}
+
+// MA-1436: generic choose-one save-variant chooser seam (Satyr Revelmaster
+// Fey Melody). Skip = advisory decline log with ZERO save, ZERO grant, ZERO
+// recharge spend (the core rule never rolls without an effect). A pick logs
+// the choice, then runs the block-save seam with the variant's OWN damage /
+// conditions / dc_success / duration_note threaded (Charming = zero damage +
+// charmed/incapacitated; Frightening = 2d6+3 Psychic half-on-save +
+// frightened) — the row-level fields never reach the picker for these rows.
+async function resolveSaveVariantSelection({ chooser, variant, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser }) {
+  setChooser(null);
+  if (!chooser) return;
+  if (!variant) {
+    addEntry(campaignName, {
+      type: 'automation',
+      automationType: 'save_variant_declined',
+      characterName: monsterName,
+      abilityName: chooser.action.name,
+      description: `${monsterName} uses ${chooser.action.name} with no variant chosen — no save was rolled and no effect applied.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[MonsterCardModal] Error logging save variant decline:', e); });
+    return;
+  }
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'save_variant_selected',
+    characterName: monsterName,
+    abilityName: chooser.action.name,
+    description: `${monsterName}'s ${chooser.action.name} — ${variant.label} variant chosen.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MonsterCardModal] Error logging save variant selection:', e); });
+  executeBlockSaveRoll({ action: chooser.action, spellInfo: chooser.spellInfo, saveDamageFormula: variant.damage_dice ?? null, saveConditions: variant.conditions, monsterName, campaignName, target: chooser.target, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, prerequisite: chooser.prerequisite, usesGate: chooser.usesGate, setPopupHtml, saveVariant: variant });
 }
 
 function getDamageTypeChoices(action) {
@@ -1715,8 +1811,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const [evasionSelection, setEvasionSelection] = useState(null);
   const [showAllyModal, setShowAllyModal] = useState(false);
   const [allyModalCreatures, setAllyModalCreatures] = useState([]);
-  const storedAllies = useRuntimeValue(monsterName, 'selectedAllies', campaignName);
-  const currentAllies = resolveCurrentAllies(storedAllies, monsterName);
+  const currentAllies = resolveCurrentAllies(useRuntimeValue(monsterName, 'selectedAllies', campaignName), monsterName);
   const pendingSaveRef = useRef(null);
 
   useEffect(() => {
@@ -1756,6 +1851,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const monsterRecharge = useRuntimeValue(monsterName, MONSTER_RECHARGE_KEY, campaignName);
   const [conePicker, setConePicker] = useState(null);
   const [animalSpiritChooser, setAnimalSpiritChooser] = useState(null);
+  const [saveVariantChooser, setSaveVariantChooser] = useState(null);
   // MA-1020: shape-shift form chooser state (Imp "Shape-Shift") — chip press
   // opens the MA-0275-byte-shape chooser; one row click resolves the stamp.
   const [shapeShiftChooser, setShapeShiftChooser] = useState(null);
@@ -2060,22 +2156,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const { refused, usesGate } = resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, setPopupHtml });
     if (refused) return;
     // MA-0268: staged_roar row (Androsphinx Roar) — the Nth click resolves
-    // ONLY the Nth roar's canonical legs (1 frightened / 2 deaf+frightened,
-    // both zero-damage WIS with turn-END repeat saves; 3 CON 8d10 thunder
-    // half-on-success + prone), swapped by the persisted MA-0020 spend
-    // counter. Byte-inert null for every other row.
-    const roarAction = resolveRoarStageAction({ action, usesGate });
-    const stageAction = roarAction || action;
-    const stageFormula = roarAction ? extractDamageDiceFromDescription(stageAction.description, stageAction.damage_dice_primary) : saveDamageFormula;
-    const stageConditions = roarAction ? extractConditionsFromSaveEffect(stageAction.save_effect) : saveConditions;
+    // ONLY the Nth roar's canonical legs, swapped by the persisted MA-0020
+    // spend counter; byte-inert passthrough for every other row (legs hoisted
+    // to resolveStageSaveFields for the §45 statement ceiling).
+    const { stageAction, stageFormula, stageConditions } = resolveStageSaveFields({ action, usesGate, saveDamageFormula, saveConditions });
     // MA-0275: Animal Spirit variant trio — open the form chooser before any
     // save prompt; the chooser confirmation runs the same block-save seam
     // with the chosen variant threaded onto the save context.
-    const spiritVariants = parseAnimalSpiritVariants(stageAction);
-    if (spiritVariants) {
-      setAnimalSpiritChooser({ action: stageAction, spellInfo, saveDamageFormula: stageFormula, saveConditions: stageConditions, prerequisite, usesGate, target, ...spiritVariants });
-      return;
-    }
+    if (tryOpenVariantChoosers({ stageAction, spellInfo, stageFormula, stageConditions, prerequisite, usesGate, target, monsterName, campaignName, setPopupHtml, setAnimalSpiritChooser, setSaveVariantChooser })) return;
     // MA-0374/MA-0383: Eye Rays — structured rays[] + len(rays) picker
     // (RAW random ray, reroll-if-used-this-turn; d10 Beholder, d4 Beholder
     // Zombie) — the picked ray's own single-ability save leg runs
@@ -2471,6 +2559,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           tempHpGrant={conePicker.tempHpGrant}
           stagedPetrify={conePicker.stagedPetrify}
           conditionDurationNote={conePicker.conditionDurationNote}
+          saveVariant={conePicker.saveVariant}
           storeLastAttack={false}
           onClose={() => setConePicker(null)}
         />
@@ -2480,6 +2569,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         monsterName={monsterName}
         onResolve={(variant) => resolveAnimalSpiritSelection({ chooser: animalSpiritChooser, variant, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser: setAnimalSpiritChooser })}
         onSkip={() => resolveAnimalSpiritSelection({ chooser: animalSpiritChooser, variant: null, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser: setAnimalSpiritChooser })}
+      />
+      <SaveVariantChooserModal
+        chooser={saveVariantChooser}
+        monsterName={monsterName}
+        onResolve={(variant) => resolveSaveVariantSelection({ chooser: saveVariantChooser, variant, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser: setSaveVariantChooser })}
+        onSkip={() => resolveSaveVariantSelection({ chooser: saveVariantChooser, variant: null, monsterName, campaignName, creatures, characters, rollSavingThrow, setConePicker, getDamageTypesForAction, setPopupHtml, setChooser: setSaveVariantChooser })}
       />
       <ShapeShiftModal
         chooser={shapeShiftChooser}

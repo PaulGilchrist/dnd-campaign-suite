@@ -192,7 +192,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, stagedPetrify: ctx.stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, bothOutcomesClause, tempHpGrant: ctx.tempHpGrant, conditionDurationNote: ctx.conditionDurationNote });
+    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, stagedPetrify: ctx.stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, bothOutcomesClause, tempHpGrant: ctx.tempHpGrant, conditionDurationNote: ctx.conditionDurationNote, saveVariant: ctx.saveVariant });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -641,7 +641,25 @@ function applyStagedPetrifySave({ stagedPetrify, success, saveDc, saveType, targ
 // Failed-save dispatch: MA-0068 staged sleep / MA-0248 staged paralysis rows
 // route through their staging seams; everything else keeps the MA-0063
 // one-shot grant untouched.
-function resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote }) {
+// MA-1436: failed-save expiry clock for a GM-chosen save variant (Satyr
+// Revelmaster Fey Melody) — ONE §37 expirationQueue clock (rounds, from the
+// variant's rounds field; 1 minute = 10 rounds) covering the variant's
+// conditions (type:'condition' — clearExpirationEffects strips them via
+// removeConditionEverywhere at expiry). Successful saves arm nothing
+// (fail-only); every chooserless picker row passes saveVariant falsy and
+// stays byte-inert.
+function applySaveVariantClockGrant({ saveVariant, success, targetName, casterName, campaignName }) {
+    if (success === true || !saveVariant) return;
+    addExpiration({
+        attackerName: casterName,
+        targetName,
+        campaignName,
+        rounds: saveVariant.rounds ?? 10,
+        effects: saveVariant.conditions.map(condition => ({ type: 'condition', condition })),
+    });
+}
+
+function resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
@@ -672,6 +690,7 @@ function resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, su
     // complexity ceiling (saveProcessing applyFailedSaveClauseGrants shape).
     applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause });
     applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
+    applySaveVariantClockGrant({ saveVariant, success, targetName, casterName: playerStats.name, campaignName });
     // MA-0875: failed-save THP clause on the ATTACKER (byte-inert when the
     // prop is null) — the picker IS the Cube row's target-selection seam.
     if (success !== true && tempHpGrant) {
@@ -1237,6 +1256,12 @@ function SaveAttackAoeModal({
     // instead of the MA-0063 flat saveConditions grant (suppressed while
     // armed), adjudicated to Petrified by the turn-END repeater.
     stagedPetrify,
+    // MA-1436 optional GM-chosen save variant (falsy default, byte-inert —
+    // §398 no default in destructure): Satyr Revelmaster Fey Melody — the
+    // choose-one song variant picked upstream at the variant chooser; failed
+    // saves arm a rounds-based expiry clock for the variant's conditions via
+    // the §37 expiration queue. All other picker rows pass undefined.
+    saveVariant,
     onClose,
 }) {
     const [summary, setSummary] = useState(null);
@@ -1298,7 +1323,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -1329,7 +1354,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote]);
+    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -1461,7 +1486,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote });
+        resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -1490,7 +1515,7 @@ function SaveAttackAoeModal({
         }, secondary);
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
