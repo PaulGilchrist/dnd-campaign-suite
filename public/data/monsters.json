@@ -53569,7 +53569,6 @@
       {
         "name": "Constrict",
         "description": "Strength Saving Throw: DC 15, one Large or smaller creature the salamander can see within 10 feet. Failure: 11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Fire damage. The target has the <strong>Grappled</strong> condition (escape DC 14), and it has the <strong>Restrained</strong> condition until the grapple ends.",
-        "attack_bonus": 0,
         "save_dc": 15,
         "save_type": "Strength",
         "save_effect": "Failure: 11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Fire damage. The target has the Grappled condition (escape DC 14) and has the Restrained condition until the grapple ends.",
@@ -53579,7 +53578,8 @@
         "damage_dice_primary": "2d6 + 4",
         "damage_type_primary": "Bludgeoning",
         "damage_dice_secondary": "2d6",
-        "damage_type_secondary": "Fire"
+        "damage_type_secondary": "Fire",
+        "dc_success": "none"
       }
     ],
     "bonus_actions": [],
