@@ -11,7 +11,7 @@
 // staged_paralysis — the eye-ray ladder channel is ray.ladder), and the
 // manual single-fire sibling rows stay byte-unchanged (MA-1481 scope).
 import { describe, it, expect } from 'vitest';
-import { parseEyeRays, pickEyeRay, buildEyeRayAction } from './MonsterCardHelpers.js';
+import { parseEyeRays, pickEyeRay, buildEyeRayAction, parseSlowedClauses } from './MonsterCardHelpers.js';
 import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import monsters from '../../../public/data/monsters.json';
 
@@ -134,5 +134,50 @@ describe('MA-1483 spectator Eye Rays launcher rays[] data', () => {
     expect(siblings[1].save_type).toBe('Constitution');
     expect(siblings[2].save_type).toBe('Wisdom');
     expect(siblings[3].save_type).toBe('Constitution');
+  });
+});
+
+// MA-1484: manual "Confusion Ray" row (actions[3]) RAW pays ZERO on a
+// successful save ("Wisdom Saving Throw: DC 12. Failure: 5 (2d4)..." — no
+// success-pays clause). dc_success was ABSENT → getSaveDcSuccess default
+// 'half' (MonsterCardModal :268/:1128) leaked half Psychic on success
+// (§63/§129 MV-20 family: MA-0481/0622/0768/0781/0868) — live ledger:
+// nat17 sum4→fd2, nat19 sum6→fd3. DATA fix: dc_success:"none" after
+// save_effect (gazer MA-0768 Frost Ray byte-shape), consistent with the
+// MA-1483 launcher rays[0] which already carries 'none'. The FAIL-side
+// no_reactions te rides parseSlowedClauses on save_effect grants at
+// saveProcessing :333/:480 regardless of dc_success (§63 trap-check).
+describe('MA-1484 spectator "Confusion Ray" dc_success none — zero damage on save success', () => {
+  const confusion = spectator.actions[3];
+
+  it('row is the Confusion Ray save row', () => {
+    expect(confusion.name).toBe('Confusion Ray');
+    expect(confusion.save_dc).toBe(12);
+    expect(confusion.save_type).toBe('Wisdom');
+  });
+
+  it('canonical prose carries NO half-on-success clause', () => {
+    expect(confusion.description).not.toMatch(/half/i);
+    expect(confusion.save_effect).not.toMatch(/half/i);
+  });
+
+  it('dc_success authored "none" (half-default leak guard)', () => {
+    expect(confusion.dc_success).toBe('none');
+  });
+
+  it('launcher rays[0] Confusion stays consistent dc_success "none" (MA-1483 twin)', () => {
+    expect(parseEyeRays(row)[0].key).toBe('confusion');
+    expect(parseEyeRays(row)[0].dc_success).toBe('none');
+  });
+
+  it('dc_success "none" does not suppress the FAIL-side slowed-clause transport', () => {
+    expect(parseSlowedClauses(confusion.save_effect)).toEqual({ effects: ['no_reactions'] });
+  });
+
+  it('save seam pays full 2d4 on fail, zero on success', () => {
+    expect(computeDamageAfterSave(7, false, confusion.dc_success)).toBe(7);
+    expect(computeDamageAfterSave(2, false, confusion.dc_success)).toBe(2);
+    expect(computeDamageAfterSave(4, true, confusion.dc_success)).toBe(0);
+    expect(computeDamageAfterSave(6, true, confusion.dc_success)).toBe(0);
   });
 });
