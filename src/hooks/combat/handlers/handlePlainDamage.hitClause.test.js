@@ -4647,3 +4647,112 @@ describe('MA-1435 Satyr Revelmaster Prance charmed-on-hit grant (one-field DATA 
     });
 });
 
+const SCARECROW = monsters.find(m => m.index === 'scarecrow');
+const FEARSOME_CLAW_ACTION = SCARECROW.actions.find(a => a.name === 'Fearsome Claw');
+const TERRIFYING_GLARE_ACTION = SCARECROW.actions.find(a => a.name === 'Terrifying Glare');
+
+describe('MA-1437 Scarecrow Fearsome Claw frightened-on-hit grant (one-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Scarecrow 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Scarecrow 1', computedStats: { armorClass: 11 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 991, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function clawContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Slashing',
+            attackerName: 'Scarecrow 1',
+            hitClause: buildHitConditionClause(FEARSOME_CLAW_ACTION),
+        };
+    }
+
+    it('data-lock: disk row carries hit_conditions ["frightened"] after damage_type_primary (MA-0621/MA-1435 byte-shape), NO escape_dc (until-next-turn, not a grapple)', () => {
+        expect(FEARSOME_CLAW_ACTION.attack_bonus).toBe(3);
+        expect(FEARSOME_CLAW_ACTION.hit_conditions).toEqual(['frightened']);
+        const keys = Object.keys(FEARSOME_CLAW_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(FEARSOME_CLAW_ACTION.escape_dc).toBeUndefined();
+        expect(FEARSOME_CLAW_ACTION.damage_dice_primary).toBe('2d4 + 1');
+        expect(FEARSOME_CLAW_ACTION.damage_type_primary).toBe('Slashing');
+        expect(FEARSOME_CLAW_ACTION.save_dc).toBe(0);
+        expect(FEARSOME_CLAW_ACTION.reach).toBe('5 ft.');
+    });
+
+    it('buildHitConditionClause arms the Frightened rider (was null pre-fix)', () => {
+        const clause = buildHitConditionClause(FEARSOME_CLAW_ACTION);
+        expect(clause).toEqual({
+            conditions: ['frightened'],
+            escapeDc: null,
+            attackName: 'Fearsome Claw',
+            targetEffect: null,
+        });
+    });
+
+    it('grants Frightened on the resolved hit via the canonical activeConditions write path', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Fearsome Claw', formula: '2d4 + 1', total: 8, rolls: [4, 3], modifier: 1, context: clawContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe('Bandit 1');
+        expect(condCall[2]).toEqual(['frightened']);
+    });
+
+    it('stamps source meta WITHOUT dc/ability and logs condition-applied naming the attack', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Fearsome Claw', formula: '2d4 + 1', total: 8, rolls: [4, 3], modifier: 1, context: clawContext() });
+
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ frightened: { source: 'Scarecrow 1' } });
+        expect(metaCall[2].frightened.dc).toBeUndefined();
+        expect(metaCall[2].frightened.ability).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Frightened',
+            reason: 'Fearsome Claw (escape DC —)',
+        }));
+    });
+
+    it('until-next-turn latch: static-list grant rides the STANDARD latch, no custom clock (§38/§153 accepted residual)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Fearsome Claw', formula: '2d4 + 1', total: 8, rolls: [4, 3], modifier: 1, context: clawContext() });
+
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Fearsome Claw', formula: '2d4 + 1', total: 8, rolls: [4, 3], modifier: 1, context: clawContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('Terrifying Glare save row byte-unchanged: hit-clause fix never touches the DC 11 save leg (§MA-1438 twin)', () => {
+        expect(TERRIFYING_GLARE_ACTION.hit_conditions).toBeUndefined();
+        expect(buildHitConditionClause(TERRIFYING_GLARE_ACTION)).toBeNull();
+        expect(TERRIFYING_GLARE_ACTION.save_dc).toBe(11);
+    });
+});
+

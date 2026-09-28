@@ -54173,7 +54173,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "2d4 + 1",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": ["frightened"]
       },
       {
         "name": "Terrifying Glare",

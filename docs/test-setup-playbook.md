@@ -974,3 +974,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Joined NPC combatants snapshot master stat blocks at join — monsters.json edits need remove+re-join to take effect live.
 - Area picker confirm with 0 targets no-ops (label shows count); stacked picker resolves leave Results overlay over newer pickers — close before scripting.
 - Expiry clocks live under runtime key `pendingExpirations` (turnStartEffects KEY), not expirationQueue.
+
+## §MA-1437 (2026-09-28, Scarecrow Fearsome Claw FIXED) New pitfalls
+- First join after admin-clear names monster bare "Bandit" (no " 1") until reseed — pin victim by cs poll not assumed suffix.
+- EB Join mid-flow auto-navigates to Initiative — stale EB evaluate can join duplicates; re-click Encounters + verify cs names after every join.

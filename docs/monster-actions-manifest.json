@@ -24298,7 +24298,7 @@
         "frightened"
       ],
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 6 (2d4 + 1) Slashing damage, and the target has the Frightened condition until the end of the scarecrow's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1437-fearsome-claw.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1438",
