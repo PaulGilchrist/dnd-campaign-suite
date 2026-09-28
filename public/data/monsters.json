@@ -55269,16 +55269,20 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "The shadow dragon takes 2 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The shadow dragon regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Pounce",
-        "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-        "uses": 1,
-        "recharge": false
+        "delegates_to": "Rend",
+        "description": "The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack."
       },
       {
         "name": "Veil of Shadow",
-        "description": "The dragon uses Shadow Stealth, and one creature of its choice that it can see within 10 feet of it takes 10 (3d6) Necrotic damage. The dragon can't take this action again until the start of its next turn.",
-        "uses": 1,
-        "recharge": false
+        "advisory": "veil_of_shadow",
+        "advisory_message": "uses Shadow Stealth and lashes one creature it can see within 10 feet for 10 (3d6) Necrotic damage — advisory record: stealth, range choice and the Necrotic damage are GM-enforced (no engine consumer for this row's mechanic; the full mechanic is MA-1457 territory). The once-per-turn limit is engine-enforced by the legendary cooldown latch.",
+        "description": "The dragon uses Shadow Stealth, and one creature of its choice that it can see within 10 feet of it takes 10 (3d6) Necrotic damage. The dragon can't take this action again until the start of its next turn."
       }
     ],
     "lair_actions": "Shadow dragons lair in places of darkness and despair, such as accursed ruins, the depths of the Underdark, or the Shadowfell.<br/><br/>The region around a shadow dragons lair is twisted by its presence, creating the following effects:<br/><br/><b>Negative Energy Suffusion.</b> Whenever a creature within 1 mile of the lair regains Hit Points from a spell, it subtracts 1d10 from the number of Hit Points regained.<br/><b>Stifling Shadows.</b> Within 1 mile of the lair, effects that normally create Bright Light instead create Dim Light, and creatures there have Advantage on Dexterity (Stealth) checks.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",

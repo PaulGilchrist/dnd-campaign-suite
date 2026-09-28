@@ -24684,7 +24684,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1456-pounce.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1457",
