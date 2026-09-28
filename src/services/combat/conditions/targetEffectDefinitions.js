@@ -770,6 +770,23 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-1449: Sea Hag Illusory Appearance self-buff te — monsterSelfBuff seam
+    // grants it ON SELF with ONE merged rounds:14400 (24 hours) clock (§37
+    // hours×600). At Will, no uses gate (RAW has no uses limit). Disguise
+    // Self is a save-less SELF cast — the row's "spell save DC 13" is the
+    // hag's caster stat (Constitution), never a saving throw anyone rolls.
+    // Truelook / physical inspection (RAW: action + DC 20 Intelligence
+    // (Investigation)) and dispel-magic are GM-enforced (§70 advisory);
+    // no attack/cast enders — RAW the disguise lasts the full duration.
+    effect: 'disguised',
+    label: 'Disguised',
+    description: 'The hag casts Disguise Self (Constitution as spellcasting ability, stat-block variant: 24-hour duration) and appears as another creature — the "spell save DC 13" in the row is the hag\'s caster stat, not a target save. Physical inspection (DC 20 Intelligence (Investigation)) and dispel-magic are GM-enforced (§70 advisory).',
+    icon: 'fa-user-secret',
+    cls: 'effect-buff',
+    group: 'Spells',
+    fields: ['source'],
+  },
+  {
     // MA-0658: Duergar Invisibility self-buff te — monsterSelfBuff seam
     // grants it ON SELF with ONE merged rounds:600 (1 hour) clock; attack /
     // cast / enlarge enders drop it early with a log. Invisibility CONDITION

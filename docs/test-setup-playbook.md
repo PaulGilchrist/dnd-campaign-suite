@@ -985,3 +985,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1448 (2026-09-28, Sea Hag Death Glare FIXED) New pitfalls
 - Save-row attack_bonus:0 decoy renders "+0" + loose "3d8" chips beside DC chip — press ONLY the DC chip; loose dice chip bypasses save seam.
 - Inline threshold-row success legs emit save-damage total:0 fd:0 + no hp_change — absence-of-half = fd:0 pin (§280 twin).
+
+## §MA-1449 (2026-09-28, Sea Hag Illusory Appearance FIXED — self-buff `disguised`) New pitfalls
+- monsterSelfBuff prose is effect-BRANCHED; 4th+ effect key pushes buildSelfBuffPopup past complexity 15 — hoist selfBuffPopupBody helper.
+- Self-buff At-Will twins (no uses) produce NO ability_use log — grant truth = automation/<effect>_granted + top-level targetEffects te.
+- invisible-only attack/cast enders (Modal:2060/2210) apply to `disguised` too; Disguise Self RAW has no attack/cast ender — duration clock only, documented designed-not-residual.

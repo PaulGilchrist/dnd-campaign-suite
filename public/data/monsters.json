@@ -54679,13 +54679,15 @@
       {
         "name": "Illusory Appearance",
         "description": "The hag casts <strong>Disguise Self</strong>, using Constitution as the spellcasting ability (spell save DC 13). The spell's duration is 24 hours.",
-        "attack_bonus": 0,
-        "save_dc": 13,
-        "save_type": "Constitution",
         "save_effect": "",
         "range": "",
         "reach": "",
-        "recharge": ""
+        "recharge": "",
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "disguised",
+          "rounds": 14400
+        }
       }
     ],
     "bonus_actions": [],

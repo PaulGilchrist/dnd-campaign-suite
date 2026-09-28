@@ -148,3 +148,49 @@ describe('MA-0780 Ghost Ethereality self-buff chip', () => {
     expect(onSelfBuffRow).not.toHaveBeenCalled();
   });
 });
+
+// MA-1449: Sea Hag "Illusory Appearance" — formerly a FAIL(a) MISROUTE row
+// whose caster stat was transcribed into row-level save_dc/save_type, arming
+// a "DC 13 Constitution" forced-save chip (junk "+0" rode attack_bonus:0,
+// §490) that paid NOTHING. Now rides the SAME self-buff chip seam —
+// automation:{type:"monster_self_buff", effect:"disguised", rounds:14400}
+// (24 hours §37). DC fields + attack_bonus KEYS DELETED: NO save chip, NO
+// junk "+0"; chip arms off automation.type with ZERO new chip-route code.
+// RAW has no uses limit → no uses counter (At Will ungated §57).
+describe('MA-1449 Sea Hag Illusory Appearance self-buff chip', () => {
+  const seaHag = monsters.find(m => m.index === 'sea-hag');
+  const ILLUSORY_ROW = seaHag.actions[2];
+
+  it('row authors the monster_self_buff automation; save_dc/save_type/attack_bonus keys DELETED', () => {
+    expect(ILLUSORY_ROW.automation).toEqual({ type: 'monster_self_buff', effect: 'disguised', rounds: 14400 });
+    expect('save_dc' in ILLUSORY_ROW).toBe(false);
+    expect('save_type' in ILLUSORY_ROW).toBe(false);
+    expect('attack_bonus' in ILLUSORY_ROW).toBe(false);
+    expect(isMonsterSelfBuffRow(ILLUSORY_ROW)).toBe(true);
+    expect(selfBuffRounds(ILLUSORY_ROW)).toBe(14400);
+  });
+
+  it('arms a clickable self-buff chip with fa-user-secret icon, NO uses counter, NO save/attack chips', () => {
+    const { container, onSelfBuffRow } = renderRow(ILLUSORY_ROW);
+    const chip = container.querySelector('.mc-dice-link-selfbuff');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toContain('Illusory Appearance');
+    expect(chip.textContent).not.toContain('/Day');
+    expect(chip.textContent).not.toContain('DC 13');
+    expect(chip.querySelector('i').className).toContain('fa-user-secret');
+    expect(chip.getAttribute('title')).toContain('te disguised on self, 14400 rounds');
+    // FAIL(a) misroute chip + junk "+0" fully gone (MA-1071/§490 family)
+    expect(container.querySelector('.mc-dice-link-save-clickable')).toBeNull();
+    fireEvent.click(chip);
+    expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
+    expect(onSelfBuffRow.mock.calls[0][0]).toBe(ILLUSORY_ROW);
+  });
+
+  it('incapacitated attacker: chip inert', () => {
+    const { container, onSelfBuffRow } = renderRow(ILLUSORY_ROW, { attackerCannotAct: true });
+    const chip = container.querySelector('.mc-dice-link-selfbuff');
+    expect(chip).toBeTruthy();
+    fireEvent.click(chip);
+    expect(onSelfBuffRow).not.toHaveBeenCalled();
+  });
+});

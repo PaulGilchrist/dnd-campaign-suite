@@ -65,7 +65,9 @@ export function buildSelfBuffGrantLog({ monsterName, action, effectKey, rounds }
       ? `te \`bolstered\` standing refuses a re-Bolster ("can't take this action again until the start of its next turn" rides the already_bolstered refusal + the legendary per-action cooldown latch); te \`bolster_advantage\` (Advantage on D20 Tests — live te fold in conditionEffects.js) stamped on itself${bolsterAllyRadiusFt(action) ? ` and allies within ${bolsterAllyRadiusFt(action)} ft` : ''}; gridless radius + ally membership GM-enforced (§42 advisory).`
       : effectKey === 'ethereal'
         ? 'the ghost enters the Border Ethereal — visible on the Material Plane while on the Border Ethereal and vice versa; plane interaction (can\'t affect or be affected by anything on the other plane) is GM-enforced (§70 advisory). At Will, no uses limit; a re-cast while ethereal refuses zero-cost via the `ethereality_refused` / already_ethereal latch.'
-        : `ends when it attacks, casts a spell, or uses its Enlarge (attack/cast/enlarge enders drop the te with an \`${effectKey}_ended\` log), or when its clock runs out. Concentration-break ender and invisibility advantage/disadvantage adjudication are GM-enforced (§70 advisory).`;
+        : effectKey === 'disguised'
+          ? 'the hag casts Disguise Self on itself (save-less SELF cast — the row\'s "spell save DC 13" is the hag\'s caster stat, never a target save); no attack/cast enders — RAW the disguise lasts the full duration. Truelook, physical inspection (DC 20 Intelligence (Investigation)) and dispel-magic are GM-enforced (§70 advisory). At Will, no uses limit; a re-cast while disguised refuses zero-cost via the `illusory_appearance_refused` / already_disguised latch.'
+          : `ends when it attacks, casts a spell, or uses its Enlarge (attack/cast/enlarge enders drop the te with an \`${effectKey}_ended\` log), or when its clock runs out. Concentration-break ender and invisibility advantage/disadvantage adjudication are GM-enforced (§70 advisory).`;
   return {
     type: 'automation',
     automationType: `${effectKey}_granted`,
@@ -93,15 +95,22 @@ export function buildAlreadyEnlargedRefusalPopup({ monsterName, action, effectKe
   return `<div class="mc-prerequisite-refusal"><h3>Already ${effectKey.charAt(0).toUpperCase()}${effectKey.slice(1)}</h3><p>${monsterName} is already ${effectKey} — ${action?.name || 'Self Buff'} refused. No use spent; the existing ${action?.name || 'Self Buff'} clock keeps running.</p></div>`;
 }
 
+// MA-1449: effect-branched popup body — new effect keys inherit the
+// invisibility else-copy (§278 pitfall), so every sanctioned self-buff
+// effect needs its own honest branch. Hoisted out of buildSelfBuffPopup to
+// hold the eslint complexity cap (§45).
+function selfBuffPopupBody({ monsterName, action, effectKey, rounds }) {
+  const name = action?.name || 'Self Buff';
+  if (effectKey === 'enlarged') return `${monsterName} grows to Large via ${name} — Strength-based weapon damage dice doubled for ${rounds} rounds (one merged clock). STR checks/saves advantage are GM-enforced (§70).`;
+  if (effectKey === 'bolstered') return `${monsterName} gains ${bolsterTempHp(action)} Temporary Hit Points (replace-if-larger) via ${name} and it + allies within ${bolsterAllyRadiusFt(action)} ft gain Advantage on D20 Tests for ${selfBuffDurationNote(rounds)} (one merged clock). Gridless radius + ally membership GM-enforced (§42).`;
+  if (effectKey === 'ethereal') return `${monsterName} slips into the Border Ethereal via ${name} — te \`ethereal\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Visible on the Material Plane while on the Border Ethereal and vice versa; plane interaction (can't affect or be affected by anything on the other plane) is GM-enforced (§70). At Will — no uses limit.`;
+  if (effectKey === 'disguised') return `${monsterName} casts Disguise Self on itself via ${name} — te \`disguised\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Save-less SELF cast: no one rolls a save (the row's "spell save DC 13" is the hag's caster stat). Truelook / inspection / dispel-magic GM-enforced (§70). At Will — no uses limit.`;
+  return `${monsterName} turns invisible via ${name} — te \`invisible\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Ends on attack, spell cast, or Enlarge (logged); invisibility adjudication is GM-enforced (§70).`;
+}
+
 export function buildSelfBuffPopup({ monsterName, action, effectKey, rounds, remaining }) {
   const usesNote = remaining != null ? ` ${remaining} use(s) left (recharges after a short or long rest, GM-enforced).` : '';
-  const body = effectKey === 'enlarged'
-    ? `${monsterName} grows to Large via ${action?.name || 'Self Buff'} — Strength-based weapon damage dice doubled for ${rounds} rounds (one merged clock). STR checks/saves advantage are GM-enforced (§70).`
-    : effectKey === 'bolstered'
-      ? `${monsterName} gains ${bolsterTempHp(action)} Temporary Hit Points (replace-if-larger) via ${action?.name || 'Self Buff'} and it + allies within ${bolsterAllyRadiusFt(action)} ft gain Advantage on D20 Tests for ${selfBuffDurationNote(rounds)} (one merged clock). Gridless radius + ally membership GM-enforced (§42).`
-      : effectKey === 'ethereal'
-        ? `${monsterName} slips into the Border Ethereal via ${action?.name || 'Self Buff'} — te \`ethereal\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Visible on the Material Plane while on the Border Ethereal and vice versa; plane interaction (can't affect or be affected by anything on the other plane) is GM-enforced (§70). At Will — no uses limit.`
-        : `${monsterName} turns invisible via ${action?.name || 'Self Buff'} — te \`invisible\` armed for ${selfBuffDurationNote(rounds)} (one merged clock). Ends on attack, spell cast, or Enlarge (logged); invisibility adjudication is GM-enforced (§70).`;
+  const body = selfBuffPopupBody({ monsterName, action, effectKey, rounds });
   return `<div class="mc-prerequisite-refusal"><h3>${monsterName} is ${effectKey.charAt(0).toUpperCase()}${effectKey.slice(1)}</h3><p>${body}${usesNote}</p></div>`;
 }
 

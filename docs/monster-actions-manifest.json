@@ -24546,7 +24546,7 @@
       "range": "",
       "recharge": "",
       "description": "The hag casts Disguise Self, using Constitution as the spellcasting ability (spell save DC 13). The spell's duration is 24 hours.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1449-illusory-appearance.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1450",
