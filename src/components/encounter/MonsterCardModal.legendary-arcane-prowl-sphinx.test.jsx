@@ -33,7 +33,7 @@ import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 import { legendaryHeaderAction, legendaryDelegateAction, legendaryDelegateAttackName, hasLegendaryCooldownClause, legendaryActionSlug } from '../../services/encounters/monsterLegendaryUses.js';
-import { parseExhaustionLevelClause } from './MonsterCardHelpers.js';
+import { parseExhaustionLevelClause, parseBothOutcomesClause, extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
@@ -183,6 +183,35 @@ describe('MA-1494 monsters.json data: sphinx-of-lore legendary block header + ch
     expect(legendaryActionSlug(row.name)).toBe('weight_of_years');
     // MA-0751 byte key "gains N Exhaustion level(s)" matches the save_effect.
     expect(parseExhaustionLevelClause(row.save_effect)).toEqual({ effect: 'exhaustion', level: 1 });
+  });
+
+  // MA-1495 facet lock (verify-only; fields landed in the MA-1494 pass): the
+  // pre-fix silent-burn was the MA-1071 `Number(save_dc) > 0` gate reading 0 →
+  // resolveLegendaryRowMechanic final else console.error (MA-0510). Success pays
+  // ZERO by RAW + dc_success:"none": the MA-1058 discriminator proves the
+  // "Failure or Success:" tail in `description` attaches to the REUSE limit only
+  // (parseBothOutcomesClause null), and save_effect carries NO such tail at all;
+  // exhaustion is the ONLY fail-leg grant, riding the canonical NUMERIC
+  // exhaustionLevel channel (MA-0751 grant pinned byte-shape in
+  // saveProcessing.exhaustion.test.js — numeric exhaustionLevel 1 + stacks +
+  // death cap 6 + `condition applied` log, no te/clock), never a boolean
+  // condition or te (CONDITIONS word list excludes exhaustion — §239).
+  it('MA-1495 facets: DC-gate armed, success pays zero (MA-1058 tail null both surfaces), fail-only canonical numeric exhaustion', () => {
+    const row = weightRow();
+    // MA-1071 canonical save-lane gate the pre-fix row failed (save_dc absent → 0).
+    expect(Number(row.save_dc) > 0).toBe(true);
+    // MA-1058 discriminator: reuse-limit tail names no condition → null.
+    expect(parseBothOutcomesClause(row.save_effect)).toBeNull();
+    expect(parseBothOutcomesClause(row.description)).toBeNull();
+    // Zero condition-word grants on EITHER leg; no te by design (MA-0751).
+    expect(extractConditionsFromSaveEffect(row.save_effect)).toEqual([]);
+    expect(extractConditionsFromSaveEffect(row.description)).toEqual([]);
+    // Canonical numeric level 1 from the byte-exact save_effect prose; the
+    // salamander recurring-burn-tick exclusion guard is NOT tripped by this row.
+    const parsed = parseExhaustionLevelClause(row.save_effect);
+    expect(parsed).toEqual({ effect: 'exhaustion', level: 1 });
+    expect(typeof parsed.level).toBe('number');
+    expect(/whenever it takes this burning damage/i.test(row.save_effect)).toBe(false);
   });
 
   // §23 byte-identical shared block: sphinx-of-valor keeps the PRE-FIX shape —
