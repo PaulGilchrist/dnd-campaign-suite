@@ -1061,3 +1061,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1520 (2026-09-28, Sprite Enchanting Bow FIXED — charmed hit-rider) New pitfalls
 - §950 one-field fix live: sprite.actions[1] `"hit_conditions":["charmed"]` → buildHitConditionClause → applyHitClauseConditions grant+meta{source}. Flat-1 row byte-unchanged (MA-0322).
 - §108 ORDER note: took-damage charmed-clear (applyDamage.js:429-435) runs BEFORE hit-clause grant (handlePlainDamage.js:1154→:1181) — same-hit grant SURVIVES; honest "removed — took damage (Charm)" → "applied" pair each hit. Judge by grant-log + meta, not by end-state absence.
+
+## §MA-1522 (2026-09-28, Sprite Invisibility FIXED — imp MA-1019 byte-twin) New pitfalls
+- Self-buff invisibility data recipe: `<strong>Invisibility</strong>` + `spellcasting_ability:"Charisma"` + `automation{type:"monster_self_buff",effect:"invisible",rounds:600}` — 600 = canonical "until concentration breaks" backstop (imp/duergar/hag convention). Attack ender `invisible_ended/ends_on_attack` live; refire-while-active → `invisibility_refused/already_invisible` zero-spend. Concentration-break ender = §70 residual (sprite traits:[] — RAW unexpressible).
+- change-data clock reads may show empty for ~10s post-grant (§15 debounce) — re-read before declaring missing.
