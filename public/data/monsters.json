@@ -53921,7 +53921,6 @@
       {
         "name": "Mockery",
         "description": "Wisdom Saving Throw: DC 12, one creature the satyr can see within 90 feet. Failure: 5 (1d6 + 2) Psychic damage.",
-        "attack_bonus": 0,
         "save_dc": 12,
         "save_type": "Wisdom",
         "save_effect": "Failure: 5 (1d6 + 2) Psychic damage.",
@@ -53929,7 +53928,8 @@
         "reach": "",
         "recharge": "",
         "damage_dice_primary": "1d6 + 2",
-        "damage_type_primary": "Psychic"
+        "damage_type_primary": "Psychic",
+        "dc_success": "none"
       }
     ],
     "bonus_actions": [],

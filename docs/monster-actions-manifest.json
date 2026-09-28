@@ -24205,7 +24205,7 @@
       "range": "",
       "recharge": "",
       "description": "Wisdom Saving Throw: DC 12, one creature the satyr can see within 90 feet. Failure: 5 (1d6 + 2) Psychic damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1433-mockery-halfleak.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1434",
