@@ -999,3 +999,9 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Done-less backdrop-flush on HIT popups silently abandons damage AND hit-clause riders while attack roll still logs — count legs by damage entries; flush only after reading HIT+Done.
 - maxHp-staging via cs POST does NOT lift currentHp — stage BOTH or victim dies of ordinary damage mid-rig.
 - Orchestrator manifest edit: python json.dump rewrites whole file AND breaks soft-hyphen escapes (§22 U+00AD) — use surgical line-number edit anchored on unique "id" line, never full re-dump.
+
+## §MA-1456 (2026-09-28, Shadow Dragon Pounce legendary header-swallow FIXED) New pitfalls
+- Legendary header-insert twin (MA-0620/0675) live on shadow-dragon: header rows[0] "Legendary Action Uses: 2" (N=floor=children count when disk text carries no RAW count; two-child twins death-tyrant/colossus stamp 2) + Pounce `delegates_to:"Rend"` + children `uses`/`recharge:false` DROPPED (household `recharge:false` booleans pollute §168 child template).
+- NEW delegate-site §640(a) re-confirmed: delegating to an attack row carrying household `save_dc:0` makes `legendaryDelegateAttackName` label the chip **"X (Rend save)"** while it honestly rides the ATTACK seam (rollAttack, saveDc:null, full dice) — pin the label, never expect rollSavingThrow.
+- Nameless advisory child `{advisory:"<snake_key>",advisory_message}` = honest record-only spend (zero rolls/hp) for legendary children whose real mechanic is a separate ticket; cooldown latch `<slug>` stamps live (MA-0073 seam).
+- `curl -X POST url1 -X POST url2` runs both, prints only the last body — confirm admin clears individually.
