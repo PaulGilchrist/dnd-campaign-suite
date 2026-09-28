@@ -40,6 +40,7 @@ vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
 }));
 
 vi.mock('../loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
     readAoeContext: vi.fn(),
     hasPotentCantrip: vi.fn(() => false),
     isMagicMissileImmune: vi.fn(() => false),

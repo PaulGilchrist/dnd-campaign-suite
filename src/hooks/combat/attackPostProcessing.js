@@ -44,6 +44,14 @@ export async function processAttackAfterResult({ hit, isAutoMiss: _isAutoMiss, t
     // buff (shieldHandler), which must survive until its own turn-start expiry.
     consumeShieldAcBonus({ targetName, characterName, campaignName });
 
+    // MA-1463: Shield Guardian Protection's +5 AC defends the wearer vs the
+    // triggering attack — the ONE-SHOT monster reaction stamp is consumed once
+    // the next attack against the protected wearer resolves (hit or miss),
+    // MA-1170 shield consume lineage. If it survives every attack it still
+    // expires on the guardian's next turn-start anchor clock
+    // (remove_active_buff 'Guardian Protection', expirationQueue §38).
+    consumeGuardianProtectionAcBonus({ targetName, characterName, campaignName });
+
     // Miss effects (vex, etc.)
     grantMissAdvantageEffects({ finalHit, finalAutoMiss, targetName, context, characterName, campaignName });
 
@@ -234,6 +242,30 @@ function consumeShieldAcBonus({ targetName, characterName, campaignName }) {
         targetName: targetName,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[MA-1170 Shield] Error logging consume:', e); });
+}
+
+// MA-1463: consume the Shield Guardian Protection stamp (oneShot:true,
+// effect 'guardian_protection') on the protected WEARER after the next
+// resolved attack against them — consumeShieldAcBonus lineage. Only the
+// guardian reaction resolver stamps this effect key, so nothing else can be
+// stripped here; the grantedBy name keeps the log honest.
+function consumeGuardianProtectionAcBonus({ targetName, characterName, campaignName }) {
+    if (!targetName) return;
+    const buffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    if (!Array.isArray(buffs) || !buffs.some(b => b && b.effect === 'guardian_protection' && b.oneShot === true)) return;
+    const armed = buffs.filter(b => b && b.effect === 'guardian_protection' && b.oneShot === true);
+    const bonus = Number(armed[0].acBonus) || 5;
+    const grantedBy = armed[0].grantedBy || 'Shield Guardian';
+    setRuntimeValue(targetName, 'activeBuffs', buffs.filter(b => !(b && b.effect === 'guardian_protection' && b.oneShot === true)), campaignName);
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'guardian_protection_consumed',
+        characterName: targetName,
+        sourceName: grantedBy,
+        description: `${targetName}'s ${grantedBy} Protection +${bonus} AC was consumed by ${characterName}'s resolved attack — AC returns to base until the guardian Protects again.`,
+        targetName: targetName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[MA-1463 Guardian Protection] Error logging consume:', e); });
 }
 
 function consumeOneShotAdvantage({ characterName, campaignName, finalAutoMiss }) {

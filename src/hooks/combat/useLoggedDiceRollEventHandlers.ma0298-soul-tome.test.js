@@ -56,6 +56,7 @@ vi.mock('../../services/rules/features/invisibilityService.js', () => ({
 }));
 
 vi.mock('../loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
     hasSoulstitchProtection: vi.fn(() => false),
 }));
 

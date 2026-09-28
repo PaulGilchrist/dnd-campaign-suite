@@ -959,11 +959,12 @@ function ChoiceOffer({ props, state }) {
 
 // AC modifier labels for the popup "vs AC" line (MA-0341 added Parry).
 // Module helper keeps DiceRollResult under the complexity ceiling.
-function buildAcBuffLabels({ shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, parryAcBonus, slowAcPenalty }) {
+function buildAcBuffLabels({ shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, parryAcBonus, guardianProtectionAcBonus, slowAcPenalty }) {
     const labels = [];
     if (shieldOfFaithAcBonus > 0) labels.push(`+${shieldOfFaithAcBonus} Shield of Faith`);
     if (wardingBondAcBonus > 0) labels.push(`+${wardingBondAcBonus} Warding Bond`);
     if (parryAcBonus > 0) labels.push(`+${parryAcBonus} Parry`);
+    if (guardianProtectionAcBonus > 0) labels.push(`+${guardianProtectionAcBonus} Protection`);
     if (shieldAcBonus > 0) labels.push(`+${shieldAcBonus} Shield`);
     if (slowAcPenalty > 0) labels.push(`−${slowAcPenalty} Slow`);
     return labels;
@@ -973,7 +974,7 @@ function DiceRollResult(props) {
     const {
         bonus = 0, modifier = 0,
         targetAc,
-        shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, slowAcPenalty, parryAcBonus,
+        shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, slowAcPenalty, parryAcBonus, guardianProtectionAcBonus,
         success,
         autoDamage,
         luckyRerolled, luckyRerollValue,
@@ -996,7 +997,7 @@ function DiceRollResult(props) {
     } = state;
 
     const hitMissTotal = homingStrikesApplied ? finalTotal : displayTotal;
-    const acBuffLabels = buildAcBuffLabels({ shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, parryAcBonus, slowAcPenalty });
+    const acBuffLabels = buildAcBuffLabels({ shieldAcBonus, shieldOfFaithAcBonus, wardingBondAcBonus, parryAcBonus, guardianProtectionAcBonus, slowAcPenalty });
     const acDisplay = `${effectiveAc ?? targetAc ?? '—'}${acBuffLabels.length ? ` (${acBuffLabels.join(', ')})` : ''}`;
 
     const handlePsiKnackClick = () => {

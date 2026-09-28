@@ -26,6 +26,7 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
 }));
 
 vi.mock('./loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
     hasPotentCantrip: vi.fn(() => false),
     applyMinDamageAdjustment: vi.fn((t) => t),

@@ -10,6 +10,7 @@ import {
     getSlowAcPenalty,
     getWardingBondAcBonus,
     getParryAcBonus,
+    getGuardianProtectionAcBonus,
 } from './loggedDiceRollUtils.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { endSanctuary } from '../../services/automation/handlers/spells/sanctuaryHandler.js';
@@ -126,6 +127,7 @@ function buildRollLogEntry({ characterName, rollType, name, ctx, context, target
         wardingBondAcBonus: ctx._wardingBondAcBonus || 0,
         slowAcPenalty: ctx._slowAcPenalty || 0,
         parryAcBonus: ctx._parryAcBonus || 0,
+        guardianProtectionAcBonus: ctx._guardianProtectionAcBonus || 0,
         hit: ctx.hit,
         isAutoMiss: ctx.isAutoMiss,
         isCrit: ctx.isCrit,
@@ -288,6 +290,8 @@ function buildAttackFeatureFlags({ ctx, context, characterName, campaignName }) 
         hitChoiceOffer: context?.hitChoiceOffer || null,
         // MA-0341: defender Parry +2 AC riding the popup AC flags (target-side).
         parryAcBonus: ctx._parryAcBonus || 0,
+        // MA-1463: defender-side Shield Guardian Protection +5 AC (target-side).
+        guardianProtectionAcBonus: ctx._guardianProtectionAcBonus || 0,
     };
 }
 
@@ -483,6 +487,9 @@ export function createLogAndShow(deps) {
         ctx._wardingBondAcBonus = getWardingBondAcBonus(acTargetName, campaignName);
         ctx._slowAcPenalty = getSlowAcPenalty(acTargetName, campaignName);
         ctx._parryAcBonus = getParryAcBonus(acTargetName, campaignName);
+        // MA-1463: Shield Guardian Protection +5 AC riding the defender's
+        // ONE-SHOT activeBuffs stamp (MA-1170 shield fold channel).
+        ctx._guardianProtectionAcBonus = getGuardianProtectionAcBonus(acTargetName, campaignName);
 
         // Bi die size for bardic inspiration defense (attack-only)
         ctx._biDieSize = resolveBiDieSize(rollType, target, campaignName, characters);

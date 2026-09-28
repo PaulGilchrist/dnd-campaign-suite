@@ -71,6 +71,7 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
 }));
 
 vi.mock('../loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
     readAoeContext: vi.fn(),
     hasPotentCantrip: vi.fn(),
     isMagicMissileImmune: vi.fn(),

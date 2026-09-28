@@ -279,9 +279,11 @@ async function maybeStoreDeathStrike(characterName, campaignName, context, targe
 // SP-109: Slow imposes a -2 AC penalty on the target while it is slowed.
 // SP-125: Warding Bond grants the warded target +1 AC (from activeBuffs acBonus).
 // MA-0341: Parry grants the parrying defender +2 AC vs the triggering attack.
+// MA-1463: Shield Guardian Protection grants the amulet wearer +5 AC vs the
+// triggering attack (ONE-SHOT activeBuffs stamp, MA-1170 shield fold shape).
 function computeEffectiveAc(context, target, targetAc) {
     const coverAcBonus = context?.coverAcBonus || 0;
-    return target ? targetAc + coverAcBonus + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + (context._shieldAcBonus || 0) + (context._shieldOfFaithAcBonus || 0) + (context._wardingBondAcBonus || 0) + (context._parryAcBonus || 0) - (context._slowAcPenalty || 0) : undefined;
+    return target ? targetAc + coverAcBonus + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + (context._shieldAcBonus || 0) + (context._shieldOfFaithAcBonus || 0) + (context._wardingBondAcBonus || 0) + (context._parryAcBonus || 0) + (context._guardianProtectionAcBonus || 0) - (context._slowAcPenalty || 0) : undefined;
 }
 
 function computeInitialHitState(context, target, effectiveD20Roll, effectiveAc) {

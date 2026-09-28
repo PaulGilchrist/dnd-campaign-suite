@@ -20,6 +20,7 @@ vi.mock('../../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../../hooks/combat/loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
   soulstitchStampKey: (n) => `_${String(n).replace(/\s+/g, '_')}_Soulstitch_Spells_active`,
 }));
 

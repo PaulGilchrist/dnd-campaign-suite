@@ -62,6 +62,7 @@ vi.mock('../../../../hooks/combat/handlers/handleOverchannelSelfDamage.js', () =
 }));
 
 vi.mock('../../../../hooks/combat/loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
   hasSoulstitchProtection: vi.fn(),
   clearSoulstitchStamp: vi.fn(),
 }));

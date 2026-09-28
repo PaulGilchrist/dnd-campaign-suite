@@ -85,6 +85,7 @@ vi.mock('../../services/combat/auras/bardicInspirationState.js', () => ({
 }));
 
 vi.mock('./loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
   getSlowAcPenalty: () => 0,
     dispatchUnbreakableMajestySave: vi.fn(),

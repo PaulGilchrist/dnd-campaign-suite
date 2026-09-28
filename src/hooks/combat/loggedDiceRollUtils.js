@@ -79,6 +79,19 @@ export function getParryAcBonus(characterName, campaignName) {
     return parryBuff ? Number(parryBuff.acBonus) || 0 : 0;
 }
 
+// MA-1463: Shield Guardian Protection grants the amulet WEARER +5 AC vs the
+// triggering attack — the ONE-SHOT stamp rides the wearer's activeBuffs
+// (grantedBy the guardian, same channel as MA-1170 shield / MA-0341 parry /
+// SP-125 warding_bond acBonus) and is consumed by the next resolved attack in
+// attackPostProcessing, or expires on the guardian's next turn-start clock.
+export function getGuardianProtectionAcBonus(characterName, campaignName) {
+    if (!characterName) return 0;
+    const activeBuffs = getRuntimeValue(characterName, 'activeBuffs', campaignName) || [];
+    if (!Array.isArray(activeBuffs)) return 0;
+    const protectionBuff = activeBuffs.find(b => b && b.effect === 'guardian_protection');
+    return protectionBuff ? Number(protectionBuff.acBonus) || 0 : 0;
+}
+
 // SP-109: Slow imposes a -2 AC penalty on the target until the spell ends.
 export function getSlowAcPenalty(characterName, campaignName) {
     if (!characterName) return 0;

@@ -37,6 +37,7 @@ vi.mock('../../services/rules/features/invisibilityService.js', () => ({
 }));
 
 vi.mock('./loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
     isMagicMissileImmune: vi.fn(),
     hasPotentCantrip: vi.fn(() => false),

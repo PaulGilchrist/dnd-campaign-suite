@@ -15,6 +15,7 @@ import { registerTargetEffect } from '../../services/combat/conditions/targetEff
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { resolveMonsterRedirectAttackRow } from '../../services/encounters/monsterRedirectAttack.js';
 import { resolveMonsterJinxRow } from '../../services/encounters/monsterJinx.js';
+import { resolveMonsterGuardianProtectionRow } from '../../services/encounters/monsterGuardianProtection.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -1123,6 +1124,26 @@ const GATED_MONSTER_REACTIONS = {
   // every press spends MONSTER_REACTION_USES[shield] (999→998…) + 1/round
   // latch (_shield_usedRound, MA-0013 shape) + lastAttack.shieldResolved stamp.
   shield: { effect: 'shield', trigger: 'targeted_by_spell', label: 'Shield', icon: 'fa-shield' },
+  // MA-1463: Shield Guardian Protection — reactive +5 AC defender-side defense
+  // reaction (MM: an attack roll hits the amulet wearer within 5 ft; the wearer
+  // gains +5 AC, including against the triggering attack, until the start of
+  // the guardian's next turn). Defender is NOT the guardian: the wearer is
+  // identified press-time via the GM-armed cs.targetName seam (MA-0882/MA-0891
+  // getTargetFromAttacker — no amulet-persistence subsystem in-app; §42 gridless
+  // advisory). Gate keys off the campaign lastAttack identity against the WEARER
+  // (targetName===wearer, hit, damage not yet applied — parry MA-0341 /
+  // redirect MA-0891 pending-window lineage) + round latch (_guardian_protection_
+  // usedRound, MA-0013 shape). At Will (usage:'At Will'+uses:999, MA-1140
+  // shape): MONSTER_REACTION_USES is NEVER written (parry never-spends shape).
+  // Press stamps the ONE-SHOT buff {effect:'guardian_protection', name:'Guardian
+  // Protection', acBonus:5, oneShot:true} on the WEARER's activeBuffs — folded
+  // via the EXISTING generic channel (getGuardianProtectionAcBonus
+  // loggedDiceRollUtils + computeEffectiveAc hitResolution, MA-1170 shield
+  // lineage) and consumed by the next resolved attack (attackPostProcessing
+  // consumeGuardianProtectionAcBonus); guardian-turn-start expiry rides ONE
+  // anchor clock (§38, MA-0548 expireOnCreatureName shape). Refusals log-only
+  // (§235d). Grants carry NO popupHtml (§217 pending-Done survival).
+  guardian_protection: { effect: 'guardian_protection', trigger: 'attacked_by_hit', label: 'Protection', icon: 'fa-shield-heart' },
   // MA-0895: Goblin Hexer Jinx — reactive miss-negation reaction. RAW trigger:
   // a creature the hexer can see hits it with an attack roll (seen is
   // GM-enforced advisory, CLA-325); response: the ATTACKER makes a WIS save
@@ -2082,6 +2103,10 @@ export async function resolveMonsterGatedReaction({ action, monsterName, campaig
 
   if (def.effect === 'jinx_negate') {
     return resolveMonsterJinxRow({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
+  }
+
+  if (def.effect === 'guardian_protection') {
+    return resolveMonsterGuardianProtectionRow({ action, monsterName, campaignName, lastAttack: ctx.rawLastAttack, cs: ctx.cs, currentRound: ctx.currentRound, usedRound: ctx.usedRound, latchKey: ctx.latchKey, deps: { ...deps, getRuntimeValue: ctx.getRV, setRuntimeValue: ctx.setRV } });
   }
 
   return resolveRecordOnlyGatedReaction({ def, action, monsterName, campaignName, lastAttack: ctx.lastAttack, currentRound: ctx.currentRound, storedUses: ctx.storedUses, usedRound: ctx.usedRound, latchKey: ctx.latchKey, setRV: ctx.setRV, log: ctx.log });
