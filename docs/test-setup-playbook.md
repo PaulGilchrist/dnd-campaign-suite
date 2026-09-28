@@ -1054,3 +1054,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1502 (2026-09-28, Sphinx of Valor Roar launcher FIXED — generalized staged roar) New pitfalls
 - roarService generalized: row-authored `roar_stages:[...]` + `staged_roar:true` + numeric uses/maxUses (the `uses:"3/Day"` STRING = NaN null-gate) take precedence via resolveStageMechanic; androsphinx hardcoded ROAR_STAGES byte-inert. Nth-click-resolves-Nth-stage live: "First Roar (1 of 3)"…4th = Uses Exhausted + roar_refused. DC 20 stages ride payload save_dc.
+
+## §MA-1510 (2026-09-28, Sphinx of Wonder Burst of Ingenuity FIXED — buff-the-roller reaction) New pitfalls
+- BUFF-THE-ROLLER reaction seam LIVE (MA-1463 lane): automation{type:"reaction",trigger:"ability_check_or_save",effect:"burst_of_ingenuity",bonus:2,range_ft:30} + numeric uses:2/maxUses:2 → gated chip "Burst of Ingenuity (2 left)" → service arms ONE-SHOT activeBuffs{saveBonus:2,oneShot} on press-selected roller → fold at d20RollComputation (ability-check chips: bonusDetail "+2 [Burst of Ingenuity]" + burst_of_ingenuity_applied) + saveProcessing/SavePromptModal (saves: burstOfIngenuitySaveBonus) → consume on resolve, not press. Refusals no_target/round/uses log-only.
