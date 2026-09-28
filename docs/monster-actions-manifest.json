@@ -25043,7 +25043,7 @@
       "saveEffect": "If the creature has 100 Hit Points or fewer, it dies. It otherwise takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
       "range": "600 feet",
       "description": "Dexterity Saving Throw: DC 21, one creature the solar can see within 600 feet. Failure: If the creature has 100 Hit Points or fewer, it dies. It otherwise takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1477-slaying-bow.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1478",

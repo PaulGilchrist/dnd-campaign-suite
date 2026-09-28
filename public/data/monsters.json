@@ -56206,6 +56206,12 @@
         "save_dc": 21,
         "save_type": "Dexterity",
         "range": "600 feet",
+        "damage_dice_primary": "4d8 + 6",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "8d8",
+        "damage_type_secondary": "Radiant",
+        "dc_success": "none",
+        "hp_threshold_kill": 100,
         "save_effect": "If the creature has 100 Hit Points or fewer, it dies. It otherwise takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage."
       },
       {

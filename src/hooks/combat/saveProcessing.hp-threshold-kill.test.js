@@ -287,3 +287,120 @@ describe('MA-1448 Sea Hag Death Glare data lock + threshold seam', () => {
         expect(popup?.dcSuccess).toBe('none');
     });
 });
+
+// MA-1477: Solar "Slaying Bow" (solar|actions|2) — three-field (+dc_success)
+// DATA fix (MA-0352 Banshee byte-shape + MA-0427 secondary-transport twins).
+// RAW: fail → ≤100 HP dies; otherwise 24 (4d8 + 6) Piercing + 36 (8d8)
+// Radiant; success → none of it (dc_success:"none").
+const solarRow = seaHagsMonsters.find(m => m.index === 'solar').actions[2];
+const SOLAR = 'Solar 1';
+
+const bowContext = {
+    saveDc: 21,
+    saveType: 'Dexterity',
+    attackerName: SOLAR,
+    actionName: 'Slaying Bow',
+    dcSuccess: solarRow.dc_success,
+    autoDamageFormula: solarRow.damage_dice_primary,
+    autoDamageDamageType: solarRow.damage_type_primary,
+    autoDamageSecondaryFormula: solarRow.damage_dice_secondary,
+    autoDamageSecondaryDamageType: solarRow.damage_type_secondary,
+    saveConditions: [],
+    hpThresholdKill: solarRow.hp_threshold_kill,
+};
+
+describe('MA-1477 Solar Slaying Bow threshold + dual-pool seam', () => {
+    it('data lock: six authored numeric fields + DC/type/range byte-exact', () => {
+        expect(solarRow.name).toBe('Slaying Bow');
+        expect(solarRow.save_dc).toBe(21);
+        expect(solarRow.save_type).toBe('Dexterity');
+        expect(solarRow.range).toBe('600 feet');
+        expect(solarRow.damage_dice_primary).toBe('4d8 + 6');
+        expect(solarRow.damage_type_primary).toBe('Piercing');
+        expect(solarRow.damage_dice_secondary).toBe('8d8');
+        expect(solarRow.damage_type_secondary).toBe('Radiant');
+        expect(solarRow.hp_threshold_kill).toBe(100);
+        expect(solarRow.dc_success).toBe('none');
+    });
+
+    it('failed save, NPC victim 50 HP (≤100): drops to 0, clause logged, NO damage pools rolled', async () => {
+        combatSummary.creatures = [{ name: 'Bandit 1', type: 'npc', currentHp: 50, maxHp: 999 }];
+        await processSaveRoll({
+            rollType: 'save',
+            target: { name: 'Bandit 1', type: 'npc' },
+            characterName: 'Bandit 1',
+            campaignName,
+            context: { ...bowContext, effectiveD20: 11 },
+            bonus: 0,
+            r1: 11,
+            r2: 11,
+            logEntry: vi.fn(),
+            setPopupHtml: vi.fn(),
+        });
+
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(50);
+        expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Piercing']);
+        expect(rollExpression).not.toHaveBeenCalled();
+        const kill = addEntryLogs.find(e => e.automationType === 'hp_threshold_kill');
+        expect(kill).toBeTruthy();
+        expect(kill.characterName).toBe('Bandit 1');
+        expect(kill.sourceName).toBe(SOLAR);
+        expect(kill.abilityName).toBe('Slaying Bow');
+        expect(kill.description).toMatch(/50 Hit Points \(50 ≤ 100\).*drops to 0 Hit Points/s);
+    });
+
+    it('failed save, victim 999 HP (>100): BOTH pools roll full (4d8+6 Piercing + 8d8 Radiant)', async () => {
+        combatSummary.creatures = [{ name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999 }];
+        const popupSpy = vi.fn();
+        const logged = [];
+        await processSaveRoll({
+            rollType: 'save',
+            target: { name: 'Bandit 1', type: 'npc' },
+            characterName: 'Bandit 1',
+            campaignName,
+            context: { ...bowContext, effectiveD20: 20 },
+            bonus: 0,
+            r1: 20,
+            r2: 20,
+            logEntry: (data) => logged.push(data),
+            setPopupHtml: popupSpy,
+        });
+
+        expect(rollExpression).toHaveBeenCalledWith('4d8 + 6');
+        expect(rollExpression).toHaveBeenCalledWith('8d8');
+        expect(addEntryLogs.some(e => e.automationType === 'hp_threshold_kill')).toBe(false);
+        // MA-0427 dual save-damage legs: primary Piercing + its own secondary entry.
+        const dmgLogs = logged.filter(e => e.rollType === 'save-damage');
+        expect(dmgLogs.length).toBeGreaterThanOrEqual(2);
+        expect(dmgLogs[0]).toMatchObject({ formula: '4d8 + 6', damageType: 'Piercing' });
+        const sec = dmgLogs.find(e => e.formula === '8d8');
+        expect(sec).toBeTruthy();
+        expect(sec.damageType).toBe('Radiant');
+        // popup threads the secondary leg (DualDamageSection fields).
+        const popup = popupSpy.mock.calls[popupSpy.mock.calls.length - 1][0];
+        expect(popup?.secondaryFormula).toBe('8d8');
+        expect(popup?.secondaryDamageType).toBe('Radiant');
+    });
+
+    it('successful save: ZERO both legs (dc_success none), threshold never consulted', async () => {
+        combatSummary.creatures = [{ name: 'Bandit 1', type: 'npc', currentHp: 50, maxHp: 999 }];
+        await processSaveRoll({
+            rollType: 'save',
+            target: { name: 'Bandit 1', type: 'npc' },
+            characterName: 'Bandit 1',
+            campaignName,
+            context: { ...bowContext, effectiveD20: 20 },
+            bonus: 1,
+            r1: 20,
+            r2: 20,
+            logEntry: vi.fn(),
+            setPopupHtml: vi.fn(),
+        });
+
+        expect(addEntryLogs.some(e => e.automationType === 'hp_threshold_kill')).toBe(false);
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(0);
+        expect(applyDamageToTarget.mock.calls[1][2]).toBe(0);
+    });
+});
