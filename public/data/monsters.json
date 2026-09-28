@@ -57556,7 +57556,13 @@
       },
       {
         "name": "Invisibility",
-        "description": "The sprite casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability."
+        "description": "The sprite casts <strong>Invisibility</strong> on itself, requiring no spell components and using Charisma as the spellcasting ability.",
+        "spellcasting_ability": "Charisma",
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "invisible",
+          "rounds": 600
+        }
       }
     ],
     "bonus_actions": [],

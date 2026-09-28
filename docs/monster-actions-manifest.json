@@ -25741,7 +25741,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The sprite casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1522-invisibility.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1523",
