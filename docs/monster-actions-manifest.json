@@ -25183,7 +25183,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 12. Failure: 5 (2d4) Psychic damage, and the target has the Frightened condition until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1486-fear-ray.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1487",

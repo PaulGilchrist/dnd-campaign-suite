@@ -11,7 +11,7 @@
 // staged_paralysis — the eye-ray ladder channel is ray.ladder), and the
 // manual single-fire sibling rows stay byte-unchanged (MA-1481 scope).
 import { describe, it, expect } from 'vitest';
-import { parseEyeRays, pickEyeRay, buildEyeRayAction, parseSlowedClauses } from './MonsterCardHelpers.js';
+import { parseEyeRays, pickEyeRay, buildEyeRayAction, parseSlowedClauses, extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
 import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import monsters from '../../../public/data/monsters.json';
 
@@ -179,5 +179,54 @@ describe('MA-1484 spectator "Confusion Ray" dc_success none — zero damage on s
     expect(computeDamageAfterSave(2, false, confusion.dc_success)).toBe(2);
     expect(computeDamageAfterSave(4, true, confusion.dc_success)).toBe(0);
     expect(computeDamageAfterSave(6, true, confusion.dc_success)).toBe(0);
+  });
+});
+
+// MA-1486: manual "Fear Ray" row (actions[5]) RAW pays ZERO on a successful
+// save ("Wisdom Saving Throw: DC 12. Failure: 5 (2d4) Psychic damage, and the
+// target has the Frightened condition until the end of its next turn." — no
+// success-pays clause, success = unaffected). dc_success was ABSENT →
+// getSaveDcSuccess default 'half' (MonsterCardModal :268/:1128) leaked half
+// Psychic on success (§63/§129 MV-20 family: MA-0481/0622/0768/0781/0868) —
+// live ledger: nat18 sum2→fd2, hp −2 (988→986). DATA fix: dc_success:"none"
+// after save_effect (same byte-shape MA-1484 landed on actions[3] today),
+// consistent with the MA-1483 launcher rays[2] fear dict which already
+// carries 'none'. The FAIL-side Frightened grant rides
+// extractConditionsFromSaveEffect on save_effect (canonical word) at
+// applyFailedSaveConditions fail-only regardless of dc_success (§63
+// trap-check: dc_success never gates condition grants).
+describe('MA-1486 spectator "Fear Ray" dc_success none — zero damage on save success', () => {
+  const fear = spectator.actions[5];
+
+  it('row is the Fear Ray save row', () => {
+    expect(fear.name).toBe('Fear Ray');
+    expect(fear.save_dc).toBe(12);
+    expect(fear.save_type).toBe('Wisdom');
+  });
+
+  it('canonical prose carries NO half-on-success clause', () => {
+    expect(fear.description).not.toMatch(/half/i);
+    expect(fear.save_effect).not.toMatch(/half/i);
+  });
+
+  it('dc_success authored "none" (half-default leak guard)', () => {
+    expect(fear.dc_success).toBe('none');
+  });
+
+  it('launcher rays[2] fear stays consistent dc_success "none" (MA-1483 twin)', () => {
+    expect(parseEyeRays(row)[2].key).toBe('fear');
+    expect(parseEyeRays(row)[2].dc_success).toBe('none');
+  });
+
+  it('dc_success "none" does not suppress the FAIL-side Frightened grant', () => {
+    expect(extractConditionsFromSaveEffect(fear.save_effect)).toContain('frightened');
+    expect(parseEyeRays(row)[2].conditions).toEqual(['frightened']);
+  });
+
+  it('save seam pays full 2d4 on fail, zero on success', () => {
+    expect(computeDamageAfterSave(4, false, fear.dc_success)).toBe(4);
+    expect(computeDamageAfterSave(7, false, fear.dc_success)).toBe(7);
+    expect(computeDamageAfterSave(2, true, fear.dc_success)).toBe(0);
+    expect(computeDamageAfterSave(9, true, fear.dc_success)).toBe(0);
   });
 });

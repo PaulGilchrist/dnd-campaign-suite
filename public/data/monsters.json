@@ -56436,7 +56436,8 @@
         "description": "Wisdom Saving Throw: DC 12. Failure: 5 (2d4) Psychic damage, and the target has the Frightened condition until the end of its next turn.",
         "save_dc": 12,
         "save_type": "Wisdom",
-        "save_effect": "The target takes 5 (2d4) Psychic damage, and has the Frightened condition until the end of its next turn."
+        "save_effect": "The target takes 5 (2d4) Psychic damage, and has the Frightened condition until the end of its next turn.",
+        "dc_success": "none"
       },
       {
         "name": "Wounding Ray",
