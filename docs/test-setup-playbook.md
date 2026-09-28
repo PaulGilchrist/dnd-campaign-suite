@@ -1057,3 +1057,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1510 (2026-09-28, Sphinx of Wonder Burst of Ingenuity FIXED — buff-the-roller reaction) New pitfalls
 - BUFF-THE-ROLLER reaction seam LIVE (MA-1463 lane): automation{type:"reaction",trigger:"ability_check_or_save",effect:"burst_of_ingenuity",bonus:2,range_ft:30} + numeric uses:2/maxUses:2 → gated chip "Burst of Ingenuity (2 left)" → service arms ONE-SHOT activeBuffs{saveBonus:2,oneShot} on press-selected roller → fold at d20RollComputation (ability-check chips: bonusDetail "+2 [Burst of Ingenuity]" + burst_of_ingenuity_applied) + saveProcessing/SavePromptModal (saves: burstOfIngenuitySaveBonus) → consume on resolve, not press. Refusals no_target/round/uses log-only.
+
+## §MA-1520 (2026-09-28, Sprite Enchanting Bow FIXED — charmed hit-rider) New pitfalls
+- §950 one-field fix live: sprite.actions[1] `"hit_conditions":["charmed"]` → buildHitConditionClause → applyHitClauseConditions grant+meta{source}. Flat-1 row byte-unchanged (MA-0322).
+- §108 ORDER note: took-damage charmed-clear (applyDamage.js:429-435) runs BEFORE hit-clause grant (handlePlainDamage.js:1154→:1181) — same-hit grant SURVIVES; honest "removed — took damage (Charm)" → "applied" pair each hit. Judge by grant-log + meta, not by end-state absence.
