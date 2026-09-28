@@ -1020,3 +1020,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Shapeless `range:""` save row w/ `attack_bonus:0` renders 3 chips (+0 / 3d6 / DC) — press ONLY the DC chip; inline victim save log folds stamped `saving_throws.<ab>.modifier` into victim `total` (popup/attacker-dupe prints "+0") — adjudicate by victim roll entry.
 - `"damage_dice_primary": "3d6",\n "damage_type_primary": "Lightning"\n }` is a unique app-wide monsters.json surgical anchor.
 - §944 addendum: MA-1459's `hit_pull` rides the ATTACK lane; save-path pulls remain unthreaded (MA-1460 Engulf pull clause stays advisory out-of-scope).
+
+## §MA-1463 (2026-9-28, Shield Guardian Protection FIXED — guardian_protection AC-bond channel) New pitfalls
+- DEFENDER +N AC BOND SEAM LIVE (second after parry §114): automation{type:"reaction",trigger:"attacked_by_hit",effect:"guardian_protection",acBonus:5} + usage At Will/uses:999 (MA-0006 sentinel) → GATED_MONSTER_REACTIONS registry entry + dispatcher branch (MonsterCardHelpers) → new service monsterGuardianProtection.js arms ONE-SHOT buff on GM-pressed defender (GM press = sanctioned wearer identification; NO amulet/bond persistence) → `_guardianProtectionAcBonus` fold channel loggedDiceRollUtils/hitResolution → consume at attackPostProcessing (oneShot:true, MA-1170 lineage) → popup "+N Protection".
+- NEW EXPORT IN HEAVILY-MOCKED loggedDiceRollUtils.js required +1 vi.mock pin in ~76 sibling test files (§45) — batch `git add src/hooks/combat/*.test.js src/hooks/combat/handlers/*.test.js` at staging.
+- Defender-reaction press rides MA-0681/235 model: press ARMS vs PENDING popup (survives avatar-over-popup press), buff lands, next resolved attack's Done consumes; refusals `no_pending_attack`/`round` log-only.
