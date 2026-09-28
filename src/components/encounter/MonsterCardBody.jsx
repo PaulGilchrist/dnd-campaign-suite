@@ -38,6 +38,16 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
 
     const lairActions = getLairActions(monster);
     const regionalEffects = getRegionalEffects(monster);
+    // MA-1451: drained-ability overlay — the ability_score_drain te ledger
+    // (te {ability, score, drained}) re-stamps the ability cell + modifier
+    // so the card is honest while the drain stands (long-rest restore via
+    // the LR te filter; byte-identical cells for every undrained ability).
+    const drainedAbilities = {};
+    for (const te of monsterTargetEffects || []) {
+      if (te.effect === 'ability_score_drain' && Number.isInteger(te.score) && Number.isInteger(te.baseScore)) {
+        drainedAbilities[te.ability] = { score: te.score, baseScore: te.baseScore, drained: Number(te.drained) || 0, source: te.source || '' };
+      }
+    }
     // MA-0021: header row authors `uses` → the section becomes a gated
     // legendary economy (counter + clickable gated rows).
     const legendaryHeader = legendaryHeaderAction(monster);
@@ -52,7 +62,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
             <MonsterCardConditionsSection monsterConditions={monsterConditions} condEffectBadges={condEffectBadges} />
           )}
           <hr />
-          <MonsterCardAbilities monster={monster} handleAbilityCheck={handleAbilityCheck} />
+          <MonsterCardAbilities monster={monster} handleAbilityCheck={handleAbilityCheck} drainedAbilities={drainedAbilities} />
           <hr />
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
           {actionSections.map(s => (
@@ -187,25 +197,28 @@ function MonsterCardConditionsSection({ monsterConditions, condEffectBadges }) {
   );
 }
 
-function MonsterCardAbilities({ monster, handleAbilityCheck }) {
+function MonsterCardAbilities({ monster, handleAbilityCheck, drainedAbilities = {} }) {
   return (
     <div className="mc-abilities">
-      {(['str', 'dex', 'con', 'int', 'wis', 'cha']).map(ab => (
-        <div key={ab} className="mc-ability">
-          <div className="mc-ability-name">{ab.toUpperCase()}</div>
-          <div className="mc-ability-score">{monster.ability_scores?.[ab] ?? '-'}</div>
-          <div
-            className="mc-ability-mod mc-dice-link"
-            onClick={() => handleAbilityCheck(ab, monster.ability_score_modifiers?.[ab] ?? 0)}
-            role="button"
-            tabIndex={0}
-          >
-            {monster.ability_score_modifiers?.[ab] != null
-              ? (monster.ability_score_modifiers[ab] >= 0 ? '+' : '') + monster.ability_score_modifiers[ab]
-              : '-'}
+      {(['str', 'dex', 'con', 'int', 'wis', 'cha']).map(ab => {
+        const drained = drainedAbilities[ab];
+        const score = drained ? drained.score : (monster.ability_scores?.[ab] ?? '-');
+        const mod = drained ? Math.floor((drained.score - 10) / 2) : (monster.ability_score_modifiers?.[ab] ?? null);
+        return (
+          <div key={ab} className="mc-ability">
+            <div className="mc-ability-name">{ab.toUpperCase()}</div>
+            <div className={`mc-ability-score${drained ? ' mc-ability-drained' : ''}`} title={drained ? `${ab.toUpperCase()} ${drained.baseScore} \u2212${drained.drained} drained by ${drained.source} \u2014 returns on a long rest` : undefined}>{score}</div>
+            <div
+              className="mc-ability-mod mc-dice-link"
+              onClick={() => handleAbilityCheck(ab, mod ?? 0)}
+              role="button"
+              tabIndex={0}
+            >
+              {mod != null ? (mod >= 0 ? '+' : '') + mod : '-'}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

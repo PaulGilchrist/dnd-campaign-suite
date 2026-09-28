@@ -194,6 +194,12 @@ const BADGE_SPECS = [
         find: ctx => findDirect(ctx, 'ac_penalty'),
         build: ctx => ({ label: `AC \u2212${ctx.te.value || 2}`, cls: 'effect-debuff', icon: 'fa-shield-halved', removable: true, removeAction: 'target_effect', effectType: 'ac_penalty', tooltip: `AC reduced by ${ctx.te.value || 2} by ${ctx.te.source || 'unknown'} until the end of the next turn` }),
     },
+    // MA-1451: Shadow Draining Swipe numeric ability-score drain te badge —
+    // states the live drained score ledger (te.score) on the victim card.
+    {
+        find: ctx => findDirect(ctx, 'ability_score_drain'),
+        build: ctx => ({ label: `${(ctx.te.ability || '').toUpperCase()} \u2212${ctx.te.drained || 0}`, cls: 'effect-debuff', icon: 'fa-arrow-down', removable: true, removeAction: 'target_effect', effectType: 'ability_score_drain', tooltip: `${(ctx.te.ability || '').toUpperCase()} ${ctx.te.baseScore ?? '?'} \u2192 ${ctx.te.score ?? '?'} (\u2212${ctx.te.drained || 0}) drained by ${ctx.te.source || 'unknown'} \u2014 dies at 0; returns on a long rest (GM-enforced early restore)` }),
+    },
     // MA-0275: Animal Spirit Pesky Swarm failed-save te badge.
     {
         find: ctx => findDirect(ctx, 'pesky_swarm'),

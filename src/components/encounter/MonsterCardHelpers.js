@@ -707,13 +707,38 @@ export function parseHitTargetEffectAbility(action) {
   return HIT_EFFECT_ABILITIES.includes(ability) ? ability : null;
 }
 
+// MA-1451: Shadow "Draining Swipe" numeric ability-score drain rider —
+// "Hit: ... the target's Strength score decreases by 1d4. The target dies if
+// this reduces that score to 0." Not a canonical condition, so
+// extractConditionsFromSaveEffect / hit_conditions (fixed-condition lists,
+// §107 MA-0575) can never carry a numeric-score delta; the structured
+// hit_ability_drain:{ability,dice} key rides the same MA-0010 hit-clause
+// seam to the resolved-hit consumer in handlePlainDamage, which rolls the
+// die, accumulates the delta on the victim's registered ability_score_drain
+// te, and logs every leg. STRUCTURED-KEY-ONLY (MA-0367/MA-0639 precedent,
+// playbook §5) — never prose-parsed; byte-inert null for every row without
+// the key, so no other monster's drain wording can double-arm.
+export function parseHitAbilityDrain(action) {
+  const drain = action?.hit_ability_drain;
+  if (!drain || typeof drain !== 'object') return null;
+  const ability = toAbbr(String(drain.ability || '').toLowerCase());
+  if (!HIT_EFFECT_ABILITIES.includes(ability)) return null;
+  const dice = String(drain.dice || '').toLowerCase();
+  return /^1d\d+$/.test(dice) ? { ability, dice } : null;
+}
+
+function hitClauseAutoGrantConditions(action) {
+  if (hitChoiceArmed(action) || !Array.isArray(action?.hit_conditions)) return [];
+  return action.hit_conditions.map(c => String(c).toLowerCase());
+}
+
 export function buildHitConditionClause(action) {
-  const autoGrantSuppressed = hitChoiceArmed(action);
-  const conditions = !autoGrantSuppressed && Array.isArray(action?.hit_conditions) ? action.hit_conditions.map(c => String(c).toLowerCase()) : [];
+  const conditions = hitClauseAutoGrantConditions(action);
   const targetEffect = action?.hit_target_effect || null;
   const targetEffectAbility = targetEffect ? parseHitTargetEffectAbility(action) : null;
   const conditionRoll = parseHitConditionRoll(action);
-  if (conditions.length === 0 && !targetEffect && !conditionRoll) return null;
+  const abilityDrain = parseHitAbilityDrain(action);
+  if (conditions.length === 0 && !targetEffect && !conditionRoll && !abilityDrain) return null;
   return {
     conditions,
     escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,
@@ -721,6 +746,7 @@ export function buildHitConditionClause(action) {
     targetEffect,
     ...(targetEffectAbility ? { targetEffectAbility } : {}),
     ...(conditionRoll ? { conditionRoll } : {}),
+    ...(abilityDrain ? { abilityDrain } : {}),
   };
 }
 

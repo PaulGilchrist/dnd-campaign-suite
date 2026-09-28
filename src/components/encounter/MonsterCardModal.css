@@ -226,6 +226,12 @@
   color: var(--color-text);
 }
 
+/* MA-1451: drained ability score (ability_score_drain te overlay) — same
+   debuff red as CreatureBadge.effect-debuff. */
+.mc-ability-drained {
+  color: #ef4444;
+}
+
 .mc-ability-mod {
   font-size: 0.8rem;
   color: var(--color-text-secondary);

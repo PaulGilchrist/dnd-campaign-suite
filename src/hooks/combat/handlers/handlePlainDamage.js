@@ -15,6 +15,9 @@ import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { consumePendingRedirectOnResolve } from '../../../services/encounters/monsterRedirectAttack.js';
 import { consumePendingJinxOnResolve } from '../../../services/encounters/monsterJinx.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
+import { getMonsterData } from '../../../services/npcs/monsterUtils.js';
+
+const ABILITY_LABELS = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 const SECONDARY_POPUP_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
@@ -608,9 +611,139 @@ function rollHitConditionChoice({ hitClause, targetName, logEntry, attackerName 
     return { condition, label };
 }
 
-function maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry, characterName }) {
+function findStandingDrain(targetName, ability) {
+    return (getRuntimeValue('campaign', 'targetEffects') || [])
+        .find(te => te.target === targetName && te.effect === 'ability_score_drain' && te.ability === ability);
+}
+
+function playerAbilityScore(characters, target, label) {
+    const entry = (characters || []).find(c => c.name === target.name)?.abilities?.find(a => a.name === label);
+    if (!entry) return null;
+    const score = [entry.baseScore, entry.featIncrease, entry.backgroundIncrease, entry.miscIncrease]
+        .reduce((sum, v) => sum + (Number(v) || 0), 0);
+    return score > 0 ? score : null;
+}
+
+// MA-1451: base-score resolution for the drain ledger — NPC/combatant
+// victims read the canonical monsters.json statblock via the cached
+// getMonsterData seam (dominatePerson twin; strips the " 1" join suffix);
+// player victims sum the char-file abilities entry (baseScore + increases).
+// Unresolvable = null (never fabricated — honest refusal, console.error).
+async function resolveDrainBaseScore({ target, ability, characters }) {
+    if (target?.type === 'player') return playerAbilityScore(characters, target, ABILITY_LABELS[ability]);
+    const monster = await getMonsterData(target.name, null);
+    const raw = monster?.ability_scores?.[ability];
+    return Number.isInteger(raw) ? raw : null;
+}
+
+function rollAbilityDrain({ hitClause, ability, dice, target, attackerName, logEntry }) {
+    const roll = rollExpression(dice);
+    const drain = roll?.rolls?.[0] ?? roll?.total;
+    if (!Number.isInteger(drain) || drain < 1) {
+        console.error(`[MA-1451] ${hitClause.attackName} ability drain roll failed: ${dice} →`, roll);
+        return null;
+    }
+    logEntry({
+        type: 'roll',
+        characterName: attackerName,
+        rollType: 'ability-drain',
+        name: hitClause.attackName,
+        formula: dice,
+        rolls: [drain],
+        total: drain,
+        targetName: target.name,
+        description: `${dice} → ${drain} ${ABILITY_LABELS[ability]} drained from ${target.name}`,
+        timestamp: Date.now(),
+    });
+    return drain;
+}
+
+function refuseAbilityDrain({ hitClause, ability, target, attackerName, logEntry }) {
+    console.error(`[MA-1451] base ${ability} score not resolvable for ${target.name} — drain not applied`);
+    logEntry({
+        type: 'automation',
+        automationType: 'ability_drain_refused',
+        characterName: attackerName,
+        abilityName: hitClause.attackName,
+        targetName: target.name,
+        description: `${attackerName} ${hitClause.attackName} rolled the drain, but ${target.name}'s ${ABILITY_LABELS[ability]} base score is not resolvable — drain recorded advisory only (GM-enforced).`,
+        timestamp: Date.now(),
+    });
+}
+
+// MA-1451: RAW death clause ("The target dies if this reduces that score to
+// 0") via the canonical applyDamageToTarget lethal clamp (MA-0352 twin).
+async function lethalStrengthDrop({ target, combatSummary, characters, campaignName, attackerName, hitClause, ability, baseScore, drained, logEntry }) {
+    const csCreature = combatSummary?.creatures?.find(c => c.name === target.name);
+    const currentHp = target.type === 'player'
+        ? Number(getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? csCreature?.currentHp ?? 0)
+        : Number(csCreature?.currentHp ?? 0);
+    if (currentHp > 0) {
+        await applyDamageToTarget(combatSummary, target.name, currentHp, ['Necrotic'], { campaignName, characters, ignoreResistance: true, attackerName });
+    }
+    logEntry({
+        type: 'automation',
+        automationType: 'ability_drain_lethal',
+        characterName: target.name,
+        sourceName: attackerName,
+        abilityName: hitClause.attackName,
+        description: `${target.name}'s ${ABILITY_LABELS[ability]} was drained to 0 or below (base ${baseScore}, total drained ${drained}) by ${attackerName}'s ${hitClause.attackName} — the target dies (Draining Swipe death clause).`,
+        timestamp: Date.now(),
+    });
+}
+
+// MA-1451: Shadow "Draining Swipe" numeric ability-score drain consumer —
+// the row authors structured hit_ability_drain:{ability,dice} (parsed by
+// parseHitAbilityDrain onto the MA-0010 hit clause; §942/§107: no numeric-
+// score channel existed app-wide). On every RESOLVED hit: rolls the die
+// (MA-0575 rollHitConditionChoice logging twin), accumulates the delta onto
+// the registered ability_score_drain te (single registerTargetEffect write —
+// §39 merged-store discipline). The te carries the full ledger
+// {baseScore, drained, score}; RAW states no end, so the te convention
+// applies: long-rest restore via the campaign LR filter
+// (restRules-longRest.js) — GM-enforced early restore via Greater
+// Restoration / badge remove, NO combat addExpiration clock. Damage legs
+// (necrotic) stay byte-identical — this rider rides AFTER them, zero
+// interference.
+async function applyHitAbilityDrain({ hitClause, target, combatSummary, characters, campaignName, logEntry, attackerName }) {
+    const { ability, dice } = hitClause.abilityDrain;
+    const drain = rollAbilityDrain({ hitClause, ability, dice, target, attackerName, logEntry });
+    if (drain == null) return;
+    const existing = findStandingDrain(target.name, ability);
+    const baseScore = Number.isInteger(existing?.baseScore) ? existing.baseScore : await resolveDrainBaseScore({ target, ability, characters });
+    if (!Number.isInteger(baseScore)) {
+        refuseAbilityDrain({ hitClause, ability, target, attackerName, logEntry });
+        return;
+    }
+    const drained = (Number(existing?.drained) || 0) + drain;
+    const score = baseScore - drained;
+    registerTargetEffect(campaignName, target.name, 'ability_score_drain', attackerName, {
+        ability, baseScore, drained, score, duration: 'until_long_rest',
+    });
+    logEntry({
+        type: 'condition',
+        action: 'applied',
+        characterName: target.name,
+        condition: `${ABILITY_LABELS[ability]} Drain`,
+        reason: `${hitClause.attackName} — ${ABILITY_LABELS[ability]} ${baseScore} → ${score} (−${drained})`,
+        note: `${target.name} ${ABILITY_LABELS[ability]} decreased by ${drain} (${dice}) — ends on a long rest; ${score <= 0 ? 'score reached 0 — death clause fires' : `dies at 0 ${ABILITY_LABELS[ability]}`}.`,
+        timestamp: Date.now(),
+    });
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    if (score > 0) return;
+    await lethalStrengthDrop({ target, combatSummary, characters, campaignName, attackerName, hitClause, ability, baseScore, drained, logEntry });
+}
+
+async function maybeApplyHitClause({ context, target, applyResult, combatSummary, characters, campaignName, logEntry, characterName }) {
     const hitClause = context?.hitClause;
     if (!hitClause || !target || !applyResult) return;
+    // MA-1451: the numeric ability drain rides before the grapple-family
+    // size gate — Draining Swipe drains ANY target size (RAW has no size
+    // restriction; §127 size-gate honesty). Every other clause leg keeps the
+    // gate byte-identical.
+    if (hitClause.abilityDrain) {
+        await applyHitAbilityDrain({ hitClause, target, combatSummary, characters, campaignName, logEntry, attackerName: characterName });
+    }
     if (!isLargeOrSmallerTarget(target.size)) return;
     let effectiveClause = hitClause;
     let riderChoice = null;
@@ -810,7 +943,7 @@ export function createPlainDamageHandler(deps) {
         applyResult = await resolveDeathStrike({ applyResult, context, combatSummary, target, characters, campaignName, characterName, adjustedTotal, formula, rolls, modifier, damageType, setPopupHtml, logEntry });
 
         maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry });
-        maybeApplyHitClause({ context, target, applyResult, campaignName, logEntry, characterName });
+        await maybeApplyHitClause({ context, target, applyResult, combatSummary, characters, campaignName, logEntry, characterName });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 

@@ -307,6 +307,25 @@ const TARGET_EFFECT_DEFINITIONS = [
 
   // ── Saves & Checks ──────────────────────────────────────
   {
+    // MA-1451: Shadow "Draining Swipe" numeric ability-score drain rider —
+    // the first ability-score-delta te (no numeric-score channel existed
+    // app-wide, §942/§107). Granted BY the hit-clause consumer
+    // (handlePlainDamage.applyHitAbilityDrain) with the rolling ledger on
+    // the payload: baseScore + cumulative drained + current score. RAW row
+    // text states no end ("The drained Strength returns…" absent); the te
+    // convention for unspecified-duration debuffs is long-rest restore
+    // (enhance_ability family twins) — cleared from targetEffects by the
+    // campaign long-rest filter (restRules-longRest.js). The die roll +
+    // per-hit delta + score are logged on every landed hit.
+    effect: 'ability_score_drain',
+    label: 'Ability Score Drain',
+    description: 'The creature\'s ability score is reduced by a cumulative drained total (payload: baseScore, drained, score). The score returns when the drain ends — long rest (GM-enforced; Greater Restoration can restore early). If the score reaches 0 the target dies.',
+    icon: 'fa-arrow-down',
+    cls: 'effect-debuff',
+    group: 'Saves & Checks',
+    fields: ['ability', 'source'],
+  },
+  {
     effect: 'advantage_abilities',
     label: 'Adv Check',
     description: 'Advantage on all ability checks.',

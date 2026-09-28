@@ -15,6 +15,10 @@ import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilienc
 // Campaign targetEffect keys cleared on long rest, in original evaluation order.
 // Each entry is a list of effect keys removed by one read/filter/write cycle.
 const LONG_REST_TARGET_EFFECT_CLEAR_KEYS = [
+  // MA-1451: Shadow Draining Swipe numeric ability drain — RAW row states no
+  // end, te convention: the drained score returns on a long rest (te ledger
+  // cleared here; the card overlay follows the te).
+  ['ability_score_drain'],
   ['clairvoyant_combatant'],
   ['pass_without_trace_bonus'],
   ['blur'],
