@@ -25076,7 +25076,7 @@
         "blinded"
       ],
       "description": "Constitution Saving Throw: DC 25, one creature the solar can see within 120 feet. Failure: The target has the Blinded condition for 1 minute. Failure or Success: The solar can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1479-blinking-gaze.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1480",

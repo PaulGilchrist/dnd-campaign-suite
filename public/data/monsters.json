@@ -56232,17 +56232,20 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "The solar takes 2 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The solar regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Blinking Gaze",
-        "description": "Constitution Saving Throw: DC 25, one creature the solar can see within 120 feet. Failure: The target has the Blinded condition for 1 minute. Failure or Success: The solar can't take this action again until the start of its next turn.",
-        "uses": 1,
-        "recharge": false,
+        "description": "Constitution Saving Throw: DC 25, one creature the solar can see within 120 feet. Failure: The target has the Blinded condition for 1 minute. Failure or Success: The solar can't take this action again until the start of its next turn. (Blinded-on-success leg advisory — single-target save seam is fail-only; both-outcomes transport is picker-only with no consumer on this single-target shape — GM adjudicates the save-success Blinded leg.)",
+        "save_dc": 25,
+        "save_type": "Constitution",
         "save_effect": "The target has the Blinded condition for 1 minute. Failure or Success: The solar can't take this action again until the start of its next turn."
       },
       {
         "name": "Radiant Teleport",
         "description": "The solar teleports up to 60 feet to an unoccupied space it can see. Dexterity Saving Throw: DC 25, each creature in a 10-foot Emanation originating from the solar at its destination space. Failure: 11 (2d10) Radiant damage. Success: Half damage.",
-        "uses": 1,
-        "recharge": false,
         "save_type": "Dexterity",
         "save_effect": "The target takes 11 (2d10) Radiant damage. Success: The target takes half damage."
       }
