@@ -57147,7 +57147,15 @@
         "name": "Burst of Ingenuity",
         "trigger": "The sphinx or another creature within 30 feet makes an ability check or a saving throw.",
         "description": "The sphinx adds 2 to the roll.",
-        "uses": "2/Day"
+        "uses": 2,
+        "maxUses": 2,
+        "automation": {
+          "type": "reaction",
+          "trigger": "ability_check_or_save",
+          "effect": "burst_of_ingenuity",
+          "bonus": 2,
+          "range_ft": 30
+        }
       }
     ],
     "traits": [

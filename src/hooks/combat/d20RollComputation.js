@@ -1,6 +1,20 @@
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasStarryDragonActive, starryDragonAppliesToRoll } from './starryDragon.js';
+import { consumeBurstOfIngenuityBuff } from '../../services/encounters/monsterBurstOfIngenuity.js';
+
+// MA-1510: Burst of Ingenuity — the Sphinx of Wonder gated reaction press
+// arms a ONE-SHOT activeBuffs {effect:'burst_of_ingenuity', saveBonus:2}
+// stamp on the roller (guardian_protection MA-1463 oneShot lineage); the
+// pendingSkillCheckBonus fold below is its check-seam twin — fold the +2
+// into every ability/skill check the armed roller rolls and CONSUME the
+// stamp on that roll (arm→next-resolve-consume §214). Saves are NOT folded
+// here: processNpcSave + SavePromptModal own the save fold seam, consuming
+// there (double-consume here would eat the stamp before the save total).
+function consumeBurstCheckBonus(characterName, campaignName, name, rollType) {
+    if (rollType !== 'check' && rollType !== 'skill') return 0;
+    return consumeBurstOfIngenuityBuff(characterName, campaignName, { rollType, rollName: name }).bonus;
+}
 
 function computeStarryDragonFloor(characterName, campaignName, name, rollType) {
     if (rollType !== 'save' && rollType !== 'check' && rollType !== 'skill') return false;
@@ -132,7 +146,7 @@ function applyTargetLuckyFeat({ rollType, forcedMode, context, campaignName, r1,
     return unchanged;
 }
 
-function buildBonusDetailParts({ bonus, sacredWeaponBonus, sunderingBlowBonus, cosmicOmenAppliedBonus, cosmicOmenDetail, pendingSkillCheckAppliedBonus, pendingSkillCheckDetail, baneAttackPenalty, baneDisplayLabel, subtractDiePenalty, subtractDieDisplayLabel, blessAttackBonus }) {
+function buildBonusDetailParts({ bonus, sacredWeaponBonus, sunderingBlowBonus, cosmicOmenAppliedBonus, cosmicOmenDetail, pendingSkillCheckAppliedBonus, pendingSkillCheckDetail, baneAttackPenalty, baneDisplayLabel, subtractDiePenalty, subtractDieDisplayLabel, blessAttackBonus, burstOfIngenuityBonus }) {
     const parts = [];
     if (sacredWeaponBonus > 0) {
         const baseBonus = bonus - sacredWeaponBonus;
@@ -149,6 +163,8 @@ function buildBonusDetailParts({ bonus, sacredWeaponBonus, sunderingBlowBonus, c
     if (baneAttackPenalty < 0) parts.push(`${baneAttackPenalty} [${baneDisplayLabel}]`);
     if (subtractDiePenalty < 0) parts.push(`${subtractDiePenalty} [${subtractDieDisplayLabel}]`);
     if (blessAttackBonus > 0) parts.push('+' + blessAttackBonus + ' [Bless]');
+    // MA-1510: Burst of Ingenuity +2 stamp folded on the roller's check/skill.
+    if (burstOfIngenuityBonus > 0) parts.push('+' + burstOfIngenuityBonus + ' [Burst of Ingenuity]');
     return parts;
 }
 
@@ -241,13 +257,17 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
 
     const sunderingBlowBonus = computeSunderingBlowBonus(context, rollType);
 
+    // MA-1510: Burst of Ingenuity ONE-SHOT +2 folded into the roller's
+    // ability/skill check (consumed here — see consumeBurstCheckBonus).
+    const burstOfIngenuityBonus = consumeBurstCheckBonus(characterName, campaignName, name, rollType);
+
     const rollResolution = resolveAttackRoll({ rollType, forcedMode, context, campaignName, r1, r2, effectiveD20 });
     const forcedModeResolved = rollResolution.forcedMode;
     const effectiveD20Roll = rollResolution.effectiveD20Roll;
     const luckyRerolled = rollResolution.luckyRerolled;
     const luckyRerollValue = rollResolution.luckyRerollValue;
 
-    const effectiveBonus = bonus + cosmicOmenAppliedBonus + pendingSkillCheckAppliedBonus + sunderingBlowBonus + baneAttackPenalty + subtractDiePenalty + blessAttackBonus;
+    const effectiveBonus = bonus + cosmicOmenAppliedBonus + pendingSkillCheckAppliedBonus + sunderingBlowBonus + baneAttackPenalty + subtractDiePenalty + blessAttackBonus + burstOfIngenuityBonus;
 
     const bonusDetailParts = buildBonusDetailParts({
         bonus,
@@ -262,6 +282,7 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
         subtractDiePenalty,
         subtractDieDisplayLabel,
         blessAttackBonus,
+        burstOfIngenuityBonus,
     });
     const finalBonusDetail = bonusDetailParts.length > 0 ? '(' + bonusDetailParts.join(', ') + ')' : undefined;
 
@@ -292,6 +313,7 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
         blessAttackBonus,
         blessAttackRoll,
         sunderingBlowBonus,
+        burstOfIngenuityBonus,
         finalBonusDetail,
         isAutoMiss,
         coverAcBonus,

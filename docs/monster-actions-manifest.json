@@ -25554,7 +25554,7 @@
       "uses": "2/Day",
       "trigger": "The sphinx or another creature within 30 feet makes an ability check or a saving throw.",
       "description": "The sphinx adds 2 to the roll.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1510-burst-of-ingenuity.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1511",

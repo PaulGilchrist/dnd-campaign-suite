@@ -18,6 +18,7 @@ import { setTempHp } from '../../services/automation/handlers/buffs/tempHpServic
 import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
 import { applyEyeRayFailedGrants } from '../../services/rules/features/beholderEyeRayService.js';
 import { stagePetrifyingBiteTargets } from '../../services/rules/features/cockatricePetrifyService.js';
+import { consumeBurstOfIngenuityBuff } from '../../services/encounters/monsterBurstOfIngenuity.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -226,7 +227,7 @@ function stampNpcSaveLastAttack({ attackerName, target, context, campaignName, e
     }, campaignName);
 }
 
-function buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, context, saveTotal, bonus, baneSaveRoll, baneSaveDisplayLabel, baneAttackerRoll, baneAttackerDisplayLabel, blessSaveRoll, wardingBondSaveBonus, saveType, saveDc, saveSuccess, attackerName }) {
+function buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, context, saveTotal, bonus, baneSaveRoll, baneSaveDisplayLabel, baneAttackerRoll, baneAttackerDisplayLabel, blessSaveRoll, wardingBondSaveBonus, burstOfIngenuitySaveBonus, saveType, saveDc, saveSuccess, attackerName }) {
     return {
         type: 'roll',
         characterName: targetName || characterName,
@@ -242,6 +243,8 @@ function buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD
         baneAttackerDisplayLabel: baneAttackerDisplayLabel,
         blessRoll: blessSaveRoll,
         wardingBondSaveBonus,
+        // MA-1510: machine truth of the folded Burst of Ingenuity +2.
+        burstOfIngenuitySaveBonus: burstOfIngenuitySaveBonus || 0,
         isNatural20: effectiveD20ForSave === 20,
         isNatural1: effectiveD20ForSave === 1,
         targetName: targetName,
@@ -269,8 +272,13 @@ async function processNpcSave({ target, characterName, campaignName, context, bo
     const { baneAttackerBonus, baneAttackerRoll, baneAttackerDisplayLabel } = rollBaneAttackerBonus(allTargetEffectsForSave, attackerName);
     const { blessSaveBonus, blessSaveRoll } = rollBlessSaveBonus(allTargetEffectsForSave, targetName);
     const wardingBondSaveBonus = resolveWardingBondSaveBonus(targetName, campaignName);
+    // MA-1510: Burst of Ingenuity ONE-SHOT +2 (Sphinx of Wonder) — the
+    // activeBuffs saveBonus fold twin of warding_bond above; consume reads,
+    // strips and logs the stamp on this resolve (arm→next-resolve-consume
+    // §214, playbook §76/§185 live inline seam). bonus:0 byte-inert unarmed.
+    const burstSave = consumeBurstOfIngenuityBuff(targetName, campaignName, { rollType: 'save', rollName: actionName });
 
-    const saveTotal = effectiveD20ForSave + bonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
+    const saveTotal = effectiveD20ForSave + bonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus + burstSave.bonus;
     const saveSuccess = saveDc != null ? (saveTotal >= saveDc) : null;
     const saveTypeValue = context?.saveType || null;
     const saveDcValue = context?.saveDc || null;
@@ -300,7 +308,7 @@ async function processNpcSave({ target, characterName, campaignName, context, bo
         stampNpcSaveLastAttack({ attackerName, target, context, campaignName, effectiveD20ForSave, r1, r2, bonus, saveTotal, saveSuccess, saveType, saveDc, actionName });
     }
 
-    logEntry(buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, context, saveTotal, bonus, baneSaveRoll, baneSaveDisplayLabel, baneAttackerRoll, baneAttackerDisplayLabel, blessSaveRoll, wardingBondSaveBonus, saveType, saveDc, saveSuccess, attackerName }));
+    logEntry(buildNpcSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, context, saveTotal, bonus: bonus + burstSave.bonus, baneSaveRoll, baneSaveDisplayLabel, baneAttackerRoll, baneAttackerDisplayLabel, blessSaveRoll, wardingBondSaveBonus, burstOfIngenuitySaveBonus: burstSave.bonus, saveType, saveDc, saveSuccess, attackerName }));
 
     // Apply save-triggered damage and conditions
     await applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml });

@@ -18,6 +18,7 @@ import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/
 import { hasBuffEffect } from '../../services/automation/common/buffToggle.js';
 import { useSaveRerollHandlers } from './useSaveRerollHandlers.js';
 import { cancelInfernalWoundAfterSaveSuccess } from '../../services/rules/features/infernalWoundService.js';
+import { consumeBurstOfIngenuityBuff } from '../../services/encounters/monsterBurstOfIngenuity.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 
 const GUARDED_MIND_SAVE_TYPES = ['Intelligence', 'Wisdom', 'Charisma', 'INT', 'WIS', 'CHA'];
@@ -289,7 +290,12 @@ async function computeSaveRollOutcome({ current, characters, campaignName, activ
   // Warding Bond: +1 flat bonus to saving throws
   const wardingBondSaveBonus = findWardingBondSaveBonus(current, campaignName);
 
-  const saveBonusTotal = saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus;
+  // MA-1510: Burst of Ingenuity ONE-SHOT +2 — same activeBuffs saveBonus
+  // fold channel as warding_bond; consume folds + strips the armed stamp on
+  // this save (arm→next-resolve-consume §214, playbook §76 live seam).
+  const burstSave = consumeBurstOfIngenuityBuff(current.targetName, campaignName, { rollType: 'save', rollName: current.name || current.sourceName });
+
+  const saveBonusTotal = saveBonus + auraBonus + cosmicOmenAppliedBonus + baneSavePenalty + blessSaveBonus + baneAttackerBonus + wardingBondSaveBonus + burstSave.bonus;
   const total = finalRoll + saveBonusTotal;
   const success = total >= current.saveDc;
   const bonusDetail = buildBonusDetail({ auraBonusStr: auraBonusString(aura), cosmicOmenDetail, baneSaveRoll, baneAttackerRoll, blessSaveRoll, wardingBondSaveBonus });
@@ -297,7 +303,7 @@ async function computeSaveRollOutcome({ current, characters, campaignName, activ
 
   return {
     hasEvasion, finalRoll, roll1, roll2, saveBonus, auraBonus, cosmicOmenAppliedBonus, total, success,
-    result: { success, roll: finalRoll, total, saveBonus: saveBonusTotal, bonusDetail, rawRolls: [roll1, roll2], mode: rollMode, baneRoll: baneSaveRoll, blessRoll: blessSaveRoll, baneAttackerRoll: baneAttackerRoll },
+    result: { success, roll: finalRoll, total, saveBonus: saveBonusTotal, bonusDetail: burstSave.applied ? `${bonusDetail ? bonusDetail + ' ' : ''}+${burstSave.bonus} [Burst of Ingenuity]` : bonusDetail, rawRolls: [roll1, roll2], mode: rollMode, baneRoll: baneSaveRoll, blessRoll: blessSaveRoll, baneAttackerRoll: baneAttackerRoll },
   };
 }
 

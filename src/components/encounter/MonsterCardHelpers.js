@@ -17,6 +17,7 @@ import { resolveMonsterRedirectAttackRow } from '../../services/encounters/monst
 import { resolveMonsterJinxRow } from '../../services/encounters/monsterJinx.js';
 import { resolveMonsterGuardianProtectionRow } from '../../services/encounters/monsterGuardianProtection.js';
 import { resolveMonsterSpellReflectionRow } from '../../services/encounters/monsterSpellReflection.js';
+import { resolveMonsterBurstOfIngenuityRow } from '../../services/encounters/monsterBurstOfIngenuity.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -1332,6 +1333,24 @@ const GATED_MONSTER_REACTIONS = {
   // shape) + lastAttack.reflexiveAntennaeResolved event stamp give the honest
   // 1-per-trigger limit.
   reflexive_antennae: { effect: 'reflexive_antennae', trigger: 'attacked_by_hit', label: 'Reflexive Antennae', icon: 'fa-bug' },
+  // MA-1510: Sphinx of Wonder Burst of Ingenuity — buff-the-roller reaction
+  // (MM: the sphinx or another creature within 30 ft makes an ability check
+  // or saving throw; +2 to the roll, 2/Day). No pending-attack event exists
+  // for checks/saves, so the roller is identified press-time via the
+  // sphinx's OWN card-armed cs.targetName seam (MA-1463 guardian wearer-
+  // press lineage — self is RAW-legal, no self_target refusal). Press arms a
+  // ONE-SHOT activeBuffs {effect:'burst_of_ingenuity', saveBonus:2} on the
+  // ROLLER (guardian_protection MA-1463 oneShot channel); the +2 folds and
+  // the stamp CONSUMES at the roller's next check/skill (d20RollComputation
+  // pendingSkillCheckBonus fold-seam mirror) or save resolution
+  // (saveProcessing.processNpcSave + SavePromptModal — the live
+  // warding_bond saveBonus fold seams §76). Economy: numeric uses:2/
+  // maxUses:2 (the "2/Day" STRING was a NaN null-gate, MA-1502) — every
+  // press spends MONSTER_REACTION_USES[burst_of_ingenuity] (MA-0013 shape)
+  // + 1/round latch (_burst_of_ingenuity_usedRound). 30-ft proximity is
+  // gridless advisory (§42); rest-rearm GM-enforced (§70). See
+  // services/encounters/monsterBurstOfIngenuity.js.
+  burst_of_ingenuity: { effect: 'burst_of_ingenuity', trigger: 'ability_check_or_save', label: 'Burst of Ingenuity', icon: 'fa-lightbulb' },
 };
 
 const SIZE_LADDER = ['colossal', 'gargantuan', 'huge', 'large', 'medium', 'small', 'tiny'];
@@ -2096,6 +2115,11 @@ const RAW_EVENT_GATE_RESOLVERS = {
   // MA-1488: two-faced spell trigger (miss OR save-success) — service owns
   // the identity probe + save + 'none' damage legs (jinx MA-0895 file shape).
   spell_reflection: resolveMonsterSpellReflectionRow,
+  // MA-1510: buff-the-roller trigger (ability check OR save, press-time
+  // roller identification) — service owns the gates + ONE-SHOT saveBonus
+  // arm; the +2 folds/consumes at the roll seams (d20RollComputation
+  // check/skill + saveProcessing/SavePromptModal saveBonus folds).
+  burst_of_ingenuity: resolveMonsterBurstOfIngenuityRow,
 };
 
 export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, species, deps = {} }) {
