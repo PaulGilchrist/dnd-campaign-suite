@@ -25507,7 +25507,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1507-arcane-prowl.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1508",
