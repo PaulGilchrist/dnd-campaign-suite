@@ -4539,3 +4539,111 @@ describe('MA-1274 Otyugh Tentacle grappled-on-hit grant (two-field DATA fix)', (
     });
 });
 
+const REVELMASTER = monsters.find(m => m.index === 'satyr-revelmaster');
+const PRANCE_ACTION = REVELMASTER.actions.find(a => a.name === 'Prance');
+const MULTIATTACK_ACTION = REVELMASTER.actions.find(a => a.name === 'Multiattack');
+
+describe('MA-1435 Satyr Revelmaster Prance charmed-on-hit grant (one-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Satyr Revelmaster 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Satyr Revelmaster 1', computedStats: { armorClass: 17 } },
+            { name: 'Knight 1', computedStats: { armorClass: 18 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: 984, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Knight 1', type: 'npc', size: 'Medium', ac: 18, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function pranceContext() {
+        return {
+            targetName: 'Knight 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Satyr Revelmaster 1',
+            hitClause: buildHitConditionClause(PRANCE_ACTION),
+        };
+    }
+
+    it('data-lock: disk row carries hit_conditions ["charmed"] after damage_type_primary (MA-0763/MA-1240 byte-shape), NO escape_dc (until-next-turn, not a grapple)', () => {
+        expect(PRANCE_ACTION.attack_bonus).toBe(7);
+        expect(PRANCE_ACTION.hit_conditions).toEqual(['charmed']);
+        const keys = Object.keys(PRANCE_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(PRANCE_ACTION.escape_dc).toBeUndefined();
+        expect(PRANCE_ACTION.damage_dice_primary).toBe('2d8 + 4');
+        expect(PRANCE_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(PRANCE_ACTION.save_dc).toBe(0);
+        expect(PRANCE_ACTION.reach).toBe('5 ft.');
+    });
+
+    it('buildHitConditionClause arms the Charmed rider (was null pre-fix)', () => {
+        const clause = buildHitConditionClause(PRANCE_ACTION);
+        expect(clause).toEqual({
+            conditions: ['charmed'],
+            escapeDc: null,
+            attackName: 'Prance',
+            targetEffect: null,
+        });
+    });
+
+    it('grants Charmed on the resolved hit via the canonical activeConditions write path', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Prance', formula: '2d8 + 4', total: 15, rolls: [5, 6], modifier: 4, context: pranceContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe('Knight 1');
+        expect(condCall[2]).toEqual(['charmed']);
+    });
+
+    it('stamps source meta WITHOUT dc/ability and logs condition-applied naming the attack', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Prance', formula: '2d8 + 4', total: 15, rolls: [5, 6], modifier: 4, context: pranceContext() });
+
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ charmed: { source: 'Satyr Revelmaster 1' } });
+        expect(metaCall[2].charmed.dc).toBeUndefined();
+        expect(metaCall[2].charmed.ability).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Knight 1',
+            condition: 'Charmed',
+            reason: 'Prance (escape DC —)',
+        }));
+    });
+
+    it('until-next-turn latch: static-list grant rides the STANDARD latch, no custom clock (§38/§153 accepted residual)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Prance', formula: '2d8 + 4', total: 15, rolls: [5, 6], modifier: 4, context: pranceContext() });
+
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Prance', formula: '2d8 + 4', total: 15, rolls: [5, 6], modifier: 4, context: pranceContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Knight 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('Multiattack header row byte-unchanged: no hit_conditions authored there (§406 header stays text/chip-only)', () => {
+        expect(MULTIATTACK_ACTION.hit_conditions).toBeUndefined();
+        expect(buildHitConditionClause(MULTIATTACK_ACTION)).toBeNull();
+    });
+});
+

@@ -963,3 +963,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Render-based data-lock tests MUST be `.test.jsx` (vitest oxc: JSX in .test.js fails "JSX syntax is disabled"); .js twins survive only if they never render.
 - zsh: `npx vitest run $files` from rg -l output passes ONE giant filter → false "No test files found" — pipe through xargs.
 - Inline save seam never stamps dcSuccess on save-damage entries even post-fix — adjudicate dc_success:"none" by saveSuccess:true + finalDamage:0 + ABSENT hp_change, never by a dcSuccess stamp.
+
+## §MA-1435 (2026-09-28, Satyr Revelmaster Prance FIXED) New pitfalls
+- HIT-stage Done spawns stage-2 damage popup WITH own Done (popup-close-btn) that intercepts next chip click — full cycle = attack-Done → stage-2 own-Done; backdrop flush insufficient.
+- Post-fix lastAttack.hitConditions stays None — clause-arm truth = log type:condition + victim activeConditions/meta.source, never lastAttack.
+- curl POST /admin/clear-* = 200 NO confirm dialog (dialogs only via admin-UI nav) — scripted cleanup path.

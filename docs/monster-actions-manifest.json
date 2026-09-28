@@ -24248,7 +24248,7 @@
         "charmed"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage, and the target has the Charmed condition until the start of the satyr's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1435-prance-charm-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1436",

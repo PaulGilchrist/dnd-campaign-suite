@@ -54044,7 +54044,8 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "2d8 + 4",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["charmed"]
       },
       {
         "name": "Fey Melody",
