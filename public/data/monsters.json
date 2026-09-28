@@ -56693,16 +56693,21 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "The sphinx of lore takes 2 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The sphinx regains expended legendary uses at the start of its turn."
+      },
+      {
         "name": "Arcane Prowl",
-        "description": "The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-        "uses": 1,
-        "recharge": false
+        "delegates_to": "Claw",
+        "description": "The sphinx can teleport up to 30 feet to an unoccupied space it can see (teleport advisory — GM moves the token; no position consumer), and it makes one Claw attack."
       },
       {
         "name": "Weight of Years",
         "description": "Constitution Saving Throw: DC 16, one creature the sphinx can see within 120 feet. Failure: The target gains 1 Exhaustion level. While the target has any Exhaustion levels, it appears 3d10 years older. Failure or Success: The sphinx can't take this action again until the start of its next turn.",
-        "uses": 1,
-        "recharge": false,
+        "save_dc": 16,
+        "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "The target gains 1 Exhaustion level and appears 3d10 years older while it has any Exhaustion levels. The sphinx can't take this action again until the start of its next turn."
       }
     ],
