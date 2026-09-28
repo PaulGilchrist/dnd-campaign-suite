@@ -19,14 +19,20 @@
 // shape — advisory prose folded into `description` per the MA-1456 precedent; the
 // condition duration rides the MA-0063 GM-enforced durationNote family (MA-0767/
 // MA-0918 twins — plain-condition grants have no auto-expiry clock consumer).
-// Radiant Teleport gets §168 child-shape sanitation only (uses/recharge dropped;
-// its numeric DC arming is MA-1480's ticket).
+// MA-1480 follow-up (same file, stale pins INVERTED §216/§219): Radiant
+// Teleport save_dc:25 now authored (prose-only DC 25 Dexterity never enforced
+// — FAIL(a)/DATA §54 family MA-0237/0318/0328/0362); twin chips render
+// ("2d10" + "DC 25 Dexterity", Slaying Bow MA-1475/1477 shape) and the chip
+// click rides spend-then-save (resolveLegendaryRowMechanic :677) adjudicating
+// Dex vs DC 25; prose "Success: Half damage" → dc_success ABSENT, default
+// 'half' RAW-correct (§63 only bites success-pays-nothing rows).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 import { legendaryHeaderAction, hasLegendaryCooldownClause, legendaryActionSlug } from '../../services/encounters/monsterLegendaryUses.js';
+import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
@@ -147,13 +153,36 @@ describe('MA-1479 monsters.json data: solar legendary block header + children', 
     expect(row.description).toContain('GM adjudicates');
   });
 
-  it('Radiant Teleport: §168 child-shape sanitation only — save_type stays, NO numeric save_dc (MA-1480 scope)', () => {
+  // MA-1480 FIXED (was MA-1479 sanitation-scope pin, inverted §216/§219):
+  // save_dc:25 authored next to save_type (Slaying Bow :56206 / Blinking
+  // Gaze :56242 byte-placement in the SAME monster block) — the §54
+  // prose-only-DC fingerprint is closed; prose DC 25 + save_type Dexterity
+  // were already on disk (row-of-record §3, DC sanity 8+CHA10+PB7=25).
+  // Prose "Success: Half damage." → dc_success STAYS ABSENT: getSaveDcSuccess
+  // default 'half' is RAW-correct (§63 half-leak only bites rows whose
+  // success pays nothing).
+  it('Radiant Teleport arms numeric save_dc:25 + save_type:"Dexterity", dc_success ABSENT (half default RAW — MA-1480 fix)', () => {
     const row = radiantRow();
+    expect(row.save_dc).toBe(25);
     expect(row.save_type).toBe('Dexterity');
-    expect(row.save_dc).toBeUndefined();
+    expect(row.dc_success).toBeUndefined();
     expect(row.uses).toBeUndefined();
     expect(row.recharge).toBeUndefined();
+    expect(row.attack_bonus).toBeUndefined();
+    expect(row.delegates_to).toBeUndefined();
     expect(row.description).toBe('The solar teleports up to 60 feet to an unoccupied space it can see. Dexterity Saving Throw: DC 25, each creature in a 10-foot Emanation originating from the solar at its destination space. Failure: 11 (2d10) Radiant damage. Success: Half damage.');
+    expect(row.save_effect).toBe('The target takes 11 (2d10) Radiant damage. Success: The target takes half damage.');
+    // No once-per-turn clause on this row — no owner cooldown latch (§204).
+    expect(hasLegendaryCooldownClause(row)).toBe(false);
+  });
+
+  // MA-1480 half-leg math at the canonical save seam (dc_success default
+  // 'half' threaded by blockSaveDcSuccess onto the save context): a failing
+  // save pays the FULL 2d10 pool, a success pays floor(raw/2).
+  it('MA-1480 save-leg math: fail pays full 2d10 pool, success pays floored half', () => {
+    expect(computeDamageAfterSave(13, false, 'half')).toBe(13);
+    expect(computeDamageAfterSave(13, true, 'half')).toBe(6);
+    expect(computeDamageAfterSave(20, true, 'half')).toBe(10);
   });
 });
 
@@ -198,10 +227,17 @@ describe('MA-1479 MonsterCardModal solar legendary gated save row', () => {
     const chip = laRow('Blinking Gaze').querySelector('.mc-dice-link-save-clickable');
     expect(chip).not.toBe(null);
     expect(chip.textContent).toContain('DC 25 Constitution');
-    // Radiant Teleport keeps its honest 2d10 damage chip post-sanitation (§168).
-    const rt = laRow('Radiant Teleport').querySelector('.mc-dice-link');
+    // MA-1480: post-fix twin chips on the Radiant Teleport row —
+    // plan.rollable dice chip "2d10" + labelled save chip "DC 25 Dexterity"
+    // (both onClick=handleSaveRoll, Slaying Bow MA-1475/1477 byte-shape;
+    // ActionDamageLinks self-suppresses on save_dc>0 MonsterAction.jsx:51).
+    const rtRow = laRow('Radiant Teleport');
+    const rt = rtRow.querySelector('.mc-dice-link');
     expect(rt).not.toBe(null);
     expect(rt.textContent).toContain('2d10');
+    const rtSaveChip = rtRow.querySelector('.mc-dice-link-save-clickable');
+    expect(rtSaveChip).not.toBe(null);
+    expect(rtSaveChip.textContent).toContain('DC 25 Dexterity');
     // Numeric children self-suppress LegendarySpendLink (MonsterAction.jsx:164) —
     // zero expend chips is the byte-proven §204 shape, not a defect.
     expect(document.querySelectorAll('.mc-dice-link-legendary').length).toBe(0);
@@ -277,13 +313,54 @@ describe('MA-1479 MonsterCardModal solar legendary gated save row', () => {
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 
-  it('Radiant Teleport 2d10 chip spends honestly then rides the damage else (§168 sanitation did not break it; MA-1480 owns its DC)', async () => {
+  // MA-1480 STALE-PIN INVERSION (§216/§219): MA-1479 pinned this child
+  // "rides the damage else" while its DC was prose-only. With save_dc:25
+  // authored the row routes the SAVE leg (resolveLegendaryRowMechanic :677
+  // Number(save_dc)>0 fork BEFORE the damage else :697) — spend honest,
+  // rollSavingThrow DEX vs DC 25, half-on-success threaded via the save
+  // context dc_success default 'half', damage formula rides the context
+  // (saveProcessing seam), NOT an unsaved rollDamage pre-pay.
+  it('Radiant Teleport DC chip spends honestly then adjudicates DEX save vs DC 25 (half-on-success) — no unsaved damage leg', async () => {
+    renderSolar({ max: 2, used: 0 });
+    fireEvent.click(laRow('Radiant Teleport').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(runtime.store['Solar 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('DEX');
+    const saveCtx = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    expect(saveCtx.saveDc).toBe(25);
+    expect(saveCtx.saveType).toBe('Dexterity');
+    expect(saveCtx.dcSuccess).toBe('half');
+    expect(saveCtx.autoDamageFormula).toBe('2d10');
+    expect(saveCtx.targetName).toBe('Bandit 1');
+    expect(saveCtx.attackerName).toBe('Solar 1');
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Radiant Teleport/.test(e.description));
+    expect(spend).toBeTruthy();
+    expect(spend.description).toMatch(/expends a legendary use for Radiant Teleport/);
+    // No once-per-turn cooldown clause on this row — latch stays unstamped.
+    expect(runtime.store['Solar 1.monsterLegendaryActionCooldowns']?.radiant_teleport).toBeUndefined();
+    // Damage never pre-pays outside the save seam.
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it('Radiant Teleport dice chip "2d10" rides the SAME save seam (no damage pre-pay)', async () => {
     renderSolar({ max: 2, used: 0 });
     fireEvent.click(laRow('Radiant Teleport').querySelector('.mc-dice-link'));
     await waitFor(() => expect(runtime.store['Solar 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 }));
-    await waitFor(() => expect(ROLLERS.rollDamage).toHaveBeenCalledTimes(1));
-    expect(ROLLERS.rollDamage.mock.calls[0][0].formula).toBe('2d10');
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('DEX');
+    expect(ROLLERS.rollSavingThrow.mock.calls[0][2].saveDc).toBe(25);
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
     expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it('exhausted (2/2): Radiant Teleport DC chip refuses, zero spend, zero save roll', async () => {
+    renderSolar({ max: 2, used: 2 });
+    fireEvent.click(laRow('Radiant Teleport').querySelector('.mc-dice-link-save-clickable'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store['Solar 1.monsterLegendaryUses']).toEqual({ max: 2, used: 2 });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });
