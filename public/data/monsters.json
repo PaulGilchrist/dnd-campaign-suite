@@ -57541,7 +57541,10 @@
         "name": "Enchanting Bow",
         "description": "Ranged Attack Roll: +6, range 40/160 ft. Hit: 1 Piercing damage, and the target has the Charmed condition until the start of the sprite's next turn.",
         "attack_bonus": 6,
-        "range": "40/160 ft."
+        "range": "40/160 ft.",
+        "hit_conditions": [
+          "charmed"
+        ]
       },
       {
         "name": "Heart Sight",

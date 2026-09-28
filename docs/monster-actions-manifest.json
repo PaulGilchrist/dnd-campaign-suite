@@ -25713,7 +25713,7 @@
         "charmed"
       ],
       "description": "Ranged Attack Roll: +6, range 40/160 ft. Hit: 1 Piercing damage, and the target has the Charmed condition until the start of the sprite's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1520-enchanting-bow.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1521",
