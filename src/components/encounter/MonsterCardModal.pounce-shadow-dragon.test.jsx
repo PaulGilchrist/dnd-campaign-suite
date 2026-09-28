@@ -10,10 +10,13 @@
 // stamp 2 without lair suffix); Pounce delegates_to:"Rend" resolving +10 / 2d6 + 5
 // Slashing + 1d6 Necrotic through the MA-0022 delegate attack seam (§432 kraken twin
 // — Rend's DC0 household decoy makes the label read "(Rend save)" while the row
-// rides the ATTACK seam, §640(a)); Veil of Shadow rides the MA-0058/MA-0957 advisory
-// seam ({advisory, advisory_message}) — spend honest via the shared gate, zero
-// fabricated damage (full mechanic is MA-1457 territory), once-per-turn cooldown
-// engine-enforced by the MA-0073 legendary cooldown latch.
+// rides the ATTACK seam, §640(a)); Veil of Shadow — MA-1457 FOLLOW-UP supersedes the
+// interim MA-0058/MA-0957 advisory stopgap: the row now carries damage_dice_primary
+// "3d6" + damage_type_primary "Necrotic" so its gated click RIDES THE DAMAGE ELSE
+// (§698) and rolls 3d6 Necrotic vs the armed target (advisory field stripped — the
+// advisory branch §678 PRECEDES the damage else and would silently suppress the roll).
+// Stealth stays §70 GM-enforced, folded into `description` (MA-1456 Pounce precedent);
+// once-per-turn cooldown engine-enforced by the MA-0073 legendary cooldown latch.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -146,25 +149,33 @@ describe('MA-1456 monsters.json data: shadow-dragon legendary block header + chi
     expect(legendaryDelegateAttackName(pounceRow(), rend)).toBe('Pounce (Rend save)');
   });
 
-  it('Veil of Shadow rides the MA-0957 advisory seam — no numeric fields, no silent-burn', () => {
+  // MA-1457: the interim MA-0957 advisory stopgap is superseded — the row now
+  // carries numeric damage fields so its gated click rolls (advisory branch §678
+  // precedes the damage else §698 and would suppress it). Stealth advisory folded
+  // into `description` per the MA-1456 Pounce precedent; cooldown clause survives.
+  it('Veil of Shadow rides the damage seam — 3d6 Necrotic numeric fields, advisory stripped', () => {
     const row = veilRow();
-    expect(row.advisory).toBe('veil_of_shadow');
-    expect(row.advisory_message).toContain('advisory record');
-    expect(row.advisory_message).toContain('MA-1457');
+    expect(row.advisory).toBeUndefined();
+    expect(row.advisory_message).toBeUndefined();
     expect(row.attack_bonus).toBeUndefined();
     expect(row.save_dc).toBeUndefined();
     expect(row.delegates_to).toBeUndefined();
-    expect(row.description).toBe("The dragon uses Shadow Stealth, and one creature of its choice that it can see within 10 feet of it takes 10 (3d6) Necrotic damage. The dragon can't take this action again until the start of its next turn.");
+    expect(row.damage_dice_primary).toBe('3d6');
+    expect(row.damage_type_primary).toBe('Necrotic');
+    expect(row.description).toContain('takes 10 (3d6) Necrotic damage');
+    expect(row.description).toContain('stealth advisory');
+    expect(row.description).toContain("can't take this action again until the start of its next turn");
   });
 });
 
 // MA-1456 live seam: header renders "Legendary Action Uses: 2 (2 left)" — NOT a
-// swallowed Pounce header; BOTH children render gated "Expend Legendary" chips.
-// Pounce click spends then rolls the delegated +10 Rend attack (armed Bandit,
-// 2d6 + 5 Slashing + 1d6 Necrotic via MA-0022 seam, save lane never armed at DC0).
-// Veil click spends and lands the advisory record — zero rolls, zero damage,
-// ZERO console.error "no resolvable mechanic" (MA-0510 silent-burn dead). Boundary
-// refire + exhausted + own-turn refusals honest, zero spend.
+// swallowed Pounce header. Pounce (no numeric affordance) keeps the gated
+// "Expend Legendary" chip; Pounce click spends then rolls the delegated +10 Rend
+// attack (armed Bandit, 2d6 + 5 Slashing + 1d6 Necrotic via MA-0022 seam, save
+// lane never armed at DC0). MA-1457: Veil of Shadow now carries numeric 3d6 so its
+// gated affordance is a plain ".mc-dice-link" damage chip (LegendarySpendLink
+// self-suppresses on numeric rows) — click spends then rolls 3d6 Necrotic vs the
+// armed Bandit. Boundary refire + exhausted + own-turn refusals honest, zero spend.
 describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -194,12 +205,16 @@ describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(2 left)');
   });
 
-  it('BOTH children render gated Expend Legendary chips (zero-affordance Pounce row dead)', () => {
+  it('Pounce keeps gated Expend Legendary chip; Veil now renders numeric 3d6 damage chip (MA-1457)', () => {
     renderShadowDragon({ max: 2, used: 0 });
-    const chips = document.querySelectorAll('.mc-dice-link-legendary');
-    expect(chips.length).toBe(2);
+    // Only the non-numeric child (Pounce) keeps the spend-only chip; a numeric
+    // legendary child self-suppresses LegendarySpendLink (:193) and affords damage.
+    expect(document.querySelectorAll('.mc-dice-link-legendary').length).toBe(1);
     expect(laRow('Pounce').querySelector('.mc-dice-link-legendary')).not.toBe(null);
-    expect(laRow('Veil of Shadow').querySelector('.mc-dice-link-legendary')).not.toBe(null);
+    const veilDmg = laRow('Veil of Shadow').querySelector('.mc-dice-link');
+    expect(laRow('Veil of Shadow').querySelector('.mc-dice-link-legendary')).toBe(null);
+    expect(veilDmg).not.toBe(null);
+    expect(veilDmg.textContent).toContain('3d6');
   });
 
   it('Pounce chip spends 2->1 after another creature turn and rolls the delegated +10 Rend attack — no save leg, no console error', async () => {
@@ -231,31 +246,40 @@ describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
     renderShadowDragon({ max: 2, used: 0 });
     fireEvent.click(laRow('Pounce').querySelector('.mc-dice-link-legendary'));
     await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
-    fireEvent.click(laRow('Veil of Shadow').querySelector('.mc-dice-link-legendary'));
+    fireEvent.click(laRow('Veil of Shadow').querySelector('.mc-dice-link'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     expect(String(setPopupHtml.mock.calls[0][0])).toContain('Only one legendary action');
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(runtime.store['Shadow Dragon 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 });
     expect(ROLLERS.rollAttack).toHaveBeenCalledTimes(1);
+    // Refused before the mechanic resolves — the numeric damage roll never fires.
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
   });
 
-  it('Veil chip spends honestly and lands the advisory record — zero rolls, zero damage, zero console error', async () => {
+  // MA-1457: the interim advisory record is superseded — the gated numeric chip
+  // spends honestly then ROLLS 3d6 Necrotic vs the armed Bandit through the damage
+  // else (§698). Stealth stays §70 GM-enforced (folded into description). Cooldown
+  // latch still stamps. Attack/save legs stay dead; zero console silent-burn.
+  it('MA-1457 Veil chip spends honestly and rolls 3d6 Necrotic vs the armed target', async () => {
     renderShadowDragon({ max: 2, used: 0 });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    fireEvent.click(laRow('Veil of Shadow').querySelector('.mc-dice-link-legendary'));
+    const chip = laRow('Veil of Shadow').querySelector('.mc-dice-link');
+    expect(chip.textContent).toContain('3d6');
+    fireEvent.click(chip);
     await waitFor(() => expect(runtime.store['Shadow Dragon 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 }));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    const popup = String(setPopupHtml.mock.calls[0][0]);
-    expect(popup).toContain('Legendary Action — Veil of Shadow');
-    expect(popup).toContain('GM-enforced');
-    expect(popup).not.toContain('damage applied');
-    const record = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /legendary action Veil of Shadow/.test(e.description));
-    expect(record).toBeTruthy();
-    expect(record.description).toContain('advisory record');
+    await waitFor(() => expect(ROLLERS.rollDamage).toHaveBeenCalledTimes(1));
+    const dmg = ROLLERS.rollDamage.mock.calls[0][0];
+    expect(dmg.name).toBe('Veil of Shadow');
+    expect(dmg.formula).toBe('3d6');
+    expect(dmg.context.damageType).toBe('Necrotic');
+    expect(dmg.context.targetName).toBe('Bandit 1');
+    expect(dmg.context.attackerName).toBe('Shadow Dragon 1');
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Veil of Shadow/.test(e.description));
+    expect(spend).toBeTruthy();
+    expect(spend.description).toMatch(/expends a legendary use for Veil of Shadow/);
     // MA-0073: the row's own once-per-turn clause stamps the cooldown latch.
     expect(runtime.store['Shadow Dragon 1.monsterLegendaryActionCooldowns']?.veil_of_shadow).toBeTruthy();
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
     expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
     errSpy.mockRestore();

@@ -24698,7 +24698,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The dragon uses Shadow Stealth, and one creature of its choice that it can see within 10 feet of it takes 10 (3d6) Necrotic damage. The dragon can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1457-veil-of-shadow.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1458",
