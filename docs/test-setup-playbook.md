@@ -1009,3 +1009,9 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1457 (2026-09-28, Shadow Dragon Veil of Shadow FIXED) New pitfalls
 - `resolveLegendaryRowMechanic` checks `advisory` BEFORE the numeric-damage leg — an advisory field on a legendary child SUPPRESSES damage resolution; once numeric dice live, fold advisory prose into `description` and drop the advisory fields (Decay twin byte-shape: `damage_dice_primary`+`damage_type_primary` on legendary child resolves 3d6 vs armed target).
 - MA-1456 header-insert tests carry advisory pins that must be INVERTED same-pass when a follow-up ticket arms numeric legs.
+
+## §MA-1459 (2026-09-28, Shambling Mound Charged Tendril FIXED — attack-row pull lane) New pitfalls
+- §944 attack-row PULL lane now LIVE: data `hit_pull:{distance_ft,size_limit}` → parseHitPull (Helpers, structured-key-only) → handlePlainDamage.applyHitPullClause grants te `pulled_toward` {value:distance, instant, no clock — WarpingImplosion mirror} + pull grant log + §42 token advisory; oversized victim → `pull_refused` zero-state. te whitelist extended ['source','value'].
+- Family gate `isLargeOrSmallerTarget` PASSES Large — stricter clause size gates must ride BEFORE it (`isTargetSizeAtMost` ladder; uppercase SIZE_LADDER name taken at Helpers:1265).
+- registerTargetEffect merges extraProps verbatim; registry `defaults` are GM-UI-only.
+- curl POST admin/clear-log can transiently fail — retry and confirm clears individually (§226 twin).
