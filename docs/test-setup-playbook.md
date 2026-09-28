@@ -978,3 +978,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1437 (2026-09-28, Scarecrow Fearsome Claw FIXED) New pitfalls
 - First join after admin-clear names monster bare "Bandit" (no " 1") until reseed — pin victim by cs poll not assumed suffix.
 - EB Join mid-flow auto-navigates to Initiative — stale EB evaluate can join duplicates; re-click Encounters + verify cs names after every join.
+
+## §MA-1444/1445 (2026-09-28, Scout Captain advantage-riders FIXED) Notes
+- Skip-path damage log keeps cosmetic note:"combined_damage_roll" with secondary fields ABSENT — pin field-absence, never note.

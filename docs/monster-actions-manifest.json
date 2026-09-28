@@ -24469,7 +24469,7 @@
       "range": "150/600 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +5, range 150/600 ft. Hit: 7 (1d8 + 3) Piercing damage, plus 10 (3d6) Piercing damage if the attack was made with Advantage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1445-longbow.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1446",

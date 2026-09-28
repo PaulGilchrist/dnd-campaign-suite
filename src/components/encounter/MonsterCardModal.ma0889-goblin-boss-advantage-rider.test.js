@@ -108,4 +108,22 @@ describe('MA-0889 Goblin Boss advantage-gated secondary rider', () => {
         expect(t.autoDamageSecondaryFormula).toBe('3d6');
         expect(t.autoDamageSecondaryDamageType).toBe('Piercing');
     });
+
+    it('MA-1445 data-lock: Scout Captain Longbow actions[2] carries secondary_condition "advantage"', () => {
+        const scoutCaptain = monsters.find(m => m.index === 'scout-captain');
+        const row = scoutCaptain.actions[2];
+        expect(row.name).toBe('Longbow');
+        expect(row.attack_bonus).toBe(5);
+        expect(row.damage_dice_primary).toBe('1d8 + 3');
+        expect(row.damage_type_primary).toBe('Piercing');
+        expect(row.damage_dice_secondary).toBe('3d6');
+        expect(row.damage_type_secondary).toBe('Piercing');
+        expect(row.secondary_condition).toBe('advantage');
+        expect(row.range).toBe('150/600 ft.');
+        expect(row.description).toContain('if the attack was made with Advantage');
+        const t = buildSecondaryDamageTransport(row, 'Longbow');
+        expect(t.secondaryCondition).toBe('advantage');
+        expect(t.autoDamageSecondaryFormula).toBe('3d6');
+        expect(t.autoDamageSecondaryDamageType).toBe('Piercing');
+    });
 });

@@ -259,6 +259,56 @@ describe('MA-0889 advantage-gated secondary rider', () => {
         });
     });
 
+    describe('MA-1445 Scout Captain Longbow — same gate on "3d6" rider, "1d8 + 3" primary', () => {
+        function longbowContext() {
+            return {
+                targetName: 'Bandit',
+                damageType: 'Piercing',
+                attackerName: 'Goblin Boss',
+                autoDamageSecondaryFormula: '3d6',
+                autoDamageSecondaryName: 'Longbow',
+                autoDamageSecondaryDamageType: 'Piercing',
+                secondaryCondition: 'advantage',
+            };
+        }
+
+        async function rollLongbow(mode) {
+            stampForcedMode(mode);
+            applyDamageToTarget
+                .mockReturnValueOnce({ finalDamage: 9, newHp: 990, damageReduced: false })
+                .mockReturnValueOnce({ finalDamage: 13, newHp: 977, damageReduced: false });
+            const fn = createLogDamageAndShow(deps);
+            await fn({ name: 'Longbow', formula: '1d8 + 3', total: 6, rolls: [3], modifier: 3, context: longbowContext() });
+        }
+
+        it('normal hit — rider gated: primary-only apply, secondary_damage_skipped "no advantage"', async () => {
+            await rollLongbow(null);
+            expect(rollExpression).not.toHaveBeenCalledWith('3d6');
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+            expect(applyDamageToTarget.mock.calls[0][2]).toBe(6);
+            expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Piercing']);
+            const skipCall = addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
+            expect(skipCall?.reason).toBe('no advantage');
+            expect(skipCall?.abilityName).toBe('Longbow');
+        });
+
+        it('advantage hit — rider rolls and pays primary + secondary', async () => {
+            await rollLongbow('advantage');
+            expect(rollExpression).toHaveBeenCalledWith('3d6');
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+            const skipped = addEntry.mock.calls.map(c => c[1]?.automationType);
+            expect(skipped).not.toContain('secondary_damage_skipped');
+        });
+
+        it('disadvantage hit — rider gated off with honest skip log', async () => {
+            await rollLongbow('disadvantage');
+            expect(rollExpression).not.toHaveBeenCalledWith('3d6');
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+            const skipCall = addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
+            expect(skipCall?.reason).toBe('no advantage');
+        });
+    });
+
     describe('legacy always-roll rows unchanged (MA-0426/0531 byte-identical)', () => {
         it('secondaryCondition null on a normal hit — rider still rolls and applies', async () => {
             await rollScimitar(null, null);
