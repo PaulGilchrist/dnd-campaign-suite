@@ -16,6 +16,7 @@ import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
 import { resolveMonsterRedirectAttackRow } from '../../services/encounters/monsterRedirectAttack.js';
 import { resolveMonsterJinxRow } from '../../services/encounters/monsterJinx.js';
 import { resolveMonsterGuardianProtectionRow } from '../../services/encounters/monsterGuardianProtection.js';
+import { resolveMonsterSpellReflectionRow } from '../../services/encounters/monsterSpellReflection.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -1144,6 +1145,23 @@ const GATED_MONSTER_REACTIONS = {
   // anchor clock (§38, MA-0548 expireOnCreatureName shape). Refusals log-only
   // (§235d). Grants carry NO popupHtml (§217 pending-Done survival).
   guardian_protection: { effect: 'guardian_protection', trigger: 'attacked_by_hit', label: 'Protection', icon: 'fa-shield-heart' },
+  // MA-1488: Spectator Spell Reflection — two-faced reactive retaliation
+  // (MM: the spectator succeeds a spell's save OR a spell's attack roll
+  // misses it; the CASTING creature takes a Dex save vs DC 12 or eats 3d6
+  // Force — RAW silent on a save success, dc_success:'none' MV-20 kill).
+  // Formerly the ungated generic save-shell chip: fired ANY time, spent
+  // NOTHING, half-leaked on success (§128 live repro). Gate keys off the
+  // campaign lastAttack spell-origin (isSpellOriginLastAttack MA-0013 seam)
+  // aimed at the monster with a miss face (hit:false, MA-0245 stamp) or a
+  // save-success face (saveResult:'success' MA-0816 + targetResults fold
+  // §893) — monsterSpellReflectionIdentityRefusal, jinx MA-0895 service
+  // lineage. 1/round latch (_spell_reflection_usedRound, MA-0013 shape) +
+  // every press spends MONSTER_REACTION_USES[spell_reflection] (At Will
+  // sentinel usage:'At Will'+uses:999, shield/jinx spend-every-press shape).
+  // The generic ActionSaveRoll chip is SUPPRESSED on gated rows (sole-press
+  // mandate) — MA-0694 self-buff suppression precedent. Refusals log-only
+  // (§235d). See services/encounters/monsterSpellReflection.js.
+  spell_reflection: { effect: 'spell_reflection', trigger: 'spell_miss_or_save_success', label: 'Spell Reflection', icon: 'fa-arrows-turn-right' },
   // MA-0895: Goblin Hexer Jinx — reactive miss-negation reaction. RAW trigger:
   // a creature the hexer can see hits it with an attack roll (seen is
   // GM-enforced advisory, CLA-325); response: the ATTACKER makes a WIS save
@@ -2051,6 +2069,9 @@ const RAW_EVENT_GATE_RESOLVERS = {
   hellish_rebuke: resolveMonsterHellishRebuke,
   mind_corrosion: resolveMonsterMindCorrosion,
   reflexive_antennae: resolveMonsterReflexiveAntennae,
+  // MA-1488: two-faced spell trigger (miss OR save-success) — service owns
+  // the identity probe + save + 'none' damage legs (jinx MA-0895 file shape).
+  spell_reflection: resolveMonsterSpellReflectionRow,
 };
 
 export async function resolveMonsterGatedReaction({ action, monsterName, campaignName, species, deps = {} }) {

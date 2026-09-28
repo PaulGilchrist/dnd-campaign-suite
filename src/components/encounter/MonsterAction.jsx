@@ -363,6 +363,13 @@ function SpellOrSaveLinks({ action, isSpellcastingRow, utilityNames, attackerCan
     const rowUsesGate = monsterAbilitySaveUsesGate(action, spellUsesUsed);
     return <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} spellNames={utilityNames} rechargeOut={rechargeOut} rowUsesGate={rowUsesGate} />;
   }
+  // MA-1488 sole-press mandate: a gated reaction row's GatedReactionSlot is
+  // the ONLY press surface — the generic save shell adjudicates vs a bare
+  // armed target with no trigger event and spends nothing (Spectator Spell
+  // Reflection live repro: fired ANY time, half-leaked on save success).
+  // MA-0694 legendary-gate suppression precedent; byte-inert on every
+  // non-gated save row.
+  if (getGatedMonsterReaction(action)) return null;
   // MA-1071: DC0 decoy never arms the save shell (MA-0551 >0 convention twin).
   if (Number(action.save_dc) > 0) {
     return <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />;

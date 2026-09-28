@@ -56455,7 +56455,21 @@
         "description": "Dexterity Saving Throw: DC 12, one creature the spectator can see within 120 feet. Failure: 10 (3d6) Force damage.",
         "save_dc": 12,
         "save_type": "Dexterity",
-        "save_effect": "The target takes 10 (3d6) Force damage."
+        "dc_success": "none",
+        "save_effect": "The target takes 10 (3d6) Force damage.",
+        "usage": "At Will",
+        "uses": 999,
+        "maxUses": 999,
+        "automation": {
+          "type": "reaction",
+          "trigger": "spell_miss_or_save_success",
+          "effect": "spell_reflection",
+          "saveType": "DEX",
+          "saveDc": 12,
+          "dcSuccess": "none",
+          "damageExpression": "3d6",
+          "damageType": "Force"
+        }
       }
     ],
     "legendary_actions": [],

@@ -25214,7 +25214,7 @@
       "saveEffect": "The target takes 10 (3d6) Force damage.",
       "trigger": "The spectator succeeds on a saving throw against a spell, or a spell's attack roll misses it.",
       "description": "Dexterity Saving Throw: DC 12, one creature the spectator can see within 120 feet. Failure: 10 (3d6) Force damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1488-spell-reflection.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1489",
