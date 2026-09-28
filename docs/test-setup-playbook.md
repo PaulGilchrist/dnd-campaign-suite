@@ -1015,3 +1015,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Family gate `isLargeOrSmallerTarget` PASSES Large — stricter clause size gates must ride BEFORE it (`isTargetSizeAtMost` ladder; uppercase SIZE_LADDER name taken at Helpers:1265).
 - registerTargetEffect merges extraProps verbatim; registry `defaults` are GM-UI-only.
 - curl POST admin/clear-log can transiently fail — retry and confirm clears individually (§226 twin).
+
+## §MA-1460 (2026-09-28, Shambling Mound Engulf FIXED) New pitfalls
+- Shapeless `range:""` save row w/ `attack_bonus:0` renders 3 chips (+0 / 3d6 / DC) — press ONLY the DC chip; inline victim save log folds stamped `saving_throws.<ab>.modifier` into victim `total` (popup/attacker-dupe prints "+0") — adjudicate by victim roll entry.
+- `"damage_dice_primary": "3d6",\n "damage_type_primary": "Lightning"\n }` is a unique app-wide monsters.json surgical anchor.
+- §944 addendum: MA-1459's `hit_pull` rides the ATTACK lane; save-path pulls remain unthreaded (MA-1460 Engulf pull clause stays advisory out-of-scope).
