@@ -6574,12 +6574,264 @@
   },
   "Scout": {
     "monsterIndex": "scout",
-    "placedIn": "test-campaign via EB exact-row Scout AC13 HP16; Bandit AC12 HP999 armed own-card",
+    "placedIn": "EB re-join recipe: search Scout check + Bandit check -> Join (Scout idx0, Bandit idx1); Bandit HP999 fill; arm Scout own-card. Admin clear wipes initiative between sessions.",
     "config": {
       "name": "Scout 1",
       "csIndex": 0,
-      "verifiedRow": "MA-1440 (PASS-subset Multiattack +4 header generic zero-dmg; Shortsword 1d6+2 + Longbow 1d8+2 comp evidence Σ22)",
+      "verifiedRow": "MA-1440 (PASS-subset Multiattack +4 header generic zero-dmg; Shortsword 1d6+2 + Longbow 1d8+2 comp evidence Σ22) | MA-1441 (PASS Shortsword standalone pure melee: +4 vs AC12, nat7/nat4 miss zero-dmg, nat10/nat14 hits 1d6+2 Piercing fd==|hpΔ| 7/3, 2026-09-27) | MA-1442 (PASS Longbow ranged +4 vs AC12: boundary nat8=12 exact-AC hit, 1d8+2 Piercing fd==|hpΔ|, range band advisory fired any distance, 2026-09-27)",
       "chips": "+4 header + Shortsword +4 + Longbow +4"
+    }
+  },
+  "Scout Captain": {
+    "monsterIndex": "scout-captain",
+    "placedIn": "test-campaign initiative via EB Join (exact td anchor; + Bandit victim exact td anchor)",
+    "config": {
+      "name": "Scout Captain 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1443 (PASS-subset Multiattack +5 header TEXT row verbatim + generic +5 chip live zero-dmg nat2=7 miss; components exact: Shortsword nat12+5=17 hit 1d6+3 fd4 Piercing + rider 3d6 fd11 hpD-15; Longbow nat7+5=12 exact-AC tie hit 1d8+3 fd9 + rider 3d6 fd13 hpD-22; ledger 999-984-962 |hpD|==legs exact; count GM-adjudicated no counter §66 MA-0009/0223/1440 twin; riders fire uncond = component-row advisory §219; admin clear cd+log quiet 2026-09-27) | MA-1444 FAIL(a) Shortsword: 3d6 adv-rider fires on normal-mode hit (rolls[11,10] mode:normal, legs 6+12 hpD18) - row lacks secondary_condition:advantage; gate seam handlePlainDamage.js:130 data-authored; Longbow twin same defect 2026-09-27 | MA-1445 FAIL(a) Longbow twin: rider 3d6 fires normal-mode (legs 5+9 hpD14; adv probe rides same) - secondary_condition absent, one-field data fix 2026-09-27 | MA-1446 PASS-subset Uncanny Dodge advisory sentinel MA-1285 Option A (mc-dice-link-advisory chip, record-only ability_use; full dmg passes, GM-adjudicated; Bandit-victim probe crit13/noncrit4 unhalved 2026-09-27)",
+      "chips": "+5 header + Shortsword +5 + Longbow +5"
+    }
+  },
+  "Sea Hag": {
+    "monsterIndex": "sea-hag",
+    "placedIn": "test-campaign initiative via EB Join 2026-09-27 (Sea Hag 1 cs idx0 ac14 hp52 init16; victim Bandit 1 ac12 resistances[] clean slashing maxHp11 currentHp999 card-input clamp-avoid, armed own-card target-select selectOption Bandit 1; no map/token gridless-lenient)",
+    "config": {
+      "name": "Sea Hag 1",
+      "csIndex": 0,
+      "verifiedRow": "MA-1447 (PASS Claw standalone pure melee: disk actions[0] byte-match manifest - attack_bonus 5, 2d6 + 3 Slashing, reach 5 ft., save fields empty, avg 10 sanity; five +5 chip fires fresh-rect zero-absorb: 4 HITS nats 12->17 / 15->20 / 7->12 boundary-tie AC12 / 19->24 + honest MISS nat2->7 hit:false; each hit ONE roll damage formula 2d6 + 3 Slashing rolls[1,1]fd5 [2,1]fd6 [4,2]fd9 [1,6]fd10 all in 5-15 range, finalDamage==|hp_change| exact (999->994->988->979->969 sum 30); MISS zero damage entry zero hp_change; resisted false Bandit resistances[]; popup HIT stage reroll-btn Done then stage-2 damage popup own popup-close-btn per MA-1441, MISS stage close-btn no reroll-btn; log roll/attack total=raw d20 +5 separate, rolls second-die display dupe; no nat20 crit branch n/a; card closed clean) | MA-1448 FAIL(a) Death Glare: DC11 WIS + 3d8 + recharge enforced OK but HP<=20 instakill inert (no hp_threshold_kill field; prose never parsed, saveProcessing.js:1244 needs structured key; MA-0352 Banshee byte-shape fix); dc_success half-leak code-proven MonsterCardModal.jsx:1032 needs none 2026-09-27 | MA-1449 FAIL(a) Illusory Appearance: save_dc/save_type on save-less self-cast renders forced DC13 CON chip (Bandit auto-rolls, pays nothing, zero disguise te); fix strip DC fields + monster_self_buff shape (MA-0918 green-hag twin contrast) 2026-09-27",
+      "date": "2026-09-27"
+    }
+  },
+  "Seahorse": {
+    "monsterIndex": "seahorse",
+    "placedIn": "EB join Seahorse x1 (test-campaign)",
+    "config": {
+      "name": "Seahorse 1",
+      "verifiedRow": "MA-1450 FAIL(a) Bubble Dash junk +0 chip fires bogus to-hit (MonsterAction.jsx:383/408 attack_bonus!=null passes 0; MA-1223 twin); fix strip + advisory:bubble_dash 2026-09-27"
+    }
+  },
+  "Shadow": {
+    "monsterIndex": "shadow",
+    "placedIn": "EB join Shadow x1 + Bandit clean-necrotic victim",
+    "config": {
+      "name": "Shadow 1",
+      "verifiedRow": "MA-1451 FAIL(a) Draining Swipe: core +4/1d6+2 Necrotic exact (fd==|hpD|) but STR-drain 1d4 zero state - rider fields absent + no ability-drain consumer seam app-wide 2026-09-27"
+    }
+  },
+  "Shadow Demon": {
+    "monsterIndex": "shadow-demon",
+    "placedIn": "EB join Shadow Demon x1 + Bandit clean-psychic victim (HP999)",
+    "config": {
+      "name": "Shadow Demon 1",
+      "verifiedRow": "MA-1452 PASS Umbral Claw +5: hits 21/19, miss 7/9 vs AC12, crit nat20 3d8x2+3 fd11 flat-not-doubled, 3d8+3 fd==|hpD| exact 2026-09-27"
+    }
+  },
+  "Shadow Dragon": {
+    "monsterIndex": "shadow-dragon",
+    "placedIn": "EB join Shadow Dragon x1 (cs idx0 AC16 init26) + Bandit 1/2 AC12 hp935 staged; board admin-cleared 2026-09-27 post-MA-1455",
+    "config": {
+      "name": "Shadow Dragon 1",
+      "verifiedRow": "MA-1453 PASS-subset Multiattack header TEXT exact + generic +10 chip; Rend x3 components: nat20crit 2d6*2+5=13+1d6 12 hpD25; nat6 14+5 hpD19; nat11 11+6 hpD17; unconditional 1d6 rider correct (no gate field, vs MA-1444 gated twin); count GM-adjudicated 2026-09-27 | MA-1454 PASS Rend: rider 4/4 (100%), nat2=12 tie boundary, legs 2d6+5+1d6 fd==hpD exact (init reused) | MA-1455 PASS Shadow Breath cone-save: picker 60-ft Cone DC17 DEX opens (breathAoeShape parse); fire1 fail-full B2 nat16 raw-d20 fd37==|hpD| (935-898), B1 nat9 fd36 (935-899); recharge refused popup+shadow_breath not-recharged log+spent class; recovery d6:2 fail r2, d6:5 recharged r3; fire2 dex+19 rig save-half B2 37->18=floor, B1 46->23=floor, hpD exact; recharge re-spend stamp; corpse-summon clause grep-zero advisory; console 0 err; admin clear cd+log 2026-09-27 | MA-1455 PASS Shadow Breath AoE cone DC17 DEX: full 10d6 fails, half floor exact successes (saveBonuses.dexterity:19 rig), recharge spend/refusal/recovery d6 all live; summon clause advisory grep-zero 2026-09-27 | MA-1456 FAIL(a) Pounce legendary header-swallow: no header row, rows[0] Pounce becomes non-clickable header (monsterLegendaryUses.js:153, MonsterCardBody slice(1)); legendary chip rides Veil w/o delegates_to -> MA-0510 silent burn; economy gate+regain themselves LIVE 2026-09-27 | MA-1457 FAIL(b) Veil of Shadow: legendary chip burns shared counter w/o delegates_to/numeric transport, zero 3d6 damage (MA-0510); refusal+regain live; root shared MA-1456 header-swallow 2026-09-27"
+    }
+  },
+  "Shambling Mound": {
+    "monsterIndex": "shambling-mound",
+    "placedIn": "EB join Shambling Mound x1 (110hp init16) + Bandit clean bludgeoning/lightning victim HP999 (initiative preserved after MA-1458)",
+    "config": {
+      "name": "Shambling Mound 1",
+      "verifiedRow": "MA-1458 PASS-subset Multiattack header verbatim + generic +7; Charged Tendril legs exact nat5 tie 1d6+4+2d4 hpD7 rider always-rides correct; Engulf chip DC15 STR renders unfired; Engulf-not-spell replace GM-adjudicated 2026-09-27 | MA-1459 FAIL(a) Charged Tendril: core+2d4 rider 9/9 exact incl nat20 crit both-dice; pull-5ft clause zero-state (parsePullClause grep-zero; MA-1451 standard) 2026-09-27 | MA-1460 FAIL(a) Engulf: DC15 STR + all 3 conditions fail-only correct, BUT half-damage leaks on save success (nat19 paid 5) - dc_success:none missing; recurring tick absent = accepted grapple residual; immediate pool on fail = MA-0771 model 2026-09-27"
+    }
+  },
+  "Shield Guardian": {
+    "monsterIndex": "shield-guardian",
+    "placedIn": "EB join Shield Guardian x1 (HP142 init9) + Bandit victim HP999 (initiative preserved; refill 999 before reuse)",
+    "config": {
+      "name": "Shield Guardian 1",
+      "verifiedRow": "MA-1461 PASS-subset Multiattack header verbatim; Fist x2 independent: 2d6+4 blunt + 2d6 force riders, sumFd37==sumhpD37 vs AC12 nat13/18 2026-09-27 | MA-1462 PASS Fist: rider 5/5, crit x2 both pools doubled +4 flat, boundary nat5=12 hit nat3=10 miss (Bandit 848/999 after) | MA-1463 FAIL(b) Protection: plain-text reaction row, zero affordance, amulet grep-zero; initiative cleared after 2026-09-27"
+    }
+  },
+  "Shrieker": {
+    "monsterIndex": "shrieker",
+    "placedIn": "EB join Shrieker x1 + Bandit witness (cleared after)",
+    "config": {
+      "name": "Shrieker 1",
+      "verifiedRow": "MA-1464 PASS-subset Shriek flavor-only honest plain-text row, chips [], junk-+0 fingerprint absent, grep-zero consumers 2026-09-27"
+    }
+  },
+  "Shrieker Fungus": {
+    "monsterIndex": "shrieker-fungus",
+    "placedIn": "EB join Shrieker Fungus x1 + Bandit witness (cleared after)",
+    "config": {
+      "name": "Shrieker Fungus 1",
+      "verifiedRow": "MA-1465 PASS-subset Shriek flavor-only plain-text reaction, zero affordance, grep-zero 2026-09-27"
+    }
+  },
+  "Silver Dragon Wyrmling": {
+    "monsterIndex": "silver-dragon-wyrmling",
+    "placedIn": "EB join Silver Dragon Wyrmling x1 (hp45 init14) + Bandit 1/2 (Bandit 2 joined MA-1468 rig, HP999 trusted-fill); board admin-cleared cd+log 2026-09-27 post-MA-1468",
+    "config": {
+      "name": "Silver Dragon Wyrmling 1",
+      "verifiedRow": "MA-1466 PASS-subset Multiattack header verbatim zero-chip; Rend x2: nat11=17 fd9, nat19=25 fd11, 1d10+4 Piercing hpD exact 2026-09-27 | MA-1467 PASS Rend: 4 hits fd==hpD 13/7/13/11, nat1 crit-miss zero-dmg (Bandit 955 after) | MA-1468 PASS Cold Breath cone DC13 CON 4d8: picker '15-ft Cone' opens from range parse; fail-full x3 nat7/1/5 fd 19/22/12 hpD exact; success nat18 fd 9=floor(19/2) exact; recharge spend ability_use + refusal cold_breath_refused popup 'Not Recharged' + mc-dice-link-spell-spent + d6:3 recharge_failed -> d6:5 recharged @turn-start + spent-class clear + fire2 re-spend stamp; dcSuccess half default RAW-correct; §96 picker reads full-word constitution -> abbrev con raw-d20 seam documented, faces natural across 2 fires; admin clear cd+log 0/0 2026-09-27 | MA-1469 FAIL(a) Paralyzing Breath: flat Incapacitated+Paralyzed both on first fail, no staged_paralysis/dc_success fields (MA-0248 template monsters.json:4648 = two-field data twin fix); ladder never repeats 2026-09-27"
+    }
+  },
+  "Skeleton": {
+    "monsterIndex": "skeleton",
+    "placedIn": "EB join Skeleton x1 (AC14 init8) + Bandit victim HP999 (initiative preserved after MA-1470, Bandit 890)",
+    "config": {
+      "name": "Skeleton 1",
+      "verifiedRow": "MA-1470 PASS Shortsword +5: 19 hits 1d6+3 Piercing fd==hpD sum109, boundary nat6=11 miss/nat7=12 tie, 8 miss zero-dmg 2026-09-27 | MA-1471 PASS Shortbow ranged +5: 3 hits 1d6+3 sum20==hpD, 2 miss zero, gridless band advisory (Bandit 979 after)"
+    }
+  },
+  "Slaad Tadpole": {
+    "monsterIndex": "slaad-tadpole",
+    "placedIn": "EB join Slaad Tadpole x1 + Bandit victim (cleared after MA-1472)",
+    "config": {
+      "name": "Slaad Tadpole 1",
+      "verifiedRow": "MA-1472 PASS Bite +4: 4 hits 1d6+2 Piercing fd==hpD, miss zero (2026-09-27)"
+    }
+  },
+  "Smoke Mephit": {
+    "monsterIndex": "smoke-mephit",
+    "placedIn": "EB join Smoke Mephit x1 + Bandit victim HP999 (initiative preserved; Bandit 942)",
+    "config": {
+      "name": "Smoke Mephit 1",
+      "verifiedRow": "MA-1473 PASS Claw +4: 12 hits 1d4+2 Slashing, boundary nat7 miss/nat8 tie-hit, 3 crits dice-only doubled (2026-09-27) | MA-1474 PASS-subset Cinder Breath DC11 DEX: blinded fail-only 6/6, success zero grants, anchor durationNote advisory no machine clock (residual family)"
+    }
+  },
+  "Solar": {
+    "monsterIndex": "solar",
+    "placedIn": "EB join Solar x1 (hp297 idx0) + Bandit victim (initiative preserved; Bandit 962)",
+    "config": {
+      "name": "Solar 1",
+      "verifiedRow": "MA-1475 PASS-subset Multiattack header zero-chip; Flying Sword numeric +15 4d6+8+8d8 radiant fd37 exact; Slaying Bow save-row prose-damage advisory 2026-09-27 | MA-1476 PASS Flying Sword: 4 fires legs exact, crit 4d6*2+8+8d8*2 fd116; no damage_dice_ranged chooser by design; return clause advisory (Bandit 704 after) | MA-1477 FAIL(b) Slaying Bow: DC21 DEX adjudicates but instakill<=100 + both prose dice pools inert (no structured fields; HP50 and HP999 zero-delta); fix 4d8+6/8d8/hp_threshold_kill:100/dc_success:none; initiative cleared after 2026-09-27 | MA-1478 FAIL(b) Spellcasting zero-chips MA-0421: plain-text spell names unmarked, no dice-link-spell affordances, numeric dc25 never renders on Spellcasting row; fix strong-markup 5 names 2026-09-27 | MA-1479 FAIL(b) Blinking Gaze legendary header-swallow MA-1456 twin: rows[0] uses:1 no header -> swallowed div mc-legendary-header-row no-onClick, slice(1) drops row, zero legendary/save chips, header-click zero-delta, change-data empty, Bandit never Blinded, DC25 CON never adjudicated, console 0; extra axes prose-only DC+missing save_type (MA-0614) + Failure-or-Success picker-only (MA-0590); fix header insert uses:2 + save_dc:25+save_type Constitution; admin clear cd+log 2026-09-27 | MA-1480 FAIL(a) Radiant Teleport legendary: chip rides gate+burns use, 2d10 paid FULL unhalved no DC/save (prose-only dc25, no save_dc field; one-field fix); emanation single-target MA-0317 residual; initiative cleared after 2026-09-27"
+    }
+  },
+  "Spectator": {
+    "monsterIndex": "spectator",
+    "placedIn": "EB join Spectator + Bandit(s); initiative admin-cleared after MA-1488 block",
+    "config": {
+      "name": "Spectator 1",
+      "verifiedRow": "MA-1481 PASS-subset Multiattack header zero-chip; rays fired x2 ungated GM-adjudicated; Eye Rays launcher rays[] ABSENT (separate defect lane gazer MA-0765 twin fix) 2026-09-27 | MA-1482 PASS Bite +4: 29 hits 1d6+2 Piercing, boundary 12/11 both faces, 5 crits dice-only (Bandit 818 after) | MA-1484 FAIL(a) Confusion Ray: DC12 WIS + 2d4 fail-full + no_reactions te rounds:2 LIVE, BUT half-leak on RAW-silent successes (half 2/3 paid) - dc_success:none fix (Bandit 985 after) | MA-1486 FAIL(a) Fear Ray: half-leak success (same dc_success:none fix as MA-1484); fail-face full 2d4 + frightened exact; Bandit1 985/Bandit2 986 after | MA-1487 PASS Wounding Ray DC12 CON half-on-save exact both faces (4 fires, dc_success half RAW-correct here) | MA-1488 FAIL(a) Spell Reflection: ungated save chip (no automation.effect), fires 5x any time, half-leak 3/3; DATA fix dc_success:none + reaction gate | SPECTATOR BLOCK DONE, cleared 2026-09-27"
+    }
+  },
+  "Specter": {
+    "monsterIndex": "specter",
+    "placedIn": "EB join Specter x1 + Bandit victim (cleared after MA-1489)",
+    "config": {
+      "name": "Specter 1",
+      "verifiedRow": "MA-1489 FAIL(a) Life Drain: core +4 2d6 exact, HP-max-reduce rider zero-state (hpMaxReduction consumers reset-only, zero producers; no te/parser) 2026-09-27"
+    }
+  },
+  "Sphinx of Lore": {
+    "monsterIndex": "sphinx-of-lore",
+    "placedIn": "EB join Sphinx of Lore x1 (170hp init29) + Bandit victim 987 (initiative preserved)",
+    "config": {
+      "name": "Sphinx of Lore 1",
+      "verifiedRow": "MA-1490 PASS-subset Multiattack header zero-chip; Claw +8 3d6+4: hit nat18 fd12 exact, miss nat3 zero (2026-09-27) | MA-1491 PASS Claw +8 3d6+4: 4 hits fd==hpD 16/14/17/9 (Bandit 943 after) | MA-1492 FAIL(a) Mind-Rending Roar: fail-face 10d6 full + incapacitated exact, recharge fully gated, BUT half-leak on successes (dc_success:none fix); emanation picker MA-0590 parses (Bandit 926 Incap after) | MA-1494 FAIL(b) Arcane Prowl header-swallow MA-1456/1479 twins: rows[0] non-clickable header, Expend chip rides WoY silent-burn MA-0510; economy honest; fix header uses:2 + delegates_to Claw"
+    }
+  },
+  "Sphinx of Secrets": {
+    "monsterIndex": "sphinx-of-secrets",
+    "placedIn": "EB join Sphinx of Secrets x1 (136hp init23) + Bandit victim 959 (initiative preserved)",
+    "config": {
+      "name": "Sphinx of Secrets 1",
+      "verifiedRow": "MA-1496 PASS-subset Multiattack header zero-chip; Claw +7 2d8+4+2d6 radiant: hit20 fd16, nat20 crit fd24 exact; Curse chip DC15 INT renders 2026-09-27 | MA-1497 PASS Claw +7: rider 3/3, boundary miss nat4=11, hpD==legs (Bandit 944 after) | MA-1498 FAIL(a) Curse of the Riddle: DC15 INT + full 6d6 + cursed condition LIVE, half-leak on success dc_success:none fix; riddle behavior clauses zero-consumer advisory; board rebuilt post-clear (Bandit 999 armed) | MA-1499 FAIL(b) Spellcasting zero-chips MA-1478/1493 twin (plain-text names; fix markup); initiative left live Sphinx/Bandit999 2026-09-27"
+    }
+  },
+  "Sphinx of Valor": {
+    "monsterIndex": "sphinx-of-valor",
+    "placedIn": "EB join Sphinx of Valor x1 (199hp) + Bandit victim 954 (initiative preserved w/ Sphinx of Secrets still present)",
+    "config": {
+      "name": "Sphinx of Valor 1",
+      "verifiedRow": "MA-1500 PASS-subset Multiattack header; Claw +12 4d6+6 x2 exact (fd23/22); Roar 3/Day inert-as-authored, staged siblings DC20 chips render 2026-09-27 | MA-1501 PASS Claw +12: 4 hits 4d6+6 fd==hpD, miss impossible vs AC12 documented (Bandit 929 after) | MA-1502 FAIL(b) Roar launcher dead MA-1483 fingerprint: uses 3/Day string never parsed, no staged_roar, zero affordance/counter; fix MA-0268 template | MA-1503 PASS-subset First Roar DC20 WIS: frightened fail-only 6 grants, zero success-grants (Cleric prompt seam 22), damageless clean; anchor clock residual documented | MA-1504 PASS-subset Second Roar DC20 WIS: flat paralyzed fail-only exact (RAW no first-stage ladder), success zero grants (Cleric 20 nat seam), repeat-save prose advisory §70; Bandit+Cleric paralyzed live | MA-1505 PASS Third Roar DC20 CON: nat20 success half floor30 no-prone, fail 43 full prone granted; initiative cleared after (re-join for MA-1506 spellcasting) | MA-1507 FAIL(b) Arcane Prowl header-swallow MA-1494 twin (rows[0] uses:1 swallowed, Expend rides WoY silent-burn); initiative live Valor/Bandit11 after"
+    }
+  },
+  "Sphinx of Wonder": {
+    "monsterIndex": "sphinx-of-wonder",
+    "placedIn": "EB join Sphinx of Wonder x1 + Bandit victim 917; cd+log cleared after MA-1510 (initiative combatants remain placed)",
+    "config": {
+      "name": "Sphinx of Wonder 1",
+      "verifiedRow": "MA-1509 PASS Rend +5: rider 6/6, crit 1d4*2+3+4d6 fd27, miss nat3 zero; legs exact 2026-09-27 | MA-1510 FAIL(b) Burst of Ingenuity zero-affordance plain-text, 2/Day string unparsed, grep-zero; fix advisory sentinel or gated +2 channel"
+    }
+  },
+  "Spider": {
+    "monsterIndex": "spider",
+    "placedIn": "EB join Spider x1 + Bandit victim 983 (initiative preserved)",
+    "config": {
+      "name": "Spider 1",
+      "verifiedRow": "MA-1511 PASS Bite +4: flat1 never-doubles + 1d4 poison 5/5, boundary 12/11 both faces (Bandit 983) 2026-09-27"
+    }
+  },
+  "Spined Devil": {
+    "monsterIndex": "spined-devil",
+    "placedIn": "EB join Spined Devil x1 (45hp init7) alongside Spider+Bandit 967 (initiative preserved)",
+    "config": {
+      "name": "Spined Devil 1",
+      "verifiedRow": "MA-1512 PASS-subset Multiattack header zero-chip; Fork 1d6+2+1d6 fire fd8, Tail Spine 1d4+2+1d6 fire fd8 exact vs AC12 2026-09-27 | MA-1513 PASS Infernal Fork: 22 hits rider 100%, boundary 12/11, crit both-pools +2 flat, hpD797 after | MA-1514 PASS Tail Spine ranged: 25 hits rider 100%, 3 crits, boundary both faces; block cleared after"
+    }
+  },
+  "Spirit Naga": {
+    "monsterIndex": "spirit-naga",
+    "placedIn": "EB join Spirit Naga x1 (135hp) + Bandit victim 968 (initiative preserved)",
+    "config": {
+      "name": "Spirit Naga 1",
+      "verifiedRow": "MA-1515 PASS-subset Multiattack header zero-chip; Bite +7 1d6+4+4d6 poison fd15, Necrotic Ray +6 6d6 tie-hit fd16 exact 2026-09-27 | MA-1516 PASS Bite: 4 hits rider 4d6 poison 100%, crit fd42 both-pools, miss nat2; Bandit 853 after | MA-1517 PASS Necrotic Ray +6 6d6: 26 hits hpD==fd, boundary nat6=12, 6 miss zero (Bandit 438 after; block continues) | MA-1518 PASS-subset Spellcasting cured MA-0421 markup: 8 chips, at-will free, 2/Day gate counts+refuses exact (LB 9d6 level-version advisory residual); board reset after"
+    }
+  },
+  "Sprite": {
+    "monsterIndex": "sprite",
+    "placedIn": "EB join Sprite x1 + Bandit victim 914 (initiative preserved)",
+    "config": {
+      "name": "Sprite 1",
+      "verifiedRow": "MA-1519 PASS Needle Sword +6: 12 hits 1d4+4, 2 crits dice-only, boundary nat6=12, miss nat3 (Bandit 914) 2026-09-27 | MA-1520 FAIL(a) Enchanting Bow: flat-1 hits exact but charmed zero-state (hit_conditions unauthored MA-0010 seam); fix hit_conditions:[charmed]; sprite block continues | MA-1521 PASS-subset Heart Sight DC10 CHA chip honest adjudication both faces, info-only zero-state RAW-correct; block continues | MA-1522 FAIL(b) Invisibility plain-text zero-affordance (MA-1019 shape fix); sprite block done, board cleared"
+    }
+  },
+  "Spy": {
+    "monsterIndex": "spy",
+    "config": {
+      "name": "Spy 1",
+      "verifiedRow": "MA-1523 PASS Shortsword +4: 8 hits rider 2d6 poison unconditional 100%, boundary 11 miss x2, hpD907 exact 2026-09-27 | MA-1524 PASS Hand Crossbow ranged +4: 34 hits rider 100%, 3 crits flat+2 kept, board cleared (Spy Master next)"
+    },
+    "placedIn": "(board cleared after MA-1524; re-join for any reuse)"
+  },
+  "Spy Master": {
+    "monsterIndex": "spy-master",
+    "config": {
+      "name": "Spy Master 1",
+      "verifiedRow": "MA-1525 PASS-subset Multiattack header zero-chip; Rapier +9 2d8+5+2d6 poison fd21, HC +9 2d6+5+2d8 fd24 exact 2026-09-27 | MA-1526 PASS Rapier +9 2d8+5+2d6 poison: rider unconditional 3/3 hits, nat2 miss, hpD945 | MA-1527 PASS Hand Crossbow ranged +9: 3 hits rider 2d8 100%, boundary nat3=12 tie-hit, gridless lenient; next MA-1528 = Smoke Bomb | MA-1528 PASS Smoke Bomb AoE DC16 CON: 9 fires, 6 fails FULL 8d6+Blinded granted, 3 saves floor-half, board cleared"
+    },
+    "placedIn": "(board cleared after MA-1528)"
+  },
+  "Steam Mephit": {
+    "monsterIndex": "steam-mephit",
+    "config": {
+      "name": "Steam Mephit 1",
+      "verifiedRow": "MA-1529 PASS Claw +2: hit fd6 1d4+1d4 rider unconditional, 3 miss zero; continues 2026-09-28 | MA-1530 FAIL(a) Steam Breath: 2d4 fire full/half exact but Speed-10 fail-rider zero-state (prose-only, no producer; MA-1451 std)"
+    },
+    "placedIn": "(board cleared after MA-1530)"
+  },
+  "Stirge": {
+    "monsterIndex": "stirge",
+    "placedIn": "(board cleared after MA-1531)",
+    "config": {
+      "name": "Stirge 1",
+      "verifiedRow": "MA-1531 FAIL(a) Proboscis: core 1d6+3 piercing exact both faces+crit, but attach+start-turn 2d4 necrotic tick zero-state (darkmantle hit_target_effect byte-shape fix, consumer grep-zero); board cleared 2026-09-28"
+    }
+  },
+  "Stone Giant": {
+    "monsterIndex": "stone-giant",
+    "config": {
+      "name": "Stone Giant 1",
+      "verifiedRow": "MA-1532 PASS-subset Multiattack header zero-chip; Stone Club +9 3d10+6 fd26, Boulder +9 2d8+6 fd11 exact, Prone ungated record-only; continues 2026-09-28 | MA-1533 PASS Stone Club +9 3d10+6: 27 hits hpD==legs, crit fd64 dice-doubled +6 kept, boundary nat3=12, miss nat<=2 (Bandit 369) | MA-1534 FAIL(a) Boulder: core 2d8+6 exact 48 hits+3crit, Prone zero-state (hit_conditions unauthored MA-1116 shape); block cleared | MA-1535 PASS-subset Deflect Missile: DC17 DEX honest both faces (fail 14 full, save floor4), Force core exact, recharge 5-6 honest GM-gated; block cleared"
+    },
+    "placedIn": "(board cleared after MA-1534)"
+  },
+  "Stone Golem": {
+    "monsterIndex": "stone-golem",
+    "placedIn": "(session-end; last live: Stone Golem 1 220hp init13 + Bandit 958)",
+    "config": {
+      "name": "Stone Golem 1",
+      "verifiedRow": "MA-1536 PASS-subset Multiattack header zero-chip; Slam +10 2d8+6+2d8 force fd22, Force Bolt +9 4d10 fd19 exact; session halted here 2026-09-28"
     }
   }
 }

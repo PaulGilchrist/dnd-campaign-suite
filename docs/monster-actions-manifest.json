@@ -24383,7 +24383,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1442",
@@ -24404,7 +24404,7 @@
       "range": "150/600 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +4, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1443",
@@ -24423,7 +24423,7 @@
       "range": "",
       "recharge": "",
       "description": "The scout makes two attacks, using Shortsword or Longbow in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1444",
@@ -24446,7 +24446,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage, plus 10 (3d6) Piercing damage if the attack was made with Advantage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1444-shortsword.md"
     },
     {
       "id": "MA-1445",
@@ -24469,7 +24469,7 @@
       "range": "150/600 ft.",
       "recharge": "",
       "description": "Ranged Attack Roll: +5, range 150/600 ft. Hit: 7 (1d8 + 3) Piercing damage, plus 10 (3d6) Piercing damage if the attack was made with Advantage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1445-longbow.md"
     },
     {
       "id": "MA-1446",
@@ -24482,7 +24482,7 @@
       "actionType": "other",
       "trigger": "The scout is hit by an attack roll",
       "description": "The scout halves the damage (round down) it takes from that attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1447",
@@ -24503,7 +24503,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1448",
@@ -24527,7 +24527,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 11, one Frightened creature the hag can see within 30 feet. Failure: If the target has 20 Hit Points or fewer, it drops to 0 Hit Points. Otherwise, the target takes 13 (3d8) Psychic damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1448-death-glare.md"
     },
     {
       "id": "MA-1449",
@@ -24546,7 +24546,7 @@
       "range": "",
       "recharge": "",
       "description": "The hag casts Disguise Self, using Constitution as the spellcasting ability (spell save DC 13). The spell's duration is 24 hours.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1449-illusory-appearance.md"
     },
     {
       "id": "MA-1450",
@@ -24565,7 +24565,7 @@
       "range": "",
       "recharge": "",
       "description": "While underwater, the seahorse moves up to its Swim Speed without provoking Opportunity Attacks.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1450-bubble-dash.md"
     },
     {
       "id": "MA-1451",
@@ -24586,7 +24586,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Necrotic damage, and the target's Strength score decreases by 1d4. The target dies if this reduces that score to 0. If a Humanoid is slain by this attack, a Shadow rises from the corpse 1d4 hours later.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1451-draining-swipe.md"
     },
     {
       "id": "MA-1452",
@@ -24607,7 +24607,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 16 (3d8 + 3) Psychic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1453",
@@ -24626,7 +24626,7 @@
       "range": "",
       "recharge": "",
       "description": "The dragon makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1454",
@@ -24649,7 +24649,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 12 (2d6 + 5) Slashing damage plus 3 (1d6) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1455",
@@ -24670,7 +24670,7 @@
       "range": "",
       "recharge": "5-6",
       "description": "Dexterity Saving Throw: DC 17, each creature in a 60-foot Cone. Failure: 35 (10d6) Necrotic damage. Success: Half damage. Failure or Success: A Humanoid reduced to 0 Hit Points by this damage dies, and a Shadow rises from the corpse. The shadow is under the dragon's control and shares the dragon's Initiative count but acts immediately after the dragon.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1456",
@@ -24684,7 +24684,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The dragon moves up to half its Speed, and it makes one Rend attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1456-pounce.md"
     },
     {
       "id": "MA-1457",
@@ -24698,7 +24698,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The dragon uses Shadow Stealth, and one creature of its choice that it can see within 10 feet of it takes 10 (3d6) Necrotic damage. The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1457-veil-of-shadow.md"
     },
     {
       "id": "MA-1458",
@@ -24717,7 +24717,7 @@
       "range": "",
       "recharge": "",
       "description": "The shambling mound makes three Charged Tendril attacks. It can replace one attack with a use of Engulf.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1459",
@@ -24740,7 +24740,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 7 (1d6 + 4) Bludgeoning damage plus 5 (2d4) Lightning damage. If the target is a Medium or smaller creature, the shambling mound pulls the target 5 feet straight toward itself.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1459-charged-tendril.md"
     },
     {
       "id": "MA-1460",
@@ -24766,7 +24766,7 @@
         "restrained"
       ],
       "description": "Strength Saving Throw: DC 15, one Medium or smaller creature within 5 feet. Failure: The target is pulled into the shambling mound's space and has the Grappled condition (escape DC 14). Until the grapple ends, the target has the Blinded and Restrained conditions, and it takes 10 (3d6) Lightning damage at the start of each of its turns. When the shambling mound moves, the Grappled target moves with it, costing it no extra movement. The shambling mound can have only one creature Grappled by this action at a time.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1460-engulf.md"
     },
     {
       "id": "MA-1461",
@@ -24785,7 +24785,7 @@
       "range": "",
       "recharge": "",
       "description": "The guardian makes two Fist attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1462",
@@ -24808,7 +24808,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1463",
@@ -24821,7 +24821,7 @@
       "actionType": "other",
       "trigger": "An attack roll hits the wearer of the guardian's amulet while the wearer is within 5 feet of the guardian",
       "description": "The wearer gains a +5 bonus to AC, including against the triggering attack and possibly causing it to miss, until the start of the guardian's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1463-protection.md"
     },
     {
       "id": "MA-1464",
@@ -24833,7 +24833,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "When bright light or a creature is within 30 feet of the shrieker, it emits a shriek audible within 300 feet of it. The shrieker continues to shriek until the disturbance moves out of range and for 1d4 of the shrieker's turns afterward",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1465",
@@ -24846,7 +24846,7 @@
       "actionType": "other",
       "trigger": "A creature or a source of Bright Light moves within 30 feet of the shrieker.",
       "description": "The shrieker emits a shriek audible within 300 feet of itself for 1 minute or until the shrieker dies.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1466",
@@ -24858,7 +24858,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes two Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1467",
@@ -24874,7 +24874,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 9 (1d10 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1468",
@@ -24893,7 +24893,7 @@
       "range": "15-foot Cone",
       "recharge": "5-6",
       "description": "Constitution Saving Throw: DC 13, each creature in a 15-foot Cone. Failure: 18 (4d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1469",
@@ -24913,7 +24913,7 @@
         "paralyzed"
       ],
       "description": "Constitution Saving Throw: DC 13, each creature in a 15-foot Cone. First Failure: The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1469-paralyzing-breath.md"
     },
     {
       "id": "MA-1470",
@@ -24929,7 +24929,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1471",
@@ -24945,7 +24945,7 @@
       "damageTypePrimary": "Piercing",
       "range": "80/320 ft.",
       "description": "Ranged Attack Roll: +5, range 80/320 ft. Hit: 6 (1d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1472",
@@ -24961,7 +24961,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1473",
@@ -24977,7 +24977,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1474",
@@ -24996,7 +24996,7 @@
         "blinded"
       ],
       "description": "Dexterity Saving Throw: DC 11, one creature the mephit can see within 15 feet. Failure: The target has the Blinded condition until the end of the mephit's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1475",
@@ -25008,7 +25008,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The solar makes two Flying Sword attacks. It can replace one attack with a use of Slaying Bow.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1476",
@@ -25027,7 +25027,7 @@
       "reach": "10 ft.",
       "range": "120 ft.",
       "description": "Melee or Ranged Attack Roll: +15, reach 10 ft. or range 120 ft. Hit: 22 (4d6 + 8) Slashing damage plus 36 (8d8) Radiant damage. Hit or Miss: The sword magically returns to the solar's hand or hovers within 5 feet of the solar immediately after a ranged attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1477",
@@ -25043,7 +25043,7 @@
       "saveEffect": "If the creature has 100 Hit Points or fewer, it dies. It otherwise takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
       "range": "600 feet",
       "description": "Dexterity Saving Throw: DC 21, one creature the solar can see within 600 feet. Failure: If the creature has 100 Hit Points or fewer, it dies. It otherwise takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1477-slaying-bow.md"
     },
     {
       "id": "MA-1478",
@@ -25058,7 +25058,7 @@
       "saveType": "Charisma",
       "saveEffect": "The solar casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 25): At Will: Detect Evil and Good; 1/Day Each: Commune, Control Weather, Dispel Evil and Good, Resurrection",
       "description": "The solar casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 25): At Will: Detect Evil and Good; 1/Day Each: Commune, Control Weather, Dispel Evil and Good, Resurrection",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1478-spellcasting.md"
     },
     {
       "id": "MA-1479",
@@ -25076,7 +25076,7 @@
         "blinded"
       ],
       "description": "Constitution Saving Throw: DC 25, one creature the solar can see within 120 feet. Failure: The target has the Blinded condition for 1 minute. Failure or Success: The solar can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1479-blinking-gaze.md"
     },
     {
       "id": "MA-1480",
@@ -25092,7 +25092,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The solar teleports up to 60 feet to an unoccupied space it can see. Dexterity Saving Throw: DC 25, each creature in a 10-foot Emanation originating from the solar at its destination space. Failure: 11 (2d10) Radiant damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1480-radiant-teleport.md"
     },
     {
       "id": "MA-1481",
@@ -25104,7 +25104,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The spectator uses Eye Rays twice.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1482",
@@ -25120,7 +25120,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1483",
@@ -25132,7 +25132,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The spectator randomly shoots one of the following magical rays at a target it can see within 90 feet of itself (roll 1d4; reroll if the spectator has already used that ray during this turn)",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1483-eye-rays.md"
     },
     {
       "id": "MA-1484",
@@ -25147,7 +25147,7 @@
       "saveType": "Wisdom",
       "saveEffect": "The target takes 5 (2d4) Psychic damage, and can't take Reactions until the end of its next turn. On its next turn, the target can't move, and it uses its action to make a melee or ranged attack against a randomly determined creature within range. If the target can't attack, it does nothing on that turn.",
       "description": "Wisdom Saving Throw: DC 12. Failure: 5 (2d4) Psychic damage, and the target can't take Reactions until the end of its next turn. On its next turn, the target can't move, and it uses its action to make a melee or ranged attack against a randomly determined creature within range. If the target can't attack, it does nothing on that turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1484-confusion-ray.md"
     },
     {
       "id": "MA-1485",
@@ -25183,7 +25183,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 12. Failure: 5 (2d4) Psychic damage, and the target has the Frightened condition until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1486-fear-ray.md"
     },
     {
       "id": "MA-1487",
@@ -25198,7 +25198,7 @@
       "saveType": "Constitution",
       "saveEffect": "The target takes 16 (3d10) Necrotic damage. Success: The target takes half damage.",
       "description": "Constitution Saving Throw: DC 12. Failure: 16 (3d10) Necrotic damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1488",
@@ -25214,7 +25214,7 @@
       "saveEffect": "The target takes 10 (3d6) Force damage.",
       "trigger": "The spectator succeeds on a saving throw against a spell, or a spell's attack roll misses it.",
       "description": "Dexterity Saving Throw: DC 12, one creature the spectator can see within 120 feet. Failure: 10 (3d6) Force damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1488-spell-reflection.md"
     },
     {
       "id": "MA-1489",
@@ -25230,7 +25230,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 7 (2d6) Necrotic damage. If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1489-life-drain.md"
     },
     {
       "id": "MA-1490",
@@ -25242,7 +25242,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The sphinx makes three Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1491",
@@ -25258,7 +25258,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 14 (3d6 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1492",
@@ -25278,7 +25278,7 @@
         "incapacitated"
       ],
       "description": "Wisdom Saving Throw: DC 16, each enemy in a 300-foot Emanation originating from the sphinx. Failure: 35 (10d6) Psychic damage, and the target has the Incapacitated condition until the start of the sphinx's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1492-mind-rending-roar.md"
     },
     {
       "id": "MA-1493",
@@ -25292,7 +25292,7 @@
       "saveDc": 16,
       "saveType": "Intelligence",
       "description": "The sphinx casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 16): At Will: Detect Magic, Identify, Mage Hand, Minor Illusion, Prestidigitation; 1/Day Each: Dispel Magic, Legend Lore, Locate Object, Plane Shift, Remove Curse, Tongues",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1493-spellcasting.md"
     },
     {
       "id": "MA-1494",
@@ -25306,7 +25306,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1494-arcane-prowl.md"
     },
     {
       "id": "MA-1495",
@@ -25321,7 +25321,7 @@
       "recharge": false,
       "uses": 1,
       "description": "Constitution Saving Throw: DC 16, one creature the sphinx can see within 120 feet. Failure: The target gains 1 Exhaustion level. While the target has any Exhaustion levels, it appears 3d10 years older. Failure or Success: The sphinx can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1495-weight-of-years.md"
     },
     {
       "id": "MA-1496",
@@ -25333,7 +25333,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The sphinx makes three Claw attacks. It can replace one attack with a use of Curse of the Riddle.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1497",
@@ -25351,7 +25351,7 @@
       "damageTypeSecondary": "Radiant",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Slashing damage plus 7 (2d6) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1498",
@@ -25367,7 +25367,7 @@
       "saveEffect": "The target takes 21 (6d6) Psychic damage and is cursed with a riddle. The cursed target has Disadvantage on ability checks and attack rolls. If it takes the Action, it must succeed on a DC 15 Intelligence saving throw or that action is wasted. The cursed target can take a Study action to make a DC 15 Intelligence check, solving the riddle and ending the curse on a success. The curse ends early if the sphinx curses another target.",
       "range": "60 feet",
       "description": "Intelligence Saving Throw: DC 15, one creature the sphinx can see within 60 feet. Failure: 21 (6d6) Psychic damage, and the target is cursed with a riddle. The cursed target has Disadvantage on ability checks and attack rolls. In addition, if it takes the Action, it must succeed on a DC 15 Intelligence saving throw or that action is wasted. The cursed target can take a Study action to make a DC 15 Intelligence check, solving the riddle and ending the curse on a success. The curse ends early if the sphinx curses another target.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1498-curse-of-the-riddle.md"
     },
     {
       "id": "MA-1499",
@@ -25381,7 +25381,7 @@
       "saveDc": 15,
       "saveType": "Intelligence",
       "description": "The sphinx casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 15): At Will: Detect Magic, Identify, Prestidigitation; 1/Day Each: Locate Object, Remove Curse",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1499-spellcasting.md"
     },
     {
       "id": "MA-1500",
@@ -25393,7 +25393,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The sphinx makes two Claw attacks and uses Roar.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1501",
@@ -25409,7 +25409,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +12, reach 5 ft. Hit: 20 (4d6 + 6) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1502",
@@ -25422,7 +25422,7 @@
       "actionType": "other",
       "uses": "3/Day",
       "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest)",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1502-roar.md"
     },
     {
       "id": "MA-1503",
@@ -25441,7 +25441,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1504",
@@ -25460,7 +25460,7 @@
         "paralyzed"
       ],
       "description": "Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1505",
@@ -25479,7 +25479,7 @@
         "prone"
       ],
       "description": "Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1506",
@@ -25493,7 +25493,7 @@
       "saveDc": 20,
       "saveType": "Wisdom",
       "description": "The sphinx casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20): At Will: Detect Evil and Good, Thaumaturgy; 1/Day Each: Detect Magic, Dispel Magic, Greater Restoration, Heroes' Feast, Zone of Truth",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1506-spellcasting.md"
     },
     {
       "id": "MA-1507",
@@ -25507,7 +25507,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1507-arcane-prowl.md"
     },
     {
       "id": "MA-1508",
@@ -25522,7 +25522,7 @@
       "recharge": false,
       "uses": 1,
       "description": "Constitution Saving Throw: DC 16, one creature the sphinx can see within 120 feet. Failure: The target gains 1 Exhaustion level. While the target has any Exhaustion levels, it appears 3d10 years older. Failure or Success: The sphinx can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1508-weight-of-years.md"
     },
     {
       "id": "MA-1509",
@@ -25540,7 +25540,7 @@
       "damageTypeSecondary": "Radiant",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 5 (1d4 + 3) Slashing damage plus 7 (2d6) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1510",
@@ -25554,7 +25554,7 @@
       "uses": "2/Day",
       "trigger": "The sphinx or another creature within 30 feet makes an ability check or a saving throw.",
       "description": "The sphinx adds 2 to the roll.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1510-burst-of-ingenuity.md"
     },
     {
       "id": "MA-1511",
@@ -25572,7 +25572,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 1 Piercing damage plus 2 (1d4) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1512",
@@ -25584,7 +25584,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The devil makes two attacks, using Infernal Fork and Tail Spine in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1513",
@@ -25602,7 +25602,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage plus 3 (1d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1514",
@@ -25620,7 +25620,7 @@
       "damageTypeSecondary": "Fire",
       "range": "20/80 ft.",
       "description": "Ranged Attack Roll: +4, range 20/80 ft. Hit: 4 (1d4 + 2) Piercing damage plus 3 (1d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1515",
@@ -25632,7 +25632,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The naga makes three attacks, using Bite or Necrotic Ray in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1516",
@@ -25650,7 +25650,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 7 (1d6 + 4) Piercing damage plus 14 (4d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1517",
@@ -25666,7 +25666,7 @@
       "damageTypePrimary": "Necrotic",
       "range": "60 ft.",
       "description": "Ranged Attack Roll: +6, range 60 ft. Hit: 21 (6d6) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1518",
@@ -25680,7 +25680,7 @@
       "saveDc": 14,
       "saveType": "Intelligence",
       "description": "The naga casts one of the following spells, requiring no Somatic or Material components and using Intelligence as the spellcasting ability (spell save DC 14): At Will: Detect Magic, Mage Hand, Minor Illusion, Water Breathing; 2/Day Each: Detect Thoughts, Dimension Door, Hold Person (level 3 version), Lightning Bolt (level 4 version)",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1519",
@@ -25696,7 +25696,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 6 (1d4 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1520",
@@ -25713,7 +25713,7 @@
         "charmed"
       ],
       "description": "Ranged Attack Roll: +6, range 40/160 ft. Hit: 1 Piercing damage, and the target has the Charmed condition until the start of the sprite's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1520-enchanting-bow.md"
     },
     {
       "id": "MA-1521",
@@ -25729,7 +25729,7 @@
       "saveEffect": "Failure: The sprite knows the target's emotions and alignment.",
       "range": "5 feet",
       "description": "Charisma Saving Throw: DC 10, one creature within 5 feet the sprite can see (Celestials, Fiends, and Undead automatically fail the save). Failure: The sprite knows the target's emotions and alignment.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1522",
@@ -25741,7 +25741,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The sprite casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1522-invisibility.md"
     },
     {
       "id": "MA-1523",
@@ -25759,7 +25759,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1524",
@@ -25777,7 +25777,7 @@
       "damageTypeSecondary": "Poison",
       "range": "30/120 ft.",
       "description": "Ranged Attack Roll: +4, range 30/120 ft. Hit: 5 (1d6 + 2) Piercing damage plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1525",
@@ -25789,7 +25789,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The spy makes three attacks, using Rapier or Hand Crossbow in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1526",
@@ -25807,7 +25807,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 14 (2d8 + 5) Piercing damage plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1527",
@@ -25825,7 +25825,7 @@
       "damageTypeSecondary": "Poison",
       "range": "30/120 ft.",
       "description": "Ranged Attack Roll: +9, range 30/120 ft. Hit: 12 (2d6 + 5) Piercing damage plus 9 (2d8) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1528",
@@ -25846,7 +25846,7 @@
         "blinded"
       ],
       "description": "The spy throws a bomb to a point it can see within 30 feet of itself. Constitution Saving Throw: DC 16, each creature in a 20-foot-radius Sphere centered on that point. Failure: 28 (8d6) Poison damage, and the target has the Blinded condition until the end of the spy's next turn. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1529",
@@ -25864,7 +25864,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 2 (1d4) Slashing damage plus 2 (1d4) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1530",
@@ -25882,7 +25882,7 @@
       "damageTypePrimary": "Fire",
       "range": "15-foot Cone",
       "description": "Constitution Saving Throw: DC 10, each creature in a 15-foot Cone. Failure: 5 (2d4) Fire damage, and the target's Speed decreases by 10 feet until the end of the mephit's next turn. Success: Half damage only. Failure or Success: Being underwater doesn't grant Resistance to this Fire damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1530-steam-breath.md"
     },
     {
       "id": "MA-1531",
@@ -25898,7 +25898,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage, and the stirge attaches to the target. While attached, the stirge can't make Proboscis attacks, and the target takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns. The stirge can detach itself by spending 5 feet of its movement. The target or a creature within 5 feet of it can detach the stirge as an action.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1531-proboscis.md"
     },
     {
       "id": "MA-1532",
@@ -25910,7 +25910,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The giant makes two attacks, using Stone Club or Boulder in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1533",
@@ -25926,7 +25926,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +9, reach 15 ft. Hit: 22 (3d10 + 6) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1534",
@@ -25945,7 +25945,7 @@
         "prone"
       ],
       "description": "Ranged Attack Roll: +9, range 60/240 ft. Hit: 15 (2d8 + 6) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1534-boulder.md"
     },
     {
       "id": "MA-1535",
@@ -25964,7 +25964,7 @@
       "recharge": "5-6",
       "trigger": "The giant is hit by a ranged attack roll and takes Bludgeoning, Piercing, or Slashing damage from it.",
       "description": "The giant reduces the damage it takes from the attack by 11 (1d10 + 6), and if that damage is reduced to 0, the giant can redirect some of the attack's force. Dexterity Saving Throw: DC 17, one creature the giant can see within 60 feet. Failure: 11 (1d10 + 6) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1536",
@@ -25976,7 +25976,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The golem makes two attacks, using Slam or Force Bolt in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1537",
