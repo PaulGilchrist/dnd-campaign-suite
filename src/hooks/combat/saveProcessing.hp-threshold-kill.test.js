@@ -207,3 +207,83 @@ describe('MA-0352 Deathly Wail HP-threshold kill seam', () => {
         expect(popup?.thresholdNote).toMatch(/Drops to 0 Hit Points/);
     });
 });
+
+// MA-1448: Sea Hag Death Glare — two-field DATA fix (hp_threshold_kill:20 +
+// dc_success:"none", MA-0352 Banshee byte-shape family) rides the same seam.
+import seaHagsMonsters from '../../../public/data/monsters.json';
+
+const SEA_HAG = 'Sea Hag 1';
+const glare = seaHagsMonsters.find(m => m.index === 'sea-hag').actions[1];
+
+const glareContext = {
+    saveDc: 11,
+    saveType: 'Wisdom',
+    attackerName: SEA_HAG,
+    actionName: 'Death Glare',
+    dcSuccess: glare.dc_success,
+    autoDamageFormula: glare.damage_dice_primary,
+    autoDamageDamageType: glare.damage_type_primary,
+    saveConditions: [],
+    hpThresholdKill: glare.hp_threshold_kill,
+};
+
+describe('MA-1448 Sea Hag Death Glare data lock + threshold seam', () => {
+    it('monsters.json row: hp_threshold_kill:20 + dc_success:"none", DC/damage/recharge untouched', () => {
+        expect(glare.name).toBe('Death Glare');
+        expect(glare.hp_threshold_kill).toBe(20);
+        expect(glare.dc_success).toBe('none');
+        expect(glare.save_dc).toBe(11);
+        expect(glare.save_type).toBe('Wisdom');
+        expect(glare.recharge).toBe('5-6');
+        expect(glare.damage_dice_primary).toBe('3d8');
+        expect(glare.damage_type_primary).toBe('Psychic');
+        expect(glare.description).toMatch(/If the target has 20 Hit Points or fewer, it drops to 0 Hit Points\./);
+    });
+
+    it('failed save, NPC victim 11 HP (≤20): drops to 0, clause logged, NO 3d8 damage rolled', async () => {
+        combatSummary.creatures = [{ name: 'Bandit 1', type: 'npc', currentHp: 11, maxHp: 11 }];
+        await processSaveRoll({
+            rollType: 'save',
+            target: { name: 'Bandit 1', type: 'npc' },
+            characterName: 'Bandit 1',
+            campaignName,
+            context: { ...glareContext },
+            bonus: -19,
+            r1: 3,
+            r2: 3,
+            effectiveD20: 3,
+            logEntry: vi.fn(),
+            setPopupHtml: vi.fn(),
+        });
+
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(11);
+        expect(rollExpression).not.toHaveBeenCalled();
+        const kill = addEntryLogs.find(e => e.automationType === 'hp_threshold_kill');
+        expect(kill).toBeTruthy();
+        expect(kill.characterName).toBe('Bandit 1');
+        expect(kill.sourceName).toBe(SEA_HAG);
+        expect(kill.abilityName).toBe('Death Glare');
+        expect(kill.description).toMatch(/11 Hit Points \(11 ≤ 20\).*drops to 0 Hit Points/s);
+    });
+
+    it('failed save, victim 999 HP (>20): full 3d8 through the normal damage leg, no threshold clause', async () => {
+        runtimeStore[`${TARGET}.currentHitPoints`] = 999;
+        await resolveSave({ ...glareContext }, false, 3);
+
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(10);
+        expect(rollExpression).toHaveBeenCalledWith('3d8');
+        expect(addEntryLogs.some(e => e.automationType === 'hp_threshold_kill')).toBe(false);
+    });
+
+    it('successful save at 11 HP: ZERO damage, no threshold kill (dc_success none, RAW success silent)', async () => {
+        runtimeStore[`${TARGET}.currentHitPoints`] = 11;
+        const popup = await resolveSaveCapturePopup({ ...glareContext }, true, 17);
+
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(0);
+        expect(addEntryLogs.some(e => e.automationType === 'hp_threshold_kill')).toBe(false);
+        expect(popup?.dcSuccess).toBe('none');
+    });
+});
