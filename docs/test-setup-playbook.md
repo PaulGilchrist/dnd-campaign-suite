@@ -1040,3 +1040,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1483 (2026-09-28, Spectator Eye Rays launcher FIXED) New pitfalls
 - §88 launcher conversion live: spectator.actions[2] `rays:[4 dicts]`+`save_dc:12`+`range:"90 ft."` arms d4 chooser `.mc-eye-ray-chooser` + eyeRaysUsed reroll-if-used latch (4 same-round presses = zero repeat, latch accumulates). Row DC stamps every synthesized ray.
 - No-damage ladder ray inside rays[] rides `ray.ladder:"paralyzed"` channel (zombie twin), NOT row-level staged_paralysis. dc_success per-ray harvested from own prose (none for condition-only rays, half for Wounding 3d10).
+
+## §MA-1488 (2026-09-28, Spectator Spell Reflection FIXED — spell-origin reaction gate) New pitfalls
+- SPELL-ORIGIN GATED REACTION seam LIVE (after guardian_protection MA-1463): automation{type:"reaction",trigger:"spell_miss_or_save_success",effect:"spell_reflection",saveType/saveDc/dcSuccess/damageExpression/damageType} + At Will/uses:999 → registry entry + RAW_EVENT_GATE_RESOLVERS flat-dispatcher leg + service monsterSpellReflection.js: gate = round latch → lastAttack spell-origin aimed at monster (MA-0013 seam, RAW wrapper) → (hit:false OR saveResult:'success') → uses → caster-active; refusals log-only `<slug>_refused`; gated row suppresses generic ActionSaveRoll/dice chips (MonsterAction.jsx, MA-0694 precedent — gate is sole press surface).
+- Save-success face: prompt "No damage on successful save" + spend honest; dc_success:none kills MV-20 half-leak live (dice roll, 0 applied).
