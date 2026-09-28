@@ -1051,3 +1051,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1494 (2026-09-28, Sphinx of Lore legendary block FIXED — header+delegates+WoY armed) Notes
 - §MA-1494: sphinx-of-lore header "Legendary Action Uses: 2" (N=children §231); Arcane Prowl delegates_to Claw; advisory fields WOULD suppress delegate numeric leg (§MA-1457 order) → teleport advisory folded into description only. Weight of Years save_dc:16/Constitution/dc_success:none — prose has NO success-pays clause ("Failure or Success:" tail attaches to reuse-limit only, MA-1058 discriminator); exhaustion rides MA-0751 canonical exhaustionLevel channel. MA-1495 numeric-DC leg COMPLETED by same-pass — verify-only next.
+
+## §MA-1502 (2026-09-28, Sphinx of Valor Roar launcher FIXED — generalized staged roar) New pitfalls
+- roarService generalized: row-authored `roar_stages:[...]` + `staged_roar:true` + numeric uses/maxUses (the `uses:"3/Day"` STRING = NaN null-gate) take precedence via resolveStageMechanic; androsphinx hardcoded ROAR_STAGES byte-inert. Nth-click-resolves-Nth-stage live: "First Roar (1 of 3)"…4th = Uses Exhausted + roar_refused. DC 20 stages ride payload save_dc.
