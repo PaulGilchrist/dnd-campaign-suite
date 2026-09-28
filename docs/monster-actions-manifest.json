@@ -25381,7 +25381,7 @@
       "saveDc": 15,
       "saveType": "Intelligence",
       "description": "The sphinx casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 15): At Will: Detect Magic, Identify, Prestidigitation; 1/Day Each: Locate Object, Remove Curse",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1499-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1500",
