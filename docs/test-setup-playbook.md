@@ -990,3 +990,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - monsterSelfBuff prose is effect-BRANCHED; 4th+ effect key pushes buildSelfBuffPopup past complexity 15 — hoist selfBuffPopupBody helper.
 - Self-buff At-Will twins (no uses) produce NO ability_use log — grant truth = automation/<effect>_granted + top-level targetEffects te.
 - invisible-only attack/cast enders (Modal:2060/2210) apply to `disguised` too; Disguise Self RAW has no attack/cast ender — duration clock only, documented designed-not-residual.
+
+## §MA-1450 (2026-09-28, Seahorse Bubble Dash FIXED — advisory) New pitfalls
+- Movement-row advisory fix keeps DC0 household noise — advisory hijack + MA-1071 >0 gate means row renders exactly one chip either way; chip census (not field presence) is render truth. Junk "+0" fingerprint total varies per press — judge by roll/attack name:<movement row> presence.

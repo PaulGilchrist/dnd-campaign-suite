@@ -54859,13 +54859,14 @@
       {
         "name": "Bubble Dash",
         "description": "While underwater, the seahorse moves up to its Swim Speed without provoking Opportunity Attacks.",
-        "attack_bonus": 0,
         "save_dc": 0,
         "save_type": "",
         "save_effect": "",
         "range": "",
         "reach": "",
-        "recharge": ""
+        "recharge": "",
+        "advisory": "bubble_dash",
+        "advisory_message": "moves up to its Swim Speed without provoking Opportunity Attacks while underwater — advisory record: self-movement and opportunity-attack suppression are GM-enforced, GM moves the token (no movement or opportunity-attack consumer app-wide, §70). No attack roll, no saving throw, no dice."
       }
     ],
     "bonus_actions": [],

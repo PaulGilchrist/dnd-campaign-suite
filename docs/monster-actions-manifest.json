@@ -24565,7 +24565,7 @@
       "range": "",
       "recharge": "",
       "description": "While underwater, the seahorse moves up to its Swim Speed without provoking Opportunity Attacks.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1450-bubble-dash.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1451",
