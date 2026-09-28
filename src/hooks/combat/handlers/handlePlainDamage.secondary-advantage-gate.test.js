@@ -217,6 +217,48 @@ describe('MA-0889 advantage-gated secondary rider', () => {
         });
     });
 
+    describe('MA-1444 Scout Captain Shortsword — same gate on "3d6" rider', () => {
+        function shortswordContext() {
+            return {
+                targetName: 'Bandit',
+                damageType: 'Piercing',
+                attackerName: 'Goblin Boss',
+                autoDamageSecondaryFormula: '3d6',
+                autoDamageSecondaryName: 'Shortsword',
+                autoDamageSecondaryDamageType: 'Piercing',
+                secondaryCondition: 'advantage',
+            };
+        }
+
+        async function rollShortsword(mode) {
+            stampForcedMode(mode);
+            applyDamageToTarget
+                .mockReturnValueOnce({ finalDamage: 8, newHp: 991, damageReduced: false })
+                .mockReturnValueOnce({ finalDamage: 6, newHp: 985, damageReduced: false });
+            const fn = createLogDamageAndShow(deps);
+            await fn({ name: 'Shortsword', formula: '1d6 + 3', total: 6, rolls: [3], modifier: 3, context: shortswordContext() });
+        }
+
+        it('normal hit — rider gated: primary-only apply, secondary_damage_skipped "no advantage"', async () => {
+            await rollShortsword(null);
+            expect(rollExpression).not.toHaveBeenCalledWith('3d6');
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+            expect(applyDamageToTarget.mock.calls[0][2]).toBe(6);
+            expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Piercing']);
+            const skipCall = addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
+            expect(skipCall?.reason).toBe('no advantage');
+            expect(skipCall?.abilityName).toBe('Shortsword');
+        });
+
+        it('advantage hit — rider rolls and pays primary + secondary', async () => {
+            await rollShortsword('advantage');
+            expect(rollExpression).toHaveBeenCalledWith('3d6');
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+            const skipped = addEntry.mock.calls.map(c => c[1]?.automationType);
+            expect(skipped).not.toContain('secondary_damage_skipped');
+        });
+    });
+
     describe('legacy always-roll rows unchanged (MA-0426/0531 byte-identical)', () => {
         it('secondaryCondition null on a normal hit — rider still rolls and applies', async () => {
             await rollScimitar(null, null);

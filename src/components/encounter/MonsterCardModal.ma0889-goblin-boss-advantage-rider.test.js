@@ -91,4 +91,21 @@ describe('MA-0889 Goblin Boss advantage-gated secondary rider', () => {
         const nullRow = { name: 'Bite', damage_dice_primary: '1d6' };
         expect(buildSecondaryDamageTransport(nullRow)).toEqual({ autoDamageSecondaryFormula: null, autoDamageSecondaryName: null, autoDamageSecondaryDamageType: null });
     });
+
+    it('MA-1444 data-lock: Scout Captain Shortsword actions[1] carries secondary_condition "advantage"', () => {
+        const scoutCaptain = monsters.find(m => m.index === 'scout-captain');
+        const row = scoutCaptain.actions[1];
+        expect(row.name).toBe('Shortsword');
+        expect(row.attack_bonus).toBe(5);
+        expect(row.damage_dice_primary).toBe('1d6 + 3');
+        expect(row.damage_type_primary).toBe('Piercing');
+        expect(row.damage_dice_secondary).toBe('3d6');
+        expect(row.damage_type_secondary).toBe('Piercing');
+        expect(row.secondary_condition).toBe('advantage');
+        expect(row.description).toContain('if the attack was made with Advantage');
+        const t = buildSecondaryDamageTransport(row, 'Shortsword');
+        expect(t.secondaryCondition).toBe('advantage');
+        expect(t.autoDamageSecondaryFormula).toBe('3d6');
+        expect(t.autoDamageSecondaryDamageType).toBe('Piercing');
+    });
 });

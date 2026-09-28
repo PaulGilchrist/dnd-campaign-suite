@@ -54525,7 +54525,8 @@
         "damage_dice_primary": "1d6 + 3",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "3d6",
-        "damage_type_secondary": "Piercing"
+        "damage_type_secondary": "Piercing",
+        "secondary_condition": "advantage"
       },
       {
         "name": "Longbow",

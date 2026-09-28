@@ -24446,7 +24446,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage, plus 10 (3d6) Piercing damage if the attack was made with Advantage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1444-shortsword.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1445",
