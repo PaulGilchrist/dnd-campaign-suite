@@ -57012,7 +57012,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The sphinx casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20): At Will: Detect Evil and Good, Thaumaturgy; 1/Day Each: Detect Magic, Dispel Magic, Greater Restoration, Heroes' Feast, Zone of Truth",
+        "description": "The sphinx casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20): <strong>At Will:</strong> <strong>Detect Evil and Good</strong>, <strong>Thaumaturgy</strong>; <strong>1/Day Each:</strong> <strong>Detect Magic</strong>, <strong>Dispel Magic</strong>, <strong>Greater Restoration</strong>, <strong>Heroes' Feast</strong>, <strong>Zone of Truth</strong>",
         "save_dc": 20,
         "save_type": "Wisdom"
       }

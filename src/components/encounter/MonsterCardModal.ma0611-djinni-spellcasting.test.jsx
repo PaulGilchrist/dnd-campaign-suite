@@ -256,7 +256,26 @@ const sosRow = sos.actions.find(a => a.name === 'Spellcasting');
 const SS_NAMES = ['Detect Magic', 'Identify', 'Prestidigitation', 'Locate Object', 'Remove Curse'];
 const SS_ONE_DAY = ['Locate Object', 'Remove Curse'];
 const SS_AT_WILL = ['Detect Magic', 'Identify', 'Prestidigitation'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES, ...SP_NAMES, ...SL_NAMES, ...SN_NAMES, ...SS_NAMES])];
+// MA-1506 sphinx-of-valor extension (exact MA-1478/MA-1493/MA-1499 triple-twin, same
+// MA-0421/MA-1327/MA-1339/MA-1478/MA-1493/MA-1499 markup-gap family): the WHOLE description
+// was plain text — names AND both tier headers unmarked → extractSpellNamesFromSpellcasting
+// [] → zero chips, 1/Day-EACH tracking structurally dead (§144 binds MARKED headers + names
+// only); the row carried zero clickable affordances. Fix = djinni MA-0611 byte-shape
+// <strong> wrap on the two tier headers + all seven names, separators ("; " / ", ") byte-kept
+// (single-line prose, no <br>/\n in this row — strip-tags byte-equality proves markup-only
+// diff; matches the committed MA-1478/MA-1493/MA-1499 byte-shape NOT <br> tier lines); the
+// numeric save_dc 20 + Wisdom pair was already authored (§89/§167 gate pre-met, untouched;
+// §676 XOR keeps the row DC unrendered as a chip). §158 trap INACTIVE: all seven names
+// byte-match BOTH spell indexes (straight-apostrophe "Heroes' Feast" is the disk-canonical
+// spelling in BOTH indexes), zero attack_type → cast-affordance only. Sphinxes share the
+// "The sphinx casts" lead-in with sphinx-of-lore (DC 16) and sphinx-of-secrets (DC 15) —
+// DC 20 + this exact 7-name list is grep-unique app-wide.
+const sv = monsters.find(m => m.index === 'sphinx-of-valor');
+const svRow = sv.actions.find(a => a.name === 'Spellcasting');
+const SV_NAMES = ['Detect Evil and Good', 'Thaumaturgy', 'Detect Magic', 'Dispel Magic', 'Greater Restoration', "Heroes' Feast", 'Zone of Truth'];
+const SV_ONE_DAY = ['Detect Magic', 'Dispel Magic', 'Greater Restoration', "Heroes' Feast", 'Zone of Truth'];
+const SV_AT_WILL = ['Detect Evil and Good', 'Thaumaturgy'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES, ...SP_NAMES, ...SL_NAMES, ...SN_NAMES, ...SS_NAMES, ...SV_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES, ...QT_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -299,6 +318,10 @@ const SN_PLAIN_ORIGINAL = 'The sphinx casts one of the following spells, requiri
 // ", " name separators, fully plain; the fix wraps ONLY the two tier headers + five spell
 // names in <strong>, so the stripped bytes must match this exactly.
 const SS_PLAIN_ORIGINAL = 'The sphinx casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 15): At Will: Detect Magic, Identify, Prestidigitation; 1/Day Each: Locate Object, Remove Curse';
+// Pre-fix sphinx-of-valor disk text — SINGLE-LINE prose with "; " tier separators and
+// ", " name separators, fully plain; the fix wraps ONLY the two tier headers + seven spell
+// names in <strong>, so the stripped bytes must match this exactly.
+const SV_PLAIN_ORIGINAL = 'The sphinx casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20): At Will: Detect Evil and Good, Thaumaturgy; 1/Day Each: Detect Magic, Dispel Magic, Greater Restoration, Heroes\' Feast, Zone of Truth';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -614,6 +637,17 @@ function renderSphinxOfSecrets() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: SOS_MONSTER_NAME, creatures })} />);
+}
+
+const SV_MONSTER_NAME = 'Sphinx of Valor 1';
+
+function renderSphinxOfValor() {
+  const m = makeMonster({ name: 'Sphinx of Valor', index: 'sphinx-of-valor', type: 'celestial', actions: [svRow] });
+  const creatures = [
+    { name: SV_MONSTER_NAME, type: 'npc', monsterType: 'celestial', targetName: 'Bandit', ac: 18, currentHp: 230, maxHp: 230, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: SV_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -2690,5 +2724,151 @@ describe('MA-1499 MonsterCardModal Sphinx of Secrets Spellcasting chips', () => 
     expect(abilityUseEntries('Locate Object').length).toBe(1);
     await act(async () => { fireEvent.click(linkByText('Remove Curse')); });
     await waitFor(() => expect(refusals('Remove Curse').length).toBe(1));
+  });
+});
+
+// ── MA-1506 data lock: Sphinx of Valor Spellcasting row ────────────────────────
+
+describe('MA-1506 monsters.json data lock: Sphinx of Valor Spellcasting row', () => {
+  it('extracts all seven spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(svRow.description);
+    expect(names).toEqual(SV_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day Each');
+  });
+
+  it('disk description carries all seven name-wrapped <strong> tokens in authored order', () => {
+    const d = svRow.description;
+    SV_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = SV_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day EACH to the five marked names; At Will names ungated (§57/§144)', () => {
+    const uses = extractSpellcastingSpellUses(svRow.description);
+    expect(uses).toEqual(Object.fromEntries(SV_ONE_DAY.map(n => [n, 1])));
+    expect(Object.keys(uses).length).toBe(5);
+    SV_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 20 + save_type Wisdom pair byte-untouched (§89/§167 gate pre-met; §676 XOR keeps DC unrendered)', () => {
+    expect(svRow.save_dc).toBe(20);
+    expect(svRow.save_type).toBe('Wisdom');
+    expect(svRow.description).toMatch(/\(spell save DC 20\)/);
+    expect('attack_bonus' in svRow).toBe(false);
+    expect('save_effect' in svRow).toBe(false);
+  });
+
+  it('emphasis census: ONLY the two tier headers + seven spell names carry <strong> — no <em>, no fake-chip decoys (§161)', () => {
+    const tokens = (svRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Detect Evil and Good</strong>', '<strong>Thaumaturgy</strong>', '<strong>1/Day Each:</strong>', '<strong>Detect Magic</strong>', '<strong>Dispel Magic</strong>', '<strong>Greater Restoration</strong>', '<strong>Heroes\' Feast</strong>', '<strong>Zone of Truth</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix SINGLE-LINE prose byte-for-byte ("; " / ", " separators kept)', () => {
+    expect(stripTags(svRow.description)).toBe(SV_PLAIN_ORIGINAL);
+  });
+
+  it('DC 20 = 8 + WIS +6 + PB +6 for the sphinx of valor (computed from disk)', () => {
+    expect(sv.ability_score_modifiers.wis).toBe(6);
+    expect(sv.proficiency_bonus).toBe(6);
+    expect(8 + sv.ability_score_modifiers.wis + sv.proficiency_bonus).toBe(20);
+  });
+
+  it('§158 trap INACTIVE: all seven spells byte-match BOTH 5e and 2024 indexes incl straight-apostrophe "Heroes\' Feast", zero attack_type — cast-affordance only', () => {
+    SV_NAMES.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s).toBeDefined();
+      expect(s.attack_type == null).toBe(true);
+      expect(spells2024.some(sp => sp.name === n)).toBe(true);
+    });
+  });
+
+  it('sphinx triple-twin discriminants — shared lead-in, distinct DC + name sets (§22 byte-shape)', () => {
+    expect(svRow.save_dc).toBe(20);
+    expect(sphinxRow.save_dc).toBe(16);
+    expect(sosRow.save_dc).toBe(15);
+    expect(svRow.description).not.toBe(sphinxRow.description);
+    expect(svRow.description).not.toBe(sosRow.description);
+    expect(svRow.description).not.toContain('Legend Lore');
+    expect(svRow.description).toContain('<strong>Heroes\' Feast</strong>');
+    expect(sosRow.description).not.toContain('Heroes');
+    expect(sphinxRow.description).toContain('<strong>Legend Lore</strong>');
+  });
+});
+
+// ── MA-1506 Modal: seven chips, counters, 1/Day-EACH gates ──────────────────────
+
+describe('MA-1506 MonsterCardModal Sphinx of Valor Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders seven spell chips — the zero-chip inert row is gone', () => {
+    renderSphinxOfValor();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(SV_NAMES);
+  });
+
+  it('the five 1/Day Each names carry counters; the two At Will names do not (§57 gate binds)', () => {
+    renderSphinxOfValor();
+    SV_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    SV_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('no row-level DC 20 save chip — SpellCastLinks XOR fork owns the row (§118/§676)', () => {
+    renderSphinxOfValor();
+    const row = Array.from(document.querySelectorAll('.mc-action')).find(el => el.querySelector('strong')?.textContent.startsWith('Spellcasting'));
+    expect(row).toBeTruthy();
+    expect(row.querySelectorAll('.mc-dice-link-spell').length).toBe(7);
+    expect(row.querySelectorAll('.mc-dice-link-save').length).toBe(0);
+  });
+
+  it('At Will Thaumaturgy casts ungated twice — zero uses, advisory log prints row DC 20 (§204/§207 utility inline advisory)', async () => {
+    renderSphinxOfValor();
+    await act(async () => { fireEvent.click(linkByText('Thaumaturgy')); });
+    await waitFor(() => expect(abilityUseEntries('Thaumaturgy').length).toBe(1));
+    expect(abilityUseEntries('Thaumaturgy')[0].description).toMatch(/\(spell save DC 20/);
+    await act(async () => { fireEvent.click(linkByText('Thaumaturgy')); });
+    await waitFor(() => expect(abilityUseEntries('Thaumaturgy').length).toBe(2));
+    expect(refusals('Thaumaturgy').length).toBe(0);
+    expect(runtime.store[`${SV_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Detect Magic 1/Day: cast spends the single use with DC 20 advisory, re-fire refused — zero extra spend (§57)', async () => {
+    renderSphinxOfValor();
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
+    expect(runtime.store[`${SV_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Detect Magic': 1 });
+    expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/\(spell save DC 20/);
+
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(refusals('Detect Magic').length).toBe(1));
+    expect(abilityUseEntries('Detect Magic').length).toBe(1);
+    expect(runtime.store[`${SV_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Detect Magic': 1 });
+  });
+
+  it('1/Day Each binds EACH name: Dispel Magic spends independently after Detect Magic; exhausted Detect Magic still refuses (§144)', async () => {
+    renderSphinxOfValor();
+    for (const n of ['Detect Magic', 'Dispel Magic']) {
+      await act(async () => { fireEvent.click(linkByText(n)); });
+      await waitFor(() => expect(abilityUseEntries(n).length).toBe(1));
+      expect(refusals(n).length).toBe(0);
+    }
+    expect(runtime.store[`${SV_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Detect Magic': 1, 'Dispel Magic': 1 });
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(refusals('Detect Magic').length).toBe(1));
+    expect(abilityUseEntries('Detect Magic').length).toBe(1);
+    await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
+    await waitFor(() => expect(refusals('Dispel Magic').length).toBe(1));
+  });
+
+  it('existence+counter pins only (no casts): Greater Restoration, Heroes\' Feast, Zone of Truth render gated 1/Day chips (§57/§144)', () => {
+    renderSphinxOfValor();
+    ['Greater Restoration', "Heroes' Feast", 'Zone of Truth'].forEach(n => {
+      expect(linkByText(n)).toBeTruthy();
+      expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/);
+    });
   });
 });
