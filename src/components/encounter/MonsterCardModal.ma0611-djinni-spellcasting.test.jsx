@@ -203,7 +203,23 @@ const sahuaginPriestRow = sahuaginPriest.actions.find(a => a.name === 'Spellcast
 const SP_NAMES = ['Thaumaturgy', 'Hold Person', 'Tongues'];
 const SP_TWO_DAY = ['Hold Person', 'Tongues'];
 const SP_AT_WILL = ['Thaumaturgy'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES, ...SP_NAMES])];
+// MA-1478 solar extension (same MA-0421/MA-1327/MA-1339 markup-gap family,
+// planetar MA-1327 spell-list twin): the WHOLE description was plain text —
+// names AND both tier headers unmarked → extractSpellNamesFromSpellcasting []
+// → zero chips, 1/Day-EACH tracking structurally dead (§144 binds MARKED
+// headers + names only); the row carried zero clickable affordances. Fix =
+// djinni MA-0611 byte-shape <strong> wrap on the two tier headers + all five
+// names, separators ("; " / ", ") byte-kept (single-line prose, no <br>/\n in
+// this row — strip-tags byte-equality proves markup-only diff); the numeric
+// save_dc 25 + Charisma pair was already authored (§89/§167 gate pre-met,
+// untouched; §676 XOR keeps the row DC unrendered as a chip). §158 trap
+// INACTIVE: all five names byte-match BOTH spell indexes, zero attack_type.
+const solar = monsters.find(m => m.index === 'solar');
+const solarRow = solar.actions.find(a => a.name === 'Spellcasting');
+const SL_NAMES = ['Detect Evil and Good', 'Commune', 'Control Weather', 'Dispel Evil and Good', 'Resurrection'];
+const SL_ONE_DAY = ['Commune', 'Control Weather', 'Dispel Evil and Good', 'Resurrection'];
+const SL_AT_WILL = ['Detect Evil and Good'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES, ...SP_NAMES, ...SL_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES, ...QT_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -234,6 +250,10 @@ const RK_PLAIN_ORIGINAL = 'The rakshasa casts one of the following spells, requi
 // Pre-fix sahuagin-priest disk text — the row used <br> separators (stripTags folds
 // them to \n); the fix is name-wrap markup + attack_bonus drop only, prose byte-equal.
 const SP_PLAIN_ORIGINAL = 'The sahuagin casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12):\nAt Will: Thaumaturgy\n2/Day Each: Hold Person, Tongues';
+// Pre-fix solar disk text — SINGLE-LINE prose with "; " tier separators and
+// ", " name separators, fully plain; the fix wraps ONLY the two tier headers +
+// five spell names in <strong>, so the stripped bytes must match this exactly.
+const SL_PLAIN_ORIGINAL = 'The solar casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 25): At Will: Detect Evil and Good; 1/Day Each: Commune, Control Weather, Dispel Evil and Good, Resurrection';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -516,6 +536,17 @@ function renderSahuaginPriest() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: SP_MONSTER_NAME, creatures })} />);
+}
+
+const SL_MONSTER_NAME = 'Solar 1';
+
+function renderSolar() {
+  const m = makeMonster({ name: 'Solar', index: 'solar', type: 'celestial', actions: [solarRow] });
+  const creatures = [
+    { name: SL_MONSTER_NAME, type: 'npc', monsterType: 'celestial', targetName: 'Bandit', ac: 21, currentHp: 297, maxHp: 297, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: SL_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -2187,5 +2218,141 @@ describe('MA-1419 MonsterCardModal Sahuagin Priest Spellcasting chips', () => {
     await waitFor(() => expect(abilityUseEntries('Thaumaturgy').length).toBe(2));
     expect(refusals('Thaumaturgy').length).toBe(0);
     expect(runtime.store[`${SP_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+});
+
+// ── MA-1478 data lock: Solar Spellcasting row ────────────────────────────────
+
+describe('MA-1478 monsters.json data lock: Solar Spellcasting row', () => {
+  it('extracts all five spell names as chips — tier headers skipped', () => {
+    const names = extractSpellNamesFromSpellcasting(solarRow.description);
+    expect(names).toEqual(SL_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day Each');
+  });
+
+  it('disk description carries all five name-wrapped <strong> tokens in authored order', () => {
+    const d = solarRow.description;
+    SL_NAMES.forEach(n => expect(d).toContain(`<strong>${n}</strong>`));
+    const pos = SL_NAMES.map(n => d.indexOf(`<strong>${n}</strong>`));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    pos.forEach(p => expect(p).toBeGreaterThan(-1));
+  });
+
+  it('binds 1/Day EACH to Commune + Control Weather + Dispel Evil and Good + Resurrection; At Will name ungated (§57/§144)', () => {
+    const uses = extractSpellcastingSpellUses(solarRow.description);
+    expect(uses).toEqual(Object.fromEntries(SL_ONE_DAY.map(n => [n, 1])));
+    SL_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level numeric save_dc 25 + save_type Charisma pair byte-untouched (§89/§167 gate pre-met; §676 XOR keeps DC unrendered)', () => {
+    expect(solarRow.save_dc).toBe(25);
+    expect(solarRow.save_type).toBe('Charisma');
+    expect(solarRow.description).toMatch(/\(spell save DC 25\)/);
+    expect('attack_bonus' in solarRow).toBe(false);
+  });
+
+  it('save_effect sibling key stays plain-text — Spellcasting row renders SpellCastLinks XOR, save lane never consulted (§118)', () => {
+    expect(solarRow.save_effect).toBe(SL_PLAIN_ORIGINAL);
+    expect(solarRow.save_effect).not.toMatch(/<(?:strong|em)>/);
+  });
+
+  it('emphasis census: ONLY the two tier headers + five spell names carry <strong> — no <em>, no fake-chip decoys (§161)', () => {
+    const tokens = (solarRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
+    expect(tokens).toEqual(['<strong>At Will:</strong>', '<strong>Detect Evil and Good</strong>', '<strong>1/Day Each:</strong>', '<strong>Commune</strong>', '<strong>Control Weather</strong>', '<strong>Dispel Evil and Good</strong>', '<strong>Resurrection</strong>']);
+  });
+
+  it('markup-only diff proof: stripped text equals the pre-fix SINGLE-LINE prose byte-for-byte ("; " / ", " separators kept)', () => {
+    expect(stripTags(solarRow.description)).toBe(SL_PLAIN_ORIGINAL);
+  });
+
+  it('DC 25 = 8 + CHA +10 + PB +7 for the solar (computed from disk)', () => {
+    expect(solar.ability_score_modifiers.cha).toBe(10);
+    expect(solar.proficiency_bonus).toBe(7);
+    expect(8 + solar.ability_score_modifiers.cha + solar.proficiency_bonus).toBe(25);
+  });
+
+  it('§158 trap INACTIVE: all five spells byte-match BOTH 5e and 2024 indexes, zero attack_type — cast-affordance only', () => {
+    SL_NAMES.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s).toBeDefined();
+      expect(s.attack_type == null).toBe(true);
+      expect(spells2024.some(sp => sp.name === n)).toBe(true);
+    });
+  });
+
+  it('planetar MA-1327 spell-list twin intact — Raise Dead tier untouched, no cross-row clobber', () => {
+    expect(planetarRow.description).toContain('<strong>Raise Dead</strong>');
+    expect(planetarRow.description).not.toContain('Resurrection');
+    expect(solarRow.description).toContain('<strong>Resurrection</strong>');
+    expect(solarRow.description).not.toBe(planetarRow.description);
+  });
+});
+
+// ── MA-1478 Modal: five chips, counters, 1/Day-EACH gates ────────────────────
+
+describe('MA-1478 MonsterCardModal Solar Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders five spell chips — the zero-chip inert row is gone', () => {
+    renderSolar();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(SL_NAMES);
+  });
+
+  it('the four 1/Day Each names carry counters; the At Will name does not (§57 gate binds)', () => {
+    renderSolar();
+    SL_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    SL_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('no row-level DC 25 save chip — SpellCastLinks XOR fork owns the row (§118/§676)', () => {
+    renderSolar();
+    const row = Array.from(document.querySelectorAll('.mc-action')).find(el => el.querySelector('strong')?.textContent.startsWith('Spellcasting'));
+    expect(row).toBeTruthy();
+    expect(row.querySelectorAll('.mc-dice-link-spell').length).toBe(5);
+    expect(row.querySelectorAll('.mc-dice-link-save').length).toBe(0);
+  });
+
+  it('At Will Detect Evil and Good casts ungated twice — zero uses, advisory log prints row DC 25 (§204/§207 utility inline advisory)', async () => {
+    renderSolar();
+    await act(async () => { fireEvent.click(linkByText('Detect Evil and Good')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Evil and Good').length).toBe(1));
+    expect(abilityUseEntries('Detect Evil and Good')[0].description).toMatch(/\(spell save DC 25/);
+    await act(async () => { fireEvent.click(linkByText('Detect Evil and Good')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Evil and Good').length).toBe(2));
+    expect(refusals('Detect Evil and Good').length).toBe(0);
+    expect(runtime.store[`${SL_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Commune 1/Day: cast spends the single use with DC 25 advisory, re-fire refused — zero extra spend (§57)', async () => {
+    renderSolar();
+    await act(async () => { fireEvent.click(linkByText('Commune')); });
+    await waitFor(() => expect(abilityUseEntries('Commune').length).toBe(1));
+    expect(runtime.store[`${SL_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Commune': 1 });
+    expect(abilityUseEntries('Commune')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Commune')[0].description).toMatch(/\(spell save DC 25/);
+
+    await act(async () => { fireEvent.click(linkByText('Commune')); });
+    await waitFor(() => expect(refusals('Commune').length).toBe(1));
+    expect(abilityUseEntries('Commune').length).toBe(1);
+    expect(runtime.store[`${SL_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Commune': 1 });
+  });
+
+  it('1/Day Each binds EACH name: Control Weather and Dispel Evil and Good spend independently after Commune; exhausted Commune still refuses (§144)', async () => {
+    renderSolar();
+    for (const n of ['Commune', 'Control Weather', 'Dispel Evil and Good']) {
+      await act(async () => { fireEvent.click(linkByText(n)); });
+      await waitFor(() => expect(abilityUseEntries(n).length).toBe(1));
+      expect(refusals(n).length).toBe(0);
+    }
+    expect(runtime.store[`${SL_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Commune': 1, 'Control Weather': 1, 'Dispel Evil and Good': 1 });
+    await act(async () => { fireEvent.click(linkByText('Commune')); });
+    await waitFor(() => expect(refusals('Commune').length).toBe(1));
+    expect(abilityUseEntries('Commune').length).toBe(1);
+    await act(async () => { fireEvent.click(linkByText('Control Weather')); });
+    await waitFor(() => expect(refusals('Control Weather').length).toBe(1));
   });
 });
