@@ -24913,7 +24913,7 @@
         "paralyzed"
       ],
       "description": "Constitution Saving Throw: DC 13, each creature in a 15-foot Cone. First Failure: The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1469-paralyzing-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1470",
