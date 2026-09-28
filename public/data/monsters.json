@@ -55417,7 +55417,8 @@
         "reach": "",
         "recharge": "",
         "damage_dice_primary": "3d6",
-        "damage_type_primary": "Lightning"
+        "damage_type_primary": "Lightning",
+        "dc_success": "none"
       }
     ],
     "bonus_actions": [],
