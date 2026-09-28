@@ -326,6 +326,26 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['ability', 'source'],
   },
   {
+    // MA-1489: Specter "Life Drain" numeric HP-max drain rider — the
+    // first producer app-wide for the §947 zero-state family (row authors
+    // structured hit_hp_max_reduce:{equal_to:"damage"}; handlePlainDamage.
+    // applyHitHpMaxReduce reduces cs maxHp by the applied damage, clamps
+    // currentHp, and registers this ledger te carrying the full state:
+    // baseMax + cumulative reduced + current max. RAW row states no end;
+    // the te convention for unspecified-duration debuffs is long-rest
+    // restore (MA-1451 byte-twin) — cleared by the campaign long-rest
+    // filter (restRules-longRest.js restores maxHp from this ledger). PC
+    // victims additionally carry the per-char numeric hpMaxReduction key
+    // that greaterRestorationHandler consumes.
+    effect: 'hp_max_reduce',
+    label: 'HP Max Reduced',
+    description: 'The creature\'s Hit Point maximum is reduced by a cumulative total equal to life-drain damage taken (payload: baseMax, reduced, max). The maximum returns when the drain ends — long rest (GM-enforced; Greater Restoration can restore early on player characters).',
+    icon: 'fa-heart-crack',
+    cls: 'effect-debuff',
+    group: 'Saves & Checks',
+    fields: ['source'],
+  },
+  {
     effect: 'advantage_abilities',
     label: 'Adv Check',
     description: 'Advantage on all ability checks.',

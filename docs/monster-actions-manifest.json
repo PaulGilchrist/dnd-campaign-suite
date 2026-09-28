@@ -25230,7 +25230,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 7 (2d6) Necrotic damage. If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1489-life-drain.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1490",

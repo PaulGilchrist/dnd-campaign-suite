@@ -19,6 +19,10 @@ const LONG_REST_TARGET_EFFECT_CLEAR_KEYS = [
   // end, te convention: the drained score returns on a long rest (te ledger
   // cleared here; the card overlay follows the te).
   ['ability_score_drain'],
+  // MA-1489: Specter Life Drain HP-max drain — same unspecified-end te
+  // convention; the ledger-based cs maxHp / PC hitPoints restore happens in
+  // restoreHpMaxDrainsOnLongRest BEFORE this filter clears the ledgers.
+  ['hp_max_reduce'],
   ['clairvoyant_combatant'],
   ['pass_without_trace_bonus'],
   ['blur'],
@@ -225,6 +229,44 @@ function clearLongRestCampaignTargetEffects(campaignName) {
     if (filtered.length !== effects.length) {
       setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true)
     }
+  }
+}
+
+// MA-1489: Specter Life Drain HP-max reduction ends on a long rest — the
+// hp_max_reduce te ledger carries baseMax (the pre-drain maximum) so the
+// drain can be honestly REVERSED when the rest completes (MA-1451 ability
+// drain only ever cleared a ledger-te; here the reduction is real cs state,
+// clearLongRestSummonEffects' polymorph maxHp-restore is the precedent).
+// NPC/combatant victims: cs maxHp (every variant the entry carries, §296)
+// back to baseMax, currentHp re-fits under it. PC victims: the exact
+// hitPoints + hpMaxReduction pair greaterRestorationHandler consumes —
+// restore is byte-symmetric (hitPoints = baseMax, hpMaxReduction = 0).
+// The ledger tes themselves are cleared by clearLongRestCampaignTargetEffects.
+function restoreHpMaxDrainsOnLongRest(campaignName) {
+  const drains = (getRuntimeValue('campaign', 'targetEffects') || []).filter(te => te.effect === 'hp_max_reduce')
+  if (drains.length === 0) return
+  const cs = getCombatSummary(campaignName)
+  let csChanged = false
+  for (const te of drains) {
+    const baseMax = Number(te.baseMax)
+    if (!Number.isInteger(baseMax) || baseMax <= 0) continue
+    const creature = cs?.creatures?.find(c => c.name === te.target)
+    if (!creature) continue
+    creature.maxHp = baseMax
+    if ('maxHitPoints' in creature) creature.maxHitPoints = baseMax
+    if (Number(creature.currentHp) > baseMax) {
+      creature.currentHp = baseMax
+      if ('currentHitPoints' in creature) creature.currentHitPoints = baseMax
+    }
+    csChanged = true
+    if (creature.type === 'player') {
+      setRuntimeValue(te.target, 'hitPoints', baseMax, campaignName, true)
+      setRuntimeValue(te.target, 'hpMaxReduction', 0, campaignName, true)
+    }
+  }
+  if (csChanged) {
+    storageService.default.set('combatSummary', cs, campaignName)
+    setCombatSummaryCache(cs, campaignName)
   }
 }
 
@@ -570,6 +612,12 @@ export async function applyLongRest(playerStats, campaignName) {
 
   // Single atomic write fires ONE SSE event with the complete final state
   setRuntimeBatch(name, charData, campaignName)
+
+  // MA-1489: restore drained HP maxima from the hp_max_reduce ledgers
+  // BEFORE the clear filter below wipes them (ledger-first discipline — the
+  // clear without the restore would leave the reduction wrongly persisting
+  // past the long rest; RAW row states no end, te convention = LR restore).
+  restoreHpMaxDrainsOnLongRest(campaignName)
 
   clearLongRestCampaignTargetEffects(campaignName)
 

@@ -56543,7 +56543,10 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "2d6",
-        "damage_type_primary": "Necrotic"
+        "damage_type_primary": "Necrotic",
+        "hit_hp_max_reduce": {
+          "equal_to": "damage"
+        }
       }
     ],
     "bonus_actions": [],

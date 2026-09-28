@@ -200,6 +200,12 @@ const BADGE_SPECS = [
         find: ctx => findDirect(ctx, 'ability_score_drain'),
         build: ctx => ({ label: `${(ctx.te.ability || '').toUpperCase()} \u2212${ctx.te.drained || 0}`, cls: 'effect-debuff', icon: 'fa-arrow-down', removable: true, removeAction: 'target_effect', effectType: 'ability_score_drain', tooltip: `${(ctx.te.ability || '').toUpperCase()} ${ctx.te.baseScore ?? '?'} \u2192 ${ctx.te.score ?? '?'} (\u2212${ctx.te.drained || 0}) drained by ${ctx.te.source || 'unknown'} \u2014 dies at 0; returns on a long rest (GM-enforced early restore)` }),
     },
+    // MA-1489: Specter Life Drain numeric HP-max-drain te badge — MA-1451
+    // "STR −N" twin rendering the live max-HP ledger (te.max) on the victim card.
+    {
+        find: ctx => findDirect(ctx, 'hp_max_reduce'),
+        build: ctx => ({ label: `Max HP \u2212${ctx.te.reduced || 0}`, cls: 'effect-debuff', icon: 'fa-heart-crack', removable: true, removeAction: 'target_effect', effectType: 'hp_max_reduce', tooltip: `Max HP ${ctx.te.baseMax ?? '?'} \u2192 ${ctx.te.max ?? '?'} (\u2212${ctx.te.reduced || 0}) drained by ${ctx.te.source || 'unknown'} \u2014 ends on a long rest (Greater Restoration can restore player characters early)` }),
+    },
     // MA-0275: Animal Spirit Pesky Swarm failed-save te badge.
     {
         find: ctx => findDirect(ctx, 'pesky_swarm'),

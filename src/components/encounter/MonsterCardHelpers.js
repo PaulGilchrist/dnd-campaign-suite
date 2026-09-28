@@ -752,6 +752,28 @@ export function parseHitPull(action) {
   return { distanceFt, sizeLimit: pull.size_limit };
 }
 
+// MA-1489: Specter "Life Drain" numeric HP-max-drain rider — "If the target
+// is a creature, its Hit Point maximum decreases by an amount equal to the
+// damage taken" (§947: the class was zero-state app-wide — hpMaxReduction
+// consumers were reset-only, no te, no parser). Not a condition and not a
+// dice table, so hit_conditions / hit_condition_roll can never carry it;
+// the structured hit_hp_max_reduce:{equal_to:"damage"} key rides the same
+// MA-0010/MA-1451 hit-clause seam to the resolved-hit consumer in
+// handlePlainDamage, which reduces the victim's max HP by the applied
+// damage, accumulates the ledger on the registered hp_max_reduce te, and
+// logs every leg. STRUCTURED-KEY-ONLY (MA-1451 byte-twin precedent,
+// playbook §5) — never prose-parsed; byte-inert null for every row without
+// the key, so no other monster's max-reduction wording can double-arm.
+// Key-naming decision: MA-1451's hit_ability_drain:{...} / MA-1459's
+// hit_pull:{...} snake_case hit_* convention; equal_to:"damage" mirrors the
+// RAW "equal to the damage taken" clause (the only magnitude source the row
+// prose offers — the consumer reads applyResult.finalDamage).
+export function parseHitHpMaxReduce(action) {
+  const rider = action?.hit_hp_max_reduce;
+  if (!rider || typeof rider !== 'object') return null;
+  return String(rider.equal_to || '').toLowerCase() === 'damage' ? { equalTo: 'damage' } : null;
+}
+
 function hitClauseAutoGrantConditions(action) {
   if (hitChoiceArmed(action) || !Array.isArray(action?.hit_conditions)) return [];
   return action.hit_conditions.map(c => String(c).toLowerCase());
@@ -765,19 +787,21 @@ function hitClauseRiderPayload(action) {
   const conditionRoll = parseHitConditionRoll(action);
   const abilityDrain = parseHitAbilityDrain(action);
   const pull = parseHitPull(action);
+  const hpMaxReduce = parseHitHpMaxReduce(action);
   return {
     targetEffect,
     ...(targetEffectAbility ? { targetEffectAbility } : {}),
     ...(conditionRoll ? { conditionRoll } : {}),
     ...(abilityDrain ? { abilityDrain } : {}),
     ...(pull ? { pull } : {}),
+    ...(hpMaxReduce ? { hpMaxReduce } : {}),
   };
 }
 
 export function buildHitConditionClause(action) {
   const conditions = hitClauseAutoGrantConditions(action);
   const riders = hitClauseRiderPayload(action);
-  if (conditions.length === 0 && !riders.targetEffect && !riders.conditionRoll && !riders.abilityDrain && !riders.pull) return null;
+  if (conditions.length === 0 && !riders.targetEffect && !riders.conditionRoll && !riders.abilityDrain && !riders.pull && !riders.hpMaxReduce) return null;
   return {
     conditions,
     escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,

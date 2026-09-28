@@ -11,6 +11,7 @@ import { getChaModifier } from '../../../services/rules/spells/metamagicRules.js
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { registerTargetEffect, getEffectDefinition } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
+import storage from '../../../services/ui/storage.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { consumePendingRedirectOnResolve } from '../../../services/encounters/monsterRedirectAttack.js';
 import { consumePendingJinxOnResolve } from '../../../services/encounters/monsterJinx.js';
@@ -756,6 +757,172 @@ async function applyHitAbilityDrain({ hitClause, target, combatSummary, characte
     await lethalStrengthDrop({ target, combatSummary, characters, campaignName, attackerName, hitClause, ability, baseScore, drained, logEntry });
 }
 
+// MA-1489: Specter "Life Drain" HP-max consumers — standing ledger lookup +
+// base-max resolution (§947 family: hpMaxReduction consumers were
+// reset-only readers, this is the first producer). NPC/combatant victims
+// resolve max from the canonical cs entry; PC victims from the runtime
+// hitPoints base the greaterRestorationHandler restore math consumes
+// (hitPoints + hpMaxReduction). Unresolvable = null — honest refusal,
+// console.error, never fabricated (MA-1451 refuseAbilityDrain twin).
+function findStandingHpMaxReduce(targetName) {
+    return (getRuntimeValue('campaign', 'targetEffects') || [])
+        .find(te => te.target === targetName && te.effect === 'hp_max_reduce');
+}
+
+function resolveHpMaxBase({ target, combatSummary, campaignName }) {
+    if (target.type === 'player') {
+        const raw = Number(getRuntimeValue(target.name, 'hitPoints', campaignName));
+        return Number.isInteger(raw) && raw > 0 ? raw : null;
+    }
+    const csCreature = combatSummary?.creatures?.find(c => c.name === target.name);
+    const raw = Number(csCreature?.maxHp ?? target?.maxHp);
+    return Number.isInteger(raw) && raw > 0 ? raw : null;
+}
+
+function refuseHpMaxReduce({ hitClause, target, attackerName, logEntry }) {
+    console.error(`[MA-1489] max HP not resolvable for ${target.name} — HP max drain not applied`);
+    logEntry({
+        type: 'automation',
+        automationType: 'hp_max_reduce_refused',
+        characterName: attackerName,
+        abilityName: hitClause.attackName,
+        targetName: target.name,
+        description: `${attackerName} ${hitClause.attackName} landed, but ${target.name}'s Hit Point maximum is not resolvable — drain recorded advisory only (GM-enforced).`,
+        timestamp: Date.now(),
+    });
+}
+
+// EB-NPC victims: cs maxHp is the canonical monster HP truth (§17) —
+// mutate via the canonical storage.set combatSummary channel (applyDamage.
+// persistAndLogDamageOutcome twin) and stamp every HP variant the entry
+// carries (§296/§298 four-key discipline); currentHp clamps down only when
+// it exceeds the NEW max, never below 0 (a zero/negative max rides the
+// canonical lethal clamp below instead).
+function npcHpMaxDrainWrite({ target, combatSummary, newMax, campaignName }) {
+    const csCreature = combatSummary?.creatures?.find(c => c.name === target.name);
+    if (!csCreature) return false;
+    const clampedMax = Math.max(0, newMax);
+    csCreature.maxHp = clampedMax;
+    if ('maxHitPoints' in csCreature) csCreature.maxHitPoints = clampedMax;
+    if (clampedMax > 0 && Number(csCreature.currentHp) > clampedMax) {
+        csCreature.currentHp = clampedMax;
+        if ('currentHitPoints' in csCreature) csCreature.currentHitPoints = clampedMax;
+    }
+    storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    return true;
+}
+
+// PC victims: stamp the exact per-char key shape greaterRestorationHandler
+// consumes (numeric hpMaxReduction accumulating the total, its restore is
+// hitPoints + hpMaxReduction — byte-symmetric with the reduction below).
+// §39 same-tick multi-key discipline: sequential awaits, one key at a time.
+async function pcHpMaxDrainWrite({ target, damage, newMax, campaignName }) {
+    const standingReduction = Number(getRuntimeValue(target.name, 'hpMaxReduction', campaignName) || 0);
+    const currentHp = Number(getRuntimeValue(target.name, 'currentHitPoints', campaignName) || 0);
+    await setRuntimeValue(target.name, 'hitPoints', Math.max(0, newMax), campaignName);
+    await setRuntimeValue(target.name, 'currentHitPoints', Math.max(0, Math.min(currentHp, newMax)), campaignName);
+    await setRuntimeValue(target.name, 'hpMaxReduction', standingReduction + damage, campaignName);
+}
+
+// RAW death-at-0: the max reaching 0 or below drops the victim via the
+// canonical applyDamageToTarget lethal clamp (MA-1451 lethalStrengthDrop
+// twin — currentHp captured BEFORE any drain-side clamp rides the call).
+async function lethalHpMaxDrop({ target, combatSummary, characters, campaignName, attackerName, hitClause, baseMax, reduced, logEntry }) {
+    const csCreature = combatSummary?.creatures?.find(c => c.name === target.name);
+    const currentHp = target.type === 'player'
+        ? Number(getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? csCreature?.currentHp ?? 0)
+        : Number(csCreature?.currentHp ?? 0);
+    if (currentHp > 0) {
+        await applyDamageToTarget(combatSummary, target.name, currentHp, ['Necrotic'], { campaignName, characters, ignoreResistance: true, attackerName });
+    }
+    logEntry({
+        type: 'automation',
+        automationType: 'hp_max_reduce_lethal',
+        characterName: target.name,
+        sourceName: attackerName,
+        abilityName: hitClause.attackName,
+        description: `${target.name}'s Hit Point maximum was drained to 0 or below (base ${baseMax}, total reduced ${reduced}) by ${attackerName}'s ${hitClause.attackName} — the target falls (Life Drain death clamp).`,
+        timestamp: Date.now(),
+    });
+}
+
+function logHpMaxReduceZero({ hitClause, target, attackerName, logEntry }) {
+    logEntry({
+        type: 'automation',
+        automationType: 'hp_max_reduce',
+        characterName: attackerName,
+        abilityName: hitClause.attackName,
+        targetName: target.name,
+        description: `${attackerName}'s ${hitClause.attackName} dealt 0 damage — ${target.name}'s Hit Point maximum is reduced by 0 (equal to damage taken). No change.`,
+        timestamp: Date.now(),
+    });
+}
+
+function buildHpMaxReduceNote({ target, damage, newMax }) {
+    return `${target.name}'s Hit Point maximum decreased by ${damage} — ends on a long rest${target.type === 'player' ? ' (Greater Restoration can restore early)' : ''}; ${newMax <= 0 ? 'maximum reached 0 — death clamp fires' : 'dies if the maximum reaches 0'}.`;
+}
+
+async function writeHpMaxDrain({ target, combatSummary, damage, newMax, campaignName }) {
+    if (target.type === 'player') {
+        await pcHpMaxDrainWrite({ target, damage, newMax, campaignName });
+        return true;
+    }
+    return npcHpMaxDrainWrite({ target, combatSummary, newMax, campaignName });
+}
+
+// MA-1489: Specter "Life Drain" numeric HP-max-drain consumer — the row
+// authors structured hit_hp_max_reduce:{equal_to:"damage"} (parsed by
+// parseHitHpMaxReduce onto the MA-0010/MA-1451 hit-clause seam; §947: the
+// HP-max-reduce family was zero-state app-wide). On every RESOLVED hit the
+// victim's max HP decreases by the damage TAKEN (applyResult.finalDamage —
+// resistance/clamp-honest), accumulates on the registered hp_max_reduce te
+// ledger {baseMax, reduced, max} (single registerTargetEffect write, §39),
+// and logs the old→new max with the equal-to-damage amount. ROW DISPOSITION
+// (disk prose): the Specter row states NO end for the reduction — the
+// MA-1451 te convention applies (long-rest restore via restRules-longRest
+// restoring from this ledger; Greater Restoration early-restore on PCs via
+// the hpMaxReduction key; NO combat addExpiration clock). RAW has no size
+// gate ("If the target is a creature") — the rider rides BEFORE the
+// Large-or-smaller family gate, MA-1451 byte-twin position. A zero-damage
+// hit reduces nothing (equal-to-damage is 0) but still logs. Damage legs
+// stay byte-identical — this rider rides after them.
+async function applyHitHpMaxReduce({ hitClause, target, applyResult, combatSummary, characters, campaignName, logEntry, attackerName }) {
+    const damage = Number(applyResult?.finalDamage) || 0;
+    if (damage <= 0) {
+        logHpMaxReduceZero({ hitClause, target, attackerName, logEntry });
+        return;
+    }
+    const existing = findStandingHpMaxReduce(target.name);
+    const baseMax = Number.isInteger(existing?.baseMax) ? existing.baseMax : resolveHpMaxBase({ target, combatSummary, campaignName });
+    if (!Number.isInteger(baseMax) || baseMax <= 0) {
+        refuseHpMaxReduce({ hitClause, target, attackerName, logEntry });
+        return;
+    }
+    const prevMax = Number.isInteger(existing?.max) ? existing.max : baseMax;
+    const reduced = (Number(existing?.reduced) || 0) + damage;
+    const newMax = baseMax - reduced;
+    if (!await writeHpMaxDrain({ target, combatSummary, damage, newMax, campaignName })) {
+        refuseHpMaxReduce({ hitClause, target, attackerName, logEntry });
+        return;
+    }
+    registerTargetEffect(campaignName, target.name, 'hp_max_reduce', attackerName, {
+        baseMax, reduced, max: newMax, duration: 'until_long_rest',
+    });
+    logEntry({
+        type: 'condition',
+        action: 'applied',
+        characterName: target.name,
+        condition: 'Max HP Reduced',
+        reason: `${hitClause.attackName} — max HP ${prevMax} → ${newMax} (−${damage}, equal to damage taken)`,
+        note: buildHpMaxReduceNote({ target, damage, newMax }),
+        timestamp: Date.now(),
+    });
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    if (newMax > 0) return;
+    await lethalHpMaxDrop({ target, combatSummary, characters, campaignName, attackerName, hitClause, baseMax, reduced, logEntry });
+}
+
 // MA-1459: Shambling Mound "Charged Tendril" size-conditional pull consumer —
 // the row authors structured hit_pull:{distance_ft,size_limit} (parsed by
 // parseHitPull onto the MA-0010/MA-1451 hit-clause seam; §944/§205/§101:
@@ -814,6 +981,14 @@ async function maybeApplyHitClause({ context, target, applyResult, combatSummary
     }
     if (hitClause.pull) {
         applyHitPullClause({ hitClause, target, attackerName: characterName, campaignName, logEntry });
+    }
+    // MA-1489: the Specter Life Drain HP-max rider likewise rides BEFORE the
+    // gate — RAW "If the target is a creature" carries no size restriction
+    // (§127 size-gate honesty, MA-1451 byte-twin position). The damage legs
+    // have already applied above (applyResult carries the damage TAKEN — the
+    // equal_to:"damage" magnitude source); this rider never re-touches them.
+    if (hitClause.hpMaxReduce) {
+        await applyHitHpMaxReduce({ hitClause, target, applyResult, combatSummary, characters, campaignName, logEntry, attackerName: characterName });
     }
     if (!isLargeOrSmallerTarget(target.size)) return;
     const { effectiveClause, riderChoice } = rollHitClauseRiderChoice({ hitClause, target, logEntry, characterName });
