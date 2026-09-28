@@ -1036,3 +1036,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Positive-success determinism at inline NPC save seam: full-word `saveBonuses.dex` + nested `saving_throws.dex` cs POST (popup "+0" cosmetic, victim `total` truth — extends §212).
 - save-prompt seam logs save-damage via `logEntry` PROP — harness addEntry captures only direct addEntry calls (threshold-kill); pin both channels. processNpcSave harness ignores top-level effectiveD20 (NaN→auto-fail = benign fail-rig).
 - Threshold row post-fix renders twin chips ("4d8 + 6" + "DC 21") — §986 trap, press DC chip only.
+
+## §MA-1483 (2026-09-28, Spectator Eye Rays launcher FIXED) New pitfalls
+- §88 launcher conversion live: spectator.actions[2] `rays:[4 dicts]`+`save_dc:12`+`range:"90 ft."` arms d4 chooser `.mc-eye-ray-chooser` + eyeRaysUsed reroll-if-used latch (4 same-round presses = zero repeat, latch accumulates). Row DC stamps every synthesized ray.
+- No-damage ladder ray inside rays[] rides `ray.ladder:"paralyzed"` channel (zombie twin), NOT row-level staged_paralysis. dc_success per-ray harvested from own prose (none for condition-only rays, half for Wounding 3d10).
