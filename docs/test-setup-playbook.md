@@ -1005,3 +1005,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - NEW delegate-site §640(a) re-confirmed: delegating to an attack row carrying household `save_dc:0` makes `legendaryDelegateAttackName` label the chip **"X (Rend save)"** while it honestly rides the ATTACK seam (rollAttack, saveDc:null, full dice) — pin the label, never expect rollSavingThrow.
 - Nameless advisory child `{advisory:"<snake_key>",advisory_message}` = honest record-only spend (zero rolls/hp) for legendary children whose real mechanic is a separate ticket; cooldown latch `<slug>` stamps live (MA-0073 seam).
 - `curl -X POST url1 -X POST url2` runs both, prints only the last body — confirm admin clears individually.
+
+## §MA-1457 (2026-09-28, Shadow Dragon Veil of Shadow FIXED) New pitfalls
+- `resolveLegendaryRowMechanic` checks `advisory` BEFORE the numeric-damage leg — an advisory field on a legendary child SUPPRESSES damage resolution; once numeric dice live, fold advisory prose into `description` and drop the advisory fields (Decay twin byte-shape: `damage_dice_primary`+`damage_type_primary` on legendary child resolves 3d6 vs armed target).
+- MA-1456 header-insert tests carry advisory pins that must be INVERTED same-pass when a follow-up ticket arms numeric legs.
