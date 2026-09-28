@@ -24740,7 +24740,7 @@
       "range": "",
       "recharge": "",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 7 (1d6 + 4) Bludgeoning damage plus 5 (2d4) Lightning damage. If the target is a Medium or smaller creature, the shambling mound pulls the target 5 feet straight toward itself.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1459-charged-tendril.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1460",

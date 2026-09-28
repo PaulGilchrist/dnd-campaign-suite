@@ -1352,13 +1352,23 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { value: 120 },
   },
   {
+    // MA-1459: Shambling Mound Charged Tendril size-conditional pull reuses
+    // this te (registry rule: check existing before registering — no
+    // duplicate pulled_5ft). Producer added on the attack-hit lane
+    // (handlePlainDamage.applyHitPullClause): value = feet pulled (5 RAW),
+    // duration 'instant' + NO addExpiration clock — byte-mirroring the PC
+    // Warping Implosion pull-marker grant (SaveAttackAoeModal:191/:1485),
+    // which has no cleanup consumer (badge-remove/admin clear residual, §70/
+    // §165 lineage). Token position stays GM-enforced (grep-zero token-move
+    // consumer, §42 gridless advisory — the grant log carries the note).
     effect: 'pulled_toward',
     label: 'Pulled Toward',
-    description: 'The creature failed its save and was pulled toward the space the caster teleported from.',
+    description: 'The creature was pulled N feet straight toward the source (Warping Implosion failed save, or a monster attack-hit pull, e.g. Charged Tendril pulls a Medium or smaller target 5 feet). Token position is GM-enforced (no token-move consumer in this engine).',
     icon: 'fa-arrows-to-circle',
     cls: 'effect-debuff',
     group: 'Movement',
-    fields: ['source'],
+    fields: ['source', 'value'],
+    defaults: { value: 5 },
   },
 ]
 

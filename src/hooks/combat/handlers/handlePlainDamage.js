@@ -518,7 +518,9 @@ async function handleMultiPlainTarget({ combatSummary, context, target, campaign
 // MA-0553: monsters.json sizes include ranges ("Medium or Small" — Bandit);
 // a plain includes() silently swallowed every hit-clause on such victims.
 // Gate on the LARGEST size named; unknown sizes stay lenient.
-function isLargeOrSmallerTarget(size) {
+// MA-1459: generalized to any ladder limit — Charged Tendril gates on
+// 'Medium', the ram/grapple family stays at 'Large' via the named wrapper.
+function isTargetSizeAtMost(size, limit) {
     if (!size) return true;
     const order = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
     const parts = String(size).split(/\s+or\s+/i).map(s => s.trim());
@@ -528,7 +530,11 @@ function isLargeOrSmallerTarget(size) {
         if (idx === -1) return false;
         if (idx > largest) largest = idx;
     }
-    return largest <= order.indexOf('Large');
+    return largest <= order.indexOf(limit);
+}
+
+function isLargeOrSmallerTarget(size) {
+    return isTargetSizeAtMost(size, 'Large');
 }
 
 function maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry }) {
@@ -609,6 +615,22 @@ function rollHitConditionChoice({ hitClause, targetName, logEntry, attackerName 
         timestamp: Date.now(),
     });
     return { condition, label };
+}
+
+// MA-1459: rider-choice block hoisted out of maybeApplyHitClause (§45
+// complexity cap — MA-1451 lineage: branch-heavy clause additions push 16).
+function rollHitClauseRiderChoice({ hitClause, target, logEntry, characterName }) {
+    if (!hitClause.conditionRoll) return { effectiveClause: hitClause, riderChoice: null };
+    const riderChoice = rollHitConditionChoice({ hitClause, targetName: target.name, logEntry, attackerName: characterName });
+    if (!riderChoice) return { effectiveClause: hitClause, riderChoice: null };
+    return {
+        riderChoice,
+        effectiveClause: {
+            ...hitClause,
+            conditions: [riderChoice.condition],
+            reasonOverride: `${hitClause.attackName} — 1d${hitClause.conditionRoll.die} rolled ${hitClause.conditionRoll.conditions.indexOf(riderChoice.condition) + 1} → ${riderChoice.label}; until the start of ${characterName}'s next turn`,
+        },
+    };
 }
 
 function findStandingDrain(targetName, ability) {
@@ -734,29 +756,67 @@ async function applyHitAbilityDrain({ hitClause, target, combatSummary, characte
     await lethalStrengthDrop({ target, combatSummary, characters, campaignName, attackerName, hitClause, ability, baseScore, drained, logEntry });
 }
 
+// MA-1459: Shambling Mound "Charged Tendril" size-conditional pull consumer —
+// the row authors structured hit_pull:{distance_ft,size_limit} (parsed by
+// parseHitPull onto the MA-0010/MA-1451 hit-clause seam; §944/§205/§101:
+// attack-row pull/move clauses were grep-zero-inert app-wide). On every
+// RESOLVED hit the victim's size is honestly gated against the ladder
+// (MA-0553 range-size semantics reused); a Medium-or-smaller victim gets the
+// registered pulled_toward te (value = feet; duration 'instant' + NO clock —
+// byte-mirror of the PC Warping Implosion pull-marker grant, whose lane has
+// no cleanup consumer: badge-remove/admin clear, §70/§165 lineage) and ONE
+// grant log carrying the RAW pull sentence + the GM token-move advisory
+// (§42 gridless: no moveToken/setTokenPos/updateToken consumer app-wide, no
+// phantom token write). Oversized victims get a pull_refused log, zero state.
+// Damage legs stay byte-identical — this rider rides after them.
+function applyHitPullClause({ hitClause, target, attackerName, campaignName, logEntry }) {
+    const { distanceFt, sizeLimit } = hitClause.pull;
+    if (!isTargetSizeAtMost(target.size, sizeLimit)) {
+        logEntry({
+            type: 'automation',
+            automationType: 'pull_refused',
+            characterName: attackerName,
+            abilityName: hitClause.attackName,
+            targetName: target.name,
+            description: `${target.name} is ${target.size || 'unknown size'} — larger than ${sizeLimit}; ${attackerName}'s ${hitClause.attackName} pull clause does not apply. No movement, no effect.`,
+            timestamp: Date.now(),
+        });
+        return;
+    }
+    registerTargetEffect(campaignName, target.name, 'pulled_toward', attackerName, {
+        duration: 'instant',
+        value: distanceFt,
+    });
+    logEntry({
+        type: 'condition',
+        action: 'applied',
+        characterName: target.name,
+        condition: 'Pulled Toward',
+        reason: `${hitClause.attackName} — pulls ${target.name} ${distanceFt} feet straight toward ${attackerName}`,
+        note: `${target.name} (Medium or smaller) is pulled ${distanceFt} ft toward ${attackerName}. Token move is GM-enforced advisory — no token-position consumer in this engine (§42 gridless).`,
+        timestamp: Date.now(),
+    });
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
 async function maybeApplyHitClause({ context, target, applyResult, combatSummary, characters, campaignName, logEntry, characterName }) {
     const hitClause = context?.hitClause;
     if (!hitClause || !target || !applyResult) return;
     // MA-1451: the numeric ability drain rides before the grapple-family
     // size gate — Draining Swipe drains ANY target size (RAW has no size
-    // restriction; §127 size-gate honesty). Every other clause leg keeps the
+    // restriction; §127 size-gate honesty). MA-1459: the Charged Tendril
+    // pull likewise rides before the gate with its OWN stricter Medium gate
+    // (the family gate is Large-or-smaller and would wrongly pass Large
+    // victims; §127 size-gate honesty). Every other clause leg keeps the
     // gate byte-identical.
     if (hitClause.abilityDrain) {
         await applyHitAbilityDrain({ hitClause, target, combatSummary, characters, campaignName, logEntry, attackerName: characterName });
     }
-    if (!isLargeOrSmallerTarget(target.size)) return;
-    let effectiveClause = hitClause;
-    let riderChoice = null;
-    if (hitClause.conditionRoll) {
-        riderChoice = rollHitConditionChoice({ hitClause, targetName: target.name, logEntry, attackerName: characterName });
-        if (riderChoice) {
-            effectiveClause = {
-                ...hitClause,
-                conditions: [riderChoice.condition],
-                reasonOverride: `${hitClause.attackName} — 1d${hitClause.conditionRoll.die} rolled ${hitClause.conditionRoll.conditions.indexOf(riderChoice.condition) + 1} → ${riderChoice.label}; until the start of ${characterName}'s next turn`,
-            };
-        }
+    if (hitClause.pull) {
+        applyHitPullClause({ hitClause, target, attackerName: characterName, campaignName, logEntry });
     }
+    if (!isLargeOrSmallerTarget(target.size)) return;
+    const { effectiveClause, riderChoice } = rollHitClauseRiderChoice({ hitClause, target, logEntry, characterName });
     const hasConditions = Array.isArray(effectiveClause.conditions) && effectiveClause.conditions.length > 0;
     if (!hasConditions && !hitClause.targetEffect) return;
     if (hasConditions) {

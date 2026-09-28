@@ -55400,7 +55400,11 @@
         "damage_dice_primary": "1d6 + 4",
         "damage_type_primary": "Bludgeoning",
         "damage_dice_secondary": "2d4",
-        "damage_type_secondary": "Lightning"
+        "damage_type_secondary": "Lightning",
+        "hit_pull": {
+          "distance_ft": 5,
+          "size_limit": "Medium"
+        }
       },
       {
         "name": "Engulf",

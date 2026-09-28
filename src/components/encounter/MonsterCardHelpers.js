@@ -727,26 +727,60 @@ export function parseHitAbilityDrain(action) {
   return /^1d\d+$/.test(dice) ? { ability, dice } : null;
 }
 
+// MA-1459: Shambling Mound "Charged Tendril" size-conditional transport
+// rider — "If the target is a Medium or smaller creature, the shambling mound
+// pulls the target 5 feet straight toward itself". Not a condition, not
+// damage: an instant positional clause §944/§205/§101 never parsed app-wide
+// on attack rows (parsePushFeetClause is save-picker-only, pulled_toward had
+// a single PC-spell producer). The structured hit_pull:{distance_ft,size_limit}
+// key rides the same MA-0010/MA-1451 hit-clause seam to the resolved-hit
+// consumer in handlePlainDamage, which size-gates the victim, grants the
+// registered pulled_toward te (value = feet, duration 'instant' — the PC
+// Warping Implosion pull-marker convention, SaveAttackAoeModal:191/:1485)
+// and logs the pull grant + GM token-move advisory. STRUCTURED-KEY-ONLY
+// (MA-0367/MA-0639 precedent, playbook §5) — byte-inert null for every row
+// without the key; size_limit validated against the size ladder.
+const PULL_SIZE_LIMITS = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
+export function parseHitPull(action) {
+  const pull = action?.hit_pull;
+  if (!pull || typeof pull !== 'object') return null;
+  const distanceFt = Number(pull.distance_ft);
+  if (!Number.isInteger(distanceFt) || distanceFt < 1) return null;
+  if (!PULL_SIZE_LIMITS.includes(pull.size_limit)) return null;
+  return { distanceFt, sizeLimit: pull.size_limit };
+}
+
 function hitClauseAutoGrantConditions(action) {
   if (hitChoiceArmed(action) || !Array.isArray(action?.hit_conditions)) return [];
   return action.hit_conditions.map(c => String(c).toLowerCase());
 }
 
-export function buildHitConditionClause(action) {
-  const conditions = hitClauseAutoGrantConditions(action);
+// MA-1459: rider payload hoisted (§45 complexity cap — MA-1451 lineage note
+// that branch-heavy additions push buildHitConditionClause over 15).
+function hitClauseRiderPayload(action) {
   const targetEffect = action?.hit_target_effect || null;
   const targetEffectAbility = targetEffect ? parseHitTargetEffectAbility(action) : null;
   const conditionRoll = parseHitConditionRoll(action);
   const abilityDrain = parseHitAbilityDrain(action);
-  if (conditions.length === 0 && !targetEffect && !conditionRoll && !abilityDrain) return null;
+  const pull = parseHitPull(action);
   return {
-    conditions,
-    escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,
-    attackName: action?.name || 'Attack',
     targetEffect,
     ...(targetEffectAbility ? { targetEffectAbility } : {}),
     ...(conditionRoll ? { conditionRoll } : {}),
     ...(abilityDrain ? { abilityDrain } : {}),
+    ...(pull ? { pull } : {}),
+  };
+}
+
+export function buildHitConditionClause(action) {
+  const conditions = hitClauseAutoGrantConditions(action);
+  const riders = hitClauseRiderPayload(action);
+  if (conditions.length === 0 && !riders.targetEffect && !riders.conditionRoll && !riders.abilityDrain && !riders.pull) return null;
+  return {
+    conditions,
+    escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,
+    attackName: action?.name || 'Attack',
+    ...riders,
   };
 }
 

@@ -305,6 +305,21 @@ describe('targetEffectDefinitions', () => {
       // shape). Consumer legs: conditionEffects.js speed_reduction +
       // no_reactions fold (MA-0087 trio) + ConditionEffectBadges.jsx
       // 'Frozen Grip' badge; economy clauses are §70 advisory copy.
+      // MA-1459: Shambling Mound Charged Tendril reuses pulled_toward (no
+      // duplicate te — AGENTS registry rule). The attack-hit producer
+      // (handlePlainDamage.applyHitPullClause) writes value = feet (5 RAW);
+      // PC Warping Implosion writes no value (default covers the GM add UI,
+      // registerTargetEffect itself merges extraProps verbatim).
+      it('MA-1459: pulled_toward whitelist extended with value field + default 5 for the monster attack-hit pull producer', () => {
+        const pulledToward = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'pulled_toward');
+        expect(pulledToward.label).toBe('Pulled Toward');
+        expect(pulledToward.group).toBe('Movement');
+        expect(pulledToward.fields).toEqual(['source', 'value']);
+        expect(pulledToward.defaults.value).toBe(5);
+        expect(pulledToward.description).toMatch(/pulled N feet straight toward the source/i);
+        expect(pulledToward.description).toMatch(/GM-enforced/);
+      });
+
       it('MA-1012: frozen_grip whitelist pins label/group/value field + default 10 for the Ice Spear passthrough', () => {
         const frozenGrip = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'frozen_grip');
         expect(frozenGrip.label).toBe('Frozen Grip');
