@@ -25132,7 +25132,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The spectator randomly shoots one of the following magical rays at a target it can see within 90 feet of itself (roll 1d4; reroll if the spectator has already used that ray during this turn)",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1483-eye-rays.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1484",

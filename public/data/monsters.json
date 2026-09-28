@@ -56356,7 +56356,65 @@
       },
       {
         "name": "Eye Rays",
-        "description": "The spectator randomly shoots one of the following magical rays at a target it can see within 90 feet of itself (roll 1d4; reroll if the spectator has already used that ray during this turn)"
+        "description": "The spectator randomly shoots one of the following magical rays at a target it can see within 90 feet of itself (roll 1d4; reroll if the spectator has already used that ray during this turn)",
+        "save_dc": 12,
+        "range": "90 ft.",
+        "save_effect": "Confusion Ray: 5 (2d4) Psychic damage, no Reactions until the target's next turn ends and its Speed is 0 on its next turn. Paralyzing Ray: Paralyzed condition, repeats save at end of each turn. Fear Ray: 5 (2d4) Psychic damage and Frightened condition. Wounding Ray: 16 (3d10) Necrotic damage. Success on damage rays: Half damage.",
+        "rays": [
+          {
+            "key": "confusion",
+            "name": "Confusion Ray",
+            "save_ability": "Wisdom",
+            "damage_dice": "2d4",
+            "damage_type": "Psychic",
+            "dc_success": "none",
+            "conditions": [],
+            "te_grants": [
+              "no_reactions",
+              "speed_zero"
+            ],
+            "clock_rounds": 2,
+            "duration_note": "5 (2d4) Psychic damage on a failed save; no Reactions until the end of the target's next turn and its Speed is 0 on its next turn (no_reactions + speed_zero te, rounds:2 clock); attacking a randomly determined creature is GM-enforced (no random-choice consumer).",
+            "save_effect": "The target takes 5 (2d4) Psychic damage, and can't take Reactions until the end of its next turn. On its next turn, the target can't move, and it uses its action to make a melee or ranged attack against a randomly determined creature within range. If the target can't attack, it does nothing on that turn. Success: none — the ray deals no damage."
+          },
+          {
+            "key": "paralyzing",
+            "name": "Paralyzing Ray",
+            "save_ability": "Constitution",
+            "damage_dice": null,
+            "damage_type": null,
+            "dc_success": "none",
+            "conditions": [],
+            "ladder": "paralyzed",
+            "duration_note": "Paralyzed — repeats the CON save at the end of each of its turns, ending on a success; auto-succeeds after 1 minute (10-round clock).",
+            "save_effect": "The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically."
+          },
+          {
+            "key": "fear",
+            "name": "Fear Ray",
+            "save_ability": "Wisdom",
+            "damage_dice": "2d4",
+            "damage_type": "Psychic",
+            "dc_success": "none",
+            "conditions": [
+              "frightened"
+            ],
+            "clock_rounds": 2,
+            "duration_note": "2d4 Psychic damage on a failed save; Frightened until the end of the target's next turn (rounds:2 clock); RAW carries no half-on-success clause (dc_success:\"none\").",
+            "save_effect": "The target takes 5 (2d4) Psychic damage, and has the Frightened condition until the end of its next turn. Success: none — the ray deals no damage."
+          },
+          {
+            "key": "wounding",
+            "name": "Wounding Ray",
+            "save_ability": "Constitution",
+            "damage_dice": "3d10",
+            "damage_type": "Necrotic",
+            "dc_success": "half",
+            "conditions": [],
+            "duration_note": "3d10 Necrotic damage on a failed save; half damage on a successful save (dc_success:\"half\").",
+            "save_effect": "The target takes 16 (3d10) Necrotic damage. Success: The target takes half damage."
+          }
+        ]
       },
       {
         "name": "Confusion Ray",
