@@ -60261,7 +60261,13 @@
         "damage_dice_primary": "1d8 + 4",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "3d6",
-        "damage_type_secondary": "Poison"
+        "damage_type_secondary": "Poison",
+        "conditional_damage": {
+          "dice": "1d4",
+          "modifier": 4,
+          "damage_type": "Piercing",
+          "condition": "Bloodied"
+        }
       }
     ],
     "bonus_actions": [],
