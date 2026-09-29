@@ -1155,3 +1155,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1584 (2026-09-29, Thri-Kreen Bite FIXED — margin rider + first generic repeat_save.effect lane) New pitfalls
 - Margin rider twin shape: save_margin:{fails_by:5,also:"paralyzed"} + MANDATORY save_effect strip to shallow band ("Failure: poisoned for 1 minute.") — un-stripped "paralyzed" prose over-grants on EVERY fail (§1105 inversion: inert rider = OVER-grant not under). Rider grant log copy hardcodes "unconscious" (MA-0639 shared template, cosmetic).
 - FIRST live repeat_save.effect row: repeat_save:{effect:'thri_kreen_bite_poison',save_type:'Constitution',dc:11,condition:'poisoned'} + te registered → applyRepeatSaveTurnEnd fires EOT saves live (success clears te+cond, fail persists). Residual: paralyzed survives repeat-success (no "while poisoned in this way" unbind consumer).
+
+## §MA-1595 (2026-09-29, Tiger Rend FIXED — queue complete) New pitfalls
+- Plain `prone` activeCondition has NO BADGE_SPECS entry (only Tasha's Hideous Laughter te) — no board Prone badge; grant truth = activeConditions + meta + condition log (§MA-1541 rule restated).
+- 68 monsters share name "Rend" — full description+digits anchor required for unique data edit. EB substring search: "Tiger" also matches Saber-Toothed Tiger — exact-text cell match required.
