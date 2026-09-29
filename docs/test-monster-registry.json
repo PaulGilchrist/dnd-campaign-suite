@@ -6711,7 +6711,7 @@
     "placedIn": "EB join Spectator + Bandit(s); initiative admin-cleared after MA-1488 block",
     "config": {
       "name": "Spectator 1",
-      "verifiedRow": "MA-1481 PASS-subset Multiattack header zero-chip; rays fired x2 ungated GM-adjudicated; Eye Rays launcher rays[] ABSENT (separate defect lane gazer MA-0765 twin fix) 2026-09-27 | MA-1482 PASS Bite +4: 29 hits 1d6+2 Piercing, boundary 12/11 both faces, 5 crits dice-only (Bandit 818 after) | MA-1484 FAIL(a) Confusion Ray: DC12 WIS + 2d4 fail-full + no_reactions te rounds:2 LIVE, BUT half-leak on RAW-silent successes (half 2/3 paid) - dc_success:none fix (Bandit 985 after) | MA-1486 FAIL(a) Fear Ray: half-leak success (same dc_success:none fix as MA-1484); fail-face full 2d4 + frightened exact; Bandit1 985/Bandit2 986 after | MA-1487 PASS Wounding Ray DC12 CON half-on-save exact both faces (4 fires, dc_success half RAW-correct here) | MA-1488 FAIL(a) Spell Reflection: ungated save chip (no automation.effect), fires 5x any time, half-leak 3/3; DATA fix dc_success:none + reaction gate | SPECTATOR BLOCK DONE, cleared 2026-09-27"
+      "verifiedRow": "MA-1481 PASS-subset Multiattack header zero-chip; rays fired x2 ungated GM-adjudicated; Eye Rays launcher rays[] ABSENT (separate defect lane gazer MA-0765 twin fix) 2026-09-27 | MA-1482 PASS Bite +4: 29 hits 1d6+2 Piercing, boundary 12/11 both faces, 5 crits dice-only (Bandit 818 after) | MA-1484 FAIL(a) Confusion Ray: DC12 WIS + 2d4 fail-full + no_reactions te rounds:2 LIVE, BUT half-leak on RAW-silent successes (half 2/3 paid) - dc_success:none fix (Bandit 985 after) | MA-1486 FAIL(a) Fear Ray: half-leak success (same dc_success:none fix as MA-1484); fail-face full 2d4 + frightened exact; Bandit1 985/Bandit2 986 after | MA-1487 PASS Wounding Ray DC12 CON half-on-save exact both faces (4 fires, dc_success half RAW-correct here) | MA-1488 FAIL(a) Spell Reflection: ungated save chip (no automation.effect), fires 5x any time, half-leak 3/3; DATA fix dc_success:none + reaction gate | SPECTATOR BLOCK DONE, cleared 2026-09-27 | MA-1485 PASS Paralyzing Ray: launcher chooser lane, DC12 CON, fail->paralyzed te eye_ray_paralyzed+rounds:10, repeat-save consumer navigationHandlers.js:148 live, nat20 success zero-apply, latch 4-press reroll 2026-09-28, rejoined+cleared"
     }
   },
   "Specter": {
@@ -6828,10 +6828,210 @@
   },
   "Stone Golem": {
     "monsterIndex": "stone-golem",
-    "placedIn": "(session-end; last live: Stone Golem 1 220hp init13 + Bandit 958)",
+    "placedIn": "(re-joined EB MA-1537; cleared after)",
     "config": {
       "name": "Stone Golem 1",
-      "verifiedRow": "MA-1536 PASS-subset Multiattack header zero-chip; Slam +10 2d8+6+2d8 force fd22, Force Bolt +9 4d10 fd19 exact; session halted here 2026-09-28"
+      "verifiedRow": "MA-1536 PASS-subset Multiattack header zero-chip; Slam +10 2d8+6+2d8 force fd22, Force Bolt +9 4d10 fd19 exact; session halted here 2026-09-28 | MA-1537 PASS Slam +10 dual-pool exact (2d8+6 Bldg then 2d8 Force, MA-0427 seam), miss nat1 11vAC12 zero-dmg; cleared 2026-09-28 | MA-1538 PASS Force Bolt +9 4d10 Force single-pool, crit 4d10*2=44, miss nat2 11v12; 14/14 ledger exact; cleared 2026-09-28"
+    }
+  },
+  "Storm Giant": {
+    "monsterIndex": "storm-giant",
+    "placedIn": "EB join Storm Giant+Bandit (MA-1539; cleared after)",
+    "config": {
+      "name": "Storm Giant 1",
+      "verifiedRow": "MA-1539 PASS-subset Multiattack header zero-chip; components Storm Sword +14 4d6+9+3d8 / Thunderbolt +14 500ft present; 2026-09-28 | MA-1540 PASS Storm Sword +14 dual-pool 4d6+9+3d8, crit 4d6*2+9 / 3d8*2, miss arith-unreachable vs AC12 (no GM d20 override offered); cleared 2026-09-28 | MA-1542 PASS Lightning Storm DC18 DEX: fail full 10d10, success floor-half exact, gridless per-target adjudication (cylinder hard-excluded picker §162); Bandit x2 recipe; cleared 2026-09-28"
+    }
+  },
+  "Succubus": {
+    "monsterIndex": "succubus",
+    "placedIn": "EB join Succubus+Bandit (MA-1544; cleared after)",
+    "config": {
+      "name": "Succubus 1",
+      "verifiedRow": "MA-1544 PASS-subset Multiattack header zero-chip; components Fiendish Touch +7 2d10+5 / Charm DC15 CHA / Draining Kiss 3d8 DC15 CON on card; 2026-09-28 | MA-1545 PASS Fiendish Touch +7 2d10+5 Psychic: 11 hits, 2 misses (nat3/4), crit 2d10*2+5=35 exact; cleared 2026-09-28"
+    }
+  },
+  "Succubus/Incubus": {
+    "monsterIndex": "succubus-incubus",
+    "placedIn": "EB join Succubus/Incubus+Bandit (MA-1548; cleared after)",
+    "config": {
+      "name": "Succubus/Incubus 1",
+      "verifiedRow": "MA-1548 PASS Claw (Fiend Form Only) +5 1d6+3 slashing; crit 1d6*2+3, misses nat1/2/5; EB matches slash-name exact; 2026-09-28 | MA-1549 PASS-subset Charm DC15 WIS: fail->charmed store+badge+log exact, success zero-leak; gaps: 1-day duration advisory absent, 24h-immunity/one-target unmodeled; cleared 2026-09-28 | MA-1550 FAIL(inert max-HP-reduce rider; DC15 CON + half-floor exact PASS-partial, maxHp 200 inert both faces, save-path seam gap §MA-1547); cleared 2026-09-28 | MA-1551 FAIL(b)/DATA Etherealness plain bold zero-affordance (MA-0780 pre-fix twin; fix=monster_self_buff automation, ghost precedent); cleared 2026-09-28"
+    }
+  },
+  "Swarm of Bats": {
+    "monsterIndex": "swarm-of-bats",
+    "placedIn": "EB join Swarm of Bats+Bandit (MA-1552; cleared after)",
+    "config": {
+      "name": "Swarm of Bats 1",
+      "verifiedRow": "MA-1552 FAIL(a)/DATA Bites +4 base-only 2d4, no conditional_damage field, zero bloodied variant offer healthy+bloodied zero-delta (MA-0485/0756 twin); 2026-09-28"
+    }
+  },
+  "Swarm of Beetles": {
+    "monsterIndex": "swarm-of-beetles",
+    "placedIn": "EB join Swarm of Beetles+Bandit (MA-1553; cleared after)",
+    "config": {
+      "name": "Swarm of Beetles 1",
+      "verifiedRow": "MA-1553 FAIL(a)/DATA Bites +3 base-only 4d4, prose-only half-HP variant zero-delta bloodied-state (MA-1552 twin); 2026-09-28"
+    }
+  },
+  "Swarm of Centipedes": {
+    "monsterIndex": "swarm-of-centipedes",
+    "placedIn": "EB join Swarm of Centipedes+Bandit (MA-1554; cleared after)",
+    "config": {
+      "name": "Swarm of Centipedes 1",
+      "verifiedRow": "MA-1554 FAIL(a)/DATA Bites base +3 4d4 exact PASS-partial; half-HP variant + KO poison/paralyzed riders both inert; 2026-09-28"
+    }
+  },
+  "Swarm of Crawling Claws": {
+    "monsterIndex": "swarm-of-crawling-claws",
+    "placedIn": "EB join Swarm of Crawling Claws+Bandit (MA-1555; cleared after)",
+    "config": {
+      "name": "Swarm of Crawling Claws 1",
+      "verifiedRow": "MA-1555 FAIL(a)/DATA base +4 4d8+2 necrotic exact; bloodied variant + prone rider inert (no conditional_damage/hit_conditions); 2026-09-28"
+    }
+  },
+  "Swarm of Dretches": {
+    "monsterIndex": "swarm-of-dretches",
+    "placedIn": "EB join Swarm of Dretches+Bandit (MA-1556; cleared after)",
+    "config": {
+      "name": "Swarm of Dretches 1",
+      "verifiedRow": "MA-1556 PASS Multiattack header zero-chip; Rend +4 3d6+2 slashing live (bloodied 3d4+2 variant pending its own row); AC12 HP45 CR4; 2026-09-28 | MA-1557 FAIL(a)/DATA Rend base 3d6+2 exact, bloodied 3d4+2 prose-only zero-delta (no conditional_damage); cleared 2026-09-28"
+    }
+  },
+  "Swarm of Insects": {
+    "monsterIndex": "swarm-of-insects",
+    "placedIn": "EB join Swarm of Insects+Bandit (MA-1558; cleared after)",
+    "config": {
+      "name": "Swarm of Insects 1",
+      "verifiedRow": "MA-1558 FAIL(a)/DATA Bites +3 base 2d4+1 poison exact; bloodied 1d4+1 prose-only zero-delta twin; 2026-09-28"
+    }
+  },
+  "Swarm of Larvae": {
+    "monsterIndex": "swarm-of-larvae",
+    "placedIn": "EB join Swarm of Larvae+Bandit (MA-1559; cleared after)",
+    "config": {
+      "name": "Swarm of Larvae 1",
+      "verifiedRow": "MA-1559 FAIL(a)/DATA Bites +4 base 2d6+2 necrotic exact; bloodied 2d4+2 prose-only zero-delta twin; 2026-09-28"
+    }
+  },
+  "Swarm of Lemures": {
+    "monsterIndex": "swarm-of-lemures",
+    "placedIn": "EB join Swarm of Lemures+Bandit (MA-1560; cleared after)",
+    "config": {
+      "name": "Swarm of Lemures 1",
+      "verifiedRow": "MA-1560 PASS Multiattack header zero-chip; Vile Slime +4 2d8+2 poison (bloodied 2d6+2 alt pending own row) AC12 HP45 CR3; 2026-09-28 | MA-1561 FAIL(a)/DATA Vile Slime base 2d8+2 exact; bloodied 2d6+2 prose-only zero-delta twin; cleared 2026-09-28"
+    }
+  },
+  "Swarm of Piranhas": {
+    "monsterIndex": "swarm-of-piranhas",
+    "placedIn": "EB join Swarm of Piranhas+Bandit (MA-1562; cleared after)",
+    "config": {
+      "name": "Swarm of Piranhas 1",
+      "verifiedRow": "MA-1562 FAIL(a)/DATA base +5 2d4+3 exact; bloodied 1d4+3 + auto-adv-if-damaged both inert; 2026-09-28"
+    }
+  },
+  "Swarm of Poisonous Snakes": {
+    "monsterIndex": "swarm-of-poisonous-snakes",
+    "placedIn": "EB join Swarm of Poisonous Snakes+Bandit (MA-1563; cleared after)",
+    "config": {
+      "name": "Swarm of Poisonous Snakes 1",
+      "verifiedRow": "MA-1563 FAIL(a) attack half +6 2d6 exact; save leg rolled 2d6-piercing pool instead of 4d6-poison (MA-1563 seam pitfall); bloodied 1d6 inert twin; 2026-09-28"
+    }
+  },
+  "Swarm of Quippers": {
+    "monsterIndex": "swarm-of-quippers",
+    "placedIn": "EB join Swarm of Quippers+Bandit (MA-1564; cleared after)",
+    "config": {
+      "name": "Swarm of Quippers 1",
+      "verifiedRow": "MA-1564 FAIL(a)/DATA base +5 4d6 piercing exact+crit doubled; bloodied 2d6 prose-only zero-delta twin; 2026-09-28"
+    }
+  },
+  "Swarm of Rats": {
+    "monsterIndex": "swarm-of-rats",
+    "placedIn": "EB join Swarm of Rats+Bandit (MA-1565; cleared after)",
+    "config": {
+      "name": "Swarm of Rats 1",
+      "verifiedRow": "MA-1565 FAIL(a)/DATA base +2 2d4 exact; bloodied 1d4 inert twin; 2026-09-28"
+    }
+  },
+  "Swarm of Ravens": {
+    "monsterIndex": "swarm-of-ravens",
+    "placedIn": "EB join Swarm of Ravens+Bandit (MA-1566/1567; cleared after)",
+    "config": {
+      "name": "Swarm of Ravens 1",
+      "verifiedRow": "MA-1566 FAIL(a)/DATA Beaks bloodied 1d4 inert; MA-1567 PASS Cacophony DC10 WIS->deafened exact, success zero-leak, advisory-only duration no rounds clock (evidence-mon-MA-1567); 2026-09-28"
+    }
+  },
+  "Swarm of Spiders": {
+    "monsterIndex": "swarm-of-spiders",
+    "placedIn": "EB join Swarm of Spiders+Bandit (MA-1568; cleared after)",
+    "config": {
+      "name": "Swarm of Spiders 1",
+      "verifiedRow": "MA-1568 FAIL(a)/DATA base +3 4d4 exact (hit-10>2d4max proves base-only); half-HP 2d4 inert twin; 2026-09-28"
+    }
+  },
+  "Swarm of Stirges": {
+    "monsterIndex": "swarm-of-stirges",
+    "placedIn": "EB join Swarm of Stirges+Bandit (MA-1569; cleared after)",
+    "config": {
+      "name": "Swarm of Stirges 1",
+      "verifiedRow": "MA-1569 FAIL(a)/DATA base +5 2d10+3 exact; bloodied 1d10+3 + grapple DC13 rider + turn-end 2d6 necrotic all inert; 2026-09-28"
+    }
+  },
+  "Swarm of Venomous Snakes": {
+    "monsterIndex": "swarm-of-venomous-snakes",
+    "placedIn": "EB join Swarm of Venomous Snakes+Bandit (MA-1570; cleared after)",
+    "config": {
+      "name": "Swarm of Venomous Snakes 1",
+      "verifiedRow": "MA-1570 FAIL(a)/DATA dual-pool 1d8+4+3d6 exact PASS-partial; bloodied 1d4+4 variant inert twin; 2026-09-28"
+    }
+  },
+  "Swarm of Wasps": {
+    "monsterIndex": "swarm-of-wasps",
+    "placedIn": "EB join Swarm of Wasps+Bandit (MA-1571; cleared after)",
+    "config": {
+      "name": "Swarm of Wasps 1",
+      "verifiedRow": "MA-1571 FAIL(a)/DATA Bites +3 4d4 exact; half-HP 2d4 inert byte-twin MA-1568; 2026-09-28"
+    }
+  },
+  "Tarrasque": {
+    "monsterIndex": "tarrasque",
+    "placedIn": "EB join Tarrasque+Bandit (MA-1572; cleared after)",
+    "config": {
+      "name": "Tarrasque 1",
+      "verifiedRow": "MA-1572 PASS Multiattack header zero-chip, text exact; components Bite/Claw/Horns/Tail +19 / Frightful Presence DC17 WIS / Swallow on card; count GM-adjudicated; 2026-09-28 | MA-1573 FAIL(a)/DATA Bite base +19 4d12+10 exact; grapple/restrained rider + one-target gate inert; typos 4dl2/Ifthe noted; Bandit x2 recipe; cleared 2026-09-28 | MA-1574 PASS Claw +19 4d8+10 slashing exact 2 hits, miss unreachable min20; cleared 2026-09-28 | MA-1575 PASS Horns +19 4d10+10 piercing exact, nat1 crit-miss reachable (high-bonus arithmetic-miss assumption corrected); cleared 2026-09-28 | MA-1576 PASS-subset Tail: attack 4d6+10 exact + DC20 STR fail->prone exact success zero-grant; RAW hit->save gate NOT enforced (independent twin chips, gridless-honest); cleared 2026-09-28 | MA-1577 FAIL(a)/DATA FP DC17 WIS frightened-on-fail exact PASS-partial, EOT repeat-save+24h-immunity unarmed (prose-only, no repeat_save/success_immunity objects) Divine_Cleric +9 save face used; cleared 2026-09-28 | MA-1578 FAIL Swallow DC20 CON chip resolves but fail-face inert (8d6+6 unharnessed, no swallowed/blinded/restrained state machine, grep-zero consumer); cleared 2026-09-28 | MA-1579 FAIL/DATA legendary header absent (monsterLegendaryUses.js:153 needs rows[0].uses!=null; tarrasque General has no uses:3 stamp, dracolich MA-0050 precedent); children plain text; cleared 2026-09-28 | MA-1580 FAIL(b)/DATA LA Attack plain-text zero-affordance (no delegates_to, choice claw/tail no consumer); legendary block 0 chips; cleared 2026-09-28 | MA-1581 FAIL(b)/DATA LA Move zero-affordance plain text (physical drag ungated GM-mode); 2026-09-28 | MA-1582 FAIL(b)/DATA LA Chomp zero-affordance (name suffix renders exact, inert); TARRASQUE BLOCK DONE cleared 2026-09-28"
+    }
+  },
+  "Thri-Kreen": {
+    "monsterIndex": "thri-kreen",
+    "placedIn": "EB join Thri-Kreen+Bandit (MA-1583; cleared after)",
+    "config": {
+      "name": "Thri-Kreen 1",
+      "verifiedRow": "MA-1583 PASS Multiattack header zero-chip; Bite +3 1d6+1 + DC11 CON / Claws +3 2d4+1 on card; NOTE source typo monsters.json:60556 Bite body DC 1 1 prose (chip correct) housekeeping; 2026-09-28 | MA-1584 FAIL(a)/DATA Bite: attack+DC11 save honest+poisoned-on-fail, BUT prose over-grant paralyzed ungated on ALL fails (no save_margin; extractConditionsFromSaveEffect over-harvest) + EOT repeat unarmed; margin byte-shape is fails_by; manifest DC 1 1 typo fixed; cleared 2026-09-28 | MA-1585 PASS Claws +3 2d4+1 slashing, 13 hits/9 misses/crit 4d4+1 ledger exact 999-86=913; cleared 2026-09-28"
+    }
+  },
+  "Thri-kreen Marauder": {
+    "monsterIndex": "thri-kreen-marauder",
+    "placedIn": "EB join Thri-kreen Marauder+Bandit (MA-1586; cleared after)",
+    "config": {
+      "name": "Thri-kreen Marauder 1",
+      "verifiedRow": "MA-1586 PASS Multiattack header zero-chip; Gythka +3 dual 1d8+1+1d4 / Chatkcha +4 1d6+2 30/120ft; 2026-09-28 | MA-1587 PASS Gythka +3 dual-pool 1d8+1 Slashing then 1d4 Poison ordered exact; HP-999 Enter-commit trick (Tab clamps via CreatureHp.jsx onBlur); cleared 2026-09-28 | MA-1588 PASS Chatkcha +4 1d6+2 Slashing 21hit/10miss/crit 1d6*2+2 exact, range display-only; BLOCK DONE cleared 2026-09-28"
+    }
+  },
+  "Thri-kreen Psion": {
+    "monsterIndex": "thri-kreen-psion",
+    "placedIn": "EB join Thri-kreen Psion+Bandit (MA-1589; cleared after)",
+    "config": {
+      "name": "Thri-kreen Psion 1",
+      "verifiedRow": "MA-1589 PASS Multiattack header zero-chip, three GM-adjudicated; Psionic Lance +7 4d6+4 Psychic melee-or-120ft; Spellcasting DC15 INT pending own row; 2026-09-28 | MA-1590 PASS Psionic Lance +7 4d6+4 Psychic, 8 hits/2 misses/crit 4d6*2+4=34 exact; dual-mode text-only; cleared 2026-09-28 | MA-1591 FAIL(b)/DATA Spellcasting markup-free zero cast links (MA-1543 twin); cleared 2026-09-28"
+    }
+  },
+  "Thug": {
+    "monsterIndex": "thug",
+    "placedIn": "EB join Thug+Bandit (MA-1592; cleared after)",
+    "config": {
+      "name": "Thug 1",
+      "verifiedRow": "MA-1592 PASS Multiattack header zero-chip; Mace +4 1d6+2 bludgeoning / Heavy Crossbow +2 1d10 on card; 2026-09-28 | MA-1593 PASS Mace +4 1d6+2 bludgeoning 7hit/4miss/crit 1d6*2+2 exact; cleared 2026-09-28 | MA-1594 PASS Heavy Crossbow +2 1d10 piercing, crit 1d10*2, misses <=9; THUG BLOCK DONE cleared 2026-09-28"
     }
   }
 }

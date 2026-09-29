@@ -25165,7 +25165,7 @@
         "paralyzed"
       ],
       "description": "Constitution Saving Throw: DC 12. Failure: The target has the Paralyzed condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1486",
@@ -25994,7 +25994,7 @@
       "damageTypeSecondary": "Force",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 15 (2d8 + 6) Bludgeoning damage plus 9 (2d8) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1538",
@@ -26010,7 +26010,7 @@
       "damageTypePrimary": "Force",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +9, range 120 ft. Hit: 22 (4d10) Force damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1539",
@@ -26022,7 +26022,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The giant makes two attacks, using Storm Sword or Thunderbolt in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1540",
@@ -26040,7 +26040,7 @@
       "damageTypeSecondary": "Lightning",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 23 (4d6 + 9) Slashing damage plus 13 (3d8) Lightning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1541",
@@ -26060,7 +26060,7 @@
         "deafened"
       ],
       "description": "Ranged Attack Roll: +14, range 500 ft. Hit: 22 (2d12 + 9) Lightning damage, and the target has the Blinded and Deafened conditions until the start of the giant's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1541-thunderbolt.md"
     },
     {
       "id": "MA-1542",
@@ -26078,7 +26078,7 @@
       "damageTypePrimary": "Lightning",
       "range": "10-foot-radius, 40-foot-high Cylinder",
       "description": "Dexterity Saving Throw: DC 18, each creature in a 10-foot-radius, 40-foot-high Cylinder originating from a point the giant can see within 500 feet. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1543",
@@ -26092,7 +26092,7 @@
       "saveDc": 18,
       "saveType": "Wisdom",
       "description": "The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18): At Will: Detect Magic, Light; 1/Day: Control Weather",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1543-spellcasting.md"
     },
     {
       "id": "MA-1544",
@@ -26104,7 +26104,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The succubus makes one Fiendish Touch attack and uses Charm or Draining Kiss.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1545",
@@ -26120,7 +26120,7 @@
       "damageTypePrimary": "Psychic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 16 (2d10 + 5) Psychic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1546",
@@ -26134,7 +26134,7 @@
       "saveDc": 15,
       "saveType": "Charisma",
       "description": "The succubus casts Dominate Person (level 8 version), requiring no spell components and using Charisma as the spellcasting ability (spell save DC 15).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1546-charm.md"
     },
     {
       "id": "MA-1547",
@@ -26155,7 +26155,7 @@
         "charmed"
       ],
       "description": "Constitution Saving Throw: DC 15, one creature Charmed by the succubus within 5 feet. Failure: 13 (3d8) Psychic damage. Success: Half damage. Failure or Success: The target's Hit Point maximum decreases by an amount equal to the damage taken.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1547-draining-kiss.md"
     },
     {
       "id": "MA-1548",
@@ -26171,7 +26171,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1549",
@@ -26189,7 +26189,7 @@
         "charmed"
       ],
       "description": "One humanoid the fiend can see within 30 feet of it must succeed on a DC 15 Wisdom saving throw or be magically charmed for 1 day. The charmed target obeys the fiend's verbal or telepathic commands. If the target suffers any harm or receives a suicidal command, it can repeat the saving throw, ending the effect on a success. If the target successfully saves against the effect, or if the effect on it ends, the target is immune to this fiend's Charm for the next 24 hours. The fiend can have only one target charmed at a time. If it charms another, the effect on the previous target ends.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1550",
@@ -26209,7 +26209,7 @@
         "charmed"
       ],
       "description": "The fiend kisses a creature charmed by it or a willing creature. The target must make a DC 15 Constitution saving throw against this magic, taking 32 (5d10 + 5) psychic damage on a failed save, or half as much damage on a successful one. The target's hit point maximum is reduced by an amount equal to the damage taken. This reduction lasts until the target finishes a long rest. The target dies if this effect reduces its hit point maximum to 0.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1550-draining-kiss.md"
     },
     {
       "id": "MA-1551",
@@ -26221,7 +26221,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The fiend magically enters the Ethereal Plane from the Material Plane, or vice versa.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1551-etherealness.md"
     },
     {
       "id": "MA-1552",
@@ -26237,7 +26237,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (2d4) Piercing damage, or 2 (1d4) Piercing damage if the swarm is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1552-bites.md"
     },
     {
       "id": "MA-1553",
@@ -26253,7 +26253,7 @@
       "damageTypePrimary": "piercing",
       "reach": "0 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 0 ft., one target in the swarm's space. Hit: 10 (4d4) piercing damage, or 5 (2d4) piercing damage if the swarm has half of its hit points or fewer.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1553-bites.md"
     },
     {
       "id": "MA-1554",
@@ -26273,7 +26273,7 @@
         "poisoned"
       ],
       "description": "Melee Weapon Attack: +3 to hit, reach 0 ft., one target in the swarm's space. Hit: 10 (4d4) piercing damage, or 5 (2d4) piercing damage if the swarm has half of its hit points or fewer. A creature reduced to 0 hit points by a swarm of centipedes is stable but poisoned for 1 hour, even after regaining hit points, and paralyzed while poisoned in this way.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1554-bites.md"
     },
     {
       "id": "MA-1555",
@@ -26292,7 +26292,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 20 (4d8 + 2) Necrotic damage, or 11 (2d8 + 2) Necrotic damage if the swarm is Bloodied. If the target is a Medium or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1555-swarm-of-grasping-hands.md"
     },
     {
       "id": "MA-1556",
@@ -26304,7 +26304,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The swarm makes two Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1557",
@@ -26320,7 +26320,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 12 (3d6 + 2) Slashing damage, or 9 (3d4 + 2) Slashing damage if the swarm is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1557-rend.md"
     },
     {
       "id": "MA-1558",
@@ -26336,7 +26336,7 @@
       "damageTypePrimary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 6 (2d4 + 1) Poison damage, or 3 (1d4 + 1) Poison damage if the swarm is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1558-bites.md"
     },
     {
       "id": "MA-1559",
@@ -26352,7 +26352,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 9 (2d6 + 2) Necrotic damage, or 7 (2d4 + 2) Necrotic damage if the swarm is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1559-bites.md"
     },
     {
       "id": "MA-1560",
@@ -26364,7 +26364,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The swarm makes two Vile Slime attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1561",
@@ -26380,7 +26380,7 @@
       "damageTypePrimary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 11 (2d8 + 2) Poison damage, or 9 (2d6 + 2) Poison damage if the swarm is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1561-vile-slime.md"
     },
     {
       "id": "MA-1562",
@@ -26396,7 +26396,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. Hit: 8 (2d4 + 3) Piercing damage, or 5 (1d4 + 3) Piercing damage if the swarm is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1562-bites.md"
     },
     {
       "id": "MA-1563",
@@ -26415,7 +26415,7 @@
       "damageTypePrimary": "piercing",
       "reach": "0 ft.",
       "description": "Melee Weapon Attack: +6 to hit, reach 0 ft., one creature in the swarm's space. Hit: 7 (2d6) piercing damage, or 3 (1d6) piercing damage if the swarm has half of its hit points or fewer. The target must make a DC 10 Constitution saving throw, taking 14 (4d6) poison damage on a failed save, or half as much damage on a successful one.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1563-bites.md"
     },
     {
       "id": "MA-1564",
@@ -26431,7 +26431,7 @@
       "damageTypePrimary": "piercing",
       "reach": "0 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 0 ft., one creature in the swarm's space. Hit: 14 (4d6) piercing damage, or 7 (2d6) piercing damage if the swarm has half of its hit points or fewer.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1564-bites.md"
     },
     {
       "id": "MA-1565",
@@ -26447,7 +26447,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 5 (2d4) Piercing damage, or 2 (1d4) Piercing damage if the swarm is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1565-bites.md"
     },
     {
       "id": "MA-1566",
@@ -26463,7 +26463,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage, or 2 (1d4) Piercing damage if the swarm is Bloodied.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1566-beaks.md"
     },
     {
       "id": "MA-1567",
@@ -26481,7 +26481,7 @@
         "deafened"
       ],
       "description": "Wisdom Saving Throw: DC 10, one creature in the swarm's space. Failure: The target has the Deafened condition until the start of the swarm's next turn. While Deafened, the target also has Disadvantage on ability checks and attack rolls.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1568",
@@ -26497,7 +26497,7 @@
       "damageTypePrimary": "piercing",
       "reach": "0 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 0 ft., one target in the swarm's space. Hit: 10 (4d4) piercing damage, or 5 (2d4) piercing damage if the swarm has half of its hit points or fewer.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1568-bites.md"
     },
     {
       "id": "MA-1569",
@@ -26516,7 +26516,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 14 (2d10 + 3) Piercing damage, or 8 (1d10 + 3) Piercing damage if the swarm is Bloodied. If the target is a Medium or smaller creature in the swarm's space, the target has the Grappled condition (escape DC 13). Until the grapple ends, the target takes 7 (2d6) Necrotic damage at the end of each of its turns.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1569-swarm-of-proboscises.md"
     },
     {
       "id": "MA-1570",
@@ -26534,7 +26534,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage\u2014or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied\u2014plus 10 (3d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1570-bites.md"
     },
     {
       "id": "MA-1571",
@@ -26550,7 +26550,7 @@
       "damageTypePrimary": "piercing",
       "reach": "0 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 0 ft., one target in the swarm's space. Hit: 10 (4d4) piercing damage, or 5 (2d4) piercing damage if the swarm has half of its hit points or fewer.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1571-bites.md"
     },
     {
       "id": "MA-1572",
@@ -26562,7 +26562,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The tarrasque can use its Frightful Presence. It then makes five attacks: one with its bite, two with its claws, one with its horns, and one with its tail. It can use its Swallow instead of its bite.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1573",
@@ -26582,7 +26582,7 @@
         "restrained"
       ],
       "description": "Melee Weapon Attack: +19 to hit, reach 10 ft., one target. Hit: 36 (4dl2 + 10) piercing damage. Ifthe target is a creature, it is grappled (escape DC 20). Until this grapple ends, the target is restrained, and the tarrasque can't bite another target.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1573-bite.md"
     },
     {
       "id": "MA-1574",
@@ -26598,7 +26598,7 @@
       "damageTypePrimary": "slashing",
       "reach": "15 ft.",
       "description": "Melee Weapon Attack: +19 to hit, reach 15 ft., one target. Hit: 28 (4d8 + 10) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1575",
@@ -26614,7 +26614,7 @@
       "damageTypePrimary": "piercing",
       "reach": "10 ft.",
       "description": "Melee Weapon Attack: +19 to hit, reach 10 ft., one target. Hit: 32 (4d10 + 10) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1576",
@@ -26636,7 +26636,7 @@
         "prone"
       ],
       "description": "Melee Weapon Attack: +19 to hit, reach 20 ft., one target. Hit: 24 (4d6 + 10) bludgeoning damage. If the target is a creature, it must succeed on a DC 20 Strength saving throw or be knocked prone.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1577",
@@ -26654,7 +26654,7 @@
         "frightened"
       ],
       "description": "Each creature ofthe tarrasque's choice within 120 feet of it and aware of it must succeed on a DC 17 Wisdom saving throw or become frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, with disadvantage if the tarrasque is within line of sight, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to the tarrasque's Frightful Presence for the next 24 hours.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1577-frightful-presence.md"
     },
     {
       "id": "MA-1578",
@@ -26674,7 +26674,7 @@
         "restrained"
       ],
       "description": "The tarrasque makes one bite attack against a Large or smaller creature it is grappling. If the attack hits, the target takes the bite's damage, the target is swallowed, and the grapple ends. While swallowed, the creature is blinded and restrained, it has total cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) acid damage at the start of each of the tarrasque's turns. If the tarrasque takes 60 damage or more on a single turn from a creature inside it, the tarrasque must succeed on a DC 20 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, which fall prone in a space within 10 feet ofthe tarrasque. If the tarrasque dies, a swallowed creature is no longer restrained by it and can escape from the corpse by using 30 feet of movement, exiting prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1578-swallow.md"
     },
     {
       "id": "MA-1579",
@@ -26686,7 +26686,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The tarrasque can take 3 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only at the end ofanother creature's turn. The tarrasque regains spent legendary actions at the start of its turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1579-general.md"
     },
     {
       "id": "MA-1580",
@@ -26698,7 +26698,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The tarrasque makes one claw attack or tail attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1580-attack.md"
     },
     {
       "id": "MA-1581",
@@ -26710,7 +26710,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The tarrasque moves up to half its speed.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1581-move.md"
     },
     {
       "id": "MA-1582",
@@ -26722,7 +26722,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The tarrasque makes one bite attack or uses its Swallow.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1582-chomp.md"
     },
     {
       "id": "MA-1583",
@@ -26734,7 +26734,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The thri-kreen makes two attacks: one with its bite and one with its claws.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1584",
@@ -26756,8 +26756,8 @@
         "paralyzed",
         "poisoned"
       ],
-      "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one creature. Hit: 4 (1d6 + 1) piercing damage, and the target must succeed on a DC 1 1 Constitution saving throw or be poisoned for 1 minute. If the saving throw fails by 5 or more, the target is also paralyzed while poisoned in this way. The poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
-      "verified": "not verified"
+      "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one creature. Hit: 4 (1d6 + 1) piercing damage, and the target must succeed on a DC 11 Constitution saving throw or be poisoned for 1 minute. If the saving throw fails by 5 or more, the target is also paralyzed while poisoned in this way. The poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1584-bite.md"
     },
     {
       "id": "MA-1585",
@@ -26773,7 +26773,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 6 (2d4 + 1) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1586",
@@ -26785,7 +26785,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The thri-kreen makes two attacks, using Gythka or Chatkcha in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1587",
@@ -26803,7 +26803,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d8 + 1) Slashing damage plus 2 (1d4) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1588",
@@ -26819,7 +26819,7 @@
       "damageTypePrimary": "Slashing",
       "range": "30/120 ft.",
       "description": "Ranged Attack Roll: +4, range 30/120 ft. Hit: 5 (1d6 + 2) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1589",
@@ -26831,7 +26831,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The thri-kreen makes three Psionic Lance attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1590",
@@ -26848,7 +26848,7 @@
       "reach": "10 ft.",
       "range": "120 ft.",
       "description": "Melee or Ranged Attack Roll: +7, reach 10 ft. or range 120 ft. Hit: 18 (4d6 + 4) Psychic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1591",
@@ -26865,7 +26865,7 @@
         "invisible"
       ],
       "description": "The thri-kreen casts one of the following spells, requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 15): At Will: Mage Hand (the hand is Invisible); 1/Day Each: Detect Thoughts, Sending, Synaptic Static",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1591-spellcasting.md"
     },
     {
       "id": "MA-1592",
@@ -26877,7 +26877,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The thug makes two melee attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1593",
@@ -26893,7 +26893,7 @@
       "damageTypePrimary": "bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one creature. Hit: 5 (1d6 + 2) bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1594",
@@ -26908,7 +26908,7 @@
       "damageDicePrimary": "1d10",
       "damageTypePrimary": "piercing",
       "description": "Ranged Weapon Attack: +2 to hit, range 100/400 ft., one target. Hit: 5 (1d10) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1595",
