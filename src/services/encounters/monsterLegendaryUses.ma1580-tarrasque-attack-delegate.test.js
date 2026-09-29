@@ -51,11 +51,14 @@ describe('MA-1580 monsters.json data: Tarrasque legendary "Attack" delegates_to 
     expect(legendaryHeaderAction(tarrasque)).toBe(header);
   });
 
-  it('siblings byte-locked: Move and Chomp (Costs 2 Actions) untouched', () => {
+  it('siblings byte-locked: Chomp (Costs 2 Actions) untouched; Move MA-1581 advisory stamp (stale inert-pin inverted same pass §216)', () => {
     const la = tarrasque.legendary_actions;
     expect(la.map(a => a.name)).toEqual(['General', 'Attack', 'Move', 'Chomp (Costs 2 Actions)']);
     const move = la.find(a => a.name === 'Move');
-    expect(Object.keys(move)).toEqual(['name', 'description']);
+    // MA-1581 fix: Move is now an advisory child — advisory + advisory_message
+    // after name, before description (androsphinx/arch-hag advisory byte-shape).
+    expect(Object.keys(move)).toEqual(['name', 'advisory', 'advisory_message', 'description']);
+    expect(move.advisory).toBe('movement');
     expect(move.description).toBe('The tarrasque moves up to half its speed.');
     const chomp = la.find(a => a.name === 'Chomp (Costs 2 Actions)');
     // Chomp cost-2 intact: name-text "(Costs 2 Actions)" + description byte,

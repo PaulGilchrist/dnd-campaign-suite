@@ -26710,7 +26710,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The tarrasque moves up to half its speed.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1581-move.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1582",

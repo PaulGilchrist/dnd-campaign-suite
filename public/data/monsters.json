@@ -60597,6 +60597,8 @@
       },
       {
         "name": "Move",
+        "advisory": "movement",
+        "advisory_message": "moves up to half its speed (40 ft.) — advisory record: GM moves the token; no movement-distance consumer (MA-1581). Movement-distance is GM-enforced and the spend is already adjudicated by the legendary gate.",
         "description": "The tarrasque moves up to half its speed."
       },
       {
