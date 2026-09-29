@@ -59227,7 +59227,13 @@
         "attack_bonus": 3,
         "reach": "5 ft.",
         "damage_dice_primary": "2d4 + 1",
-        "damage_type_primary": "Poison"
+        "damage_type_primary": "Poison",
+        "conditional_damage": {
+          "dice": "1d4",
+          "modifier": 1,
+          "damage_type": "Poison",
+          "condition": "Bloodied"
+        }
       }
     ],
     "bonus_actions": [],
