@@ -198,11 +198,11 @@ describe('MA-1557 monsters.json data lock: Swarm of Dretches Rend Bloodied fix',
     expect(REND.hit_choice).toBeUndefined();
   });
 
-  it('untouched siblings stay untouched: Multiattack plain, ravens inert; rats fixed MA-1565', () => {
+  it('untouched siblings stay untouched: Multiattack plain; rats fixed MA-1565; ravens fixed MA-1566', () => {
     expect(SWARM.actions[0].name).toBe('Multiattack');
     expect(SWARM.actions[0].conditional_damage).toBeUndefined();
     expect(monsters.find((m) => m.index === 'swarm-of-rats').actions[0].conditional_damage).toEqual({ dice: '1d4', damage_type: 'Piercing', condition: 'Bloodied' });
-    expect(monsters.find((m) => m.index === 'swarm-of-ravens').actions[0].conditional_damage).toBeUndefined();
+    expect(monsters.find((m) => m.index === 'swarm-of-ravens').actions[0].conditional_damage).toEqual({ dice: '1d4', damage_type: 'Piercing', condition: 'Bloodied' });
   });
 });
 
