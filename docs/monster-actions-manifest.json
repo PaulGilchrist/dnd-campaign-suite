@@ -26686,7 +26686,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The tarrasque can take 3 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only at the end ofanother creature's turn. The tarrasque regains spent legendary actions at the start of its turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1579-general.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1580",
