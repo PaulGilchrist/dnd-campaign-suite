@@ -1065,3 +1065,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1522 (2026-09-28, Sprite Invisibility FIXED — imp MA-1019 byte-twin) New pitfalls
 - Self-buff invisibility data recipe: `<strong>Invisibility</strong>` + `spellcasting_ability:"Charisma"` + `automation{type:"monster_self_buff",effect:"invisible",rounds:600}` — 600 = canonical "until concentration breaks" backstop (imp/duergar/hag convention). Attack ender `invisible_ended/ends_on_attack` live; refire-while-active → `invisibility_refused/already_invisible` zero-spend. Concentration-break ender = §70 residual (sprite traits:[] — RAW unexpressible).
 - change-data clock reads may show empty for ~10s post-grant (§15 debounce) — re-read before declaring missing.
+
+## §MA-1530 (2026-09-28, Steam Mephit Steam Breath FIXED — save-route speed_reduction producer) New pitfalls
+- Save-route fail-clause producer recipe: parseSpeedReduceClause (Helpers:99, `/speed decreases by N feet/i`) → conePicker payload → SaveAttackAoeModal prop threaded through BOTH resolveSaveFailGrant sites → registerTargetEffect speed_reduction {value:N} + ONE addExpiration {expireOnCreatureName:caster, remove_target_effect} (MA-0995/1147 anchor) + grant log. Expiry anchors at caster NEXT TURN-START (end-of-turn = MA-0542 accepted residual).
+- Dedupe: registerTargetEffect per-(target,effect,source) REPLACE — refire value stays 10 not 20 (consumer conditionEffects:386 accumulates across distinct sources only).
+- Gridless lenient picker: Bandit selectable without token placement (§62 pre-check empty-map drop did NOT fire here).
