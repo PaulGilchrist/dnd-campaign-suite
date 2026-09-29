@@ -791,6 +791,25 @@ export function parseHitHpMaxReduce(action) {
   return String(rider.equal_to || '').toLowerCase() === 'damage' ? { equalTo: 'damage' } : null;
 }
 
+// MA-1547: Succubus "Draining Kiss" save-path HP-max-drain rider — the
+// save-row twin of MA-1489's hit_hp_max_reduce (§1096: that seam was
+// attack-hit-path-only, handlePlainDamage.js:990; "Failure or Success: the
+// target's Hit Point maximum decreases by an amount equal to the damage
+// taken" was structurally unexpressible on save rows). STRUCTURED-KEY-ONLY
+// (MA-1489/MA-1451 byte-inert precedent) — reads ONLY the save_hp_max_reduce
+// key, never prose, so every clauseless save row (and the succubus' own
+// untouched incubus twin) stays byte-identical. The consumer
+// (saveProcessing.applySaveDamage via hpMaxReduceService.applyHpMaxReduce)
+// reduces the victim's max HP by the damage TAKEN (finalDamage — half-floored
+// on success already folded upstream via dc_success:'half') on BOTH faces,
+// accumulates the registered hp_max_reduce te ledger, no clock (RAW ends only
+// at greater restoration; LR restore rides the ledger, MA-1489 convention).
+export function parseSaveHpMaxReduce(action) {
+  const rider = action?.save_hp_max_reduce;
+  if (!rider || typeof rider !== 'object') return null;
+  return String(rider.equal_to || '').toLowerCase() === 'damage' ? { equalTo: 'damage' } : null;
+}
+
 function hitClauseAutoGrantConditions(action) {
   if (hitChoiceArmed(action) || !Array.isArray(action?.hit_conditions)) return [];
   return action.hit_conditions.map(c => String(c).toLowerCase());

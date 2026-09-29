@@ -26155,7 +26155,7 @@
         "charmed"
       ],
       "description": "Constitution Saving Throw: DC 15, one creature Charmed by the succubus within 5 feet. Failure: 13 (3d8) Psychic damage. Success: Half damage. Failure or Success: The target's Hit Point maximum decreases by an amount equal to the damage taken.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1547-draining-kiss.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1548",

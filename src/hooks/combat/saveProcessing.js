@@ -19,6 +19,7 @@ import { grantInfernalWound } from '../../services/rules/features/infernalWoundS
 import { applyEyeRayFailedGrants } from '../../services/rules/features/beholderEyeRayService.js';
 import { stagePetrifyingBiteTargets } from '../../services/rules/features/cockatricePetrifyService.js';
 import { consumeBurstOfIngenuityBuff } from '../../services/encounters/monsterBurstOfIngenuity.js';
+import { applyHpMaxReduce } from '../../services/rules/features/hpMaxReduceService.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -1307,6 +1308,24 @@ async function maybeApplyThresholdKillLeg({ context, characterName, campaignName
     return true;
 }
 
+// MA-1547: Succubus Draining Kiss save-path HP-max drain (§1096: the
+// MA-1489 seam was attack-hit-path-only — this is its save-row twin).
+// Armed ONLY by the structured save_hp_max_reduce key parsed onto the
+// block-save context (byte-inert for every clauseless save row); pays
+// BOTH RAW faces — failure reduces max by the FULL applied damage,
+// success by the HALF-floored finalDamage ("equal to the damage taken").
+// Reuses the MA-1489 core (npc cs maxHp drop + currentHp clamp, PC
+// hpMaxReduction byte-symmetry, te ledger {baseMax,reduced,max}, zero/
+// refusal/lethal logs) via hpMaxReduceService; saveOutcome names the
+// face on the automation hp_max_reduce log. NO addExpiration clock —
+// RAW ends at greater restoration; LR restore rides the ledger
+// (LONG_REST_TARGET_EFFECT_CLEAR_KEYS already pins hp_max_reduce).
+async function applySaveHpMaxReduceLeg({ context, applyTarget, applyResult, combatSummaryForSave, characters, campaignName, attackerName, saveSuccess, logEntry }) {
+    if (!context?.saveHpMaxReduce) return null;
+    const drainTarget = context?._target || { name: applyTarget, type: combatSummaryForSave?.creatures?.find(c => c.name === applyTarget)?.type || 'npc' };
+    return await applyHpMaxReduce({ attackName: context?.actionName || context.name, target: drainTarget, damage: Number(applyResult?.finalDamage) || 0, combatSummary: combatSummaryForSave, characters, campaignName, attackerName, logEntry, saveOutcome: saveSuccess ? 'success' : 'failure' });
+}
+
 async function applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters }) {
     const damageFormula = context.autoDamageFormula;
     const damageType = context?.autoDamageDamageType || 'Slashing';
@@ -1332,6 +1351,9 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
     const applyResult = await applyDamageToTarget(combatSummaryForSave, applyTarget, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: attackerName, suppressHpLog: false, ...{ isSpellDamage: true } });
 
     logEntry(buildSaveDamageLogData({ attackerName, context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, saveSuccess }));
+
+    // MA-1547: save-path HP-max drain rider (hoisted sibling, §45 cap).
+    await applySaveHpMaxReduceLeg({ context, applyTarget, applyResult, combatSummaryForSave, characters, campaignName, attackerName, saveSuccess, logEntry });
 
     // MA-0427: authored secondary damage on a SAVE row (Brazen Gorgon Smelting
     // Charge "Failure: 2d8 + 4 Piercing damage plus 3d8 Fire damage") rolls as a

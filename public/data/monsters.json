@@ -58469,6 +58469,10 @@
         "description": "Constitution Saving Throw: DC 15, one creature Charmed by the succubus within 5 feet. Failure: 13 (3d8) Psychic damage. Success: Half damage. Failure or Success: The target's Hit Point maximum decreases by an amount equal to the damage taken.",
         "save_dc": 15,
         "save_type": "Constitution",
+        "dc_success": "half",
+        "save_hp_max_reduce": {
+          "equal_to": "damage"
+        },
         "range": "5 feet",
         "save_effect": "13 (3d8) Psychic damage. Success: Half damage. Failure or Success: The target's Hit Point maximum decreases by an amount equal to the damage taken",
         "damage_dice_primary": "3d8",
