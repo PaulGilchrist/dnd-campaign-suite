@@ -26380,7 +26380,7 @@
       "damageTypePrimary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 11 (2d8 + 2) Poison damage, or 9 (2d6 + 2) Poison damage if the swarm is Bloodied.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1561-vile-slime.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1562",
