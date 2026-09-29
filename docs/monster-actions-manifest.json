@@ -26060,7 +26060,7 @@
         "deafened"
       ],
       "description": "Ranged Attack Roll: +14, range 500 ft. Hit: 22 (2d12 + 9) Lightning damage, and the target has the Blinded and Deafened conditions until the start of the giant's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1541-thunderbolt.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1542",

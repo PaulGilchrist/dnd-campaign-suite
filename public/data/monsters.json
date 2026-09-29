@@ -58330,7 +58330,8 @@
         "attack_bonus": 14,
         "range": "500 ft.",
         "damage_dice_primary": "2d12 + 9",
-        "damage_type_primary": "Lightning"
+        "damage_type_primary": "Lightning",
+        "hit_conditions": ["blinded", "deafened"]
       },
       {
         "name": "Lightning Storm",

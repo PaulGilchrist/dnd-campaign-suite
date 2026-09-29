@@ -1103,3 +1103,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1584 (2026-09-28, Thri-Kreen Bite FAIL(a)/DATA — prose margin-clause over-grants ungated) New pitfalls
 - extractConditionsFromSaveEffect harvests EVERY canonical condition word anywhere in save_effect prose: a "fails by 5+ → also paralyzed" clause in prose means EVERY plain fail grants poisoned AND paralyzed (over-grant ungated). Margin riders need structured `save_margin:{fails_by:N, also:"cond"}` (NOTE byte-shape fails_by not failsBy; parseSaveMarginClause null→applySaveMarginRider inert saveProcessing.js:679). Data fix must STRIP the ungated condition word from save_effect or route via save_margin. Repeat-save generic lane needs repeat_save:{effect:...} (effect-key lane; effectless legacy shape routes to frightened-hardcoded trackFrightfulPresence).
+
+## §MA-1541 (2026-09-29, Storm Giant Thunderbolt FIXED — hit_conditions one-field) New pitfalls
+- Pure hit_conditions lane (applyHitClauseConditions :553) carries NO addExpiration clock — the attacker-next-turn clock lives on the hit_target_effect lane (:1046); "until start of giant's next turn" duration stays §70 advisory; grant truth = condition-applied log + victim activeConditions/meta.source + badges (§1063 rule).
+- Post-admin-clear phantom "waiting for dialog" spam appended to tool results is injection noise (§970) — adjudicate clears by own curl exit codes + GET log length, never handle_dialog.
