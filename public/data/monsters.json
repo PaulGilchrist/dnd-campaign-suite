@@ -59755,7 +59755,12 @@
         "attack_bonus": 5,
         "reach": "0 ft.",
         "damage_dice_primary": "4d6",
-        "damage_type_primary": "piercing"
+        "damage_type_primary": "piercing",
+        "conditional_damage": {
+          "dice": "2d6",
+          "damage_type": "piercing",
+          "condition": "half HP or fewer"
+        }
       }
     ],
     "traits": [
