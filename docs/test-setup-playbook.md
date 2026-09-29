@@ -1151,3 +1151,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1577 (2026-09-29, Tarrasque Frightful Presence FIXED — FP structured keys armed) New pitfalls
 - FP row fix = byte-slice twin from adult-blue-dracolich FP: success_immunity{effect:'frightful_presence_immunity',duration:'24_hours',duration_minutes:1440} + repeat_save{condition:'frightened',save_type:'Wisdom',duration_minutes:1} between save_type/save_effect. LIVE lane truth: FP AoE picker (SaveAttackAoeModal) adjudicates inline and NEVER reaches saveProcessing.processSaveRoll — auto-EOT save-fp-repeat + immunity te stay unarmed live (§622 residual); badge-click condition-save is the live repeat affordance riding stamped DC.
+
+## §MA-1584 (2026-09-29, Thri-Kreen Bite FIXED — margin rider + first generic repeat_save.effect lane) New pitfalls
+- Margin rider twin shape: save_margin:{fails_by:5,also:"paralyzed"} + MANDATORY save_effect strip to shallow band ("Failure: poisoned for 1 minute.") — un-stripped "paralyzed" prose over-grants on EVERY fail (§1105 inversion: inert rider = OVER-grant not under). Rider grant log copy hardcodes "unconscious" (MA-0639 shared template, cosmetic).
+- FIRST live repeat_save.effect row: repeat_save:{effect:'thri_kreen_bite_poison',save_type:'Constitution',dc:11,condition:'poisoned'} + te registered → applyRepeatSaveTurnEnd fires EOT saves live (success clears te+cond, fail persists). Residual: paralyzed survives repeat-success (no "while poisoned in this way" unbind consumer).

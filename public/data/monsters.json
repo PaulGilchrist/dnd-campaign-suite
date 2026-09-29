@@ -60687,14 +60687,24 @@
       },
       {
         "name": "Bite",
-        "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one creature. Hit: 4 (1d6 + 1) piercing damage, and the target must succeed on a DC 1 1 Constitution saving throw or be poisoned for 1 minute. If the saving throw fails by 5 or more, the target is also paralyzed while poisoned in this way. The poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
+        "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one creature. Hit: 4 (1d6 + 1) piercing damage, and the target must succeed on a DC 11 Constitution saving throw or be poisoned for 1 minute. If the saving throw fails by 5 or more, the target is also paralyzed while poisoned in this way. The poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
         "attack_bonus": 3,
         "reach": "5 ft.",
         "save_dc": 11,
         "damage_dice_primary": "1d6 + 1",
         "damage_type_primary": "piercing",
         "save_type": "Constitution",
-        "save_effect": "Failure: poisoned for 1 minute A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Failure by 5 or more: the target is also paralyzed while poisoned in this way"
+        "repeat_save": {
+          "effect": "thri_kreen_bite_poison",
+          "save_type": "Constitution",
+          "dc": 11,
+          "condition": "poisoned"
+        },
+        "save_effect": "Failure: poisoned for 1 minute.",
+        "save_margin": {
+          "fails_by": 5,
+          "also": "paralyzed"
+        }
       },
       {
         "name": "Claws",

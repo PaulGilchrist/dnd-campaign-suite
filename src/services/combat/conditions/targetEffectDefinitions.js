@@ -145,6 +145,22 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Attack',
     fields: ['source'],
   },
+  {
+    // MA-1584: Thri-Kreen Bite repeat-save te (first row-level repeat_save
+    // .effect lane rider — generic MA-0048 arm grantRepeatSaveEffect arms it
+    // on the failed save, turn-END consumer repeatSaveService.applyRepeatSaveTurnEnd
+    // repeats the CON save (DC 11) while poisoned: success strips te + the
+    // Poisoned condition, a fail keeps it. fail-by-5 Paralyzed rides the
+    // canonical save_margin lane (MA-0639), not this te. No expiration clock —
+    // the repeat save is the terminator (MA-0610 whirlwind byte-shape).
+    effect: 'thri_kreen_bite_poison',
+    label: 'Poisoned',
+    description: 'Thri-Kreen venom: Poisoned for 1 minute; at the end of each of its turns the target repeats the CON save (DC indicated), ending the Poisoned condition on itself on a success. Fail by 5 or more also Paralyzed while poisoned (save_margin lane).',
+    icon: 'fa-disease',
+    cls: 'effect-debuff',
+    group: 'Attack',
+    fields: ['source', 'dc', 'saveType'],
+  },
 
   // ── Defensive ──────────────────────────────────────────
   {
