@@ -1130,3 +1130,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1552 (2026-09-29, Swarm of Bats Bites FIXED — Bloodied variant conditional_damage) New pitfalls
 - Bloodied variant rides MA-1363 conditional_damage seam (buildChargeBonusOffer arms cd?.dice, chargeOfferLabel static-state branch "Bloodied: +NdX Type?", HIT-only gate DiceRollResult.jsx:851, offer/decline/Done share dice-roll-reroll-btn — target exact text). Swarms ship only currentHp/maxHp (no *HitPoints).
 - SWARM FAMILY ANCHOR: swarm-of-bats/rats/ravens share "Hit: N (XdY) Piercing, or M (ZdW)… if the swarm is Bloodied" — anchor conditional_damage edits on multi-line description+bonus+dice, siblings separate tickets.
+
+## §MA-1554 (2026-09-29, Swarm of Centipedes Bites FIXED — half-HP variant; KO advisory) New pitfalls
+- 0-HP KO clause ("stable but poisoned 1 hour / paralyzed while poisoned") = GM-adjudicated ADVISORY by design (no 0-HP state machine, §70) — do NOT mechanize; data-lock asserts row carries no fake KO fields.
+- "paralyzed while poisoned in this way" prose ×2 monsters — anchor swarm edits on centipedes-unique bytes, assert raw.count==1. Accept-variant press stacks two popups sequentially (bonus then base) — exact-text Done each. Downed victim clamps hp_change to 0 — judge ledger by roll entries.
