@@ -1107,3 +1107,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1541 (2026-09-29, Storm Giant Thunderbolt FIXED — hit_conditions one-field) New pitfalls
 - Pure hit_conditions lane (applyHitClauseConditions :553) carries NO addExpiration clock — the attacker-next-turn clock lives on the hit_target_effect lane (:1046); "until start of giant's next turn" duration stays §70 advisory; grant truth = condition-applied log + victim activeConditions/meta.source + badges (§1063 rule).
 - Post-admin-clear phantom "waiting for dialog" spam appended to tool results is injection noise (§970) — adjudicate clears by own curl exit codes + GET log length, never handle_dialog.
+
+## §MA-1543 (2026-09-29, Storm Giant Spellcasting FIXED — markup twin) New pitfalls
+- "The giant casts one of the following spells" lead-in ×2 file-wide (cloud-giant DC 15 @~13688 + storm-giant DC 18) — anchor markup edits on `(spell save DC 18):` full tail.
+- extractSpellcastingSpellUses binds "N/Day:" WITHOUT "Each" (optional group, Helpers:440).
+- SpellCastLinks advisory lane: non-save route skipSpendLog=true yet MA-0020 spend still fires — truth = ONE ability_use cast entry w/ spend note; exhausted re-fire = log-only automation blocked, no popup, chip mc-dice-link-spell-spent.

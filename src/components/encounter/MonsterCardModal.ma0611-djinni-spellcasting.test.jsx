@@ -275,7 +275,29 @@ const svRow = sv.actions.find(a => a.name === 'Spellcasting');
 const SV_NAMES = ['Detect Evil and Good', 'Thaumaturgy', 'Detect Magic', 'Dispel Magic', 'Greater Restoration', "Heroes' Feast", 'Zone of Truth'];
 const SV_ONE_DAY = ['Detect Magic', 'Dispel Magic', 'Greater Restoration', "Heroes' Feast", 'Zone of Truth'];
 const SV_AT_WILL = ['Detect Evil and Good', 'Thaumaturgy'];
-const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES, ...SP_NAMES, ...SL_NAMES, ...SN_NAMES, ...SS_NAMES, ...SV_NAMES])];
+// MA-1543 storm-giant extension (same MA-0421/MA-1230/MA-1327/MA-1339
+// markup-gap family): the WHOLE description was plain text on a SINGLE line
+// with "; " tier separators — names AND both tier headers unmarked →
+// extractSpellNamesFromSpellcasting [] → SpellCastLinks null → zero chips,
+// zero cast affordance; the 1/Day tracking was structurally dead (§144 binds
+// MARKED headers + names only); save_dc 18 + Wisdom ride the row untouched
+// (§676/MA-1294 XOR: Spellcasting rows render NO DC chip ever — expected,
+// not a fail). Fix = ticket-directed dao house-style re-markup: tier headers
+// "<strong>At Will:</strong> / <strong>1/Day:</strong>" + all three names
+// "<em>" + "\n" tier lines (cloud giant line 13688 is the in-file dao giant
+// twin; extractor accepts both <strong>/<em> names §57 and "N/Day:" without
+// "Each" — dayHeader regex makes Each optional, MonsterCardHelpers.js:440).
+// "; " tier separators fold to "\n" per the ticket-directed byte target;
+// name separators ", " and ALL prose words byte-kept. §158 trap INACTIVE:
+// all three names byte-match BOTH spell indexes, zero attack_type →
+// cast-affordance only; Control Weather is the MA-0674 zero-target advisory
+// class (§230) — chip arms on row NAME + tier markup alone, save-less.
+const stormGiant = monsters.find(m => m.index === 'storm-giant');
+const stormGiantRow = stormGiant.actions.find(a => a.name === 'Spellcasting');
+const SG_NAMES = ['Detect Magic', 'Light', 'Control Weather'];
+const SG_ONE_DAY = ['Control Weather'];
+const SG_AT_WILL = ['Detect Magic', 'Light'];
+const ALL_NAMES = [...new Set([...NAMES, ...NH_NAMES, ...NP_NAMES, ...OI_NAMES, ...PL_NAMES, ...PM_NAMES, ...PX_NAMES, ...WB_NAMES, ...PT_NAMES, ...PR_NAMES, ...PA_NAMES, ...QT_NAMES, ...QK_NAMES, ...RK_NAMES, ...SP_NAMES, ...SL_NAMES, ...SN_NAMES, ...SS_NAMES, ...SV_NAMES, ...SG_NAMES])];
 const SPELLS = Object.fromEntries(ALL_NAMES.map(n => [n, spells5e.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 const SPELLS_2024 = Object.fromEntries([...NP_NAMES, ...PM_NAMES, ...QT_NAMES].map(n => [n, spells2024.find(s => s.name === n)]).filter(([, s]) => Boolean(s)));
 
@@ -322,6 +344,13 @@ const SS_PLAIN_ORIGINAL = 'The sphinx casts one of the following spells, requiri
 // ", " name separators, fully plain; the fix wraps ONLY the two tier headers + seven spell
 // names in <strong>, so the stripped bytes must match this exactly.
 const SV_PLAIN_ORIGINAL = 'The sphinx casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20): At Will: Detect Evil and Good, Thaumaturgy; 1/Day Each: Detect Magic, Dispel Magic, Greater Restoration, Heroes\' Feast, Zone of Truth';
+// Pre-fix storm-giant disk text — SINGLE-LINE prose, fully plain, "; " tier
+// separators. The ticket-directed fix folds those two "; " separators into
+// "\n" tier lines (dao/cloud-giant house style) + adds markup, so the
+// stripped bytes must equal the folded original exactly — every prose WORD,
+// ", " name separator and the lead-in stay byte-identical.
+const SG_PREFIX_ORIGINAL = 'The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18): At Will: Detect Magic, Light; 1/Day: Control Weather';
+const SG_PLAIN_ORIGINAL = 'The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18):\nAt Will: Detect Magic, Light\n1/Day: Control Weather';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Djinni 1';
@@ -648,6 +677,17 @@ function renderSphinxOfValor() {
     { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: SV_MONSTER_NAME, creatures })} />);
+}
+
+const SG_MONSTER_NAME = 'Storm Giant 1';
+
+function renderStormGiant() {
+  const m = makeMonster({ name: 'Storm Giant', index: 'storm-giant', type: 'giant', actions: [stormGiantRow] });
+  const creatures = [
+    { name: SG_MONSTER_NAME, type: 'npc', monsterType: 'giant', targetName: 'Bandit', ac: 15, currentHp: 230, maxHp: 230, conditions: [] },
+    { name: 'Bandit', type: 'player', ac: 12, currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
+  ];
+  render(<MonsterCardModal {...makeProps(m, { creatureName: SG_MONSTER_NAME, creatures })} />);
 }
 
 // ── Data lock: djinni Spellcasting row ───────────────────────────────────────
@@ -2870,5 +2910,133 @@ describe('MA-1506 MonsterCardModal Sphinx of Valor Spellcasting chips', () => {
       expect(linkByText(n)).toBeTruthy();
       expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/);
     });
+  });
+});
+
+// ── MA-1543 data lock: Storm Giant Spellcasting row ─────────────────────────────
+
+describe('MA-1543 monsters.json data lock: Storm Giant Spellcasting row', () => {
+  it('extracts all three spell names — tier headers skipped (§57)', () => {
+    const names = extractSpellNamesFromSpellcasting(stormGiantRow.description);
+    expect(names).toEqual(SG_NAMES);
+    expect(names).not.toContain('At Will');
+    expect(names).not.toContain('1/Day');
+  });
+
+  it('binds 1/Day to Control Weather via header without "Each"; At Will names ungated (§57/§144)', () => {
+    const uses = extractSpellcastingSpellUses(stormGiantRow.description);
+    expect(uses).toEqual({ 'Control Weather': 1 });
+    SG_AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  });
+
+  it('row-level save_dc 18 + save_type Wisdom byte-untouched; no attack_bonus junk (§676/§1294/§490)', () => {
+    expect(stormGiantRow.save_dc).toBe(18);
+    expect(stormGiantRow.save_type).toBe('Wisdom');
+    expect('attack_bonus' in stormGiantRow).toBe(false);
+    expect('save_effect' in stormGiantRow).toBe(false);
+    expect(stormGiantRow.description).toMatch(/\(spell save DC 18\)/);
+  });
+
+  it('emphasis census: ONLY the two tier headers (<strong>) + three names (<em>) — dao house style, zero fake-chip decoys (§161)', () => {
+    const tokens = stormGiantRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || [];
+    expect(tokens).toEqual([
+      '<strong>At Will:</strong>',
+      '<em>Detect Magic</em>',
+      '<em>Light</em>',
+      '<strong>1/Day:</strong>',
+      '<em>Control Weather</em>',
+    ]);
+    expect(stormGiantRow.description).not.toMatch(/<(?:strong|em)>[^<]*DC 18[^<]*<\/(?:strong|em)>/);
+  });
+
+  it('markup-only diff proof: stripped text equals the folded pre-fix prose byte-for-byte ("; " tier separators → "\n" per ticket-directed dao bytes)', () => {
+    expect(stripTags(stormGiantRow.description)).toBe(SG_PLAIN_ORIGINAL);
+    expect(SG_PREFIX_ORIGINAL.replace('): At Will:', '):\nAt Will:').replace('; 1/Day', '\n1/Day')).toBe(SG_PLAIN_ORIGINAL);
+    expect(stormGiantRow.description.startsWith('The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18):')).toBe(true);
+  });
+
+  it('DC 18 = 8 + WIS +5 + PB +5 for the storm giant (computed from disk)', () => {
+    expect(stormGiant.ability_score_modifiers.wis).toBe(5);
+    expect(stormGiant.proficiency_bonus).toBe(5);
+    expect(8 + stormGiant.ability_score_modifiers.wis + stormGiant.proficiency_bonus).toBe(18);
+  });
+
+  it('§158 trap INACTIVE: all three spells byte-match BOTH indexes, zero attack_type — cast-affordance only; Control Weather = MA-0674 zero-target advisory class (§230)', () => {
+    SG_NAMES.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s).toBeDefined();
+      expect(s.attack_type == null).toBe(true);
+      expect(spells2024.some(sp => sp.name === n)).toBe(true);
+      expect(s.damage == null).toBe(true);
+    });
+    const cw = spells5e.find(sp => sp.name === 'Control Weather');
+    expect(cw.concentration).toBe(true);
+    expect(cw.duration).toBe('Up to 8 hours');
+  });
+
+  it('cloud-giant dao twin discriminant — DC 18 Wisdom storm vs DC 15 Charisma cloud, shared lead-in (§22)', () => {
+    const cgRow = monsters.find(m => m.index === 'cloud-giant').actions.find(a => a.name === 'Spellcasting');
+    expect(stormGiantRow.description).not.toBe(cgRow.description);
+    expect(cgRow.save_dc).toBe(15);
+    expect(stormGiantRow.description).not.toContain('Fog Cloud');
+    expect(stormGiantRow.description).toContain('<em>Control Weather</em>');
+    expect(cgRow.description).toContain('<em>Control Weather</em>');
+  });
+});
+
+// ── MA-1543 Modal: three chips, counters, 1/Day gate ────────────────────────────
+
+describe('MA-1543 MonsterCardModal Storm Giant Spellcasting chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('renders three spell chips — the zero-chip inert row is gone', () => {
+    renderStormGiant();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(SG_NAMES);
+  });
+
+  it('Control Weather carries the 1/Day counter; the two At Will names do not (§57)', () => {
+    renderStormGiant();
+    SG_ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+    SG_AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
+  });
+
+  it('no row-level DC 18 save chip — SpellCastLinks XOR fork owns the row (§118/§676/MA-1294)', () => {
+    renderStormGiant();
+    const row = Array.from(document.querySelectorAll('.mc-action')).find(el => el.querySelector('strong')?.textContent.startsWith('Spellcasting'));
+    expect(row).toBeTruthy();
+    expect(row.querySelectorAll('.mc-dice-link-spell').length).toBe(3);
+    expect(row.querySelectorAll('.mc-dice-link-save').length).toBe(0);
+  });
+
+  it('At Will Detect Magic casts ungated twice + Light once — zero uses, advisory log prints row DC 18 (§204/§207)', async () => {
+    renderStormGiant();
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
+    expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/\(spell save DC 18/);
+    expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/GM-enforced/);
+    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
+    await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(2));
+    await act(async () => { fireEvent.click(linkByText('Light')); });
+    await waitFor(() => expect(abilityUseEntries('Light').length).toBe(1));
+    expect(refusals('Detect Magic').length).toBe(0);
+    expect(runtime.store[`${SG_MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+  });
+
+  it('Control Weather 1/Day: cast spends the single use with GM-enforced advisory, re-fire refused — zero extra spend (§57/MA-0020/MA-0674)', async () => {
+    renderStormGiant();
+    await act(async () => { fireEvent.click(linkByText('Control Weather')); });
+    await waitFor(() => expect(abilityUseEntries('Control Weather').length).toBe(1));
+    expect(runtime.store[`${SG_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Control Weather': 1 });
+    expect(abilityUseEntries('Control Weather')[0].description).toMatch(/1\/Day use spent/);
+    expect(abilityUseEntries('Control Weather')[0].description).toMatch(/Concentration \(Up to 8 hours\)/);
+    expect(abilityUseEntries('Control Weather')[0].description).toMatch(/GM-enforced/);
+
+    await act(async () => { fireEvent.click(linkByText('Control Weather')); });
+    await waitFor(() => expect(refusals('Control Weather').length).toBe(1));
+    expect(abilityUseEntries('Control Weather').length).toBe(1);
+    expect(runtime.store[`${SG_MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Control Weather': 1 });
   });
 });

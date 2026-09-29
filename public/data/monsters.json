@@ -58345,7 +58345,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18): At Will: Detect Magic, Light; 1/Day: Control Weather",
+        "description": "The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18):\n<strong>At Will:</strong> <em>Detect Magic</em>, <em>Light</em>\n<strong>1/Day:</strong> <em>Control Weather</em>",
         "save_dc": 18,
         "save_type": "Wisdom"
       }

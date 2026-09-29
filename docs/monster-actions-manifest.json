@@ -26092,7 +26092,7 @@
       "saveDc": 18,
       "saveType": "Wisdom",
       "description": "The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18): At Will: Detect Magic, Light; 1/Day: Control Weather",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1543-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1544",
