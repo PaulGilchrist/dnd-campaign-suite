@@ -1122,3 +1122,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1550 (2026-09-29, Succubus/Incubus Draining Kiss FIXED — save-path hp-max-reduce twin rides MA-1547 seam) New pitfalls
 - One-field DATA fix rides §MA-1547 live save-path seam (save_hp_max_reduce:{equal_to:"damage"} after save_type); succubus-incubus half-default dc_success UNAUTHORED verified correct (raw→halved exact both faces). MA-1547 test harness parametrizes via kissContext(saveHpMaxReduce) — twins reuse, invert stale incubus inertness pins same pass (§216). cs seam writes currentHp/maxHp/maxHitPoints, leaves legacy currentHitPoints stale (adjudication reads currentHp — cosmetic §122).
+
+## §MA-1551 (2026-09-29, Succubus/Incubus Etherealness FIXED — ghost MA-0780 self-buff twin) New pitfalls
+- Refusal slug derives from ACTION NAME: succubus-incubus row named "Etherealness" → `etherealness_refused` (ghost's "Ethereality" → `ethereality_refused`) — §278 rule re-confirmed, automationDetail `already_ethereal` shared via effect key; pin both per-monster.
+- No whole-DB self-buff armed census exists (MA-1014 utility census excludes automation rows) — nothing to invert for self-buff data fixes.
