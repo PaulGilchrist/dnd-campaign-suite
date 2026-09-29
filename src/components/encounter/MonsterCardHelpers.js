@@ -810,6 +810,19 @@ export function parseSaveHpMaxReduce(action) {
   return String(rider.equal_to || '').toLowerCase() === 'damage' ? { equalTo: 'damage' } : null;
 }
 
+// MA-1563: save-leg-specific damage pool (Swarm of Poisonous Snakes Bites
+// "save_damage_dice":"4d6"/"save_damage_type":"Poison") — structured keys
+// only, never prose. Byte-inert null for every row without the keys, so all
+// legacy save chips keep rolling damage_dice_primary exactly as before. The
+// consumer (saveChipPlan + resolveSaveLegDamageFields in MonsterCardModal)
+// overrides the save transport formula/type so the save leg rolls 4d6 Poison
+// instead of the attack pool's 2d6 piercing.
+export function parseSaveDamageFields(action) {
+  const dice = action?.save_damage_dice;
+  if (dice == null || String(dice).trim() === '') return null;
+  return { dice: String(dice).trim(), damageType: action?.save_damage_type ? String(action.save_damage_type) : null };
+}
+
 function hitClauseAutoGrantConditions(action) {
   if (hitChoiceArmed(action) || !Array.isArray(action?.hit_conditions)) return [];
   return action.hit_conditions.map(c => String(c).toLowerCase());

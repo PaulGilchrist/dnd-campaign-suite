@@ -59656,6 +59656,8 @@
         "attack_bonus": 6,
         "reach": "0 ft.",
         "save_dc": 10,
+        "save_damage_dice": "4d6",
+        "save_damage_type": "Poison",
         "damage_dice_primary": "2d6",
         "damage_type_primary": "piercing",
         "save_type": "Constitution",

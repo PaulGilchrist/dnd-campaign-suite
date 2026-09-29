@@ -1142,3 +1142,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1561 (2026-09-29, Swarm of Lemures Vile Slime FIXED) New pitfalls
 - CR0 `lemure` shares action name "Vile Slime" (1d4) — anchor swarm edits on +bonus/dice bytes raw.count==1; swarm-of-lemures is Multiattack-first (Vile Slime = actions[1] not [0]).
+
+## §MA-1563 (2026-09-29, Swarm of Poisonous Snakes Bites FIXED — save-leg pool) New pitfalls
+- SAVE-LEG POOL OVERRIDE LIVE: attack+save rows w/ a distinct save_effect pool were paying damage_dice_primary on the DC chip (formula "2d6" never "4d6" — min-dice arithmetic is the smoking gun). Fix lane = structured `save_damage_dice`+`save_damage_type` beside save_dc → parseSaveDamageFields (Helpers, structured-key-only, byte-inert) → saveChipPlan formula override + resolveSaveLegDamageFields (Modal) overwrite autoDamageFormula/autoDamageDamageType on the SAVE transport ONLY (attack chip byte-identical). Do NOT conflate with MA-0427 autoDamageSecondaryFormula additive seam (§154).
