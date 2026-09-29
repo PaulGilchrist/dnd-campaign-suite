@@ -60906,7 +60906,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The thri-kreen casts one of the following spells, requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 15): At Will: Mage Hand (the hand is Invisible); 1/Day Each: Detect Thoughts, Sending, Synaptic Static",
+        "description": "The thri-kreen casts one of the following spells, requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 15):\n<strong>At Will:</strong> <em>Mage Hand</em> (the hand is Invisible)\n<strong>1/Day Each:</strong> <em>Detect Thoughts</em>, <em>Sending</em>, <em>Synaptic Static</em>",
         "save_dc": 15,
         "save_type": "Intelligence"
       }

@@ -26865,7 +26865,7 @@
         "invisible"
       ],
       "description": "The thri-kreen casts one of the following spells, requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 15): At Will: Mage Hand (the hand is Invisible); 1/Day Each: Detect Thoughts, Sending, Synaptic Static",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1591-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1592",
