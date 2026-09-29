@@ -25882,7 +25882,7 @@
       "damageTypePrimary": "Fire",
       "range": "15-foot Cone",
       "description": "Constitution Saving Throw: DC 10, each creature in a 15-foot Cone. Failure: 5 (2d4) Fire damage, and the target's Speed decreases by 10 feet until the end of the mephit's next turn. Success: Half damage only. Failure or Success: Being underwater doesn't grant Resistance to this Fire damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1530-steam-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1531",

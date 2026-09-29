@@ -192,7 +192,7 @@ function resolveNpcTarget(ctx) {
     }
     // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
     // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, stagedPetrify: ctx.stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, bothOutcomesClause, tempHpGrant: ctx.tempHpGrant, conditionDurationNote: ctx.conditionDurationNote, saveVariant: ctx.saveVariant });
+    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, stagedPetrify: ctx.stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, speedReduceClause: ctx.speedReduceClause, bothOutcomesClause, tempHpGrant: ctx.tempHpGrant, conditionDurationNote: ctx.conditionDurationNote, saveVariant: ctx.saveVariant });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -659,7 +659,7 @@ function applySaveVariantClockGrant({ saveVariant, success, targetName, casterNa
     });
 }
 
-function resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant }) {
+function resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant }) {
     if (sleepStaging) {
         applyStagedSleepSave({ sleepStaging, success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, roll: saveRoll, saveBonus, campaignName });
         return;
@@ -688,7 +688,7 @@ function resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, su
     // Authored failed-save te clause legs (MA-0087/0102/0115/0138/0146) —
     // split from the dispatcher to keep both functions under the lint
     // complexity ceiling (saveProcessing applyFailedSaveClauseGrants shape).
-    applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause });
+    applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause });
     applySaveFailConditions({ saveConditions, saveSuccess: success, saveDc, saveType, targetName, casterName: playerStats.name, actionName: action.name, campaignName, pushFeet, conditionDurationNote });
     applySaveVariantClockGrant({ saveVariant, success, targetName, casterName: playerStats.name, campaignName });
     // MA-0875: failed-save THP clause on the ATTACKER (byte-inert when the
@@ -701,7 +701,7 @@ function resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, su
 // Failed-save authored te clause dispatch (MA-0087 slowed trio, MA-0102
 // weakening breath, MA-0115 AC penalty, MA-0138 push-only marker, MA-0146
 // speed zero). Every leg is byte-inert when its clause is null.
-function applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause }) {
+function applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause }) {
     // MA-0087: "slowed" rider clauses grant te for each authored clause on a
     // failed save ('slowed' is not a registered condition, so each clause maps
     // to a registered te with a live consumer). Byte-inert when null.
@@ -731,6 +731,14 @@ function applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, play
     if (!success && pushFeet != null && (!saveConditions || saveConditions.length === 0)) {
         grantPushOnlyClause({ pushFeet, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
     }
+    // MA-0146/MA-1530 Speed rider legs hoisted to a shared dispatch to keep
+    // this dispatcher under the §45 complexity ceiling (byte-identical legs).
+    applyPickerSpeedClauseLegs({ success, speedZeroClause, speedReduceClause, campaignName, targetName, playerStats, action, saveType, saveDc });
+}
+
+// Failed-save Speed rider dispatch (MA-0146 speed_zero, MA-1530
+// speed_reduction). Every leg is byte-inert when its clause is null.
+function applyPickerSpeedClauseLegs({ success, speedZeroClause, speedReduceClause, campaignName, targetName, playerStats, action, saveType, saveDc }) {
     // MA-0146: Freezing Burst failed-save speed-zero clause — speed_zero te +
     // activeCondition until the end of the target's next turn, rounds:2 clock
     // (MA-0073/MA-0115 shape); live consumer conditionEffects speedZero →
@@ -738,6 +746,50 @@ function applyPickerFailClauseLegs({ success, saveDc, saveType, targetName, play
     if (!success && speedZeroClause) {
         grantSpeedZeroClause({ campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
     }
+    // MA-1530: Steam Breath failed-save Speed-reduce-by-N clause — registered
+    // speed_reduction te (value −N, MA-1147 Ocean Spear twin passthrough te)
+    // until the end of the ATTACKER's next turn, drained by ONE clock anchored
+    // on the caster (MA-0995 §37 single-clock; RAW end-of-turn anchor fires at
+    // the caster's next turn-start — the accepted advisory residual, MA-0542
+    // twin). registerTargetEffect dedupes per (target, effect, source): repeat
+    // breaths REPLACE the te, never stack (consumer conditionEffects:386
+    // accumulates across DISTINCT sources only). Byte-inert when null.
+    if (!success && speedReduceClause) {
+        grantSpeedReduceClause({ speedReduceClause, campaignName, targetName, casterName: playerStats.name, actionName: action.name, saveType, saveDc });
+    }
+}
+
+// MA-1530: Steam Mephit Steam Breath failed-save Speed-reduce grant (cone
+// picker). Registry speed_reduction te with the parsed value (default 10 =
+// RAW −10 ft); live consumers conditionEffects speed_reduction fold +
+// ConditionEffectBadges "Speed -N" (MA-0995/MA-1147 te reuse — NO new
+// registry key, NO new consumer). ONE addExpiration clock anchored on the
+// caster (MA-0995 javelin byte-shape).
+function grantSpeedReduceClause({ speedReduceClause, campaignName, targetName, casterName, actionName, saveType, saveDc }) {
+    const feet = Number(speedReduceClause?.value) || 10;
+    registerTargetEffect(campaignName, targetName, 'speed_reduction', casterName, {
+        duration: 'until_end_of_next_turn',
+        value: feet,
+        actionName,
+    });
+    addExpiration({
+        attackerName: casterName,
+        targetName,
+        campaignName,
+        rounds: undefined,
+        expireOnCreatureName: casterName,
+        effects: [{ type: 'remove_target_effect', effectKey: 'speed_reduction', source: casterName, target: targetName }],
+    });
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: targetName,
+        condition: 'Speed Reduced',
+        sourceName: casterName,
+        sourceAbility: actionName,
+        description: `${targetName} failed the ${saveType} save (DC ${saveDc}) in ${casterName}'s ${actionName} — Speed Reduced \u2212${feet} ft until the end of ${casterName}'s next turn.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging speed reduction:', e); });
 }
 
 // MA-0303: both-outcomes clause success-leg grant (Arch-hag Crackling Wave —
@@ -1238,6 +1290,15 @@ function SaveAttackAoeModal({
     // activeCondition (until_end_of_next_turn, rounds:2 clock) on each failed
     // save; live consumer conditionEffects speedZero → sheet Speed 0.
     speedZeroClause,
+    // MA-1530 optional failed-save Speed-reduce-by-N clause (byte-inert
+    // undefined default): Steam Mephit Steam Breath — "the target's Speed
+    // decreases by 10 feet until the end of the mephit's next turn" — grants
+    // the registered speed_reduction te (value −N, until_end_of_next_turn,
+    // ONE attacker-anchored clock MA-0995/MA-1147 twin) on each failed save;
+    // registerTargetEffect dedupes per (target, effect, source) so repeat
+    // breaths REPLACE not stack; live consumer conditionEffects
+    // speed_reduction → "Speed -N" fold + badge.
+    speedReduceClause,
     // MA-0303 optional both-outcomes clause (byte-inert undefined default):
     // Arch-hag Crackling Wave — "Failure or Success: The target is cursed
     // until the end of the hag's next turn. The target can't take Reactions
@@ -1323,7 +1384,7 @@ function SaveAttackAoeModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -1354,7 +1415,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
+    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -1486,7 +1547,7 @@ function SaveAttackAoeModal({
         }
         // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
         // when neither flag authored).
-        resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant });
+        resolveSaveFailGrant({ sleepStaging, stagedParalysis, stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant });
         if (success && logSaveSuccess) {
             logPlayerSaveSuccess({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
@@ -1515,7 +1576,7 @@ function SaveAttackAoeModal({
         }, secondary);
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

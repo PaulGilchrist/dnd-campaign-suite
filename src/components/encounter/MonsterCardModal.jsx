@@ -18,7 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, parseSpeedReduceClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { SaveVariantChooserModal } from './SaveVariantChooserModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
@@ -341,6 +341,18 @@ function speedZeroClauseForAction(spellInfo, action) {
   return parseSpeedZeroClause(action?.save_effect);
 }
 
+// MA-1530: authored failed-save Speed-reduce-by-N clause (Steam Mephit Steam
+// Breath — "the target's Speed decreases by 10 feet until the end of the
+// mephit's next turn"). Parsed once and forwarded to the cone picker as an
+// optional te-grant seam (byte-inert null for clauseless rows, MA-0146
+// shape): the picker grants the registered speed_reduction te (value −N) on
+// each failed save with ONE attacker-anchored clock (MA-0995/MA-1147 twin);
+// live consumer conditionEffects speed_reduction → "Speed -N" fold.
+function speedReduceClauseForAction(spellInfo, action) {
+  if (spellInfo) return null;
+  return parseSpeedReduceClause(action?.save_effect);
+}
+
 // MA-0303: authored both-outcomes clause (Arch-hag Crackling Wave —
 // "Failure or Success: The target is cursed ... can't take Reactions until
 // the curse ends"). Parsed once and forwarded to the cone picker as an
@@ -428,6 +440,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
   const weakeningBreath = weakeningBreathForAction(spellInfo, action);
   const acPenaltyClause = acPenaltyClauseForAction(spellInfo, action);
   const speedZeroClause = speedZeroClauseForAction(spellInfo, action);
+  const speedReduceClause = speedReduceClauseForAction(spellInfo, action);
   const bothOutcomesClause = bothOutcomesClauseForAction(spellInfo, action);
   if (aoe == null && !recharge.gate) { fire(); return; }
   (async () => {
@@ -455,7 +468,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
           timestamp: Date.now(),
         }).catch((e) => { console.error('[MonsterCardModal] Error logging Cube area advisory:', e); });
       }
-      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape}${aoe.shapeNote ? ` — ${aoe.shapeNote}` : ''} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, bothOutcomesClause, tempHpGrant: parseTempHpGrantClause(action?.save_effect), conditionDurationNote: blockSaveConditionDurationNote(action, spellInfo, saveVariant), stagedPetrify: parseStagedPetrifyClause(action), saveVariant });
+      setConePicker({ action, saveDamageFormula, saveConditions, saveType, dcSuccess, coneFt: aoe.feet, rangeGateFt: aoe.rangeGateFt, title: `${aoe.feet}-ft ${aoe.shape}${aoe.shapeNote ? ` — ${aoe.shapeNote}` : ''} (GM positions tokens; selection advisory)`, damageType: pickerPrimaryDamageType(action, getDamageTypesForAction, secondary.secondaryType), secondaryFormula: secondary.secondaryFormula, secondaryType: secondary.secondaryType, zoneTe: zoneTeForAction(action), sleepStaging, stagedParalysis, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant: parseTempHpGrantClause(action?.save_effect), conditionDurationNote: blockSaveConditionDurationNote(action, spellInfo, saveVariant), stagedPetrify: parseStagedPetrifyClause(action), saveVariant });
       return;
     }
     fire();
@@ -2555,6 +2568,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           weakeningBreath={conePicker.weakeningBreath}
           acPenaltyClause={conePicker.acPenaltyClause}
           speedZeroClause={conePicker.speedZeroClause}
+          speedReduceClause={conePicker.speedReduceClause}
           bothOutcomesClause={conePicker.bothOutcomesClause}
           tempHpGrant={conePicker.tempHpGrant}
           stagedPetrify={conePicker.stagedPetrify}

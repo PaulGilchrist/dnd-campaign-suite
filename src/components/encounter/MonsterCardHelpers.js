@@ -86,6 +86,22 @@ export function parseSpeedZeroClause(saveEffect) {
   return /speed is 0\b/i.test(saveEffect) ? { effect: 'speed_zero' } : null;
 }
 
+// MA-1530: authored failed-save Speed-reduce-by-N clause (Steam Mephit Steam
+// Breath — "the target's Speed decreases by 10 feet until the end of the
+// mephit's next turn"). Neither parseSpeedHalfClause nor parseSpeedZeroClause
+// matches "Speed decreases by N feet" (grep-zero transport pre-fix); this
+// clause parse maps the rider to the registered speed_reduction te with the
+// parsed numeric value (registry default 10 = RAW −10 ft) — te+clock producer
+// in the SaveAttackAoeModal picker fail leg (MA-0146 grant shape, MA-0995/
+// MA-1147 attacker-anchored clock twin). Byte-inert (null) for rows without
+// the clause — frost-giant Great Bow's save_effect decoy never reaches the
+// picker save seam (attack row, no save_dc).
+export function parseSpeedReduceClause(saveEffect) {
+  if (!saveEffect || typeof saveEffect !== 'string') return null;
+  const m = saveEffect.match(/speed\s+decreases?\s+by\s+(\d+)\s+feet/i);
+  return m ? { effect: 'speed_reduction', value: Number(m[1]) } : null;
+}
+
 // MA-0093: authored failed-save subtract-die debuff clause (Adult Copper
 // Dragon Giggling Magic — "the target rolls 1d6 whenever it makes an
 // ability check or attack roll and subtracts the number rolled"). Maps the
