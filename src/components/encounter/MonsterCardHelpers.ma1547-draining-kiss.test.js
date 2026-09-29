@@ -13,7 +13,10 @@
 //     parseSaveHpMaxReduce (structured-key-only, byte-inert elsewhere)
 //     threaded onto the block-save context via buildAbilitySaveRollContext →
 //     saveProcessing.applySaveDamage → hpMaxReduceService.applyHpMaxReduce.
-// The incubus twin row stays UNTOUCHED (MA-1550 is its own ticket).
+// MA-1550 (2026-09-29): the succubus-incubus twin row is now ARMED with the
+// same save_hp_max_reduce:{equal_to:"damage"} rider — pins inverted below;
+// its dc_success stays UNAUTHORED (half-default verified live, MA-0963
+// convention — §523; §165: never copy the succubus' explicit half here).
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -53,9 +56,13 @@ describe('MA-1547 disk fingerprint: succubus Draining Kiss save row', () => {
     expect(keys.indexOf('save_hp_max_reduce')).toBe(keys.indexOf('dc_success') + 1);
   });
 
-  it('incubus twin row stays byte-inert — MA-1550 owns its own fix', () => {
+  it('MA-1550 twin row now carries the rider after save_type; dc_success stays UNAUTHORED', () => {
+    expect(INCUBUS_TWIN.save_hp_max_reduce).toEqual({ equal_to: 'damage' });
+    const keys = Object.keys(INCUBUS_TWIN);
+    expect(keys.indexOf('save_hp_max_reduce')).toBe(keys.indexOf('save_type') + 1);
+    // Half-default is the verified MA-0963 behaviour on this row (§523/§165) —
+    // do NOT copy the succubus' explicit dc_success:"half" here.
     expect(INCUBUS_TWIN.dc_success).toBeUndefined();
-    expect(INCUBUS_TWIN.save_hp_max_reduce).toBeUndefined();
   });
 });
 
@@ -64,8 +71,11 @@ describe('MA-1547 parseSaveHpMaxReduce — structured-key-only parser', () => {
     expect(parseSaveHpMaxReduce(KISS)).toEqual({ equalTo: 'damage' });
   });
 
-  it('byte-inert null for rows without the key (incubus twin, clauseless rows)', () => {
-    expect(parseSaveHpMaxReduce(INCUBUS_TWIN)).toBeNull();
+  it('arms the MA-1550 incubus twin row clause', () => {
+    expect(parseSaveHpMaxReduce(INCUBUS_TWIN)).toEqual({ equalTo: 'damage' });
+  });
+
+  it('byte-inert null for rows without the key (clauseless rows)', () => {
     expect(parseSaveHpMaxReduce({ name: 'Constrict', save_dc: 15, save_type: 'Strength' })).toBeNull();
     expect(parseSaveHpMaxReduce(undefined)).toBeNull();
   });
@@ -110,9 +120,16 @@ describe('MA-1547 block-save context threading (buildAbilitySaveRollContext)', (
     expect(ctx.saveHpMaxReduce).toEqual({ equalTo: 'damage' });
   });
 
-  it('legacy save rows stay byte-inert — saveHpMaxReduce null without the key', () => {
+  it('MA-1550 incubus twin rides the rider with half-default dcSuccess (dc_success unauthored)', () => {
     const ctx = kissContext(INCUBUS_TWIN);
-    expect(ctx.saveHpMaxReduce).toBeNull();
+    expect(ctx.saveDc).toBe(15);
+    expect(ctx.saveType).toBe('CON');
+    // Harness feeds `action.dc_success ?? 'half'` exactly as MonsterCardModal's
+    // getSaveDcSuccess default does — unauthored row lands on half (MA-0963).
+    expect(INCUBUS_TWIN.dc_success).toBeUndefined();
+    expect(ctx.dcSuccess).toBe('half');
     expect(ctx.autoDamageFormula).toBe('5d10 + 5');
+    expect(ctx.autoDamageDamageType).toBe('Psychic');
+    expect(ctx.saveHpMaxReduce).toEqual({ equalTo: 'damage' });
   });
 });
