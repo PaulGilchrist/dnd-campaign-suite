@@ -1134,3 +1134,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1554 (2026-09-29, Swarm of Centipedes Bites FIXED — half-HP variant; KO advisory) New pitfalls
 - 0-HP KO clause ("stable but poisoned 1 hour / paralyzed while poisoned") = GM-adjudicated ADVISORY by design (no 0-HP state machine, §70) — do NOT mechanize; data-lock asserts row carries no fake KO fields.
 - "paralyzed while poisoned in this way" prose ×2 monsters — anchor swarm edits on centipedes-unique bytes, assert raw.count==1. Accept-variant press stacks two popups sequentially (bonus then base) — exact-text Done each. Downed victim clamps hp_change to 0 — judge ledger by roll entries.
+
+## §MA-1555 (2026-09-29, Swarm of Crawling Claws FIXED — variant + prone rider) New pitfalls
+- conditional_damage modifier byte-shape = separate `modifier:N` field (Chimera MA-0485 twin) — 0/14 rows file-wide embed "+" in dice; label renders "+2d8+2" via chargeOfferLabel modText.
+- ChargeBonusOffer seam is ADDITIVE (bonus leg rides base Done) — shrinking "or NdX" swarm variants authored as full reduced dice per MA-1552/1553/1554 family convention; accept pays base+variant, RAW-replace residual is GM-declines-when-healthy advisory (§70).
+- hit_conditions lane has NO size-cap field (size_limit = hit_pull lane only; isTargetSizeAtMost ladder MA-1459 pull/ram only) — "Medium or smaller" prone riders over-apply on Large victims; §1116 residual.
