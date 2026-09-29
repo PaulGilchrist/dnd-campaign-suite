@@ -1265,16 +1265,17 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { value: 2 },
   },
   {
-    // MA-0553: Darkmantle "Crush" hit-clause (MA-0016/MA-0542 te route) —
-    // a hit attaches the darkmantle. STATE STAMP ONLY: RAW Blinded +
-    // suffocation gates on advantage-cover (Medium-or-smaller), and the
-    // attach/detach/suffocation state machine is unbuilt (§69 grapple-family
-    // advisory) — no fabricated Blinded grant. Attach consequences (speed 0,
-    // moves with target, DC 13 Athletics action to detach) ride the
-    // description as GM-enforced advisory; MA-0434 advisory-duration family.
+    // MA-0553/MA-1531: Darkmantle "Crush" + Stirge "Proboscis" hit-clause
+    // (MA-0016/MA-0542 te route) — a hit attaches the attacher. STATE STAMP
+    // ONLY: the attach/detach/suffocation state machine is unbuilt (§69
+    // grapple-family advisory) — no fabricated Blinded grant. Attach
+    // consequences ride the description as GM-enforced advisory; MA-0434
+    // advisory-duration family. Copy generalized to carry both hosts:
+    // darkmantle (Speed 0, moves with target, DC 13 Athletics detach) and
+    // stirge (2d4 Necrotic turn-start tick, 5-ft movement / action detach).
     effect: 'attached',
-    label: 'Attached (Darkmantle)',
-    description: 'A darkmantle is attached: Speed 0, moves with the target, attacks only it with Advantage. Blinded + suffocating only while covering on an Advantage hit; detach with a DC 13 Strength (Athletics) action — GM-enforced.',
+    label: 'Attached',
+    description: "A darkmantle or stirge is attached. Darkmantle: Speed 0, moves with the target, attacks only it with Advantage. Blinded + suffocating only while covering on an Advantage hit; detach with a DC 13 Strength (Athletics) action. Stirge: the target takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns; the stirge detaches by spending 5 feet of movement, and the target or a creature within 5 feet can detach it as an action — GM-enforced.",
     icon: 'fa-circle-dot',
     cls: 'effect-debuff',
     group: 'Movement',

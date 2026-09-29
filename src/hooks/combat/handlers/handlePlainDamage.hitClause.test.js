@@ -2635,6 +2635,119 @@ describe('MA-0553 Darkmantle Crush attached hit-clause (stamp + advisory, no fab
     });
 });
 
+const STIRGE = monsters.find(m => m.index === 'stirge');
+const PROBOSCIS_ACTION = STIRGE.actions[0];
+
+describe('MA-1531 Stirge Proboscis attached hit-clause (stamp + advisory, same darkmantle te)', () => {
+    const deps = {
+        characterName: 'Stirge 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Stirge 1', computedStats: { armorClass: 13 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getEffectDefinition.mockImplementation((key) => ({
+            effect: key,
+            label: 'Attached',
+            description: "A darkmantle or stirge is attached. Darkmantle: Speed 0, moves with the target, attacks only it with Advantage. Blinded + suffocating only while covering on an Advantage hit; detach with a DC 13 Strength (Athletics) action. Stirge: the target takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns; the stirge detaches by spending 5 feet of movement, and the target or a creature within 5 feet can detach it as an action — GM-enforced.",
+            group: 'Movement',
+        }));
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 9, newHp: 990, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-1531 data-lock: Proboscis row authors hit_target_effect:"attached" (darkmantle byte-shape), damage legs exact, NO hit_conditions', () => {
+        expect(PROBOSCIS_ACTION.name).toBe('Proboscis');
+        expect(PROBOSCIS_ACTION.attack_bonus).toBe(5);
+        expect(PROBOSCIS_ACTION.reach).toBe('5 ft.');
+        expect(PROBOSCIS_ACTION.damage_dice_primary).toBe('1d6 + 3');
+        expect(PROBOSCIS_ACTION.damage_type_primary).toBe('Piercing');
+        expect(PROBOSCIS_ACTION.hit_target_effect).toBe('attached');
+        expect(PROBOSCIS_ACTION.hit_conditions).toBeUndefined();
+        expect(PROBOSCIS_ACTION.escape_dc).toBeUndefined();
+    });
+
+    it('builds a targetEffect-only clause from the Proboscis row', () => {
+        expect(buildHitConditionClause(PROBOSCIS_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Proboscis',
+            targetEffect: 'attached',
+        });
+    });
+
+    it('registers the attached te on the victim, sourced from the stirge, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Proboscis', formula: '1d6 + 3', total: 9, rolls: [6], modifier: 3, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Stirge 1',
+            hitClause: buildHitConditionClause(PROBOSCIS_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'attached',
+            'Stirge 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('MA-1531 clock-lock: grants ONE addExpiration anchored on the stirge (MA-0553 anchor twin; attach-until-detached RAW is advisory per MA-0434)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Proboscis', formula: '1d6 + 3', total: 9, rolls: [6], modifier: 3, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Stirge 1',
+            hitClause: buildHitConditionClause(PROBOSCIS_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Stirge 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'attached', source: 'Stirge 1', target: 'Bandit 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Stirge 1',
+        });
+    });
+
+    it('logs condition-applied with the generalized registry label + stirge tick/detach advisory; never fabricates an activeConditions write', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Proboscis', formula: '1d6 + 3', total: 9, rolls: [6], modifier: 3, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Stirge 1',
+            hitClause: buildHitConditionClause(PROBOSCIS_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Attached',
+        }));
+        const conditionLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied');
+        expect(conditionLog.note).toMatch(/2d4\) Necrotic damage at the start of each of the stirge's turns/);
+        expect(conditionLog.note).toMatch(/GM-enforced/);
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+    });
+});
+
 const CYCLOPS_SENTRY = monsters.find(m => m.index === 'cyclops-sentry');
 const STONE_CLUB_ACTION = CYCLOPS_SENTRY.actions[1];
 

@@ -656,11 +656,20 @@ describe('targetEffectDefinitions', () => {
       const def = getEffectDefinition('attached');
       expect(def).toBeTruthy();
       expect(def.effect).toBe('attached');
-      expect(def.label).toBe('Attached (Darkmantle)');
+      expect(def.label).toBe('Attached');
       expect(def.group).toBe('Movement');
       expect(def.description).toMatch(/DC 13 Strength \(Athletics\)/);
       expect(def.description).toMatch(/GM-enforced/);
       expect(def.fields).toContain('source');
+    });
+
+    it('MA-1531: generalized copy carries stirge tick + detach advisory, darkmantle copy intact', () => {
+      const def = getEffectDefinition('attached');
+      expect(def.description).toMatch(/2d4\) Necrotic damage at the start of each of the stirge's turns/);
+      expect(def.description).toMatch(/5 feet of movement/);
+      expect(def.description).toMatch(/creature within 5 feet can detach it as an action/);
+      expect(def.description).toMatch(/Darkmantle: Speed 0, moves with the target/);
+      expect(def.description).toMatch(/DC 13 Strength \(Athletics\) action/);
     });
   });
 });

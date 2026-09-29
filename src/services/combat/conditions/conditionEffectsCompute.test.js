@@ -448,6 +448,13 @@ describe('computeConditionEffects — targetEffects', () => {
     expect(result.saveAdvantageAbilities).toContain('WIS');
     expect(result.saveAdvantageReasons).toContain('Beacon of Hope');
   });
+
+  it('MA-1531: attached te stamps attachedBy from source (darkmantle MA-0553 twin, stirge byte-identical consumer)', () => {
+    const dm = computeConditionEffects({ saveModifiers: [], targetEffects: [{ target: 'Bandit 1', effect: 'attached', source: 'Darkmantle 1' }] });
+    expect(dm.attachedBy).toBe('Darkmantle 1');
+    const stirge = computeConditionEffects({ saveModifiers: [], targetEffects: [{ target: 'Bandit 1', effect: 'attached', source: 'Stirge 1' }] });
+    expect(stirge.attachedBy).toBe('Stirge 1');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -680,5 +687,5 @@ describe('computeConditionEffects — peerless_athlete skills', () => {
     ];
     const effects = computeConditionEffects({ saveModifiers: modifiers });
     expect(effects.abilityCheckAdvantageSkills).toEqual(['Deception', 'Performance']);
-  });
-});
+  });});
+
