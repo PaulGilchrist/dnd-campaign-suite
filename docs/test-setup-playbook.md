@@ -1070,3 +1070,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Save-route fail-clause producer recipe: parseSpeedReduceClause (Helpers:99, `/speed decreases by N feet/i`) → conePicker payload → SaveAttackAoeModal prop threaded through BOTH resolveSaveFailGrant sites → registerTargetEffect speed_reduction {value:N} + ONE addExpiration {expireOnCreatureName:caster, remove_target_effect} (MA-0995/1147 anchor) + grant log. Expiry anchors at caster NEXT TURN-START (end-of-turn = MA-0542 accepted residual).
 - Dedupe: registerTargetEffect per-(target,effect,source) REPLACE — refire value stays 10 not 20 (consumer conditionEffects:386 accumulates across distinct sources only).
 - Gridless lenient picker: Bandit selectable without token placement (§62 pre-check empty-map drop did NOT fire here).
+
+## §MA-1531 (2026-09-28, Stirge Proboscis FIXED — attached stamp + registry generalization) New pitfalls
+- Attach stamp recipe: one-field `hit_target_effect:"attached"` → applyHitClauseTargetEffect te + attachedBy + grant log (darkmantle twin live). te `attached` label generalized "Attached"; description additively carries stirge tick/detach GM-advisory copy — darkmantle DC13 copy intact.
+- BADGE_SPECS has no `attached` spec → no initiative-card badge (MA-0553/§581 accepted residual; copy live via log+EffectAdder).
+- Sibling audit open lead: Cloaker actions[1] "Attach" prose-only, no hit_target_effect — likely next ticket twin if ever verified broken.
