@@ -60496,11 +60496,16 @@
       },
       {
         "name": "Bite",
-        "description": "Melee Weapon Attack: +19 to hit, reach 10 ft., one target. Hit: 36 (4dl2 + 10) piercing damage. Ifthe target is a creature, it is grappled (escape DC 20). Until this grapple ends, the target is restrained, and the tarrasque can't bite another target.",
+        "description": "Melee Weapon Attack: +19 to hit, reach 10 ft., one target. Hit: 36 (4d12 + 10) piercing damage. If the target is a creature, it is grappled (escape DC 20). Until this grapple ends, the target is restrained, and the tarrasque can't bite another target.",
         "attack_bonus": 19,
         "reach": "10 ft.",
         "damage_dice_primary": "4d12 + 10",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": [
+          "grappled",
+          "restrained"
+        ],
+        "escape_dc": 20
       },
       {
         "name": "Claw",

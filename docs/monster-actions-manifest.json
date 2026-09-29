@@ -26582,7 +26582,7 @@
         "restrained"
       ],
       "description": "Melee Weapon Attack: +19 to hit, reach 10 ft., one target. Hit: 36 (4dl2 + 10) piercing damage. Ifthe target is a creature, it is grappled (escape DC 20). Until this grapple ends, the target is restrained, and the tarrasque can't bite another target.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1573-bite.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1574",
