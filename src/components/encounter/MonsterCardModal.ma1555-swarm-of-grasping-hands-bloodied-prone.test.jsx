@@ -203,8 +203,8 @@ describe('MA-1555 monsters.json data lock: Swarm of Grasping Hands dual-rider fi
     expect(GRASPING.hit_choice).toBeUndefined();
   });
 
-  it('sibling swarm rows stay untouched: rats/ravens carry no conditional_damage', () => {
-    expect(monsters.find((m) => m.index === 'swarm-of-rats').actions[0].conditional_damage).toBeUndefined();
+  it('sibling swarm rows: ravens still inert, rats fixed MA-1565 (Bloodied conditional_damage)', () => {
+    expect(monsters.find((m) => m.index === 'swarm-of-rats').actions[0].conditional_damage).toEqual({ dice: '1d4', damage_type: 'Piercing', condition: 'Bloodied' });
     expect(monsters.find((m) => m.index === 'swarm-of-ravens').actions[0].conditional_damage).toBeUndefined();
   });
 });

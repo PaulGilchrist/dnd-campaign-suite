@@ -59836,7 +59836,12 @@
         "attack_bonus": 2,
         "reach": "5 ft.",
         "damage_dice_primary": "2d4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "conditional_damage": {
+          "dice": "1d4",
+          "damage_type": "Piercing",
+          "condition": "Bloodied"
+        }
       }
     ],
     "bonus_actions": [],
