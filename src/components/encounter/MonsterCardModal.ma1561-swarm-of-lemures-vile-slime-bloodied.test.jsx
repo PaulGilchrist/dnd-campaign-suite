@@ -210,7 +210,7 @@ describe('MA-1561 monsters.json data lock: Swarm of Lemures Vile Slime Bloodied 
     expect(LEMURE.actions.find((a) => a.name === 'Vile Slime').conditional_damage).toBeUndefined();
     expect(LEMURE.actions.find((a) => a.name === 'Vile Slime').damage_dice_primary).toBe('1d4');
     const spiders = monsters.find((m) => m.index === 'swarm-of-spiders');
-    expect(spiders.actions.find((a) => a.name === 'Bites').conditional_damage).toBeUndefined();
+    expect(spiders.actions.find((a) => a.name === 'Bites').conditional_damage).toEqual({ dice: '2d4', damage_type: 'piercing', condition: 'half HP or fewer' });
     expect(DRETCHES_REND.conditional_damage).toEqual({ dice: '3d4', modifier: 2, damage_type: 'Slashing', condition: 'Bloodied' });
     expect(INSECTS_BITES.conditional_damage).toEqual({ dice: '1d4', modifier: 1, damage_type: 'Poison', condition: 'Bloodied' });
     expect(LARVAE_BITES.conditional_damage).toEqual({ dice: '2d4', modifier: 2, damage_type: 'Necrotic', condition: 'Bloodied' });

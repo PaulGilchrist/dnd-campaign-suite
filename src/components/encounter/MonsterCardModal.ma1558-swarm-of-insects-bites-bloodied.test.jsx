@@ -202,7 +202,7 @@ describe('MA-1558 monsters.json data lock: Swarm of Insects Bites Bloodied fix',
   it('untouched siblings stay untouched: swarm-of-insects is single-action, swarm-of-spiders/centipedes own rows unchanged', () => {
     expect(SWARM.actions.length).toBe(1);
     const spiders = monsters.find((m) => m.index === 'swarm-of-spiders');
-    expect(spiders.actions.find((a) => a.name === 'Bites').conditional_damage).toBeUndefined();
+    expect(spiders.actions.find((a) => a.name === 'Bites').conditional_damage).toEqual({ dice: '2d4', damage_type: 'piercing', condition: 'half HP or fewer' });
     const centipedes = monsters.find((m) => m.index === 'swarm-of-centipedes');
     expect(centipedes.actions[0].conditional_damage).toEqual({ dice: '2d4', damage_type: 'piercing', condition: expect.any(String) });
     expect(DRETCHES_REND.conditional_damage).toEqual({ dice: '3d4', modifier: 2, damage_type: 'Slashing', condition: 'Bloodied' });

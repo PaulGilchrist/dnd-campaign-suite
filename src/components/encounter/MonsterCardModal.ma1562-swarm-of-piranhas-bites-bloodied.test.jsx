@@ -207,7 +207,7 @@ describe('MA-1562 monsters.json data lock: Swarm of Piranhas Bites Bloodied fix'
   });
 
   it('untouched siblings stay untouched: 2d4+3 neighbours inert, swarm-family twin pins hold', () => {
-    expect(SPIDERS_BITES.conditional_damage).toBeUndefined();
+    expect(SPIDERS_BITES.conditional_damage).toEqual({ dice: '2d4', damage_type: 'piercing', condition: 'half HP or fewer' });
     expect(WERERAT_BITE.conditional_damage).toBeUndefined();
     expect(monsters.find((m) => m.index === 'bandit-deceiver').actions.find((a) => a.name === 'Dagger').conditional_damage).toBeUndefined();
     expect(monsters.find((m) => m.index === 'elk').actions.find((a) => a.name === 'Hooves').conditional_damage).toBeUndefined();
