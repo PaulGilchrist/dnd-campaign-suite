@@ -60603,6 +60603,7 @@
       },
       {
         "name": "Chomp (Costs 2 Actions)",
+        "delegates_to": "Bite",
         "description": "The tarrasque makes one bite attack or uses its Swallow."
       }
     ],

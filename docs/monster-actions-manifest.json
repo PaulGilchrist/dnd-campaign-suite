@@ -26722,7 +26722,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The tarrasque makes one bite attack or uses its Swallow.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1582-chomp.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1583",

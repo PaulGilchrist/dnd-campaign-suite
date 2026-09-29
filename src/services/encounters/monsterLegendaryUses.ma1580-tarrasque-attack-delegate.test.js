@@ -61,11 +61,12 @@ describe('MA-1580 monsters.json data: Tarrasque legendary "Attack" delegates_to 
     expect(move.advisory).toBe('movement');
     expect(move.description).toBe('The tarrasque moves up to half its speed.');
     const chomp = la.find(a => a.name === 'Chomp (Costs 2 Actions)');
-    // Chomp cost-2 intact: name-text "(Costs 2 Actions)" + description byte,
-    // no delegates_to authored (bite-or-Swallow choice is a separate ticket).
-    expect(Object.keys(chomp)).toEqual(['name', 'description']);
+    // Stale inert-pin inverted same pass (§216): MA-1582 lands
+    // delegates_to:"Bite" on Chomp — name-text "(Costs 2 Actions)" +
+    // description bytes intact, delegates_to authored between them.
+    expect(Object.keys(chomp)).toEqual(['name', 'delegates_to', 'description']);
+    expect(chomp.delegates_to).toBe('Bite');
     expect(chomp.description).toBe('The tarrasque makes one bite attack or uses its Swallow.');
-    expect(chomp.delegates_to).toBeUndefined();
   });
 
   it('delegate spans actions[]: legendaryDelegateAction lands the REAL Claw attack row', () => {
@@ -86,9 +87,11 @@ describe('MA-1580 monsters.json data: Tarrasque legendary "Attack" delegates_to 
     expect(legendaryDelegateAttackName(attack, delegate)).toBe('Attack (Claw attack)');
   });
 
-  it('no-delegate refusal vocabulary reachable for the untouched Chomp child', () => {
+  it('no-delegate refusal vocabulary still reachable (Move advisory child has no delegates_to; Chomp now resolves Bite per MA-1582)', () => {
+    const move = tarrasque.legendary_actions.find(a => a.name === 'Move');
+    expect(legendaryDelegateAction(tarrasque, move)).toBeNull();
     const chomp = tarrasque.legendary_actions.find(a => a.name === 'Chomp (Costs 2 Actions)');
-    expect(legendaryDelegateAction(tarrasque, chomp)).toBeNull();
+    expect(legendaryDelegateAction(tarrasque, chomp)).toBe(tarrasque.actions.find(a => a.name === 'Bite'));
   });
 });
 

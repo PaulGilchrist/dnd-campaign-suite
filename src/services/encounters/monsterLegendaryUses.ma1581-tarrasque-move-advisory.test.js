@@ -140,7 +140,9 @@ describe('MA-1581 block siblings intact', () => {
     expect(attack.delegates_to).toBe('Claw');
     const chomp = tarrasque.legendary_actions[3];
     expect(chomp.name).toBe('Chomp (Costs 2 Actions)');
-    expect(Object.keys(chomp)).toEqual(['name', 'description']);
+    // Stale inert-pin inverted same pass (§216): MA-1582 lands delegates_to:"Bite".
+    expect(Object.keys(chomp)).toEqual(['name', 'delegates_to', 'description']);
+    expect(chomp.delegates_to).toBe('Bite');
     expect(chomp.description).toBe('The tarrasque makes one bite attack or uses its Swallow.');
   });
 
