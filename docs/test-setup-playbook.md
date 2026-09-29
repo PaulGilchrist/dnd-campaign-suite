@@ -1148,3 +1148,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1569 (2026-09-29, Swarm of Stirges Swarm of Proboscises FIXED — multi-rider row) New pitfalls
 - Multi-rider attack row recipe LIVE: conditional_damage + hit_conditions:["grappled"]+escape_dc:13 + hit_target_effect:"attached" all coexist (buildHitConditionClause carries rider lanes orthogonal; maybeApplyHitClause runs conditions :841 THEN targetEffect :854; suppression arms ONLY on hit_choice). Recurring bleed tick stays §87 GM-advisory via attached te copy — no new consumer. Grapple escape_dc stamps meta {dc:13,ability:"str"} + badge "Grappled DC 13".
+
+## §MA-1577 (2026-09-29, Tarrasque Frightful Presence FIXED — FP structured keys armed) New pitfalls
+- FP row fix = byte-slice twin from adult-blue-dracolich FP: success_immunity{effect:'frightful_presence_immunity',duration:'24_hours',duration_minutes:1440} + repeat_save{condition:'frightened',save_type:'Wisdom',duration_minutes:1} between save_type/save_effect. LIVE lane truth: FP AoE picker (SaveAttackAoeModal) adjudicates inline and NEVER reaches saveProcessing.processSaveRoll — auto-EOT save-fp-repeat + immunity te stay unarmed live (§622 residual); badge-click condition-save is the live repeat affordance riding stamped DC.

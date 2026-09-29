@@ -60536,9 +60536,19 @@
       },
       {
         "name": "Frightful Presence",
-        "description": "Each creature ofthe tarrasque's choice within 120 feet of it and aware of it must succeed on a DC 17 Wisdom saving throw or become frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, with disadvantage if the tarrasque is within line of sight, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to the tarrasque's Frightful Presence for the next 24 hours.",
+        "description": "Each creature of the tarrasque's choice within 120 feet of it and aware of it must succeed on a DC 17 Wisdom saving throw or become frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, with disadvantage if the tarrasque is within line of sight, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to the tarrasque's Frightful Presence for the next 24 hours.",
         "save_dc": 17,
         "save_type": "Wisdom",
+        "success_immunity": {
+          "effect": "frightful_presence_immunity",
+          "duration": "24_hours",
+          "duration_minutes": 1440
+        },
+        "repeat_save": {
+          "condition": "frightened",
+          "save_type": "Wisdom",
+          "duration_minutes": 1
+        },
         "save_effect": "Failure: become frightened for 1 minute A creature can repeat the saving throw at the end of each of its turns with disadvantage, ending the effect on itself on a success. The creature is immune to this effect for the next 24 hours."
       },
       {
