@@ -58461,7 +58461,8 @@
         "name": "Charm",
         "description": "The succubus casts Dominate Person (level 8 version), requiring no spell components and using Charisma as the spellcasting ability (spell save DC 15).",
         "save_dc": 15,
-        "save_type": "Charisma"
+        "save_type": "Charisma",
+        "save_effect": "The target is charmed until the spell ends. The charmed target regards the succubus as a trusted ally; domination and command-control are GM-enforced (charmed is the mechanical marker; no automatic-control subsystem)."
       },
       {
         "name": "Draining Kiss",

@@ -26134,7 +26134,7 @@
       "saveDc": 15,
       "saveType": "Charisma",
       "description": "The succubus casts Dominate Person (level 8 version), requiring no spell components and using Charisma as the spellcasting ability (spell save DC 15).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1546-charm.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1547",

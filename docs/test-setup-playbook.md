@@ -1112,3 +1112,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - "The giant casts one of the following spells" lead-in ×2 file-wide (cloud-giant DC 15 @~13688 + storm-giant DC 18) — anchor markup edits on `(spell save DC 18):` full tail.
 - extractSpellcastingSpellUses binds "N/Day:" WITHOUT "Each" (optional group, Helpers:440).
 - SpellCastLinks advisory lane: non-save route skipSpendLog=true yet MA-0020 spend still fires — truth = ONE ability_use cast entry w/ spend note; exhausted re-fire = log-only automation blocked, no popup, chip mc-dice-link-spell-spent.
+
+## §MA-1546 (2026-09-29, Succubus Charm FIXED — save_effect charmed floor) New pitfalls
+- No-save-effect damageless save rows (§1092): fix = author `save_effect` with canonical word only ("charmed", avoid over-grant scan hits) + GM-enforced advisory copy in the same string; consumer applyDamagelessSaveConditions then grants + condition_clauses_advisory duration note. Dominated-control layer stays §70 advisory.
