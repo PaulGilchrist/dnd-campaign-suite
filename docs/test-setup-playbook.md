@@ -1145,3 +1145,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §MA-1563 (2026-09-29, Swarm of Poisonous Snakes Bites FIXED — save-leg pool) New pitfalls
 - SAVE-LEG POOL OVERRIDE LIVE: attack+save rows w/ a distinct save_effect pool were paying damage_dice_primary on the DC chip (formula "2d6" never "4d6" — min-dice arithmetic is the smoking gun). Fix lane = structured `save_damage_dice`+`save_damage_type` beside save_dc → parseSaveDamageFields (Helpers, structured-key-only, byte-inert) → saveChipPlan formula override + resolveSaveLegDamageFields (Modal) overwrite autoDamageFormula/autoDamageDamageType on the SAVE transport ONLY (attack chip byte-identical). Do NOT conflate with MA-0427 autoDamageSecondaryFormula additive seam (§154).
+
+## §MA-1569 (2026-09-29, Swarm of Stirges Swarm of Proboscises FIXED — multi-rider row) New pitfalls
+- Multi-rider attack row recipe LIVE: conditional_damage + hit_conditions:["grappled"]+escape_dc:13 + hit_target_effect:"attached" all coexist (buildHitConditionClause carries rider lanes orthogonal; maybeApplyHitClause runs conditions :841 THEN targetEffect :854; suppression arms ONLY on hit_choice). Recurring bleed tick stays §87 GM-advisory via attached te copy — no new consumer. Grapple escape_dc stamps meta {dc:13,ability:"str"} + badge "Grappled DC 13".

@@ -60158,7 +60158,18 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "2d10 + 3",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "conditional_damage": {
+          "dice": "1d10",
+          "modifier": 3,
+          "damage_type": "Piercing",
+          "condition": "Bloodied"
+        },
+        "hit_conditions": [
+          "grappled"
+        ],
+        "escape_dc": 13,
+        "hit_target_effect": "attached"
       }
     ],
     "bonus_actions": [],
