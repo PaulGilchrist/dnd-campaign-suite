@@ -1126,3 +1126,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1551 (2026-09-29, Succubus/Incubus Etherealness FIXED — ghost MA-0780 self-buff twin) New pitfalls
 - Refusal slug derives from ACTION NAME: succubus-incubus row named "Etherealness" → `etherealness_refused` (ghost's "Ethereality" → `ethereality_refused`) — §278 rule re-confirmed, automationDetail `already_ethereal` shared via effect key; pin both per-monster.
 - No whole-DB self-buff armed census exists (MA-1014 utility census excludes automation rows) — nothing to invert for self-buff data fixes.
+
+## §MA-1552 (2026-09-29, Swarm of Bats Bites FIXED — Bloodied variant conditional_damage) New pitfalls
+- Bloodied variant rides MA-1363 conditional_damage seam (buildChargeBonusOffer arms cd?.dice, chargeOfferLabel static-state branch "Bloodied: +NdX Type?", HIT-only gate DiceRollResult.jsx:851, offer/decline/Done share dice-roll-reroll-btn — target exact text). Swarms ship only currentHp/maxHp (no *HitPoints).
+- SWARM FAMILY ANCHOR: swarm-of-bats/rats/ravens share "Hit: N (XdY) Piercing, or M (ZdW)… if the swarm is Bloodied" — anchor conditional_damage edits on multi-line description+bonus+dice, siblings separate tickets.
