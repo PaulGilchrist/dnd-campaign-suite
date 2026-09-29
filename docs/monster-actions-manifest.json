@@ -26320,7 +26320,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 12 (3d6 + 2) Slashing damage, or 9 (3d4 + 2) Slashing damage if the swarm is Bloodied.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1557-rend.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1558",
