@@ -60592,6 +60592,7 @@
       },
       {
         "name": "Attack",
+        "delegates_to": "Claw",
         "description": "The tarrasque makes one claw attack or tail attack."
       },
       {

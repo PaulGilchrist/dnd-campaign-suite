@@ -26698,7 +26698,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The tarrasque makes one claw attack or tail attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1580-attack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1581",
