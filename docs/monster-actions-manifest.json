@@ -26352,7 +26352,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 9 (2d6 + 2) Necrotic damage, or 7 (2d4 + 2) Necrotic damage if the swarm is Bloodied.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1559-bites.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1560",

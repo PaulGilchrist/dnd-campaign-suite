@@ -59326,7 +59326,13 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 2",
-        "damage_type_primary": "Necrotic"
+        "damage_type_primary": "Necrotic",
+        "conditional_damage": {
+          "dice": "2d4",
+          "modifier": 2,
+          "damage_type": "Necrotic",
+          "condition": "Bloodied"
+        }
       }
     ],
     "bonus_actions": [],
