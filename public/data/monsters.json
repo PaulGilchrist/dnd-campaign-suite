@@ -58101,7 +58101,8 @@
         "attack_bonus": 9,
         "range": "60/240 ft.",
         "damage_dice_primary": "2d8 + 6",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["prone"]
       }
     ],
     "bonus_actions": [],
