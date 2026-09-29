@@ -1075,3 +1075,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Attach stamp recipe: one-field `hit_target_effect:"attached"` → applyHitClauseTargetEffect te + attachedBy + grant log (darkmantle twin live). te `attached` label generalized "Attached"; description additively carries stirge tick/detach GM-advisory copy — darkmantle DC13 copy intact.
 - BADGE_SPECS has no `attached` spec → no initiative-card badge (MA-0553/§581 accepted residual; copy live via log+EffectAdder).
 - Sibling audit open lead: Cloaker actions[1] "Attach" prose-only, no hit_target_effect — likely next ticket twin if ever verified broken.
+
+## §MA-1534 (2026-09-28, Stone Giant Boulder FIXED — prone hit-rider; QUEUE COMPLETE) New pitfalls
+- One-field prone recipe live (MA-1116 twin): stone-giant.actions[2] `"hit_conditions":["prone"]` → grants per-hit + meta source + badge; Medium victim passes Large-or-smaller consumer gate. "Boulder" name anchor unique file-wide; description-scope anchor still required for other repeated rows (§MA-1531 lesson).
