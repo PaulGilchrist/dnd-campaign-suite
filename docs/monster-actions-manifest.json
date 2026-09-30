@@ -27883,7 +27883,7 @@
       "saveDc": 18,
       "saveType": "Charisma",
       "description": "The vampire casts Hunger of Hadar (level 5 version), requiring no spell components and using Charisma as the spellcasting ability (spell save DC 18).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1656-hunger-of-hadar.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1657",
