@@ -27305,7 +27305,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 33 (4d12 + 7) Piercing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 17). While Grappled, the target has the Restrained condition and can't be targeted by the tyrannosaurus's Tail.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1620-trex-bite-grapple.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1621",

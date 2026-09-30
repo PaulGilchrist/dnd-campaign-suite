@@ -62203,7 +62203,9 @@
         "attack_bonus": 10,
         "reach": "10 ft.",
         "damage_dice_primary": "4d12 + 7",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 17
       },
       {
         "name": "Tail",
