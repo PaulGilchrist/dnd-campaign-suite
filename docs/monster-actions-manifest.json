@@ -27542,7 +27542,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The unicorn moves up to half its Speed without provoking Opportunity Attacks, and it makes one Radiant Horn attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1635-unicorn-charging-horn.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1636",

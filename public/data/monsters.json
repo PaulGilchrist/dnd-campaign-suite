@@ -62852,10 +62852,14 @@
     "reactions": [],
     "legendary_actions": [
       {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "Immediately after another creature's turn, the unicorn can expend a use to take one of the following actions. The unicorn regains all expended uses at the start of each of its turns."
+      },
+      {
         "name": "Charging Horn",
         "description": "The unicorn moves up to half its Speed without provoking Opportunity Attacks, and it makes one Radiant Horn attack.",
-        "uses": 1,
-        "recharge": false
+        "delegates_to": "Radiant Horn"
       },
       {
         "name": "Shimmering Shield",
