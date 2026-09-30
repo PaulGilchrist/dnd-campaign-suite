@@ -785,10 +785,39 @@ export function parseHitPull(action) {
 // hit_pull:{...} snake_case hit_* convention; equal_to:"damage" mirrors the
 // RAW "equal to the damage taken" clause (the only magnitude source the row
 // prose offers — the consumer reads applyResult.finalDamage).
+// MA-1645: magnitude scope extension — equal_to:"secondary" (Vampire
+// Nightbringer Bite "decreases by an amount equal to the Necrotic damage
+// taken" — the NECROTIC pool is damage_dice_secondary on the dual-damage
+// row; the plain byte-twin equal_to:"damage" would drain the PRIMARY
+// Piercing-only magnitude, the WRONG pool). Consumer
+// (handlePlainDamage.applyHitHpMaxReduce) reads secondaryFinalDamage ONLY
+// when equal_to:"secondary" — no fallback to primary (disk wording is the
+// truth); every existing equal_to:"damage" row (Specter, all MA-1451/1489
+// twins) stays byte-identical.
 export function parseHitHpMaxReduce(action) {
   const rider = action?.hit_hp_max_reduce;
   if (!rider || typeof rider !== 'object') return null;
-  return String(rider.equal_to || '').toLowerCase() === 'damage' ? { equalTo: 'damage' } : null;
+  const equalTo = String(rider.equal_to || '').toLowerCase();
+  return equalTo === 'damage' || equalTo === 'secondary' ? { equalTo } : null;
+}
+
+// MA-1645: hit-lane ATTACKER-recover rider — the attack-row twin of
+// MA-1639's save_attacker_recover (same grammar, same consumer discipline),
+// keyed on the structured hit_attacker_recover key ONLY (never prose —
+// MA-1489/MA-1547/MA-1639 structured-key-only precedent), so every
+// clauseless attack row stays byte-identical. RAW (Vampire Nightbringer
+// Bite): "the vampire regains Hit Points equal to that amount" — "that
+// amount" = the NECROTIC damage taken (equal_to:"secondary"), NOT half,
+// NOT the combined total (disk description is canonical). The consumer
+// (handlePlainDamage.maybeApplyHitClause → applyHitAttackerRecover) heals
+// the ATTACKER through the canonical applyHealingToTarget choke point
+// (no_healing + infernal-wound choke points honored, MA-0016/MA-0367).
+// Byte-inert null for every row without the key.
+export function parseHitAttackerRecover(action) {
+  const rider = action?.hit_attacker_recover;
+  if (!rider || typeof rider !== 'object') return null;
+  const equalTo = String(rider.equal_to || '').toLowerCase();
+  return equalTo === 'damage' || equalTo === 'secondary' ? { equalTo } : null;
 }
 
 // MA-1547: Succubus "Draining Kiss" save-path HP-max-drain rider — the
@@ -856,6 +885,7 @@ function hitClauseRiderPayload(action) {
   const abilityDrain = parseHitAbilityDrain(action);
   const pull = parseHitPull(action);
   const hpMaxReduce = parseHitHpMaxReduce(action);
+  const attackerRecover = parseHitAttackerRecover(action);
   return {
     targetEffect,
     ...(targetEffectAbility ? { targetEffectAbility } : {}),
@@ -863,13 +893,14 @@ function hitClauseRiderPayload(action) {
     ...(abilityDrain ? { abilityDrain } : {}),
     ...(pull ? { pull } : {}),
     ...(hpMaxReduce ? { hpMaxReduce } : {}),
+    ...(attackerRecover ? { attackerRecover } : {}),
   };
 }
 
 export function buildHitConditionClause(action) {
   const conditions = hitClauseAutoGrantConditions(action);
   const riders = hitClauseRiderPayload(action);
-  if (conditions.length === 0 && !riders.targetEffect && !riders.conditionRoll && !riders.abilityDrain && !riders.pull && !riders.hpMaxReduce) return null;
+  if (conditions.length === 0 && !riders.targetEffect && !riders.conditionRoll && !riders.abilityDrain && !riders.pull && !riders.hpMaxReduce && !riders.attackerRecover) return null;
   return {
     conditions,
     escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,

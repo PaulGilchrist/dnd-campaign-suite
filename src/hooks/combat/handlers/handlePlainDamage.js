@@ -16,6 +16,7 @@ import { consumePendingRedirectOnResolve } from '../../../services/encounters/mo
 import { consumePendingJinxOnResolve } from '../../../services/encounters/monsterJinx.js';
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
 import { applyHpMaxReduce } from '../../../services/rules/features/hpMaxReduceService.js';
+import { applyHealingToTarget } from '../../../services/rules/combat/applyHealing.js';
 import { getMonsterData } from '../../../services/npcs/monsterUtils.js';
 
 const ABILITY_LABELS = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
@@ -762,8 +763,76 @@ async function applyHitAbilityDrain({ hitClause, target, combatSummary, characte
 // reusable machinery out of this file byte-for-byte); this hit-clause wrapper
 // keeps the attack-lane call site and every MA-1489 byte identical
 // (saveOutcome stays null → no save-face automation entry).
-async function applyHitHpMaxReduce({ hitClause, target, applyResult, combatSummary, characters, campaignName, logEntry, attackerName }) {
-    await applyHpMaxReduce({ attackName: hitClause.attackName, target, damage: Number(applyResult?.finalDamage) || 0, combatSummary, characters, campaignName, attackerName, logEntry });
+// MA-1645: rider magnitude resolution. equal_to:"secondary" (Vampire
+// Nightbringer Bite — RAW scopes the drain/regain to the NECROTIC pool,
+// which rides secondaryFinalDamage on combined_damage_roll rows) consumes
+// the secondary leg's applied damage; equal_to:"damage" (Specter + every
+// legacy single-pool twin) keeps consuming applyResult.finalDamage byte-
+// identical. No fallback to primary for the secondary scope (disk wording
+// is canonical) — a zero secondary drains/logs zero honestly.
+function resolveHitRiderDamage({ hitClause, applyResult, secondaryFinalDamage }) {
+    if (String(hitClause?.hpMaxReduce?.equalTo || '') === 'secondary' || String(hitClause?.attackerRecover?.equalTo || '') === 'secondary') {
+        return Number(secondaryFinalDamage) || 0;
+    }
+    return Number(applyResult?.finalDamage) || 0;
+}
+
+async function applyHitHpMaxReduce({ hitClause, target, applyResult, secondaryFinalDamage, combatSummary, characters, campaignName, logEntry, attackerName }) {
+    const damage = resolveHitRiderDamage({ hitClause, applyResult, secondaryFinalDamage });
+    await applyHpMaxReduce({ attackName: hitClause.attackName, target, damage, combatSummary, characters, campaignName, attackerName, logEntry });
+}
+
+// MA-1645: hit-lane attacker-recover rider — the attack-row twin of
+// MA-1639's applySaveAttackerRecoverLeg, healed through the canonical
+// applyHealingToTarget choke point (cs currentHp + clamp + storage.set +
+// combat-summary-updated; no_healing / infernal-wound choke points honored,
+// MA-0016/MA-0367). Armed ONLY by the structured hit_attacker_recover key
+// parsed onto the hit clause (byte-inert for every clauseless row); heals
+// the ATTACKER by the SAME rider amount the drain rider consumed (the
+// NECROTIC pool on the dual-damage Nightbringer Bite — disk RAW: "the
+// vampire regains Hit Points equal to that amount", full amount, NOT half).
+// HP truth (§17): monster = cs currentHp. No clock: RAW permanent until
+// restored (the drain ledger's rules, MA-1489/MA-1639 convention).
+async function applyHitAttackerRecover({ hitClause, target, applyResult, secondaryFinalDamage, combatSummary, campaignName, logEntry, attackerName }) {
+    if (!hitClause.attackerRecover) return null;
+    const amount = resolveHitRiderDamage({ hitClause, applyResult, secondaryFinalDamage });
+    const actionName = hitClause.attackName;
+    if (amount <= 0) {
+        logEntry({
+            type: 'automation',
+            automationType: 'hit_attacker_recover',
+            characterName: attackerName,
+            abilityName: actionName,
+            targetName: target?.name,
+            description: `${attackerName}'s ${actionName} drained 0 Hit Points from ${target?.name} — ${attackerName} regains 0 Hit Points (equal to the damage drained). No change.`,
+            timestamp: Date.now(),
+        });
+        return 'zero';
+    }
+    const result = applyHealingToTarget(combatSummary, attackerName, amount, campaignName);
+    if (!result) {
+        console.error(`[handlePlainDamage] MA-1645 attacker HP unresolvable for ${attackerName} — regain not applied`);
+        logEntry({
+            type: 'automation',
+            automationType: 'hit_attacker_recover_refused',
+            characterName: attackerName,
+            abilityName: actionName,
+            targetName: target?.name,
+            description: `${attackerName}'s ${actionName} drained ${amount} Hit Points from ${target?.name}, but ${attackerName}'s Hit Points are not resolvable — regain recorded advisory only (GM-enforced).`,
+            timestamp: Date.now(),
+        });
+        return null;
+    }
+    logEntry({
+        type: 'automation',
+        automationType: 'hit_attacker_recover',
+        characterName: attackerName,
+        abilityName: actionName,
+        targetName: target?.name,
+        description: `${attackerName} regains ${result.actualHeal} Hit Points equal to the damage drained from ${target?.name} by ${actionName} — ${attackerName} ${result.oldHp} → ${result.newHp} Hit Points (max ${result.maxHp}).`,
+        timestamp: Date.now(),
+    });
+    return result;
 }
 
 // MA-1459: Shambling Mound "Charged Tendril" size-conditional pull consumer —
@@ -809,7 +878,21 @@ function applyHitPullClause({ hitClause, target, attackerName, campaignName, log
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-async function maybeApplyHitClause({ context, target, applyResult, combatSummary, characters, campaignName, logEntry, characterName }) {
+// MA-1645: drain + regain rider dispatch hoisted out of maybeApplyHitClause
+// (§45 complexity cap — MA-1459 rider-choice precedent). Each rider's own
+// guard keeps the other byte-inert: Specter (equal_to:"damage", no regain
+// key) reduces by finalDamage and heals nothing; Nightbringer (both keys,
+// equal_to:"secondary") reduces AND regains by the NECROTIC pool.
+async function applyHpMaxReduceAndRecoverRiders({ hitClause, target, applyResult, secondaryFinalDamage, combatSummary, characters, campaignName, logEntry, attackerName }) {
+    if (hitClause.hpMaxReduce) {
+        await applyHitHpMaxReduce({ hitClause, target, applyResult, secondaryFinalDamage, combatSummary, characters, campaignName, logEntry, attackerName });
+    }
+    if (hitClause.attackerRecover) {
+        await applyHitAttackerRecover({ hitClause, target, applyResult, secondaryFinalDamage, combatSummary, campaignName, logEntry, attackerName });
+    }
+}
+
+async function maybeApplyHitClause({ context, target, applyResult, secondaryFinalDamage = 0, combatSummary, characters, campaignName, logEntry, characterName }) {
     const hitClause = context?.hitClause;
     if (!hitClause || !target || !applyResult) return;
     // MA-1451: the numeric ability drain rides before the grapple-family
@@ -825,14 +908,13 @@ async function maybeApplyHitClause({ context, target, applyResult, combatSummary
     if (hitClause.pull) {
         applyHitPullClause({ hitClause, target, attackerName: characterName, campaignName, logEntry });
     }
-    // MA-1489: the Specter Life Drain HP-max rider likewise rides BEFORE the
-    // gate — RAW "If the target is a creature" carries no size restriction
-    // (§127 size-gate honesty, MA-1451 byte-twin position). The damage legs
-    // have already applied above (applyResult carries the damage TAKEN — the
-    // equal_to:"damage" magnitude source); this rider never re-touches them.
-    if (hitClause.hpMaxReduce) {
-        await applyHitHpMaxReduce({ hitClause, target, applyResult, combatSummary, characters, campaignName, logEntry, attackerName: characterName });
-    }
+    // MA-1489 + MA-1645: the HP-max-drain and attacker-regain riders ride
+    // BEFORE the gate — RAW carries no size restriction (§127 size-gate
+    // honesty, MA-1451 byte-twin position). The damage legs have already
+    // applied above (applyResult carries the damage TAKEN; the NECROTIC
+    // secondary pool rides secondaryFinalDamage); these riders never
+    // re-touch them. Hoisted to a sibling to hold the §45 complexity cap.
+    await applyHpMaxReduceAndRecoverRiders({ hitClause, target, applyResult, secondaryFinalDamage, combatSummary, characters, campaignName, logEntry, attackerName: characterName });
     if (!isLargeOrSmallerTarget(target.size)) return;
     const { effectiveClause, riderChoice } = rollHitClauseRiderChoice({ hitClause, target, logEntry, characterName });
     const hasConditions = Array.isArray(effectiveClause.conditions) && effectiveClause.conditions.length > 0;
@@ -1021,7 +1103,7 @@ export function createPlainDamageHandler(deps) {
         applyResult = await resolveDeathStrike({ applyResult, context, combatSummary, target, characters, campaignName, characterName, adjustedTotal, formula, rolls, modifier, damageType, setPopupHtml, logEntry });
 
         maybeApplyRamProne({ context, target, applyResult, campaignName, logEntry });
-        await maybeApplyHitClause({ context, target, applyResult, combatSummary, characters, campaignName, logEntry, characterName });
+        await maybeApplyHitClause({ context, target, applyResult, secondaryFinalDamage, combatSummary, characters, campaignName, logEntry, characterName });
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 

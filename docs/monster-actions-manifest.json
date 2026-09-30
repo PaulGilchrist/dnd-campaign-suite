@@ -27707,7 +27707,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 7 (1d6 + 4) Piercing damage plus 10 (3d6) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1645-nightbringer-bite-drain.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1646",

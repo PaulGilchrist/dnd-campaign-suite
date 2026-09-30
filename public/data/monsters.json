@@ -63236,7 +63236,13 @@
         "damage_dice_primary": "1d6 + 4",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "3d6",
-        "damage_type_secondary": "Necrotic"
+        "damage_type_secondary": "Necrotic",
+        "hit_hp_max_reduce": {
+          "equal_to": "secondary"
+        },
+        "hit_attacker_recover": {
+          "equal_to": "secondary"
+        }
       },
       {
         "name": "Shadow Strike",
