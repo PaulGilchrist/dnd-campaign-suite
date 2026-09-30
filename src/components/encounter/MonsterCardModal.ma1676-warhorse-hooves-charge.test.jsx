@@ -238,3 +238,126 @@ describe('MA-1676 Hooves HIT popup offer + grant/decline', () => {
     expect(rollDamage).not.toHaveBeenCalled();
   });
 });
+
+// MA-1699: Wereboar Tusk — one-field DATA fix: conditional_damage
+// {dice:"2d6", damage_type:"Piercing"} authored on monsters.json actions[3]
+// (MA-0007 charge-bonus seam, MA-0885 goat Ram / MA-1676 warhorse Hooves
+// byte-shape twins) so the HIT popup offers "20+ ft Charge: +2d6 Piercing?"
+// (chargeOfferLabel, feet=20 parsed from the clause) + decline instead of
+// base-only damage. Prone half: movement-gated Prone stays advisory —
+// hit_conditions deliberately NOT authored (ungated every-hit grant wrong
+// RAW, MA-1676/MA-1610/MA-0903 precedent).
+const WEREBOAR = monsters.find((m) => m.index === 'wereboar');
+const TUSK = WEREBOAR.actions[3];
+
+const TUSK_CREATURES = [
+  { name: 'Wereboar 1', targetName: 'Bandit 1' },
+  { name: 'Bandit 1', type: 'player', size: 'Medium' },
+];
+
+function tuskHitPopupHtml(overrides = {}) {
+  const offer = buildChargeBonusOffer(TUSK, 'Tusk');
+  return {
+    type: 'd20',
+    rollType: 'attack',
+    name: 'Tusk',
+    rolls: [14],
+    bonus: 5,
+    targetName: 'Bandit 1',
+    targetAc: 12,
+    hit: true,
+    autoDamage: { name: 'Tusk', formula: '2d6 + 3', damageType: 'Piercing', source: 'Wereboar 1' },
+    chargeBonusOffer: offer,
+    ...overrides,
+  };
+}
+
+function renderTusk(popupHtml = null) {
+  _setPopupHtml(popupHtml);
+  const m = makeMonster({ name: 'Wereboar', actions: WEREBOAR.actions });
+  damageUtils.__setFindCreatureReturn({ name: 'Wereboar 1', targetName: 'Bandit 1', conditions: [] });
+  return render(<MonsterCardModal {...makeProps(m, { creatures: TUSK_CREATURES, creatureName: 'Wereboar 1' })} />);
+}
+
+function clickTuskLink() {
+  const row = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Tusk/.test(a.textContent.trim()));
+  const chip = Array.from(row.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+5');
+  expect(chip, 'Expected Tusk +5 dice link').toBeTruthy();
+  fireEvent.click(chip);
+}
+
+describe('MA-1699 monsters.json data lock: Wereboar Tusk conditional charge damage', () => {
+  it('authors conditional_damage after damage_type_primary, last key (MA-0885/MA-1676 placement)', () => {
+    expect(TUSK.name).toBe('Tusk');
+    expect(TUSK.attack_bonus).toBe(5);
+    expect(TUSK.damage_dice_primary).toBe('2d6 + 3');
+    expect(TUSK.damage_type_primary).toBe('Piercing');
+    const keys = Object.keys(TUSK);
+    expect(keys.indexOf('conditional_damage')).toBeGreaterThan(keys.indexOf('damage_type_primary'));
+    expect(keys.indexOf('conditional_damage')).toBe(keys.length - 1);
+    expect(TUSK.description).toMatch(/extra 7 \(2d6\) Piercing damage/i);
+    expect(canRollExpression(TUSK.damage_dice_primary)).toBe(true);
+  });
+
+  it('conditional_damage is the goat/warhorse twin byte-shape (2d6 Piercing, modifier-less, same key order)', () => {
+    const cd = TUSK.conditional_damage;
+    expect(cd).toBeTruthy();
+    expect(cd.dice).toBe('2d6');
+    expect(cd.damage_type).toBe('Piercing');
+    expect(cd.condition).toBe('moved 20+ feet straight toward the target immediately before the hit');
+    expect(cd).not.toHaveProperty('modifier');
+    expect(Object.keys(cd)).toEqual(Object.keys(GOAT_CD));
+    expect(Object.keys(cd)).toEqual(Object.keys(HOOVES.conditional_damage));
+  });
+
+  it('prone stays advisory: hit_conditions NOT authored (movement-gated rider — MA-1676/MA-1610/MA-0903)', () => {
+    expect('hit_conditions' in TUSK).toBe(false);
+    expect(buildHitConditionClause(TUSK)).toBeNull();
+  });
+
+  it('buildChargeBonusOffer arms on the row: formula "2d6" (modifier 0), charge label', () => {
+    const offer = buildChargeBonusOffer(TUSK, 'Tusk');
+    expect(offer).toMatchObject({ dice: '2d6', modifier: 0, damageType: 'Piercing', formula: '2d6', attackName: 'Tusk' });
+    expect(offer.label).toBe('20+ ft Charge: +2d6 Piercing?');
+  });
+});
+
+describe('MA-1699 Tusk HIT popup offer + grant/decline', () => {
+  it('forwards the charge offer to the attack roll context, no prone clause', () => {
+    renderTusk();
+    clickTuskLink();
+    expect(rollAttack).toHaveBeenCalled();
+    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toMatchObject({ dice: '2d6', modifier: 0, damageType: 'Piercing', formula: '2d6' });
+    expect(rollAttack.mock.calls[0][2].hitClause).toBeNull();
+  });
+
+  it('grants: rolls 2d6 as its own extra damage leg, logs conditional_damage_granted', async () => {
+    renderTusk(tuskHitPopupHtml());
+    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
+    fireEvent.click(grantBtn);
+    await vi.waitFor(() => {
+      expect(rollDamage).toHaveBeenCalled();
+    });
+    const call = rollDamage.mock.calls[0][0];
+    expect(call.formula).toBe('2d6');
+    expect(call.name).toBe('Tusk — Charge Bonus');
+    expect(call.context.damageType).toBe('Piercing');
+    expect(rollExpression).toHaveBeenCalledWith('2d6');
+    expect(rollExpressionDoubled).not.toHaveBeenCalled();
+    const grant = findLogEntry('conditional_damage_granted');
+    expect(grant).toBeTruthy();
+    expect(grant.description).toContain('+7 Piercing (2d6)');
+  });
+
+  it('declines: logs conditional_damage_declined with zero charge roll', async () => {
+    renderTusk(tuskHitPopupHtml());
+    const declineBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-decline');
+    fireEvent.click(declineBtn);
+    await vi.waitFor(() => {
+      const decline = findLogEntry('conditional_damage_declined');
+      expect(decline).toBeTruthy();
+      expect(decline.description).toContain('base damage only');
+    });
+    expect(rollDamage).not.toHaveBeenCalled();
+  });
+});

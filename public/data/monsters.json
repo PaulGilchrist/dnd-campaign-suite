@@ -65228,7 +65228,12 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 3",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "conditional_damage": {
+          "dice": "2d6",
+          "damage_type": "Piercing",
+          "condition": "moved 20+ feet straight toward the target immediately before the hit"
+        }
       }
     ],
     "bonus_actions": [
