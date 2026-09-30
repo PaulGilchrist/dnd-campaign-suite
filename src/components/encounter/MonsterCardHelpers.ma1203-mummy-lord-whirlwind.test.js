@@ -209,6 +209,73 @@ describe('MA-1681 Warrior Commander Counterattack — same parry channel byte-tw
   });
 });
 
+describe('MA-1686 Warrior Veteran Parry — same parry channel byte-twin', () => {
+  const WV_ROW = monsters.find(m => m.index === 'warrior-veteran').reactions[0];
+  const WV = 'Warrior Veteran 1';
+
+  function meleeHitOnVeteran(overrides = {}) {
+    return { attackerName: BANDIT, targetName: WV, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 14, bonus: 3, total: 17, targetAc: 17, effectiveAc: 17, damageApplied: undefined, ...overrides };
+  }
+
+  it('disk reactions[0] carries the MA-0341 parry byte-shape with acBonus 2 + At Will sentinel, twins\' key grammar (automation last)', () => {
+    expect(WV_ROW.name).toBe('Parry');
+    expect(WV_ROW.trigger).toBe('The warrior is hit by a melee attack roll while holding a weapon.');
+    expect(WV_ROW.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
+    expect(WV_ROW.usage).toBe('At Will');
+    expect(WV_ROW.uses).toBe(999);
+    expect(WV_ROW.maxUses).toBe(999);
+    const keys = Object.keys(WV_ROW);
+    expect(keys[keys.length - 1]).toBe('automation');
+    expect(keys.slice(0, 3)).toEqual(['name', 'trigger', 'description']);
+  });
+
+  it('getGatedMonsterReaction arms the chip off automation.effect (was null pre-fix)', () => {
+    expect(getGatedMonsterReaction(WV_ROW)?.effect).toBe('parry');
+    expect(getGatedMonsterReaction(WV_ROW)?.label).toBe('Parry');
+    expect(monsterReactionUsesRemaining(WV_ROW, {})).toBe(999);
+    expect(monsterReactionUsesRemaining(WV_ROW, { parry: 2 })).toBe(997);
+  });
+
+  it('press at pending melee hit: effAc fold 17 → 19, activeBuffs +2 stamp, round latch, lastAttack parryAcBonus:2, At Will never spends MONSTER_REACTION_USES', async () => {
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: meleeHitOnVeteran(), round: 4 });
+    const result = await resolveMonsterGatedReaction({ action: WV_ROW, monsterName: WV, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(2);
+    expect(result.newAc).toBe(19);
+    expect(state[`${WV}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(true);
+    expect(state[`${WV}._parry_usedRound`]).toBe(4);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: WV, parryAcBonus: 2 });
+    expect(state[`${WV}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    const spend = logs.find(l => l.type === 'ability_use');
+    expect(spend.abilityName).toBe('Parry');
+    expect(spend.description).toMatch(/AC 17 → 19/);
+    expect(spend.description).toMatch(/At Will/);
+  });
+
+  it('honest refusals: ranged trigger (melee), damage committed (resolved), same-event re-press (reacted) — zero writes', async () => {
+    const ranged = makeParryDeps({ lastAttack: meleeHitOnVeteran({ weaponType: 'ranged' }) });
+    expect((await resolveMonsterGatedReaction({ action: WV_ROW, monsterName: WV, campaignName: CAMPAIGN, deps: ranged.deps })).ok).toBe(false);
+    expect(ranged.logs[0]).toMatchObject({ type: 'automation', automationType: 'parry_refused' });
+    expect(ranged.deps.setRuntimeValue).not.toHaveBeenCalled();
+
+    const done = makeParryDeps({ lastAttack: meleeHitOnVeteran({ damageApplied: true, actualDamage: 10 }) });
+    expect((await resolveMonsterGatedReaction({ action: WV_ROW, monsterName: WV, campaignName: CAMPAIGN, deps: done.deps })).ok).toBe(false);
+    expect(done.logs[0].description).toMatch(/resolved/);
+
+    const reacted = makeParryDeps({ lastAttack: meleeHitOnVeteran({ parryResolved: true, parriedBy: WV }), store: { [`${WV}._parry_usedRound`]: 4 } });
+    expect((await resolveMonsterGatedReaction({ action: WV_ROW, monsterName: WV, campaignName: CAMPAIGN, deps: reacted.deps })).ok).toBe(false);
+    expect(reacted.logs[0].description).toMatch(/reacted/);
+    expect(reacted.deps.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('parryGate +2 honest boundary: total 18 vs AC 17 parries (19), total 19 still hits', () => {
+    expect(parryIdentityRefusal(meleeHitOnVeteran({ d20: 15, total: 18 }), WV)).toBe(null);
+    expect(18 < 17 + 2).toBe(true);
+    expect(19 >= 17 + 2).toBe(true);
+    expect(parryIdentityRefusal(meleeHitOnVeteran({ weaponType: 'ranged' }), WV)).toBe('melee');
+  });
+});
+
 describe('MA-1203 byte-inertness for existing parry twins', () => {
   it('Bandit Captain spend log stays byte-identical (label Parry, no advisory append)', async () => {
     const twin = monsters.find(m => m.index === 'bandit-captain').reactions[0];
