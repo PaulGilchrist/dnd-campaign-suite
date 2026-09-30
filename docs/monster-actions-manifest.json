@@ -27820,7 +27820,7 @@
         "restrained"
       ],
       "description": "Constitution Saving Throw: DC 14, one creature within 5 feet that is willing or that has the Grappled, Incapacitated, or Restrained condition. Failure: 5 (1d4 + 3) Piercing damage plus 10 (3d6) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1652-spawn-bite-drain.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1653",

@@ -63386,12 +63386,26 @@
         "description": "Constitution Saving Throw: DC 14, one creature within 5 feet that is willing or that has the Grappled, Incapacitated, or Restrained condition. Failure: 5 (1d4 + 3) Piercing damage plus 10 (3d6) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount.",
         "save_dc": 14,
         "save_type": "Constitution",
+        "dc_success": "none",
+        "save_hp_max_reduce": {
+          "equal_to": "damage"
+        },
+        "save_attacker_recover": {
+          "equal_to": "damage"
+        },
         "range": "5 feet",
         "damage_dice_primary": "1d4 + 3",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "3d6",
         "damage_type_secondary": "Necrotic",
-        "save_effect": "5 (1d4 + 3) Piercing damage plus 10 (3d6) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount"
+        "save_effect": "5 (1d4 + 3) Piercing damage plus 10 (3d6) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount",
+        "target_prerequisite": {
+          "conditions": [
+            "grappled",
+            "incapacitated",
+            "restrained"
+          ]
+        }
       }
     ],
     "bonus_actions": [
