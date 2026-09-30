@@ -27628,7 +27628,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The vampire casts Command, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 17). The vampire can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1640-beguile.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1641",
