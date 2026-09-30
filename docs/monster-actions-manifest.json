@@ -27556,7 +27556,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary Hit Points, and its AC increases by 2 until the end of the unicorn's next turn. The unicorn can't take this action again until the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1636-shimmering-shield.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1637",
