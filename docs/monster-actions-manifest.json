@@ -28386,7 +28386,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1688-slam-prone.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1689",

@@ -64802,7 +64802,8 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage_dice_primary": "2d8 + 4",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["prone"]
       },
       {
         "name": "Whelm",

@@ -5346,3 +5346,124 @@ describe('MA-1680 Warrior Commander Longbow speed_reduction hit-clause passthrou
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const WATER_ELEMENTAL = monsters.find(m => m.index === 'water-elemental');
+const WATER_SLAM_ACTION = WATER_ELEMENTAL.actions[1];
+
+describe('MA-1688 Water Elemental Slam prone-on-hit grant (one-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Water Elemental 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Water Elemental 1', computedStats: { armorClass: 14 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 7, newHp: 992, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function slamContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Water Elemental 1',
+            hitClause: buildHitConditionClause(WATER_SLAM_ACTION),
+        };
+    }
+
+    it('MA-1688 data-lock: disk row carries hit_conditions:["prone"] after damage_type_primary (MA-0775 ghast Claw trailing byte-shape), numerics byte-unchanged', () => {
+        expect(WATER_SLAM_ACTION.name).toBe('Slam');
+        expect(WATER_SLAM_ACTION.attack_bonus).toBe(7);
+        expect(WATER_SLAM_ACTION.reach).toBe('5 ft.');
+        expect(WATER_SLAM_ACTION.damage_dice_primary).toBe('2d8 + 4');
+        expect(WATER_SLAM_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(WATER_SLAM_ACTION.hit_conditions).toEqual(['prone']);
+        const keys = Object.keys(WATER_SLAM_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(WATER_SLAM_ACTION.escape_dc).toBeUndefined();
+        expect(WATER_SLAM_ACTION.save_dc).toBeUndefined();
+        expect(WATER_SLAM_ACTION.save_type).toBeUndefined();
+        expect(WATER_SLAM_ACTION.save_effect).toBeUndefined();
+        expect(WATER_SLAM_ACTION.hit_target_effect).toBeUndefined();
+        expect(WATER_SLAM_ACTION.hit_condition_roll).toBeUndefined();
+        expect(WATER_SLAM_ACTION.description).toBe('Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.');
+    });
+
+    it('neighbors byte-unchanged: Multiattack header and Whelm save row untouched (§22 anchor caution — 38 "Slam" rows app-wide)', () => {
+        expect(WATER_ELEMENTAL.actions[0].name).toBe('Multiattack');
+        expect(WATER_ELEMENTAL.actions[0].hit_conditions).toBeUndefined();
+        const whelm = WATER_ELEMENTAL.actions[2];
+        expect(whelm.name).toBe('Whelm');
+        expect(whelm.save_dc).toBe(15);
+        expect(whelm.save_type).toBe('Strength');
+        expect(whelm.damage_dice_primary).toBe('4d8 + 4');
+        expect(whelm.damage_type_primary).toBe('Bludgeoning');
+        expect(whelm.hit_conditions).toBeUndefined();
+        expect(buildHitConditionClause(whelm)).toBeNull();
+    });
+
+    it('builds a prone-only clause with no escape DC (ungated-hit size prose — no movement clause unlike MA-1677)', () => {
+        expect(buildHitConditionClause(WATER_SLAM_ACTION)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Slam',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Prone + meta {source} + condition-applied log on a resolved Slam hit, damage paid byte-exact', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Slam', formula: '2d8 + 4', total: 7, rolls: [1, 2], modifier: 4, context: slamContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['prone']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ prone: { source: 'Water Elemental 1' } });
+        expect(metaCall[2].prone.dc).toBeUndefined();
+        expect(metaCall[2].prone.ability).toBeUndefined();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Prone',
+            reason: 'Slam (escape DC —)',
+        }));
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Slam', formula: '2d8 + 4', total: 7, rolls: [1, 2], modifier: 4, context: slamContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('§70 advisories documented: size-gate gap (consumer admits Large, no size-cap field §1141) + prone expiry/stand-up cost — no te/clock authored by the lane', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Slam', formula: '2d8 + 4', total: 7, rolls: [1, 2], modifier: 4, context: slamContext() });
+
+        // Consumer gate isLargeOrSmallerTarget admits Large vs RAW "Medium or
+        // smaller" (MA-1116/MA-1274 accepted family precedent, §1141 residual —
+        // Medium victim is the clean probe). Pure hit_conditions lane carries
+        // NO addExpiration clock and NO te (§MA-1541); expiry/stand-up
+        // movement cost stay GM-enforced advisory.
+        expect(WATER_ELEMENTAL.size).toBe('Large');
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+    });
+});
