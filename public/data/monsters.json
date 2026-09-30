@@ -63861,7 +63861,9 @@
         "attack_bonus": 4,
         "reach": "10 ft.",
         "damage_dice_primary": "1d8 + 2",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 12
       },
       {
         "name": "Entangling Plants",

@@ -5091,3 +5091,115 @@ describe('MA-1655 Vampire Umbral Lord Sickening Ray poisoned-on-hit hit-clause',
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const VINE_BLIGHT = monsters.find(m => m.index === 'vine-blight');
+const VINE_CONSTRICTING_VINE_ACTION = VINE_BLIGHT.actions[0];
+
+describe('MA-1664 Vine Blight Constricting Vine grappled-on-hit grant (two-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Vine Blight 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Vine Blight 1', computedStats: { armorClass: 12 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 989, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function vineContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Bludgeoning',
+            attackerName: 'Vine Blight 1',
+            hitClause: buildHitConditionClause(VINE_CONSTRICTING_VINE_ACTION),
+        };
+    }
+
+    it('MA-1664 data-lock: disk row carries hit_conditions:["grappled"] + escape_dc:12 after damage_type_primary (MA-1651/MA-1274/MA-0010 trailing byte-shape)', () => {
+        expect(VINE_CONSTRICTING_VINE_ACTION.name).toBe('Constricting Vine');
+        expect(VINE_CONSTRICTING_VINE_ACTION.attack_bonus).toBe(4);
+        expect(VINE_CONSTRICTING_VINE_ACTION.reach).toBe('10 ft.');
+        expect(VINE_CONSTRICTING_VINE_ACTION.damage_dice_primary).toBe('1d8 + 2');
+        expect(VINE_CONSTRICTING_VINE_ACTION.damage_type_primary).toBe('Bludgeoning');
+        expect(VINE_CONSTRICTING_VINE_ACTION.hit_conditions).toEqual(['grappled']);
+        expect(VINE_CONSTRICTING_VINE_ACTION.escape_dc).toBe(12);
+        const keys = Object.keys(VINE_CONSTRICTING_VINE_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('hit_conditions') + 1);
+        expect(VINE_CONSTRICTING_VINE_ACTION.description).toContain('If the target is a Large or smaller creature, it has the Grappled condition (escape DC 12).');
+    });
+
+    it('escape DC check: 8 + STR +2 + PB 2 = 12', () => {
+        expect(VINE_BLIGHT.ability_score_modifiers.str).toBe(2);
+        expect(VINE_BLIGHT.proficiency_bonus).toBe(2);
+    });
+
+    it('builds the grappled clause arming escapeDc 12 (STR)', () => {
+        expect(buildHitConditionClause(VINE_CONSTRICTING_VINE_ACTION)).toEqual({
+            conditions: ['grappled'],
+            escapeDc: 12,
+            attackName: 'Constricting Vine',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + escape-meta {dc:12, ability:str, source} + "(escape DC 12)" condition log on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Constricting Vine', formula: '1d8 + 2', total: 10, rolls: [8], modifier: 2, context: vineContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 12, ability: 'str', source: 'Vine Blight 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Grappled',
+            reason: 'Constricting Vine (escape DC 12)',
+        }));
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Constricting Vine', formula: '1d8 + 2', total: 10, rolls: [8], modifier: 2, context: vineContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('§87 turn-start DoT advisory residual: grapple-duration lane adds NO addExpiration clock / te (MA-1651 twin framing)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Constricting Vine', formula: '1d8 + 2', total: 10, rolls: [8], modifier: 2, context: vineContext() });
+
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+    });
+
+    it('Entangling Plants save row byte-unchanged: two-field fix never touched actions[1] (§22 same-monster block-text anchor caution)', () => {
+        const entangle = VINE_BLIGHT.actions[1];
+        expect(entangle.name).toBe('Entangling Plants');
+        expect(entangle.save_dc).toBe(12);
+        expect(entangle.save_type).toBe('Constitution');
+        expect(entangle.hit_conditions).toBeUndefined();
+        expect(entangle.escape_dc).toBeUndefined();
+        expect(buildHitConditionClause(entangle)).toBeNull();
+    });
+});
