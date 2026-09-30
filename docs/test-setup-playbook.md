@@ -1159,3 +1159,37 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1595 (2026-09-29, Tiger Rend FIXED — queue complete) New pitfalls
 - Plain `prone` activeCondition has NO BADGE_SPECS entry (only Tasha's Hideous Laughter te) — no board Prone badge; grant truth = activeConditions + meta + condition log (§MA-1541 rule restated).
 - 68 monsters share name "Rend" — full description+digits anchor required for unique data edit. EB substring search: "Tiger" also matches Saber-Toothed Tiger — exact-text cell match required.
+
+## §MA-1596 (2026-09-29, Tough Mace PASS) New recipes/pitfalls
+- RECIPE: plain-commoner victim join WITHOUT +NPC autocomplete: `POST /api/campaigns/:c/NPCs {selectedMonster:'bandit',count:1}` → cs entry ~1s, unsuffixed, disk-exact, zero clobber of EB-joined monsters.
+- EB "Tough" = 2 rows (Tough CR0.5 / Tough Boss CR4) — exact td[1] anchor; first-join vs Tough-Boss collision family confirmed.
+- Avatar→chip first-press absorb ~1/22 on fresh card open — single re-press at same fresh rect fires (§442 tail-count).
+- Cheapest exact-PASS ledger for +N single-primary melee: ONE GET /log pass split by rollType attack|damage|hp_change; press-to-log 1:1 + no secondary* keys + resisted:false is complete proof.
+- CORRECTION §MA-1596: `POST /NPCs {selectedMonster,count}` now 400s (route is NPC-definition CRUD expecting {npcs:[...]}) — canonical victim join is +NPC autocomplete: focus prefilled "NPC 1" input, Meta+A+type, real-pointer exact-li, Escape+blur; enumerate .monster-autocomplete-input by VALUE not index.
+- Avatar scrollIntoView+rect in SAME evaluate can return stale x=-1621 — re-read rect in second evaluate before pointer press.
+- Pure-ranged rows log lastAttack.weaponType:"melee" on some builds (§459 both-directions) — never judge lane from weaponType; rangeReason:null = gridless truth.
+- EB-joined avatar can sit offscreen-x in initiative carousel — scroll scrollWidth>clientWidth ancestor horizontally before rect read (§636 ext).
+- +NPC li commit: identical retype does NOT re-arm dropdown after swallowed li-click — Meta+A+Backspace+type fires input events; li commits via real mouse.click at fresh rect; cs lands ~10s debounce (§15).
+- GET /lastAttack wraps {lastAttack:{...}} (§133 family).
+- PUSH-LANE CENSUS (MA-1599): attack-row push has NO structured lane (hit_push/applyHitPush/pushed_toward grep-zero; parsePushFeetClause Helpers:147 picker-only; te push producers picker+PC maneuvers) — attack-row "pushes the target up to N" prose = advisory PASS-subset (MA-0679/MA-1127 family); change-data push greps must exclude combat-ui-viewingMonster prose echo (§193).
+- log.attack.total = RAW nat on this seam (§810); lastAttack carries +bonus total — nat+bonus ledger checks must key lastAttack/popup, not log.total.
+- MAJOR PITFALL (MA-1601): +NPC autocomplete li-click on boards with active rename textboxes RENAMES the EB-joined combatant (hybrid monsterIndex) even after Meta+A+Backspace — victim monsters MUST be injected via full-store /combatSummary POST {value:cs} (full fields + 4 HP keys + attacker targetName same POST); recover corrupted board via confirm-override + click-all .npc-remove-btn → EB re-join.
+- AC-ladder escalation (MA-1602): for ≥+10 rows, AC-rig miss windows run blank often (nat≤3 @AC14 = 15%/press, 14/14 blank) — escalate rig AC to bonus+15 for honest miss faces in ~1 press; crit rides free. Miss popups carry cosmetic Done glyph but NO reroll-btn — flush via .popup-close-btn only (§646).
+- `uses:"1/Day"` STRING renders NOTHING even cosmetically (formatActionUsage reads action.usage only §240); `usage:"1/Day"` dict → cosmetic "(1/Day)". Zero-affordance summon rows fixable fully via MA-0648/0757 monster_summon template; self-summon guard (monsterSummon.js:252) is SPAWN-SIDE copy-strip ("copies lack this action" RAW), NOT a summoner-side refusal. Post-clear tab resurrection live §15 — close tab before final curl clear.
+
+- §MA-1625 Ultroloth Spellcasting plain-text header (0 chips) = FAIL(b)/DATA per MA-1543 §1088/§1089 precedent (fix: dao house-style <strong> wrap EACH spell name, Headers-only still dead §648). Spellcasting-header adjudication map: live chips=PASS-subset §207; plain-text=FAIL(b) §1088.
+- §MA-1632 AC-rig tie-geometry limit: a tie face (nat+bonus==AC) is a fixed 5%/press nat roll; no victim-AC rig can manufacture it honestly (rig only widens the miss window). Starved tie in ~12 presses = honest straddle + subset note, do not chase.
+- §MA-1638 dual-damage stage-2 popup center is covered by `.dice-roll-secondary-damage` child (mouse/el.click/Escape fail to dismiss) — flush via card X-close then avatar reopen.
+- §MA-1639 save-rig lane at monster save chips = ability_score_modifiers.con (Helpers:612); numeric saving_throws.con yields NaN popup (rig artifact); saveBonuses.con unconsumed at this seam.
+- §MA-1640 cs GET returns bare {combatSummary} (no value wrapper; wrapper only on full-store POST). legendaryHeaderAction swallows ANY rows[0].uses!=null prose legendary into no-onClick counter label.
+- §MA-1645 drain lane name = hit_hp_max_reduce:{equal_to:"damage"} (Specter :56547); parser magnitude=finalDamage=PRIMARY on combined rows (needs secondary-scope ext for dual-dice RAW). cs GET envelope may flip {value} <-> bare same session — unwrap both.
+- §MA-1649 lair discriminator: te-lane existence splits name+desc lair twins — fog zone lane lair_fog_cloud armed by 4 disk twins => silence FAIL(b)/DATA (fix zone:{radius_ft,no_save,noun,effect_key}); no-lane rows stay static PASS-subset MA-0024.
+- §MA-1656 monster cast-save rows are ROW-LOCAL: findMonsterSpell unreachable (ActionSaveRoll 3-arg, spellInfo undefined) — spell-DB damage never pulled; nat20 save total can still fail honestly with big negative rig.
+- §MA-1661 chooser-census sufficiency: for field-absent versatile rows, popup buttons==["Done"] at every stage x every hit + whole-log zero variant tokens = sufficient FAIL(a) proof; do not burn budget chasing crit/miss faces.
+- §MA-1665 Entangle RAW save = STRENGTH (not DEX); "Constitution" in monster rows = casting-ability conflation, adjudicate vs spell-DB dc_type. Cast-save zero-outcome = FAIL(b)/DATA MA-1546 twin.
+- §MA-1670 save-row picker rig needs FULL-word saveBonuses.constitution (abbrev con coexists but picker reads full word); dc_success absent is honest half-default iff description byte-says "Success: Half".
+- §MA-1673 picker success copy auto-fabricates "takes half damage" whenever dc_success absent — prose twin of §523 mechanic leak; check copy+mechanic as one fingerprint.
+- §MA-1674 uses:"1/Day" STRING -> Number() NaN -> monsterAbilityUses gate null = mechanical double-dip unenforced+unrecorded (fix usage/uses/maxUses numerics MA-0633 template).
+- §MA-1675 stage-2 popup immune to container el.click() (absorbs chip clicks w/ stale replay) — flush only popup-close-btn; miss popups carry it too (extends §148).
+- §MA-1689 save-rig seam split: block-save lane consumes saving_throws.<abbr>.{modifier} object (bare int -> NaN); picker lane full-word saveBonuses.<word> (§MA-1670); monster chip lane ability_score_modifiers (§MA-1639) — match lane to seam.
+- §MA-1693 grant-lane split: SAVE-lane rows grant CONDITIONS word-list tokens (Helpers.js:55, e.g. "Cursed") even with te grep-zero; ATTACK-hit-lane still needs hit_conditions (MA-1688/1690 zero-grant holds). Save popup "DC Unknown" + attacker-roll mislabel = cosmetic; adjudicate victim log §141.

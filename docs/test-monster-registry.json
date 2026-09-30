@@ -7033,5 +7033,215 @@
       "name": "Thug 1",
       "verifiedRow": "MA-1592 PASS Multiattack header zero-chip; Mace +4 1d6+2 bludgeoning / Heavy Crossbow +2 1d10 on card; 2026-09-28 | MA-1593 PASS Mace +4 1d6+2 bludgeoning 7hit/4miss/crit 1d6*2+2 exact; cleared 2026-09-28 | MA-1594 PASS Heavy Crossbow +2 1d10 piercing, crit 1d10*2, misses <=9; THUG BLOCK DONE cleared 2026-09-28"
     }
+  },
+  "Tough": {
+    "monsterIndex": "tough",
+    "placedIn": "test-campaign initiative via EB Join Encounter (Tough 1 CR0.5 AC12 HP32 cs idx0); victim Bandit via Initiative +NPC autocomplete (POST /NPCs recipe DEFUNCT 400s — use +NPC: focus prefilled 'NPC 1' input, Meta+A+type, real-pointer exact-li). HP 999 via full-store cs POST w/ targetName in same body. Board CLEARED after MA-1597 — re-join required",
+    "verifiedRow": "MA-1596 (PASS Mace +4 1d6+2 Bludgeoning 21 presses) | MA-1597 (PASS Heavy Crossbow +3 1d10+1 Piercing, 12 presses press-to-log 1:1, boundary nat8✗/nat14✓ vs AC12, rangeReason:null gridless, weaponType melee cosmetic §459)"
+  },
+  "Tough Boss": {
+    "monsterIndex": "tough-boss",
+    "placedIn": "EB Join Encounter (Tough Boss 1 CR4 ac16 cs idx0) + +NPC Bandit victim ac12 maxHp/currentHp 999 full-store cs POST, targetName armed same POST. Board CLEARED after MA-1600",
+    "verifiedRow": "MA-1598 (PASS-subset Multiattack: header zero chips; Warhammer +5 2d8+3 + Heavy Crossbow +4 2d10+2 both live, WH/HC combo 4/4 first-click, fd==|hpΔ| exact) | MA-1599 (PASS-subset Warhammer +5 2d8+3, tie nat7+5=12✓, push rider advisory grep-proven no hit_push lane §101/§152) | MA-1600 (PASS Heavy Crossbow +4 2d10+2 Piercing 10 presses, tie nat8✓, sumFd105==sumΔ)"
+  },
+  "Treant": {
+    "monsterIndex": "treant",
+    "placedIn": "Board CLEARED after MA-1604 (close tab BEFORE final curl clear — resurrection §15). Rig: EB exact-td Treant + Bandit full-store cs POST (4 HP keys, ac12, tn same POST)",
+    "verifiedRow": "MA-1601 (PASS-subset Multiattack: header zero chips; Slam +10 3d6+6 Bludgeoning x4 exact fd==|hpΔ|; Hail of Bark shares +10 text — startsWith scope mandatory)",
+    "verifiedRow2": "MA-1602 (PASS Slam actions[1]: +10 chip row-scoped strong.startsWith('Slam'); 18 presses press-to-log 1:1 zero absorb; popup total=nat+10 exact all 18; hits 15/15 formula '3d6 + 6' Bludgeoning byte-exact fd==|hpDelta| unclamped chain 999->732 sum267; nat20 CRIT landed press18 log formula '3d6*2+6 (5, 5, 2)' fd30 flat+6 undoubled popup '5*2, 5*2, 2*2 +6'; honest MISS faces x3 via AC-rig 25 (nat10->20x,nat13->23x,nat12->22x, no stage-1 Done, zero damage/hp entries); AC-rig 14 boundary hits nat5->15/nat8->18 read live targetAc per-press; no secondary keys whole-log; saveDc/saveType/dcSuccess null lastAttack, zero save entries, targetEffects ABSENT; console 0 errors)",
+    "verifiedRow3": "MA-1603 (PASS Hail of Bark +10 4d10+6 Piercing 180ft: 13 fired 1:1, formula byte-exact, AC-rig25 misses + nat2->12 tie; Piercing internally consistent field+desc, RAW-phrasing note only)",
+    "verifiedRow4": "MA-1604 (FAIL(b)/DATA Animate Trees: zero-affordance usage-only summon row; uses-string renders NOTHING; fix=MA-0648/0757 monster_summon {options:[{monster:treant}],count:2,stat_override:{int:1,cha:1},range_ft:60}+uses/maxUses:1; self-guard is spawn-side copy-strip monsterSummon.js:252, RAW-correct)"
+  },
+  "Tree Blight": {
+    "monsterIndex": "tree-blight",
+    "placedIn": "Board CLEARED after MA-1607 (close tab before final curl clear §15). Rig: EB exact-td Tree Blight + Bandit 1 full-store cs POST (4 HP keys 999, ac12, tn same POST); success rig saving_throws:{str:{modifier:19}}",
+    "verifiedRow": "MA-1605 (PASS-subset Multiattack: header zero chips; Branch +9 3d6+6 x2 exact; Grasping Root DC 17 Str inline chip, fail->grappled-only, success zero grants; escape-DC prose advisory §915) | MA-1606 (PASS Branch standalone +9 3d6+6: 14 presses, tie nat3->12, AC-rig misses, crit 3d6*2+6) | MA-1607 (PASS-subset Grasping Root standalone: DC 17 Str inline chip only, fail->grappled cd+meta no-dc §915, success rig str+19 zero grants; pull/DoT advisories §1022/§87)"
+  },
+  "Tribal Warrior": {
+    "monsterIndex": "tribal-warrior",
+    "placedIn": "Board CLEARED after MA-1608. Rig when needed: EB exact-td Tribal Warrior + Bandit full-store cs POST (4 HP keys 999, tn same POST)",
+    "verifiedRow": "MA-1608 (FAIL(a)/DATA Spear: damage_dice_two_handed ABSENT, versatile 1d8+1 clause prose-only, HIT/crit popups buttons=[Done] only, zero chooser; core lane exact +3/1d6+1 crit 1d6*2+1, piercing lowercase §1262; fix=MA-1063 kuo-toa byte-twin '1d8 + 1'; see bug-mon-MA-1608-spear-versatile.md)"
+  },
+  "Triceratops": {
+    "monsterIndex": "triceratops",
+    "placedIn": "Board CLEARED after MA-1610. Rig: EB exact-td Triceratops ('Triceratops 1' cs idx0) + victim via full-store cs POST (ac12, 4 HP keys 999, targetName same POST); AC-rig 24 for honest misses",
+    "verifiedRow": "MA-1609 (PASS-subset Multiattack: header zero chips; Gore +9 2d12+6 Piercing x10 0-absorb, fd==|hpΔ| sum149 unclamped; charge rider prose-only §MA-0903 advisory frame) | MA-1610 (FAIL(a)/DATA Gore: conditional_damage ABSENT, charge rider inert, popups Done-only x4 hits, zero charge/prone grants; fix=MA-0885 byte-shape {dice:'2d8',damage_type:'Piercing',condition:<charge clause>}, prone half §MA-0903 residual; see bug-mon-MA-1610-gore-charge-rider.md)"
+  },
+  "Tridrone": {
+    "monsterIndex": "tridrone",
+    "placedIn": "Board CLEARED after MA-1611. Rig: EB exact td[1]=='Tridrone' (legacy 'Modron Tridrone' is row-0 substring twin); victim Bandit full-store cs POST (ac12,4HP999,tn same POST); card-closed selectOption",
+    "verifiedRow": "MA-1611 (PASS-subset Multiattack: header NO bonus=true zero chips; Fist +3 1d4+1 blud + Javelin +3 1d6+1 pier both live distinct pools; count GM-adjudicated §66) | MA-1612 (PASS Fist standalone +3 1d4+1 bludgeoning lowercase: 36 presses, boundary both faces nat8✗/nat9✓, 3 crits 1d4*2+1; board cleared) | MA-1613 (PASS-subset Javelin dual-mode dice-identical: band 30/120 gridless-inert §147/§190, boundary both faces, formula byte-exact; board cleared)"
+  },
+  "Troglodyte": {
+    "monsterIndex": "troglodyte",
+    "placedIn": "Board CLEARED after MA-1614. Rig: EB exact-td Troglodyte (AC11 HP13) + Bandit full-store cs POST (ac12 4HP999 tn same POST)",
+    "verifiedRow": "MA-1614 (PASS Rend +4 1d6+2 Slashing: 35 presses 1:1, boundary nat7✗/nat8✓ tie, crit 1d6*2+2, sumFd133==sumΔ; board cleared)"
+  },
+  "Troll": {
+    "monsterIndex": "troll",
+    "placedIn": "EB Join Encounter (Troll 1 CR5 AC15 HP94 cs idx0) + Bandit victim full-store cs POST (ac12 4HP999 tn same POST); card-closed selectOption. Board CLEARED after MA-1615",
+    "verifiedRow": "MA-1615 (PASS-subset Multiattack: header zero chips; Rend +7 2d6+4 Slashing reach10 — 3 presses nat1✗/nat15✓/nat9✓ byte-exact fd==|hpΔ|) | MA-1616 (PASS Rend standalone +7 2d6+4: 12 presses 1:1, 2 honest misses, 10 hits byte-exact sumFd112; board cleared)"
+  },
+  "Troll Limb": {
+    "monsterIndex": "troll-limb",
+    "placedIn": "EB Join Encounter (Troll Limb 1 CR1/2 AC13 HP14) + Bandit victim full-store cs POST (ac12 HP999 tn same POST); card-closed selectOption. Board CLEARED after MA-1617",
+    "verifiedRow": "MA-1617 (PASS-subset Rend +6 2d4+4 Slashing reach5: 12 presses 1:1, 3 honest misses nat2/4/3, nat6->12 tie HIT, 9 hits byte-exact sumFd74==|hp| 999->925 unclamped; board cleared)"
+  },
+  "Twig Blight": {
+    "monsterIndex": "twig-blight",
+    "placedIn": "EB Join Encounter (Twig Blight 1 CR1/8 AC14 HP7) + Bandit cs POST rig. Board CLEARED after MA-1618",
+    "verifiedRow": "MA-1618 (PASS-subset Claw +4 1d4+2 Slashing: 11 presses, boundary both faces, sumFd26==sumΔ)",
+    "date": "2026-09-29"
+  },
+  "Tyrannosaurus Rex": {
+    "monsterIndex": "tyrannosaurus-rex",
+    "placedIn": "EB Join Encounter (T-Rex 1 CR8 AC13 HP136) + Bandit cs POST rig (ac12 4HP999 tn same POST). AC-rig 25 for misses. Board CLEARED after MA-1619",
+    "verifiedRow": "MA-1619 (PASS-subset Multiattack: header zero chips; Bite +10 4d12+7 Piercing + Tail +10 4d8+7 Bludgeoning both live, riders prose-only §827) | MA-1620 (FAIL(a)/DATA Bite grapple rider prose-only, zero grants 3/3 hits; fix hit_conditions+escape_dc:17) | MA-1621 (FAIL(a)/DATA Tail prone rider prose-only, zero grants 3/3 hits; fix hit_conditions:['prone'])"
+  },
+  "Ultroloth": {
+    "monsterIndex": "ultroloth",
+    "placedIn": "EB Join Ultroloth 1 (ac19 hp221) + Bandit cs POST rig (ac12 4HP999 tn same POST). §409 bare-3d6 trap chip on Gaze row — press DC only. Board CLEARED after MA-1622",
+    "verifiedRow": "MA-1622 (PASS Multiattack: header zero chips; Mercurial Whip +9 6d6+4 Force live x2; Hypnotic Gaze DC17 Wis picker both faces fail->Stunned+full13, success zero-grant; gaze half-leak+teleport rider = component-row tickets) | MA-1623 (PASS-subset Mercurial Whip +9 6d6+4 Force: 14 presses, crit 6d6*2+4, sumFd318 unclamped; teleport rider advisory grep-zero §MA-1167) | MA-1624 (PASS-subset Hypnotic Gaze: DC17 Wis both faces, fail Stunned+3d6 full, success zero-cond half-default §523 advisory; §69/§87 advisories)"
+  },
+  "Umber Hulk": {
+    "monsterIndex": "umber-hulk",
+    "placedIn": "EB Join Umber Hulk 1 (ac18 hp93) + Bandit cs POST rig (ac12 4HP999 tn same POST). AC-rig 24 for misses. Board CLEARED after MA-1626",
+    "verifiedRow": "MA-1626 (PASS Multiattack: header zero chips; 3x Rend +8 2d6+5 Slashing live, honest AC24 miss; PITFALL: .mc-overlay position:fixed -> offsetParent null, use computedStyle) | MA-1627 (PASS-subset standalone Rend: 14 presses, AC-rig21 tie pair, 9/9 formula exact)"
+  },
+  "Undead Spirit (Ghostly)": {
+    "monsterIndex": "undead-spirit-ghostly",
+    "placedIn": "EB Join Undead Spirit (Ghostly) 1 (ac11 hp30). Board CLEARED after MA-1628",
+    "verifiedRow": "MA-1628 (PASS-subset Deathly Touch: summon-template zero-chip by design §86/MA-0515 twin attackRowMissingToHit gate; canonical lane=Summon Undead cast-fold MA-0623; Frightened prose-only advisory)"
+  },
+  "Undead Spirit (Putrid)": {
+    "monsterIndex": "undead-spirit-putrid",
+    "placedIn": "EB Join Undead Spirit (Putrid) 1 (ac11 hp30). Board CLEARED after MA-1629",
+    "verifiedRow": "MA-1629 (PASS-subset Rotting Claw: summon-template zero-chip §86/MA-0515 twin; Poisoned->Paralyzed rider advisory grep-zero)"
+  },
+  "Undead Spirit (Skeletal)": {
+    "monsterIndex": "undead-spirit-skeletal",
+    "placedIn": "EB Join Undead Spirit (Skeletal) 1 (ac11 hp20). Board CLEARED after MA-1630",
+    "verifiedRow": "MA-1630 (PASS-subset Crave Bolt: summon-template zero-chip §86/MA-0515 twin; gridless range advisory)"
+  },
+  "Unicorn": {
+    "monsterIndex": "unicorn",
+    "placedIn": "EB Join Unicorn 1 (ac12 hp97) + Bandit cs POST rig. Board CLEARED after MA-1631",
+    "verifiedRow": "MA-1631 (PASS-subset Multiattack: Hooves +7 2d6+4 Bludgeoning + Radiant Horn +7 1d10+4 Radiant live, no save riders §827) | MA-1632 (PASS-subset Hooves +7 2d6+4 Bludgeoning: 12 presses, crit flat §32) | MA-1633 (PASS-subset Radiant Horn +7 1d10+4 Radiant: 12 presses crit flat) | MA-1635 (FAIL(b)/DATA Charging Horn legendary rows[0] swallowed as header MA-0675 §99 harder-zero; fix header insert+delegates_to §165) | MA-1636 (FAIL(a)/DATA Shimmering Shield silent-burn MA-0957: pool spends+gates honest, zero THP/AC grant; fix advisory ladder(a))"
+  },
+  "Vampire": {
+    "monsterIndex": "vampire",
+    "placedIn": "EB Join Vampire 1 (ac16 hp195) + Bandit cs POST rig (ac12 999x4 tn same POST). Bite row: press DC chip only, 1d4+4 decoy beside it. Board CLEARED after MA-1637",
+    "verifiedRow": "MA-1637 (PASS-subset Multiattack: header zero chips; Grave Strike +9 1d8+4 Bludgeoning + 2d6 Necrotic live x2; Bite DC17 Con save-row both faces live) | MA-1638 (FAIL(a)/DATA Grave Strike grapple rider prose-only, fix hit_conditions+escape_dc:14) | MA-1639 (FAIL(a)/DATA Bite: legs/saves/conds live but max-HP drain frozen + zero regain; fix save_hp_max_reduce succubus-twin :58473) | MA-1640 (FAIL(b)/DATA Beguile swallowed rows[0]) | MA-1641 (FAIL(a)/DATA Deathless Strike silent-burn, fix delegates_to)"
+  },
+  "Vampire Familiar": {
+    "monsterIndex": "vampire-familiar",
+    "placedIn": "EB Join Vampire Familiar 1 (ac15 hp65) + Bandit cs POST rig. Board CLEARED after MA-1642",
+    "verifiedRow": "MA-1642 (PASS-subset Multiattack: Umbral Dagger +5 1d4+3 Piercing + 3d4 Necrotic live x2) | MA-1643 (PASS-subset Umbral Dagger standalone: KO-phase done, 0-HP rider advisory §MA-1554 do-not-mechanize)"
+  },
+  "Vampire Nightbringer": {
+    "monsterIndex": "vampire-nightbringer",
+    "placedIn": "EB Join Vampire Nightbringer 1 (ac16 hp142) + Bandit cs POST rig. Board CLEARED after MA-1644",
+    "verifiedRow": "MA-1644 (PASS-subset Multiattack: Bite +7 attack-shaped 1d6+4 Piercing+3d6 Nec + Shadow Strike +7 1d6+4 Slashing+4d6 Cold both live) | MA-1645 (FAIL(a)/DATA Bite drain frozen, fix hit_hp_max_reduce Specter-twin :56547; regain lane grep-zero FAIL(b) axis) | MA-1646 (PASS Shadow Strike dual-leg 10 presses incl nat20 crit flat) | MA-1647 (PASS-subset Children of the Night lair aura: static display advisory MA-0024 sanctioned class)"
+  },
+  "Vampire Spawn": {
+    "monsterIndex": "vampire-spawn",
+    "placedIn": "EB Join Vampire Spawn 1 (ac16 hp90) + Bandit cs POST rig. Bite row press DC14 chip only. Board CLEARED after MA-1650",
+    "verifiedRow": "MA-1650 (PASS-subset Multiattack: Claw +6 2d4+3 live x2 + Bite DC14 Con both faces; claw grapple + bite drain riders own-tickets) | MA-1651 (FAIL(a)/DATA Claw grapple rider prose-only, fix hit_conditions+escape_dc:13) | MA-1652 (FAIL(a)/DATA Bite drain frozen regain absent, Succubus-twin fix)"
+  },
+  "Vampire Umbral Lord": {
+    "monsterIndex": "vampire-umbral-lord",
+    "placedIn": "EB Join Vampire Umbral Lord 1 (ac16 hp187) + Bandit cs POST rig. Board CLEARED after MA-1653",
+    "verifiedRow": "MA-1653 (PASS-subset Multiattack: Grave Strike +10 1d8+5 Slashing+3d8 Nec + Sickening Ray +10 attack-shaped 2d10+5 Nec both live; ray Poisoned rider own-ticket) | MA-1654 (PASS-subset Grave Strike standalone 8/8 hits incl nat20 crit flat) | MA-1655 (FAIL(a)/DATA Sickening Ray Poisoned rider zero-grant, fix hit_conditions:[poisoned]) | MA-1656 (FAIL(b)/DATA Hunger of Hadar zero-outcome DC chip MA-1546 fingerprint; spell 2024-only 4d6@L5 unreachable row-local lane) | MA-1657 (FAIL(b)/DATA Beguile legendary header-swallow MA-1640 twin; NOTE manifest gap: legendary_actions|1 Umbral Strike has no row) | MA-1658 (FAIL(a)/DATA Umbral Strike silent-burn MA-1641 twin, fix delegates_to + header §165)"
+  },
+  "Venomous Snake": {
+    "monsterIndex": "venomous-snake",
+    "placedIn": "EB Join Venomous Snake 1 + Bandit cs POST rig. Board CLEARED after MA-1659",
+    "verifiedRow": "MA-1659 (PASS-subset Bite +4 1d4+2 Piercing + 1d6 Poison dual-leg live 12 presses)"
+  },
+  "Veteran": {
+    "monsterIndex": "veteran",
+    "placedIn": "EB Join Veteran 1 + Bandit cs POST rig ac12/HP999/resist[]; tn Bandit 1. Board CLEARED after MA-1662",
+    "verifiedRow": "MA-1660 (PASS-subset Multiattack: Longsword +5 1d8+3 slashing + Shortsword +5 1d6+3 piercing live; versatile prose §827 own-ticket) | MA-1661 (FAIL(a)/DATA Longsword versatile inert, fix damage_dice_two_handed:'1d10 + 3' MA-1063) | MA-1662 (PASS Shortsword standalone actions[2]: 8 real-pointer presses 1:1; 7 hits incl 2 crits 1d6*2+3 flat-undoubled; honest miss nat1->6; tie nat7->12 HIT x3 §199; formulas byte-exact 1d6 + 3 piercing, fd==|hpΔ| unclamped Σ45, resisted:false; zero save affordance, console 0) | MA-1662 (PASS Shortsword standalone: 8 presses, 2 crits flat, tie nat7 x3, formula exact) | MA-1663 (PASS Heavy Crossbow +3 1d10+1: 10 presses, boundary pair both faces, 2 crits)"
+  },
+  "Vine Blight": {
+    "monsterIndex": "vine-blight",
+    "placedIn": "EB Join Vine Blight + Bandit cs POST rig. Board CLEARED after MA-1664",
+    "verifiedRow": "MA-1664 (FAIL(a)/DATA Constricting Vine grapple rider prose-only, fix hit_conditions+escape_dc:12; DoT clause §87 advisory)"
+  },
+  "Violet Fungus": {
+    "monsterIndex": "violet-fungus",
+    "placedIn": "EB Join Violet Fungus 1 (ac5 hp18) + Bandit cs POST rig. Board CLEARED after MA-1666",
+    "verifiedRow": "MA-1666 (PASS-subset Multiattack: Rotting Touch +2 1d8 Necrotic live x2 incl tie-hit) | MA-1667 (PASS-subset Rotting Touch standalone: 11 presses, natural boundary pair)"
+  },
+  "Violet Fungus Necrohulk": {
+    "monsterIndex": "violet-fungus-necrohulk",
+    "placedIn": "EB Join Violet Fungus Necrohulk 1 (ac17 hp123) + Bandit cs POST rig. Board CLEARED after MA-1668",
+    "verifiedRow": "MA-1668 (PASS-subset Multiattack: Rotting Slam +7 1d10+4 Bludgeoning+2d6 Nec live x2+2 crits) | MA-1669 (PASS-subset Rotting Slam standalone: 16 presses 13 hits sum233) | MA-1670 (PASS-subset Spore Bomb DC15 Con: fail full+Poisoned, success half)"
+  },
+  "Vrock": {
+    "monsterIndex": "vrock",
+    "placedIn": "EB Join Vrock 1 (ac15 hp152) + Bandit cs POST rig ac12 HPx4 999 res[]. Board CLEARED after MA-1672",
+    "verifiedRow": "MA-1671 (PASS-subset Multiattack: Shred +6 2d6+3 Piercing+3d6 Poison live x2+) | MA-1672 (PASS Shred standalone: 10 presses, 8 hits dual byte-exact fd+sfd==|dHp| unclamped 8/8, 2 honest misses nat4/nat2, resisted false x2, zero save affordance, console 0) | MA-1672 (PASS Shred standalone: 10 presses 8 hits dual byte-exact) | MA-1673 (FAIL(a)/DATA Spores success-half leak, fix dc_success:'none' MA-0781 twin) | MA-1674 (FAIL(a)/DATA Stunning Scream: half-leak + uses:'1/Day' NaN gate unenforced, two fixes)"
+  },
+  "Vulture": {
+    "monsterIndex": "vulture",
+    "placedIn": "EB Join Vulture 1 + Bandit cs POST rig. Board CLEARED after MA-1675",
+    "verifiedRow": "MA-1675 (PASS Beak +2 1d4 Piercing: 12 presses incl crit + boundary miss x3)"
+  },
+  "Warhorse": {
+    "monsterIndex": "warhorse",
+    "placedIn": "EB Join Warhorse 1 + Bandit cs POST rig. Board CLEARED after MA-1676",
+    "verifiedRow": "MA-1676 (FAIL(a)/DATA Hooves charge rider inert MA-1610 twin, fix conditional_damage MA-0885 shape)"
+  },
+  "Warhorse Skeleton": {
+    "monsterIndex": "warhorse-skeleton",
+    "placedIn": "EB Join Warhorse Skeleton + Bandit cs POST rig. Board CLEARED after MA-1677",
+    "verifiedRow": "MA-1677 (PASS-subset Hooves: +6 1d6+4 live, movement-gated prone advisory MA-1127 class)"
+  },
+  "Warrior Commander": {
+    "monsterIndex": "warrior-commander",
+    "placedIn": "EB Join Warrior Commander 1 (ac18 hp161) + Bandit cs POST rig. Board CLEARED after MA-1678",
+    "verifiedRow": "MA-1678 (PASS-subset Multiattack: Greatsword +9 4d6+5 Slashing + Longbow +9 3d8+5 Piercing live, crit flat, riders own-tickets) | MA-1679 (PASS-subset Greatsword standalone: 8/8 hits, Sap/Maneuver choose-one advisory) | MA-1680 (FAIL(a)/DATA Longbow speed rider inert, fix hit_target_effect:speed_reduction MA-0995 twin) | MA-1681 (FAIL(a)/DATA Counterattack zero-affordance, fix parry automation MA-1203 twin)"
+  },
+  "Warrior Infantry": {
+    "monsterIndex": "warrior-infantry",
+    "placedIn": "EB Join Warrior Infantry 1 + Bandit cs POST rig. Board CLEARED after MA-1682",
+    "verifiedRow": "MA-1682 (PASS-subset Spear +3 1d6+1 Piercing melee/ranged, 12 presses)"
+  },
+  "Warrior Veteran": {
+    "monsterIndex": "warrior-veteran",
+    "placedIn": "EB Join Warrior Veteran 1 (ac17 hp65) + Bandit cs POST rig. Board CLEARED after MA-1685",
+    "verifiedRow": "MA-1683 (PASS-subset Multiattack: Greatsword +5 2d6+3 + Heavy Crossbow +3 2d10+1 live) | MA-1684 (PASS-subset Greatsword standalone: 12 presses crit flat) | MA-1685 (PASS-subset Heavy Crossbow +3 standalone actions[2]: 12 real-pointer startsWith-anchored presses zero-absorb vs Bandit 1 AC12 HP999 full-store rig (arm+rig ONE cs POST §491); 9 hits incl nat20 CRIT seam live formula \"2d10*2+1 (5, 5)\" flat +1 undoubled §32 fd21==|Δ21|; 8 non-crit formulas \"2d10 + 1\" byte-exact, fd==Σdice+1==|hpΔ| unclamped chain 999→895 Σ104==Σ104, resisted:false ×9 single-primary §188; 3 honest misses nat7/nat1-critMISS/nat6 zero-damage §101 count-by-damage (1 stray flush re-roll artifact nat2✗ zero-cost); hit-flag==(nat+3≥12) exact every entry; nat9→12 tie/nat8→11 boundary starved in 12 presses = fixed 5%/press honest straddle §MA-1632/§199 subset note; gridless fingerprint rangeReason:null ×13 + lastAttack range:null band 100/400 inert §200, targetAc==effAc==12, weaponType:\"melee\" cosmetic §459; zero save affordance saveDc/saveType null pendingSavePrompts/targetEffects None console 0; log 3→34 ledger exact join-noise excluded §146; cleanup tab-closed-first §15 admin clears cd{} log[] cs0) | MA-1686 (FAIL(a)/DATA Parry unauthored, fix automation parry MA-1203 twin)"
+  },
+  "Water Elemental": {
+    "monsterIndex": "water-elemental",
+    "placedIn": "EB Join Water Elemental 1 (ac14 hp114) + Bandit cs POST rig. Board CLEARED after MA-1687",
+    "verifiedRow": "MA-1687 (PASS-subset Multiattack: Slam +7 2d8+4 Bludgeoning live x2; prone/whelm riders own-tickets) | MA-1688 (FAIL(a)/DATA Slam prone rider zero-grant, fix hit_conditions:['prone']) | MA-1689 (FAIL(a)/DATA Whelm half-leak RAW-zero success, fix dc_success:'none'; grappled+restrained DO grant on fail §52)"
+  },
+  "Water Weird": {
+    "monsterIndex": "water-weird",
+    "placedIn": "EB Join Water Weird 1 + Bandit cs POST rig. Board CLEARED after MA-1690",
+    "verifiedRow": "MA-1690 (FAIL(a)/DATA Surge grapple+restrained rider inert-unauthored; core 8/8 byte-exact)",
+    "date": "2026-09-30"
+  },
+  "Weasel": {
+    "monsterIndex": "weasel",
+    "placedIn": "EB Join Weasel 1 + Bandit cs POST rig. Board CLEARED after MA-1691",
+    "verifiedRow": "MA-1691 (PASS Bite constant-damage '1' Piercing: chip live §213/§870, fd==1 exact 7/7)"
+  },
+  "Werebear": {
+    "monsterIndex": "werebear",
+    "placedIn": "EB Join Werebear 1 (ac15 hp135) + Bandit cs POST rig. Board CLEARED after MA-1692",
+    "verifiedRow": "MA-1692 (PASS-subset Multiattack: Handaxe 3d6+4/Rend 2d8+4/Bite 2d12+4 all live any-combination; Bite curse own-ticket) | MA-1693 (PASS-subset Bite attack+save: DC14 Con enforced both faces, fail grants 'cursed' word-lane; conversion/immunity advisory) | MA-1694 (PASS-subset Handaxe +7 3d6+4 Slashing live; 20/60 ranged lane inert-by-construction MA-0867 advisory) | MA-1695 (PASS Rend +7 2d8+4 Slashing live 3/3; triple '+7' chip collision row-scoped)"
+  },
+  "Wereboar": {
+    "monsterIndex": "wereboar",
+    "placedIn": "EB Join Wereboar 1 + Bandit cs POST rig. Board CLEARED after MA-1696",
+    "verifiedRow": "MA-1696 (PASS-subset Multiattack: Javelin/Tusk/Gore +5 any-combination live; crit nat20 3d6*2+3=19; Gore curse own-ticket) | MA-1697 (PASS-subset Gore attack+save: +5 2d8+3 Piercing live; DC12 Con enforced; 'Cursed' word-lane grant; conversion advisory) | MA-1698 (PASS Javelin +5 3d6+3 Piercing live; 30/120 ranged lane inert advisory) | MA-1699 (FAIL(a)/DATA Tusk charge 2d6 dropped, fix conditional_damage + hit_conditions:['prone']; movement-gate advisory)"
+  },
+  "Wererat": {
+    "monsterIndex": "wererat",
+    "placedIn": "EB Join Wererat 1 + Bandit cs POST rig (ac12 hp999 res[]). Board CLEARED after MA-1700",
+    "verifiedRow": "MA-1700 (PASS-subset Multiattack: Scratch 1d6+3 Slashing / HC 1d6+3 Piercing / Bite 2d4+3 Piercing live any-combination; crit nat20 1d6*2+3=9; Bite curse own-ticket MA-1701)"
   }
 }

@@ -26943,7 +26943,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1597",
@@ -26959,7 +26959,7 @@
       "damageTypePrimary": "Piercing",
       "range": "100/400 ft.",
       "description": "Ranged Attack Roll: +3, range 100/400 ft. Hit: 6 (1d10 + 1) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1598",
@@ -26971,7 +26971,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The tough makes two attacks, using Warhammer or Heavy Crossbow in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1599",
@@ -26987,7 +26987,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 12 (2d8 + 3) Bludgeoning damage. If the target is a Large or smaller creature, the tough pushes the target up to 10 feet straight away from itself.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1600",
@@ -27003,7 +27003,7 @@
       "damageTypePrimary": "Piercing",
       "range": "100/400 ft.",
       "description": "Ranged Attack Roll: +4, range 100/400 ft. Hit: 13 (2d10 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1601",
@@ -27015,7 +27015,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The treant makes two Slam attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1602",
@@ -27031,7 +27031,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 16 (3d6 + 6) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1603",
@@ -27047,7 +27047,7 @@
       "damageTypePrimary": "Piercing",
       "range": "180 ft.",
       "description": "Ranged Attack Roll: +10, range 180 ft. Hit: 28 (4d10 + 6) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1604",
@@ -27060,7 +27060,7 @@
       "actionType": "other",
       "uses": "1/Day",
       "description": "The treant magically animates up to two trees it can see within 60 feet of itself. Each tree uses the Treant stat block, except it has Intelligence and Charisma scores of 1, it can't speak, and it lacks this action. The tree takes its turn immediately after the treant on the same Initiative count, and it obeys the treant. A tree remains animate for 1 day or until it dies, the treant dies, or it is more than 120 feet from the treant. The tree then takes root if possible.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1604-animate-trees.md"
     },
     {
       "id": "MA-1605",
@@ -27072,7 +27072,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The blight makes two Branch attacks and uses Grasping Root.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1606",
@@ -27088,7 +27088,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +9, reach 15 ft. Hit: 16 (3d6 + 6) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1607",
@@ -27106,7 +27106,7 @@
         "grappled"
       ],
       "description": "Strength Saving Throw: DC 17, one Large or smaller creature the blight can see within 15 feet. Failure: The target is pulled up to 10 feet straight toward the blight and has the Grappled condition (escape DC 16) from one of six roots. Until the grapple ends, the target takes 13 (2d6 + 6) Bludgeoning damage at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1608",
@@ -27122,7 +27122,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d6 + 1) piercing damage, or 5 (1d8 + 1) piercing damage if used with two hands to make a melee attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1608-spear-versatile.md"
     },
     {
       "id": "MA-1609",
@@ -27134,7 +27134,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The triceratops makes two Gore attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1610",
@@ -27153,7 +27153,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 19 (2d12 + 6) Piercing damage. If the target is Huge or smaller and the triceratops moved 20+ feet straight toward it immediately before the hit, the target takes an extra 9 (2d8) Piercing damage and has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1610-gore-charge-rider.md"
     },
     {
       "id": "MA-1611",
@@ -27165,7 +27165,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The tridrone makes three fist attacks or three javelin attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1612",
@@ -27181,7 +27181,7 @@
       "damageTypePrimary": "bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1613",
@@ -27197,7 +27197,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 4 (1d6 + 1) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1614",
@@ -27213,7 +27213,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1615",
@@ -27225,7 +27225,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The troll makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1616",
@@ -27241,7 +27241,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 11 (2d6 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1617",
@@ -27257,7 +27257,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 9 (2d4 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1618",
@@ -27273,7 +27273,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1619",
@@ -27285,7 +27285,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The tyrannosaurus makes one Bite attack and one Tail attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1620",
@@ -27305,7 +27305,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 33 (4d12 + 7) Piercing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 17). While Grappled, the target has the Restrained condition and can't be targeted by the tyrannosaurus's Tail.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1620-trex-bite-grapple.md"
     },
     {
       "id": "MA-1621",
@@ -27324,7 +27324,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +10, reach 15 ft. Hit: 25 (4d8 + 7) Bludgeoning damage. If the target is a Huge or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1621-trex-tail-prone.md"
     },
     {
       "id": "MA-1622",
@@ -27336,7 +27336,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The ultroloth uses Hypnotic Gaze and makes two Mercurial Whip attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1623",
@@ -27352,7 +27352,7 @@
       "damageTypePrimary": "Force",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +9, reach 15 ft. Hit: 25 (6d6 + 4) Force damage, and the ultroloth can teleport the target up to 10 feet to an unoccupied space the ultroloth can see that isn't in the air.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1624",
@@ -27371,7 +27371,7 @@
         "stunned"
       ],
       "description": "Wisdom Saving Throw: DC 17, each creature in a 30-foot Cone. Failure: 10 (3d6) Psychic damage, and the target has the Stunned condition until the start of the ultroloth's next turn. Success: The target is immune to this ultroloth's Hypnotic Gaze for 24 hours.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1625",
@@ -27386,7 +27386,7 @@
       "saveType": "Intelligence",
       "saveEffect": "Targets of the spell's saving throw use the spell save DC 17. Various effects depending on the spell cast: Alter Self (self only), Clairvoyance, Detect Magic, Dimension Door, Fireball (DC 17 Intelligence save for half Fire damage), Wall of Fire (DC 17 Dexterity save for half Fire damage).",
       "description": "The ultroloth casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 17): At Will: Alter Self, Clairvoyance, Detect Magic; 1/Day Each: Dimension Door, Fireball (level 5 version), Wall of Fire",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1625-ultroloth-spellcasting.md"
     },
     {
       "id": "MA-1626",
@@ -27398,7 +27398,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The umber hulk makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1627",
@@ -27414,7 +27414,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 12 (2d6 + 5) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1628",
@@ -27432,7 +27432,7 @@
         "frightened"
       ],
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+3+spell level Necrotic damage, and the target has the Frightened condition until the end of the spirit's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1629",
@@ -27451,7 +27451,7 @@
         "poisoned"
       ],
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d6+3+spell level Slashing damage. If the target has the Poisoned condition, it has the Paralyzed condition until the end of the spirit's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1630",
@@ -27469,7 +27469,7 @@
       "reach": null,
       "range": "150 ft.",
       "description": "Ranged Spell Attack: +spell attack modifier, range 150 ft. Hit: 2d4+3+spell level Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1631",
@@ -27481,7 +27481,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The unicorn makes one Hooves attack and one Radiant Horn attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1632",
@@ -27497,7 +27497,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 11 (2d6 + 4) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1633",
@@ -27513,7 +27513,7 @@
       "damageTypePrimary": "Radiant",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 9 (1d10 + 4) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1634",
@@ -27528,7 +27528,7 @@
       "saveType": "Charisma",
       "saveEffect": "Targets of the spell's saving throw use the spell save DC 14. Various effects depending on the spell cast: Detect Evil and Good, Druidcraft, Calm Emotions (DC 14 Wisdom save), Dispel Evil and Good, Entangle (DC 14 Dexterity save for half Bludgeoning damage), Pass without Trace (self only), Word of Recall.",
       "description": "The unicorn casts one of the following spells, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 14): At Will: Detect Evil and Good, Druidcraft; 1/Day Each: Calm Emotions, Dispel Evil and Good, Entangle, Pass without Trace, Word of Recall",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1634-unicorn-spellcasting.md"
     },
     {
       "id": "MA-1635",
@@ -27542,7 +27542,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The unicorn moves up to half its Speed without provoking Opportunity Attacks, and it makes one Radiant Horn attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1635-unicorn-charging-horn.md"
     },
     {
       "id": "MA-1636",
@@ -27556,7 +27556,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary Hit Points, and its AC increases by 2 until the end of the unicorn's next turn. The unicorn can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1636-shimmering-shield.md"
     },
     {
       "id": "MA-1637",
@@ -27568,7 +27568,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The vampire makes two Grave Strike attacks and uses Bite.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1638",
@@ -27589,7 +27589,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 8 (1d8 + 4) Bludgeoning damage plus 7 (2d6) Necrotic damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from one of two hands.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1638-grave-strike-grapple.md"
     },
     {
       "id": "MA-1639",
@@ -27614,7 +27614,7 @@
         "restrained"
       ],
       "description": "Constitution Saving Throw: DC 17, one creature within 5 feet that is willing or that has the Grappled, Incapacitated, or Restrained condition. Failure: 6 (1d4 + 4) Piercing damage plus 13 (3d8) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount. A Humanoid reduced to 0 Hit Points by this damage and then buried rises the following sunset as a Vampire Spawn under the vampire's control.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1639-vampire-bite-drain.md"
     },
     {
       "id": "MA-1640",
@@ -27628,7 +27628,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The vampire casts Command, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 17). The vampire can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1640-beguile.md"
     },
     {
       "id": "MA-1641",
@@ -27642,7 +27642,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The vampire moves up to half its Speed, and it makes one Grave Strike attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1641-deathless-strike.md"
     },
     {
       "id": "MA-1642",
@@ -27654,7 +27654,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The familiar makes two Umbral Dagger attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1643",
@@ -27677,7 +27677,7 @@
         "poisoned"
       ],
       "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 20/60 ft. Hit: 5 (1d4 + 3) Piercing damage plus 7 (3d4) Necrotic damage. If the target is reduced to 0 Hit Points by this attack, the target becomes Stable but has the Poisoned condition for 1 hour. While it has the Poisoned condition, the target has the Paralyzed condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1644",
@@ -27689,7 +27689,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The vampire makes one Bite attack and one Shadow Strike attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1645",
@@ -27707,7 +27707,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 7 (1d6 + 4) Piercing damage plus 10 (3d6) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1645-nightbringer-bite-drain.md"
     },
     {
       "id": "MA-1646",
@@ -27725,7 +27725,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 7 (1d6 + 4) Slashing damage plus 14 (4d6) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1647",
@@ -27740,7 +27740,7 @@
         "charmed"
       ],
       "description": "The vampire exerts influence over the animals in its domain. From dusk until dawn, Medium or smaller Beasts have the Charmed condition while within 1 mile of the lair.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1648",
@@ -27752,7 +27752,7 @@
       "category": "lair_actions",
       "actionType": "save",
       "description": "Shadows within 1 mile of the lair seem to move as if alive. Any creature (excluding the vampire and its allies) that finishes a Short Rest while within 1 mile of the lair must succeed on a DC 15 Wisdom saving throw or gain no benefit from that rest.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1649",
@@ -27764,7 +27764,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The area within 1 mile of the lair is Lightly Obscured by a persistent, creeping fog. The vampire and any creatures of its choice are unaffected by the fog.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1649-nightbringer-mists.md"
     },
     {
       "id": "MA-1650",
@@ -27776,7 +27776,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The vampire makes two Claw attacks and uses Bite.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1651",
@@ -27795,7 +27795,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (2d4 + 3) Slashing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13) from one of two claws.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1651-spawn-claw-grapple.md"
     },
     {
       "id": "MA-1652",
@@ -27820,7 +27820,7 @@
         "restrained"
       ],
       "description": "Constitution Saving Throw: DC 14, one creature within 5 feet that is willing or that has the Grappled, Incapacitated, or Restrained condition. Failure: 5 (1d4 + 3) Piercing damage plus 10 (3d6) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1652-spawn-bite-drain.md"
     },
     {
       "id": "MA-1653",
@@ -27832,7 +27832,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The vampire makes two attacks, using Grave Strike or Sickening Ray in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1654",
@@ -27850,7 +27850,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 9 (1d8 + 5) Slashing damage plus 13 (3d8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1655",
@@ -27869,7 +27869,7 @@
         "poisoned"
       ],
       "description": "Ranged Attack Roll: +10, range 120 ft. Hit: 16 (2d10 + 5) Necrotic damage, and the target has the Poisoned condition until the start of the vampire's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1655-sickening-ray-poison.md"
     },
     {
       "id": "MA-1656",
@@ -27883,7 +27883,7 @@
       "saveDc": 18,
       "saveType": "Charisma",
       "description": "The vampire casts Hunger of Hadar (level 5 version), requiring no spell components and using Charisma as the spellcasting ability (spell save DC 18).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1656-hunger-of-hadar.md"
     },
     {
       "id": "MA-1657",
@@ -27897,7 +27897,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The vampire casts Command, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 18). The vampire can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1657-ul-beguile.md"
     },
     {
       "id": "MA-1658",
@@ -27911,7 +27911,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The vampire moves up to half its Speed, and it makes one Grave Strike or Sickening Ray attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1658-umbral-strike.md"
     },
     {
       "id": "MA-1659",
@@ -27929,7 +27929,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Piercing damage plus 3 (1d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1660",
@@ -27941,7 +27941,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The veteran makes two longsword attacks. If it has a shortsword drawn, it can also make a shortsword attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1661",
@@ -27957,7 +27957,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) slashing damage, or 8 (1d10 + 3) slashing damage if used with two hands.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1661-veteran-longsword-versatile.md"
     },
     {
       "id": "MA-1662",
@@ -27973,7 +27973,7 @@
       "damageTypePrimary": "piercing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1663",
@@ -27988,7 +27988,7 @@
       "damageDicePrimary": "1d10 + 1",
       "damageTypePrimary": "piercing",
       "description": "Ranged Weapon Attack: +3 to hit, range 100/400 ft., one target. Hit: 6 (1d10 + 1) piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1664",
@@ -28007,7 +28007,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +4, reach 10 ft. Hit: 6 (1d8 + 2) Bludgeoning damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 12). Until the grapple ends, the target takes 4 (1d8) Bludgeoning damage at the start of each of its turns, and the blight can't make Constricting Vine attacks.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1664-constricting-vine-grapple.md"
     },
     {
       "id": "MA-1665",
@@ -28021,7 +28021,7 @@
       "saveDc": 12,
       "saveType": "Constitution",
       "description": "The blight casts the Entangle spell, using Constitution as the spellcasting ability (spell save DC 12).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1665-entangling-plants.md"
     },
     {
       "id": "MA-1666",
@@ -28033,7 +28033,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The fungus makes two Rotting Touch attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1667",
@@ -28049,7 +28049,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +2, reach 10 ft. Hit: 4 (1d8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1668",
@@ -28061,7 +28061,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The necrohulk makes two Rotting Slam attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1669",
@@ -28079,7 +28079,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 9 (1d10 + 4) Bludgeoning damage plus 7 (2d6) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1670",
@@ -28099,7 +28099,7 @@
         "poisoned"
       ],
       "description": "Constitution Saving Throw: DC 15, each creature in a 20-foot-radius Sphere centered on a point the necrohulk can see within 60 feet. Failure: 28 (8d6) Necrotic damage, and the target has the Poisoned condition until the start of the necrohulk's next turn. While Poisoned, the target can't regain Hit Points. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1671",
@@ -28111,7 +28111,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The vrock makes two Shred attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1672",
@@ -28129,7 +28129,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 10 (2d6 + 3) Piercing damage plus 10 (3d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1673",
@@ -28149,7 +28149,7 @@
         "poisoned"
       ],
       "description": "Constitution Saving Throw: DC 15, each creature in a 20-foot Emanation originating from the vrock. Failure: The target has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. While Poisoned, the target takes 5 (1d10) Poison damage at the start of each of its turns. Emptying a flask of Holy Water on the target ends the effect early.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1673-spores.md"
     },
     {
       "id": "MA-1674",
@@ -28170,7 +28170,7 @@
         "stunned"
       ],
       "description": "Constitution Saving Throw: DC 15, each creature in a 20-foot Emanation originating from the vrock (demons succeed automatically). Failure: 10 (3d6) Thunder damage, and the target has the Stunned condition until the end of the vrock's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1674-stunning-scream.md"
     },
     {
       "id": "MA-1675",
@@ -28186,7 +28186,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 2 (1d4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1676",
@@ -28205,7 +28205,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 9 (2d4 + 4) Bludgeoning damage. If the target is a Large or smaller creature and the horse moved 20+ feet straight toward it immediately before the hit, the target takes an extra 5 (2d4) Bludgeoning damage and has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1676-hooves-charge-rider.md"
     },
     {
       "id": "MA-1677",
@@ -28224,7 +28224,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 7 (1d6 + 4) Bludgeoning damage. If the target is a Large or smaller creature and the skeleton moved 20+ feet straight toward it immediately before the hit, the target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1678",
@@ -28236,7 +28236,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The warrior makes three attacks, using Greatsword or Longbow in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1679",
@@ -28252,7 +28252,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 19 (4d6 + 5) Slashing damage. The warrior also creates one of the following effects: Sap. The target has Disadvantage on its next attack roll before the start of the warrior's next turn. Maneuver. One ally who can see or hear the warrior can take a Reaction to move up to half the ally's Speed without provoking Opportunity Attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1680",
@@ -28268,7 +28268,7 @@
       "damageTypePrimary": "Piercing",
       "range": "150/600 ft.",
       "description": "Ranged Attack Roll: +9, range 150/600 ft. Hit: 18 (3d8 + 5) Piercing damage, and the target's Speed decreases by 10 feet until the end of the target's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1680-longbow-speed-rider.md"
     },
     {
       "id": "MA-1681",
@@ -28281,7 +28281,7 @@
       "actionType": "other",
       "trigger": "The warrior is hit by an attack roll.",
       "description": "The warrior adds 4 to its AC against that attack, possibly causing it to miss. On a miss, the warrior can make one Greatsword or Longbow attack against the attacker.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1681-counterattack.md"
     },
     {
       "id": "MA-1682",
@@ -28298,7 +28298,7 @@
       "reach": "5 ft.",
       "range": "20/60 ft.",
       "description": "Melee or Ranged Attack Roll: +3, reach 5 ft. or range 20/60 ft. Hit: 4 (1d6 + 1) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1683",
@@ -28310,7 +28310,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The warrior makes two Greatsword or Heavy Crossbow attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1684",
@@ -28326,7 +28326,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1685",
@@ -28342,7 +28342,7 @@
       "damageTypePrimary": "Piercing",
       "range": "100/400 ft.",
       "description": "Ranged Attack Roll: +3, range 100/400 ft. Hit: 12 (2d10 + 1) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1686",
@@ -28355,7 +28355,7 @@
       "actionType": "other",
       "trigger": "The warrior is hit by a melee attack roll while holding a weapon.",
       "description": "The warrior adds 2 to its AC against that attack, possibly causing it to miss.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1686-veteran-parry.md"
     },
     {
       "id": "MA-1687",
@@ -28367,7 +28367,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The elemental makes two Slam attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1688",
@@ -28386,7 +28386,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1688-slam-prone.md"
     },
     {
       "id": "MA-1689",
@@ -28407,7 +28407,7 @@
         "restrained"
       ],
       "description": "Strength Saving Throw: DC 15, each creature in the elemental's space. Failure: 22 (4d8 + 4) Bludgeoning damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14). Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water, and takes 9 (2d8) Bludgeoning damage at the start of each of the elemental's turns. The elemental can grapple one Large creature or up to two Medium or smaller creatures at a time with Whelm. As an action, a creature within 5 feet of the elemental can pull a creature out of it by succeeding on a DC 14 Strength (Athletics) check.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1689-whelm.md"
     },
     {
       "id": "MA-1690",
@@ -28427,7 +28427,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 13 (3d6 + 3) Cold damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13), and it has the Restrained condition until the grapple ends.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1690-surge-grapple.md"
     },
     {
       "id": "MA-1691",
@@ -28443,7 +28443,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 1 Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1692",
@@ -28455,7 +28455,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The werebear makes two attacks, using Handaxe or Rend in any combination. It can replace one attack with a Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1693",
@@ -28474,7 +28474,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 17 (2d12 + 4) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 14. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Werebear under the DM's control and has 10 Hit Points. Success: The target is immune to this werebear's curse for 24 hours.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1694",
@@ -28491,7 +28491,7 @@
       "reach": "5 ft.",
       "range": "20/60 ft.",
       "description": "Melee or Ranged Attack Roll: +7, reach 5 ft or range 20/60 ft. Hit: 14 (3d6 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1695",
@@ -28507,7 +28507,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1696",
@@ -28519,7 +28519,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The wereboar makes two attacks, using Javelin or Tusk in any combination. It can replace one attack with a Gore attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1697",
@@ -28538,7 +28538,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Wereboar under the DM's control and has 10 Hit Points. Success: The target is immune to this wereboar's curse for 24 hours.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1698",
@@ -28555,7 +28555,7 @@
       "reach": "5 ft.",
       "range": "30/120 ft.",
       "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 30/120 ft. Hit: 13 (3d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1699",
@@ -28574,7 +28574,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Piercing damage. If the target is a Medium or smaller creature and the wereboar moved 20+ feet straight toward it immediately before the hit, the target takes an extra 7 (2d6) Piercing damage and has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1699-tusk-charge.md"
     },
     {
       "id": "MA-1700",
@@ -28586,7 +28586,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The wererat makes two attacks, using Scratch or Hand Crossbow in any combination. It can replace one attack with a Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1701",
