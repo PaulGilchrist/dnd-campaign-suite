@@ -64507,6 +64507,7 @@
         "description": "Ranged Attack Roll: +9, range 150/600 ft. Hit: 18 (3d8 + 5) Piercing damage, and the target's Speed decreases by 10 feet until the end of the target's next turn.",
         "attack_bonus": 9,
         "range": "150/600 ft.",
+        "hit_target_effect": "speed_reduction",
         "damage_dice_primary": "3d8 + 5",
         "damage_type_primary": "Piercing"
       }

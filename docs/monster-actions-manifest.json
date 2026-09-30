@@ -28268,7 +28268,7 @@
       "damageTypePrimary": "Piercing",
       "range": "150/600 ft.",
       "description": "Ranged Attack Roll: +9, range 150/600 ft. Hit: 18 (3d8 + 5) Piercing damage, and the target's Speed decreases by 10 feet until the end of the target's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1680-longbow-speed-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1681",

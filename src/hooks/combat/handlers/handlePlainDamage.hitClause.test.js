@@ -5205,3 +5205,144 @@ describe('MA-1664 Vine Blight Constricting Vine grappled-on-hit grant (two-field
         expect(buildHitConditionClause(entangle)).toBeNull();
     });
 });
+
+const WARRIOR_COMMANDER = monsters.find(m => m.index === 'warrior-commander');
+const LONGBOW_ACTION = WARRIOR_COMMANDER.actions[2];
+
+describe('MA-1680 Warrior Commander Longbow speed_reduction hit-clause passthrough', () => {
+    const deps = {
+        characterName: 'Warrior Commander 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Warrior Commander 1', computedStats: { armorClass: 18 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getEffectDefinition.mockImplementation((key) => ({
+            effect: key,
+            label: 'Speed Reduced',
+            description: 'The creature\'s Speed is reduced by N feet.',
+            group: 'Movement',
+        }));
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 13, newHp: 986, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-1680 data-lock: Longbow authors hit_target_effect:"speed_reduction" at the MA-0995/MA-1147 twin slot (after range, before damage_dice_primary); attack core exact', () => {
+        expect(LONGBOW_ACTION.name).toBe('Longbow');
+        expect(LONGBOW_ACTION.attack_bonus).toBe(9);
+        expect(LONGBOW_ACTION.range).toBe('150/600 ft.');
+        expect(LONGBOW_ACTION.damage_dice_primary).toBe('3d8 + 5');
+        expect(LONGBOW_ACTION.damage_type_primary).toBe('Piercing');
+        expect(LONGBOW_ACTION.hit_target_effect).toBe('speed_reduction');
+        const keys = Object.keys(LONGBOW_ACTION);
+        expect(keys.indexOf('hit_target_effect')).toBe(keys.indexOf('range') + 1);
+        expect(keys.indexOf('hit_target_effect')).toBe(keys.indexOf('damage_dice_primary') - 1);
+        expect(LONGBOW_ACTION.save_effect).toBeUndefined();
+        expect(LONGBOW_ACTION.save_dc).toBeUndefined();
+        expect(LONGBOW_ACTION.save_type).toBeUndefined();
+        expect(LONGBOW_ACTION.escape_dc).toBeUndefined();
+        expect(LONGBOW_ACTION.hit_conditions).toBeUndefined();
+        expect(LONGBOW_ACTION.hit_condition_roll).toBeUndefined();
+        expect(LONGBOW_ACTION.description).toMatch(/Hit: 18 \(3d8 \+ 5\) Piercing damage, and the target's Speed decreases by 10 feet until the end of the target's next turn\./);
+    });
+
+    it('MA-1680 greatsword twin stays byte-unchanged: same "+9" bonus, NO rider authored (row-scoped lock §693)', () => {
+        const greatsword = WARRIOR_COMMANDER.actions[1];
+        expect(greatsword.name).toBe('Greatsword');
+        expect(greatsword.attack_bonus).toBe(9);
+        expect(greatsword.hit_target_effect).toBeUndefined();
+        expect(buildHitConditionClause(greatsword)).toBeNull();
+    });
+
+    it('builds a targetEffect-only clause from the Longbow row', () => {
+        expect(buildHitConditionClause(LONGBOW_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Longbow',
+            targetEffect: 'speed_reduction',
+        });
+    });
+
+    it('registers the speed_reduction te on the victim, sourced from the warrior commander, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Longbow', formula: '3d8 + 5', total: 13, rolls: [1, 1, 6], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Warrior Commander 1',
+            hitClause: buildHitConditionClause(LONGBOW_ACTION),
+        } });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'speed_reduction',
+            'Warrior Commander 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('MA-1680 clock-lock: grants ONE addExpiration attacker-anchored until_start_of_next_turn (§38 single-clock; RAW end-of-target-next-turn anchor = MA-0542/MA-0995 accepted advisory residual)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Longbow', formula: '3d8 + 5', total: 13, rolls: [1, 1, 6], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Warrior Commander 1',
+            hitClause: buildHitConditionClause(LONGBOW_ACTION),
+        } });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Warrior Commander 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'speed_reduction', source: 'Warrior Commander 1', target: 'Bandit 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Warrior Commander 1',
+        });
+    });
+
+    it('logs condition-applied "Speed Reduced" with the registry label, writes no raw activeConditions, and pays damage exactly once (no double-pay)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Longbow', formula: '3d8 + 5', total: 13, rolls: [1, 1, 6], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Warrior Commander 1',
+            hitClause: buildHitConditionClause(LONGBOW_ACTION),
+        } });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Speed Reduced',
+            reason: "Longbow — until the start of Warrior Commander 1's next turn",
+        }));
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(
+            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
+        );
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    });
+
+    it('grants nothing when the Longbow attack misses (no clause reaches the damage leg)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Longbow', formula: '3d8 + 5', total: 13, rolls: [1, 1, 6], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Warrior Commander 1',
+        } });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});
