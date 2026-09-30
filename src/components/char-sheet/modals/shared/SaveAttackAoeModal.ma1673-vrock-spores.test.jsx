@@ -120,8 +120,9 @@ import { applyDamageToTarget } from '../../../../services/rules/combat/applyDama
 import { addEntry } from '../../../../services/ui/logService.js';
 import { addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 
-function renderSporesPicker() {
-  const row = sporesRow();
+const screamRow = () => monstersData.find(m => m.index === 'vrock').actions.find(a => a.name === 'Stunning Scream');
+
+function renderRowPicker(row, opts = {}) {
   // dc_success flows exactly as MonsterCardModal.resolveBlockSaveDcSuccess
   // computes it for the live chip: Number(save_dc) > 0 ? dc_success ?? 'half'.
   const dcSuccess = Number(row.save_dc) > 0 ? (row.dc_success ?? 'half') : null;
@@ -131,11 +132,11 @@ function renderSporesPicker() {
       playerStats={{ name: 'Vrock 1' }}
       campaignName="test-campaign"
       damage={row.damage_dice_primary}
-      damageType="Poison"
+      damageType={opts.damageType}
       saveType={row.save_type}
       saveDc={row.save_dc}
       dcSuccess={dcSuccess}
-      saveConditions={['poisoned']}
+      saveConditions={opts.saveConditions}
       titleOverride=" 20-ft Radius (GM positions tokens; selection advisory)"
       excludeNames={['Vrock 1']}
       rangeGateFt={20}
@@ -143,6 +144,14 @@ function renderSporesPicker() {
       onClose={vi.fn()}
     />
   );
+}
+
+function renderSporesPicker() {
+  return renderRowPicker(sporesRow(), { damageType: 'Poison', saveConditions: ['poisoned'] });
+}
+
+function renderScreamPicker() {
+  return renderRowPicker(screamRow(), { damageType: 'Thunder', saveConditions: ['stunned'] });
 }
 
 beforeEach(() => {
@@ -186,6 +195,55 @@ describe('MA-1673 Vrock Spores picker seam (live emanation route)', () => {
     const dmgLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e && e.rollType === 'save-damage');
     expect(dmgLogs.every(e => e.finalDamage === 0)).toBe(true);
     // Picker copy honesty (§1191): dc_success:'none' prints "no damage", never half.
+    expect(pickerCopy.current).toMatch(/takes no damage/i);
+    expect(pickerCopy.current).not.toMatch(/half damage/i);
+  });
+});
+
+// MA-1674: Vrock "Stunning Scream" picker twin — RAW success pays ZERO + no
+// Stunned; FAIL pays FULL 3d6 Thunder + Stunned. Pre-fix data had NO
+// dc_success (picker defaulted 'half', fabricated "takes half damage" copy —
+// "Saved — takes 4 Thunder damage (rolled 15, halved)" live fingerprint) and
+// a `uses:"1/Day"` STRING gate (Number→NaN→null, no counter, no spend).
+describe('MA-1674 Vrock Stunning Scream picker seam', () => {
+  it('row data: dc_success none after save_type + MA-0633 numeric 1/Day triple', () => {
+    const row = screamRow();
+    expect(row.dc_success).toBe('none');
+    expect(Object.keys(row).indexOf('dc_success')).toBe(Object.keys(row).indexOf('save_type') + 1);
+    expect(row.usage).toBe('1/Day');
+    expect(row.uses).toBe(1);
+    expect(row.maxUses).toBe(1);
+    expect(Number(row.save_dc) > 0 ? (row.dc_success ?? 'half') : null).toBe('none');
+  });
+
+  it('FAIL face (constitution −19 floor): FULL "3d6" rolls [7] Thunder + Stunned granted with source meta', async () => {
+    combatSummary.current.creatures[1].saveBonuses = { constitution: -19, con: 1 };
+    const { getByText } = renderScreamPicker();
+    await waitFor(() => expect(document.querySelector('.sp-roll-btn')).toBeTruthy());
+    fireEvent.click(getByText('Confirm'));
+    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(1));
+    const call = applyDamageToTarget.mock.calls[0];
+    expect(call[1]).toBe('Bandit 1');
+    expect(call[2]).toBe(7);
+    expect(call[3]).toEqual(['Thunder']);
+    const saveLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.rollType === 'save-damage');
+    expect(saveLog).toMatchObject({ formula: '3d6', rolls: [7], finalDamage: 7, saveResult: 'failure', saveDc: 15, dcSuccess: 'none', targetName: 'Bandit 1' });
+    expect(runtimeStore['Bandit 1.activeConditions']).toContain('stunned');
+    expect(runtimeStore['Bandit 1.activeConditionMeta'].stunned).toMatchObject({ dc: 15, ability: 'con', source: 'Vrock 1' });
+    const condLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'condition' && e.action === 'applied');
+    expect(condLog.description).toMatch(/Stunned/);
+  });
+
+  it('SUCCESS face (constitution +19): ZERO damage — no applyDamageToTarget, no Stunned, copy honest "no damage"', async () => {
+    combatSummary.current.creatures[1].saveBonuses = { constitution: 19, con: 1 };
+    const { getByText } = renderScreamPicker();
+    await waitFor(() => expect(document.querySelector('.sp-roll-btn')).toBeTruthy());
+    fireEvent.click(getByText('Confirm'));
+    await waitFor(() => expect(addTargetResult).toHaveBeenCalled());
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(runtimeStore['Bandit 1.activeConditions'] ?? []).not.toContain('stunned');
+    const dmgLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e && e.rollType === 'save-damage');
+    expect(dmgLogs.every(e => e.finalDamage === 0)).toBe(true);
     expect(pickerCopy.current).toMatch(/takes no damage/i);
     expect(pickerCopy.current).not.toMatch(/half damage/i);
   });

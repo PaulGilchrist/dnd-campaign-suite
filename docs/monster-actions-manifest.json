@@ -28170,7 +28170,7 @@
         "stunned"
       ],
       "description": "Constitution Saving Throw: DC 15, each creature in a 20-foot Emanation originating from the vrock (demons succeed automatically). Failure: 10 (3d6) Thunder damage, and the target has the Stunned condition until the end of the vrock's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1674-stunning-scream.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1675",

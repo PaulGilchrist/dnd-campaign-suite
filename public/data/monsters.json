@@ -64152,8 +64152,11 @@
         "description": "Constitution Saving Throw: DC 15, each creature in a 20-foot Emanation originating from the vrock (demons succeed automatically). Failure: 10 (3d6) Thunder damage, and the target has the Stunned condition until the end of the vrock's next turn.",
         "save_dc": 15,
         "save_type": "Constitution",
+        "dc_success": "none",
         "range": "20-foot Emanation",
-        "uses": "1/Day",
+        "usage": "1/Day",
+        "uses": 1,
+        "maxUses": 1,
         "save_effect": "10 (3d6) Thunder damage, and the target has the Stunned condition until the end of the vrock's next turn",
         "damage_dice_primary": "3d6"
       }

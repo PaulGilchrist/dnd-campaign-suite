@@ -85,6 +85,9 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
 }));
 
 import { processSaveRoll } from './saveProcessing.js';
+import monstersData from '../../../public/data/monsters.json';
+
+const screamRow = () => monstersData.find(m => m.index === 'vrock').actions.find(a => a.name === 'Stunning Scream');
 
 const campaignName = 'test-campaign';
 const ATTACKER = 'Vrock 1';
@@ -146,6 +149,62 @@ describe('MA-1673 processNpcSave seam: Vrock Spores dc_success none', () => {
     expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
     expect(applyDamageToTarget.mock.calls[0][2]).toBe(0);
     expect((runtimeStore[`${TARGET}.activeConditions`] || [])).not.toContain('poisoned');
+  });
+});
+
+// MA-1674: Vrock "Stunning Scream" twin seam locks — RAW success pays ZERO
+// (dc_success:"none" fix for the half-default leak: live pre-fix proof
+// "Saved — takes 4 Thunder damage (rolled 15, halved)") and FAIL pays FULL
+// 3d6 Thunder + Stunned fail-only (Stunned expiry durationNote stays §38
+// GM-enforced advisory; demons-succeed-auto §70 not modeled app-wide).
+const screamContext = (over = {}) => ({
+  saveDc: 15,
+  saveType: 'Constitution',
+  attackerName: ATTACKER,
+  actionName: 'Stunning Scream',
+  dcSuccess: screamRow().dc_success,
+  autoDamageFormula: '3d6',
+  autoDamageDamageType: 'Thunder',
+  saveConditions: ['stunned'],
+  effectiveBonus: 0,
+  ...over,
+});
+
+describe('MA-1674 processNpcSave seam: Vrock Stunning Scream dc_success none', () => {
+  it('FAIL face (−19 always-fail floor, nat 6): FULL 3d6 (fd 7) + Stunned granted', async () => {
+    const result = await processSaveRoll({
+      rollType: 'save',
+      target: { name: TARGET, type: 'npc' },
+      characterName: TARGET,
+      campaignName,
+      context: { ...screamContext(), effectiveD20: 6 },
+      bonus: -19,
+      r1: 6, r2: 6,
+      logEntry: vi.fn(),
+      setPopupHtml: vi.fn(),
+    });
+    expect(result.saveSuccess).toBe(false);
+    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    expect(applyDamageToTarget.mock.calls[0][2]).toBe(7);
+    expect(runtimeStore[`${TARGET}.activeConditions`]).toContain('stunned');
+  });
+
+  it('SUCCESS face (+19 always-success, nat 15): ZERO damage — RAW success pays nothing', async () => {
+    const result = await processSaveRoll({
+      rollType: 'save',
+      target: { name: TARGET, type: 'npc' },
+      characterName: TARGET,
+      campaignName,
+      context: { ...screamContext(), effectiveD20: 15 },
+      bonus: 19,
+      r1: 15, r2: 15,
+      logEntry: vi.fn(),
+      setPopupHtml: vi.fn(),
+    });
+    expect(result.saveSuccess).toBe(true);
+    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    expect(applyDamageToTarget.mock.calls[0][2]).toBe(0);
+    expect((runtimeStore[`${TARGET}.activeConditions`] || [])).not.toContain('stunned');
   });
 });
 
