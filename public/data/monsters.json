@@ -63869,7 +63869,9 @@
         "name": "Entangling Plants",
         "description": "The blight casts the Entangle spell, using Constitution as the spellcasting ability (spell save DC 12).",
         "save_dc": 12,
-        "save_type": "Constitution"
+        "save_type": "Strength",
+        "dc_success": "none",
+        "save_effect": "Target has the Restrained condition until the spell ends. Escape: Strength (Athletics) action vs spell save DC 12. Difficult terrain and concentration clauses are GM-enforced."
       }
     ],
     "bonus_actions": [],

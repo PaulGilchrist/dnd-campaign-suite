@@ -28021,7 +28021,7 @@
       "saveDc": 12,
       "saveType": "Constitution",
       "description": "The blight casts the Entangle spell, using Constitution as the spellcasting ability (spell save DC 12).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1665-entangling-plants.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1666",

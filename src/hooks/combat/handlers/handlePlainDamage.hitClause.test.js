@@ -5193,11 +5193,13 @@ describe('MA-1664 Vine Blight Constricting Vine grappled-on-hit grant (two-field
         expect(registerTargetEffect).not.toHaveBeenCalled();
     });
 
-    it('Entangling Plants save row byte-unchanged: two-field fix never touched actions[1] (§22 same-monster block-text anchor caution)', () => {
+    it('Entangling Plants save row stays off the HIT lane (§22 anchor caution; MA-1665 save-axis fields never arm hit grants)', () => {
         const entangle = VINE_BLIGHT.actions[1];
         expect(entangle.name).toBe('Entangling Plants');
         expect(entangle.save_dc).toBe(12);
-        expect(entangle.save_type).toBe('Constitution');
+        expect(entangle.save_type).toBe('Strength');
+        expect(entangle.dc_success).toBe('none');
+        expect(entangle.save_effect).toMatch(/\bRestrained\b/);
         expect(entangle.hit_conditions).toBeUndefined();
         expect(entangle.escape_dc).toBeUndefined();
         expect(buildHitConditionClause(entangle)).toBeNull();
