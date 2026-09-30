@@ -20,6 +20,7 @@ import { applyEyeRayFailedGrants } from '../../services/rules/features/beholderE
 import { stagePetrifyingBiteTargets } from '../../services/rules/features/cockatricePetrifyService.js';
 import { consumeBurstOfIngenuityBuff } from '../../services/encounters/monsterBurstOfIngenuity.js';
 import { applyHpMaxReduce } from '../../services/rules/features/hpMaxReduceService.js';
+import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js';
 
 export async function processSaveRoll({ rollType, target, characterName, campaignName, context, bonus, r1, r2, logEntry, setPopupHtml }) {
     const saveDc = context?.saveDc;
@@ -1320,10 +1321,77 @@ async function maybeApplyThresholdKillLeg({ context, characterName, campaignName
 // face on the automation hp_max_reduce log. NO addExpiration clock —
 // RAW ends at greater restoration; LR restore rides the ledger
 // (LONG_REST_TARGET_EFFECT_CLEAR_KEYS already pins hp_max_reduce).
-async function applySaveHpMaxReduceLeg({ context, applyTarget, applyResult, combatSummaryForSave, characters, campaignName, attackerName, saveSuccess, logEntry }) {
+// MA-1639: rider amount resolution. On the dual-damage Vampire Bite the RAW
+// scopes BOTH riders ("decreases by an amount equal to the Necrotic damage
+// taken, and the vampire regains Hit Points equal to that amount") to the
+// NECROTIC pool — damage_dice_secondary on this row — so when a necrotic
+// secondary leg rides the save transport the riders consume ITS applied
+// finalDamage (half-floored success damage already folded upstream via
+// dc_success). Single-damage rows (MA-1547 succubus twin, every legacy
+// drain row) keep consuming applyResult.finalDamage byte-identically.
+function resolveSaveRiderDamage({ applyResult, secondaryOutcome, context }) {
+    const secondaryType = String(context?.autoDamageSecondaryDamageType || '').toLowerCase();
+    if (secondaryOutcome && secondaryType.includes('necrotic')) return Number(secondaryOutcome.finalDamage) || 0;
+    return Number(applyResult?.finalDamage) || 0;
+}
+
+async function applySaveHpMaxReduceLeg({ context, applyTarget, riderDamage, combatSummaryForSave, characters, campaignName, attackerName, saveSuccess, logEntry }) {
     if (!context?.saveHpMaxReduce) return null;
     const drainTarget = context?._target || { name: applyTarget, type: combatSummaryForSave?.creatures?.find(c => c.name === applyTarget)?.type || 'npc' };
-    return await applyHpMaxReduce({ attackName: context?.actionName || context.name, target: drainTarget, damage: Number(applyResult?.finalDamage) || 0, combatSummary: combatSummaryForSave, characters, campaignName, attackerName, logEntry, saveOutcome: saveSuccess ? 'success' : 'failure' });
+    return await applyHpMaxReduce({ attackName: context?.actionName || context.name, target: drainTarget, damage: Number(riderDamage) || 0, combatSummary: combatSummaryForSave, characters, campaignName, attackerName, logEntry, saveOutcome: saveSuccess ? 'success' : 'failure' });
+}
+
+// MA-1639: Vampire Bite attacker-recover rider (MA-0651 applySummonSelfDamage
+// mirrored for HEALING via the canonical applyHealingToTarget choke point —
+// cs currentHp + clamp + storage.set + combat-summary-updated, no_healing /
+// infernal-wound choke points honored, MA-0016/MA-0367). Armed ONLY by the
+// structured save_attacker_recover:{equal_to:"damage"} key parsed onto the
+// block-save context (byte-inert for every clauseless save row); heals the
+// ATTACKER by the SAME riderDamage the drain rider consumed, on BOTH faces
+// ("equal to that amount"), and logs roll face + save outcome + HP ledger.
+// HP truth (§17): monster = cs currentHp — applyHealingToTarget owns the
+// write. No clock: RAW permanent until restored (the drain ledger's rules,
+// MA-1489/MA-1547 convention).
+async function applySaveAttackerRecoverLeg({ context, applyTarget, riderDamage, combatSummaryForSave, campaignName, attackerName, saveSuccess, saveDc, logEntry }) {
+    if (!context?.saveAttackerRecover) return null;
+    const amount = Number(riderDamage) || 0;
+    const actionName = context?.actionName || context.name;
+    if (amount <= 0) {
+        logEntry({
+            type: 'automation',
+            automationType: 'save_attacker_recover',
+            characterName: attackerName,
+            abilityName: actionName,
+            targetName: applyTarget,
+            description: `${attackerName}'s ${actionName} drained 0 Hit Points from ${applyTarget} — ${attackerName} regains 0 Hit Points (equal to the damage taken). No change.`,
+            timestamp: Date.now(),
+        });
+        return 'zero';
+    }
+    const result = applyHealingToTarget(combatSummaryForSave, attackerName, amount, campaignName);
+    if (!result) {
+        console.error(`[saveProcessing] MA-1639 attacker HP unresolvable for ${attackerName} — regain not applied`);
+        logEntry({
+            type: 'automation',
+            automationType: 'save_attacker_recover_refused',
+            characterName: attackerName,
+            abilityName: actionName,
+            targetName: applyTarget,
+            description: `${attackerName}'s ${actionName} drained ${amount} Hit Points from ${applyTarget}, but ${attackerName}'s Hit Points are not resolvable — regain recorded advisory only (GM-enforced).`,
+            timestamp: Date.now(),
+        });
+        return null;
+    }
+    logEntry({
+        type: 'automation',
+        automationType: 'save_attacker_recover',
+        characterName: attackerName,
+        abilityName: actionName,
+        targetName: applyTarget,
+        description: `${attackerName} regains ${result.actualHeal} Hit Points equal to the damage drained from ${applyTarget} by ${actionName} (save ${saveSuccess ? 'succeeded' : 'failed'} vs DC ${saveDc}) — ${attackerName} ${result.oldHp} → ${result.newHp} Hit Points (max ${result.maxHp}).`,
+        timestamp: Date.now(),
+    });
+    return result;
 }
 
 async function applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters }) {
@@ -1352,9 +1420,6 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
 
     logEntry(buildSaveDamageLogData({ attackerName, context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, saveSuccess }));
 
-    // MA-1547: save-path HP-max drain rider (hoisted sibling, §45 cap).
-    await applySaveHpMaxReduceLeg({ context, applyTarget, applyResult, combatSummaryForSave, characters, campaignName, attackerName, saveSuccess, logEntry });
-
     // MA-0427: authored secondary damage on a SAVE row (Brazen Gorgon Smelting
     // Charge "Failure: 2d8 + 4 Piercing damage plus 3d8 Fire damage") rolls as a
     // SECOND save-damage leg with its own half-on-success pass — dc_success
@@ -1362,6 +1427,14 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
     // each leg floor-halved independently. Byte-inert null for every row without
     // damage_dice_secondary (all existing single-damage suites byte-identical).
     const secondaryOutcome = await applySecondarySaveDamageLeg({ context, combatSummary: combatSummaryForSave, attackerName, applyTarget, saveSuccess, hasEvasion, characters, campaignName, logEntry });
+
+    // MA-1547 save-path HP-max drain rider + MA-1639 attacker-recover twin
+    // (hoisted siblings, §45 cap) — both ride the damage TAKEN, resolved to the
+    // necrotic secondary pool on dual-damage rows (Vampire Bite), PRIMARY
+    // finalDamage unchanged on every legacy single-damage drain row.
+    const riderDamage = resolveSaveRiderDamage({ applyResult, secondaryOutcome, context });
+    await applySaveHpMaxReduceLeg({ context, applyTarget, riderDamage, combatSummaryForSave, characters, campaignName, attackerName, saveSuccess, logEntry });
+    await applySaveAttackerRecoverLeg({ context, applyTarget, riderDamage, combatSummaryForSave, campaignName, attackerName, saveSuccess, saveDc, logEntry });
 
     setPopupHtml({
         ...buildSaveDamagePopupData({ context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, targetName, effectiveD20ForSave, saveTotal, saveSuccess, saveDc, saveType }),

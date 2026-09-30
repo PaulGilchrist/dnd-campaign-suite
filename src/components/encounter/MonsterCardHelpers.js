@@ -810,6 +810,25 @@ export function parseSaveHpMaxReduce(action) {
   return String(rider.equal_to || '').toLowerCase() === 'damage' ? { equalTo: 'damage' } : null;
 }
 
+// MA-1639: Vampire Bite save-path ATTACKER-recover rider — the regain twin of
+// MA-1547's save_hp_max_reduce, keyed on the structured save_attacker_recover
+// key ONLY (never prose — MA-1489/MA-1547 structured-key-only precedent), so
+// every clauseless save row stays byte-identical. RAW: "the vampire regains
+// Hit Points equal to that amount" — "that amount" = the damage the drain
+// rider takes (the Necrotic pool on the dual-damage Bite row), NOT half of
+// the total (the disk text is the truth; the manifest half-damage wording was
+// indicative only). The consumer (saveProcessing.applySaveDamage →
+// applySaveAttackerRecoverLeg) heals the ATTACKER by the SAME riderDamage the
+// drain rider consumed, through the canonical applyHealingToTarget choke point
+// (no_healing + infernal-wound choke points honored, MA-0016/MA-0367) and
+// logs roll face + heal amount + save outcome. Byte-inert null for every row
+// without the key.
+export function parseSaveAttackerRecover(action) {
+  const rider = action?.save_attacker_recover;
+  if (!rider || typeof rider !== 'object') return null;
+  return String(rider.equal_to || '').toLowerCase() === 'damage' ? { equalTo: 'damage' } : null;
+}
+
 // MA-1563: save-leg-specific damage pool (Swarm of Poisonous Snakes Bites
 // "save_damage_dice":"4d6"/"save_damage_type":"Poison") — structured keys
 // only, never prose. Byte-inert null for every row without the keys, so all
