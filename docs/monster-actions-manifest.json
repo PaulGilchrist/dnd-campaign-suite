@@ -28149,7 +28149,7 @@
         "poisoned"
       ],
       "description": "Constitution Saving Throw: DC 15, each creature in a 20-foot Emanation originating from the vrock. Failure: The target has the Poisoned condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. While Poisoned, the target takes 5 (1d10) Poison damage at the start of each of its turns. Emptying a flask of Holy Water on the target ends the effect early.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1673-spores.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1674",
