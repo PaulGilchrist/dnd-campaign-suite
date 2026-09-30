@@ -64811,6 +64811,7 @@
         "save_dc": 15,
         "save_type": "Strength",
         "save_effect": "Failure: 22 (4d8 + 4) Bludgeoning damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14). Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water, and takes 9 (2d8) Bludgeoning damage at the start of each of the elemental's turns.",
+        "dc_success": "none",
         "damage_dice_primary": "4d8 + 4",
         "damage_type_primary": "Bludgeoning"
       }
