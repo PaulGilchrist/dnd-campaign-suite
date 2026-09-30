@@ -28205,7 +28205,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 9 (2d4 + 4) Bludgeoning damage. If the target is a Large or smaller creature and the horse moved 20+ feet straight toward it immediately before the hit, the target takes an extra 5 (2d4) Bludgeoning damage and has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1676-hooves-charge-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1677",
