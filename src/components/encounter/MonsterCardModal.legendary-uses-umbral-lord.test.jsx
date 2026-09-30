@@ -16,8 +16,9 @@
 // "60 feet", save_effect carrying the obey-clause honestly as GM-enforced
 // advisory MA-0058 family), Beguile child uses/recharge dropped §165 (the
 // header owns the pool — phantom double-economy MA-1058/MA-1089 twins).
-// Umbral Strike stays byte-unchanged (§216 current-state pin): its
-// delegates_to + stray recharge "(false)" cosmetic belong to MA-1658.
+// MA-1658 same-day follow-up: Umbral Strike pins are INVERTED (§216) —
+// delegates_to:"Grave Strike" added, child uses/recharge dropped §165,
+// stray recharge:false "(false)" tail killed (§MA-1636 twin).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -28,6 +29,7 @@ import spellsData from '../../../public/data/spells.json';
 import {
   legendaryHeaderAction, legendaryMaxUses, legendaryUsesRemaining,
   legendaryExpendGate, hasLegendaryCooldownClause,
+  legendaryDelegateAction, legendaryDelegateAttackName,
 } from '../../services/encounters/monsterLegendaryUses.js';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
@@ -170,16 +172,32 @@ describe('MA-1657 monsters.json data lock: umbral lord legendary header + Beguil
     expect(hasLegendaryCooldownClause(beg)).toBe(true);
   });
 
-  it('Umbral Strike stays byte-unchanged (MA-1658 owns delegates_to + recharge "(false)" cosmetic — §216 current-state pin)', () => {
+  it('MA-1658: Umbral Strike delegates_to Grave Strike, child uses/recharge dropped (§165 — §216 pin inverted from MA-1657 untouched-state)', () => {
     const us = row('Umbral Strike');
-    expect(Object.keys(us).sort()).toEqual(['description', 'name', 'recharge', 'uses']);
+    expect(Object.keys(us)).toEqual(['name', 'description', 'delegates_to']);
     expect(us.description).toBe('The vampire moves up to half its Speed, and it makes one Grave Strike or Sickening Ray attack.');
-    expect(us.uses).toBe(1);
-    expect(us.recharge).toBe(false);
-    expect(us.delegates_to).toBeUndefined();
+    expect(us.delegates_to).toBe('Grave Strike');
+    expect(us.uses).toBeUndefined();
+    expect(us.recharge).toBeUndefined();
     expect(us.save_dc).toBeUndefined();
     expect(us.attack_bonus).toBeUndefined();
     expect(us.advisory).toBeUndefined();
+    // MA-1641 Deathless Strike byte-twin key shape: delegates_to rides LAST.
+    const ds = monstersData.find(m => m.name === 'Vampire').legendary_actions.find(a => a.name === 'Deathless Strike');
+    expect(Object.keys(ds)).toEqual(['name', 'description', 'delegates_to']);
+  });
+
+  it('MA-1658: delegate resolves to the Grave Strike actions[] row — resolvable attack leg, no console dead-end', () => {
+    const us = row('Umbral Strike');
+    const delegate = legendaryDelegateAction(umbralLord(), us);
+    expect(delegate).not.toBeNull();
+    expect(delegate.name).toBe('Grave Strike');
+    expect(delegate.attack_bonus).toBe(10);
+    expect(delegate.damage_dice_primary).toBe('1d8 + 5');
+    expect(delegate.damage_type_primary).toBe('Slashing');
+    expect(delegate.damage_dice_secondary).toBe('3d8');
+    expect(delegate.damage_type_secondary).toBe('Necrotic');
+    expect(legendaryDelegateAttackName(us, delegate)).toBe('Umbral Strike (Grave Strike attack)');
   });
 
   it('gate math on the fixed header: allows after another creature, refuses own-turn and exhausted', () => {
@@ -276,5 +294,59 @@ describe('MA-1657 MonsterCardModal umbral lord gated legendary economy', () => {
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(runtime.store[KEY]).toEqual({ max: 2, used: 0 });
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  function uExpendChip(name) {
+    return uRow(name).querySelector('.mc-dice-link-legendary');
+  }
+
+  it('MA-1658: Umbral Strike Expend-Legendary chip routes the delegate — spends 2→1, rollAttack +10 "Umbral Strike (Grave Strike attack)", Grave Strike damage legs ride, zero console.error', async () => {
+    renderUmbralLord({ max: 2, used: 0 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(2 left)');
+    const chip = uExpendChip('Umbral Strike');
+    expect(chip).not.toBe(null);
+    expect(chip.textContent).toContain('Expend Legendary');
+    fireEvent.click(chip);
+    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 }));
+    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
+    expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Umbral Strike (Grave Strike attack)');
+    expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(10);
+    const opts = ROLLERS.rollAttack.mock.calls[0][2];
+    expect(opts.autoDamageFormula).toBe('1d8 + 5');
+    expect(opts.damageType).toBe('Slashing');
+    expect(opts.autoDamageSecondaryFormula).toBe('3d8');
+    expect(opts.autoDamageSecondaryDamageType).toBe('Necrotic');
+    expect(opts.targetName).toBe('Bandit 1');
+    expect(opts.saveDc).toBeNull();
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Umbral Strike/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Umbral Strike/);
+    expect(spend.description).toMatch(/1 of 2 left/);
+    expect(consoleSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
+  });
+
+  it('MA-1658: same-boundary Umbral Strike refire refuses on the turn latch, counter held, zero extra rollAttack', async () => {
+    renderUmbralLord({ max: 2, used: 0 });
+    fireEvent.click(uExpendChip('Umbral Strike'));
+    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 }));
+    ROLLERS.rollAttack.mockClear();
+    setPopupHtml.mockClear();
+    fireEvent.click(uExpendChip('Umbral Strike'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Only one legendary action');
+    expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it('MA-1658: exhausted (2/2) Umbral Strike press refuses honestly — popup + legendary_use_refused, zero spend, zero roll', async () => {
+    renderUmbralLord({ max: 2, used: 2 });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
+    fireEvent.click(uExpendChip('Umbral Strike'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 });
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(consoleSpy).not.toHaveBeenCalled();
   });
 });
