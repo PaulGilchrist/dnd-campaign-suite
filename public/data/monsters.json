@@ -61373,7 +61373,23 @@
       {
         "name": "Animate Trees",
         "description": "The treant magically animates up to two trees it can see within 60 feet of itself. Each tree uses the Treant stat block, except it has Intelligence and Charisma scores of 1, it can't speak, and it lacks this action. The tree takes its turn immediately after the treant on the same Initiative count, and it obeys the treant. A tree remains animate for 1 day or until it dies, the treant dies, or it is more than 120 feet from the treant. The tree then takes root if possible.",
-        "uses": "1/Day"
+        "automation": {
+          "type": "monster_summon",
+          "options": [
+            {
+              "monster": "treant",
+              "stat_override": {
+                "int": 1,
+                "cha": 1
+              }
+            }
+          ],
+          "count": 2,
+          "range_ft": 60,
+          "duration_minutes": 1440
+        },
+        "uses": 1,
+        "maxUses": 1
       }
     ],
     "bonus_actions": [],

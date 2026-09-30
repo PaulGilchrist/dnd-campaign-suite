@@ -203,6 +203,56 @@ describe('MA-0759 Galib Duhr Animate Boulders chip', () => {
   });
 });
 
+// MA-1604: Treant "Animate Trees" (actions[3]) — MA-0757 byte-twin. The
+// formerly zero-affordance row (uses:"1/Day" STRING rendering NOTHING,
+// §240) now authors monster_summon automation with the self-block option +
+// stat_override int/cha 1, constant count:2, 60 ft range, 1-day duration;
+// numeric uses/maxUses arm the 1/Day counter. Its Slam attack row arms no
+// summon chip.
+const treant = monsters.find(m => m.index === 'treant');
+const TREANT_ANIMATE_ROW = treant.actions.find(a => a.name === 'Animate Trees');
+
+describe('MA-1604 Treant Animate Trees chip', () => {
+  it('arms a clickable summon chip counting 1/Day with honest tree tooltip', () => {
+    const { container, onSummonRow } = renderRow(TREANT_ANIMATE_ROW);
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute('role')).toBe('button');
+    expect(chip.textContent).toContain('Summon');
+    expect(chip.textContent).toContain('(1/Day · 1 left)');
+    const title = chip.getAttribute('title');
+    expect(title).toContain('treant');
+    expect(title).toContain('count 2');
+    expect(title).toContain('60 ft');
+    expect(title).toContain('1440 min');
+    expect(title).not.toContain('demon');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+    expect(onSummonRow.mock.calls[0][0]).toBe(TREANT_ANIMATE_ROW);
+  });
+
+  it('spent row: 0 left + spent class, stays clickable for honest refusal', () => {
+    const { container, onSummonRow } = renderRow(TREANT_ANIMATE_ROW, { spellUsesUsed: { 'Animate Trees': 1 } });
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip.className).toContain('mc-dice-link-spell-spent');
+    expect(chip.textContent).toContain('0 left');
+    fireEvent.click(chip);
+    expect(onSummonRow).toHaveBeenCalledTimes(1);
+  });
+
+  it('incapacitated treant: chip inert', () => {
+    const { container, onSummonRow } = renderRow(TREANT_ANIMATE_ROW, { attackerCannotAct: true });
+    fireEvent.click(container.querySelector('.mc-dice-link-summon'));
+    expect(onSummonRow).not.toHaveBeenCalled();
+  });
+
+  it('Slam attack row arms no summon chip', () => {
+    const slam = treant.actions.find(a => a.name === 'Slam');
+    const { container } = renderRow(slam);
+    expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
+  });
+});
+
 // MA-1215: Myconid Sovereign "Animating Spores" — the junk "+0" chip is dead
 // (attack_bonus:null); the row now arms the canonical MA-0648 summon chip.
 // Recharge-3 (no uses/maxUses) drives the spent class from the live recharge

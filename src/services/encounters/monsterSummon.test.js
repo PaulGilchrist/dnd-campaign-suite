@@ -884,3 +884,108 @@ describe('MA-1215 legacy twins byte-unchanged', () => {
     }
   });
 });
+
+// MA-1604: Treant "Animate Trees" (actions[3]) — MA-0757 byte-twin on the
+// same monster_summon seam. Formerly a uses-STRING zero-affordance row
+// ("uses":"1/Day" renders NOTHING and gates NOTHING, §240). Now authored
+// automation {monster_summon, options:[treant @ stat_override int/cha 1],
+// count:2 (RAW "up to two" adjudicable max, no chooser seam), range 60,
+// duration 1 day = 1440 min} + numeric uses/maxUses on the MA-0020 gate.
+// SELF-SUMMON guard strips Animate Trees from every spawned copy ("lacks
+// this action", RAW) — animated trees can never chain-animate.
+const treant = monstersData.find(m => m.index === 'treant');
+const TREANT_ANIMATE_ROW = treant.actions[3];
+
+describe('MA-1604 treant Animate Trees data', () => {
+  it('authors monster_summon automation + numeric count + numeric 1/Day gate; uses-string removed', () => {
+    expect(TREANT_ANIMATE_ROW.name).toBe('Animate Trees');
+    expect(TREANT_ANIMATE_ROW.automation).toEqual({
+      type: 'monster_summon',
+      options: [{ monster: 'treant', stat_override: { int: 1, cha: 1 } }],
+      count: 2,
+      range_ft: 60,
+      duration_minutes: 1440,
+    });
+    expect(TREANT_ANIMATE_ROW.uses).toBe(1);
+    expect(TREANT_ANIMATE_ROW.maxUses).toBe(1);
+    expect(typeof TREANT_ANIMATE_ROW.uses).toBe('number');
+    expect(TREANT_ANIMATE_ROW.usage).toBeUndefined();
+    expect(isMonsterSummonRow(TREANT_ANIMATE_ROW)).toBe(true);
+  });
+
+  it('chance-less summon is guaranteed: adjudication never flips a d100', () => {
+    const rollFn = vi.fn(() => 50);
+    expect(adjudicateSummonAttempt(TREANT_ANIMATE_ROW.automation.options, rollFn)).toMatchObject({ monster: 'treant', roll: null, success: true, chance: null });
+    expect(rollFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('MA-1604 constant-count self-summon resolution', () => {
+  function makeTreantDeps(cs, uses = {}) {
+    const deps = makeDeps({ cs, uses });
+    deps.monsters = [treant];
+    deps.rollExpression = vi.fn(() => ({ total: 99, rolls: [99], modifier: 99, formula: 'must-not-roll' }));
+    return deps;
+  }
+
+  const TREANT_CS = () => ({ round: 1, creatures: [{ name: 'Treant 1', type: 'npc', monsterIndex: 'treant', initiative: '19', currentHp: 138, maxHp: 138 }] });
+
+  it('spawns TWO treants (constant count, ZERO dice rolled) right after the caster; each lacks Animate Trees, Int/Cha 1 stamped, te @1440_minutes; no coin-flip log; summons+ability_use logged', async () => {
+    const deps = makeTreantDeps(TREANT_CS());
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: TREANT_ANIMATE_ROW,
+      monsterName: 'Treant 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: {},
+      deps,
+    });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ resolved: true, countRoll: null, remaining: 0 });
+    expect(result.summonedNames).toEqual(['Treant', 'Treant 2']);
+    const copies = deps.store.cs.creatures.filter(c => c.name !== 'Treant 1');
+    expect(copies.map(c => c.name)).toEqual(['Treant', 'Treant 2']);
+    for (const b of copies) {
+      expect(b).toMatchObject({ type: 'npc', monsterIndex: 'treant', summonedBy: 'Treant 1', summonSource: 'monster_ability', ac: 16, maxHp: 138, currentHp: 138, initiative: '18.9' });
+      expect(b.ability_scores).toMatchObject({ str: 23, dex: 8, con: 21, int: 1, wis: 16, cha: 1 });
+      expect(b.actions.map(a => a.name)).toEqual(['Multiattack', 'Slam', 'Hail of Bark']);
+      expect(b.actions.some(a => a.automation?.type === 'monster_summon')).toBe(false);
+    }
+    expect(deps.registerTargetEffect).toHaveBeenCalledTimes(2);
+    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Treant', 'summoned', 'Treant 1', { duration: '1440_minutes' });
+    expect(deps.store.uses).toEqual({ 'Animate Trees': 1 });
+    expect(deps.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
+    const spawnLog = deps.logs.find(e => e.type === 'summons');
+    expect(spawnLog.summonedCreatures).toEqual(['Treant', 'Treant 2']);
+    expect(spawnLog.summonCount).toBe(2);
+    expect(spawnLog.description).toContain('60 ft');
+    expect(spawnLog.description).toContain('remain 1440 minutes');
+    const spendLog = deps.logs.find(e => e.type === 'ability_use');
+    expect(spendLog.description).toContain('Animate Trees');
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Treant'));
+  });
+
+  it('1/Day gate: refire refused with animate_trees_refused, zero spend/spawn/te', async () => {
+    const deps = makeTreantDeps(TREANT_CS(), { 'Animate Trees': 1 });
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: TREANT_ANIMATE_ROW,
+      monsterName: 'Treant 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: { 'Animate Trees': 1 },
+      deps,
+    });
+    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(deps.setCombatSummary).not.toHaveBeenCalled();
+    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(deps.store.cs.creatures).toHaveLength(1);
+    expect(deps.logs.find(e => e.automationType === 'animate_trees_refused')).toBeTruthy();
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
+  });
+});
