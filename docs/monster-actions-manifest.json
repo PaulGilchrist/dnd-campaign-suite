@@ -27764,7 +27764,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The area within 1 mile of the lair is Lightly Obscured by a persistent, creeping fog. The vampire and any creatures of its choice are unaffected by the fog.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1649-nightbringer-mists.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1650",

@@ -4751,3 +4751,80 @@ describe('MA-1209 mummy-lord spellcasting-pain save-row data lock', () => {
     expect(mummyLord.lair_actions[1].save_dc).toBeUndefined();
   });
 });
+
+// MA-1649: Vampire Nightbringer lair_actions[2] "Mists" was a name+description-only
+// dict — named but ZERO affordance (live: whole-card .mc-dice-link-lair count 0,
+// click probes ×3 zero popups zero log delta; isLairRowClickable false, MA-0024
+// static carve-out does not cover named rows). The lightly-obscured fog te lane is
+// LIVE and REGISTERED (lair_fog_cloud, MA-0043 zoneOnly picker), and the four fog
+// lair twins (adult/ancient-bronze, ancient-silver fog + ancient-white freezing
+// fog) all ship zone dicts — silence was the family defect. Data-only fix: zone
+// dict authored as LAST key, MA-0085/MA-0254 byte-shape (radius_ft 5280 = the
+// RAW 1-mile region, no_save, noun fog, effect_key lair_fog_cloud, honest
+// advisory). 1-mile radius abstraction, persistent-until-lair-moves cadence and
+// vampire-choice immunity stay advisory residuals (no consumers — MA-0378 class).
+describe('MA-1649 vampire-nightbringer mists fog zone data lock', () => {
+  const nightbringer = monstersData.find(m => m.index === 'vampire-nightbringer');
+  const mists = nightbringer.lair_actions[2];
+
+  it('[2] is the named Mists row and is now CLICKABLE via a save-less zone affordance', () => {
+    expect(mists.name).toBe('Mists');
+    expect(isLairRowClickable(mists)).toBe(true);
+    expect(lairRowAffordance(mists)).toBe('zone');
+    expect(mists.save_dc).toBeUndefined();
+    expect(mists.attack_bonus).toBeUndefined();
+    expect(mists.advisory).toBeUndefined();
+  });
+
+  it('zone dict: effect_key lair_fog_cloud, no_save true, radius 5280 (1 mile), noun fog, key order twins adult-bronze', () => {
+    expect(mists.zone.effect_key).toBe('lair_fog_cloud');
+    expect(mists.zone.no_save).toBe(true);
+    expect(mists.zone.radius_ft).toBe(5280);
+    expect(mists.zone.noun).toBe('fog');
+    expect(mists.zone.advisory).toMatch(/GM-enforced/i);
+    expect(mists.zone.advisory).toMatch(/lightly obscured/i);
+    expect(Object.keys(mists.zone)).toEqual(Object.keys(monstersData.find(m => m.index === 'adult-bronze-dragon').lair_actions[0].zone));
+    expect(Object.keys(mists)).toEqual(['name', 'description', 'zone']);
+  });
+
+  it('press routes handleZone(action) ONCE — no save, no damage, no advisory/refusal log', async () => {
+    const logs = [];
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: mists,
+      monsterName: 'Vampire Nightbringer 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+      saveDamageFormula: null,
+      saveConditions: [],
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledTimes(1);
+    expect(handleZone.mock.calls[0][0]).toBe(mists);
+    expect(logs).toHaveLength(0);
+  });
+
+  it('[0]/[1] siblings byte-untouched by MA-1649 (name+description-only static rows stay MA-0024 inert)', () => {
+    expect(nightbringer.lair_actions[0]).toEqual({
+      name: 'Children of the Night',
+      description: 'The vampire exerts influence over the animals in its domain. From dusk until dawn, Medium or smaller Beasts have the Charmed condition while within 1 mile of the lair.',
+    });
+    expect(nightbringer.lair_actions[1]).toEqual({
+      name: 'Looming Shadows',
+      description: 'Shadows within 1 mile of the lair seem to move as if alive. Any creature (excluding the vampire and its allies) that finishes a Short Rest while within 1 mile of the lair must succeed on a DC 15 Wisdom saving throw or gain no benefit from that rest.',
+    });
+    expect(isLairRowClickable(nightbringer.lair_actions[0])).toBe(false);
+    expect(isLairRowClickable(nightbringer.lair_actions[1])).toBe(false);
+  });
+
+  it('no new te registered — lair_fog_cloud is the single pre-existing registration', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    expect(getEffectDefinition('lair_fog_cloud').group).toBe('Lair');
+    expect(getEffectDefinition('lair_nightbringer_mists')).toBeFalsy();
+  });
+});

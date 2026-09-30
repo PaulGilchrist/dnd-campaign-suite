@@ -63274,7 +63274,14 @@
       },
       {
         "name": "Mists",
-        "description": "The area within 1 mile of the lair is Lightly Obscured by a persistent, creeping fog. The vampire and any creatures of its choice are unaffected by the fog."
+        "description": "The area within 1 mile of the lair is Lightly Obscured by a persistent, creeping fog. The vampire and any creatures of its choice are unaffected by the fog.",
+        "zone": {
+          "radius_ft": 5280,
+          "no_save": true,
+          "noun": "fog",
+          "effect_key": "lair_fog_cloud",
+          "advisory": "1-mile lair region modeled as a GM-positioned radius picker (no 1-mile token scale; gridless map). Lightly obscured has no obscurement/light-level consumer in this engine — GM-enforced. The vampire and creatures of its choice are unaffected — GM-enforced (no selective-immunity consumer). Persists until the vampire dies or moves its lair — GM-enforced (no initiative-20 lair seam / persistent-lair-state consumer)."
+        }
       }
     ],
     "traits": [
