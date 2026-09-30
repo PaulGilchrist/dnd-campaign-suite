@@ -27153,7 +27153,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 19 (2d12 + 6) Piercing damage. If the target is Huge or smaller and the triceratops moved 20+ feet straight toward it immediately before the hit, the target takes an extra 9 (2d8) Piercing damage and has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1610-gore-charge-rider.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1611",
