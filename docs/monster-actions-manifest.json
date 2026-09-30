@@ -27528,7 +27528,7 @@
       "saveType": "Charisma",
       "saveEffect": "Targets of the spell's saving throw use the spell save DC 14. Various effects depending on the spell cast: Detect Evil and Good, Druidcraft, Calm Emotions (DC 14 Wisdom save), Dispel Evil and Good, Entangle (DC 14 Dexterity save for half Bludgeoning damage), Pass without Trace (self only), Word of Recall.",
       "description": "The unicorn casts one of the following spells, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 14): At Will: Detect Evil and Good, Druidcraft; 1/Day Each: Calm Emotions, Dispel Evil and Good, Entangle, Pass without Trace, Word of Recall",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1634-unicorn-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1635",
