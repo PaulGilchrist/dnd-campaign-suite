@@ -63521,7 +63521,10 @@
         "attack_bonus": 10,
         "range": "120 ft.",
         "damage_dice_primary": "2d10 + 5",
-        "damage_type_primary": "Necrotic"
+        "damage_type_primary": "Necrotic",
+        "hit_conditions": [
+          "poisoned"
+        ]
       },
       {
         "name": "Hunger of Hadar",

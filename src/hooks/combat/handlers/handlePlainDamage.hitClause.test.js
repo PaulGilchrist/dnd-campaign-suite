@@ -4977,3 +4977,117 @@ describe('MA-1651 Vampire Spawn Claw grappled-on-hit grant (two-field DATA fix)'
         expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
     });
 });
+
+const VAMPIRE_UMBRAL_LORD = monsters.find(m => m.index === 'vampire-umbral-lord');
+const UMBRAL_SICKENING_RAY_ACTION = VAMPIRE_UMBRAL_LORD.actions.find(a => a.name === 'Sickening Ray');
+
+describe('MA-1655 Vampire Umbral Lord Sickening Ray poisoned-on-hit hit-clause', () => {
+    const deps = {
+        characterName: 'Vampire Umbral Lord 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Vampire Umbral Lord 1', computedStats: { armorClass: 16 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: 984, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    it('MA-1655 data-lock: authors hit_conditions:["poisoned"] after damage_type_primary (MA-0984 Trash Lob key-order byte-twin), no escape_dc', () => {
+        expect(UMBRAL_SICKENING_RAY_ACTION.attack_bonus).toBe(10);
+        expect(UMBRAL_SICKENING_RAY_ACTION.range).toBe('120 ft.');
+        expect(UMBRAL_SICKENING_RAY_ACTION.damage_dice_primary).toBe('2d10 + 5');
+        expect(UMBRAL_SICKENING_RAY_ACTION.damage_type_primary).toBe('Necrotic');
+        expect(UMBRAL_SICKENING_RAY_ACTION.hit_conditions).toEqual(['poisoned']);
+        const keys = Object.keys(UMBRAL_SICKENING_RAY_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(UMBRAL_SICKENING_RAY_ACTION.escape_dc).toBeUndefined();
+        expect(UMBRAL_SICKENING_RAY_ACTION.save_dc).toBeUndefined();
+        expect(UMBRAL_SICKENING_RAY_ACTION.save_type).toBeUndefined();
+        expect(UMBRAL_SICKENING_RAY_ACTION.save_effect).toBeUndefined();
+        expect(UMBRAL_SICKENING_RAY_ACTION.hit_target_effect).toBeUndefined();
+    });
+
+    it('description byte-unchanged and carries the canonical Poisoned word + duration prose (§87 advisory rider)', () => {
+        expect(UMBRAL_SICKENING_RAY_ACTION.description).toBe("Ranged Attack Roll: +10, range 120 ft. Hit: 16 (2d10 + 5) Necrotic damage, and the target has the Poisoned condition until the start of the vampire's next turn.");
+    });
+
+    it('Grave Strike twin byte-unchanged: one-field fix never touched actions[1] (§22 same-monster anchor caution)', () => {
+        const grave = VAMPIRE_UMBRAL_LORD.actions[1];
+        expect(grave.name).toBe('Grave Strike');
+        expect(grave.attack_bonus).toBe(10);
+        expect(grave.damage_dice_secondary).toBe('3d8');
+        expect(grave.damage_type_secondary).toBe('Necrotic');
+        expect(grave.hit_conditions).toBeUndefined();
+    });
+
+    it('builds a poisoned-only clause with no escape DC', () => {
+        expect(buildHitConditionClause(UMBRAL_SICKENING_RAY_ACTION)).toEqual({
+            conditions: ['poisoned'],
+            escapeDc: null,
+            attackName: 'Sickening Ray',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Poisoned + attacker-source meta + condition log on a resolved Sickening Ray hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Sickening Ray', formula: '2d10 + 5', total: 15, rolls: [8, 2], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Necrotic',
+            attackerName: 'Vampire Umbral Lord 1',
+            hitClause: buildHitConditionClause(UMBRAL_SICKENING_RAY_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['poisoned']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({ poisoned: { source: 'Vampire Umbral Lord 1' } });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Poisoned',
+            reason: 'Sickening Ray (escape DC —)',
+        }));
+    });
+
+    it('§87 duration residual: hit_conditions lane adds NO addExpiration clock (GM-enforced expiry precedent MA-0984/MA-0763)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Sickening Ray', formula: '2d10 + 5', total: 15, rolls: [8, 2], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Necrotic',
+            attackerName: 'Vampire Umbral Lord 1',
+            hitClause: buildHitConditionClause(UMBRAL_SICKENING_RAY_ACTION),
+        } });
+
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Sickening Ray', formula: '2d10 + 5', total: 15, rolls: [8, 2], modifier: 5, context: {
+            targetName: 'Bandit 1',
+            damageType: 'Necrotic',
+            attackerName: 'Vampire Umbral Lord 1',
+            hitClause: buildHitConditionClause(UMBRAL_SICKENING_RAY_ACTION),
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

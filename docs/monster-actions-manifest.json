@@ -27869,7 +27869,7 @@
         "poisoned"
       ],
       "description": "Ranged Attack Roll: +10, range 120 ft. Hit: 16 (2d10 + 5) Necrotic damage, and the target has the Poisoned condition until the start of the vampire's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1655-sickening-ray-poison.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1656",
