@@ -61588,6 +61588,7 @@
         "attack_bonus": 3,
         "reach": "5 ft.",
         "damage_dice_primary": "1d6 + 1",
+        "damage_dice_two_handed": "1d8 + 1",
         "damage_type_primary": "piercing"
       }
     ],
