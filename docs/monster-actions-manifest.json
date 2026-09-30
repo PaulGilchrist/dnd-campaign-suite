@@ -27642,7 +27642,7 @@
       "recharge": false,
       "uses": 1,
       "description": "The vampire moves up to half its Speed, and it makes one Grave Strike attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1641-deathless-strike.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1642",

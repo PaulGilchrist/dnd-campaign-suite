@@ -14,8 +14,9 @@
 // carrying the obey-clause honestly as GM-enforced advisory MA-0058 family),
 // per-child uses/recharge dropped §165 (header owns the pool) — mirrored from
 // the VERIFIED unicorn disk state post-MA-1635/1636 where BOTH children carry
-// no uses/recharge. Deathless Strike stays mechanic-untouched (MA-1641 owns
-// its delegate seam — no delegates_to authored here).
+// no uses/recharge. Deathless Strike's delegates_to:"Grave Strike" is the
+// MA-1641 follow-up fix (silent-burn delegate lane, Unicorn MA-1635 twin) —
+// its pin lives in MonsterCardModal.legendary-uses-vampire-ma1641.test.jsx.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -162,13 +163,20 @@ describe('MA-1640 monsters.json data lock: vampire legendary header + Beguile nu
     }
   });
 
-  it('Deathless Strike mechanic stays untouched (MA-1641 owns its delegate seam)', () => {
+  it('Deathless Strike delegates_to Grave Strike (MA-1641 — pin inverted from MA-1640 untouched-state §216)', () => {
     const ds = row('Deathless Strike');
     expect(ds.description).toBe('The vampire moves up to half its Speed, and it makes one Grave Strike attack.');
-    expect(ds.delegates_to).toBeUndefined();
+    expect(ds.delegates_to).toBe('Grave Strike');
     expect(ds.save_dc).toBeUndefined();
     expect(ds.attack_bonus).toBeUndefined();
     expect(ds.advisory).toBeUndefined();
+    expect(ds.uses).toBeUndefined();
+    expect(ds.recharge).toBeUndefined();
+    const gs = vampire().actions.find(a => a.name === ds.delegates_to);
+    expect(gs.attack_bonus).toBe(9);
+    expect(gs.damage_dice_primary).toBe('1d8 + 4');
+    expect(gs.damage_dice_secondary).toBe('2d6');
+    expect(gs.damage_type_secondary).toBe('Necrotic');
   });
 
   it('until-next-turn cooldown prose rides Beguile (§204 owner latch)', () => {
