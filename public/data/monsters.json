@@ -62213,7 +62213,8 @@
         "attack_bonus": 10,
         "reach": "15 ft.",
         "damage_dice_primary": "4d8 + 7",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": ["prone"]
       }
     ],
     "bonus_actions": [],

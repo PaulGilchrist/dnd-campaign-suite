@@ -8,7 +8,8 @@
 // seam): hit_conditions:["grappled"] + escape_dc:17 placed after
 // damage_type_primary. Locks: disk row shape + key placement, clause arms
 // Grappled with escapeDc:17, damage/description fields byte-unchanged, the
-// "+10" attack chip stays live, no save fields on row, Tail row untouched.
+// "+10" attack chip stays live, no save fields on row; Tail row pin inverted
+// by MA-1621 (Tail now carries hit_conditions ["prone"], still no escape_dc).
 // "While Grappled → Restrained + Tail immunity" is the sustained-grapple
 // state machine with zero producers (§70) — GM-adjudicated residual; single
 // grappled grant is the ceiling, restrained must NOT join hit_conditions.
@@ -60,7 +61,7 @@ describe('MA-1620 disk fingerprint: tyrannosaurus-rex Bite grapple rider fix', (
 
   it('restrained NEVER joins hit_conditions (sustained-grapple state machine = §70 advisory)', () => {
     expect(BITE.hit_conditions).not.toContain('restrained');
-    expect(TAIL.hit_conditions).toBeUndefined();
+    expect(TAIL.hit_conditions).toEqual(['prone']);
     expect(TAIL.escape_dc).toBeUndefined();
   });
 
