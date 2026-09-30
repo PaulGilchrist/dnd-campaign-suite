@@ -27386,7 +27386,7 @@
       "saveType": "Intelligence",
       "saveEffect": "Targets of the spell's saving throw use the spell save DC 17. Various effects depending on the spell cast: Alter Self (self only), Clairvoyance, Detect Magic, Dimension Door, Fireball (DC 17 Intelligence save for half Fire damage), Wall of Fire (DC 17 Dexterity save for half Fire damage).",
       "description": "The ultroloth casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 17): At Will: Alter Self, Clairvoyance, Detect Magic; 1/Day Each: Dimension Door, Fireball (level 5 version), Wall of Fire",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1625-ultroloth-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1626",
