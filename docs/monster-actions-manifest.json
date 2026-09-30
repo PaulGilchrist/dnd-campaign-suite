@@ -27795,7 +27795,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (2d4 + 3) Slashing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13) from one of two claws.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1651-spawn-claw-grapple.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1652",

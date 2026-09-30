@@ -4870,3 +4870,110 @@ describe('MA-1437 Scarecrow Fearsome Claw frightened-on-hit grant (one-field DAT
     });
 });
 
+
+const VAMPIRE_SPAWN = monsters.find(m => m.index === 'vampire-spawn');
+const VAMPIRE_SPAWN_CLAW_ACTION = VAMPIRE_SPAWN.actions[1];
+const VAMPIRE_SPAWN_BITE_ACTION = VAMPIRE_SPAWN.actions[2];
+
+describe('MA-1651 Vampire Spawn Claw grappled-on-hit grant (two-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Vampire Spawn 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Vampire Spawn 1', computedStats: { armorClass: 16 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 989, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function clawContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Slashing',
+            attackerName: 'Vampire Spawn 1',
+            hitClause: buildHitConditionClause(VAMPIRE_SPAWN_CLAW_ACTION),
+        };
+    }
+
+    it('MA-1651 data-lock: disk row carries hit_conditions:["grappled"] + escape_dc:13 after damage_type_primary (MA-0010/MA-1274 byte-shape)', () => {
+        expect(VAMPIRE_SPAWN_CLAW_ACTION.name).toBe('Claw');
+        expect(VAMPIRE_SPAWN_CLAW_ACTION.attack_bonus).toBe(6);
+        expect(VAMPIRE_SPAWN_CLAW_ACTION.reach).toBe('5 ft.');
+        expect(VAMPIRE_SPAWN_CLAW_ACTION.damage_dice_primary).toBe('2d4 + 3');
+        expect(VAMPIRE_SPAWN_CLAW_ACTION.damage_type_primary).toBe('Slashing');
+        expect(VAMPIRE_SPAWN_CLAW_ACTION.hit_conditions).toEqual(['grappled']);
+        expect(VAMPIRE_SPAWN_CLAW_ACTION.escape_dc).toBe(13);
+        const keys = Object.keys(VAMPIRE_SPAWN_CLAW_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('hit_conditions') + 1);
+        expect(VAMPIRE_SPAWN_CLAW_ACTION.description).toContain('If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13) from one of two claws.');
+    });
+
+    it('builds the grappled clause with escape DC 13 (statblock STR 16/+3; escape DC 13 authored)', () => {
+        expect(VAMPIRE_SPAWN.ability_score_modifiers.str).toBe(3);
+        expect(buildHitConditionClause(VAMPIRE_SPAWN_CLAW_ACTION)).toEqual({
+            conditions: ['grappled'],
+            escapeDc: 13,
+            attackName: 'Claw',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + escape-meta + condition log on a resolved Claw hit (Bandit Medium = clean size-gate probe)', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claw', formula: '2d4 + 3', total: 10, rolls: [4, 3], modifier: 3, context: clawContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 13, ability: 'str', source: 'Vampire Spawn 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Grappled',
+            reason: 'Claw (escape DC 13)',
+        }));
+    });
+
+    it('Bite save row byte-unchanged: Claw hit-clause fix never touches the DC 14 Constitution save leg (§22 same-monster block-text anchor caution)', () => {
+        expect(VAMPIRE_SPAWN_BITE_ACTION.name).toBe('Bite');
+        expect(VAMPIRE_SPAWN_BITE_ACTION.save_dc).toBe(14);
+        expect(VAMPIRE_SPAWN_BITE_ACTION.save_type).toBe('Constitution');
+        expect(VAMPIRE_SPAWN_BITE_ACTION.hit_conditions).toBeUndefined();
+        expect(VAMPIRE_SPAWN_BITE_ACTION.escape_dc).toBeUndefined();
+        expect(buildHitConditionClause(VAMPIRE_SPAWN_BITE_ACTION)).toBeNull();
+    });
+
+    it('sustained-grapple state machine stays §59 zero-producer — no te/clock authored by the rider', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claw', formula: '2d4 + 3', total: 10, rolls: [4, 3], modifier: 3, context: clawContext() });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Claw', formula: '2d4 + 3', total: 10, rolls: [4, 3], modifier: 3, context: clawContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+});

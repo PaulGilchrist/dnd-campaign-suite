@@ -63377,7 +63377,9 @@
         "attack_bonus": 6,
         "reach": "5 ft.",
         "damage_dice_primary": "2d4 + 3",
-        "damage_type_primary": "Slashing"
+        "damage_type_primary": "Slashing",
+        "hit_conditions": ["grappled"],
+        "escape_dc": 13
       },
       {
         "name": "Bite",
