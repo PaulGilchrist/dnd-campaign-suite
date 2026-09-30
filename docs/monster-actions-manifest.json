@@ -28427,7 +28427,7 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 13 (3d6 + 3) Cold damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13), and it has the Restrained condition until the grapple ends.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1690-surge-grapple.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1691",

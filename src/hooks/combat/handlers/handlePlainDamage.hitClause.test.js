@@ -5467,3 +5467,126 @@ describe('MA-1688 Water Elemental Slam prone-on-hit grant (one-field DATA fix)',
         expect(addExpiration).not.toHaveBeenCalled();
     });
 });
+
+const WATER_WEIRD = monsters.find(m => m.index === 'water-weird');
+const WATER_WEIRD_SURGE_ACTION = WATER_WEIRD.actions[0];
+const GIANT_OCTOPUS = monsters.find(m => m.index === 'giant-octopus');
+const GIANT_OCTOPUS_TENTACLES_ACTION = GIANT_OCTOPUS.actions[0];
+
+describe('MA-1690 Water Weird Surge grapple+restrained-on-hit grant (two-field DATA fix)', () => {
+    const deps = {
+        characterName: 'Water Weird 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Water Weird 1', computedStats: { armorClass: 13 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 14, newHp: 985, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 999, maxHp: 999 }],
+        });
+    });
+
+    function surgeContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Cold',
+            attackerName: 'Water Weird 1',
+            hitClause: buildHitConditionClause(WATER_WEIRD_SURGE_ACTION),
+        };
+    }
+
+    it('MA-1690 data-lock: disk row carries hit_conditions:["grappled","restrained"] + escape_dc:13 trailing after damage_type_primary, numerics byte-unchanged', () => {
+        expect(WATER_WEIRD_SURGE_ACTION.name).toBe('Surge');
+        expect(WATER_WEIRD_SURGE_ACTION.attack_bonus).toBe(5);
+        expect(WATER_WEIRD_SURGE_ACTION.reach).toBe('10 ft.');
+        expect(WATER_WEIRD_SURGE_ACTION.damage_dice_primary).toBe('3d6 + 3');
+        expect(WATER_WEIRD_SURGE_ACTION.damage_type_primary).toBe('Cold');
+        expect(WATER_WEIRD_SURGE_ACTION.hit_conditions).toEqual(['grappled', 'restrained']);
+        expect(WATER_WEIRD_SURGE_ACTION.escape_dc).toBe(13);
+        const keys = Object.keys(WATER_WEIRD_SURGE_ACTION);
+        expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+        expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('hit_conditions') + 1);
+        expect(WATER_WEIRD_SURGE_ACTION.save_dc).toBeUndefined();
+        expect(WATER_WEIRD_SURGE_ACTION.save_type).toBeUndefined();
+        expect(WATER_WEIRD_SURGE_ACTION.save_effect).toBeUndefined();
+        expect(WATER_WEIRD_SURGE_ACTION.hit_target_effect).toBeUndefined();
+        expect(WATER_WEIRD_SURGE_ACTION.hit_condition_roll).toBeUndefined();
+        expect(WATER_WEIRD_SURGE_ACTION.description).toBe('Melee Attack Roll: +5, reach 10 ft. Hit: 13 (3d6 + 3) Cold damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13), and it has the Restrained condition until the grapple ends.');
+    });
+
+    it('giant-octopus Tentacles numeric-twin parity: identical hc pair + escape_dc 13 + attack_bonus 5 byte-shape placement', () => {
+        expect(GIANT_OCTOPUS_TENTACLES_ACTION.name).toBe('Tentacles');
+        expect(GIANT_OCTOPUS_TENTACLES_ACTION.attack_bonus).toBe(5);
+        expect(GIANT_OCTOPUS_TENTACLES_ACTION.hit_conditions).toEqual(['grappled', 'restrained']);
+        expect(GIANT_OCTOPUS_TENTACLES_ACTION.escape_dc).toBe(13);
+        expect(Object.keys(WATER_WEIRD_SURGE_ACTION).slice(6)).toEqual(Object.keys(GIANT_OCTOPUS_TENTACLES_ACTION).slice(6));
+    });
+
+    it('builds the grappled+restrained clause with escape DC 13 (statblock STR 17/+3 + PB 2)', () => {
+        expect(WATER_WEIRD.ability_score_modifiers.str).toBe(3);
+        expect(WATER_WEIRD.proficiency_bonus).toBe(2);
+        expect(buildHitConditionClause(WATER_WEIRD_SURGE_ACTION)).toEqual({
+            conditions: ['grappled', 'restrained'],
+            escapeDc: 13,
+            attackName: 'Surge',
+            targetEffect: null,
+        });
+    });
+
+    it('applies Grappled + Restrained + meta {dc:13, ability:str, source} + condition-applied log on a resolved Surge hit, damage paid byte-exact', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Surge', formula: '3d6 + 3', total: 14, rolls: [4, 4, 3], modifier: 3, context: surgeContext() });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['grappled', 'restrained']);
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2]).toMatchObject({
+            grappled: { dc: 13, ability: 'str', source: 'Water Weird 1' },
+            restrained: { dc: 13, ability: 'str', source: 'Water Weird 1' },
+        });
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Grappled, Restrained',
+            reason: 'Surge (escape DC 13)',
+        }));
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    });
+
+    it('miss-zero: unresolved hit writes no condition state', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Surge', formula: '3d6 + 3', total: 14, rolls: [4, 4, 3], modifier: 3, context: surgeContext() });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditions', expect.anything(), 'test-campaign');
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign');
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('§70 advisories documented: size-gate admits Large vs RAW Medium-or-smaller; "until the grapple ends" retain-clause is fixed-duration meta — no te/clock authored by the lane', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Surge', formula: '3d6 + 3', total: 14, rolls: [4, 4, 3], modifier: 3, context: surgeContext() });
+
+        // Consumer gate isLargeOrSmallerTarget admits Large vs RAW "Medium or
+        // smaller" (§1141 residual, MA-1688 twin precedent — Medium Bandit is
+        // the clean probe). Grapple state-machine zero consumers (§70):
+        // "Restrained until the grapple ends" lands as fixed-duration meta
+        // like all grapple-lane twins; pure hit_conditions lane carries NO
+        // addExpiration clock and NO te.
+        expect(WATER_WEIRD.size).toBe('Large');
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+    });
+});

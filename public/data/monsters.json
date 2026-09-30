@@ -64909,7 +64909,9 @@
         "attack_bonus": 5,
         "reach": "10 ft.",
         "damage_dice_primary": "3d6 + 3",
-        "damage_type_primary": "Cold"
+        "damage_type_primary": "Cold",
+        "hit_conditions": ["grappled", "restrained"],
+        "escape_dc": 13
       }
     ],
     "bonus_actions": [],
