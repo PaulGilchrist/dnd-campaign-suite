@@ -28281,7 +28281,7 @@
       "actionType": "other",
       "trigger": "The warrior is hit by an attack roll.",
       "description": "The warrior adds 4 to its AC against that attack, possibly causing it to miss. On a miss, the warrior can make one Greatsword or Longbow attack against the attacker.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1681-counterattack.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1682",

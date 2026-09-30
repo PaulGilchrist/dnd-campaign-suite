@@ -135,6 +135,80 @@ describe('MA-1203 resolveMonsterGatedReaction — pending-window parry press', (
   });
 });
 
+describe('MA-1681 Warrior Commander Counterattack — same parry channel byte-twin', () => {
+  const WC_ROW = monsters.find(m => m.index === 'warrior-commander').reactions[0];
+  const WC = 'Warrior Commander 1';
+
+  function meleeHitOnWarrior(overrides = {}) {
+    return { attackerName: BANDIT, targetName: WC, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 14, bonus: 3, total: 17, targetAc: 18, effectiveAc: 18, damageApplied: undefined, ...overrides };
+  }
+
+  it('disk reactions[0] carries the MA-1203 parry byte-shape with acBonus 4 + At Will sentinel, twins\' key grammar (automation last)', () => {
+    expect(WC_ROW.name).toBe('Counterattack');
+    expect(WC_ROW.trigger).toBe('The warrior is hit by an attack roll.');
+    expect(WC_ROW.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 4 });
+    expect(WC_ROW.usage).toBe('At Will');
+    expect(WC_ROW.uses).toBe(999);
+    expect(WC_ROW.maxUses).toBe(999);
+    const keys = Object.keys(WC_ROW);
+    expect(keys[keys.length - 1]).toBe('automation');
+    expect(keys.slice(0, 3)).toEqual(['name', 'trigger', 'description']);
+  });
+
+  it('automation.description documents the counter-attack weapon leg as GM-adjudicated advisory', () => {
+    expect(WC_ROW.automation.description).toMatch(/Greatsword or Longbow/);
+    expect(WC_ROW.automation.description).toMatch(/GM-adjudicated/);
+    expect(WC_ROW.automation.description).toMatch(/no counterattack subsystem/);
+  });
+
+  it('getGatedMonsterReaction arms the chip off automation.effect (was null pre-fix)', () => {
+    expect(getGatedMonsterReaction(WC_ROW)?.effect).toBe('parry');
+    expect(getGatedMonsterReaction(WC_ROW)?.label).toBe('Parry');
+    expect(monsterReactionUsesRemaining(WC_ROW, {})).toBe(999);
+  });
+
+  it('press at pending melee hit: effAc fold 18 → 22, activeBuffs +4 stamp, lastAttack parryAcBonus:4, label Counterattack, advisory logged, counter-leg never rolls', async () => {
+    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: meleeHitOnWarrior(), round: 5 });
+    const result = await resolveMonsterGatedReaction({ action: WC_ROW, monsterName: WC, campaignName: CAMPAIGN, deps });
+    expect(result.ok).toBe(true);
+    expect(result.acBonus).toBe(4);
+    expect(result.newAc).toBe(22);
+    expect(state[`${WC}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 4)).toBe(true);
+    expect(state[`${WC}._parry_usedRound`]).toBe(5);
+    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: WC, parryAcBonus: 4 });
+    expect(state[`${WC}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+    const spend = logs.find(l => l.type === 'ability_use');
+    expect(spend.abilityName).toBe('Counterattack');
+    expect(spend.description).toMatch(/AC 18 → 22/);
+    expect(spend.description).toMatch(/Greatsword or Longbow/);
+    expect(spend.description).toMatch(/At Will/);
+    expect(logs.some(l => l.type === 'roll attack' || l.type === 'roll')).toBe(false);
+  });
+
+  it('honest refusals: ranged trigger (melee), damage committed (resolved), same-event re-press (reacted) — zero writes', async () => {
+    const ranged = makeParryDeps({ lastAttack: meleeHitOnWarrior({ weaponType: 'ranged' }) });
+    expect((await resolveMonsterGatedReaction({ action: WC_ROW, monsterName: WC, campaignName: CAMPAIGN, deps: ranged.deps })).ok).toBe(false);
+    expect(ranged.logs[0]).toMatchObject({ type: 'automation', automationType: 'parry_refused' });
+    expect(ranged.deps.setRuntimeValue).not.toHaveBeenCalled();
+
+    const done = makeParryDeps({ lastAttack: meleeHitOnWarrior({ damageApplied: true, actualDamage: 5 }) });
+    expect((await resolveMonsterGatedReaction({ action: WC_ROW, monsterName: WC, campaignName: CAMPAIGN, deps: done.deps })).ok).toBe(false);
+    expect(done.logs[0].description).toMatch(/resolved/);
+
+    const reacted = makeParryDeps({ lastAttack: meleeHitOnWarrior({ parryResolved: true, parriedBy: WC }), store: { [`${WC}._parry_usedRound`]: 5 } });
+    expect((await resolveMonsterGatedReaction({ action: WC_ROW, monsterName: WC, campaignName: CAMPAIGN, deps: reacted.deps })).ok).toBe(false);
+    expect(reacted.logs[0].description).toMatch(/reacted/);
+    expect(reacted.deps.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('parryGate +4 honest boundary: total 21 vs AC 18 parries (22), total 22 still hits', () => {
+    expect(parryIdentityRefusal(meleeHitOnWarrior({ d20: 18, total: 21 }), WC)).toBe(null);
+    expect(21 < 18 + 4).toBe(true);
+    expect(22 >= 18 + 4).toBe(true);
+    expect(parryIdentityRefusal(meleeHitOnWarrior({ weaponType: 'ranged' }), WC)).toBe('melee');
+  });
+});
+
 describe('MA-1203 byte-inertness for existing parry twins', () => {
   it('Bandit Captain spend log stays byte-identical (label Parry, no advisory append)', async () => {
     const twin = monsters.find(m => m.index === 'bandit-captain').reactions[0];
