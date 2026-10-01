@@ -7,8 +7,12 @@
 // apply): chip renders named "Fog Cloud" (.mc-dice-link-lair) and clicks
 // route to the CLA-325 advisory record — ability_use "casts fog cloud" +
 // initiative-20 GM-enforced popup — NO picker, NO save, NO damage, NO
-// zone te. Sibling [1] (MA-1803) stays the nameless description-only
-// dict: row renders static, zero affordance (FALSE-pin).
+// zone te. Sibling [1] (MA-1803) was the nameless description-only dict
+// (FALSE-pin) — MA-1803 promotes it to {name:"Rolling Fog",
+// advisory:"fog_cloud", description}: census widens 1→2 named chips, both
+// advisory lane (duplicate advisory key OK — consumer keys by action.name,
+// MA-1779), click logs ability_use "Rolling Fog", still NO picker/save/
+// damage/zone.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -106,27 +110,40 @@ beforeEach(() => {
 });
 
 describe('MA-1802 young-silver-dragon fog cloud lair chip lock', () => {
-  it('lair block renders EXACTLY one named chip "Fog Cloud" (was zero — bare string inert)', () => {
+  it('lair block renders two named advisory chips "Fog Cloud" + "Rolling Fog" (MA-1803 widened census 1→2)', () => {
     renderDragon();
     const chips = lairChips();
-    expect(chips.map(c => c.textContent.trim())).toEqual(['Fog Cloud']);
-    expect(chips[0].getAttribute('role')).toBe('button');
-    expect(chips[0].getAttribute('tabindex')).toBe('0');
-    expect(chips[0].getAttribute('title')).toMatch(/Lair action — Fog Cloud/);
-    expect(chips[0].textContent).not.toMatch(/DC/);
+    expect(chips.map(c => c.textContent.trim())).toEqual(['Fog Cloud', 'Rolling Fog']);
+    chips.forEach((chip, i) => {
+      expect(chip.getAttribute('role')).toBe('button');
+      expect(chip.getAttribute('tabindex')).toBe('0');
+      expect(chip.getAttribute('title')).toMatch(new RegExp(`Lair action — ${i === 0 ? 'Fog Cloud' : 'Rolling Fog'}`));
+      expect(chip.textContent).not.toMatch(/DC/);
+    });
   });
 
-  it('sibling [1] MA-1803 FALSE-pin: row renders static, zero affordance', () => {
+  it('sibling [1] MA-1803 pin INVERTED: row renders own "Rolling Fog" advisory chip, click logs ability_use', async () => {
     renderDragon();
     const title = Array.from(document.querySelectorAll('h5.mc-section-title')).find(h => h.textContent.includes('Lair Actions'));
     const rows = Array.from(title.nextElementSibling.querySelectorAll('.mc-action'));
     expect(rows).toHaveLength(2);
     const sib = rows[1];
-    expect(sib.querySelectorAll('.mc-dice-link-lair, .mc-dice-link, [role=button], button, i')).toHaveLength(0);
-    expect(sib.querySelector('strong')).toBeNull();
-    fireEvent.click(sib.querySelector('span'));
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(ROLLERS.setPopupHtml).not.toHaveBeenCalled();
+    const sibChips = sib.querySelectorAll('.mc-dice-link-lair');
+    expect(sibChips).toHaveLength(1);
+    expect(sibChips[0].textContent.trim()).toBe('Rolling Fog');
+    expect(sib.querySelector('strong')?.textContent).toMatch(/Rolling Fog/);
+    fireEvent.click(sibChips[0]);
+    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.characterName).toBe('Young Silver Dragon 1');
+    expect(entry.abilityName).toBe('Rolling Fog');
+    expect(entry.description).toMatch(/Rolling Fog/);
+    expect(entry.description).toMatch(/casts fog cloud/i);
+    expect(entry.description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(entry.description).not.toMatch(/save DC/i);
+    expect(aoeProps.current).toBeNull();
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 
   it('chip click routes advisory record: ability_use fog log + GM-enforced popup, NO picker/save/damage', async () => {

@@ -68460,6 +68460,8 @@
         "description": "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round."
       },
       {
+        "name": "Rolling Fog",
+        "advisory": "fog_cloud",
         "description": "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round."
       }
     ],
