@@ -91,14 +91,6 @@ export function getCombatContextSync(targetName, overrideContext) {
     return null;
 }
 
-export function setGetCombatContextSyncOverride(val) {
-    _getCombatContextSyncOverride = val;
-}
-
-export function clearGetCombatContextSyncOverride() {
-    _getCombatContextSyncOverride = null;
-}
-
 /**
  * Apply Cunning Strike cost by deducting Sneak Attack dice.
  * The cost is specified as "Nd6" meaning N d6 dice to forgo.

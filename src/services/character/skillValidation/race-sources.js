@@ -1,5 +1,4 @@
 import { fetchRaceData, loadFeatData } from '../../ui/dataLoader.js';
-import { formatFeatExpertiseDetails } from './feat-helpers.js';
 
 /**
  * Extracts skill choice lists from race traits with proficiency_choices
@@ -131,17 +130,4 @@ export async function getFeatProficiencyChoiceData(formData, allFeats) {
   });
 
   return { count: totalCount, skillLists };
-}
-
-/**
- * Builds the feat expertise details string for skill limits.
- * @param {object} formData - The character form data
- * @param {Array} allFeats - Array of all feat data objects
- * @param {string} prefix - Label prefix for the details string
- * @returns {string} Formatted detail string or empty string
- */
-export function buildFeatSkillLimitsDetails(formData, allFeats, prefix) {
-  const featChoiceDetails = formatFeatExpertiseDetails(formData.feats || [], allFeats);
-  if (!featChoiceDetails) return '';
-  return `. + ${prefix} from ${prefix === 'feats' ? 'feats' : 'feats/traits'}: ${featChoiceDetails}`;
 }

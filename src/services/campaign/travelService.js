@@ -47,7 +47,6 @@ export const TRAVEL_PACES = [
 ];
 
 export const MAX_TRAVEL_HOURS_PER_DAY = 8;
-export const MAX_FORCED_MARCH_HOURS = 6;
 export const HORSEBACK_SPEED_MULTIPLIER = 2;
 export const EXHAUSTION_SPEED_MULTIPLIER = 5 / 6;
 export const EXHAUSTION_LEVELS = 6;
@@ -64,10 +63,6 @@ export function applyExhaustionSpeedPenaltyToBudget(baseBudget, exhaustionStacks
 
 export function getExhaustionMultiplierPercent(exhaustionStacks) {
   return Math.round(Math.pow(EXHAUSTION_SPEED_MULTIPLIER, exhaustionStacks) * 100);
-}
-
-export function isTerrainPassable(terrainType) {
-  return TERRAIN_MOVE_COST[terrainType] !== null;
 }
 
 export function getHexTravelTime(terrainType, paceId, horseback = false) {

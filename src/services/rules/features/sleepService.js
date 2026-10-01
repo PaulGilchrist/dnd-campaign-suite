@@ -24,10 +24,6 @@ function findSleepEffect(targetName, campaignName) {
     return effects.find(te => te.effect === SLEEP_TE_EFFECT && targetOf(te) === targetName) || null;
 }
 
-export function getSleepEffect(targetName, campaignName) {
-    return findSleepEffect(targetName, campaignName);
-}
-
 function blocksSleepViaImmunities(immunities) {
     return immunities.includes('exhaustion') || immunities.includes('magical sleep');
 }

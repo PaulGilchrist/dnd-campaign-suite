@@ -20,15 +20,10 @@ Scope: 3,624 `*.js|jsx` files (~910k lines incl. 2,399 tests). ts/tsx: none.
 
 Verified: no importer anywhere (imports resolved incl. case-insensitive; only one `import.meta.glob` exists, in `map3dAssets.js`; no lazy imports; namespace imports checked). Removing these strands also orphans their co-located tests.
 
-- **Unreferenced modules (production)**:
-  - `src/encounters/combatData.js` — one-line `export *` shim over `services/encounters/combatData.js`; only its own test imports it.
-  - `src/services/rules/core/savageAttacker.js` + `src/services/combat/steps/features/savageAttacker.js` (see Duplication 4).
-  - `src/services/automation/handlers/class-warlock/beguilingTwistHandler.js` (see Duplication 5).
-  - `src/services/character/rageUtils.js` (15 L) — zero mentions repo-wide outside itself/tests.
-  - `src/services/combat/effects/calmEmotionsCleanup.js` (59 L) — zero production mentions.
-  - `src/services/rules/features/{aid,antimagicField,fear,feignDeath,massHeal,powerWordFortify}Service.js` — only tests import these.
-  - `src/services/shared/{getClassLevelData.js (5 L), injectSpecialActions.js (20 L)}`, `src/services/automation/common/conditionEventStore.js` (11 L), `src/services/ui/syncStoreValue.js` (127 L).
-- **Unreferenced UI components** (only 1 test imports each): `popups/{MultiTargetCountPopup,SingleTargetPopup,PsionicChoicePopup,TargetWithCheckboxesPopup,TargetWithTypePopup}.jsx`, `modals/shared/{ChoiceListModal,HealingIllusionModal}.jsx`, `initiative/{ConcentrationPicker,ConditionPicker}.jsx`, `character-creation/WizardStepRaceClass.jsx`.
+- ~~Deleted (234d56073)~~: `rules/core/savageAttacker.js`, `combat/steps/features/savageAttacker.js`, warlock `beguilingTwistHandler.js`, `rageUtils.js`, `calmEmotionsCleanup.js`, `shared/{getClassLevelData,injectSpecialActions}.js`, `automation/common/conditionEventStore.js`, `ui/syncStoreValue.js`, `popups/PsionicChoicePopup.jsx`, `initiative/{ConcentrationPicker,ConditionPicker}.jsx`, `character-creation/WizardStepRaceClass.jsx` + stranded tests.
+- **CORRECTION**: `src/encounters/combatData.js` is NOT an orphan — `../../../encounters/combatData.js` imports from `src/services/combat/steps/*.js` resolve to it. Keep.
+- **`vi.mock`-referenced UI components** (no production importers; kept because surviving CharSpells/CharActionModals tests mock these paths): `popups/{MultiTargetCountPopup,SingleTargetPopup,TargetWithCheckboxesPopup,TargetWithTypePopup}.jsx`, `modals/shared/{ChoiceListModal,HealingIllusionModal}.jsx`.
+- **Still open**: `src/services/rules/features/{aid,antimagicField,fear,feignDeath,massHeal,powerWordFortify}Service.js` — only tests import these.
 - **Unreferenced module** with caveat: `src/routes/config.js` — only its test imports it, but AGENTS.md calls it "canonical view config"; App.jsx hardcodes views. Document drift, not automatic removal.
 
 ## Unused Symbols

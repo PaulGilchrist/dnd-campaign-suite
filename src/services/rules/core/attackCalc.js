@@ -201,28 +201,6 @@ export function resolveSpellDamageAtLevel(spell, playerLevel) {
 }
 
 /**
- * Determines if a spell uses a spell attack or a saving throw.
- * @param {Object} spell - The spell object with dc property
- * @returns {boolean} true if the spell uses a spell attack (no DC)
- */
-export function isSpellAttack(spell) {
-    return !spell.dc;
-}
-
-/**
- * Determines the combat action type from a spell's casting_time.
- * @param {string} castingTime - The spell's casting_time
- * @returns {string} "Action" or "Bonus Action" or null
- */
-export function getSpellActionType(castingTime) {
-    const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
-    const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
-    if (actionCastingTimes.includes(castingTime)) return 'Action';
-    if (bonusActionCastingTimes.includes(castingTime)) return 'Bonus Action';
-    return null;
-}
-
-/**
  * Build an Action attack for a ranged weapon with Archery / Thrown Weapon Fighting bonuses.
  * @param {Object} weapon
  * @param {string} weaponName
