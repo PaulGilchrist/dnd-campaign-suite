@@ -7241,7 +7241,218 @@
   },
   "Wererat": {
     "monsterIndex": "wererat",
-    "placedIn": "EB Join Wererat 1 + Bandit cs POST rig (ac12 hp999 res[]). Board CLEARED after MA-1700",
-    "verifiedRow": "MA-1700 (PASS-subset Multiattack: Scratch 1d6+3 Slashing / HC 1d6+3 Piercing / Bite 2d4+3 Piercing live any-combination; crit nat20 1d6*2+3=9; Bite curse own-ticket MA-1701)"
+    "placedIn": "ROWS DONE: Wererat+Bandit joined MA-1702, board CLEARED via Admin after MA-1703 (log empty, stable 30s)",
+    "config": "Scratch confirmed standalone +5 chip (PB+2+DEX+3); MA-1701 Bite two-chip composite +5/DC11 CON rider unchanged; miss popup in this build HAS popup-close-btn Done — flush via that, overlay el.click()/backdrop click does NOT dismiss",
+    "verifiedRow": "MA-1701 (PASS-subset Bite attack+save) + MA-1702 (PASS Scratch) + MA-1703 (PASS Hand Crossbow: 4 shots, 3 hits dmg 8/6/7 Piercing hpΔ exact, miss 7 vs AC12 clean, range 30/120 advisory gridless)"
+  },
+  "Weretiger": {
+    "monsterIndex": "weretiger",
+    "placedIn": "ROWS DONE: Weretiger+Bandit joined MA-1704, board CLEARED via Admin after MA-1707 (keys empty, log 0, no resurrection)",
+    "config": "Weretiger 1 AC13 hp120; Multiattack text-header zero-affordance; Scratch +5 chip 2d6+3 Slashing; Longbow +4 chip 2d8+2 Piercing (nat20 crit dice-double only, flat +2 undoubled); Bite +5 + DC13 CON rider present (MA-1705 scope)",
+    "verifiedRow": "MA-1704 (PASS-subset Multiattack) + MA-1705 (PASS-subset Bite attack+save: +5 hit leg full 2d8+3 Piercing hpΔ exact; DC13 CON rider fail nat5 grants cursed activeConditions+log, success nat16 zero delta; transform/immunity/Humanoid-gate grep-zero advisory) + MA-1706 (PASS Scratch: d20 16/15 hits 2d6+3 Slashing hpΔ 14/10 exact, nat3 miss clean; manifest row consistent 2d6+3) + MA-1707 (PASS Longbow: +4 honest hit/miss vs AC12, 2d8+2 Piercing hpΔ exact 13/10, miss clean)"
+  },
+  "Werewolf": {
+    "monsterIndex": "werewolf",
+    "placedIn": "ROWS DONE: Werewolf+Bandit joined MA-1708, board CLEARED via Admin after MA-1711 (change-data {}, log absent, no resurrection)",
+    "config": "Werewolf 1 hp71 init7; Multiattack zero-affordance text; Scratch +5 2d6+3 Slashing; Longbow +4 2d8+2 Piercing (nat1 crit-miss honored); Bite +5 + DC12 CON rider present MA-1709 scope",
+    "verifiedRow": "MA-1708 (PASS-subset Multiattack MA-1704 precedent: components exact, hpDeltas exact, misses zero-damage) + MA-1709 (PASS-subset Bite attack+save: nat7 hit 12v12 full 2d8+3 15 hpΔ exact, miss nat3 clean; DC12 rider fail nat11 curses+meta.source written, success nat17 zero delta; transform/immunity/Humanoid grep-zero) + MA-1710 (PASS Scratch: 2 hits 11/9 Slashing hpΔ exact, nat3 miss clean, no save legs) + MA-1711 (PASS Longbow: nat15 hit 17 Piercing hpΔ exact, 2 honest misses)"
+  },
+  "White Dragon Wyrmling": {
+    "monsterIndex": "white-dragon-wyrmling",
+    "placedIn": "ROWS DONE: Wyrmling+Bandit1(+NPC Bandit2) joined MA-1712; board CLEARED via Admin after MA-1714 (keys 0 log 0)",
+    "config": "Multiattack zero-affordance text; Rend +4 combined_damage_roll primary 1d8+2 Slashing + secondary 1d4 Cold sfd logged, hpΔ 11=9+2 exact; nat5 miss clean; Cold Breath MA-1714 scope",
+    "verifiedRow": "MA-1712 (PASS Multiattack: exactly 2 Rend presses, combined secondary live MA-0531, hpD exact) + MA-1713 (PASS Rend: nat8 10+3=13, nat14 6+1=7 hpΔ exact, nat3 miss clean; Bandit cd ~979) + MA-1714 (PASS Cold Breath cone DC12 CON 5d8: 2 targets SAVE half floor 13/9 exact, FAIL full 18/19 exact x4 hpD; recharge authored-absent so second press fire correct; picker 15-ft Cone)"
+  },
+  "Wight": {
+    "monsterIndex": "wight",
+    "placedIn": "ROWS DONE: Wight+Bandit joined MA-1715; board CLEARED via Admin after MA-1718 (keys {} log 0)",
+    "config": "Multiattack zero-affordance text; Necrotic Sword +4 combined 1d8+2 Slashing+1d8 Necrotic (hpΔ14 exact); Necrotic Bow +4 combined 1d8+2 Piercing+1d8 Necrotic (hpΔ13 exact); Life Drain DC13 CON chip present MA-1718 scope",
+    "verifiedRow": "MA-1715 (PASS-subset Multiattack: components exact combined-damage, misses clean, count GM-adjudicated MA-1708/12 precedent) + MA-1716 (PASS Necrotic Sword: nat15 hit 10+5=15 hpΔ exact, 2 misses clean) + MA-1717 (PASS Necrotic Bow: hits 6+4=10 / 8+7=15 hpD exact, miss clean, range advisory) + MA-1718 (FAIL(a) Life Drain: DC13 CON + full/half dmg exact but hp-max-reduce inert — save_hp_max_reduce structured key missing on disk wight.actions[3], consumer live MA-1547 lane; bug file)"
+  },
+  "Will-o'-Wisp": {
+    "monsterIndex": "will-o-wisp",
+    "placedIn": "ROWS DONE: Wisp+Bandit joined MA-1719; board CLEARED via Admin after MA-1720",
+    "config": "Shock +4 chip flat 2d8 lightning lowercase verbatim in logs, 7 hits hpSum 74 exact, 1 miss clean; advantage observed on 3 rolls (source unprobed); no save/recharge disk-none",
+    "verifiedRow": "MA-1719 (PASS Shock: 2d8 no-mod exact vs AC12) + MA-1720 (FAIL(b)/DATA Invisibility: prose-only row, monster_self_buff key absent, zero affordance; sprite/imp MA-1522/1019 holders = one-field fix template)"
+  },
+  "Winged Kobold": {
+    "monsterIndex": "winged-kobold",
+    "placedIn": "ROWS DONE: Kobold+Bandit joined MA-1721; board CLEARED via Admin after MA-1722 (keys [] log 0)",
+    "config": "Dragon-Tooth Blade +5 chip: 6 hits + nat20 crit 1d6*2+3 flat-3-undoubled, 1 miss clean, hpSum 51 exact; Chromatic Spitfire +5 chip renders (disk no damage_type_primary - MA-1722 scope)",
+    "verifiedRow": "MA-1721 (PASS Dragon-Tooth Blade vs AC12) + MA-1722 (PASS-subset Chromatic Spitfire: +5 hit 6 / miss clean, damageType null honest type-less disk row, no chooser = advisory, grep MonsterCardModal:2065+damageUtils:16)"
+  },
+  "Winter Wolf": {
+    "monsterIndex": "winter-wolf",
+    "placedIn": "ROWS DONE: Winter Wolf + 2 NPC-Bandits joined MA-1724; board CLEARED via Admin (keys {} log 0)",
+    "config": "Bite +6 chip: 3 hits 10/12/14 Piercing hpD exact; prone NEVER lands live (no hit_conditions key) = FAIL(a)/DATA MA-1534/1541 one-field lane",
+    "verifiedRow": "MA-1723 (FAIL(a)/DATA Bite: core dmg exact, prone rider inert live+static; bug file) + MA-1724 (PASS Cold Breath cone DC12 CON 4d8: half 10/9/4 floor exact + full 14, second press no-recharge correct disk-absent, picker 15-ft Cone)"
+  },
+  "Wisp": {
+    "monsterIndex": "wisp",
+    "placedIn": "EB Join Wisp 1 + Bandit(+NPC) MA-1725; board CLEARED via Admin after run (log 0 keys empty)",
+    "config": "Shock +4 chip: nat20 crit 2d8*2+2=10 flat+2 undoubled, 2 hits 13/14 Lightning hpD exact, miss clean; distinct row from will-o-wisp 2d8",
+    "verifiedRow": "MA-1725 (PASS Shock)"
+  },
+  "Wolf": {
+    "monsterIndex": "wolf",
+    "placedIn": "EB Join Wolf 1 + Bandit MA-1726; board CLEARED via Admin (keys {})",
+    "config": "Bite +4: d20 12 hit 8 Piercing hpD exact, 2 misses clean; prone rider NEVER lands (disk free-text only, no hit_conditions) = FAIL(a)/DATA MA-1723 lane; manifest carries extracted conditions:[prone] which is label-not-key",
+    "verifiedRow": "MA-1726 (FAIL(a)/DATA Bite prone rider inert; bug file)"
+  },
+  "Worg": {
+    "monsterIndex": "worg",
+    "placedIn": "EB Join Worg 1 + Bandit 1/2 MA-1727; board CLEARED via Admin (keys {} log [])",
+    "config": "Bite +5 chip live: hits 5/9 Piercing hpD exact, miss clean; advantage rider inert (no disk structured field; te distracting_strike_advantage pre-registered targetEffectDefinitions:80, producer needs hit_target_effect one-field)",
+    "verifiedRow": "MA-1727 (FAIL(a)/DATA Bite advantage rider inert; bug file)"
+  },
+  "Wraith": {
+    "monsterIndex": "wraith",
+    "placedIn": "EB Join Wraith 1 + victims MA-1728/1729; board CLEARED via Admin after MA-1729",
+    "config": "Life Drain +6 attack chip live: hits 19/19 Necrotic hpD exact, miss+nat1-crit-miss clean; hit_hp_max_reduce MISSING on disk (specter holder) = FAIL(a)/DATA one-field; Create Specter MA-1729 scope",
+    "verifiedRow": "MA-1728 (FAIL(a)/DATA Life Drain max-reduce inert; bug file) + MA-1729 (FAIL(b)/DESIGN-GAP Create Specter: prose-only zero-affordance row, monster_summon lane EXISTS (drow-mage etc) but wraith lacks it; corpse-state/cap unmodeled; bug file)"
+  },
+  "Wyvern": {
+    "monsterIndex": "wyvern",
+    "placedIn": "ROWS DONE: Wyvern+Bandit joined MA-1730; board CLEARED via Admin after MA-1732",
+    "config": "Multiattack 0-affordance text; Bite +7 2d8+4=12 hpD exact; Sting +7 combined 2d6+4=15 Piercing + 7d6=30 Poison hpD -45 exact; miss clean; Poisoned rider observation -> MA-1732",
+    "verifiedRow": "MA-1730 (PASS-subset Multiattack MA-1704/08/12/15 precedent) + MA-1731 (PASS Bite: hit 12 Piercing hpD exact, miss clean; Bandit 930) + MA-1732 (FAIL(a)/DATA Sting: core 2d6+4+7d6 combined exact x9 hits + crit + miss, poisoned rider never lands (no hit_conditions); bug file)"
+  },
+  "Xorn": {
+    "monsterIndex": "xorn",
+    "placedIn": "EB Join Xorn 1 + Bandit 1; IN initiative round 1 after MA-1734, Bandit 843, for MA-1735; MA-1735 done, board CLEARED via Admin (keys 0 log 0)",
+    "config": "Multiattack 0-affordance; Bite +6 4d6+3 Piercing hpD exact; Claw +6 1d10+3 Slashing hpD exact; 6 misses zero; crit vacuous",
+    "verifiedRow": "MA-1733 (PASS-subset Multiattack MA-1704/30 precedent) + MA-1734 (PASS Bite: hits 19/21 hpD exact, miss clean; Bandit 843) + MA-1735 (PASS Claw: 1d10+3=6 hpD exact, 2 misses clean)"
+  },
+  "Yeti": {
+    "monsterIndex": "yeti",
+    "placedIn": "ROWS DONE: Yeti+Bandit joined MA-1736; board CLEARED via Admin after MA-1739 (keys [] log 0)",
+    "config": "Multiattack 0-affordance; Claw combined 1d6+4 Slashing + 1d6 Cold hpD 11 exact; Ice Throw combined 1d4+4 Blud + 1d4 Cold hpD 10 exact, miss clean; Chilling Gaze chips render (MA-1739 scope)",
+    "verifiedRow": "MA-1736 (PASS-subset Multiattack MA-1733 precedent) + MA-1737 (PASS Claw: miss nat5 clean; hit 9+2=11 combined hpD exact) + MA-1738 (PASS Ice Throw: 7+4=11 / 7+2=9 combined hpD exact, nat1 crit-miss clean) + MA-1739 (FAIL(a)/DATA Chilling Gaze: fail-face full 2d4 + paralyzed LANDS (text-parse lane), success-face half-leak 2/2x2 raw5 - RAW pays 0; dc_success:none one-field fix; bug file)"
+  },
+  "Yochlol": {
+    "monsterIndex": "yochlol",
+    "placedIn": "ROWS DONE: Yochlol+Bandit joined MA-1740; board CLEARED via Admin after MA-1743",
+    "config": "Multiattack 0-affordance; Caustic Lash +8 chip 2 hits 17/31 Acid hpD exact, melee-default no ranged chooser (disk no damage_dice_ranged); Spellcasting plain-text DC15 MA-1742 scope; Toxic Escape reaction MA-1743 scope",
+    "verifiedRow": "MA-1740 (PASS-subset Multiattack) + MA-1741 (PASS Caustic Lash: nat17 hit 19 Acid hpD exact, miss clean) + MA-1742 (FAIL(b)/DATA Spellcasting: plain-text spell names zero chips MA-0524/1543 lane, save_dc never renders on Spellcasting-named row, uses-gate dead code; chip fix MA-0421 markup twin; bug file) + MA-1743 (PASS-subset Toxic Escape reaction: Bandit hit trigger live, DC15 CON raw adjudicated, success clean, fail lands poisoned+incapacitated (conditionUtils real keys), ungated manual re-fire = no automation GM-driven by design 60, halves/teleport/AoE grep-zero advisory)"
+  },
+  "Young Black Dragon": {
+    "monsterIndex": "young-black-dragon",
+    "placedIn": "ROWS DONE: YBD+Bandit1/2 joined MA-1744; board CLEARED via Admin after MA-1749",
+    "config": "Multiattack 0-affordance; Rend +7 combined 2d4+4 Slashing + 1d6 Acid, 2 hits 15/16 hpD exact, miss clean; Acid Breath DC14 DEX line MA-1746; lair rows MA-1747-49",
+    "verifiedRow": "MA-1744 (PASS-subset Multiattack three-Rend count: 2 hits 1 miss hpD exact) + MA-1745 (PASS Rend: 15 hits combined hpD exact, nat20 crit 2d4*2+4+1d6x2=26 flat-4-undoubled, miss clean; Bandit 775) + MA-1746 (PASS Acid Breath line DC14 DEX 14d6: half 25/30/24 floor exact, full 53, picker 30-ft Line, recharge disk-absent refire correct) + MA-1747 (FAIL(b)/DATA lair pools bare-string inert: MonsterCardBody:357+monsterLairActions:25 !name=inert, zero affordance zero delta; bug file, MA-0378 zone template) + MA-1748 (FAIL(b)/DATA lair pools nameless dict inert: save_dc does not bypass name gate monsterLairActions:25; one-field name fix cheaper than MA-1747; bug file) + MA-1749 (FAIL(b)/DATA lair insect-cloud nameless dict inert, zone/duration/te unspawned, adult MA-0042 full-template fix; bug file)"
+  },
+  "Young Blue Dragon": {
+    "monsterIndex": "young-blue-dragon",
+    "placedIn": "ROWS DONE: YBID+Bandit1/2 joined MA-1750; board CLEARED via Admin after MA-1755",
+    "config": "Multiattack 0-affordance; Rend +9 2d6+5 Slashing + 1d10 Lightning; crit 2d6*2+5 undoubled +1d10x2=29 exact; nat1 crit-miss clean; NPC hp re-clamp judge via hp_change",
+    "verifiedRow": "MA-1750 (PASS-subset Multiattack three-Rend: crit+hit+crit-miss, hpD exact) + MA-1751 (PASS Rend: 2 fresh hits hpD exact, 2 crit-miss zero, HP-refill Enter-commit recipe) + MA-1752 (PASS Lightning Breath line DC16 DEX 10d10: fail-full 51, saves half 20/29/32 floor, picker 60-ft Line, ungated refire correct) + MA-1753 (FAIL(b)/DATA lair ceiling bare-string inert, bug file; buried/restrained advisory) + MA-1754 (FAIL(b)/DATA lair ceiling nameless dict inert twin MA-1748; prose damage lacks Failure prefix; bug file) + MA-1755 (FAIL(b)/DATA lair sand-cloud nameless dict inert; lair_sand_cloud te:1209 registered-unspawned; guard test carve-out ~:2221; subagent labeled PASS-inert = FAIL(b) per lane)"
+  },
+  "Young Brass Dragon": {
+    "monsterIndex": "young-brass-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1760/61",
+    "config": "Multiattack header 0-affordance w/ replace-clause advisory grep-zero; Rend +7 2d10+4 Slashing single pool, crit 36 exact, 2 miss clean; disk Hit text 15; Fire Breath 40ft line DC14 DEX 11d6; Sleep Breath 30ft Cone DC14 CON incapacitated->unconscious repeat-save",
+    "verifiedRow": "MA-1756 (PASS-subset Multiattack: miss/miss/crit hpD exact) + MA-1757 (PASS Rend: 2 hits hpD exact 20/15, miss zero; Bandit2 999 added for line) + MA-1758 (PASS Fire Breath line DC14 DEX 11d6: halves 18/18/20/21 floor, fulls 41/31, picker 40-ft Line, ungated refire x2) + MA-1759 (PASS-subset Sleep cone DC14 CON: fails land incapacitated+unconscious both via prose parse, saves zero, picker 30-ft Cone; repeat-save/duration/wake grep-zero advisory) + MA-1760/61 (FAIL(b)/DATA lair bare-string + nameless DC15 STR inert, systemic young-dragon lair streak 8; adult MA-0074 Strong Wind template; bug files)"
+  },
+  "Young Bronze Dragon": {
+    "monsterIndex": "young-bronze-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1766/67",
+    "config": "Multiattack header 0-affordance (replace-one-with-Repulsion advisory); Rend +8 2d10+5 single pool hpD exact; Lightning line DC15 DEX 9d10; Repulsion cone DC15 STR push40+prone; lair STRING+nameless fog dict",
+    "verifiedRow": "MA-1762 (PASS-subset Multiattack: crit-miss+2 hits hpD exact) + MA-1763 (PASS Rend: hit 17 exact, miss clean; Bandit2 999 staged) + MA-1764 (PASS Lightning line DC15 DEX 9d10: fulls 46/58/66, half 28 floor, picker 60-ft Line, ungated refire) + MA-1765 (PASS Repulsion cone DC15 STR: fails land prone+push te v40 marker (teDef:1324, parser Helpers:147, SaveAttackAoeModal:511), save clean; picker 30-ft Cone) + MA-1766/67 (FAIL(b)/DATA lair bare-string+fog nameless-dict inert, streak 10; adult Fog Cloud zone template w/ zone-block arms picker; bug files)"
+  },
+  "Young Copper Dragon": {
+    "monsterIndex": "young-copper-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1772/73",
+    "config": "Multiattack 0-affordance replace-one-with-Slowing advisory grep-zero; Rend +7 2d10+4 single pool 3-hit hpD exact; Acid line DC14 DEX 9d8; Slowing cone DC14 CON; lair STRING+nameless",
+    "verifiedRow": "MA-1768 (PASS-subset Multiattack: 3 hits hpD exact 999-51=948) + MA-1769 (PASS Rend: 2 hits 17/19 exact, miss clean; Bandit2 staged) + MA-1770 (PASS Acid line DC14 DEX 9d8: full 52, halves 20/28/20 floor incl exact-DC save; ungated refire) + MA-1771 (PASS Slowing cone DC14 CON: parseSlowedClauses Helpers:161-168 trio tes speed_half/no_reactions/no_action_and_bonus_action on fail, save zero, no literal slowed-cond by MA-0087 design) + MA-1772/73 (FAIL(b)/DATA lair bare-string+nameless-fog-dict inert, streak 12; adult Copper Spike Growth/Liquid Mud zone templates; bug files)"
+  },
+  "Young Gold Dragon": {
+    "monsterIndex": "young-gold-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1778/79",
+    "config": "Multiattack replace-Weakening advisory grep-zero; Rend +10 2d10+6 single pool 3 hits hpD exact (23/22/17); Fire cone DC17 DEX 10d10; Weakening cone DC17 STR; lair STRING+nameless",
+    "verifiedRow": "MA-1774 (PASS-subset Multiattack: 3 hits exact; GM-fill >max unclamped = pre-existing GM-override behavior MA-1768, not row defect) + MA-1775 (PASS Rend: hits 24/26 hpD exact; Bandit2 joined clamped 11/11) + MA-1776 (PASS Fire cone DC17 DEX 10d10: saves half 34 floor, fulls 71/66 down B2 honest, picker 30-ft Cone, ungated refire) + MA-1777 (PASS-subset Weakening cone DC17 STR: te weakening_breath strDisadv+sub1d6 rounds10 via Helpers:129/Modal:715, immunity lane excludes affected picker :1138, turn-end repeat live :125, 1-min clock armed) + MA-1778/79 (FAIL(b)/DATA lair bare-string+nameless twin inert streak 14; adult-gold Glimpse-the-Future advisory template; bug files)"
+  },
+  "Young Green Dragon": {
+    "monsterIndex": "young-green-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1783-85",
+    "config": "DRIFT-vs-MANIFEST: disk Rend has SECONDARY poison pool (brief single-pool wrong); disk Poison Breath range 30-ft Cone (manifest 60ft wrong); Multiattack text-only 0-affordance",
+    "verifiedRow": "MA-1780 (PASS-subset Multiattack: 3 hits two-pool hpD exact 16/21/19) + MA-1781 (PASS Rend TWO-pool disk 2d6+4 Slashing + 2d6 Poison: hit 15 exact, 2 miss zero; brief drift corrected disk-wins) + MA-1782 (PASS Poison cone DC14 CON 12d6: full 29/48/41, half 20 floor; picker 30-ft Cone; no manifest drift; ungated refire) + MA-1783/84/85 (FAIL(b)/DATA lair trio all inert streak 17; adult-green Grasping Roots/Wall of Thorns named templates; bug files)"
+  },
+  "Young Red Dragon": {
+    "monsterIndex": "young-red-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1789-91",
+    "config": "Multiattack 0-affordance; Rend +10 two-pool 2d6+6 Slashing + 1d6 Fire hpD exact 12/15/20; Fire cone DC17 DEX 16d6; lair STRING+nameless pair",
+    "verifiedRow": "MA-1786 (PASS-subset Multiattack: 3 hits two-pool exact) + MA-1787 (PASS Rend: 2 hits two-pool exact 11/17) + MA-1788 (PASS Fire cone DC17 DEX 16d6: fulls 68/56/49/54/64, half 28 floor; picker 30-ft Cone; ungated refire x2) + MA-1789/90/91 (FAIL(b)/DATA lair trio inert streak 20; adult-red Magma Geyser/Tremor named templates; bug files)"
+  },
+  "Young Red Shadow Dragon": {
+    "monsterIndex": "young-red-shadow-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1795",
+    "config": "Multiattack mix bite+2claw verified; Bite +10 2d10+6 Piercing + 1d6 Necrotic; Claw +10 2d6+6 Slashing; Shadow Breath DC18 DEX 16d6 NECROTIC range key ABSENT on disk (picker shape probe MA-1795)",
+    "verifiedRow": "MA-1792 (PASS-subset Multiattack mix: bite 14 exact, claw-miss zero, claw 14 exact) + MA-1793/94 (PASS Bite 2-pool 20/18, Claw single 12/14 exact) + MA-1795 (PASS Shadow Breath full recharge cycle: spend->Not Recharged refusal->d6:5 recharge->refire; usage-dict monsterRecharge:30; picker 30-ft Cone from PROSE no range-key; shadow-summon grep-zero MA-1729)"
+  },
+  "Young Remorhaz": {
+    "monsterIndex": "young-remorhaz",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1796/97",
+    "config": "HeatAura: live 2d10 manual chip, no endOfTurn auto-fire (no automation; navigationHandlers:108 pass) = GM-advisory PASS-subset MA-0286 precedent; Bite +7 two-pool 2d10+4 Piercing + 3d8 Fire -41 exact",
+    "verifiedRow": "MA-1796 (PASS-subset aura chip+advisory) + MA-1797 (PASS Bite two-pool+miss)"
+  },
+  "Young Silver Dragon": {
+    "monsterIndex": "young-silver-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1802/03",
+    "config": "Multiattack replace-Paralyzing advisory; Rend +10 2d8+6 single pool 13/18/17 exact; Cold cone DC17 CON 11d8; Paralyzing cone DC17 CON; lair STRING+nameless",
+    "verifiedRow": "MA-1798 (PASS-subset Multiattack: 3 hits exact) + MA-1799 (PASS Rend 2 hits 13/17 exact) + MA-1800 (PASS Cold cone DC17 CON 11d8: 7 fulls exact, nat20 save half 28 floor; ungated x3; usage-dict ABSENT distinct from MA-1795) + MA-1801 (PASS Paralyzing cone DC17 CON: fail flat-spray incapacitated+paralyzed via prose extractor Helpers:377 (no staged_paralysis key Modal:287=flat by design MA-1759/1469), save zero, idempotent merge) + MA-1802/03 (FAIL(b)/DATA lair fog pair inert streak 23; adult-silver fix needs name+advisory:fog_cloud advisory-affordance not zone; bug files)"
+  },
+  "Young White Dragon": {
+    "monsterIndex": "young-white-dragon",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1807-09",
+    "config": "Multiattack 0-affordance; Rend +7 two-pool 2d4+4 Slashing + 1d4 Cold hpD 8/16/11 exact; Cold cone DC15 CON 9d8; lair STRING+nameless pair",
+    "verifiedRow": "MA-1804 (PASS-subset Multiattack 3 hits two-pool exact) + MA-1805 (PASS Rend two-pool 10/11 exact; disk reach 10ft) + MA-1806 (PASS Cold cone DC15 CON 9d8: half 18 floor nat20, fulls exact; ungated x2) + MA-1807/08/09 (FAIL(b)/DATA lair trio inert streak 26; adult-white Freezing Fog save/Jagged Ice attack named templates; bug files)"
+  },
+  "Yuan-ti Abomination": {
+    "monsterIndex": "yuan-ti-abomination",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1814",
+    "config": "Multiattack 2-bite+replace-Suggestion advisory; Bite +7 two-pool 2d6+4 Piercing + 3d6 Poison exact 23/26; Constrict save-row DC15 STR 7d6+4 grapple-DC14-restrained; PoisonSpray cone DC14 CON 6d6 blinded+poisoned; Spellcasting DC15 WIS AtWill AnimalFriendship 3/Day Suggestion (MA-1742 plaintext-zero-chips lane probe MA-1814)",
+    "verifiedRow": "MA-1810 (PASS-subset Multiattack 2 bites exact) + MA-1811 (PASS Bite: hit 18, miss zero, hit 25 two-pool exact) + MA-1812 (PASS-subset Constrict DC15 STR: inline single-target, fail 7d6+4 full + grappled+restrained landed, success half (disk has half clause); escape-DC-14 prose-only no machine field :906) + MA-1813 (PASS Poison Spray cone DC14 CON 6d6: fail full+poisoned+blinded transitive, save half 9 floor zero-cond; exact-DC save) + MA-1814 (FAIL(b)/DATA Spellcasting plaintext zero chips MA-1742 twin; MA-1543 Storm Giant markup template; 3/Day unmodeled; bug file)"
+  },
+  "Yuan-ti Infiltrator": {
+    "monsterIndex": "yuan-ti-infiltrator",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1818",
+    "config": "Multiattack 2xScimitar verified (hit 3 + miss); Scimitar +3 1d6+1; Poison Ray ranged +4 2d6+2 Poison 120ft; Spellcasting DC12 WIS (MA-1814 plaintext lane probe)",
+    "verifiedRow": "MA-1815 (PASS-subset Multiattack hit+miss) + MA-1816 (PASS Scimitar hit 6 exact) + MA-1817 (PASS Poison Ray ranged 120ft: miss + hits 10/11 Poison exact) + MA-1818 (FAIL(b)/DATA Spellcasting plaintext zero-chips triple-twin MA-1742/1814; bug file)"
+  },
+  "Yuan-ti Malison": {
+    "monsterIndex": "yuan-ti-malison",
+    "placedIn": "ROWS DONE: board CLEARED via Admin after MA-1820-23",
+    "config": "Multiattack advisory two-ranged-or-two-melee once-once clause grep-zero; chips keep (requires X) suffix startsWith anchors; Bite +5 1d4+3p+2d6poison lowercase; Scimitar +5 1d6+3; Constrict +5 2d6+3; Longbow +4 1d8+2+2d6 poison 120ft?",
+    "verifiedRow": "MA-1819 (PASS-subset Multiattack mixed pair exact) + MA-1820/21/22/23 (PASS all four: Bite 13, Constrict 8, Scimitar 6, Longbow 14 exact; disk Longbow range 150/600 drift vs brief 120; chassis-requires grep-zero advisory)"
+  },
+  "Yuan-ti Malison Type 1": {
+    "monsterIndex": "yuan-ti-malison-type-1",
+    "placedIn": "YTMT1 1 + Bandit 1 (984) IN initiative for Type2/3 continuation",
+    "config": "Mixed pair 1Bite+1PoisonRay exact (miss Bite, ray 15 Poison 2d8+3 disk range 120ft)",
+    "verifiedRow": "MA-1824/25/26 (PASS x3 batch) + MA-1827 (FAIL(b)/DATA Spellcasting plaintext zero-chips quad-twin; bug file)"
+  },
+  "Yuan-ti Malison Type 2": {
+    "monsterIndex": "yuan-ti-malison-type-2",
+    "placedIn": "EB join into existing board (ini21); with YTMT1+Bandit 1 (970)",
+    "config": "2-Bite multiattack advisory; Bite +5 1d8+3P+2d6Poison hit 14 exact + miss; Spellcasting plaintext zero-chips",
+    "verifiedRow": "MA-1828/29 (PASS) + MA-1830 (FAIL(b)/DATA quint-twin spellcasting; bug file)"
+  },
+  "Yuan-ti Malison Type 3": {
+    "monsterIndex": "yuan-ti-malison-type-3",
+    "placedIn": "EB join into existing board ini9; with YTMT1/2 + Bandit 1 (918 grappled+restrained)",
+    "config": "2xBurst advisory (miss+hit 16); Burst +5 120ft 2d8+3; Constrict DC13 STR inline save full 23 + grapple/restrained, save half 13; Spellcasting plaintext zero-chips",
+    "verifiedRow": "MA-1831/32/33 (PASS) + MA-1834 (FAIL(b)/DATA sextuplet spellcasting; bug file)"
+  },
+  "Yuan-ti Pureblood": {
+    "monsterIndex": "yuan-ti-pureblood",
+    "placedIn": "EB join final; board CLEARED via Admin after MA-1835-37",
+    "config": "Multiattack two-melee advisory (Scimitar x2 strict); Scimitar +3 1d6+1 slashing hit 6; Shortbow disk = 80/320 ft 1d6+1 piercing + 2d6 poison secondary (brief drift), miss withheld",
+    "verifiedRow": "MA-1835/36/37 (PASS x3)"
+  },
+  "Zombie": {
+    "monsterIndex": "zombie",
+    "placedIn": "EB Join Zombie 1 + Bandit 1; FINAL row; board CLEARED via Admin",
+    "config": "Slam +3 1d8+1 Bludgeoning: 2 miss zero, hit 3 exact",
+    "verifiedRow": "MA-1838 (PASS Slam; first attempt ATTEMPT-FAILED on navigate wrapper echo, retry resolved by location.href value per AGENTS.md)"
   }
 }

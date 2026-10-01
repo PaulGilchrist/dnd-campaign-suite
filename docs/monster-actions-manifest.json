@@ -28605,7 +28605,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (2d4 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 11. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Wererat under the DM's control and has 10 Hit Points. Success: The target is immune to this wererat's curse for 24 hours.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1702",
@@ -28621,7 +28621,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1703",
@@ -28637,7 +28637,7 @@
       "damageTypePrimary": "Piercing",
       "range": "30/120 ft.",
       "description": "Ranged Attack Roll: +5, range 30/120 ft. Hit: 6 (1d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1704",
@@ -28649,7 +28649,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The weretiger makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1705",
@@ -28668,7 +28668,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 13. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Weretiger under the DM's control and has 10 Hit Points. Success: The target is immune to this weretiger's curse for 24 hours.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1706",
@@ -28684,7 +28684,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1707",
@@ -28700,7 +28700,7 @@
       "damageTypePrimary": "Piercing",
       "range": "150/600 ft.",
       "description": "Ranged Attack Roll: +4, range 150/600 ft. Hit: 11 (2d8 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1708",
@@ -28712,7 +28712,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The werewolf makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1709",
@@ -28731,7 +28731,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Werewolf under the DM's control and has 10 Hit Points. Success: The target is immune to this werewolf's curse for 24 hours.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1710",
@@ -28747,7 +28747,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1711",
@@ -28763,7 +28763,7 @@
       "damageTypePrimary": "Piercing",
       "range": "150/600 ft.",
       "description": "Ranged Attack Roll: +4, range 150/600 ft. Hit: 11 (2d8 + 2) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1712",
@@ -28775,7 +28775,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes two Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1713",
@@ -28793,7 +28793,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 2 (1d4) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1714",
@@ -28809,7 +28809,7 @@
       "saveEffect": "Failure: 22 (5d8) Cold damage. Success: Half damage.",
       "range": "15-foot Cone",
       "description": "Constitution Saving Throw: DC 12, each creature in a 15-foot Cone. Failure: 22 (5d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1715",
@@ -28821,7 +28821,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. It can replace one attack with a use of Life Drain.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1716",
@@ -28839,7 +28839,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 4 (1d8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1717",
@@ -28857,7 +28857,7 @@
       "damageTypeSecondary": "Necrotic",
       "range": "150/600 ft.",
       "description": "Ranged Attack Roll: +4, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage plus 4 (1d8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1718",
@@ -28873,7 +28873,7 @@
       "saveEffect": "Failure: 6 (1d8 + 2) Necrotic damage, and the target's Hit Point maximum decreases by an amount equal to the damage taken. A Humanoid slain by this attack rises 24 hours later as a Zombie under the wight's control, unless the Humanoid is restored to life or its body is destroyed. The wight can have no more than twelve zombies under its control at a time.",
       "range": "5 feet",
       "description": "Constitution Saving Throw: DC 13, one creature within 5 feet. Failure: 6 (1d8 + 2) Necrotic damage, and the target's Hit Point maximum decreases by an amount equal to the damage taken. A Humanoid slain by this attack rises 24 hours later as a Zombie under the wight's control, unless the Humanoid is restored to life or its body is destroyed. The wight can have no more than twelve zombies under its control at a time.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1718-wight-life-drain.md"
     },
     {
       "id": "MA-1719",
@@ -28889,7 +28889,7 @@
       "damageTypePrimary": "lightning",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +4 to hit, reach 5 ft., one creature. Hit: 9 (2d8) lightning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1720",
@@ -28904,7 +28904,7 @@
         "invisible"
       ],
       "description": "The will-o'-wisp and its light magically become invisible until it attacks or uses its Consume Life, or until its concentration ends (as if concentrating on a spell).",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1720-will-o-wisp-invisibility.md"
     },
     {
       "id": "MA-1721",
@@ -28920,7 +28920,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1722",
@@ -28935,7 +28935,7 @@
       "damageDicePrimary": "1d6 + 3",
       "range": "30 ft.",
       "description": "Ranged Attack Roll: +5, range 30 ft. Hit: 6 (1d6 + 3) damage of a type chosen by the kobold: Acid, Cold, Fire, Lightning, or Poison.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1723",
@@ -28954,7 +28954,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1723-winter-wolf-bite-prone.md"
     },
     {
       "id": "MA-1724",
@@ -28970,7 +28970,7 @@
       "saveEffect": "Failure: 18 (4d8) Cold damage. Success: Half damage.",
       "range": "15-foot Cone",
       "description": "Constitution Saving Throw: DC 12, each creature in a 15-foot Cone. Failure: 18 (4d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1725",
@@ -28986,7 +28986,7 @@
       "damageTypePrimary": "Lightning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 11 (2d8 + 2) Lightning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1726",
@@ -29005,7 +29005,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage. If the target is a Medium or smaller creature, it has the Prone condition.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1726-wolf-bite-prone.md"
     },
     {
       "id": "MA-1727",
@@ -29021,7 +29021,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage, and the next attack roll made against the target before the start of the worg's next turn has Advantage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1727-worg-bite-advantage-rider.md"
     },
     {
       "id": "MA-1728",
@@ -29037,7 +29037,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 21 (4d8 + 3) Necrotic damage. If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1728-wraith-life-drain.md"
     },
     {
       "id": "MA-1729",
@@ -29049,7 +29049,7 @@
       "category": "actions",
       "actionType": "other",
       "description": "The wraith targets a Humanoid corpse within 10 feet of itself that has been dead for no longer than 1 minute. The target's spirit rises as a Specter in the space of its corpse or in the nearest unoccupied space. The specter is under the wraith's control. The wraith can have no more than seven specters under its control at a time.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1729-wraith-create-specter.md"
     },
     {
       "id": "MA-1730",
@@ -29061,7 +29061,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The wyvern makes one Bite attack and one Sting attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1731",
@@ -29077,7 +29077,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1732",
@@ -29098,7 +29098,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 11 (2d6 + 4) Piercing damage plus 24 (7d6) Poison damage, and the target has the Poisoned condition until the start of the wyvern's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1732-wyvern-sting-poisoned.md"
     },
     {
       "id": "MA-1733",
@@ -29110,7 +29110,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The xorn makes one Bite attack and three Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1734",
@@ -29126,7 +29126,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 17 (4d6 + 3) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1735",
@@ -29142,7 +29142,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d10 + 3) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1736",
@@ -29154,7 +29154,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yeti can use its Chilling Gaze and makes two attacks, using Claw or Ice Throw in any combination.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1737",
@@ -29172,7 +29172,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 7 (1d6 + 4) Slashing damage plus 3 (1d6) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1738",
@@ -29190,7 +29190,7 @@
       "damageTypeSecondary": "Cold",
       "range": "30/120 ft.",
       "description": "Ranged Attack Roll: +6, range 30/120 ft. Hit: 6 (1d4 + 4) Bludgeoning damage plus 2 (1d4) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1739",
@@ -29209,7 +29209,7 @@
         "paralyzed"
       ],
       "description": "Constitution Saving Throw: DC 13, one creature the yeti can see within 30 feet. Failure: 5 (2d4) Cold damage, and the target has the Paralyzed condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. Success: The target is immune to the Chilling Gaze of all yetis (but not abominable yetis) for 1 hour.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1739-yeti-chilling-gaze-half-leak.md"
     },
     {
       "id": "MA-1740",
@@ -29221,7 +29221,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yochlol makes two Caustic Lash attacks, and it can use Spellcasting to cast Web or Dominate Person if available.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1741",
@@ -29238,7 +29238,7 @@
       "reach": "10 ft.",
       "range": "120 ft.",
       "description": "Melee or Ranged Attack Roll: +8, reach 10 ft. or range 120 ft. Hit: 25 (6d6 + 4) Acid damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1742",
@@ -29252,7 +29252,7 @@
       "saveDc": 15,
       "saveType": "Charisma",
       "description": "The yochlol casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15): At Will: Detect Thoughts, Gaseous Form (self only), Web; 1/Day: Dominate Person",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1742-yochlol-spellcasting-plaintext-zero-chips.md"
     },
     {
       "id": "MA-1743",
@@ -29272,7 +29272,7 @@
         "poisoned"
       ],
       "description": "The yochlol halves the attack's damage to itself (round down), and it teleports to an unoccupied space it can see within 30 feet of itself. Constitution Saving Throw: DC 15, each creature within 5 feet of the yochlol's destination space. Failure: The target has the Poisoned condition until the end of its next turn. While Poisoned, it has the Incapacitated condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1744",
@@ -29284,7 +29284,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1745",
@@ -29302,7 +29302,7 @@
       "damageTypeSecondary": "Acid",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 9 (2d4 + 4) Slashing damage plus 3 (1d6) Acid damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1746",
@@ -29318,7 +29318,7 @@
       "saveEffect": "49 (14d6) Acid damage. Success: Half damage.",
       "range": "30-foot-long, 5-foot-wide Line",
       "description": "Dexterity Saving Throw: DC 14, each creature in a 30-foot-long, 5-foot-wide Line. Failure: 49 (14d6) Acid damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1747",
@@ -29333,7 +29333,7 @@
         "prone"
       ],
       "description": "Pools of water that the dragon can see within 120 feet of it surge outward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 15 Strength saving throw or be pulled up to 20 feet into the water and knocked prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1747-young-black-dragon-lair-pools-bare-string-inert.md"
     },
     {
       "id": "MA-1748",
@@ -29350,7 +29350,7 @@
         "prone"
       ],
       "description": "Pools of water that the dragon can see within 120 feet of it surge outward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 15 Strength saving throw or be pulled up to 20 feet into the water and knocked prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1748-young-black-dragon-lair-pools-nameless-dict-inert.md"
     },
     {
       "id": "MA-1749",
@@ -29364,7 +29364,7 @@
       "saveDc": 15,
       "saveType": "Constitution",
       "description": "A cloud of swarming insects fills a 20-foot-radius sphere centered on a point the dragon chooses within 120 feet of it. The cloud spreads around corners and remains until the dragon dismisses it as an action, uses this lair action again, or dies. The cloud is lightly obscured. Any creature in the cloudwhen it appears must make on a DC 15 Constitution saving throw, taking 10 (3d6) piercing damage on a failed save, or half as much damage on a successful one. A creature that ends its turn in the cloud takes 10 (3d6) piercing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1749-young-black-dragon-lair-insect-cloud-nameless-dict-inert.md"
     },
     {
       "id": "MA-1750",
@@ -29376,7 +29376,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1751",
@@ -29394,7 +29394,7 @@
       "damageTypeSecondary": "Lightning",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +9, reach 10 ft. Hit: 12 (2d6 + 5) Slashing damage plus 5 (1d10) Lightning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1752",
@@ -29410,7 +29410,7 @@
       "saveEffect": "55 (10d10) Lightning damage. Success: Half damage.",
       "range": "60-foot-long, 5-foot-wide Line",
       "description": "Dexterity Saving Throw: DC 16, each creature in a 60-foot-long, 5-foot-wide Line. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1753",
@@ -29426,7 +29426,7 @@
         "restrained"
       ],
       "description": "Part of the ceiling collapses above one creature that the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) bludgeoning damage and be knocked prone and buried. The buried target is restrained and unable to breathe or stand up. A creature can take an action to make a DC 10 Strength check, ending the buried state on a success.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1753-young-blue-dragon-lair-ceiling-bare-string-inert.md"
     },
     {
       "id": "MA-1754",
@@ -29444,7 +29444,7 @@
         "restrained"
       ],
       "description": "Part of the ceiling collapses above one creature that the dragon can see within 120 feet of it. The creature must succeed on a DC 15 Dexterity saving throw or take 10 (3d6) bludgeoning damage and be knocked prone and buried. The buried target is restrained and unable to breathe or stand up. A creature can take an action to make a DC 10 Strength check, ending the buried state on a success.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1754-young-blue-dragon-lair-ceiling-nameless-dict-inert.md"
     },
     {
       "id": "MA-1755",
@@ -29462,7 +29462,7 @@
         "blinded"
       ],
       "description": "A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1755-young-blue-dragon-lair-sand-cloud-nameless-dict-inert.md"
     },
     {
       "id": "MA-1756",
@@ -29474,7 +29474,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace two attacks with a use of Sleep Breath.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1757",
@@ -29490,7 +29490,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 15 (2d10 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1758",
@@ -29506,7 +29506,7 @@
       "saveEffect": "38 (11d6) Fire damage. Success: Half damage.",
       "range": "40-foot-long, 5-foot-wide Line",
       "description": "Dexterity Saving Throw: DC 14, each creature in a 40-foot-long, 5-foot-wide Line. Failure: 38 (11d6) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1759",
@@ -29526,7 +29526,7 @@
         "unconscious"
       ],
       "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: The target has the Incapacitated condition until the end of its next turn, at which point it repeats the save. Second Failure: The target has the Unconscious condition for 1 minute. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1760",
@@ -29541,7 +29541,7 @@
         "prone"
       ],
       "description": "A strong wind blows around the dragon. Each creature within 60 feet of the dragon must succeed on a DC 15 Strength saving throw or be pushed 15 feet away from the dragon and knocked prone. Gases and vapors are dispersed by the wind, and unprotected flames are extinguished. Protected flames, such as lanterns, have a 50 percent chance of being extinguished.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1760-young-brass-dragon-lair-bare-string-inert.md"
     },
     {
       "id": "MA-1761",
@@ -29558,7 +29558,7 @@
         "prone"
       ],
       "description": "A strong wind blows around the dragon. Each creature within 60 feet of the dragon must succeed on a DC 15 Strength saving throw or be pushed 15 feet away from the dragon and knocked prone. Gases and vapors are dispersed by the wind, and unprotected flames are extinguished. Protected flames, such as lanterns, have a 50 percent chance of being extinguished.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1761-young-brass-dragon-lair-strength-nameless-inert.md"
     },
     {
       "id": "MA-1762",
@@ -29570,7 +29570,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Repulsion Breath.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1763",
@@ -29586,7 +29586,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 16 (2d10 + 5) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1764",
@@ -29604,7 +29604,7 @@
       "damageTypePrimary": "Lightning",
       "range": "60-foot-long, 5-foot-wide Line",
       "description": "Dexterity Saving Throw: DC 15, each creature in a 60-foot-long, 5-foot-wide Line. Failure: 49 (9d10) Lightning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1765",
@@ -29623,7 +29623,7 @@
         "prone"
       ],
       "description": "Strength Saving Throw: DC 15, each creature in a 30-foot Cone. Failure: The target is pushed up to 40 feet straight away from the dragon and has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1766",
@@ -29635,7 +29635,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon creates fog as though it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1766-young-bronze-dragon-lair-bare-string-inert.md"
     },
     {
       "id": "MA-1767",
@@ -29647,7 +29647,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon creates fog as though it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1767-young-bronze-dragon-lair-fog-nameless-inert.md"
     },
     {
       "id": "MA-1768",
@@ -29659,7 +29659,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Slowing Breath.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1769",
@@ -29675,7 +29675,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 15 (2d10 + 4) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1770",
@@ -29693,7 +29693,7 @@
       "damageTypePrimary": "Acid",
       "range": "40-foot-long, 5-foot-wide Line",
       "description": "Dexterity Saving Throw: DC 14, each creature in a 40-foot-long, 5-foot-wide Line. Failure: 40 (9d8) Acid damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1771",
@@ -29709,7 +29709,7 @@
       "saveEffect": "The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn",
       "range": "30-foot Cone",
       "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: The target can't take Reactions; its Speed is halved; and it can take either an action or a Bonus Action on its turn, not both. This effect lasts until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1772",
@@ -29721,7 +29721,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon chooses a point on the ground that it can see within 120 feet of it. Stone spikes sprout from the ground in a 20-foot radius centered on that point. The effect is otherwise identical to the spike growth spell and lasts until the dragon uses this lair action again or until the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1772-young-copper-dragon-lair-bare-string-inert.md"
     },
     {
       "id": "MA-1773",
@@ -29733,7 +29733,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon chooses a point on the ground that it can see within 120 feet of it. Stone spikes sprout from the ground in a 20-foot radius centered on that point. The effect is otherwise identical to the spike growth spell and lasts until the dragon uses this lair action again or until the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1773-young-copper-dragon-lair-nameless-inert.md"
     },
     {
       "id": "MA-1774",
@@ -29745,7 +29745,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Weakening Breath.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1775",
@@ -29761,7 +29761,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 17 (2d10 + 6) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1776",
@@ -29779,7 +29779,7 @@
       "damageTypePrimary": "Fire",
       "range": "30-foot Cone",
       "description": "Dexterity Saving Throw: DC 17, each creature in a 30-foot Cone. Failure: 55 (10d10) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1777",
@@ -29795,7 +29795,7 @@
       "saveEffect": "The target has Disadvantage on Strength-based D20 Tests and subtracts 3 (1d6) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically",
       "range": "30-foot Cone",
       "description": "Strength Saving Throw: DC 17, each creature that isn't currently affected by this breath in a 30-foot Cone. Failure: The target has Disadvantage on Strength-based D20 Tests and subtracts 3 (1d6) from its damage rolls. It repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1778",
@@ -29807,7 +29807,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1778-young-gold-dragon-lair-bare-string-inert.md"
     },
     {
       "id": "MA-1779",
@@ -29819,7 +29819,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1779-young-gold-dragon-lair-advantage-nameless-inert.md"
     },
     {
       "id": "MA-1780",
@@ -29831,7 +29831,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1781",
@@ -29849,7 +29849,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 11 (2d6 + 4) Slashing damage plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1782",
@@ -29867,7 +29867,7 @@
       "damageTypePrimary": "Poison",
       "range": "30-foot Cone",
       "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: 42 (12d6) Poison damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1783",
@@ -29882,7 +29882,7 @@
         "restrained"
       ],
       "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif\u00adficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1783-young-green-dragon-lair-roots-bare-string-inert.md"
     },
     {
       "id": "MA-1784",
@@ -29899,7 +29899,7 @@
         "restrained"
       ],
       "description": "Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif\u00adficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1784-young-green-dragon-lair-roots-nameless-inert.md"
     },
     {
       "id": "MA-1785",
@@ -29915,7 +29915,7 @@
       "damageDicePrimary": "4d8",
       "damageTypePrimary": "Piercing",
       "description": "A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall's space must make a DC 15 Dexterity saving throw once each round it's in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec\u00ad tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1785-young-green-dragon-lair-thornwall-nameless-inert.md"
     },
     {
       "id": "MA-1786",
@@ -29927,7 +29927,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1787",
@@ -29945,7 +29945,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 13 (2d6 + 6) Slashing damage plus 3 (1d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1788",
@@ -29963,7 +29963,7 @@
       "damageTypePrimary": "Fire",
       "range": "30-foot Cone",
       "description": "Dexterity Saving Throw: DC 17, each creature in a 30-foot Cone. Failure: 56 (16d6) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1789",
@@ -29975,7 +29975,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak\u00ad ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1789-young-red-dragon-lair-magma-bare-string-inert.md"
     },
     {
       "id": "MA-1790",
@@ -29991,7 +29991,7 @@
       "damageDicePrimary": "6d6",
       "damageTypePrimary": "Fire",
       "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak\u00ad ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1790-young-red-dragon-lair-nameless-save-damage-inert.md"
     },
     {
       "id": "MA-1791",
@@ -30008,7 +30008,7 @@
         "prone"
       ],
       "description": "A tremor shakes the lair in a 60-foot radius around the dragon. Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1791-young-red-dragon-lair-nameless-dex-inert.md"
     },
     {
       "id": "MA-1792",
@@ -30020,7 +30020,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three attacks: one with its bite and two with its claws.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1793",
@@ -30038,7 +30038,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Weapon Attack: +10 to hit, reach 10 ft., one target. Hit: 17 (2d10 + 6) piercing damage plus 3 (1d6) necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1794",
@@ -30054,7 +30054,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +10 to hit, reach 5 ft., one target. Hit: 13 (2d6 + 6) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1795",
@@ -30071,7 +30071,7 @@
       "damageDicePrimary": "16d6",
       "damageTypePrimary": "Necrotic",
       "description": "The dragon exhales shadowy fire in a 30-foot cone. Each creature in that area must make a DC 18 Dexterity saving throw, taking 56 (16d6) necrotic damage on a failed save, or half as much damage on a successful one. A humanoid reduced to 0 hit points by this damage dies, and an undead shadow rises from its corpse and acts immediately after the dragon in the initiative count. The shadow is under the dragon's control.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1796",
@@ -30086,7 +30086,7 @@
       "damageTypePrimary": "Fire",
       "range": "5-foot Emanation",
       "description": "At the end of each of the remorhaz's turns, each creature in a 5-foot Emanation originating from the remorhaz takes 11 (2d10) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1797",
@@ -30104,7 +30104,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 15 (2d10 + 4) Piercing damage plus 13 (3d8) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1798",
@@ -30116,7 +30116,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks. It can replace one attack with a use of Paralyzing Breath.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1799",
@@ -30132,7 +30132,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 15 (2d8 + 6) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1800",
@@ -30150,7 +30150,7 @@
       "damageTypePrimary": "Cold",
       "range": "30-foot Cone",
       "description": "Constitution Saving Throw: DC 17, each creature in a 30-foot Cone. Failure: 49 (11d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1801",
@@ -30170,7 +30170,7 @@
         "paralyzed"
       ],
       "description": "Constitution Saving Throw: DC 17, each creature in a 30-foot Cone. First Failure: The target has the Incapacitated condition until the end of its next turn, when it repeats the save. Second Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1802",
@@ -30182,7 +30182,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1802-young-silver-dragon-lair-fog-bare-string-inert.md"
     },
     {
       "id": "MA-1803",
@@ -30194,7 +30194,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1803-young-silver-dragon-lair-fog-nameless-inert.md"
     },
     {
       "id": "MA-1804",
@@ -30206,7 +30206,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The dragon makes three Rend attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1805",
@@ -30224,7 +30224,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 9 (2d4 + 4) Slashing damage plus 2 (1d4) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1806",
@@ -30242,7 +30242,7 @@
       "damageTypePrimary": "Cold",
       "range": "30-foot Cone",
       "description": "Constitution Saving Throw: DC 15, each creature in a 30-foot Cone. Failure: 40 (9d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1807",
@@ -30254,7 +30254,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "Freezing fog fills a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The fog spreads around corners, and its area is heavily obscured. Each creature in the fog when it appears must make a DC 10 Constitution saving throw, taking 10 (3d6) cold damage on a failed save, or half as much damage on a successful one. A creature that ends its turn in the fog takes 10 (3d6) cold damage. A wind of at least 20 miles per hour disperses the fog. The fog otherwise lasts until the dragon uses this lair action again or until the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1807-young-white-dragon-lair-fog-bare-string-inert.md"
     },
     {
       "id": "MA-1808",
@@ -30270,7 +30270,7 @@
       "damageDicePrimary": "3d6",
       "damageTypePrimary": "Cold",
       "description": "Freezing fog fills a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The fog spreads around corners, and its area is heavily obscured. Each creature in the fog when it appears must make a DC 10 Constitution saving throw, taking 10 (3d6) cold damage on a failed save, or half as much damage on a successful one. A creature that ends its turn in the fog takes 10 (3d6) cold damage. A wind of at least 20 miles per hour disperses the fog. The fog otherwise lasts until the dragon uses this lair action again or until the dragon dies.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1808-young-white-dragon-lair-fog-nameless-inert.md"
     },
     {
       "id": "MA-1809",
@@ -30284,7 +30284,7 @@
       "damageDicePrimary": "3d6",
       "damageTypePrimary": "Piercing",
       "description": "Jagged ice shards fall from the ceiling, striking up to three creatures underneath that the dragon can see within 120 feet of it. The dragon makes one ranged attack roll (+7 to hit) against each target. On a hit, the target takes 10 (3d6) piercing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1809-young-white-dragon-lair-ice-nameless-inert.md"
     },
     {
       "id": "MA-1810",
@@ -30296,7 +30296,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yuan-ti makes two Bite attacks, and it can use Spellcasting to cast Suggestion if available.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1811",
@@ -30314,7 +30314,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage plus 10 (3d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1812",
@@ -30336,7 +30336,7 @@
         "restrained"
       ],
       "description": "Strength Saving Throw: DC 15, one Large or smaller creature within 5 feet. Failure: 28 (7d6 + 4) Bludgeoning damage. The target has the Grappled condition (escape DC 14), and it has the Restrained condition until the grapple ends. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1813",
@@ -30358,7 +30358,7 @@
         "poisoned"
       ],
       "description": "Constitution Saving Throw: DC 14, each creature in a 30-foot Cone. Failure: 21 (6d6) Poison damage, and the target has the Poisoned condition until the end of the yuan-ti's next turn. While Poisoned, the target has the Blinded condition. Success: Half damage only.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1814",
@@ -30372,7 +30372,7 @@
       "saveDc": 15,
       "saveType": "Wisdom",
       "description": "The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15): At Will: Animal Friendship (snakes only); 3/Day: Suggestion",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1814-yuan-ti-abomination-spellcasting-plaintext-zero-chips.md"
     },
     {
       "id": "MA-1815",
@@ -30384,7 +30384,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yuan-ti makes two Scimitar attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1816",
@@ -30400,7 +30400,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 4 (1d6 + 1) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1817",
@@ -30416,7 +30416,7 @@
       "damageTypePrimary": "Poison",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +4, range 120 ft. Hit: 9 (2d6 + 2) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1818",
@@ -30430,7 +30430,7 @@
       "saveDc": 12,
       "saveType": "Wisdom",
       "description": "The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12): At Will: Animal Friendship (snakes only); 2/Day: Suggestion",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1818-yuan-ti-infiltrator-spellcasting-plaintext-zero-chips.md"
     },
     {
       "id": "MA-1819",
@@ -30442,7 +30442,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yuan-ti makes two ranged attacks or two melee attacks, but can use its bite or constrict only once unless type 2 biting with its arms.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1820",
@@ -30460,7 +30460,7 @@
       "damageTypeSecondary": "poison",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one creature. Hit: 5 (1d4 + 3) piercing damage plus 7 (2d6) poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1821",
@@ -30480,7 +30480,7 @@
         "restrained"
       ],
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) bludgeoning damage, and the target is grappled (escape DC 13). Until this grapple ends, the target is restrained, and the yuan-ti can't constrict another target.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1822",
@@ -30496,7 +30496,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1823",
@@ -30513,7 +30513,7 @@
       "damageDiceSecondary": "2d6",
       "damageTypeSecondary": "poison",
       "description": "Ranged Weapon Attack: +4 to hit, range 150/600 ft., one target. Hit: 6 (1d8 + 2) piercing damage plus 7 (2d6) poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1824",
@@ -30525,7 +30525,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yuan-ti makes two attacks, using Bite or Poison Ray in any combination, and it can use Spellcasting to cast Suggestion if available.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1825",
@@ -30543,7 +30543,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 5 (1d4 + 3) Piercing damage plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1826",
@@ -30559,7 +30559,7 @@
       "damageTypePrimary": "Poison",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +5, range 120 ft. Hit: 12 (2d8 + 3) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1827",
@@ -30573,7 +30573,7 @@
       "saveDc": 13,
       "saveType": "Wisdom",
       "description": "The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 13): At Will: Animal Friendship (snakes only); 2/Day: Suggestion",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1827-yuan-ti-malison-type-1-spellcasting-plaintext-zero-chips.md"
     },
     {
       "id": "MA-1828",
@@ -30585,7 +30585,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yuan-ti makes two Bite attacks, and it can use Spellcasting to cast Suggestion if available.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1829",
@@ -30603,7 +30603,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 7 (1d8 + 3) Piercing damage plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1830",
@@ -30617,7 +30617,7 @@
       "saveDc": 13,
       "saveType": "Wisdom",
       "description": "The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 13): At Will: Animal Friendship (snakes only); 2/Day: Suggestion",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1830-yuan-ti-malison-type-2-spellcasting-plaintext-zero-chips.md"
     },
     {
       "id": "MA-1831",
@@ -30629,7 +30629,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yuan-ti makes two Poison Burst attacks, and it can use Spellcasting to cast Suggestion if available.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1832",
@@ -30646,7 +30646,7 @@
       "reach": "5 ft.",
       "range": "120 ft.",
       "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 120 ft. Hit: 12 (2d8 + 3) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1833",
@@ -30666,7 +30666,7 @@
         "restrained"
       ],
       "description": "Strength Saving Throw: DC 13, one Medium or smaller creature within 5 feet. Failure: 21 (4d8 + 3) Bludgeoning damage. The target has the Grappled condition (escape DC 13), and it has the Restrained condition until the grapple ends.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1834",
@@ -30680,7 +30680,7 @@
       "saveDc": 13,
       "saveType": "Wisdom",
       "description": "The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 13): At Will: Animal Friendship (snakes only); 2/Day: Suggestion",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1834-yuan-ti-malison-type-3-spellcasting-plaintext-zero-chips.md"
     },
     {
       "id": "MA-1835",
@@ -30692,7 +30692,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The yuan-ti makes two melee attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1836",
@@ -30708,7 +30708,7 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 4 (1d6 + 1) slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1837",
@@ -30725,7 +30725,7 @@
       "damageDiceSecondary": "2d6",
       "damageTypeSecondary": "poison",
       "description": "Ranged Weapon Attack: +3 to hit, range 80/320 ft., one target. Hit: 4 (1d6 + 1) piercing damage plus 7 (2d6) poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1838",
@@ -30741,7 +30741,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d8 + 1) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     }
   ]
 }
