@@ -4,8 +4,11 @@
 // → row renders <strong>Grasping Roots.</strong> + ONE .mc-dice-link-lair
 // chip "DC 15 Strength"; click routes through handleSaveRoll → the existing
 // save seam at the authored DC/type, dcSuccess "none" (damageless RAW),
-// autoDamageFormula null, saveConditions ['restrained']. Nameless siblings
-// [1] (MA-1784) / [2] (MA-1785) stay static — chip census EXACTLY ONE.
+// autoDamageFormula null, saveConditions ['restrained'].
+// MA-1784 census widening: [1] nameless roots dict promoted to the distinct-
+// named "Erupting Roots" save row → chip census now EXACTLY TWO root chips
+// ("Grasping Roots." + "Erupting Roots.", both "DC 15 Strength"). Thorn-wall
+// [2] (MA-1785) stays nameless static — zero chips.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -99,22 +102,24 @@ beforeEach(() => {
 });
 
 describe('MA-1783 young-green-dragon grasping-roots lair chip lock', () => {
-  it('lair block renders EXACTLY ONE chip "DC 15 Strength" on the "Grasping Roots." row', () => {
+  it('lair block renders EXACTLY TWO "DC 15 Strength" chips — "Grasping Roots." [0] + "Erupting Roots." [1] (MA-1784 widening)', () => {
     renderDragon();
     const chips = lairChips();
-    expect(chips).toHaveLength(1);
-    expect(chips[0].textContent.trim()).toBe('DC 15 Strength');
+    expect(chips).toHaveLength(2);
+    expect(chips.map(c => c.textContent.trim())).toEqual(['DC 15 Strength', 'DC 15 Strength']);
     expect(chips[0].getAttribute('title')).toMatch(/Lair action — DC 15 Strength/);
-    const row = chips[0].closest('.mc-action');
-    expect(row.querySelector('strong')?.textContent).toBe('Grasping Roots.');
+    const rows = chips.map(c => c.closest('.mc-action').querySelector('strong')?.textContent);
+    expect(rows).toEqual(['Grasping Roots.', 'Erupting Roots.']);
   });
 
-  it('nameless inert siblings [1]/[2] render zero chips (static prose only)', () => {
+  it('thorn-wall sibling [2] renders zero chips (static prose only); erupting-roots prose rides the clickable [1] row', () => {
     renderDragon();
     const staticRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => !el.querySelector('.mc-dice-link-lair'));
-    expect(staticRows.some(el => el.textContent.includes('Grasping roots and vines erupt'))).toBe(true);
     expect(staticRows.some(el => el.textContent.includes('tangled brush bristling with thorns'))).toBe(true);
     expect(staticRows.every(el => el.querySelectorAll('span[role="button"]').length === 0)).toBe(true);
+    const eruptRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => el.textContent.includes('Grasping roots and vines erupt'));
+    expect(eruptRows).toHaveLength(2);
+    expect(eruptRows.every(el => el.querySelector('.mc-dice-link-lair'))).toBe(true);
   });
 
   it('chip click arms the 20-ft Radius picker at DC 15 Strength, dcSuccess none, no damage (disk twin wins, picker route)', async () => {
@@ -132,6 +137,19 @@ describe('MA-1783 young-green-dragon grasping-roots lair chip lock', () => {
     expect(p.saveConditions).toEqual(['restrained']);
     expect(p.zoneOnly ?? false).toBe(false);
     expect(p.excludeNames).toContain('Young Green Dragon 1');
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('MA-1784: the NEW [1] "Erupting Roots." chip arms the same DC 15 Strength picker, dcSuccess none, restrained (was inert nameless)', async () => {
+    renderDragon();
+    fireEvent.click(lairChips()[1]);
+    await waitFor(() => expect(pickerProps.current).toBeTruthy());
+    const p = pickerProps.current;
+    expect(p.saveType).toBe('Strength');
+    expect(p.saveDc).toBe(15);
+    expect(p.dcSuccess).toBe('none');
+    expect(p.damage ?? null).toBeFalsy();
+    expect(p.saveConditions).toEqual(['restrained']);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });

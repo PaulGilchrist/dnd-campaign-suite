@@ -2861,17 +2861,19 @@ describe('MA-0231 ancient-green-dragon grasping roots and vines data lock', () =
     expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
   });
 
-  it('scope guard: adult-green sibling untouched; young-green [0] promoted by MA-1783, nameless [1] stays inert', () => {
+  it('scope guard: adult-green sibling untouched; young-green [0]/[1] promoted by MA-1783/MA-1784, thorn-wall [2] stays inert', () => {
     const adult = monstersData.find(m => m.index === 'adult-green-dragon');
     const young = monstersData.find(m => m.index === 'young-green-dragon');
     expect(adult.lair_actions[0].name).toBe('Grasping Roots');
     expect(adult.lair_actions[0].save_effect).toBe('The target is restrained by the roots and vines.');
     // MA-1783 inverted this pin: young [0] bare string promoted to the
-    // adult-green byte-twin named save row; nameless [1] sibling stays FALSE-pinned (MA-1784).
+    // adult-green byte-twin named save row. MA-1784 inverted the [1]
+    // FALSE-pin: nameless roots dict promoted to distinct-named "Erupting
+    // Roots" save row. Thorn-wall [2] stays FALSE-pinned (MA-1785).
     expect(young.lair_actions[0].name).toBe('Grasping Roots');
     expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
-    expect(young.lair_actions[1].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(young.lair_actions[1].name).toBe('Erupting Roots');
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
     // MA-0232 fixed [1] (Wall of Thorns), MA-0233 fixed [2] (Fog Charm) in later passes.
     expect(dragon.lair_actions[2].name).toBe('Fog Charm');
   });
@@ -5966,8 +5968,9 @@ describe('MA-1779 young-gold-dragon foresightful-glimpse advisory data lock', ()
 // "none" closes the MV-20 half-default leak (no damage RAW). Difficult
 // terrain radius, DC 15 STR break-free action, and wilt expiry stay advisory
 // prose in the tail (§70 — no zone/movement-cost/rescue-engine consumers).
-// Siblings index-bound: [1] stays nameless inert dict (MA-1784), [2] stays
-// nameless thorn-wall inert dict (MA-1785) — FALSE-pinned.
+// Siblings index-bound: [1] promoted by MA-1784 (distinct-named "Erupting
+// Roots" save row), [2] stays nameless thorn-wall inert dict (MA-1785) —
+// FALSE-pinned.
 describe('MA-1783 young-green-dragon grasping roots data lock', () => {
   const young = monstersData.find(m => m.index === 'young-green-dragon');
   const adult = monstersData.find(m => m.index === 'adult-green-dragon');
@@ -6027,11 +6030,11 @@ describe('MA-1783 young-green-dragon grasping roots data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
   });
 
-  it('scope guard: exactly 3 elements; nameless siblings [1] (MA-1784) and [2] (MA-1785) stay FALSE-pinned', () => {
+  it('scope guard: exactly 3 elements; [1] promoted by MA-1784, thorn-wall [2] stays FALSE-pinned', () => {
     expect(young.lair_actions).toHaveLength(3);
-    expect(young.lair_actions[1].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
-    expect(lairRowAffordance(young.lair_actions[1])).toBeNull();
+    expect(young.lair_actions[1].name).toBe('Erupting Roots');
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
+    expect(lairRowAffordance(young.lair_actions[1])).toBe('save');
     expect(young.lair_actions[2].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
     expect(lairRowAffordance(young.lair_actions[2])).toBeNull();
@@ -6040,5 +6043,93 @@ describe('MA-1783 young-green-dragon grasping roots data lock', () => {
     expect(young.lair_actions[1].save_type).toBe('Strength');
     expect(young.lair_actions[2].save_type).toBe('Dexterity');
     expect(young.lair_actions[2].damage_dice_primary).toBe('4d8');
+  });
+});
+
+// MA-1784: Young Green Dragon lair_actions[1] was a NAMELESS roots save dict
+// {description, save_dc:15, save_type:"Strength"} — mechanically complete but
+// rejected solely by the `!row.name` gate at monsterLairActions.js:25
+// (MA-1748 twin fingerprint): static prose render, zero .mc-dice-link-lair
+// chip, no save prompt, restrained never applied (name alone insufficient per
+// MA-1754 — handleLairRow grants ONLY via extractConditionsFromSaveEffect
+// (action.save_effect), description NEVER read; §180). Data-only fix promotes
+// it to the sibling/adult-green byte-shape with a DISTINCT RAW-anchored name
+// ("roots and vines erupt") — "Erupting Roots" (distinct from [0] "Grasping
+// Roots", MA-1748 distinct-naming precedent) — key order mirrors [0]:
+// {name, description:<young RAW byte-preserved>, save_dc:15,
+// save_type:"Strength", dc_success:"none", save_effect:"The target is
+// restrained by the roots and vines."}. Young RAW success = no damage →
+// dc_success "none" closes the MV-20 half-default leak. RESTRAINED rides the
+// untouched MA-0017 damageless failed-save seam. Thorn-wall [2] untouched
+// (MA-1785).
+describe('MA-1784 young-green-dragon erupting roots data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-green-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-green-dragon');
+  const roots = young.lair_actions[1];
+  const YOUNG_RAW = 'Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif\u00adficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.';
+
+  it('row is now clickable TRUE with affordance SAVE (was nameless inert at the name gate)', () => {
+    expect(typeof roots).toBe('object');
+    expect(isLairRowClickable(roots)).toBe(true);
+    expect(lairRowAffordance(roots)).toBe('save');
+  });
+
+  it('distinct name "Erupting Roots" (RAW-anchored "roots and vines erupt"), sibling [0] keeps "Grasping Roots"', () => {
+    expect(roots.name).toBe('Erupting Roots');
+    expect(young.lair_actions[0].name).toBe('Grasping Roots');
+    expect(roots.name).not.toBe(adult.lair_actions[0].name);
+  });
+
+  it('key order mirrors [0]/adult-green[0]: name, description, save_dc, save_type, dc_success, save_effect', () => {
+    expect(Object.keys(roots)).toEqual(['name', 'description', 'save_dc', 'save_type', 'dc_success', 'save_effect']);
+    expect(Object.keys(adult.lair_actions[0])).toEqual(Object.keys(roots));
+  });
+
+  it('young RAW prose byte-preserved verbatim (no adult advisory tail authored on this row)', () => {
+    expect(roots.description).toBe(YOUNG_RAW);
+  });
+
+  it('save fields RAW-agreed: DC 15 Strength, dc_success none, no damage authored', () => {
+    expect(roots.save_dc).toBe(15);
+    expect(roots.save_type).toBe('Strength');
+    expect(roots.dc_success).toBe('none');
+    expect(roots.damage_dice_primary).toBeUndefined();
+    expect(roots.damage_type_primary).toBeUndefined();
+  });
+
+  it('save_effect vocabulary extracts ONLY restrained (MA-0017 damageless seam; MA-1754 name-alone insufficient)', () => {
+    expect(roots.save_effect).toBe('The target is restrained by the roots and vines.');
+    expect(extractConditionsFromSaveEffect(roots.save_effect)).toEqual(['restrained']);
+    // MA-1754 twin: name alone insufficient — the pre-fix nameless dict shape
+    // (no save_effect authored) had zero transport at the gate regardless.
+    expect(isLairRowClickable({ description: YOUNG_RAW, save_dc: 15, save_type: 'Strength' })).toBe(false);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + restrained', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: roots,
+      monsterName: 'Young Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(roots.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
+  });
+
+  it('scope guard: exactly 3 elements; thorn-wall sibling [2] stays nameless FALSE-pinned (MA-1785)', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(lairRowAffordance(young.lair_actions[2])).toBeNull();
+    expect(young.lair_actions[2].save_type).toBe('Dexterity');
+    expect(young.lair_actions[2].damage_dice_primary).toBe('4d8');
+    // adult-green twin untouched by this ticket
+    expect(adult.lair_actions[0].name).toBe('Grasping Roots');
   });
 });
