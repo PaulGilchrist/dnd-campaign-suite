@@ -364,3 +364,38 @@ describe('MA-1209 mummy-lord spellcasting-pain save chip render + press lock', (
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });
+
+// MA-1747: Young Black Dragon lair_actions[0] bare-string pools row was
+// text-only with zero affordance (MA-0378 bare-string family, live inert
+// 2026-09-30). Data fix Option B arms exactly ONE save chip — siblings
+// [1]/[2] (MA-1748/MA-1749 nameless dicts) must stay inert static prose.
+describe('MA-1747 young-black-dragon surging pools chip render + press lock', () => {
+  const young = monstersData.find(m => m.index === 'young-black-dragon');
+
+  it('named [0] renders ONE "DC 15 Strength" chip; nameless siblings render static prose without buttons', () => {
+    const m = makeMonster({ name: 'Young Black Dragon', lair_actions: young.lair_actions });
+    const creatures = [{ name: 'Young Black Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 127, maxHp: 127, ac: 18, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Black Dragon 1', creatures })} />);
+    const links = lairLinks();
+    expect(links).toHaveLength(1);
+    expect(links[0].textContent).toContain('DC 15 Strength');
+    expect(links[0].getAttribute('role')).toBe('button');
+    expect(links[0].getAttribute('title')).toMatch(/initiative 20/);
+    const staticRows = Array.from(document.querySelectorAll('.mc-section .mc-action')).filter(el => el.textContent.includes('grasping tide') && !el.querySelector('.mc-dice-link-lair'));
+    expect(staticRows).toHaveLength(1);
+    expect(staticRows[0].querySelectorAll('span[role="button"]')).toHaveLength(0);
+  });
+
+  it('chip press → save seam at authored DC 15 STR, zero damage formula, zero conditions (prone/pull GM-advisory)', async () => {
+    const m = makeMonster({ name: 'Young Black Dragon', lair_actions: young.lair_actions });
+    const creatures = [{ name: 'Young Black Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 127, maxHp: 127, ac: 18, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Black Dragon 1', creatures })} />);
+    fireEvent.click(lairLinkWithName('DC 15 Strength'));
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const call = ROLLERS.rollSavingThrow.mock.calls[0];
+    expect(call[0]).toBe('STR');
+    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Strength', attackerName: 'Young Black Dragon 1', targetName: 'TestPC' });
+    expect(call[2].autoDamageFormula).toBeNull();
+    expect(call[2].saveConditions).toEqual([]);
+  });
+});

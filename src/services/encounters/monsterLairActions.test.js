@@ -1912,14 +1912,16 @@ describe('MA-0165 ancient-black-dragon grasping tide data lock', () => {
     expect(dragon.lair_actions[2].zone.no_save).toBe(true);
   });
 
-  it('young-black-dragon scope guard: its raw-string and identical nameless grasping-tide dict are NOT touched by this fix', () => {
+  it('young-black-dragon scope guard: nameless grasping-tide dict [1] stays inert (MA-1748 separate); raw-string [0] structured by MA-1747', () => {
     const young = monstersData.find(m => m.index === 'young-black-dragon');
-    expect(typeof young.lair_actions[0]).toBe('string');
     expect(young.lair_actions[1].description).toBe(VERBATIM);
     expect(young.lair_actions[1].name).toBeUndefined();
     expect(young.lair_actions[1].dc_success).toBeUndefined();
     expect(young.lair_actions[1].save_effect).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    // MA-1747 inverted this pin: [0] was the raw string, now the named save dict
+    expect(typeof young.lair_actions[0]).toBe('object');
+    expect(young.lair_actions[0].name).toBe('Surging Pools');
   });
 });
 
@@ -2116,8 +2118,10 @@ describe('MA-0167 ancient-black-dragon darkness zone data lock', () => {
   });
 
   it('scope guard: legacy raw-string lair rows elsewhere never become clickable', () => {
-    const young = monstersData.find(m => m.index === 'young-black-dragon');
-    const rawRow = young.lair_actions.find(la => typeof la === 'string');
+    // Re-anchored off young-black-dragon (its raw-string [0] was structured
+    // by MA-1747) onto the lich's still-legacy recharge lair row.
+    const lich = monstersData.find(m => m.index === 'lich');
+    const rawRow = lich.lair_actions.find(la => typeof la === 'string');
     expect(typeof rawRow).toBe('string');
     expect(isLairRowClickable(rawRow)).toBe(false);
     expect(lairRowAffordance(rawRow)).toBeNull();
@@ -4826,5 +4830,75 @@ describe('MA-1649 vampire-nightbringer mists fog zone data lock', () => {
     const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
     expect(getEffectDefinition('lair_fog_cloud').group).toBe('Lair');
     expect(getEffectDefinition('lair_nightbringer_mists')).toBeFalsy();
+  });
+});
+
+// MA-1747: Young Black Dragon lair_actions[0] pools-of-water was a LEGACY
+// BARE STRING (MA-0378/MA-0118 bare-string family) — it hit the
+// typeof la === 'string' static branch in MonsterCardBody.jsx:358 BEFORE
+// isLairRowClickable was even consulted → text-only row, zero
+// .mc-dice-link-lair, zero save prompt, zero log (live inert, 2026-09-30).
+// Option B data-only fix per ticket: named structured SAVE row
+// {"name":"Surging Pools","description":<verbatim>,"save_dc":15,
+// "save_type":"Strength"} → lairRowAffordance 'save' → "DC 15 Strength"
+// chip riding the untouched handleSaveRoll seam (MA-0024). PRONE/PULL are
+// ticket-adjudicated GM-enforced advisory residuals (no save_effect authored,
+// no pull consumer, no initiative-20 lair seam — §70). MUST NOT collide with
+// siblings MA-1748 (nameless pools dict [1]) / MA-1749 (nameless insect
+// dict [2]) — both stay inert.
+describe('MA-1747 young-black-dragon surging pools data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-black-dragon');
+  const pools = young.lair_actions[0];
+  const VERBATIM = 'Pools of water that the dragon can see within 120 feet of it surge outward in a grasping tide. Any creature on the ground within 20 feet of such a pool must succeed on a DC 15 Strength saving throw or be pulled up to 20 feet into the water and knocked prone.';
+
+  it('row is now a named structured clickable SAVE row (was bare-string inert)', () => {
+    expect(typeof pools).toBe('object');
+    expect(pools.name).toBe('Surging Pools');
+    expect(isLairRowClickable(pools)).toBe(true);
+    expect(lairRowAffordance(pools)).toBe('save');
+  });
+
+  it('save fields prose-agreed: DC 15 Strength; description byte-preserved verbatim', () => {
+    expect(pools.save_dc).toBe(15);
+    expect(pools.save_type).toBe('Strength');
+    expect(pools.description).toBe(VERBATIM);
+    expect(pools.description).toMatch(/DC 15 Strength saving throw/i);
+  });
+
+  it('ticket Option B shape: name/description/save_dc/save_type only — pull/prone stay GM advisory (no save_effect, no dc_success, no zone)', () => {
+    expect(Object.keys(pools)).toEqual(['name', 'description', 'save_dc', 'save_type']);
+    expect(pools.save_effect).toBeUndefined();
+    expect(pools.dc_success).toBeUndefined();
+    expect(pools.zone).toBeUndefined();
+    expect(extractConditionsFromSaveEffect(pools.save_effect)).toEqual([]);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula and zero conditions; no refusal/advisory branches', async () => {
+    const handleSaveRoll = vi.fn();
+    const logs = [];
+    const res = await resolveLairRow({
+      action: pools,
+      monsterName: 'Young Black Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: [],
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(pools, null, []);
+    expect(logs).toHaveLength(0);
+  });
+
+  it('sibling collision control: [1] nameless pools dict and [2] nameless insect dict stay inert untouched rows', () => {
+    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(young.lair_actions[1].description).toBe(VERBATIM);
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(young.lair_actions[2].save_type).toBe('Constitution');
+    expect(young.lair_actions).toHaveLength(3);
   });
 });
