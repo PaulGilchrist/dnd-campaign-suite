@@ -3120,8 +3120,10 @@ describe('MA-0242 ancient-red-dragon magma geyser data lock', () => {
     expect(dragon.lair_actions[2].name).toBe('Volcanic Gases');
     expect(isLairRowClickable(dragon.lair_actions[2])).toBe(true);
     const young = monstersData.find(m => m.index === 'young-red-dragon');
-    expect(young.lair_actions[0].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+    // MA-1789 INVERTED this FALSE-pin: young-red bare string promoted to
+    // the named "Magma Geyser" save dict mirroring this adult template.
+    expect(young.lair_actions[0].name).toBe('Magma Geyser');
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
   });
 });
 
@@ -3283,13 +3285,15 @@ describe('MA-0244 ancient-red-dragon volcanic gases data lock', () => {
     expect(cloud.duration).toBe(adultCloud.duration);
   });
 
-  it('scope guard: ancient-red [0]/[1] fixed rows untouched; young-red twin rows stay nameless/inert (MA-0222 name-gate)', () => {
+  it('scope guard: ancient-red [0]/[1] fixed rows untouched; young-red [0] promoted by MA-1789, twins [1]/[2] stay nameless/inert (MA-0222 name-gate)', () => {
     expect(dragon.lair_actions[0].name).toBe('Magma Geyser');
     expect(dragon.lair_actions[0].dc_success).toBe('half');
     expect(dragon.lair_actions[1].name).toBe('Tremor');
     const young = monstersData.find(m => m.index === 'young-red-dragon');
-    expect(typeof young.lair_actions[0]).toBe('string');
-    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+    // MA-1789 INVERTED the [0] pins: bare string → named "Magma Geyser" save row.
+    expect(typeof young.lair_actions[0]).toBe('object');
+    expect(young.lair_actions[0].name).toBe('Magma Geyser');
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
     expect(young.lair_actions[1].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
     expect(young.lair_actions[2].name).toBeUndefined();
@@ -6229,5 +6233,86 @@ describe('MA-1785 young-green-dragon wall of thorns data lock', () => {
     expect(young.lair_actions[1].save_type).toBe('Strength');
     expect(young.lair_actions[1].dc_success).toBe('none');
     expect(young.lair_actions[1].damage_dice_primary).toBeUndefined();
+  });
+});
+
+// MA-1789: Young Red Dragon lair_actions[0] was a BARE STRING (MA-0378/
+// MA-0118 bare-string inert family) — it hit the `typeof la === 'string'`
+// static short-circuit in MonsterCardBody.jsx BEFORE isLairRowClickable was
+// even consulted → text-only row, zero .mc-dice-link-lair, zero save
+// prompt, zero damage, zero log (live inert, 2026-10-01). DATA-only fix:
+// promoted to the adult-red MA-0128 byte-twin named SAVE row {"name":
+// "Magma Geyser", save_dc:15, save_type:"Dexterity", damage_dice_primary:
+// "6d6", damage_type_primary:"Fire", dc_success:"half"} — description
+// repaired soft-hyphen U+00AD "tak\xad ing" → clean "taking" (the ONLY byte-
+// diff vs the adult prose; adult still carries the SH). RAW success = half.
+// Siblings [1] nameless magma dict / [2] nameless tremor dict stay
+// nameless/inert FALSE-pins (MA-0222 name-gate).
+describe('MA-1789 young-red-dragon magma geyser bare-string data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-red-dragon');
+  const geyser = young.lair_actions[0];
+
+  it('[0] is now a named clickable SAVE row (was bare-string inert)', () => {
+    expect(typeof geyser).toBe('object');
+    expect(geyser.name).toBe('Magma Geyser');
+    expect(isLairRowClickable(geyser)).toBe(true);
+    expect(lairRowAffordance(geyser)).toBe('save');
+  });
+
+  it('structured fields: DC 15 Dexterity, 6d6 Fire, dc_success half (RAW half-on-success)', () => {
+    expect(geyser.save_dc).toBe(15);
+    expect(geyser.save_type).toBe('Dexterity');
+    expect(geyser.damage_dice_primary).toBe('6d6');
+    expect(geyser.damage_type_primary).toBe('Fire');
+    expect(geyser.dc_success).toBe('half');
+    expect(geyser.description).toMatch(/^Magma erupts from a point on the ground/);
+    expect(geyser.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(geyser.description).toMatch(/taking 21 \(6d6\) fire damage on a failed save/i);
+    expect(geyser.description).toMatch(/half as much damage on a successful one\.$/);
+  });
+
+  it('adult-red MA-0128 template byte-parity modulo soft-hyphen repair', () => {
+    const adult = monstersData.find(m => m.index === 'adult-red-dragon');
+    const adultGeyser = adult.lair_actions[0];
+    expect(adultGeyser.name).toBe('Magma Geyser');
+    expect(geyser.name).toBe(adultGeyser.name);
+    expect(geyser.save_dc).toBe(adultGeyser.save_dc);
+    expect(geyser.save_type).toBe(adultGeyser.save_type);
+    expect(geyser.damage_dice_primary).toBe(adultGeyser.damage_dice_primary);
+    expect(geyser.damage_type_primary).toBe(adultGeyser.damage_type_primary);
+    expect(geyser.dc_success).toBe(adultGeyser.dc_success);
+    expect(Object.keys(geyser)).toEqual(Object.keys(adultGeyser));
+    // adult prose still carries U+00AD; young fix repaired it to clean text —
+    // the ONLY permitted byte-diff is the SH + its following space collapse.
+    expect(adultGeyser.description).toContain('\u00ad');
+    expect(geyser.description).not.toContain('\u00ad');
+    expect(geyser.description).toBe(adultGeyser.description.replace('tak\u00ad ing', 'taking'));
+  });
+
+  it('save row routes through handleSaveRoll with 6d6 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: geyser,
+      monsterName: 'Young Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '6d6',
+      saveConditions: extractConditionsFromSaveEffect(geyser.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
+  });
+
+  it('scope guard: lair block keeps 3 elements; siblings [1]/[2] stay nameless/inert FALSE-pins', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(young.lair_actions[1].description).toContain('\u00ad');
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(young.lair_actions[2].description).toMatch(/^A tremor shakes the lair/);
   });
 });

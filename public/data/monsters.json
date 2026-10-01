@@ -68074,7 +68074,15 @@
     "reactions": [],
     "legendary_actions": [],
     "lair_actions": [
-      "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
+      {
+        "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, taking 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
+        "save_dc": 15,
+        "save_type": "Dexterity",
+        "damage_dice_primary": "6d6",
+        "damage_type_primary": "Fire",
+        "name": "Magma Geyser",
+        "dc_success": "half"
+      },
       {
         "description": "Magma erupts from a point on the ground the dragon can see within 120 feet of it, creating a 20-foot-high, 5-foot-radius geyser. Each creature in the geyser's area must make a DC 15 Dexterity saving throw, tak­ ing 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
         "save_dc": 15,
