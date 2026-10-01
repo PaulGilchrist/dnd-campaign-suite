@@ -5650,3 +5650,75 @@ describe('MA-1767 young-bronze-dragon lair_rolling_fog data lock', () => {
     expect(new Set(young.lair_actions.map(la => la.name)).size).toBe(2);
   });
 });
+
+// MA-1772: Young Copper Dragon lair_actions[0] was a BARE STRING (MA-1747/
+// 1753/1760/1766 lane twin) — static prose, zero affordance, log delta 0.
+// Fix = promote to the VERIFIED adult-copper [0] byte-twin save row
+// (MA-0096): "Spike Growth", DC 15 Dexterity, dc_success "none"
+// (damageless), save_effect carrying the canonical restrained word
+// (MA-0594/MA-0584 word-gate precedent). Adult disk twin WINS — key order
+// and description byte-parity pinned. Spike-growth RAW residuals
+// (half-speed terrain, pierce-on-move, rescue action) stay advisory.
+describe('MA-1772 young-copper-dragon spike growth data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-copper-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-copper-dragon');
+  const spike = young.lair_actions[0];
+
+  it('row is now a structured clickable SAVE row named Spike Growth', () => {
+    expect(typeof spike).toBe('object');
+    expect(spike.name).toBe('Spike Growth');
+    expect(isLairRowClickable(spike)).toBe(true);
+    expect(lairRowAffordance(spike)).toBe('save');
+  });
+
+  it('byte-parity with the VERIFIED adult [0] disk twin (key order included)', () => {
+    expect(JSON.stringify(spike)).toBe(JSON.stringify(adult.lair_actions[0]));
+    expect(Object.keys(spike)).toEqual(['name', 'description', 'save_dc', 'save_type', 'dc_success', 'save_effect']);
+  });
+
+  it('authored save fields: DC 15 Dexterity, dc_success none, zero damage', () => {
+    expect(spike.save_dc).toBe(15);
+    expect(spike.save_type).toBe('Dexterity');
+    expect(spike.dc_success).toBe('none');
+    expect(spike.damage_dice_primary).toBeUndefined();
+    expect(spike.damage_type_primary).toBeUndefined();
+    expect(spike.description).toMatch(/spike growth spell/i);
+    expect(spike.description).toMatch(/until the dragon uses this lair action again or until the dragon dies/i);
+  });
+
+  it('save_effect extracts ONLY restrained (canonical word gate)', () => {
+    expect(spike.save_effect).toBe('The target is restrained.');
+    expect(extractConditionsFromSaveEffect(spike.save_effect)).toEqual(['restrained']);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + restrained', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: spike,
+      monsterName: 'Young Copper Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(spike.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(spike, null, ['restrained']);
+  });
+
+  it('sibling [1] stays MA-1773 scope: nameless description-only dict, NOT clickable', () => {
+    const sibling = young.lair_actions[1];
+    expect(typeof sibling).toBe('object');
+    expect(typeof sibling).not.toBe('string');
+    expect(sibling.name).toBeUndefined();
+    expect(isLairRowClickable(sibling)).toBe(false);
+    expect(lairRowAffordance(sibling)).toBeNull();
+  });
+
+  it('scope guard: lair block is exactly 2 elements, no bare strings remain', () => {
+    expect(young.lair_actions).toHaveLength(2);
+    expect(young.lair_actions.filter(la => typeof la === 'string')).toHaveLength(0);
+  });
+});
