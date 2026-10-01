@@ -30,9 +30,7 @@ Verified: no importer anywhere (imports resolved incl. case-insensitive; only on
 
 Exports whose names appear **nowhere outside their defining file** (and dynamic-dispatch via namespace import ruled out):
 
-- `savePromptService.js:105,114,132,141` — `sendPrismaticSprayIndigoPrompt`, `clearPrismaticSprayIndigoPrompt`, `sendPrismaticSprayVioletPrompt`, `clearPrismaticSprayVioletPrompt` (the `…Result` variants are live; the `…Prompt` variants are dead).
-- `magicSpells.js` — `addFeyTouchedSpell`, `addMagicInitiateSpells`, `addShadowTouchedSpell` (definition-only).
-- `attackCalc.js` — `getSpellActionType`, `isSpellAttack`; `sleepService.js:27` — `getSleepEffect`; `travelService.js` — `isTerrainPassable`, `MAX_FORCED_MARCH_HOURS`; `race-sources.js` — `buildFeatSkillLimitsDetails`; `cunningStrikeUtils.js` — `setGetCombatContextSyncOverride`, `clearGetCombatContextSyncOverride` (safest fix: drop `export`, or remove if internal mentions also 1).
+- ~~DONE (d546738f6)~~: deleted all top-tier zero-referenced exports in savePromptService (…Prompt variants), magicSpells, attackCalc, sleepService, travelService, race-sources, cunningStrikeUtils.
 - Lower-confidence tier (used in-file once, never imported): ~40 `build*Popup/RefusalPopup/SpendLog/…Log` helpers across the `monster*.js` services listed above — safe to drop the `export` keyword only.
 
 ## Complexity
