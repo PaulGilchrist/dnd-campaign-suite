@@ -30430,7 +30430,7 @@
       "saveDc": 12,
       "saveType": "Wisdom",
       "description": "The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12): At Will: Animal Friendship (snakes only); 2/Day: Suggestion",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1818-yuan-ti-infiltrator-spellcasting-plaintext-zero-chips.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1819",
