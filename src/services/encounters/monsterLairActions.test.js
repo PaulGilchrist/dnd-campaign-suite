@@ -1912,16 +1912,21 @@ describe('MA-0165 ancient-black-dragon grasping tide data lock', () => {
     expect(dragon.lair_actions[2].zone.no_save).toBe(true);
   });
 
-  it('young-black-dragon scope guard: nameless grasping-tide dict [1] stays inert (MA-1748 separate); raw-string [0] structured by MA-1747', () => {
+  it('young-black-dragon scope guard: [1] armed by MA-1748 ONE-FIELD name fix; [0] MA-1747 lock stays', () => {
     const young = monstersData.find(m => m.index === 'young-black-dragon');
     expect(young.lair_actions[1].description).toBe(VERBATIM);
-    expect(young.lair_actions[1].name).toBeUndefined();
+    // MA-1748 inverted this pin: nameless dict got its single `name` key
+    expect(young.lair_actions[1].name).toBe('Grasping Tide');
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
+    expect(lairRowAffordance(young.lair_actions[1])).toBe('save');
+    expect(Object.keys(young.lair_actions[1])).toEqual(['name', 'description', 'save_dc', 'save_type']);
     expect(young.lair_actions[1].dc_success).toBeUndefined();
     expect(young.lair_actions[1].save_effect).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(young.lair_actions[1].name).not.toBe(young.lair_actions[0].name);
     // MA-1747 inverted this pin: [0] was the raw string, now the named save dict
     expect(typeof young.lair_actions[0]).toBe('object');
     expect(young.lair_actions[0].name).toBe('Surging Pools');
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
   });
 });
 
@@ -4844,8 +4849,8 @@ describe('MA-1649 vampire-nightbringer mists fog zone data lock', () => {
 // chip riding the untouched handleSaveRoll seam (MA-0024). PRONE/PULL are
 // ticket-adjudicated GM-enforced advisory residuals (no save_effect authored,
 // no pull consumer, no initiative-20 lair seam — §70). MUST NOT collide with
-// siblings MA-1748 (nameless pools dict [1]) / MA-1749 (nameless insect
-// dict [2]) — both stay inert.
+// siblings MA-1748 (pools dict [1], armed same-family ONE-FIELD name fix →
+// distinct name "Grasping Tide") / MA-1749 (nameless insect dict [2] — inert).
 describe('MA-1747 young-black-dragon surging pools data lock', () => {
   const young = monstersData.find(m => m.index === 'young-black-dragon');
   const pools = young.lair_actions[0];
@@ -4893,10 +4898,12 @@ describe('MA-1747 young-black-dragon surging pools data lock', () => {
     expect(logs).toHaveLength(0);
   });
 
-  it('sibling collision control: [1] nameless pools dict and [2] nameless insect dict stay inert untouched rows', () => {
-    expect(young.lair_actions[1].name).toBeUndefined();
+  it('sibling collision control: [1] armed by MA-1748 w/ DISTINCT name; [2] nameless insect dict stays inert', () => {
+    expect(young.lair_actions[1].name).toBe('Grasping Tide');
+    expect(young.lair_actions[1].name).not.toBe(pools.name);
     expect(young.lair_actions[1].description).toBe(VERBATIM);
-    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
+    expect(lairRowAffordance(young.lair_actions[1])).toBe('save');
     expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
     expect(young.lair_actions[2].save_type).toBe('Constitution');
     expect(young.lair_actions).toHaveLength(3);
