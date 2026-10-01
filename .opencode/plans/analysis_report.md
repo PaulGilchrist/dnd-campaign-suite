@@ -12,9 +12,9 @@ Scope: 3,624 `*.js|jsx` files (~910k lines incl. 2,399 tests). ts/tsx: none.
 
 3. **Monster reaction service family** — `src/services/encounters/monster{Jinx,RedirectAttack,GrantReaction,LairActions,GuardianProtection,ShapeShift,SelfBuff,SelfAura,SpellReflection,UtilitySpellCast,Summon}.js` — each repeats the same scaffolding: exported `handle()` + `buildXRefusalPopup` + `buildXSpendLog`/`buildXRefusalLog` builders + round/uses latch checks (same pattern of exported-but-never-imported builders; see Unused Symbols).
 
-4. **Two Savage Attacker implementations** — `src/services/rules/core/savageAttacker.js` (94 L) and `src/services/combat/steps/features/savageAttacker.js` (43 L) both implement "roll damage twice, keep higher" + the identical passive predicate `passives.some(p => p.type === 'passive_rule' && p.effect === 'reroll_damage_once_per_turn')`. **Neither is imported by any production file** — the live logic is inline in `handlePlainDamage.js`/`DiceRollResult.*`.
+4. **Two Savage Attacker implementations** — `src/services/rules/core/savageAttacker.js` (94 L) and `src/services/combat/steps/features/savageAttacker.js` (43 L) both implement "roll damage twice, keep higher" + the identical passive predicate `passives.some(p => p.type === 'passive_rule' && p.effect === 'reroll_damage_once_per_turn')`. **Neither is imported by any production file** — the live logic is inline in `handlePlainDamage.js`/`DiceRollResult.*`. RESOLVED: both files deleted in 234d56073.
 
-5. **Two `beguilingTwistHandler.js`** — `automation/handlers/class-ranger/` (105 L, registered at `automation/index.js:121`) vs `class-warlock/` (175 L, orphaned, diverged implementation, 3 test files). Beguiling Twist is a Ranger (Gloom Stalker) feature; the warlock copy is an unreferenced fork.
+5. **Two `beguilingTwistHandler.js`** — `automation/handlers/class-ranger/` (105 L, registered at `automation/index.js:121`) vs `class-warlock/` (175 L, orphaned, diverged implementation, 3 test files). Beguiling Twist is a Ranger (Gloom Stalker) feature; the warlock copy is an unreferenced fork. RESOLVED: warlock copy deleted in 234d56073.
 
 ## Dead Code
 
@@ -23,7 +23,7 @@ Verified: no importer anywhere (imports resolved incl. case-insensitive; only on
 - ~~Deleted (234d56073)~~: `rules/core/savageAttacker.js`, `combat/steps/features/savageAttacker.js`, warlock `beguilingTwistHandler.js`, `rageUtils.js`, `calmEmotionsCleanup.js`, `shared/{getClassLevelData,injectSpecialActions}.js`, `automation/common/conditionEventStore.js`, `ui/syncStoreValue.js`, `popups/PsionicChoicePopup.jsx`, `initiative/{ConcentrationPicker,ConditionPicker}.jsx`, `character-creation/WizardStepRaceClass.jsx` + stranded tests.
 - **CORRECTION**: `src/encounters/combatData.js` is NOT an orphan — `../../../encounters/combatData.js` imports from `src/services/combat/steps/*.js` resolve to it. Keep.
 - **`vi.mock`-referenced UI components** (no production importers; kept because surviving CharSpells/CharActionModals tests mock these paths): `popups/{MultiTargetCountPopup,SingleTargetPopup,TargetWithCheckboxesPopup,TargetWithTypePopup}.jsx`, `modals/shared/{ChoiceListModal,HealingIllusionModal}.jsx`.
-- **Still open**: `src/services/rules/features/{aid,antimagicField,fear,feignDeath,massHeal,powerWordFortify}Service.js` — only tests import these.
+- ~~DONE (1bcbf83df)~~: deleted orphan `rules/features/{aid,antimagicField,calmEmotions,feignDeath,massHeal,powerWordFortify}Service.js` + stranded tests. `fearService.js` KEPT — live `vi.mock` paths in 9 surviving spellCastService tests reference it.
 - **Unreferenced module** with caveat: `src/routes/config.js` — only its test imports it, but AGENTS.md calls it "canonical view config"; App.jsx hardcodes views. Document drift, not automatic removal.
 
 ## Unused Symbols
@@ -55,9 +55,9 @@ Brace-nesting depth / function-length scan of the largest production files:
 
 ## Prioritized Low-Risk Opportunities
 
-1. **Rename `initiative.jsx` → `Initiative.jsx`** and fix remaining case-mismatched imports (`subscriber.jsx` done: commit 63deb3844).
-2. **Delete verified orphan modules + their stranded tests** (Dead Code list; ~1,000 L): `rageUtils.js`, `calmEmotionsCleanup.js`, the two `savageAttacker.js`, warlock `beguilingTwistHandler.js`, `src/encounters/combatData.js` shim, `getClassLevelData.js`, `injectSpecialActions.js`, `conditionEventStore.js`, and the 7 unreferenced popups/modals/pickers — each has zero production importers.
-3. **Strip `export` from the ~20 truly-unused exports** (Unused Symbols, top tier) — no call sites, no dispatch risk.
-4. **Delete the 6 `rules/features/*Service.js` orphans** after a one-time GM smoke check that Aid/Antimagic Field/etc. flows route through the live handlers (they already do — services unreferenced).
-5. **Consolidate the 4 area-effect modals** into `AreaEffectTargetModalBase` — biggest duplication win (up to 400 L saved) but needs the most review; do last.
-6. Cosmetic backlog: camelCase dirs → kebab-case, reduce inline styles/`!important`, route dice rolls through `diceRoller.js` (changes RNG call order — NOT zero-risk; deprioritize).
+1. ~~DONE~~ (63deb3844 Subscriber.jsx, 88f1ebb23 Initiative.jsx).
+2. ~~DONE~~ (234d56073 — 13 sources + 17 stranded tests/CSS removed, −5,002 L; `src/encounters/combatData.js` re-verified LIVE — not deleted).
+3. ~~DONE~~ (d546738f6 — 16 zero-referenced exports deleted).
+4. ~~DONE~~ (1bcbf83df — 6 orphan services + 9 tests removed; `fearService.js` kept: live `vi.mock` refs).
+5. ~~DONE (985e517f2)~~: extracted `AreaEffectSaveFlow.utils.js` (hooks: useCarefulSpellSelection, usePendingPromptsCleanup, useSaveResultListener, rollNpcSave, issuePlayerSavePrompt, …) shared by the 4 area-effect modals; net −192 lines; full suite green.
+6. Cosmetic backlog (deferred, not zero-risk / architectural): camelCase dirs → kebab-case, inline styles (89 files), `!important` usages, dice rolls → `diceRoller.js` (changes RNG call order), hooks-layer imports in initiative components.
