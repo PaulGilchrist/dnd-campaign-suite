@@ -67669,7 +67669,12 @@
         "save_effect": "The target is restrained."
       },
       {
-        "description": "The dragon chooses a point on the ground that it can see within 120 feet of it. Stone spikes sprout from the ground in a 20-foot radius centered on that point. The effect is otherwise identical to the spike growth spell and lasts until the dragon uses this lair action again or until the dragon dies."
+        "name": "Sprouting Spikes",
+        "description": "The dragon chooses a point on the ground that it can see within 120 feet of it. Stone spikes sprout from the ground in a 20-foot radius centered on that point. The effect is otherwise identical to the spike growth spell and lasts until the dragon uses this lair action again or until the dragon dies.",
+        "save_dc": 15,
+        "save_type": "Dexterity",
+        "dc_success": "none",
+        "save_effect": "The target is restrained."
       }
     ],
     "traits": [],
