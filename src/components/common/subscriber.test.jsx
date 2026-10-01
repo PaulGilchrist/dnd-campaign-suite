@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render } from '@testing-library/react';
 
-import Subscriber from './subscriber.jsx';
+import Subscriber from './Subscriber.jsx';
 
 // Module-level registry for the mocked SSE client.
 var _sseRegistry = new Map();
