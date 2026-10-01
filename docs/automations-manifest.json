@@ -188,7 +188,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: skill_check; Skills: Stealth; Also applies to Initiative; Uses: superiority_die",
       "expectedBehavior": "When you make a Dexterity (Stealth) check or an Initiative roll, you can expend one Superiority Die and add the die to the roll, unless you are Incapacitated."
@@ -200,7 +200,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-002-animal-friendship-caster-abort-and-upcast-inert.md",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "Level 1 Enchantment (Bard, Druid, Ranger) Casting Time: Action Range: 30 feet Components: V, S, M (a morsel of food) Duration: 24 hours Target a Beast that you can see within range. The target must succeed on a Wisdom saving throw or have the Charmed condition for the duration. If you or one of your allies deals damage to the target, the spell ends. Using a Higher-Level Spell Slot. You can target one additional Beast for each spell slot level above 1."
@@ -236,7 +236,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Automation type: animate_dead",
       "expectedBehavior": "Choose a pile of bones or a corpse of a Medium or Small Humanoid within range. The target becomes an Undead creature: a Skeleton if you chose bones or a Zombie if you chose a corpse (see appendix B for the stat blocks). On each of your turns, you can take a Bonus Action to mentally command any creature you made with this spell if the creature is within 60 feet of you (if you control multiple creatures, you can command any of them at the same time, issuing the same command to each one). You decide what action the creature will take and where it will move on its next turn, or you can issue a general command, such as to guard a chamber or corridor. If you issue no commands, the creature takes the Dodge action and moves only to avoid harm. Once given an order, the creature continues to follow it until its task is complete. The creature is under your control for 24 hours, after which it stops obeying any command you've given it. To maintain control of the creature for another 24 hours, you must cast this spell on the creature again before the current 24-hour period ends. This use of the spell reasserts your control over up to four creatures you have animated with this spell rather than animating a new creature. Using a Higher-Level Spell Slot. You animate or reassert control over two additional Undead creatures for each spell slot level above 3. Each of the creatures must come from a different corpse or pile of bones."
@@ -344,7 +344,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-013-archdruid-unlimited-uses-clause-absent-2024.md",
       "class": "Druid",
       "triggerConditions": "",
       "expectedBehavior": "The vitality of nature constantly blooms within you, granting you the following benefits. Evergreen Wild Shape: Whenever you roll Initiative and have no uses of Wild Shape left, you regain one expended use of it. Nature Magician: You can convert uses of Wild Shape into a spell slot (no action required). Choose a number of your unexpended uses of Wild Shape and convert them into a single spell slot, with each use contributing 2 spell levels. Longevity: The primal magic that you wield causes you to age more slowly. For every ten years that pass, your body ages only one year"
@@ -381,7 +381,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "You gain one of the following options of your choice. Whenever you finish a Long Rest, you can change your choice. Owl: You have Darkvision with a range of 60 feet. If you already have Darkvision, its range increases by 60 feet. Panther: You have a Climb Speed equal to your Speed. Salmon: You have a Swim Speed equal to your Speed."
@@ -393,7 +393,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-CLA-016-assassinate-extra-damage-inert.md",
       "class": "Rogue",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Initiative: Advantage on Initiative rolls. Surprising Strikes: During first round of each combat, Advantage on attack rolls against any creature that hasn't taken a turn. If Sneak Attack hits any target during that round, target takes extra damage equal to your Rogue level."
@@ -416,7 +416,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Paladin",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Your Aura of Protection is now a 30-foot Emanation."
