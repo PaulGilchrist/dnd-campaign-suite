@@ -5483,3 +5483,90 @@ describe('MA-1761 young-brass-dragon lair_dispersing_wind data lock', () => {
     expect(young.lair_actions.map(la => la.name)).toEqual(['Strong Wind', 'Dispersing Wind']);
   });
 });
+
+// MA-1766: Young Bronze Dragon lair_actions[0] was a BARE STRING (MA-0378
+// bare-string inert family — systemic young-dragon lair streak, MA-1747/
+// MA-1760 twins). MonsterCardBody.jsx:357 typeof==='string' first disjunct →
+// static span, zero affordance, click zero log delta. DATA fix promotes it to
+// the byte-proven adult-bronze-dragon MA-0085 "Fog Cloud" zone dict —
+// byte-parity mirror (young prose is byte-identical). NO save fields (canonical
+// fog cloud is save-less): save_dc==null + zone.radius_ft arms affordance
+// 'zone' (MA-0043 zoneOnly picker, no save prompts); lair_fog_cloud te
+// (registered targetEffectDefinitions:1218, Lair group) stamps covered targets
+// until_end_of_zone. Obscurement + initiative-count-20 expiry stay advisory
+// (§70 — no obscurement/init-20 consumer). Sibling [1] (MA-1767 lane) stays
+// the nameless description-only dict, FALSE-locked.
+describe('MA-1766 young-bronze-dragon lair fog cloud data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-bronze-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-bronze-dragon');
+  const fog = young.lair_actions[0];
+
+  it('row is now a structured clickable ZONE row named Fog Cloud (was bare-string inert)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Fog Cloud');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('zone');
+  });
+
+  it('byte-parity twin of the VERIFIED adult-bronze MA-0085 Fog Cloud row', () => {
+    expect(JSON.stringify(fog)).toBe(JSON.stringify(adult.lair_actions[0]));
+    expect(Object.keys(fog)).toEqual(['name', 'description', 'zone', 'duration']);
+  });
+
+  it('zone dict: radius 20, no_save true, noun fog, te key lair_fog_cloud; NO save fields', () => {
+    expect(fog.zone.radius_ft).toBe(20);
+    expect(fog.zone.no_save).toBe(true);
+    expect(fog.zone.noun).toBe('fog');
+    expect(fog.zone.effect_key).toBe('lair_fog_cloud');
+    expect(fog.zone.advisory).toMatch(/GM-enforced/);
+    expect(fog.save_dc).toBeUndefined();
+    expect(fog.save_type).toBeUndefined();
+    expect(fog.dc_success).toBeUndefined();
+    expect(fog.duration).toBe('until initiative count 20 next round (advisory)');
+  });
+
+  it('lair_fog_cloud te registered (Lair group) — the zone stamp key', async () => {
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_fog_cloud');
+    expect(def).toBeTruthy();
+    expect(def.label).toBe('Fog Cloud (Lair)');
+    expect(def.group).toBe('Lair');
+  });
+
+  it('zone row routes through handleZone, zero save/attack/damage handler calls', async () => {
+    const handleZone = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Young Bronze Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone,
+      saveDamageFormula: null,
+      saveConditions: [],
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'zone' });
+    expect(handleZone).toHaveBeenCalledWith(fog);
+  });
+
+  // MA-1767 lane — nameless description-only dict stays INERT until its own
+  // naming fix. Keep FALSE-locked (sibling-index pins for unfixed siblings).
+  it('sibling [1] MA-1767 stays FALSE-locked: nameless dict inert, distinct zero-affordance', () => {
+    const sib = young.lair_actions[1];
+    expect(young.lair_actions).toHaveLength(2);
+    expect(typeof sib).toBe('object');
+    expect(sib.name).toBeUndefined();
+    expect(sib.description).toBe(fog.description);
+    expect(isLairRowClickable(sib)).toBe(false);
+    expect(lairRowAffordance(sib)).toBeNull();
+  });
+
+  it('scope guard: young-bronze lair block is exactly 2 elements, [0] fixed dict only changed', () => {
+    expect(young.lair_actions).toHaveLength(2);
+    expect(typeof young.lair_actions[0]).toBe('object');
+    expect(typeof young.lair_actions[1]).toBe('object');
+    expect(young.lair_actions[1].zone).toBeUndefined();
+  });
+});

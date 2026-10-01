@@ -29635,7 +29635,7 @@
       "category": "lair_actions",
       "actionType": "other",
       "description": "The dragon creates fog as though it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1766-young-bronze-dragon-lair-bare-string-inert.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1767",
