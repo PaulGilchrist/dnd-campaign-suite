@@ -1,12 +1,18 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
+import {
+    usePendingPromptsCleanup,
+    useSaveResultListener,
+    rollNpcSave,
+    issuePlayerSavePrompt,
+    logAbilityUseSelection,
+} from './AreaEffectSaveFlow.utils.js';
 
 function buildLaughterConditionEntry(targetName, actionName) {
     return {
@@ -78,14 +84,9 @@ function TashasLaughterModal({
     setPopupHtml,
 }) {
     const [pendingPrompts, setPendingPrompts] = useState([]);
+    usePendingPromptsCleanup(setPendingPrompts);
     const [heightenTarget, setHeightenTarget] = useState(null);
     const allResultsRef = useRef([]);
-
-    useEffect(() => {
-        return () => {
-            setPendingPrompts([]);
-        };
-    }, []);
 
     const maxTargets = Math.max(1, spellSlotLevel);
 
@@ -160,16 +161,10 @@ function TashasLaughterModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
-            const isHeightenTarget = heightenTarget === targetName;
-            const disadvantage = isHeightenTarget;
+            const disadvantage = heightenTarget === targetName;
 
             if (isNpc) {
-                const saveRoll = disadvantage
-                    ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1)
-                    : Math.floor(Math.random() * 20) + 1;
-                const saveTotal = saveRoll + saveBonus;
-                const success = saveTotal >= saveDc;
+                const { saveBonus, saveRoll, saveTotal, success } = rollNpcSave(target, saveType, saveDc, disadvantage);
 
                 if (success) {
                     await addEntry(campaignName, {
@@ -235,22 +230,7 @@ function TashasLaughterModal({
                     results.push({ targetName, success: false, roll: saveRoll, total: saveTotal, saveBonus, conditionApplied: true });
                 }
             } else {
-                const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-                sendSavePrompt(campaignName, {
-                    promptId,
-                    targetName,
-                    saveType: saveType,
-                    saveDc: saveDc,
-                    sourceName: casterName,
-                    disadvantage,
-                });
-
-                const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
-                existingPrompts.push(promptId);
-                setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
-
-                prompts.push({ promptId, targetName });
+                prompts.push(issuePlayerSavePrompt(campaignName, { targetName, saveType, saveDc, casterName, payloadExtra: { disadvantage } }));
             }
         }
 
@@ -297,14 +277,7 @@ function TashasLaughterModal({
         });
     }, [campaignName, saveDc, saveType, pendingPrompts, applyLaughterConditionsToTarget, playerStats.name, action.name, onClose, setPopupHtml]);
 
-    useEffect(() => {
-        if (pendingPrompts.length === 0) return;
-        const handleSaveEvent = (event) => {
-            handleSaveResult(event);
-        };
-        window.addEventListener('save-result', handleSaveEvent);
-        return () => window.removeEventListener('save-result', handleSaveEvent);
-    }, [pendingPrompts.length, handleSaveResult]);
+    useSaveResultListener(pendingPrompts, handleSaveResult);
 
     const combatSummary = getCombatSummary(campaignName);
 
@@ -323,13 +296,7 @@ function TashasLaughterModal({
     };
 
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${action.name}: Selecting ${selectedNames.length} target(s) for save (DC ${saveDc} ${saveType})`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[TashasLaughterModal] Error logging feature use:', e); });
+        await logAbilityUseSelection(campaignName, { casterName: playerStats.name, abilityName: action.name, targetCount: selectedNames.length, saveDc, saveType, logPrefix: '[TashasLaughterModal]' });
 
         const { results, prompts } = await resolveAllSaves(selectedNames);
         allResultsRef.current = results;

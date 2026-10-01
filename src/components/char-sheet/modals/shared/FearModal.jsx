@@ -1,14 +1,27 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
-import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
-import { getAllyList } from '../../../../hooks/useAllySelection.js';
-import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { logConditionApplied, logSaveResultEntry } from './saveResultLogging.js';
+import {
+    useCarefulSpellSelection,
+    usePendingPromptsCleanup,
+    useSaveResultListener,
+    useCarefulEligibleTargets,
+    mapCreatureTargets,
+    rollNpcSave,
+    buildCarefulPlayerSaveResult,
+    issuePlayerSavePrompt,
+    logAbilityUseSelection,
+    resolveAllSavesPreamble,
+    resolveNpcCarefulSave,
+    resolveNpcSaveSuccess,
+    resolveNpcSaveFailure,
+    dropPendingPrompt,
+} from './AreaEffectSaveFlow.utils.js';
 
 function FearModal({
     action,
@@ -22,24 +35,11 @@ function FearModal({
     onClose,
 }) {
     const [pendingPrompts, setPendingPrompts] = useState([]);
-
-    useEffect(() => {
-        return () => {
-            setPendingPrompts([]);
-        };
-    }, []);
+    usePendingPromptsCleanup(setPendingPrompts);
 
     const [heightenTarget, setHeightenTarget] = useState(null);
 
-    const isCarefulSpell = metamagicCareful || false;
-    const allyList = isCarefulSpell ? getAllyList(playerStats.name) : null;
-    const isCarefulAlly = useCallback((name) => allyList ? allyList.includes(name) : false, [allyList]);
-
-    useEffect(() => {
-        return () => {
-            setPendingPrompts([]);
-        };
-    }, []);
+    const { isCarefulSpell, isCarefulAlly } = useCarefulSpellSelection(metamagicCareful, playerStats.name);
 
     const applyFrightenedToTarget = useCallback((targetName, campaignName) => {
         const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
@@ -71,186 +71,58 @@ function FearModal({
     }, []);
 
     const resolveAllSaves = useCallback(async (selectedNames) => {
-        const combatSummary = getCombatSummary(campaignName);
-        if (!combatSummary) return { results: [], prompts: [] };
-
-        const results = [];
-        const prompts = [];
         const casterName = playerStats.name;
+        const combatSummary = getCombatSummary(campaignName);
 
-        storeSpellLastAttack(campaignName, {
-            casterName,
-            spellName: action.name,
-            saveType,
-            saveDc,
-            attackScope: 'aoe',
-        });
+        const state = resolveAllSavesPreamble(campaignName, { casterName, spellName: action.name, saveType, saveDc, combatSummary });
+        if (!state) return { results: [], prompts: [] };
+        const { results, prompts } = state;
 
         for (const targetName of selectedNames) {
             const target = combatSummary.creatures.find(c => c.name === targetName);
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
 
             if (isNpc) {
                 const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
-                const isHeightenTarget = heightenTarget === targetName;
-
-                const saveRoll = isHeightenTarget ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
-                const saveTotal = saveRoll + saveBonus;
-                const success = saveTotal >= saveDc;
+                const save = rollNpcSave(target, saveType, saveDc, heightenTarget === targetName);
 
                 if (carefulSpellProtected) {
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: casterName,
+                    results.push(await resolveNpcCarefulSave(campaignName, { casterName, targetName, saveDc, saveType, roll: save.saveRoll, total: save.saveTotal, saveBonus: save.saveBonus, logPrefix: '[FearModal]' }));
+                } else if (!save.success) {
+                    results.push(await resolveNpcSaveFailure(campaignName, {
+                        casterName,
                         targetName,
                         saveDc,
                         saveType,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal}) — Careful Spell protected`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[FearModal] Error logging save result:', e); });
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'success',
-                        roll: saveRoll,
-                        total: saveTotal,
-                        conditions: [],
-                        appliedDamage: 0,
-                    });
-                    results.push({
-                        targetName,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        conditionApplied: false,
-                    });
-                } else if (!success) {
-                    applyFrightenedToTarget(targetName, campaignName);
-                    addExpiration({ attackerName: casterName, targetName, effects: [
-                        { type: 'condition', condition: 'frightened' },
-                    ], campaignName });
-                    trackFearEffect(casterName, targetName, saveDc, campaignName);
-
-                    await addEntry(campaignName, {
-                        type: 'condition',
-                        action: 'applied',
-                        characterName: targetName,
-                        condition: 'Frightened',
-                        dc: saveDc,
-                        ability: saveType,
-                        sourceName: casterName,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[FearModal] Error logging condition:', e); });
-
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: casterName,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        success: false,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        description: `${targetName} failed ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal})`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[FearModal] Error logging save result:', e); });
-
-                    await addEntry(campaignName, {
-                        type: 'condition',
-                        action: 'applied',
-                        characterName: targetName,
-                        condition: 'Frightened',
-                        reason: 'Fear spell',
-                        note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[FearModal] Error logging condition:', e); });
-
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'failure',
-                        roll: saveRoll,
-                        total: saveTotal,
+                        roll: save.saveRoll,
+                        total: save.saveTotal,
+                        saveBonus: save.saveBonus,
+                        logPrefix: '[FearModal]',
+                        applyConditions: (targetName, campaignName) => {
+                            applyFrightenedToTarget(targetName, campaignName);
+                            addExpiration({ attackerName: casterName, targetName, effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
+                            trackFearEffect(casterName, targetName, saveDc, campaignName);
+                        },
+                        conditionNames: ['Frightened'],
+                        failSummary: {
+                            condition: 'Frightened',
+                            reason: 'Fear spell',
+                            note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
+                        },
                         conditions: ['frightened'],
-                        appliedDamage: 0,
-                    });
-
-                    results.push({
-                        targetName,
-                        success: false,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        conditionApplied: true,
-                    });
+                    }));
                 } else {
-                    results.push({
-                        targetName,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        conditionApplied: false,
-                    });
-
-                    await addEntry(campaignName, {
-                        type: 'save_result',
-                        characterName: casterName,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        success: true,
-                        roll: saveRoll,
-                        total: saveTotal,
-                        saveBonus,
-                        description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal})`,
-                        timestamp: Date.now(),
-                    }).catch((e) => { console.error('[FearModal] Error logging save result:', e); });
-
-                    addTargetResult(campaignName, {
-                        targetName,
-                        saveResult: 'success',
-                        roll: saveRoll,
-                        total: saveTotal,
-                        conditions: [],
-                        appliedDamage: 0,
-                    });
+                    results.push(await resolveNpcSaveSuccess(campaignName, { casterName, targetName, saveDc, saveType, roll: save.saveRoll, total: save.saveTotal, saveBonus: save.saveBonus, logPrefix: '[FearModal]' }));
                 }
             } else {
                 const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
 
                 if (carefulSpellProtected) {
-                    results.push({
-                        targetName,
-                        success: true,
-                        roll: null,
-                        total: 0,
-                        saveBonus: 0,
-                        conditionApplied: false,
-                    });
+                    results.push(buildCarefulPlayerSaveResult(targetName));
                 } else {
-                    const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-                    sendSavePrompt(campaignName, {
-                        promptId,
-                        targetName,
-                        saveType: saveType,
-                        saveDc: saveDc,
-                        sourceName: casterName,
-                    });
-
-                    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
-                    existingPrompts.push(promptId);
-                    setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
-
-                    prompts.push({ promptId, targetName });
+                    prompts.push(issuePlayerSavePrompt(campaignName, { targetName, saveType, saveDc, casterName }));
                 }
             }
         }
@@ -311,54 +183,22 @@ function FearModal({
 
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
-        setPendingPrompts(prev => {
-            const updated = prev.filter(p => p.promptId !== detail.promptId);
-            if (updated.length === 0) {
-                setTimeout(() => onClose(), 500);
-            }
-            return updated;
-        });
+        dropPendingPrompt(setPendingPrompts, detail.promptId, onClose);
     }, [campaignName, saveDc, saveType, pendingPrompts, applyFrightenedToTarget, trackFearEffect, playerStats.name, onClose]);
 
-    useEffect(() => {
-        if (pendingPrompts.length === 0) return;
-        const handleSaveEvent = (event) => {
-            handleSaveResult(event);
-        };
-        window.addEventListener('save-result', handleSaveEvent);
-        return () => window.removeEventListener('save-result', handleSaveEvent);
-    }, [pendingPrompts.length, handleSaveResult]);
+    useSaveResultListener(pendingPrompts, handleSaveResult);
 
     const combatSummary = getCombatSummary(campaignName);
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');
 
-    const eligibleTargets = useMemo(() => {
-        if (!combatSummary?.creatures) return [];
-        return combatSummary.creatures
-            .map(c => ({
-                ...c,
-                carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),
-            }));
-    }, [combatSummary, isCarefulSpell, isCarefulAlly]);
+    const eligibleTargets = useCarefulEligibleTargets(combatSummary, isCarefulSpell, isCarefulAlly);
 
     const getCreatureTargets = () => {
-        return eligibleTargets.map(c => ({
-            name: c.name,
-            type: c.type,
-            currentHp: c.currentHp,
-            maxHp: c.maxHp,
-            carefulSpellProtected: c.carefulSpellProtected,
-        }));
+        return mapCreatureTargets(eligibleTargets);
     };
 
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${action.name}: Selecting ${selectedNames.length} target(s) for save (DC ${saveDc} ${saveType})`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[FearModal] Error logging feature use:', e); });
+        await logAbilityUseSelection(campaignName, { casterName: playerStats.name, abilityName: action.name, targetCount: selectedNames.length, saveDc, saveType, logPrefix: '[FearModal]' });
 
         const { prompts } = await resolveAllSaves(selectedNames);
         setPendingPrompts(prompts);

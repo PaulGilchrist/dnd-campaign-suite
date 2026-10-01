@@ -1,23 +1,24 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
+import React, { useState, useCallback, useEffect } from 'react';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
-import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { logSaveResultEntry } from './saveResultLogging.js';
 import { applyCalmEmotionsImmunity, applyCalmEmotionsCharmed } from '../../../../services/automation/handlers/spells/calmEmotionsHandler.js';
-
-const rollD20 = () => Math.floor(Math.random() * 20) + 1;
+import {
+    useCarefulSpellSelection,
+    useSaveResultListener,
+    useCarefulEligibleTargets,
+    rollNpcSave,
+    issuePlayerSavePrompt,
+    logAbilityUseSelection,
+    dropPendingPrompt,
+} from './AreaEffectSaveFlow.utils.js';
 
 async function resolveCalmNpcSave(ctx, targetName, target) {
-    const { campaignName, casterName, saveType, saveDc, isCarefulSpell, isCarefulAlly, heightenTarget, choice } = ctx;
-    const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    const { campaignName, casterName, saveType, saveDc, isCarefulSpell, isCarefulAlly, choice } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
-    const saveRoll = heightenTarget === targetName ? Math.min(rollD20(), rollD20()) : rollD20();
-    const saveTotal = saveRoll + saveBonus;
-    const success = saveTotal >= saveDc;
+    const { saveBonus, saveRoll, saveTotal, success } = rollNpcSave(target, saveType, saveDc, ctx.heightenTarget === targetName);
 
     if (carefulSpellProtected) {
         await addEntry(campaignName, {
@@ -33,7 +34,7 @@ async function resolveCalmNpcSave(ctx, targetName, target) {
             description: `${targetName} succeeded on ${saveType} save (DC ${saveDc}, rolled ${saveRoll} + ${saveBonus} = ${saveTotal}) — Careful Spell protected`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[calmEmotions] Error logging save result:', e); });
-        addTargetResult(campaignName, {
+        await addTargetResult(campaignName, {
             targetName,
             saveResult: 'success',
             roll: saveRoll,
@@ -64,21 +65,7 @@ async function resolveCalmPlayerSave(ctx, targetName, results, prompts) {
         results.push({ targetName, success: true, roll: null, total: 0, saveBonus: 0, conditionApplied: false });
         return;
     }
-    const promptId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-    sendSavePrompt(campaignName, {
-        promptId,
-        targetName,
-        saveType: saveType,
-        saveDc: saveDc,
-        sourceName: casterName,
-    });
-
-    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
-    existingPrompts.push(promptId);
-    setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
-
-    prompts.push({ promptId, targetName, choice });
+    prompts.push({ ...issuePlayerSavePrompt(campaignName, { targetName, saveType, saveDc, casterName }), choice });
 }
 
 function CalmEmotionsModal({
@@ -96,22 +83,13 @@ function CalmEmotionsModal({
     const [heightenTarget, setHeightenTarget] = useState(null);
     const [targetChoices, setTargetChoices] = useState({});
 
-    const isCarefulSpell = metamagicCareful || false;
-    const allyList = isCarefulSpell ? getAllyList(playerStats.name) : null;
-    const isCarefulAlly = useCallback((name) => allyList ? allyList.includes(name) : false, [allyList]);
+    const { isCarefulSpell, isCarefulAlly } = useCarefulSpellSelection(metamagicCareful, playerStats.name);
 
     // Default: all creatures included, default choice = immunity
     const combatSummary = getCombatSummary(campaignName);
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');
 
-    const eligibleTargets = useMemo(() => {
-        if (!combatSummary?.creatures) return [];
-        return combatSummary.creatures
-            .map(c => ({
-                ...c,
-                carefulSpellProtected: isCarefulSpell && isCarefulAlly(c.name),
-            }));
-    }, [combatSummary, isCarefulSpell, isCarefulAlly]);
+    const eligibleTargets = useCarefulEligibleTargets(combatSummary, isCarefulSpell, isCarefulAlly);
 
     useEffect(() => {
         const defaultChoices = {};
@@ -210,36 +188,17 @@ function CalmEmotionsModal({
 
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
-        setPendingPrompts(prev => {
-            const updated = prev.filter(p => p.promptId !== detail.promptId);
-            if (updated.length === 0) {
-                setTimeout(() => onClose(), 500);
-            }
-            return updated;
-        });
+        dropPendingPrompt(setPendingPrompts, detail.promptId, onClose);
     }, [campaignName, saveDc, saveType, pendingPrompts, playerStats.name, onClose]);
 
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${action.name}: Selecting ${selectedNames.length} target(s) for save (DC ${saveDc} ${saveType})`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[calmEmotions] Error logging feature use:', e); });
+        await logAbilityUseSelection(campaignName, { casterName: playerStats.name, abilityName: action.name, targetCount: selectedNames.length, saveDc, saveType, logPrefix: '[calmEmotions]' });
 
         const { prompts } = await resolveAllSaves(selectedNames);
         setPendingPrompts(prompts);
     }, [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSaves]);
 
-    useEffect(() => {
-        if (pendingPrompts.length === 0) return;
-        const handleSaveEvent = (event) => {
-            handleSaveResult(event);
-        };
-        window.addEventListener('save-result', handleSaveEvent);
-        return () => window.removeEventListener('save-result', handleSaveEvent);
-    }, [pendingPrompts.length, handleSaveResult]);
+    useSaveResultListener(pendingPrompts, handleSaveResult);
 
     const handleToggleTarget = useCallback((targetName) => {
         setTargetChoices(prev => {
