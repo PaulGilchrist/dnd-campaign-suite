@@ -3452,11 +3452,15 @@ describe('MA-0255 ancient-silver-dragon cold wind data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(wind, '1d10', []);
   });
 
-  it('scope guard: [0] fog zone and young-silver inert twins untouched; wyrmling lair empty', () => {
+  it('scope guard: [0] fog zone; young-silver [0] inert twin pin INVERTED by MA-1802; wyrmling lair empty', () => {
     expect(dragon.lair_actions[0].name).toBe('Fog Cloud');
     expect(lairRowAffordance(dragon.lair_actions[0])).toBe('zone');
     const young = monstersData.find(m => m.index === 'young-silver-dragon');
-    expect(typeof young.lair_actions[0]).toBe('string');
+    // MA-1802: young-silver [0] promoted from bare string to the adult-silver
+    // MA-0140 advisory dict — stale broken-state pin inverted same pass.
+    expect(typeof young.lair_actions[0]).toBe('object');
+    expect(young.lair_actions[0].name).toBe('Fog Cloud');
+    expect(lairRowAffordance(young.lair_actions[0])).toBe('advisory');
     expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
     const wyrmling = monstersData.find(m => m.index === 'silver-dragon-wyrmling');
     expect(wyrmling.lair_actions).toEqual([]);
@@ -6500,5 +6504,83 @@ describe('MA-1791 young-red-dragon tremor nameless-dict data lock', () => {
     expect(young.lair_actions[1].dc_success).toBe('half');
     expect(young.lair_actions[1].damage_dice_primary).toBe('6d6');
     expect(young.lair_actions[1].damage_type_primary).toBe('Fire');
+  });
+});
+
+// MA-1802: Young Silver Dragon lair_actions[0] was a BARE STRING (MA-0378 /
+// MA-1747/1753/1760/1766 bare-string inert family — systemic young-dragon
+// lair streak). MonsterCardBody.jsx:358 typeof==='string' first disjunct →
+// static span, zero affordance, click zero log delta. DATA fix promotes it to
+// the byte-proven adult-silver-dragon MA-0140 advisory dict — exact byte
+// parity INCLUDING the name ("Fog Cloud", advisory:"fog_cloud"); silver fog
+// carries NO zone block (unlike bronze MA-1766 zone lane): affordance is
+// 'advisory' → CLA-325 spell-named ability_use record, initiative-count-20
+// expiry GM-enforced (§70 no initiative lair seam). Sibling [1] (MA-1803)
+// stays the byte-duplicate nameless description-only dict — FALSE-PIN kept.
+describe('MA-1802 young-silver-dragon lair fog cloud data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-silver-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-silver-dragon');
+  const fog = young.lair_actions[0];
+
+  it('row is now a structured clickable ADVISORY row named Fog Cloud (was bare-string inert)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Fog Cloud');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('advisory');
+  });
+
+  it('byte-parity twin of the VERIFIED adult-silver MA-0140 Fog Cloud advisory row', () => {
+    expect(JSON.stringify(fog)).toBe(JSON.stringify(adult.lair_actions[0]));
+    expect(Object.keys(fog)).toEqual(['name', 'advisory', 'description']);
+    expect(fog.advisory).toBe('fog_cloud');
+    expect(fog.description).toBe('The dragon creates fog as if it had cast the fog cloud spell. The fog lasts until initiative count 20 on the next round.');
+  });
+
+  it('advisory shape carries NO save/zone/damage fields (silver lane, not bronze zone)', () => {
+    expect(fog.save_dc).toBeUndefined();
+    expect(fog.save_type).toBeUndefined();
+    expect(fog.dc_success).toBeUndefined();
+    expect(fog.damage_dice_primary).toBeUndefined();
+    expect(fog.zone).toBeUndefined();
+  });
+
+  it('advisory click logs ability_use fog record, zero save/attack/damage/zone', async () => {
+    const logs = [];
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Young Silver Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll: vi.fn(),
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      deps: { addEntry: (_c, e) => { logs.push(e); return Promise.resolve(); } },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].type).toBe('ability_use');
+    expect(logs[0].abilityName).toBe('Fog Cloud');
+    expect(logs[0].description).toMatch(/casts fog cloud/i);
+    expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(logs[0].description).not.toMatch(/save DC/i);
+  });
+
+  it('sibling [1] MA-1803 FALSE-PIN kept: nameless description-only dict, still inert', () => {
+    const sib = young.lair_actions[1];
+    expect(young.lair_actions).toHaveLength(2);
+    expect(typeof sib).toBe('object');
+    expect(sib.name).toBeUndefined();
+    expect(sib.advisory).toBeUndefined();
+    expect(sib.save_dc).toBeUndefined();
+    expect(sib.zone).toBeUndefined();
+    expect(sib.description).toBe(fog.description);
+    expect(isLairRowClickable(sib)).toBe(false);
+    expect(lairRowAffordance(sib)).toBeNull();
+  });
+
+  it('scope guard: young-silver lair block is exactly [advisory Fog Cloud, nameless dict]', () => {
+    expect(young.lair_actions).toHaveLength(2);
+    expect(young.lair_actions.map(la => (typeof la === 'string' ? 'string' : la.name ?? null))).toEqual(['Fog Cloud', null]);
   });
 });
