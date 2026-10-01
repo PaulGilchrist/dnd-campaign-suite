@@ -2861,13 +2861,17 @@ describe('MA-0231 ancient-green-dragon grasping roots and vines data lock', () =
     expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
   });
 
-  it('scope guard: adult-green sibling and young-green nameless rows untouched', () => {
+  it('scope guard: adult-green sibling untouched; young-green [0] promoted by MA-1783, nameless [1] stays inert', () => {
     const adult = monstersData.find(m => m.index === 'adult-green-dragon');
     const young = monstersData.find(m => m.index === 'young-green-dragon');
     expect(adult.lair_actions[0].name).toBe('Grasping Roots');
     expect(adult.lair_actions[0].save_effect).toBe('The target is restrained by the roots and vines.');
-    expect(young.lair_actions[0].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[0])).toBe(false);
+    // MA-1783 inverted this pin: young [0] bare string promoted to the
+    // adult-green byte-twin named save row; nameless [1] sibling stays FALSE-pinned (MA-1784).
+    expect(young.lair_actions[0].name).toBe('Grasping Roots');
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
+    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
     // MA-0232 fixed [1] (Wall of Thorns), MA-0233 fixed [2] (Fog Charm) in later passes.
     expect(dragon.lair_actions[2].name).toBe('Fog Charm');
   });
@@ -5943,5 +5947,98 @@ describe('MA-1779 young-gold-dragon foresightful-glimpse advisory data lock', ()
     expect(logs[0].description).toMatch(/casts glimpse the future/i);
     expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringMatching(/Lair Action — Foresightful Glimpse/));
+  });
+});
+
+// MA-1783: Young Green Dragon lair_actions[0] was a LEGACY BARE STRING
+// (MA-1747/1760/1766/1772/1778 twin family) — it hit the
+// `typeof la === 'string'` first disjunct in MonsterCardBody.jsx:357 BEFORE
+// isLairRowClickable was consulted → text-only row, zero .mc-dice-link-lair,
+// zero save prompt, zero restrained grant, zero log (live inert, 2026-10-01).
+// Data-only fix: promoted to the ADULT-GREEN byte-twin named structured SAVE
+// row {name:"Grasping Roots", description:<young RAW prose byte-preserved +
+// adult-style GM-enforced advisory tail>, save_dc:15, save_type:"Strength",
+// dc_success:"none", save_effect:"The target is restrained by the roots and
+// vines."} — the adult description base is byte-identical to the young RAW
+// prose, so the twin mirrors byte-for-byte (young prose kept verbatim, tail
+// carries the GM-enforced caveats). RESTRAINED rides the untouched MA-0017
+// damageless failed-save seam via save_effect canonical word; dc_success
+// "none" closes the MV-20 half-default leak (no damage RAW). Difficult
+// terrain radius, DC 15 STR break-free action, and wilt expiry stay advisory
+// prose in the tail (§70 — no zone/movement-cost/rescue-engine consumers).
+// Siblings index-bound: [1] stays nameless inert dict (MA-1784), [2] stays
+// nameless thorn-wall inert dict (MA-1785) — FALSE-pinned.
+describe('MA-1783 young-green-dragon grasping roots data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-green-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-green-dragon');
+  const roots = young.lair_actions[0];
+  const YOUNG_RAW = 'Grasping roots and vines erupt in a 20-foot radius centered on a point on the ground that the dragon can see within 120 feet of it. That area becomes dif\u00adficult terrain, and each creature there must succeed on a DC 15 Strength saving throw or be restrained by the roots and vines. A creature can be freed if it or another creature takes an action to make a DC 15 Strength check and succeeds. The roots and vines wilt away when the dragon uses this lair action again or when the dragon dies.';
+
+  it('row is now a named structured clickable SAVE row (was bare-string inert)', () => {
+    expect(typeof roots).toBe('object');
+    expect(roots.name).toBe('Grasping Roots');
+    expect(isLairRowClickable(roots)).toBe(true);
+    expect(lairRowAffordance(roots)).toBe('save');
+  });
+
+  it('byte-mirror of the adult-green twin (MA-0117 template)', () => {
+    expect(roots).toEqual(adult.lair_actions[0]);
+  });
+
+  it('young RAW prose byte-preserved verbatim before the advisory tail', () => {
+    expect(roots.description.startsWith(YOUNG_RAW)).toBe(true);
+    expect(roots.description).toMatch(/DC 15 Strength saving throw/i);
+    expect(roots.description).toMatch(/20-foot radius/i);
+  });
+
+  it('GM-enforced advisory tail: difficult terrain, escape action, wilt expiry', () => {
+    expect(roots.description).toMatch(/difficult terrain is GM-enforced/i);
+    expect(roots.description).toMatch(/DC 15 Strength action to break free/i);
+    expect(roots.description).toMatch(/wilt.*GM-enforced/i);
+  });
+
+  it('save fields RAW-agreed: DC 15 Strength; no damage authored; dc_success none', () => {
+    expect(roots.save_dc).toBe(15);
+    expect(roots.save_type).toBe('Strength');
+    expect(roots.dc_success).toBe('none');
+    expect(roots.damage_dice_primary).toBeUndefined();
+    expect(roots.damage_type_primary).toBeUndefined();
+  });
+
+  it('save_effect vocabulary extracts ONLY restrained (MA-0017 damageless seam)', () => {
+    expect(roots.save_effect).toBe('The target is restrained by the roots and vines.');
+    expect(extractConditionsFromSaveEffect(roots.save_effect)).toEqual(['restrained']);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + restrained', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: roots,
+      monsterName: 'Young Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(roots.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
+  });
+
+  it('scope guard: exactly 3 elements; nameless siblings [1] (MA-1784) and [2] (MA-1785) stay FALSE-pinned', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(lairRowAffordance(young.lair_actions[1])).toBeNull();
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(lairRowAffordance(young.lair_actions[2])).toBeNull();
+    // [1]/[2] untouched: still the description-only / thorn-wall save dicts
+    expect(young.lair_actions[1].save_dc).toBe(15);
+    expect(young.lair_actions[1].save_type).toBe('Strength');
+    expect(young.lair_actions[2].save_type).toBe('Dexterity');
+    expect(young.lair_actions[2].damage_dice_primary).toBe('4d8');
   });
 });
