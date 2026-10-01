@@ -989,3 +989,92 @@ describe('MA-1604 constant-count self-summon resolution', () => {
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
   });
 });
+
+// MA-1729: Wraith "Create Specter" (actions[1]) — formerly a zero-affordance
+// inert {name,description} row (§60 fingerprint), zero producer/consumer for the
+// RAW corpse→Specter rise under the wraith's control. DATA fix rides the live
+// MA-0648/MA-1215 monster_summon lane byte-shape: automation
+// {type:monster_summon, options:[specter], range_ft:10, advisory}. A chance-less
+// guaranteed spawn (no coin flip, no count); NO fabricated recharge/uses economy
+// (the RAW limit is the seven-specter control cap, not a recharge — inventing a
+// Recharge-3 like MA-1215 would be wrong). Corpse eligibility, the 1-minute
+// corpse-age clock, and the seven-specter cap are §70 GM-adjudicated residuals
+// carried verbatim on the advisory (MA-1215 byte-twin).
+const wraith = monstersData.find(m => m.index === 'wraith');
+const CREATE_SPECTER_ROW = wraith.actions.find(a => a.name === 'Create Specter');
+const specter = monstersData.find(m => m.index === 'specter');
+
+const WRAITH_CS = () => ({ round: 1, creatures: [
+  { name: 'Wraith 1', type: 'npc', monsterIndex: 'wraith', initiative: '16', currentHp: 67, maxHp: 67 },
+  { name: 'Bandit', type: 'npc', initiative: '11', currentHp: 999, maxHp: 999, ac: 12 },
+] });
+
+describe('MA-1729 Wraith Create Specter data lock', () => {
+  it('inert row armed on the MA-1215 byte-shape: type/options/range_ft/advisory, specter @10 ft, narrative byte-unchanged, no fabricated economy', () => {
+    expect(CREATE_SPECTER_ROW.name).toBe('Create Specter');
+    expect(CREATE_SPECTER_ROW.attack_bonus).toBeUndefined();
+    expect(CREATE_SPECTER_ROW.save_dc).toBeUndefined();
+    expect(CREATE_SPECTER_ROW.recharge).toBeUndefined();
+    expect(CREATE_SPECTER_ROW.uses).toBeUndefined();
+    expect(CREATE_SPECTER_ROW.maxUses).toBeUndefined();
+    expect(CREATE_SPECTER_ROW.description).toBe("The wraith targets a Humanoid corpse within 10 feet of itself that has been dead for no longer than 1 minute. The target's spirit rises as a Specter in the space of its corpse or in the nearest unoccupied space. The specter is under the wraith's control. The wraith can have no more than seven specters under its control at a time.");
+    expect(isMonsterSummonRow(CREATE_SPECTER_ROW)).toBe(true);
+    expect(Object.keys(CREATE_SPECTER_ROW.automation)).toEqual(['type', 'options', 'range_ft', 'advisory']);
+    expect(CREATE_SPECTER_ROW.automation.type).toBe('monster_summon');
+    expect(CREATE_SPECTER_ROW.automation.options).toEqual([{ monster: 'specter' }]);
+    expect(CREATE_SPECTER_ROW.automation.range_ft).toBe(10);
+    expect(CREATE_SPECTER_ROW.automation.advisory).toContain('Humanoid corpse');
+    expect(CREATE_SPECTER_ROW.automation.advisory).toContain('1 minute');
+    expect(CREATE_SPECTER_ROW.automation.advisory).toContain('seven specters');
+    expect(CREATE_SPECTER_ROW.automation.advisory).toContain('GM-adjudicated');
+    expect(specter.name).toBe('Specter');
+    expect(specter.hit_points).toBeGreaterThan(0);
+  });
+});
+
+describe('MA-1729 Create Specter chance-less summon resolution', () => {
+  function makeWraithDeps(cs = WRAITH_CS()) {
+    const deps = makeDeps({ cs });
+    deps.monsters = [specter];
+    deps.rollExpression = vi.fn(() => null);
+    return deps;
+  }
+
+  it('fresh press: spawns a Specter ally right after the wraith (init 15.9), te summoned @gm_adjudicated, ZERO dice/coin-flip/ability_use/recharge write; summons log + popup carry the RAW advisory', async () => {
+    const deps = makeWraithDeps();
+    const setPopupHtml = vi.fn();
+    const result = await resolveMonsterSummonRow({
+      action: CREATE_SPECTER_ROW,
+      monsterName: 'Wraith 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      deps,
+    });
+    expect(result).toMatchObject({ resolved: true, summonedName: 'Specter', summonedNames: ['Specter'], countRoll: null, verdict: { monster: 'specter', roll: null, success: true }, remaining: null });
+    expect(deps.rollDie).not.toHaveBeenCalled();
+    expect(deps.rollExpression).not.toHaveBeenCalled();
+    const spawned = deps.store.cs.creatures.find(c => c.name === 'Specter');
+    expect(spawned).toMatchObject({ type: 'npc', monsterIndex: 'specter', ac: 12, maxHp: 22, currentHp: 22, summonedBy: 'Wraith 1', summonSource: 'monster_ability', initiative: '15.9' });
+    expect(spawned.actions.map(a => a.name)).toEqual(['Life Drain']);
+    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Specter', 'summoned', 'Wraith 1', { duration: 'gm_adjudicated' });
+    expect(deps.store.logs.some(e => e.rollType === 'attack')).toBe(false);
+    expect(deps.store.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
+    expect(deps.store.logs.some(e => e.type === 'ability_use')).toBe(false);
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    const spawnLog = deps.logs.find(e => e.type === 'summons');
+    expect(spawnLog.summonedCreatures).toEqual(['Specter']);
+    expect(spawnLog.description).toContain('10 ft');
+    expect(spawnLog.description).toContain('Humanoid corpse');
+    expect(spawnLog.description).toContain('seven specters');
+    expect(spawnLog.description).not.toContain('10 minutes');
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Specter'));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('GM-adjudicated'));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.not.stringContaining('10 minutes'));
+  });
+
+  it('guaranteed rise: adjudication never flips a d100', () => {
+    const rollFn = vi.fn(() => 50);
+    expect(adjudicateSummonAttempt(CREATE_SPECTER_ROW.automation.options, rollFn)).toMatchObject({ monster: 'specter', roll: null, success: true, chance: null });
+    expect(rollFn).not.toHaveBeenCalled();
+  });
+});

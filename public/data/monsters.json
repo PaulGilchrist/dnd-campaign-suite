@@ -66477,7 +66477,17 @@
       },
       {
         "name": "Create Specter",
-        "description": "The wraith targets a Humanoid corpse within 10 feet of itself that has been dead for no longer than 1 minute. The target's spirit rises as a Specter in the space of its corpse or in the nearest unoccupied space. The specter is under the wraith's control. The wraith can have no more than seven specters under its control at a time."
+        "description": "The wraith targets a Humanoid corpse within 10 feet of itself that has been dead for no longer than 1 minute. The target's spirit rises as a Specter in the space of its corpse or in the nearest unoccupied space. The specter is under the wraith's control. The wraith can have no more than seven specters under its control at a time.",
+        "automation": {
+          "type": "monster_summon",
+          "options": [
+            {
+              "monster": "specter"
+            }
+          ],
+          "range_ft": 10,
+          "advisory": "Must target a Humanoid corpse within 10 ft of the wraith that has been dead no longer than 1 minute; the spirit rises as a Specter under the wraith's control and the wraith can have no more than seven specters under its control at a time — corpse eligibility, the 1-minute corpse-age clock, and the seven-specter control cap are GM-adjudicated (§70); pressing this chip models the rise."
+        }
       }
     ],
     "bonus_actions": [],
