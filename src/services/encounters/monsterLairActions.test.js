@@ -2861,7 +2861,7 @@ describe('MA-0231 ancient-green-dragon grasping roots and vines data lock', () =
     expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
   });
 
-  it('scope guard: adult-green sibling untouched; young-green [0]/[1] promoted by MA-1783/MA-1784, thorn-wall [2] stays inert', () => {
+  it('scope guard: adult-green sibling untouched; young-green [0]/[1]/[2] all promoted (MA-1783/MA-1784/MA-1785)', () => {
     const adult = monstersData.find(m => m.index === 'adult-green-dragon');
     const young = monstersData.find(m => m.index === 'young-green-dragon');
     expect(adult.lair_actions[0].name).toBe('Grasping Roots');
@@ -2869,7 +2869,8 @@ describe('MA-0231 ancient-green-dragon grasping roots and vines data lock', () =
     // MA-1783 inverted this pin: young [0] bare string promoted to the
     // adult-green byte-twin named save row. MA-1784 inverted the [1]
     // FALSE-pin: nameless roots dict promoted to distinct-named "Erupting
-    // Roots" save row. Thorn-wall [2] stays FALSE-pinned (MA-1785).
+    // Roots" save row. MA-1785 promoted thorn-wall [2] to the adult-green[1]
+    // byte-twin named "Wall of Thorns" save row.
     expect(young.lair_actions[0].name).toBe('Grasping Roots');
     expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
     expect(young.lair_actions[1].name).toBe('Erupting Roots');
@@ -2953,10 +2954,12 @@ describe('MA-0232 ancient-green-dragon wall of thorns data lock', () => {
     expect(wall.save_effect).not.toMatch(/pushed up to \d+ feet/i);
   });
 
-  it('scope guard: nameless young-green thorn-wall twin and ancient siblings untouched', () => {
+  it('scope guard: young-green thorn-wall twin promoted by MA-1785; ancient siblings untouched', () => {
     const young = monstersData.find(m => m.index === 'young-green-dragon');
-    expect(young.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    // MA-1785 INVERTED this FALSE-pin: the nameless young-green thorn-wall
+    // twin is now the adult-green[1] byte-twin named "Wall of Thorns" save row.
+    expect(young.lair_actions[2].name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
     expect(dragon.lair_actions[0].name).toBe('Grasping Roots and Vines');
     // MA-0233 fixed [2] (Fog Charm) in a later pass.
     expect(dragon.lair_actions[2].name).toBe('Fog Charm');
@@ -3036,8 +3039,9 @@ describe('MA-0233 ancient-green-dragon fog charm data lock', () => {
     expect(adult.lair_actions[2].name).toBe('Fog Charm');
     expect(adult.lair_actions[2].save_effect).toBe('The target is charmed by the dragon.');
     expect(adult.lair_actions[2].dc_success).toBe('none');
-    expect(young.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    // MA-1785 promoted the young-green thorn-wall twin to the named save row.
+    expect(young.lair_actions[2].name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
     expect(dragon.lair_actions[0].name).toBe('Grasping Roots and Vines');
     expect(dragon.lair_actions[1].name).toBe('Wall of Thorns');
   });
@@ -5105,10 +5109,11 @@ describe('MA-1749 young-black-dragon insect cloud data lock', () => {
     expect(Object.keys(young.lair_actions[1])).toEqual(['name', 'description', 'save_dc', 'save_type']);
   });
 
-  it('other-species young-dragon nameless twins stay inert (scope stays black-dragon [2] only)', () => {
+  it('other-species young-dragon twins: green [2] promoted by MA-1785; young-red twin stays inert', () => {
     const youngGreen = monstersData.find(m => m.index === 'young-green-dragon');
-    expect(youngGreen.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(youngGreen.lair_actions[2])).toBe(false);
+    // MA-1785 INVERTED this FALSE-pin: young-green thorn-wall named save row.
+    expect(youngGreen.lair_actions[2].name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(youngGreen.lair_actions[2])).toBe(true);
     const youngRed = monstersData.find(m => m.index === 'young-red-dragon');
     expect(isLairRowClickable(youngRed.lair_actions[2])).toBe(false);
   });
@@ -5969,8 +5974,8 @@ describe('MA-1779 young-gold-dragon foresightful-glimpse advisory data lock', ()
 // terrain radius, DC 15 STR break-free action, and wilt expiry stay advisory
 // prose in the tail (§70 — no zone/movement-cost/rescue-engine consumers).
 // Siblings index-bound: [1] promoted by MA-1784 (distinct-named "Erupting
-// Roots" save row), [2] stays nameless thorn-wall inert dict (MA-1785) —
-// FALSE-pinned.
+// Roots" save row), [2] thorn-wall promoted by MA-1785 (adult-green[1]
+// byte-twin named save row — see MA-1785 lock below).
 describe('MA-1783 young-green-dragon grasping roots data lock', () => {
   const young = monstersData.find(m => m.index === 'young-green-dragon');
   const adult = monstersData.find(m => m.index === 'adult-green-dragon');
@@ -6030,15 +6035,15 @@ describe('MA-1783 young-green-dragon grasping roots data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
   });
 
-  it('scope guard: exactly 3 elements; [1] promoted by MA-1784, thorn-wall [2] stays FALSE-pinned', () => {
+  it('scope guard: exactly 3 elements; [1] promoted by MA-1784, [2] promoted by MA-1785', () => {
     expect(young.lair_actions).toHaveLength(3);
     expect(young.lair_actions[1].name).toBe('Erupting Roots');
     expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
     expect(lairRowAffordance(young.lair_actions[1])).toBe('save');
-    expect(young.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
-    expect(lairRowAffordance(young.lair_actions[2])).toBeNull();
-    // [1]/[2] untouched: still the description-only / thorn-wall save dicts
+    // MA-1785 fixed [2]: thorn-wall promoted to the adult-green[1] twin save row
+    expect(young.lair_actions[2].name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
+    expect(lairRowAffordance(young.lair_actions[2])).toBe('save');
     expect(young.lair_actions[1].save_dc).toBe(15);
     expect(young.lair_actions[1].save_type).toBe('Strength');
     expect(young.lair_actions[2].save_type).toBe('Dexterity');
@@ -6122,14 +6127,107 @@ describe('MA-1784 young-green-dragon erupting roots data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(roots, null, ['restrained']);
   });
 
-  it('scope guard: exactly 3 elements; thorn-wall sibling [2] stays nameless FALSE-pinned (MA-1785)', () => {
+  it('scope guard: exactly 3 elements; thorn-wall sibling [2] promoted by MA-1785', () => {
     expect(young.lair_actions).toHaveLength(3);
-    expect(young.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
-    expect(lairRowAffordance(young.lair_actions[2])).toBeNull();
+    expect(young.lair_actions[2].name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
+    expect(lairRowAffordance(young.lair_actions[2])).toBe('save');
     expect(young.lair_actions[2].save_type).toBe('Dexterity');
     expect(young.lair_actions[2].damage_dice_primary).toBe('4d8');
     // adult-green twin untouched by this ticket
     expect(adult.lair_actions[0].name).toBe('Grasping Roots');
+  });
+});
+
+// MA-1785: Young Green Dragon lair_actions[2] was a NAMELESS thorn-wall dict
+// {description, save_dc:15, save_type:"Dexterity", damage_dice_primary:"4d8",
+// damage_type_primary:"Piercing"} — the RICHEST of the three young rows (save
+// AND damage legs authored) stranded inert purely at the `!row.name` name gate
+// (monsterLairActions.js:25): static prose render, zero .mc-dice-link-lair
+// chip, no DC 15 Dexterity prompt, no 4d8 Piercing roll, zero log (live probe
+// delta 0). Data-only fix mirrors the ADULT-GREEN lair_actions[1] template
+// (MA-0118) byte-for-byte — the young RAW wall prose is byte-identical to the
+// adult's (both rows pay 18 (4d8) piercing), so the promoted row equals the
+// adult twin dict with NO adaptation needed: {name:"Wall of Thorns",
+// description:<young RAW byte-preserved + adult GM-enforced advisory tail>,
+// save_dc:15, save_type:"Dexterity", dc_success:"half",
+// damage_dice_primary:"4d8", damage_type_primary:"Piercing", save_effect:
+// "The target takes 18 (4d8) piercing damage and is pushed 5 feet out of the
+// wall's space."} — dc_success "half" matches RAW half-on-success (MV-20
+// default closed explicitly). LoS block, 4-ft-per-1-ft movement cost,
+// per-round contact re-save cadence, and wall-section AC/HP object stats stay
+// §70 advisory (no zone/object/movement-cost/lair-cadence consumer — §76).
+describe('MA-1785 young-green-dragon wall of thorns data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-green-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-green-dragon');
+  const wall = young.lair_actions[2];
+  const YOUNG_RAW = 'A wall of tangled brush bristling with thorns springs into existence on a solid surface within 120 feet of the dragon. The wall is up to 60 feet long, 10 feet high, and 5 feet thick, and it blocks line of sight. When the wall appears, each creature in its area must make a DC 15 Dexterity saving throw. A creature that fails the save takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall\'s space, appearing on whichever side of the wall it wants. A creature can move through the wall, albeit slowly and painfully. For every 1 foot a creature travels through the wall, it must spend 4 feet of movement. Furthermore, a creature in the wall\'s space must make a DC 15 Dexterity saving throw once each round it\'s in contact with the wall, taking 18 (4d8) piercing damage on a failed save, or half as much damage on a successful one. Each 10-foot sec\u00ad tion of wall has AC 5, 15 hit points, vulnerability to fire damage, resistance to bludgeoning and piercing damage, and immunity to psychic damage. The wall sinks back into the ground when the dragon uses this lair action again or when the dragon dies.';
+
+  it('row is now a structured clickable SAVE row named Wall of Thorns (was nameless inert at the name gate)', () => {
+    expect(typeof wall).toBe('object');
+    expect(wall.name).toBe('Wall of Thorns');
+    expect(isLairRowClickable(wall)).toBe(true);
+    expect(lairRowAffordance(wall)).toBe('save');
+  });
+
+  it('byte-parity with the adult-green[1] twin (MA-0118 template; same 4d8, zero adaptation)', () => {
+    expect(wall).toEqual(adult.lair_actions[1]);
+    expect(Object.keys(wall)).toEqual(['name', 'description', 'save_dc', 'save_type', 'dc_success', 'damage_dice_primary', 'damage_type_primary', 'save_effect']);
+  });
+
+  it('young RAW prose byte-preserved verbatim before the advisory tail', () => {
+    expect(wall.description.startsWith(YOUNG_RAW)).toBe(true);
+    expect(wall.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(wall.description).toMatch(/18 \(4d8\) piercing damage/i);
+    expect(wall.description).toMatch(/half as much damage on a successful one/i);
+  });
+
+  it('save/damage fields RAW-agreed: DC 15 Dexterity, 4d8 Piercing, half on success', () => {
+    expect(wall.save_dc).toBe(15);
+    expect(wall.save_type).toBe('Dexterity');
+    expect(wall.damage_dice_primary).toBe('4d8');
+    expect(wall.damage_type_primary).toBe('Piercing');
+    expect(wall.dc_success).toBe('half');
+  });
+
+  it('save_effect vocabulary: full 4d8 piercing + push prose; NO canonical condition extracted (damage-only leg, no condition authored)', () => {
+    expect(wall.save_effect).toBe("The target takes 18 (4d8) piercing damage and is pushed 5 feet out of the wall's space.");
+    expect(extractConditionsFromSaveEffect(wall.save_effect)).toEqual([]);
+  });
+
+  it('advisory residuals annotated in description (GM-enforced, no consumers — LoS/movement-cost/object-stats §70)', () => {
+    expect(wall.description).toMatch(/recurring once-each-round contact-save cadence/i);
+    expect(wall.description).toMatch(/blocks line of sight/i);
+    expect(wall.description).toMatch(/4-feet-of-movement-per-1-foot cost/i);
+    expect(wall.description).toMatch(/AC 5, 15 hit points/i);
+    expect(wall.description).toMatch(/GM-enforced/i);
+  });
+
+  it('save row routes through handleSaveRoll with 4d8 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wall,
+      monsterName: 'Young Green Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '4d8',
+      saveConditions: extractConditionsFromSaveEffect(wall.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wall, '4d8', []);
+  });
+
+  it('scope guard: exactly 3 elements; roots siblings [0]/[1] byte-untouched (MA-1783/MA-1784)', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions[0].name).toBe('Grasping Roots');
+    expect(young.lair_actions[0].save_type).toBe('Strength');
+    expect(young.lair_actions[0].dc_success).toBe('none');
+    expect(young.lair_actions[1].name).toBe('Erupting Roots');
+    expect(young.lair_actions[1].save_type).toBe('Strength');
+    expect(young.lair_actions[1].dc_success).toBe('none');
+    expect(young.lair_actions[1].damage_dice_primary).toBeUndefined();
   });
 });
