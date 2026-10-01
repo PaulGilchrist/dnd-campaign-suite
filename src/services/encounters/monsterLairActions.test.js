@@ -1668,13 +1668,17 @@ describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
   });
 
   // MA-1807 INVERTED this pin: young [0] bare string promoted to this
-  // adult-white byte-twin named save row. MA-1808 still open: [1] nameless.
-  it('young-white-dragon scope guard: [0] promoted by MA-1807; [1] nameless dict untouched', () => {
+  // adult-white byte-twin named save row. MA-1808 INVERTED the [1] pin:
+  // nameless fog dict promoted to "Glacial Fog" (distinct name, byte-parity
+  // with [0]/adult except name). [2] nameless ice shards stays open (MA-1809).
+  it('young-white-dragon scope guard: [0] promoted by MA-1807; [1] promoted by MA-1808; [2] untouched', () => {
     const young = monstersData.find(m => m.index === 'young-white-dragon');
     expect(typeof young.lair_actions[0]).toBe('object');
     expect(young.lair_actions[0].name).toBe('Freezing Fog');
     expect(JSON.stringify(young.lair_actions[0])).toBe(JSON.stringify(fog));
-    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(young.lair_actions[1].name).toBe('Glacial Fog');
+    expect(young.lair_actions[1].name).not.toBe(young.lair_actions[0].name);
+    expect(young.lair_actions[2].name).toBeUndefined();
   });
 });
 
@@ -6677,8 +6681,8 @@ describe('MA-1803 young-silver-dragon lair rolling fog data lock', () => {
 // (MV-20/MV-27 half-on-success math). Turn-end re-damage, heavily-obscured
 // area, wind dispersal and initiative-20 cadence stay GM-advisory prose
 // residuals (§70 — no fog zone/obscurement/turn-end consumer app-wide).
-// Siblings index-bound and untouched: [1] nameless fog dict (MA-1808),
-// [2] nameless jagged ice shards dict (MA-1809).
+// Siblings index-bound: [1] fog dict promoted by MA-1808 ("Glacial Fog"),
+// [2] nameless jagged ice shards dict stays inert (MA-1809).
 describe('MA-1807 young-white-dragon freezing fog bare-string data lock', () => {
   const young = monstersData.find(m => m.index === 'young-white-dragon');
   const adult = monstersData.find(m => m.index === 'adult-white-dragon');
@@ -6737,14 +6741,17 @@ describe('MA-1807 young-white-dragon freezing fog bare-string data lock', () => 
     expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
   });
 
-  it('siblings FALSE-pinned: [1] nameless fog dict + [2] nameless ice shards stay inert', () => {
+  // MA-1808 INVERTS the [1] FALSE-pin: the nameless fog dict gained
+  // name:"Glacial Fog" + dc_success:"half" → clickable 'save' row.
+  // [2] nameless ice shards stays FALSE-pinned (MA-1809 open).
+  it('siblings: [1] promoted by MA-1808 to clickable "Glacial Fog" save row; [2] nameless ice shards stays inert', () => {
     expect(young.lair_actions).toHaveLength(3);
     expect(young.lair_actions.filter(la => typeof la === 'string')).toHaveLength(0);
     const fogDict = young.lair_actions[1];
     expect(typeof fogDict).toBe('object');
-    expect(fogDict.name).toBeUndefined();
-    expect(isLairRowClickable(fogDict)).toBe(false);
-    expect(lairRowAffordance(fogDict)).toBeNull();
+    expect(fogDict.name).toBe('Glacial Fog');
+    expect(isLairRowClickable(fogDict)).toBe(true);
+    expect(lairRowAffordance(fogDict)).toBe('save');
     expect(fogDict.save_dc).toBe(10);
     expect(fogDict.damage_dice_primary).toBe('3d6');
     const shards = young.lair_actions[2];
@@ -6752,5 +6759,86 @@ describe('MA-1807 young-white-dragon freezing fog bare-string data lock', () => 
     expect(isLairRowClickable(shards)).toBe(false);
     expect(lairRowAffordance(shards)).toBeNull();
     expect(shards.damage_type_primary).toBe('Piercing');
+  });
+});
+
+// MA-1808: Young White Dragon lair_actions[1] was a NAMELESS fog DICT —
+// full structured save row (save_dc/save_type/damage dice authored) but no
+// `name`, so it died at the name gate isLairRowClickable (monsterLairActions.js:26)
+// BEFORE the save_dc affordance branch (:41) — inert static row, click zero
+// log delta (live inert). DATA fix promotes it to the MA-1807/fixed-[0]/
+// adult-white byte-shape with a DISTINCT name "Glacial Fog":
+// name + dc_success:"half" added, everything else byte-identical (description
+// byte-equal to [0] and adult-white[0]). Affordance 'save' → chip
+// "DC 10 Constitution" → handleSaveRoll → 20-ft Radius picker, 3d6 Cold,
+// dc_success "half" (RAW half-on-success, MV-20/MV-27 math untouched).
+// Distinct name keeps the two fog rows separately clickable in the chip lane.
+// Turn-end re-damage, heavily-obscured area, wind dispersal, initiative-20
+// cadence and the fog zone itself stay GM-advisory (§70 grep-zero consumers).
+describe('MA-1808 young-white-dragon glacial fog nameless-dict data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-white-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-white-dragon');
+  const fog = young.lair_actions[1];
+
+  it('[1] is now a structured clickable SAVE row named Glacial Fog (was nameless-dict inert)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Glacial Fog');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('save');
+  });
+
+  it('distinct name from siblings [0] and adult twin — no collision in the chip lane', () => {
+    expect(fog.name).not.toBe(young.lair_actions[0].name);
+    expect(fog.name).not.toBe(adult.lair_actions[0].name);
+    const names = young.lair_actions.filter(la => la && la.name).map(la => la.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('byte-parity with fixed [0]/adult-white except name — key order mirrored', () => {
+    expect(JSON.stringify(fog)).toBe(JSON.stringify({ ...adult.lair_actions[0], name: 'Glacial Fog' }));
+    expect(Object.keys(fog)).toEqual(['description', 'save_dc', 'save_type', 'damage_dice_primary', 'damage_type_primary', 'name', 'dc_success']);
+    expect(fog.description).toBe(young.lair_actions[0].description);
+    expect(fog.description).toBe(adult.lair_actions[0].description);
+  });
+
+  it('save fields: DC 10 Constitution, 3d6 Cold, dc_success half (RAW half-on-success)', () => {
+    expect(fog.save_dc).toBe(10);
+    expect(fog.save_type).toBe('Constitution');
+    expect(fog.damage_dice_primary).toBe('3d6');
+    expect(fog.damage_type_primary).toBe('Cold');
+    expect(fog.dc_success).toBe('half');
+    expect(fog.description).toMatch(/DC 10 Constitution saving throw/i);
+    expect(fog.description).toMatch(/half as much damage on a successful one/i);
+  });
+
+  it('no zone/duration/advisory/save_effect fabricated — adult byte-shape (§70 advisory)', () => {
+    expect(fog.zone).toBeUndefined();
+    expect(fog.duration).toBeUndefined();
+    expect(fog.advisory).toBeUndefined();
+    expect(fog.save_effect).toBeUndefined();
+  });
+
+  it('[1] chip click arms the 20-ft Radius picker at DC 10 Constitution, 3d6 Cold, dcSuccess half', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Young White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '3d6',
+      saveConditions: [],
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
+  });
+
+  it('scope: lair_actions stays 3 rows; [0] Freezing Fog + [2] nameless shards untouched', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions[0].name).toBe('Freezing Fog');
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
   });
 });
