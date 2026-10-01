@@ -67807,6 +67807,8 @@
         "description": "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round."
       },
       {
+        "name": "Foresightful Glimpse",
+        "advisory": "glimpse_the_future",
         "description": "The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round."
       }
     ],
