@@ -66829,7 +66829,13 @@
         "description": "Constitution Saving Throw: DC 13, one creature the yeti can see within 30 feet. Failure: 5 (2d4) Cold damage, and the target has the Paralyzed condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. Success: The target is immune to the Chilling Gaze of all yetis (but not abominable yetis) for 1 hour.",
         "save_dc": 13,
         "save_type": "Constitution",
+        "dc_success": "none",
         "range": "30 feet",
+        "success_immunity": {
+          "effect": "gaze_immunity",
+          "duration": "1_hour",
+          "duration_minutes": 60
+        },
         "save_effect": "5 (2d4) Cold damage, and the target has the Paralyzed condition until the start of the yeti's next turn unless the target has Immunity to Cold damage. Success: The target is immune to the Chilling Gaze of all yetis (but not abominable yetis) for 1 hour."
       }
     ],
