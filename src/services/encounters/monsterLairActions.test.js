@@ -5377,19 +5377,109 @@ describe('MA-1760 young-brass-dragon lair strong wind data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(wind, null, ['prone']);
   });
 
-  it('sibling [1] MA-1761 scope guard: stays the nameless inert dict, FALSE-locked, 2 rows kept', () => {
+  // MA-1761 fixed this row — former FALSE-pin of the nameless inert dict
+  // inverted same pass (stale-pin pattern §216): [1] is now the distinct
+  // "Dispersing Wind" adult-MA-0074 byte-twin.
+  it('sibling [1] MA-1761: distinct named "Dispersing Wind" save twin, 2 rows kept', () => {
     const sib = young.lair_actions[1];
     expect(young.lair_actions).toHaveLength(2);
     expect(typeof sib).toBe('object');
-    expect(sib.name).toBeUndefined();
+    expect(sib.name).toBe('Dispersing Wind');
+    expect(sib.name).not.toBe(wind.name);
     expect(sib.description).toBe(wind.description);
     expect(sib.save_dc).toBe(15);
     expect(sib.save_type).toBe('Strength');
-    expect(isLairRowClickable(sib)).toBe(false);
-    expect(lairRowAffordance(sib)).toBeNull();
+    expect(isLairRowClickable(sib)).toBe(true);
+    expect(lairRowAffordance(sib)).toBe('save');
   });
 
   it('scope guard: young-brass lair block holds NO bare strings anymore', () => {
     expect(young.lair_actions.filter(la => typeof la === 'string')).toHaveLength(0);
+  });
+});
+
+// MA-1761: Young Brass Dragon lair_actions[1] was the byte-duplicate nameless
+// dict of the (then bare-string, now fixed) [0] strong-wind row — description
+// + save_dc 15 + save_type Strength, NO name → monsterLairActions.js:26
+// !row.name name gate → static span, dead DC data, click zero log delta
+// (MA-1748/MA-1754 nameless-dict family). DATA fix adopts the adult-brass
+// MA-0074 "Strong Wind" shape wholesale — name DISTINCT ("Dispersing Wind",
+// RAW-anchored on "Gases and vapors are dispersed by the wind"; name-only
+// insufficient: handleLairRow prone needs save_effect, MA-1754 precedent) —
+// everything else byte-mirrored from [0]/adult: save_dc 15/Strength,
+// dc_success "none", adult save_effect verbatim, adult key order. Prone rides
+// the MA-0017 damageless failed-save seam. NO zone (aura). Push/gas/flame/
+// cadence/immunity residuals stay advisory (§70).
+describe('MA-1761 young-brass-dragon lair_dispersing_wind data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-brass-dragon');
+  const wind1 = young.lair_actions[1];
+
+  it('row [1] is now a structured clickable SAVE row named Dispersing Wind (was nameless inert)', () => {
+    expect(typeof wind1).toBe('object');
+    expect(wind1.name).toBe('Dispersing Wind');
+    expect(isLairRowClickable(wind1)).toBe(true);
+    expect(lairRowAffordance(wind1)).toBe('save');
+  });
+
+  it('byte-parity twin of adult-brass MA-0074 Strong Wind EXCEPT distinct name', () => {
+    const adult = monstersData.find(m => m.index === 'adult-brass-dragon');
+    expect(wind1.name).not.toBe(adult.lair_actions[0].name);
+    expect(wind1.name).not.toBe(young.lair_actions[0].name);
+    const mirror = { ...adult.lair_actions[0], name: 'Dispersing Wind' };
+    expect(JSON.stringify(wind1)).toBe(JSON.stringify(mirror));
+    expect(Object.keys(wind1)).toEqual(['name', 'description', 'save_dc', 'save_type', 'dc_success', 'save_effect']);
+  });
+
+  it('save fields: DC 15 Strength, dc_success none, no damage fields', () => {
+    expect(wind1.save_dc).toBe(15);
+    expect(wind1.save_type).toBe('Strength');
+    expect(wind1.dc_success).toBe('none');
+    expect(wind1.damage_dice_primary).toBeUndefined();
+    expect(wind1.damage_type_primary).toBeUndefined();
+    expect(wind1.description).toMatch(/DC 15 Strength saving throw/i);
+  });
+
+  it('failed-save vocabulary extracts ONLY prone (MA-0017 damageless seam)', () => {
+    expect(wind1.save_effect).toMatch(/pushed 15 feet away from the dragon/i);
+    expect(wind1.save_effect).toMatch(/knocked prone/i);
+    expect(wind1.save_effect).toMatch(/deals no damage/i);
+    expect(extractConditionsFromSaveEffect(wind1.save_effect)).toEqual(['prone']);
+  });
+
+  it('NO zone authored — point-origin aura stays advisory (adult zone-less twin)', () => {
+    expect(wind1.zone).toBeUndefined();
+  });
+
+  it('gas/flame extinguish clauses kept as advisory prose (GM-enforced — no consumer)', () => {
+    expect(wind1.save_effect).toMatch(/GM-enforced/);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula, prone conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wind1,
+      monsterName: 'Young Brass Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(wind1.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wind1, null, ['prone']);
+  });
+
+  it('sibling [0] MA-1760 untouched: still byte-identical adult Strong Wind row', () => {
+    const adult = monstersData.find(m => m.index === 'adult-brass-dragon');
+    expect(JSON.stringify(young.lair_actions[0])).toBe(JSON.stringify(adult.lair_actions[0]));
+  });
+
+  it('scope guard: young-brass lair block is 2 named rows, no bare strings', () => {
+    expect(young.lair_actions).toHaveLength(2);
+    expect(young.lair_actions.filter(la => typeof la === 'string')).toHaveLength(0);
+    expect(young.lair_actions.map(la => la.name)).toEqual(['Strong Wind', 'Dispersing Wind']);
   });
 });
