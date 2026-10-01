@@ -5,8 +5,15 @@
 // as the only byte-diff vs adult) → row renders <strong>Magma Geyser.</strong>
 // + ONE .mc-dice-link-lair chip "DC 15 Dexterity"; click arms the picker at
 // DC 15 Dexterity with 6d6 Fire half-on-success (dcSuccess "half"), saveCondi-
-// tions []. Siblings [1] nameless magma dict / [2] nameless tremor dict stay
-// static prose (FALSE-pins).
+// tions [].
+// MA-1790 WIDENS this census 1→2: sibling [1] nameless magma dict promoted to
+// the distinct-named "Erupting Magma" save row (MA-1748/MA-1753/MA-1754/
+// MA-1767/MA-1773/MA-1784 distinct-sibling-naming precedent — [0] already owns
+// "Magma Geyser"; raw duplicate-mechanic rows named distinctly, never merged)
+// → lair block renders TWO named rows, each with its own "DC 15 Dexterity"
+// .mc-dice-link-lair chip; BOTH chips arm the picker at DC 15 Dexterity,
+// 6d6 Fire, dcSuccess "half", saveConditions []. [2] nameless tremor dict
+// stays static prose (FALSE-pin).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -99,21 +106,40 @@ beforeEach(() => {
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
 });
 
-describe('MA-1789 young-red-dragon magma-geyser lair chip lock', () => {
-  it('bare-string [0] promoted: lair block renders EXACTLY ONE chip "DC 15 Dexterity" on the "Magma Geyser." row; siblings [1]/[2] stay static prose', () => {
+describe('MA-1789/MA-1790 young-red-dragon magma lair chip lock', () => {
+  it('bare-string [0] promoted by MA-1789 + nameless [1] promoted by MA-1790: lair block renders TWO named rows ("Magma Geyser."/"Erupting Magma."), TWO chips "DC 15 Dexterity"; [2] tremor stays static prose', () => {
     renderDragon();
     const chips = lairChips();
-    expect(chips).toHaveLength(1);
-    expect(chips[0].textContent.trim()).toBe('DC 15 Dexterity');
-    expect(chips[0].getAttribute('title')).toMatch(/Lair action — DC 15 Dexterity/);
+    expect(chips).toHaveLength(2);
+    expect(chips.map(c => c.textContent.trim())).toEqual(['DC 15 Dexterity', 'DC 15 Dexterity']);
+    chips.forEach(c => expect(c.getAttribute('title')).toMatch(/Lair action — DC 15 Dexterity/));
     expect(chips[0].closest('.mc-action').querySelector('strong')?.textContent).toBe('Magma Geyser.');
+    expect(chips[1].closest('.mc-action').querySelector('strong')?.textContent).toBe('Erupting Magma.');
     const staticRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => !el.querySelector('.mc-dice-link-lair'));
-    expect(staticRows).toHaveLength(2);
+    expect(staticRows).toHaveLength(1);
+    expect(staticRows[0].textContent).toMatch(/^A tremor shakes the lair/);
   });
 
-  it('chip click arms the picker at DC 15 Dexterity, 6d6 Fire, dcSuccess half, zero conditions', async () => {
+  it('[0] chip click arms the picker at DC 15 Dexterity, 6d6 Fire, dcSuccess half, zero conditions', async () => {
     renderDragon();
     fireEvent.click(lairChips()[0]);
+    await waitFor(() => expect(pickerProps.current).toBeTruthy());
+    const p = pickerProps.current;
+    expect(p.saveType).toBe('Dexterity');
+    expect(p.saveDc).toBe(15);
+    expect(p.dcSuccess).toBe('half');
+    expect(p.damage).toBe('6d6');
+    expect(p.damageType).toBe('Fire');
+    expect(p.saveConditions).toEqual([]);
+    expect(p.zoneOnly ?? false).toBe(false);
+    expect(p.excludeNames).toContain('Young Red Dragon 1');
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('[1] chip click arms the picker identically (Erupting Magma — same DC/type/dice/half math seam)', async () => {
+    pickerProps.current = null;
+    renderDragon();
+    fireEvent.click(lairChips()[1]);
     await waitFor(() => expect(pickerProps.current).toBeTruthy());
     const p = pickerProps.current;
     expect(p.saveType).toBe('Dexterity');

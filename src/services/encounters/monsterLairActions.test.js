@@ -3285,7 +3285,7 @@ describe('MA-0244 ancient-red-dragon volcanic gases data lock', () => {
     expect(cloud.duration).toBe(adultCloud.duration);
   });
 
-  it('scope guard: ancient-red [0]/[1] fixed rows untouched; young-red [0] promoted by MA-1789, twins [1]/[2] stay nameless/inert (MA-0222 name-gate)', () => {
+  it('scope guard: ancient-red [0]/[1] fixed rows untouched; young-red [0]/[1] promoted by MA-1789/MA-1790, twin [2] stays nameless/inert (MA-0222 name-gate)', () => {
     expect(dragon.lair_actions[0].name).toBe('Magma Geyser');
     expect(dragon.lair_actions[0].dc_success).toBe('half');
     expect(dragon.lair_actions[1].name).toBe('Tremor');
@@ -3294,8 +3294,9 @@ describe('MA-0244 ancient-red-dragon volcanic gases data lock', () => {
     expect(typeof young.lair_actions[0]).toBe('object');
     expect(young.lair_actions[0].name).toBe('Magma Geyser');
     expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
-    expect(young.lair_actions[1].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    // MA-1790 INVERTED the [1] pins: nameless magma dict → named "Erupting Magma" save row.
+    expect(young.lair_actions[1].name).toBe('Erupting Magma');
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
     expect(young.lair_actions[2].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
   });
@@ -6306,11 +6307,93 @@ describe('MA-1789 young-red-dragon magma geyser bare-string data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
   });
 
-  it('scope guard: lair block keeps 3 elements; siblings [1]/[2] stay nameless/inert FALSE-pins', () => {
+  it('scope guard: lair block keeps 3 elements; [1] promoted by MA-1790 to named "Erupting Magma" save row, twin [2] stays nameless/inert FALSE-pin', () => {
     expect(young.lair_actions).toHaveLength(3);
-    expect(young.lair_actions[1].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
-    expect(young.lair_actions[1].description).toContain('\u00ad');
+    // MA-1790 INVERTED this FALSE-pin: nameless magma dict → named "Erupting
+    // Magma" save row (soft-hyphen repaired to clean text, same as this [0]).
+    expect(young.lair_actions[1].name).toBe('Erupting Magma');
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
+    expect(young.lair_actions[1].description).not.toContain('\u00ad');
+    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(young.lair_actions[2].description).toMatch(/^A tremor shakes the lair/);
+  });
+});
+
+// MA-1790: Young Red Dragon lair_actions[1] was a NAMELESS save+damage dict
+// (MA-0222/MV-24 name-gate fingerprint — isLairRowClickable !row.name → false
+// at monsterLairActions.js:25 fires BEFORE save_dc/damage fields are consulted
+// → static prose, zero .mc-dice-link-lair, zero save prompt, zero damage, zero
+// log despite fully-authored mechanic; live inert 2026-10-01, log 32→32).
+// DATA-only fix: distinct sibling name "Erupting Magma" (MA-1748/MA-1753/
+// MA-1754/MA-1767/MA-1773/MA-1784 distinct-sibling-naming precedent — sibling
+// [0] already owns "Magma Geyser" from MA-1789, raw duplicate-name rows named
+// distinctly, never merged) + dc_success "half" (adult MA-0128 style; RAW
+// success = half as much damage) + soft-hyphen U+00AD "tak\xad ing" repaired to
+// clean "taking" — key order and every other byte mirror the fixed young-red
+// [0] row exactly modulo the distinct name. lairRowAffordance 'save' rides
+// the untouched handleSaveRoll seam (MA-0024); live picker-route proof:
+// saveBonuses.dexterity -19 → failure, full 6d6 finalDamage==|hpΔ| 22;
+// +19 (no Evasion victim) → floored half finalDamage 10==|hpΔ| (floor 21/2).
+describe('MA-1790 young-red-dragon erupting magma nameless-dict data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-red-dragon');
+  const geyser = young.lair_actions[1];
+  const sibling = young.lair_actions[0];
+
+  it('[1] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof geyser).toBe('object');
+    expect(geyser.name).toBe('Erupting Magma');
+    expect(isLairRowClickable(geyser)).toBe(true);
+    expect(lairRowAffordance(geyser)).toBe('save');
+  });
+
+  it('name DISTINCT from sibling [0] "Magma Geyser" (MA-1748 distinct-sibling precedent)', () => {
+    expect(sibling.name).toBe('Magma Geyser');
+    expect(geyser.name).not.toBe(sibling.name);
+  });
+
+  it('save fields: DC 15 Dexterity, 6d6 Fire, dc_success half (RAW half-on-success)', () => {
+    expect(geyser.save_dc).toBe(15);
+    expect(geyser.save_type).toBe('Dexterity');
+    expect(geyser.damage_dice_primary).toBe('6d6');
+    expect(geyser.damage_type_primary).toBe('Fire');
+    expect(geyser.dc_success).toBe('half');
+    expect(geyser.description).toMatch(/^Magma erupts from a point on the ground/);
+    expect(geyser.description).toMatch(/DC 15 Dexterity saving throw/i);
+    expect(geyser.description).toMatch(/taking 21 \(6d6\) fire damage on a failed save/i);
+    expect(geyser.description).toMatch(/half as much damage on a successful one\.$/);
+    expect(geyser.description).not.toContain('\u00ad');
+  });
+
+  it('byte-parity with fixed sibling [0] modulo the distinct name', () => {
+    expect(Object.keys(geyser)).toEqual(Object.keys(sibling));
+    Object.keys(geyser).forEach((k) => {
+      if (k === 'name') return;
+      expect(geyser[k]).toBe(sibling[k]);
+    });
+  });
+
+  it('save row routes through handleSaveRoll with 6d6 formula + zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: geyser,
+      monsterName: 'Young Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '6d6',
+      saveConditions: extractConditionsFromSaveEffect(geyser.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
+  });
+
+  it('scope guard: lair block keeps 3 elements; sibling [0] "Magma Geyser" untouched; [2] tremor twin stays nameless/inert FALSE-pin', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(sibling.name).toBe('Magma Geyser');
+    expect(sibling.dc_success).toBe('half');
     expect(young.lair_actions[2].name).toBeUndefined();
     expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
     expect(young.lair_actions[2].description).toMatch(/^A tremor shakes the lair/);
