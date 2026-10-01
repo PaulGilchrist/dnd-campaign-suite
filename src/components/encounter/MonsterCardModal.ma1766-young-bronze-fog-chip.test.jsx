@@ -5,8 +5,9 @@
 // and clicks route to the area picker in zoneOnly mode (MA-0043 lane — title
 // "20-ft radius (GM positions; selection advisory)", NO save DC/type, NO
 // damage, zone payload carries effectKey 'lair_fog_cloud' + radiusFt 20).
-// Sibling [1] (MA-1767 lane) stays the nameless description-only dict with
-// ZERO chips (FALSE-lock).
+// Sibling [1] (MA-1767) since fixed: nameless dict promoted to the same
+// adult-bronze zone shape with DISTINCT name "Rolling Fog" — FALSE-lock
+// inverted, census widened to TWO named fog chips, both zoneOnly pickers.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -101,13 +102,13 @@ beforeEach(() => {
 });
 
 describe('MA-1766 young-bronze-dragon fog cloud lair chip census', () => {
-  it('lair block renders EXACTLY one chip — the named "Fog Cloud" row; sibling [1] nameless stays static', () => {
+  it('lair block renders EXACTLY two named chips — "Fog Cloud" + MA-1767 "Rolling Fog"', () => {
     renderDragon();
     const chips = lairChips();
-    expect(chips.map(c => c.textContent.trim())).toEqual(['Fog Cloud']);
-    const chip = chips[0];
-    expect(chip.getAttribute('title')).toMatch(/Lair action — Fog Cloud/);
-    expect(chip.textContent).not.toMatch(/DC/);
+    expect(chips.map(c => c.textContent.trim())).toEqual(['Fog Cloud', 'Rolling Fog']);
+    expect(chips[0].getAttribute('title')).toMatch(/Lair action — Fog Cloud/);
+    expect(chips[1].getAttribute('title')).toMatch(/Lair action — Rolling Fog/);
+    chips.forEach(c => expect(c.textContent).not.toMatch(/DC/));
   });
 
   it('chip click routes to the picker zoneOnly: no save, no damage, radius 20, gate off', async () => {
@@ -138,5 +139,28 @@ describe('MA-1766 young-bronze-dragon fog cloud lair chip census', () => {
     expect(zt.radiusFt).toBe(20);
     expect(zt.repeatTurnEnd).toBe(false);
     expect(zt.damage).toBeNull();
+  });
+
+  // MA-1767: second chip — "Rolling Fog" — clickable zoneOnly twin of [0].
+  it('MA-1767 "Rolling Fog" chip click routes to the picker zoneOnly: no save, no damage, radius 20', async () => {
+    renderDragon();
+    fireEvent.click(lairChips()[1]);
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    const p = aoeProps.current;
+    expect(p.titleOverride).toBe('20-ft radius (GM positions; selection advisory)');
+    expect(p.saveDc ?? null).toBeNull();
+    expect(p.saveType).toBeNull();
+    expect(p.damage).toBeNull();
+    expect(p.damageType).toBeNull();
+    expect(p.dcSuccess ?? null).toBeNull();
+    expect(p.range).toBe(20);
+    expect(p.rangeGateFt).toBeNull();
+    expect(p.zoneOnly).toBe(true);
+    expect(p.excludeNames).toEqual(['Young Bronze Dragon 1']);
+    expect(p.storeLastAttack).toBe(false);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(p.zoneTe.effectKey).toBe('lair_fog_cloud');
+    expect(p.zoneTe.radiusFt).toBe(20);
+    expect(p.zoneTe.damage).toBeNull();
   });
 });
