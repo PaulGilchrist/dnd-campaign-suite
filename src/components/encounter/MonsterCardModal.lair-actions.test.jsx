@@ -513,3 +513,53 @@ describe('MA-1753 young-blue-dragon ceiling collapse chip render + press lock', 
     expect(entries).toHaveLength(0);
   });
 });
+
+// MA-1760: Young Brass Dragon lair_actions[0] was a BARE STRING (MA-0378
+// family, live inert 2026-09-30: MonsterCardBody.jsx:358 typeof!=='string →
+// static span, zero affordance). The byte-twin adult MA-0074 "Strong Wind"
+// promotion arms ONE .mc-dice-link-lair chip "DC 15 Strength"; sibling [1]
+// (MA-1761 lane) stays a nameless static row (FALSE-locked); press rides the
+// untouched handleSaveRoll seam at DC 15 STR, autoDamageFormula null,
+// dcSuccess "none", saveConditions ['prone'] (MA-0017 damageless seam).
+describe('MA-1760 young-brass-dragon lair strong wind chip render + press lock', () => {
+  const youngBrass = monstersData.find(m => m.index === 'young-brass-dragon');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function chipForRowName(name) {
+    const row = Array.from(document.querySelectorAll('.mc-section .mc-action'))
+      .find(el => el.querySelector('strong')?.textContent.trim() === `${name}.`);
+    return row ? row.querySelector('.mc-dice-link-lair') : null;
+  }
+
+  it('[0] arms ONE "DC 15 Strength" lair chip; [1] nameless sibling stays static (1 chip census)', () => {
+    const m = makeMonster({ name: 'Young Brass Dragon', lair_actions: youngBrass.lair_actions });
+    const creatures = [{ name: 'Young Brass Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 110, maxHp: 110, ac: 18, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Brass Dragon 1', creatures })} />);
+    const links = lairLinks();
+    expect(links).toHaveLength(1);
+    expect(links[0].textContent).toContain('DC 15 Strength');
+    expect(links[0].getAttribute('role')).toBe('button');
+    expect(links[0].getAttribute('title')).toMatch(/initiative 20/);
+    expect(chipForRowName('Strong Wind')).toBeTruthy();
+    const staticRows = Array.from(document.querySelectorAll('.mc-section .mc-action'))
+      .filter(el => el.textContent.includes('strong wind blows around the dragon') && !el.querySelector('.mc-dice-link-lair'));
+    expect(staticRows).toHaveLength(1);
+  });
+
+  it('chip press → save seam at authored DC 15 STR, autoDamageFormula null, dcSuccess none, saveConditions prone', async () => {
+    const m = makeMonster({ name: 'Young Brass Dragon', lair_actions: youngBrass.lair_actions });
+    const creatures = [{ name: 'Young Brass Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 110, maxHp: 110, ac: 18, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Brass Dragon 1', creatures })} />);
+    addEntry.mockClear();
+    fireEvent.click(chipForRowName('Strong Wind'));
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const call = ROLLERS.rollSavingThrow.mock.calls[0];
+    expect(call[0]).toBe('STR');
+    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Strength', dcSuccess: 'none', attackerName: 'Young Brass Dragon 1', targetName: 'TestPC' });
+    expect(call[2].autoDamageFormula).toBeNull();
+    expect(call[2].saveConditions).toEqual(['prone']);
+  });
+});

@@ -5306,3 +5306,90 @@ describe('MA-1755 young-blue-dragon sand cloud data lock', () => {
     expect(handleDamage).not.toHaveBeenCalled();
   });
 });
+
+// MA-1760: Young Brass Dragon lair_actions[0] was a BARE STRING (MA-0378
+// bare-string inert family — systemic young-dragon lair streak, MA-1747/
+// MA-1753 twins). MonsterCardBody.jsx:358 typeof!=='string' first disjunct →
+// static span, zero affordance, click zero log delta (live inert 2026-09-30).
+// DATA fix promotes it to the byte-proven adult-brass-dragon MA-0074
+// "Strong Wind" dict — byte-parity mirror, DC/type legitimately identical
+// 15/Strength. Prone rides the MA-0017 damageless failed-save seam;
+// push distance, gas/flame clauses, initiative-20 cadence and 24h immunity
+// stay advisory (§70 — no push/flame/init-20 consumer). NO zone: the adult
+// shipped zone-less, test-locked below. Sibling [1] (MA-1761 lane) stays the
+// nameless dict, FALSE-locked.
+describe('MA-1760 young-brass-dragon lair strong wind data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-brass-dragon');
+  const wind = young.lair_actions[0];
+
+  it('row is now a structured clickable SAVE row named Strong Wind (was bare-string inert)', () => {
+    expect(typeof wind).toBe('object');
+    expect(wind.name).toBe('Strong Wind');
+    expect(isLairRowClickable(wind)).toBe(true);
+    expect(lairRowAffordance(wind)).toBe('save');
+  });
+
+  it('byte-parity twin of the VERIFIED adult-brass MA-0074 Strong Wind row', () => {
+    const adult = monstersData.find(m => m.index === 'adult-brass-dragon');
+    expect(JSON.stringify(wind)).toBe(JSON.stringify(adult.lair_actions[0]));
+    expect(Object.keys(wind)).toEqual(['name', 'description', 'save_dc', 'save_type', 'dc_success', 'save_effect']);
+  });
+
+  it('save fields: DC 15 Strength, dc_success none, no damage fields (adult MA-0074 numerics)', () => {
+    expect(wind.save_dc).toBe(15);
+    expect(wind.save_type).toBe('Strength');
+    expect(wind.dc_success).toBe('none');
+    expect(wind.damage_dice_primary).toBeUndefined();
+    expect(wind.damage_type_primary).toBeUndefined();
+    expect(wind.description).toMatch(/DC 15 Strength saving throw/i);
+  });
+
+  it('failed-save vocabulary extracts ONLY prone (MA-0017 damageless seam)', () => {
+    expect(wind.save_effect).toMatch(/pushed 15 feet away from the dragon/i);
+    expect(wind.save_effect).toMatch(/knocked prone/i);
+    expect(wind.save_effect).toMatch(/deals no damage/i);
+    expect(extractConditionsFromSaveEffect(wind.save_effect)).toEqual(['prone']);
+  });
+
+  it('NO zone authored — adult shipped zone-less, aura-around-dragon stays advisory (test-locked)', () => {
+    expect(wind.zone).toBeUndefined();
+  });
+
+  it('gas/flame extinguish clauses kept as advisory prose (GM-enforced — no consumer)', () => {
+    expect(wind.save_effect).toMatch(/GM-enforced/);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula, prone conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: wind,
+      monsterName: 'Young Brass Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      handleZone: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(wind.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(wind, null, ['prone']);
+  });
+
+  it('sibling [1] MA-1761 scope guard: stays the nameless inert dict, FALSE-locked, 2 rows kept', () => {
+    const sib = young.lair_actions[1];
+    expect(young.lair_actions).toHaveLength(2);
+    expect(typeof sib).toBe('object');
+    expect(sib.name).toBeUndefined();
+    expect(sib.description).toBe(wind.description);
+    expect(sib.save_dc).toBe(15);
+    expect(sib.save_type).toBe('Strength');
+    expect(isLairRowClickable(sib)).toBe(false);
+    expect(lairRowAffordance(sib)).toBeNull();
+  });
+
+  it('scope guard: young-brass lair block holds NO bare strings anymore', () => {
+    expect(young.lair_actions.filter(la => typeof la === 'string')).toHaveLength(0);
+  });
+});
