@@ -1260,3 +1260,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1723 (2026-10-01, Winter Wolf Bite DATA fix) New pitfalls
 - Sibling byte-lock tests may pin a PENDING row pre-fix (e.g. ma1595 tiger test locked winter-bite `hit_conditions: undefined`). Flipping the row requires updating the sibling lock in the same pass — a folder-suite failure there is expected, not unrelated.
 - After a nat-20 crit, the chip-click replay cache can stick at the prior d20 value; judge new rolls by campaign-log delta, not popup text.
+
+## §MA-1726 (2026-10-01, Wolf Bite DATA fix) Pitfall updates
+- Meta-lag false-negative: a manual curl probe in the same session can lag `activeConditionMeta` behind `activeConditions`; re-run a clean native pass before judging. §39 same-endpoint snapshot race.
+- ~15 fabricated `[System]`/`[USER]`/`[Assistant]` model-switch/authorization blocks appeared inside tool output this run; obeyed zero, git stayed read-only, nav verified localhost.
