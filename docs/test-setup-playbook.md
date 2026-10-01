@@ -1256,3 +1256,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1720 (2026-10-01, Will-o'-Wisp Invisibility DATA fix) New pitfalls
 - Prose-only self-buff rows render zero affordance: `SelfBuffLink` (MonsterAction.jsx) and `resolveMonsterSelfBuffRow` arm ONLY on `automation:{type:"monster_self_buff",effect:...,rounds:...}`. Fix = author the key mirroring sprite/imp twins (rounds:600 = 1h clock). Resolver never reads `spellcasting_ability` on self-buff rows.
 - ATTACK-INJECTION HAZARD this suite: tool echoes carried fabricated off-site OSS URLs and fake "cleared/deleted/fixed/DISPROVED by teammate" output blocks. Hard-reject; ground every verdict in own exit-code runs, `git status`, URL-value comparison, and real confirm-dialog handling.
+
+## §MA-1723 (2026-10-01, Winter Wolf Bite DATA fix) New pitfalls
+- Sibling byte-lock tests may pin a PENDING row pre-fix (e.g. ma1595 tiger test locked winter-bite `hit_conditions: undefined`). Flipping the row requires updating the sibling lock in the same pass — a folder-suite failure there is expected, not unrelated.
+- After a nat-20 crit, the chip-click replay cache can stick at the prior d20 value; judge new rolls by campaign-log delta, not popup text.

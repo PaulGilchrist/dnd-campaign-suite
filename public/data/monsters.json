@@ -66112,7 +66112,10 @@
         "attack_bonus": 6,
         "reach": "5 ft.",
         "damage_dice_primary": "2d6 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "hit_conditions": [
+          "prone"
+        ]
       },
       {
         "name": "Cold Breath",

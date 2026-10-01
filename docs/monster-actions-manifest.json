@@ -28954,7 +28954,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage. If the target is a Large or smaller creature, it has the Prone condition.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1723-winter-wolf-bite-prone.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1724",

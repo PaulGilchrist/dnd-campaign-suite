@@ -169,7 +169,8 @@ describe('MA-1595 disk fingerprint: tiger Rend hit_conditions fix', () => {
         expect(BOULDER.hit_conditions).toEqual(['prone']);
         expect(WINTER_BITE.attack_bonus).toBe(6);
         expect(WINTER_BITE.damage_dice_primary).toBe('2d6 + 4');
-        expect(WINTER_BITE.hit_conditions).toBeUndefined();
+        // MA-1723 fixed same lane: winter-wolf Bite now carries hit_conditions ["prone"].
+        expect(WINTER_BITE.hit_conditions).toEqual(['prone']);
         expect(NIMBLE.description).toBe('The tiger takes the Disengage or Hide action.');
         expect(Object.keys(NIMBLE)).toEqual(['name', 'description']);
     });
