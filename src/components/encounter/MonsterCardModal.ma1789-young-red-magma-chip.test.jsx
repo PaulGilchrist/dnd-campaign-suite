@@ -10,10 +10,14 @@
 // the distinct-named "Erupting Magma" save row (MA-1748/MA-1753/MA-1754/
 // MA-1767/MA-1773/MA-1784 distinct-sibling-naming precedent — [0] already owns
 // "Magma Geyser"; raw duplicate-mechanic rows named distinctly, never merged)
-// → lair block renders TWO named rows, each with its own "DC 15 Dexterity"
-// .mc-dice-link-lair chip; BOTH chips arm the picker at DC 15 Dexterity,
-// 6d6 Fire, dcSuccess "half", saveConditions []. [2] nameless tremor dict
-// stays static prose (FALSE-pin).
+// → lair block renders named rows, each with its own "DC 15 Dexterity"
+// .mc-dice-link-lair chip; chips arm the picker at DC 15 Dexterity,
+// 6d6 Fire, dcSuccess "half", saveConditions []. MA-1791 WIDENS this census
+// 2→3: sibling [2] nameless tremor dict promoted to the adult-red MA-0129
+// byte-twin named "Tremor" save row (dc_success "none", save_effect carries
+// the canonical prone word → saveConditions ['prone'], no damage dice) → its
+// chip arms the picker at DC 15 Dexterity with dcSuccess "none", damage null,
+// saveConditions ['prone']; zero static prose rows remain.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -107,17 +111,17 @@ beforeEach(() => {
 });
 
 describe('MA-1789/MA-1790 young-red-dragon magma lair chip lock', () => {
-  it('bare-string [0] promoted by MA-1789 + nameless [1] promoted by MA-1790: lair block renders TWO named rows ("Magma Geyser."/"Erupting Magma."), TWO chips "DC 15 Dexterity"; [2] tremor stays static prose', () => {
+  it('bare-string [0] promoted by MA-1789 + nameless [1] promoted by MA-1790 + nameless [2] tremor promoted by MA-1791: lair block renders THREE named rows ("Magma Geyser."/"Erupting Magma."/"Tremor."), THREE chips "DC 15 Dexterity"; zero static prose rows', () => {
     renderDragon();
     const chips = lairChips();
-    expect(chips).toHaveLength(2);
-    expect(chips.map(c => c.textContent.trim())).toEqual(['DC 15 Dexterity', 'DC 15 Dexterity']);
+    expect(chips).toHaveLength(3);
+    expect(chips.map(c => c.textContent.trim())).toEqual(['DC 15 Dexterity', 'DC 15 Dexterity', 'DC 15 Dexterity']);
     chips.forEach(c => expect(c.getAttribute('title')).toMatch(/Lair action — DC 15 Dexterity/));
     expect(chips[0].closest('.mc-action').querySelector('strong')?.textContent).toBe('Magma Geyser.');
     expect(chips[1].closest('.mc-action').querySelector('strong')?.textContent).toBe('Erupting Magma.');
+    expect(chips[2].closest('.mc-action').querySelector('strong')?.textContent).toBe('Tremor.');
     const staticRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => !el.querySelector('.mc-dice-link-lair'));
-    expect(staticRows).toHaveLength(1);
-    expect(staticRows[0].textContent).toMatch(/^A tremor shakes the lair/);
+    expect(staticRows).toHaveLength(0);
   });
 
   it('[0] chip click arms the picker at DC 15 Dexterity, 6d6 Fire, dcSuccess half, zero conditions', async () => {
@@ -148,6 +152,22 @@ describe('MA-1789/MA-1790 young-red-dragon magma lair chip lock', () => {
     expect(p.damage).toBe('6d6');
     expect(p.damageType).toBe('Fire');
     expect(p.saveConditions).toEqual([]);
+    expect(p.zoneOnly ?? false).toBe(false);
+    expect(p.excludeNames).toContain('Young Red Dragon 1');
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('[2] chip click arms the picker at DC 15 Dexterity, dcSuccess none, no damage, saveConditions ["prone"] (MA-1791 Tremor — damageless prone row)', async () => {
+    pickerProps.current = null;
+    renderDragon();
+    fireEvent.click(lairChips()[2]);
+    await waitFor(() => expect(pickerProps.current).toBeTruthy());
+    const p = pickerProps.current;
+    expect(p.saveType).toBe('Dexterity');
+    expect(p.saveDc).toBe(15);
+    expect(p.dcSuccess).toBe('none');
+    expect(p.damage).toBeNull();
+    expect(p.saveConditions).toEqual(['prone']);
     expect(p.zoneOnly ?? false).toBe(false);
     expect(p.excludeNames).toContain('Young Red Dragon 1');
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();

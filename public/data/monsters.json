@@ -68093,9 +68093,12 @@
         "dc_success": "half"
       },
       {
-        "description": "A tremor shakes the lair in a 60-foot radius around the dragon. Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone.",
+        "name": "Tremor",
+        "description": "A tremor shakes the lair in a 60-foot radius around the dragon. Each creature other than the dragon on the ground in that area must succeed on a DC 15 Dexterity saving throw or be knocked prone. The dragon and flying creatures are excluded from the area (ground/flight gate is GM-enforced — no ground-state consumer).",
         "save_dc": 15,
-        "save_type": "Dexterity"
+        "save_type": "Dexterity",
+        "dc_success": "none",
+        "save_effect": "Failure: The target is knocked prone. Success: unaffected. This effect deals no damage."
       }
     ],
     "traits": [],

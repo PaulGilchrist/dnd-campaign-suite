@@ -3114,7 +3114,7 @@ describe('MA-0242 ancient-red-dragon magma geyser data lock', () => {
     expect(geyser.description).toBe(adultGeyser.description);
   });
 
-  it('scope guard: ancient-red [1] tremor structured by MA-0243; [2] volcanic-gases structured later by MA-0244; young-red twin inert', () => {
+  it('scope guard: ancient-red [1] tremor structured by MA-0243; [2] volcanic-gases structured later by MA-0244; young-red twin promoted by MA-1791', () => {
     expect(dragon.lair_actions[1].name).toBe('Tremor');
     expect(isLairRowClickable(dragon.lair_actions[1])).toBe(true);
     expect(dragon.lair_actions[2].name).toBe('Volcanic Gases');
@@ -3193,12 +3193,14 @@ describe('MA-0243 ancient-red-dragon tremor data lock', () => {
     expect(tremor.save_type).toBe(adultTremor.save_type);
   });
 
-  it('young-red twin guard: nameless tremor dict stays nameless and inert (MA-0222 name-gate)', () => {
+  it('young-red twin: tremor promoted by MA-1791 — named clickable save row (was nameless inert dict)', () => {
     const young = monstersData.find(m => m.index === 'young-red-dragon');
     const twin = young.lair_actions[2];
     expect(twin.description).toMatch(/^A tremor shakes the lair in a 60-foot radius/);
-    expect(twin.name).toBeUndefined();
-    expect(isLairRowClickable(twin)).toBe(false);
+    // MA-1791 INVERTED this FALSE-pin: nameless tremor dict promoted to the
+    // adult-red MA-0129 byte-twin named "Tremor" save row.
+    expect(twin.name).toBe('Tremor');
+    expect(isLairRowClickable(twin)).toBe(true);
   });
 });
 
@@ -3285,7 +3287,7 @@ describe('MA-0244 ancient-red-dragon volcanic gases data lock', () => {
     expect(cloud.duration).toBe(adultCloud.duration);
   });
 
-  it('scope guard: ancient-red [0]/[1] fixed rows untouched; young-red [0]/[1] promoted by MA-1789/MA-1790, twin [2] stays nameless/inert (MA-0222 name-gate)', () => {
+  it('scope guard: ancient-red [0]/[1] fixed rows untouched; young-red [0]/[1]/[2] promoted by MA-1789/MA-1790/MA-1791', () => {
     expect(dragon.lair_actions[0].name).toBe('Magma Geyser');
     expect(dragon.lair_actions[0].dc_success).toBe('half');
     expect(dragon.lair_actions[1].name).toBe('Tremor');
@@ -3297,8 +3299,9 @@ describe('MA-0244 ancient-red-dragon volcanic gases data lock', () => {
     // MA-1790 INVERTED the [1] pins: nameless magma dict → named "Erupting Magma" save row.
     expect(young.lair_actions[1].name).toBe('Erupting Magma');
     expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
-    expect(young.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    // MA-1791 INVERTED the [2] pins: nameless tremor dict → named "Tremor" save row.
+    expect(young.lair_actions[2].name).toBe('Tremor');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
   });
 });
 
@@ -5114,13 +5117,15 @@ describe('MA-1749 young-black-dragon insect cloud data lock', () => {
     expect(Object.keys(young.lair_actions[1])).toEqual(['name', 'description', 'save_dc', 'save_type']);
   });
 
-  it('other-species young-dragon twins: green [2] promoted by MA-1785; young-red twin stays inert', () => {
+  it('other-species young-dragon twins: green [2] promoted by MA-1785; young-red tremor [2] promoted by MA-1791', () => {
     const youngGreen = monstersData.find(m => m.index === 'young-green-dragon');
     // MA-1785 INVERTED this FALSE-pin: young-green thorn-wall named save row.
     expect(youngGreen.lair_actions[2].name).toBe('Wall of Thorns');
     expect(isLairRowClickable(youngGreen.lair_actions[2])).toBe(true);
     const youngRed = monstersData.find(m => m.index === 'young-red-dragon');
-    expect(isLairRowClickable(youngRed.lair_actions[2])).toBe(false);
+    // MA-1791 INVERTED this FALSE-pin: young-red nameless tremor dict promoted.
+    expect(youngRed.lair_actions[2].name).toBe('Tremor');
+    expect(isLairRowClickable(youngRed.lair_actions[2])).toBe(true);
   });
 });
 
@@ -6247,8 +6252,8 @@ describe('MA-1785 young-green-dragon wall of thorns data lock', () => {
 // "6d6", damage_type_primary:"Fire", dc_success:"half"} — description
 // repaired soft-hyphen U+00AD "tak\xad ing" → clean "taking" (the ONLY byte-
 // diff vs the adult prose; adult still carries the SH). RAW success = half.
-// Siblings [1] nameless magma dict / [2] nameless tremor dict stay
-// nameless/inert FALSE-pins (MA-0222 name-gate).
+// Sibling [1] nameless magma dict was promoted by MA-1790 ("Erupting Magma")
+// and sibling [2] nameless tremor dict by MA-1791 ("Tremor").
 describe('MA-1789 young-red-dragon magma geyser bare-string data lock', () => {
   const young = monstersData.find(m => m.index === 'young-red-dragon');
   const geyser = young.lair_actions[0];
@@ -6307,15 +6312,17 @@ describe('MA-1789 young-red-dragon magma geyser bare-string data lock', () => {
     expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
   });
 
-  it('scope guard: lair block keeps 3 elements; [1] promoted by MA-1790 to named "Erupting Magma" save row, twin [2] stays nameless/inert FALSE-pin', () => {
+  it('scope guard: lair block keeps 3 elements; [1] promoted by MA-1790 to named "Erupting Magma" save row, [2] promoted by MA-1791 to named "Tremor" save row', () => {
     expect(young.lair_actions).toHaveLength(3);
     // MA-1790 INVERTED this FALSE-pin: nameless magma dict → named "Erupting
     // Magma" save row (soft-hyphen repaired to clean text, same as this [0]).
     expect(young.lair_actions[1].name).toBe('Erupting Magma');
     expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
     expect(young.lair_actions[1].description).not.toContain('\u00ad');
-    expect(young.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    // MA-1791 INVERTED this FALSE-pin: nameless tremor dict → named "Tremor"
+    // save row (adult-red MA-0129 byte-twin with advisory tail + save_effect).
+    expect(young.lair_actions[2].name).toBe('Tremor');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
     expect(young.lair_actions[2].description).toMatch(/^A tremor shakes the lair/);
   });
 });
@@ -6390,12 +6397,108 @@ describe('MA-1790 young-red-dragon erupting magma nameless-dict data lock', () =
     expect(handleSaveRoll).toHaveBeenCalledWith(geyser, '6d6', []);
   });
 
-  it('scope guard: lair block keeps 3 elements; sibling [0] "Magma Geyser" untouched; [2] tremor twin stays nameless/inert FALSE-pin', () => {
+  it('scope guard: lair block keeps 3 elements; sibling [0] "Magma Geyser" untouched; [2] tremor promoted by MA-1791', () => {
     expect(young.lair_actions).toHaveLength(3);
     expect(sibling.name).toBe('Magma Geyser');
     expect(sibling.dc_success).toBe('half');
-    expect(young.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(young.lair_actions[2].name).toBe('Tremor');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
     expect(young.lair_actions[2].description).toMatch(/^A tremor shakes the lair/);
+  });
+});
+
+// MA-1791: Young Red Dragon lair_actions[2] was a NAMELESS tremor dict
+// (MA-0222/MV-24 name-gate fingerprint — isLairRowClickable !row.name →
+// false at monsterLairActions.js:25 fires BEFORE the fully-authored
+// save_dc/save_type fields are consulted → static prose render
+// (MonsterCardBody.jsx:357), zero .mc-dice-link-lair, zero save prompt,
+// zero log despite DC 15 Dexterity + prone mechanic on disk; live inert
+// 2026-10-01, card row 2 static text, log 32→32). DATA-only fix: promoted
+// to the adult-red MA-0129 byte-twin named SAVE row — canonical sibling name
+// "Tremor" (adult twin name; siblings [0]/[1] own "Magma Geyser" from
+// MA-1789 and "Erupting Magma" from MA-1790 — no collision) + every other
+// key order and byte mirror the fixed adult-red [1] row VERBATIM, including
+// the ground/flight advisory tail in description and the save_effect
+// ("Failure: The target is knocked prone. Success: unaffected. This effect
+// deals no damage.") that arms the MA-0017 damageless failed-save prone seam
+// via extractConditionsFromSaveEffect → ['prone'] (§180: description is
+// NEVER read by the grant lane — naming REQUIRES the save_effect word);
+// dc_success "none" (RAW success = no prone/no damage, MV-20 half-leak
+// suppression). No damage fields authored. LIVE (test-campaign 2026-10-01):
+// THREE named chips ("Magma Geyser"/"Erupting Magma"/"Tremor", all
+// "DC 15 Dexterity"); Tremor chip opens the 60-ft Radius picker "Dexterity
+// saving throw (DC 15) … On a failed save, target is Prone"; picker-route
+// saveBonuses.dexterity FULL-word rig (§163): +19 success first leg →
+// results "Saved — takes no damage (rolled 20)", Bandit change-data key
+// ABSENT, zero grants; -19 fail leg → results "Failed the save", `condition
+// applied` Prone on Bandit 1, activeConditions ['prone'] + meta
+// {dc:15,ability:'dex',source:'Young Red Dragon 1'}; whole-log damageEntry
+// count 0 + Bandit HP 11 held (damageless row).
+describe('MA-1791 young-red-dragon tremor nameless-dict data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-red-dragon');
+  const tremor = young.lair_actions[2];
+
+  it('[2] is now a named clickable SAVE row (was nameless inert dict)', () => {
+    expect(typeof tremor).toBe('object');
+    expect(tremor.name).toBe('Tremor');
+    expect(isLairRowClickable(tremor)).toBe(true);
+    expect(lairRowAffordance(tremor)).toBe('save');
+  });
+
+  it('adult-red MA-0129 byte-parity: identical key order and every key value verbatim', () => {
+    const adult = monstersData.find(m => m.index === 'adult-red-dragon');
+    const adultTremor = adult.lair_actions[1];
+    expect(adultTremor.name).toBe('Tremor');
+    expect(Object.keys(tremor)).toEqual(Object.keys(adultTremor));
+    Object.keys(tremor).forEach((k) => {
+      expect(tremor[k]).toBe(adultTremor[k]);
+    });
+  });
+
+  it('save fields: DC 15 Dexterity, dc_success none (RAW success = no prone/no damage), no damage authored', () => {
+    expect(tremor.save_dc).toBe(15);
+    expect(tremor.save_type).toBe('Dexterity');
+    expect(tremor.dc_success).toBe('none');
+    expect(tremor.damage_dice_primary).toBeUndefined();
+    expect(tremor.damage_type_primary).toBeUndefined();
+  });
+
+  it('save_effect carries the canonical prone word verbatim — extracts ONLY prone (MA-0017 damageless seam, §180)', () => {
+    expect(tremor.save_effect).toBe('Failure: The target is knocked prone. Success: unaffected. This effect deals no damage.');
+    expect(extractConditionsFromSaveEffect(tremor.save_effect)).toEqual(['prone']);
+  });
+
+  it('description byte-mirrors adult template incl. ground/flight advisory tail', () => {
+    expect(tremor.description).toMatch(/^A tremor shakes the lair in a 60-foot radius around the dragon\./i);
+    expect(tremor.description).toMatch(/must succeed on a DC 15 Dexterity saving throw or be knocked prone\./i);
+    expect(tremor.description).toMatch(/ground\/flight gate is GM-enforced/i);
+  });
+
+  it('save row routes through handleSaveRoll with zero damage formula + prone', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: tremor,
+      monsterName: 'Young Red Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(tremor.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(tremor, null, ['prone']);
+  });
+
+  it('scope guard: lair block keeps 3 elements; siblings [0]/[1] untouched bytes', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions[0].name).toBe('Magma Geyser');
+    expect(young.lair_actions[0].dc_success).toBe('half');
+    expect(young.lair_actions[0].damage_dice_primary).toBe('6d6');
+    expect(young.lair_actions[1].name).toBe('Erupting Magma');
+    expect(young.lair_actions[1].dc_success).toBe('half');
+    expect(young.lair_actions[1].damage_dice_primary).toBe('6d6');
+    expect(young.lair_actions[1].damage_type_primary).toBe('Fire');
   });
 });
