@@ -6,9 +6,10 @@
 // "DC 10 Constitution"; click arms the 20-ft Radius picker at DC 10
 // Constitution with 3d6 Cold half-on-success (dcSuccess "half"), saveConditions
 // []. MA-1808 promotes sibling [1] to the same byte-shape with DISTINCT name
-// "Glacial Fog" — now TWO named DC 10 Constitution chips. Only [2] nameless
-// jagged ice shards dict stays an inert static row (MA-1809) — exactly TWO
-// chips, ONE static row.
+// "Glacial Fog" — two named DC 10 Constitution chips. MA-1809 promotes [2]
+// nameless jagged ice shards dict to the adult-white attack byte-twin
+// (name/attack_bonus/range) — now THREE named rows, THREE chips ("Freezing
+// Fog"/"Glacial Fog" save + "Jagged Ice Shards" attack), ZERO static rows.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -103,10 +104,10 @@ beforeEach(() => {
 });
 
 describe('MA-1807 young-white-dragon freezing fog lair chip lock', () => {
-  it('MA-1807+MA-1808 promoted: lair block renders TWO named fog rows "Freezing Fog."/"Glacial Fog." + TWO chips "DC 10 Constitution"; only [2] stays an inert static row', () => {
+  it('MA-1807+MA-1808+MA-1809 promoted: lair block renders THREE named rows "Freezing Fog."/"Glacial Fog."/"Jagged Ice Shards." + THREE chips (two "DC 10 Constitution" save + one "Jagged Ice Shards" attack); ZERO static rows', () => {
     renderDragon();
     const chips = lairChips();
-    expect(chips).toHaveLength(2);
+    expect(chips).toHaveLength(3);
     expect(chips[0].textContent.trim()).toBe('DC 10 Constitution');
     expect(chips[0].getAttribute('title')).toMatch(/Lair action — DC 10 Constitution/);
     expect(chips[0].getAttribute('role')).toBe('button');
@@ -117,10 +118,13 @@ describe('MA-1807 young-white-dragon freezing fog lair chip lock', () => {
     expect(chips[1].getAttribute('role')).toBe('button');
     expect(chips[1].getAttribute('tabindex')).toBe('0');
     expect(chips[1].closest('.mc-action').querySelector('strong')?.textContent).toBe('Glacial Fog.');
+    expect(chips[2].textContent.trim()).toBe('Jagged Ice Shards');
+    expect(chips[2].getAttribute('title')).toMatch(/Lair action — Jagged Ice Shards/);
+    expect(chips[2].getAttribute('role')).toBe('button');
+    expect(chips[2].getAttribute('tabindex')).toBe('0');
+    expect(chips[2].closest('.mc-action').querySelector('strong')?.textContent).toBe('Jagged Ice Shards.');
     const staticRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => !el.querySelector('.mc-dice-link-lair'));
-    expect(staticRows).toHaveLength(1);
-    expect(staticRows[0].querySelector('strong')).toBeNull();
-    expect(staticRows[0].textContent).toMatch(/Jagged ice shards/i);
+    expect(staticRows).toHaveLength(0);
   });
 
   it('[0] chip click arms the 20-ft Radius picker at DC 10 Constitution, 3d6 Cold, dcSuccess half, zero conditions', async () => {

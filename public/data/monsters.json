@@ -68595,7 +68595,10 @@
         "dc_success": "half"
       },
       {
+        "name": "Jagged Ice Shards",
         "description": "Jagged ice shards fall from the ceiling, striking up to three creatures underneath that the dragon can see within 120 feet of it. The dragon makes one ranged attack roll (+7 to hit) against each target. On a hit, the target takes 10 (3d6) piercing damage.",
+        "attack_bonus": 7,
+        "range": "120 ft.",
         "damage_dice_primary": "3d6",
         "damage_type_primary": "Piercing"
       }

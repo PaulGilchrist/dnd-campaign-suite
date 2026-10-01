@@ -1670,15 +1670,18 @@ describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
   // MA-1807 INVERTED this pin: young [0] bare string promoted to this
   // adult-white byte-twin named save row. MA-1808 INVERTED the [1] pin:
   // nameless fog dict promoted to "Glacial Fog" (distinct name, byte-parity
-  // with [0]/adult except name). [2] nameless ice shards stays open (MA-1809).
-  it('young-white-dragon scope guard: [0] promoted by MA-1807; [1] promoted by MA-1808; [2] untouched', () => {
+  // with [0]/adult except name). MA-1809 INVERTED the [2] pin: nameless
+  // jagged ice shards dict promoted to the adult-white attack byte-twin.
+  it('young-white-dragon scope guard: [0] promoted by MA-1807; [1] promoted by MA-1808; [2] promoted by MA-1809', () => {
     const young = monstersData.find(m => m.index === 'young-white-dragon');
     expect(typeof young.lair_actions[0]).toBe('object');
     expect(young.lair_actions[0].name).toBe('Freezing Fog');
     expect(JSON.stringify(young.lair_actions[0])).toBe(JSON.stringify(fog));
     expect(young.lair_actions[1].name).toBe('Glacial Fog');
     expect(young.lair_actions[1].name).not.toBe(young.lair_actions[0].name);
-    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(young.lair_actions[2].name).toBe('Jagged Ice Shards');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
+    expect(lairRowAffordance(young.lair_actions[2])).toBe('attack');
   });
 });
 
@@ -1761,13 +1764,19 @@ describe('MA-0150 adult-white-dragon jagged ice shards data lock', () => {
     expect(ancient.lair_actions[1].description).toBe(shards.description);
   });
 
-  it('young-white-dragon scope guard: its nameless jagged-ice dict is NOT touched by this fix', () => {
+  // MA-1809 INVERTED this pin: the young nameless jagged-ice dict was
+  // promoted to this adult-white byte-twin attack row (same ice prose,
+  // name/attack_bonus/range added).
+  it('young-white-dragon scope guard: jagged-ice dict promoted by MA-1809 to this adult byte-twin attack row', () => {
     const young = monstersData.find(m => m.index === 'young-white-dragon');
     const jagged = (young.lair_actions || []).find(r => typeof r === 'object' && r?.description?.includes('Jagged ice shards'));
     expect(jagged).toBeDefined();
-    expect(jagged.name).toBeUndefined();
-    expect(jagged.attack_bonus).toBeUndefined();
-    expect(isLairRowClickable(jagged)).toBe(false);
+    expect(jagged.name).toBe('Jagged Ice Shards');
+    expect(jagged.attack_bonus).toBe(7);
+    expect(jagged.range).toBe('120 ft.');
+    expect(isLairRowClickable(jagged)).toBe(true);
+    expect(lairRowAffordance(jagged)).toBe('attack');
+    expect(JSON.stringify(jagged)).toBe(JSON.stringify(shards));
   });
 });
 
@@ -3632,7 +3641,9 @@ describe('MA-0264 ancient-white-dragon jagged ice shards raw-string data lock', 
     expect(handleDamage).not.toHaveBeenCalled();
   });
 
-  it('scope guards: [0] MA-0263 fog dict byte-untouched; adult MA-0150 sibling byte-identical; young-white nameless dict still inert', () => {
+  // MA-1809 INVERTED the young-white tail of this guard: its nameless
+  // jagged-ice dict was promoted to the adult attack byte-twin.
+  it('scope guards: [0] MA-0263 fog dict byte-untouched; adult MA-0150 sibling byte-identical; young-white jagged dict promoted by MA-1809', () => {
     expect(dragon.lair_actions[0].name).toBe('Freezing Fog');
     expect(lairRowAffordance(dragon.lair_actions[0])).toBe('save');
     expect(typeof dragon.lair_actions[2]).toBe('object');
@@ -3642,8 +3653,9 @@ describe('MA-0264 ancient-white-dragon jagged ice shards raw-string data lock', 
     const young = monstersData.find(m => m.index === 'young-white-dragon');
     const jagged = (young.lair_actions || []).find(r => typeof r === 'object' && r?.description?.includes('Jagged ice shards'));
     expect(jagged).toBeDefined();
-    expect(jagged.name).toBeUndefined();
-    expect(isLairRowClickable(jagged)).toBe(false);
+    expect(jagged.name).toBe('Jagged Ice Shards');
+    expect(isLairRowClickable(jagged)).toBe(true);
+    expect(lairRowAffordance(jagged)).toBe('attack');
   });
 });
 
@@ -6682,7 +6694,7 @@ describe('MA-1803 young-silver-dragon lair rolling fog data lock', () => {
 // area, wind dispersal and initiative-20 cadence stay GM-advisory prose
 // residuals (§70 — no fog zone/obscurement/turn-end consumer app-wide).
 // Siblings index-bound: [1] fog dict promoted by MA-1808 ("Glacial Fog"),
-// [2] nameless jagged ice shards dict stays inert (MA-1809).
+// [2] jagged ice shards dict promoted by MA-1809 to the adult attack twin.
 describe('MA-1807 young-white-dragon freezing fog bare-string data lock', () => {
   const young = monstersData.find(m => m.index === 'young-white-dragon');
   const adult = monstersData.find(m => m.index === 'adult-white-dragon');
@@ -6743,8 +6755,9 @@ describe('MA-1807 young-white-dragon freezing fog bare-string data lock', () => 
 
   // MA-1808 INVERTS the [1] FALSE-pin: the nameless fog dict gained
   // name:"Glacial Fog" + dc_success:"half" → clickable 'save' row.
-  // [2] nameless ice shards stays FALSE-pinned (MA-1809 open).
-  it('siblings: [1] promoted by MA-1808 to clickable "Glacial Fog" save row; [2] nameless ice shards stays inert', () => {
+  // MA-1809 INVERTS the [2] FALSE-pin: nameless ice shards dict promoted
+  // to the adult-white attack byte-twin → clickable 'attack' row.
+  it('siblings: [1] promoted by MA-1808 to clickable "Glacial Fog" save row; [2] promoted by MA-1809 to clickable "Jagged Ice Shards" attack row', () => {
     expect(young.lair_actions).toHaveLength(3);
     expect(young.lair_actions.filter(la => typeof la === 'string')).toHaveLength(0);
     const fogDict = young.lair_actions[1];
@@ -6755,9 +6768,9 @@ describe('MA-1807 young-white-dragon freezing fog bare-string data lock', () => 
     expect(fogDict.save_dc).toBe(10);
     expect(fogDict.damage_dice_primary).toBe('3d6');
     const shards = young.lair_actions[2];
-    expect(shards.name).toBeUndefined();
-    expect(isLairRowClickable(shards)).toBe(false);
-    expect(lairRowAffordance(shards)).toBeNull();
+    expect(shards.name).toBe('Jagged Ice Shards');
+    expect(isLairRowClickable(shards)).toBe(true);
+    expect(lairRowAffordance(shards)).toBe('attack');
     expect(shards.damage_type_primary).toBe('Piercing');
   });
 });
@@ -6835,10 +6848,100 @@ describe('MA-1808 young-white-dragon glacial fog nameless-dict data lock', () =>
     expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
   });
 
-  it('scope: lair_actions stays 3 rows; [0] Freezing Fog + [2] nameless shards untouched', () => {
+  // MA-1809 promoted [2] in the same family pass — no longer inert.
+  it('scope: lair_actions stays 3 rows; [0] Freezing Fog + [2] Jagged Ice Shards (MA-1809)', () => {
     expect(young.lair_actions).toHaveLength(3);
     expect(young.lair_actions[0].name).toBe('Freezing Fog');
-    expect(young.lair_actions[2].name).toBeUndefined();
-    expect(isLairRowClickable(young.lair_actions[2])).toBe(false);
+    expect(young.lair_actions[2].name).toBe('Jagged Ice Shards');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
+  });
+});
+
+// MA-1809: Young White Dragon lair_actions[2] jagged ice shards was a
+// NAMELESS DICT ({description, damage_dice_primary:"3d6",
+// damage_type_primary:"Piercing"} only) — it died at the name gate
+// isLairRowClickable (monsterLairActions.js:26 `!row.name`) BEFORE the
+// damage_dice_primary fallback (:29/:44) was ever consulted, and the adult
+// white twin even its attack_bonus/range machine fields were dropped on the
+// young row (live inert: zero <strong>, zero .mc-dice-link-lair, cursor
+// auto, click zero log delta). DATA-only fix promotes [2] to the ADULT-WHITE
+// lair_actions[1] byte-twin (MA-0150 precedent): name:"Jagged Ice Shards" +
+// attack_bonus:7 + range:"120 ft." over the byte-identical ice prose and the
+// already-authored 3d6 Piercing — exact key set AND order mirrored
+// (name/description/attack_bonus/range/damage dice/type). Affordance
+// 'attack' (monsterLairActions.js:43, reachable only once the name gate
+// passes) → chip "Jagged Ice Shards" → resolveLairRow attack leg (:109-112)
+// → handleAttack(name, 7, row) — the UNCHANGED monster attack seam: +7 vs
+// armed target AC, 3d6 Piercing auto-damage on hit, 120-ft range gate via
+// resolveAttackRange/computeMapRangeState (gridless = lenient, §42). "Up to
+// three creatures" stays GM-click-per-target (MA-0068/MA-0009); ceiling
+// placement and initiative-20 cadence stay GM-advisory (§70 residual).
+describe('MA-1809 young-white-dragon jagged ice shards nameless-dict data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-white-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-white-dragon');
+  const shards = young.lair_actions[2];
+
+  it('[2] is now a structured clickable ATTACK row named Jagged Ice Shards (was nameless-dict inert)', () => {
+    expect(typeof shards).toBe('object');
+    expect(shards.name).toBe('Jagged Ice Shards');
+    expect(isLairRowClickable(shards)).toBe(true);
+    expect(lairRowAffordance(shards)).toBe('attack');
+  });
+
+  it('byte-parity with the adult-white MA-0150 twin — exact key set AND order mirrored', () => {
+    expect(JSON.stringify(shards)).toBe(JSON.stringify(adult.lair_actions[1]));
+    expect(Object.keys(shards)).toEqual(['name', 'description', 'attack_bonus', 'range', 'damage_dice_primary', 'damage_type_primary']);
+  });
+
+  it('attack fields: +7 to hit, 120 ft range, 3d6 Piercing (prose-agreed)', () => {
+    expect(shards.attack_bonus).toBe(7);
+    expect(shards.range).toBe('120 ft.');
+    expect(shards.damage_dice_primary).toBe('3d6');
+    expect(shards.damage_type_primary).toBe('Piercing');
+    expect(shards.description).toMatch(/\+7 to hit/i);
+    expect(shards.description).toMatch(/up to three creatures/i);
+    expect(shards.description).toMatch(/within 120 feet/i);
+    expect(shards.description).toMatch(/10 \(3d6\) piercing damage/i);
+  });
+
+  it('young RAW prose byte-preserved verbatim (string unchanged by the promotion)', () => {
+    expect(shards.description).toBe(adult.lair_actions[1].description);
+    expect(shards.description).toMatch(/^Jagged ice shards fall from the ceiling/);
+    expect(shards.description).toMatch(/ piercing damage\.$/);
+  });
+
+  it('no save authored on the row — zero save-prompt routing', () => {
+    expect(shards.save_dc).toBeUndefined();
+    expect(shards.save_type).toBeUndefined();
+    expect(shards.save_effect).toBeUndefined();
+    expect(shards.dc_success).toBeUndefined();
+  });
+
+  it('attack row routes through the UNCHANGED monster attack seam: handleAttack(name, +7, row)', async () => {
+    const handleAttack = vi.fn();
+    const handleSaveRoll = vi.fn();
+    const handleDamage = vi.fn();
+    const res = await resolveLairRow({
+      action: shards,
+      monsterName: 'Young White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack,
+      handleDamage,
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'attack' });
+    expect(handleAttack).toHaveBeenCalledWith('Jagged Ice Shards', 7, shards);
+    expect(handleSaveRoll).not.toHaveBeenCalled();
+    expect(handleDamage).not.toHaveBeenCalled();
+  });
+
+  it('scope: lair_actions stays 3 rows; [0]/[1] fog rows byte-untouched', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions[0].name).toBe('Freezing Fog');
+    expect(lairRowAffordance(young.lair_actions[0])).toBe('save');
+    expect(young.lair_actions[1].name).toBe('Glacial Fog');
+    expect(lairRowAffordance(young.lair_actions[1])).toBe('save');
+    expect(shards.name).toBe('Jagged Ice Shards');
   });
 });
