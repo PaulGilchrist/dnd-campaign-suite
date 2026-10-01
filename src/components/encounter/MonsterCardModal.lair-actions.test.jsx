@@ -457,25 +457,28 @@ describe('MA-1753 young-blue-dragon ceiling collapse chip render + press lock', 
     return row ? row.querySelector('.mc-dice-link-lair') : null;
   }
 
-  // MA-1754 bumped the young-blue chip census 1→2: [1] was named
-  // "Collapsing Ceiling" (distinct from [0]); only [2] sand cloud renders static.
-  it('[0]+[1] arm TWO "DC 15 Dexterity" lair chips; [2] sand cloud renders static (2 chips total)', () => {
+  // MA-1754 bumped the young-blue chip census 1→2 ([1] named "Collapsing
+  // Ceiling"); MA-1755 widens it 2→3: [2] sand cloud got its adult-blue
+  // byte-twin "Sand Cloud" save+zone row → clickable "DC 15 Constitution" chip.
+  it('[0]+[1]+[2] arm THREE lair chips — two "DC 15 Dexterity" + one "DC 15 Constitution" (3 chips total)', () => {
     const m = makeMonster({ name: 'Young Blue Dragon', lair_actions: youngBlue.lair_actions });
     const creatures = [{ name: 'Young Blue Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 155, maxHp: 155, ac: 19, conditions: [] }, ...CREATURES];
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Blue Dragon 1', creatures })} />);
     const links = lairLinks();
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(3);
+    const dex = links.filter(l => l.textContent.includes('DC 15 Dexterity'));
+    const con = links.filter(l => l.textContent.includes('DC 15 Constitution'));
+    expect(dex).toHaveLength(2);
+    expect(con).toHaveLength(1);
     for (const link of links) {
-      expect(link.textContent).toContain('DC 15 Dexterity');
       expect(link.getAttribute('role')).toBe('button');
       expect(link.getAttribute('title')).toMatch(/initiative 20/);
     }
     expect(chipForRowName('Ceiling Collapse')).toBeTruthy();
     expect(chipForRowName('Collapsing Ceiling')).toBeTruthy();
-    const sandRow = Array.from(document.querySelectorAll('.mc-section .mc-action'))
-      .find(el => el.textContent.includes('cloud of sand'));
-    expect(sandRow).toBeTruthy();
-    expect(sandRow.querySelector('.mc-dice-link-lair')).toBeNull();
+    const sandChip = chipForRowName('Sand Cloud');
+    expect(sandChip).toBeTruthy();
+    expect(sandChip.textContent).toContain('DC 15 Constitution');
   });
 
   it('chip press → save seam at authored DC 15 DEX, autoDamageFormula 3d6, dcSuccess none, saveConditions prone+restrained', async () => {

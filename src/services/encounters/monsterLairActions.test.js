@@ -2228,8 +2228,10 @@ describe('MA-0176 ancient-blue-dragon ceiling collapse data lock', () => {
 
   // MA-1753 INVERTED this pin for [0]; MA-1754 INVERTS it for [1]: the
   // duplicated nameless ceiling dict got its own distinct name
-  // "Collapsing Ceiling" + full mechanic keys (byte-twin of [0]). Only the
-  // sand-cloud dict [2] (MA-1755 lane) and other page-90 variants stay inert.
+  // "Collapsing Ceiling" + full mechanic keys (byte-twin of [0]). MA-1755
+  // INVERTS the last young-blue pin for [2]: the nameless sand-cloud dict
+  // got its adult-blue MA-0063 byte-twin "Sand Cloud" save+zone row — all
+  // three young-blue lair rows are now named and clickable.
   it('scope guard: nameless ceiling dicts elsewhere stay inert; young-blue [0]/[1] fixed MA-1753/MA-1754', () => {
     const variants = monstersData.filter(m => Array.isArray(m.lair_actions) &&
       m.lair_actions.some(la => typeof la === 'object' && la && la.description === VERBATIM && !la.name));
@@ -2275,8 +2277,9 @@ describe('MA-0176 ancient-blue-dragon ceiling collapse data lock', () => {
       expect(lairs).toHaveLength(3);
       expect(lairs[0].name).toBe('Ceiling Collapse');
       expect(row.name).not.toBe(lairs[0].name);
-      expect(lairs[2].name).toBeUndefined();
-      expect(isLairRowClickable(lairs[2])).toBe(false);
+      // MA-1755 INVERTED: [2] sand cloud was nameless inert; now named + clickable.
+      expect(lairs[2].name).toBe('Sand Cloud');
+      expect(isLairRowClickable(lairs[2])).toBe(true);
     });
     it('DC 15 Dexterity save mechanics byte-mirror fixed sibling [0]', () => {
       expect(row.save_dc).toBe(15);
@@ -5121,8 +5124,8 @@ describe('MA-1749 young-black-dragon insect cloud data lock', () => {
 // RAW success = NO damage → dc_success:"none" closes the MV-20 half-default
 // leak (§63/§255 family, ancient-black-dragon MA-0165 "none" convention).
 // NO zone (RAW: single creature, point target). Name "Ceiling Collapse"
-// DISTINCT from sibling [1] MA-1754 (nameless ceiling dict lane) and [2]
-// MA-1755 (nameless sand-cloud dict lane) — siblings untouched, index-bound.
+// DISTINCT from sibling [1] MA-1754 "Collapsing Ceiling" and [2] MA-1755
+// "Sand Cloud" (both fixed in later lanes) — siblings index-bound.
 // buried-state marker / suffocation / DC 10 STR rescue action / initiative-20
 // cadence stay §70 advisory residuals (grep-zero consumers).
 describe('MA-1753 young-blue-dragon ceiling collapse data lock', () => {
@@ -5188,8 +5191,9 @@ describe('MA-1753 young-blue-dragon ceiling collapse data lock', () => {
   });
 
   // MA-1754 INVERTED this pin: [1] was named "Collapsing Ceiling" with [0]'s
-  // full mechanic key set; only [2] (MA-1755 sand-cloud lane) stays inert.
-  it('sibling collision control (MA-1754 inverted): [1] armed as distinct-named Collapsing Ceiling byte-twin of [0]; [2] sand cloud untouched; THREE index-bound rows kept', () => {
+  // full mechanic key set. MA-1755 INVERTED the [2] pin: the nameless
+  // sand-cloud dict got its adult-blue byte-twin "Sand Cloud".
+  it('sibling collision control (MA-1754/MA-1755 inverted): [1] armed as distinct-named Collapsing Ceiling byte-twin of [0]; [2] sand cloud named + armed; THREE index-bound rows kept', () => {
     expect(young.lair_actions).toHaveLength(3);
     expect(typeof young.lair_actions.filter(la => typeof la === 'string')[0]).toBe('undefined');
     expect(young.lair_actions[1].name).toBe('Collapsing Ceiling');
@@ -5201,8 +5205,104 @@ describe('MA-1753 young-blue-dragon ceiling collapse data lock', () => {
     expect(young.lair_actions[1].damage_type_primary).toBe('Bludgeoning');
     expect(young.lair_actions[1].dc_success).toBe('none');
     expect(Object.keys(young.lair_actions[1])).toEqual(Object.keys(ceiling));
-    expect(young.lair_actions[2].name).toBeUndefined();
+    expect(young.lair_actions[2].name).toBe('Sand Cloud');
+    expect(isLairRowClickable(young.lair_actions[2])).toBe(true);
     expect(young.lair_actions[2].save_type).toBe('Constitution');
     expect(ceiling.name).not.toBe(young.lair_actions[1].name);
+  });
+});
+
+// MA-1755: Young Blue Dragon lair_actions[2] sand cloud was a NAMELESS DICT
+// (MA-1748/MA-0118/MV-24 name-gate inert twin — save_dc 15 / Constitution
+// authored and prose complete, but isLairRowClickable's !row.name gate →
+// static span, zero affordance, zero adjudication; live inert, 2026-10-01).
+// Data-only fix byte-mirrors the VERIFIED adult-blue MA-0063/MA-0177
+// "Sand Cloud" zone dict template (disk twin wins over bug-file shape):
+// name "Sand Cloud" FIRST key + dc_success "none" (damageless — RAW blinded
+// 1 min, no half clause) + Failure/Success save_effect carrying canonical
+// Blinded + zone {radius_ft 20, effect_key lair_sand_cloud, repeat_save,
+// advisory} + duration "blinded 1 minute (repeat save ends early; advisory)".
+// Young description was already typo-free and byte-identical to the adult
+// twin — preserved verbatim. lair_sand_cloud te pre-registered
+// (targetEffectDefinitions.js:1209); consumers live via SaveAttackAoeModal
+// picker-confirm arm (adult MA-0063 proven). Sphere→radius, lightly-
+// obscured, 1-minute expiry, NPC turn-end auto-repeat stay §70 advisory
+// residuals (GM-enforced, per zone.advisory).
+describe('MA-1755 young-blue-dragon sand cloud data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-blue-dragon');
+  const cloud = young.lair_actions[2];
+  const VERBATIM = 'A cloud of sand swirls about in a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it. The cloud spreads around corners. Each creature in the cloud must succeed on a DC 15 Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.';
+
+  it('row is now a structured clickable SAVE row named Sand Cloud (was nameless inert dict)', () => {
+    expect(typeof cloud).toBe('object');
+    expect(cloud.name).toBe('Sand Cloud');
+    expect(isLairRowClickable(cloud)).toBe(true);
+    expect(lairRowAffordance(cloud)).toBe('save');
+  });
+
+  it('authored save fields: DC 15 Constitution, no damage (dc_success none), description byte-preserved', () => {
+    expect(cloud.save_dc).toBe(15);
+    expect(cloud.save_type).toBe('Constitution');
+    expect(cloud.dc_success).toBe('none');
+    expect(cloud.damage_dice_primary).toBeUndefined();
+    expect(cloud.description).toBe(VERBATIM);
+  });
+
+  it('save_effect vocabulary extracts blinded only (no fabricated conditions)', () => {
+    expect(cloud.save_effect).toMatch(/Failure: The target is blinded for 1 minute/i);
+    expect(cloud.save_effect).toMatch(/Success: unaffected\./i);
+    expect(cloud.save_effect).toMatch(/deals no damage/i);
+    expect(extractConditionsFromSaveEffect(cloud.save_effect)).toEqual(['blinded']);
+  });
+
+  it('machine-readable persisting zone: 20-ft radius, lair_sand_cloud key, repeat_save, advisory', async () => {
+    expect(cloud.zone.radius_ft).toBe(20);
+    expect(cloud.zone.effect_key).toBe('lair_sand_cloud');
+    expect(cloud.zone.repeat_save).toBe(true);
+    expect(cloud.zone.advisory).toMatch(/GM-enforced/);
+    expect(cloud.duration).toMatch(/blinded 1 minute/i);
+    const { getEffectDefinition } = await import('../combat/conditions/targetEffectDefinitions.js');
+    const def = getEffectDefinition('lair_sand_cloud');
+    expect(def).toBeTruthy();
+    expect(def.effect).toBe('lair_sand_cloud');
+  });
+
+  it('byte-twin of the VERIFIED adult-blue MA-0063 Sand Cloud template row', () => {
+    const adultCloud = monstersData.find(m => m.index === 'adult-blue-dragon').lair_actions[1];
+    expect(JSON.stringify(cloud)).toBe(JSON.stringify(adultCloud));
+    expect(Object.keys(cloud)).toEqual(['name', 'description', 'save_dc', 'save_type', 'dc_success', 'save_effect', 'zone', 'duration']);
+  });
+
+  it('three named clickable lair rows preserved; ceiling pair [0]/[1] untouched', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions[0].name).toBe('Ceiling Collapse');
+    expect(young.lair_actions[1].name).toBe('Collapsing Ceiling');
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
+    for (const la of young.lair_actions) expect(typeof la).toBe('object');
+  });
+
+  it('save row routes through handleSaveRoll with no damage formula and blinded conditions; no zone/attack/damage branches', async () => {
+    const handleSaveRoll = vi.fn();
+    const handleZone = vi.fn();
+    const handleAttack = vi.fn();
+    const handleDamage = vi.fn();
+    const res = await resolveLairRow({
+      action: cloud,
+      monsterName: 'Young Blue Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack,
+      handleDamage,
+      handleZone,
+      saveDamageFormula: null,
+      saveConditions: extractConditionsFromSaveEffect(cloud.save_effect),
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(cloud, null, ['blinded']);
+    expect(handleZone).not.toHaveBeenCalled();
+    expect(handleAttack).not.toHaveBeenCalled();
+    expect(handleDamage).not.toHaveBeenCalled();
   });
 });
