@@ -68723,7 +68723,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15): At Will: Animal Friendship (snakes only); 3/Day: Suggestion",
+        "description": "The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 15): <strong>At Will:</strong> <em>Animal Friendship</em> (snakes only); <strong>3/Day:</strong> <em>Suggestion</em>",
         "save_dc": 15,
         "save_type": "Wisdom"
       }
