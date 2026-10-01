@@ -1667,9 +1667,13 @@ describe('MA-0149 adult-white-dragon freezing fog data lock', () => {
     expect(ancient.lair_actions[0].dc_success).toBe('half');
   });
 
-  it('young-white-dragon scope guard: its fog rows (string + nameless dict) untouched', () => {
+  // MA-1807 INVERTED this pin: young [0] bare string promoted to this
+  // adult-white byte-twin named save row. MA-1808 still open: [1] nameless.
+  it('young-white-dragon scope guard: [0] promoted by MA-1807; [1] nameless dict untouched', () => {
     const young = monstersData.find(m => m.index === 'young-white-dragon');
-    expect(typeof young.lair_actions[0]).toBe('string');
+    expect(typeof young.lair_actions[0]).toBe('object');
+    expect(young.lair_actions[0].name).toBe('Freezing Fog');
+    expect(JSON.stringify(young.lair_actions[0])).toBe(JSON.stringify(fog));
     expect(young.lair_actions[1].name).toBeUndefined();
   });
 });
@@ -6654,5 +6658,99 @@ describe('MA-1803 young-silver-dragon lair rolling fog data lock', () => {
     expect(logs[0].description).toMatch(/casts fog cloud/i);
     expect(logs[0].description).toMatch(/initiative 20 \(GM-enforced/i);
     expect(logs[0].description).not.toMatch(/save DC/i);
+  });
+});
+
+// MA-1807: Young White Dragon lair_actions[0] was a LEGACY BARE STRING
+// (MA-1747/1753/1760/1766/1789/MA-1802 bare-string inert family — systemic
+// young-dragon lair_actions data-generation defect). MonsterCardBody.jsx:358
+// `typeof la === 'string'` first disjunct short-circuited the static branch
+// BEFORE isLairRowClickable was ever consulted → zero affordance, click zero
+// log delta (live inert). DATA-only fix promotes it to the adult-white-dragon
+// MA-0149 freezing-fog byte-twin named SAVE row — young RAW prose is
+// byte-identical to the adult's description, so the promoted row mirrors the
+// adult dict byte-for-byte INCLUDING key order (description first,
+// name/dc_success last) and the no-zone shape (adult authored none — the
+// 20-ft sphere parses from the verbatim prose via sphereRadiusFeet,
+// MA-0129/MA-0149 precedent): affordance 'save' → chip "DC 10 Constitution" →
+// handleSaveRoll → 20-ft Radius picker, 3d6 Cold, dc_success "half"
+// (MV-20/MV-27 half-on-success math). Turn-end re-damage, heavily-obscured
+// area, wind dispersal and initiative-20 cadence stay GM-advisory prose
+// residuals (§70 — no fog zone/obscurement/turn-end consumer app-wide).
+// Siblings index-bound and untouched: [1] nameless fog dict (MA-1808),
+// [2] nameless jagged ice shards dict (MA-1809).
+describe('MA-1807 young-white-dragon freezing fog bare-string data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-white-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-white-dragon');
+  const fog = young.lair_actions[0];
+
+  it('[0] is now a structured clickable SAVE row named Freezing Fog (was bare-string inert)', () => {
+    expect(typeof fog).toBe('object');
+    expect(fog.name).toBe('Freezing Fog');
+    expect(isLairRowClickable(fog)).toBe(true);
+    expect(lairRowAffordance(fog)).toBe('save');
+  });
+
+  it('byte-parity with the adult-white MA-0149 twin incl. key order — adult bytes win', () => {
+    expect(JSON.stringify(fog)).toBe(JSON.stringify(adult.lair_actions[0]));
+    expect(Object.keys(fog)).toEqual(['description', 'save_dc', 'save_type', 'damage_dice_primary', 'damage_type_primary', 'name', 'dc_success']);
+  });
+
+  it('save fields: DC 10 Constitution, 3d6 Cold, dc_success half (prose-agreed)', () => {
+    expect(fog.save_dc).toBe(10);
+    expect(fog.save_type).toBe('Constitution');
+    expect(fog.damage_dice_primary).toBe('3d6');
+    expect(fog.damage_type_primary).toBe('Cold');
+    expect(fog.dc_success).toBe('half');
+    expect(fog.description).toMatch(/DC 10 Constitution saving throw/i);
+    expect(fog.description).toMatch(/half as much damage on a successful one/i);
+    expect(fog.description).toMatch(/20-foot-radius sphere/i);
+  });
+
+  it('adult authored NO zone block — none fabricated on the young twin (§70 advisory)', () => {
+    expect(fog.zone).toBeUndefined();
+    expect(fog.duration).toBeUndefined();
+    expect(fog.advisory).toBeUndefined();
+    expect(fog.save_effect).toBeUndefined();
+  });
+
+  it('young RAW prose byte-preserved verbatim (string → description, zero adaptation)', () => {
+    expect(fog.description).toMatch(/^Freezing fog fills a 20-foot-radius sphere centered on a point the dragon can see within 120 feet of it\./);
+    expect(fog.description).toMatch(/A wind of at least 20 miles per hour disperses the fog\./);
+    expect(fog.description).toMatch(/lasts until the dragon uses this lair action again or until the dragon dies\.$/);
+  });
+
+  it('save row routes through handleSaveRoll with 3d6 formula and zero conditions', async () => {
+    const handleSaveRoll = vi.fn();
+    const res = await resolveLairRow({
+      action: fog,
+      monsterName: 'Young White Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack: vi.fn(),
+      handleDamage: vi.fn(),
+      saveDamageFormula: '3d6',
+      saveConditions: [],
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'save' });
+    expect(handleSaveRoll).toHaveBeenCalledWith(fog, '3d6', []);
+  });
+
+  it('siblings FALSE-pinned: [1] nameless fog dict + [2] nameless ice shards stay inert', () => {
+    expect(young.lair_actions).toHaveLength(3);
+    expect(young.lair_actions.filter(la => typeof la === 'string')).toHaveLength(0);
+    const fogDict = young.lair_actions[1];
+    expect(typeof fogDict).toBe('object');
+    expect(fogDict.name).toBeUndefined();
+    expect(isLairRowClickable(fogDict)).toBe(false);
+    expect(lairRowAffordance(fogDict)).toBeNull();
+    expect(fogDict.save_dc).toBe(10);
+    expect(fogDict.damage_dice_primary).toBe('3d6');
+    const shards = young.lair_actions[2];
+    expect(shards.name).toBeUndefined();
+    expect(isLairRowClickable(shards)).toBe(false);
+    expect(lairRowAffordance(shards)).toBeNull();
+    expect(shards.damage_type_primary).toBe('Piercing');
   });
 });
