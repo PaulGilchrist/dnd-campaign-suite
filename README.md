@@ -1,4 +1,6 @@
-# 🐉 D&D Character Sheet
+# 🐉 D&D Campaign Suite
+
+*(the app appears in your browser tab as **CharSheets**)*
 
 > <strong>WARNING:</strong> This application is going through a major enhancement of automating ALL class, subclass, race, subrace, background, and feat special abilities and should be considered Alpha software until that implementation is complete, and this warning is removed.
 
@@ -19,7 +21,9 @@
   <strong>🧙 Metamagic, auras &amp; 200+ automations</strong> &nbsp;·&nbsp;
   <strong>🎯 Multi-target spell targeting</strong> &nbsp;·&nbsp;
   <strong>🗺️ Adjacent dungeon generation</strong> &nbsp;·&nbsp;
-  <strong>🎲 13 log entry types with full tracking</strong>
+  <strong>🎲 13 log entry types with full tracking</strong> &nbsp;·&nbsp;
+  <strong>🧊 Real-time 3D map view</strong> &nbsp;·&nbsp;
+  <strong>👾 1,800+ interactive monster actions across 600+ monsters</strong>
 </p>
 
 ---
@@ -32,7 +36,7 @@ A **complete D&D character sheet and campaign management suite** that runs on yo
 
 **As a printable sheet:** The app creates **beautiful, well-organized character sheets that fit on a single page**. All the critical stats you need during combat are front and center. Print it out, keep it at the table, and have everything you need at a glance — no flipping through rulebooks.
 
-**As a GM toolkit:** Indoor maps with fog of war and spell overlays, outdoor hex maps with procedural terrain and overland travel, encounter and loot builders, a BSP dungeon generator and adjacent dungeon generator, procedural terrain and settlement generators, quest tracking, faction management, NPC management with full stat blocks, campaign notes, a comprehensive activity log with 13 entry types, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin and Druid aura systems, a combat automation engine with 200+ handlers, transformation tracking for Polymorph and Shapechange, summoned creature lifecycle management, passive skill computation, campaign snapshots for backup and restore, random events during overland travel, campaign admin tools for clearing state and resetting — everything you need to run a campaign from one app.
+**As a GM toolkit:** Indoor maps with fog of war and spell overlays — plus a real-time **3D map view** with extruded walls, fog volumes, portrait tokens, and torch lighting — outdoor hex maps with procedural terrain and overland travel, encounter and loot builders, a BSP dungeon generator and adjacent dungeon generator, procedural terrain and settlement generators, quest tracking, faction management, NPC management with full stat blocks, campaign notes, a comprehensive activity log with 13 entry types, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin and Druid aura systems, a combat automation engine with 200+ handlers, transformation tracking for Polymorph and Shapechange, summoned creature lifecycle management, passive skill computation, campaign snapshots for backup and restore, random events during overland travel, campaign admin tools for clearing state and resetting — everything you need to run a campaign from one app.
 
 > **No computer expertise required.** If you can open a web browser, you can use this app. The setup instructions at the bottom are written for complete beginners.
 
@@ -65,7 +69,9 @@ No more "Wait, how many hit points do you have?" mid-combat! No more passing aro
 | 🖨️ **Print-Ready Sheets** | Single-page, clean layout, critical stats front and center |
 | ⚔️ **Initiative Tracker** | Turn order, round counter, NPC management, keyboard shortcuts, battle notes |
 | 👾 **Encounter Builder** | Monster selection, XP budgets, difficulty ratings, save/load, auto-generation by environment, loot tables |
+| 🐲 **Interactive Monster Stat Blocks** | Fully clickable monster actions — 1,800+ verified action rows across 600+ monsters: attacks, spellcasting, AoE save pickers, recharge gates, legendary action pools, lair actions with persistent hazard zones, reactions, summons into initiative |
 | 🗺️ **Indoor Maps** | Grid-based, fog of war, 25+ furniture types, spell overlays, ruler tool, door toggling, bulk selection |
+| 🧊 **3D Map View** | One-click WebGL view of any indoor map — extruded textured walls, 3D furniture models, portrait tokens, torch point lights, fog-of-war volumes, 3D spell-effect volumes, orbit/pan/zoom camera, live SSE sync |
 | 🏔️ **Outdoor Hex Maps** | Procedural terrain, rivers, roads, POIs, weather, overland travel with paces, indoor map linking |
 | 🏚️ **Dungeon Generator** | BSP algorithm, configurable rooms, corridors, doors, triggered from outdoor encounters |
 | 🗺️ **Terrain Generator** | Procedural hex terrain using fractal noise with configurable seed, grid size, and biome weights |
@@ -109,6 +115,7 @@ No more "Wait, how many hit points do you have?" mid-combat! No more passing aro
 
 A **campaign** is one adventure story with its own party of heroes. This app lets you:
 
+- **Create campaigns right in the app** — click "Add" on the campaign selection screen; no folders or config files needed
 - **Run multiple campaigns at once** — Keep your epic fantasy saga separate from your one-shot dungeon crawl
 - **Switch between campaigns** with one click
 - **Rename or delete campaigns** when the story ends
@@ -404,8 +411,26 @@ Click the info icon on any monster to see its **full stat block**:
 - Senses (blindsight, darkvision, truesight, tremorsense, passive perception)
 - Damage vulnerabilities, resistances, and immunities
 - Legendary Resistance (if applicable)
-- Actions, Reactions, Legendary Actions, Lair Actions, Regional Effects — with clickable attack rolls and damage dice
-- Full dice roll integration with damage type resolution and resistance notices
+- Actions, Reactions, Legendary Actions, Lair Actions, Regional Effects — every row is an interactive chip, not just text
+
+#### ✨ Fully Interactive Monster Actions (1,800+ verified rows, 600+ monsters)
+
+Monsters are playable straight from their stat blocks — each action row is a verified, clickable automation:
+
+- **Attack chips** — one-click to-hit vs AC, damage dice with resistance/vulnerability resolution, crit handling, and "on hit" condition riders parsed from the text
+- **Multiattack rows** — each component attack individually clickable
+- **Spellcasting chips** — castable per slot/uses, spell attacks and save spells, level scaling, and "usable once" tracking
+- **AoE save prompts** — cone, sphere, line, cube, and emanation **area pickers** parsed from the ability's written coverage, with per-target saves and half-on-success resolution
+- **Recharge gates** — spent breath weapons refuse to fire until recharged; a successful use consumes the charge
+- **Legendary actions** — real point-pool tracking ("N of M left"), spend/refuse enforcement, once-per-round cooldowns, self-heals, and delegated attack options
+- **Lair actions** — clickable rows that place **persistent hazard zones** (fog clouds, darkness, insect clouds, winds) which run repeat-save passes at the start or end of each round
+- **Reactions** — including Redirect Attack-style target retargeting (swap an incoming attack onto an ally, with full bookkeeping)
+- **Utility chips** — self-invisibility/etherealness, self auras, shapeshift, Beholder-style eye-ray pickers, charge bonus offers, ranged variant pickers
+- **Summons into initiative** — clicked summon rows drop the creature directly into the initiative tracker right behind the caster, tagged and ready for its next turn
+- **HP-max drain** — Wight/Specter-style abilities reduce the target's maximum HP by the damage dealt, on both attack and save lanes
+- **Everything logged** — rolls, spends, refusals, and advisories all record to the campaign log and broadcast over SSE
+
+Every one of the 1,838 monster action rows is covered by a verification registry, with 596 monsters tested live on the initiative tracker.
 
 ### 🗺️ Indoor Maps
 
@@ -443,13 +468,17 @@ Tactical grid-based dungeon maps with a full suite of editing tools:
 - Non-host players see only what their tokens can see
 
 **Spell Combat Overlays:**
-- **Three shapes**: Radius (circle), Cone (angle-based), Line (rectangular beam)
+- **Five shapes**: Sphere/Radius (circle), Cylinder, Cube, Cone (angle-based), Line (rectangular beam)
 - Configurable parameters: radius in feet, cone distance/angle, line distance/width
 - **Drag to place**, drag overlays to reposition
+- **Click-to-edit** — clicking an existing overlay selects it for moving/rotating instead of dropping a new one, even while a placement tool is active
 - **Rotate** cone and line overlays by dragging endpoints
 - Controls panel with shape selector, parameters, active overlay list, and clear all
-- **Real-time sync** across all connected clients via SSE with debounced updates during drag
-- **AoE damage detection** — Tokens within a spell overlay area are automatically detected so damage can be applied to all affected targets
+- **Server-persisted** — overlays are kept server-side, surviving view switches, and **real-time synced** across all connected clients via SSE with debounced updates during drag
+- **AoE damage detection** — Tokens within a spell overlay area are automatically detected and **auto-selected as targets** for the spell's damage/save prompts
+- **Distance badges** — spell target selection popups show in/out-of-range badges computed from actual map positions
+- **Initiative integration** — creature cards in the tracker get an overlay target picker so the GM can designate an active overlay as a creature's target
+- Subtle fill styling keeps tokens and fog readable beneath the overlay
 
 **Ruler / Distance Measurement:**
 - Click two points to measure distance
@@ -460,6 +489,22 @@ Tactical grid-based dungeon maps with a full suite of editing tools:
 - Seamless handoff between indoor tactical maps and outdoor overland maps
 
 <img src="public/map-indoor-example.png" alt="Indoor Map Example" width="800" />
+
+### 🧊 3D Map View
+
+One click of the **3D** button on any indoor map turns your tactical grid into a real-time WebGL scene:
+
+- **Extruded, textured walls** — every painted wall becomes a 10 ft tall stone wall with PBR rock textures
+- **3D furniture models** — altars, beds, bookshelves, barrels, chests, tables, statues, fountains, stairs, trees, and more as hand-crafted GLB models; doors visibly **swing open and closed**
+- **Tokens as 3D figures** — players (blue) and NPCs (red) with circular portrait discs and floating name labels
+- **Torch & fire lighting** — glowing flame textures with warm point lights cast onto the scene, toggleable
+- **Fog of war in 3D** — unfogged areas only; GM sees translucent fog, players see solid — mirroring the 2D rules, including hidden secret doors and items
+- **Spell overlays as 3D volumes** — sphere, cylinder, cube, cone, and beam overlays rendered above the fog, staying visible during combat
+- **Full camera control** — orbit, pan, and zoom with damping, auto-framing on entry, and a one-click "Top-down" view
+- **Live sync** — edits made in the 2D view by the GM (or any client) appear instantly in every open 3D view
+- **Soft shadows and cinematic tone mapping** for a table-ready look
+
+Switch back to 2D any time with the **2D** button — all editing stays in the 2D view; 3D is a shared live window onto the same battle.
 
 ### 🏔️ Outdoor Hex Maps
 
@@ -826,7 +871,9 @@ Want to level up, buy gear, or prepare spells between sessions?
 
 **No More Rules Confusion** — The app validates your character against the rules and shows warnings if something doesn't match.
 
-**No More Boring Maps** — Interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel, a BSP dungeon generator, and encounter-map transitions make your table feel alive.
+**No More Boring Maps** — Interactive indoor maps with fog of war and spell overlays, a real-time 3D map view with torch-lit walls and portrait tokens, outdoor hex maps with overland travel, a BSP dungeon generator, and encounter-map transitions make your table feel alive.
+
+**No More Read-Only Monster Stat Blocks** — Over 1,800 monster actions across 600+ monsters are fully playable from the stat block itself: click an attack to roll it, pick an AoE shape for a breath weapon, spend legendary action points, trigger lair hazards that persist on the map, or drop a summon straight into initiative.
 
 **No More Manual Combat Math** — The automation engine with 200+ handlers handles save prompts, concentration checks, cover calculation, range validation, auto-damage with saves, critical hit dice doubling, condition propagation, healing pool tracking, buff management, and reaction automations — so you can focus on tactics, not arithmetic.
 
@@ -905,7 +952,7 @@ The app validates your character against the rules and shows warnings if somethi
 Yes! Download your character as a JSON file, work on it at home, then upload it before the next session.
 
 **What campaign tools are available?**
-The app includes an initiative tracker with passive resource recovery on initiative roll, encounter builder with auto-generation and loot tables, interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel and weather, a BSP dungeon generator and fractal terrain generator, an adjacent dungeon generator, a procedural settlement generator, quest tracking, faction management, NPC management with full stat blocks and a procedural NPC generator, settlement management, campaign notes with private notes and location tracking, a comprehensive campaign activity log with 13 entry types, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin aura systems with combo effects, Druid and Cleric auras (Duplicity, Elder Champion, Lion, Wolf, Corona), a combat automation engine with 200+ handlers and 87 per-spell services that handles save prompts, concentration checks, auto-damage, condition propagation, healing pool tracking, buff management, reaction automations, and 100+ class-specific feature modals (weapon masteries, divine interventions, elemental affinities, teleports, wild companions, and more), campaign snapshots for backup and restore, transformation tracking for Polymorph/Shapechange/Animal Shapes/True Polymorph, summoned creature lifecycle management, passive skill computation, random events during overland travel, and campaign admin tools for clearing state and resetting — everything a DM needs to run a great session.
+The app includes an initiative tracker with passive resource recovery on initiative roll, encounter builder with auto-generation and loot tables, interactive indoor maps with fog of war and spell overlays, a real-time 3D map view of any indoor map, fully interactive monster stat blocks with 1,800+ verified clickable action rows (attacks, AoE save pickers, recharge gates, legendary actions, lair hazards, reactions, and summons into initiative), outdoor hex maps with overland travel and weather, a BSP dungeon generator and fractal terrain generator, an adjacent dungeon generator, a procedural settlement generator, quest tracking, faction management, NPC management with full stat blocks and a procedural NPC generator, settlement management, campaign notes with private notes and location tracking, a comprehensive campaign activity log with 13 entry types, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin aura systems with combo effects, Druid and Cleric auras (Duplicity, Elder Champion, Lion, Wolf, Corona), a combat automation engine with 200+ handlers and 87 per-spell services that handles save prompts, concentration checks, auto-damage, condition propagation, healing pool tracking, buff management, reaction automations, and 100+ class-specific feature modals (weapon masteries, divine interventions, elemental affinities, teleports, wild companions, and more), campaign snapshots for backup and restore, transformation tracking for Polymorph/Shapechange/Animal Shapes/True Polymorph, summoned creature lifecycle management, passive skill computation, random events during overland travel, and campaign admin tools for clearing state and resetting — everything a DM needs to run a great session.
 
 **How does real-time sync work?**
 The app uses Server-Sent Events (SSE) — a lightweight, one-way push protocol. When the DM or a player changes something (HP, spell slots, position on a map, fog of war updates), the server broadcasts the update to every connected browser instantly. No polling, no refresh lag.
@@ -1018,7 +1065,7 @@ This app works alongside **[D&D Tools](https://paulgilchrist.github.io/dnd-tools
 
 **[Try D&D Tools →](https://paulgilchrist.github.io/dnd-tools/spells)**
 
-While **D&D Character Sheet** handles character creation and combat tracking, **D&D Tools** is your instant reference guide:
+The **Rules** button in the app sidebar opens D&D Tools in a new tab whenever you need a quick lookup mid-session. While **D&D Character Sheet** handles character creation and combat tracking, **D&D Tools** is your instant reference guide:
 
 - **Spells** — Browse and filter the complete spell list by level, class, and more
 - **Monsters** — Search the monster compendium with detailed stat blocks
