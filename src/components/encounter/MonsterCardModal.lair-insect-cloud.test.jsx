@@ -149,3 +149,82 @@ describe('MA-0042 Insect Cloud lair row → 20-ft radius area picker', () => {
     expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('STR');
   });
 });
+
+// MA-1749: Young Black Dragon lair_actions[2] was the nameless insect-cloud
+// save dict (name-gate inert, MA-0118/MV-24 family) — zero chip, zero picker,
+// zero te lane (playbook: lair_insect_cloud pre-registered but zone/name
+// gated it out of zoneTeForAction). MA-1749 data fix byte-mirrors this
+// VERIFIED adult MA-0042 row, so the young card rides the identical picker
+// route: named "DC 15 Constitution" .mc-dice-link-lair chip → 20-ft radius
+// SaveAttackAoeModal picker (coverage gate off, half-on-success,
+// excludeNames = dragon) + persisting-zone payload effectKey lair_insect_cloud.
+describe('MA-1749 young-black-dragon insect cloud → same 20-ft area picker route', () => {
+  const young = monstersData.find(m => m.index === 'young-black-dragon');
+
+  function renderYoung() {
+    const m = makeMonster({ name: 'Young Black Dragon', lair_actions: young.lair_actions });
+    const creatures = [
+      { name: 'Young Black Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 127, maxHp: 127, ac: 18, conditions: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, ac: 11, conditions: [] },
+      { name: 'ElderPaladin', type: 'player', currentHp: 60, maxHp: 60, conditions: [] },
+    ];
+    return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Black Dragon 1', creatures })} />);
+  }
+
+  it('young [2] is byte-identical to the VERIFIED adult MA-0042 template row', () => {
+    const adultCloud = monstersData.find(m => m.index === 'adult-black-dragon').lair_actions[1];
+    expect(JSON.stringify(young.lair_actions[2])).toBe(JSON.stringify(adultCloud));
+  });
+
+  it('renders three distinct-name lair chips incl. clickable "DC 15 Constitution" Insect Cloud', () => {
+    renderYoung();
+    const links = Array.from(document.querySelectorAll('.mc-dice-link-lair'));
+    expect(links).toHaveLength(3);
+    const chip = lairLinkWithName('DC 15 Constitution');
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute('role')).toBe('button');
+    expect(chip.getAttribute('title')).toMatch(/initiative 20/);
+    expect(chip.closest('.mc-action').querySelector('strong').textContent.trim()).toBe('Insect Cloud.');
+    expect(chip.closest('.mc-action').textContent).not.toMatch(/cloudwhen/);
+  });
+
+  it('chip click routes to the area picker at CON DC 15, 3d6 Piercing half, radius 20, gate off, no block-save', async () => {
+    renderYoung();
+    fireEvent.click(lairLinkWithName('DC 15 Constitution'));
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    const p = aoeProps.current;
+    expect(p.saveDc).toBe(15);
+    expect(p.saveType).toBe('Constitution');
+    expect(p.damage).toBe('3d6');
+    expect(p.damageType).toBe('Piercing');
+    expect(p.dcSuccess).toBe('half');
+    expect(p.range).toBe(20);
+    expect(p.rangeGateFt).toBeNull();
+    expect(p.titleOverride).toBe('20-ft Radius (GM positions tokens; selection advisory)');
+    expect(p.excludeNames).toEqual(['Young Black Dragon 1']);
+    expect(p.storeLastAttack).toBe(false);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('carries the persisting-zone payload lair_insect_cloud for the picker-confirm arm', async () => {
+    renderYoung();
+    fireEvent.click(lairLinkWithName('DC 15 Constitution'));
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    expect(aoeProps.current.zoneTe).toEqual({
+      effectKey: 'lair_insect_cloud',
+      trackingPrefix: 'lair_insect_cloud',
+      radiusFt: 20,
+      repeatTurnEnd: true,
+      damage: '3d6',
+      duration: 'until dismissed or used again (advisory)',
+    });
+  });
+
+  it('pool siblings [0]/[1] keep their single-target block-save route untouched', async () => {
+    renderYoung();
+    fireEvent.click(lairLinkWithName('DC 15 Strength'));
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
+    expect(aoeProps.current).toBeNull();
+    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('STR');
+  });
+});

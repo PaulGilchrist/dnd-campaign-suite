@@ -370,9 +370,12 @@ describe('MA-1209 mummy-lord spellcasting-pain save chip render + press lock', (
 // bare-string / MV-24 nameless-dict families, live inert 2026-09-30).
 // Option B data fixes arm TWO distinct save chips — "Surging Pools" [0]
 // (MA-1747) + "Grasping Tide" [1] (MA-1748 ONE-FIELD name fix, RAW-anchored
-// on the row's own prose, adult-black-dragon MA-0165 name precedent) —
-// sibling [2] (MA-1749 nameless insect dict) stays inert static prose.
-describe('MA-1747/MA-1748 young-black-dragon pools chips render + press lock', () => {
+// on the row's own prose, adult-black-dragon MA-0165 name precedent).
+// MA-1748 WIDENED this lock to 2 chips; MA-1749 WIDENS IT AGAIN to THREE:
+// sibling [2] was the nameless insect dict (inert) and now carries the full
+// adult MA-0042 zone template → named "Insect Cloud" "DC 15 Constitution"
+// chip — three lair chips render distinct names on one card.
+describe('MA-1747/MA-1748/MA-1749 young-black-dragon lair chips render + press lock', () => {
   const young = monstersData.find(m => m.index === 'young-black-dragon');
 
   function chipForRowName(name) {
@@ -381,22 +384,26 @@ describe('MA-1747/MA-1748 young-black-dragon pools chips render + press lock', (
     return row ? row.querySelector('.mc-dice-link-lair') : null;
   }
 
-  it('[0]+[1] render TWO distinct named "DC 15 Strength" chips; [2] stays static prose', () => {
+  it('[0]+[1]+[2] render THREE distinct named chips — 2× "DC 15 Strength" + "DC 15 Constitution" (MA-1749 widened 2→3)', () => {
     const m = makeMonster({ name: 'Young Black Dragon', lair_actions: young.lair_actions });
     const creatures = [{ name: 'Young Black Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 127, maxHp: 127, ac: 18, conditions: [] }, ...CREATURES];
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Black Dragon 1', creatures })} />);
     const links = lairLinks();
-    expect(links).toHaveLength(2);
-    expect(links.every(el => el.textContent.includes('DC 15 Strength'))).toBe(true);
+    expect(links).toHaveLength(3);
+    expect(links.filter(el => el.textContent.includes('DC 15 Strength'))).toHaveLength(2);
+    expect(links.filter(el => el.textContent.includes('DC 15 Constitution'))).toHaveLength(1);
     expect(links.every(el => el.getAttribute('role') === 'button')).toBe(true);
     expect(links.every(el => /initiative 20/.test(el.getAttribute('title') || ''))).toBe(true);
     expect(chipForRowName('Surging Pools')).toBeTruthy();
     expect(chipForRowName('Grasping Tide')).toBeTruthy();
+    expect(chipForRowName('Insect Cloud')).toBeTruthy();
+    const names = [chipForRowName('Surging Pools'), chipForRowName('Grasping Tide'), chipForRowName('Insect Cloud')].map(c => c.closest('.mc-action').querySelector('strong').textContent.trim());
+    expect(new Set(names).size).toBe(3);
     const staticRows = Array.from(document.querySelectorAll('.mc-section .mc-action')).filter(el => el.textContent.includes('grasping tide') && !el.querySelector('.mc-dice-link-lair'));
     expect(staticRows).toHaveLength(0);
     const insectRow = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('swarming insects'));
     expect(insectRow).toBeTruthy();
-    expect(insectRow.querySelectorAll('span[role="button"]')).toHaveLength(0);
+    expect(insectRow.querySelector('.mc-dice-link-lair')).toBeTruthy();
   });
 
   it('[0] chip press → save seam at authored DC 15 STR, zero damage formula, zero conditions (prone/pull GM-advisory)', async () => {
