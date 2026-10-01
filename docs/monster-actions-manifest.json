@@ -28904,7 +28904,7 @@
         "invisible"
       ],
       "description": "The will-o'-wisp and its light magically become invisible until it attacks or uses its Consume Life, or until its concentration ends (as if concentrating on a spell).",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1720-will-o-wisp-invisibility.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1721",
