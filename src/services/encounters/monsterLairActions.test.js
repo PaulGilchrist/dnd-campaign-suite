@@ -5791,3 +5791,80 @@ describe('MA-1773 young-copper-dragon sprouting spikes data lock', () => {
     expect(young.lair_actions.every(la => isLairRowClickable(la))).toBe(true);
   });
 });
+
+// MA-1778: Young Gold Dragon lair_actions[0] was a bare string (inert static
+// span, zero affordance — LAIR lane MA-0024 legacy gate). Fix = wrap in the
+// adult-gold-dragon disk twin shape {name:"Glimpse the Future",
+// advisory:"glimpse_the_future", description:<verbatim>} — clickable advisory
+// affordance + record-only log. Sibling [1] is MA-1779 (nameless dict) —
+// FALSE-pinned untouched.
+describe('MA-1778 young-gold-dragon glimpse the future advisory data lock', () => {
+  const young = monstersData.find(m => m.index === 'young-gold-dragon');
+  const adult = monstersData.find(m => m.index === 'adult-gold-dragon');
+  const row = young.lair_actions[0];
+
+  it('[0] is now a named clickable ADVISORY row (was bare string)', () => {
+    expect(typeof row).toBe('object');
+    expect(row.name).toBe('Glimpse the Future');
+    expect(row.advisory).toBe('glimpse_the_future');
+    expect(isLairRowClickable(row)).toBe(true);
+    expect(lairRowAffordance(row)).toBe('advisory');
+  });
+
+  it('[0] mirrors the adult-gold-dragon[0] twin byte-for-byte (keys + values)', () => {
+    expect(JSON.stringify(row)).toBe(JSON.stringify(adult.lair_actions[0]));
+  });
+
+  it('[0] description kept verbatim (advantage until initiative count 20)', () => {
+    expect(row.description).toBe('The dragon glimpses the future, so it has advantage on attack rolls, ability checks, and saving throws until initiative count 20 on the next round.');
+  });
+
+  it('[0] saves nothing: no save/attack/damage machinery (advisory is the ceiling)', () => {
+    expect(row.save_dc).toBeUndefined();
+    expect(row.save_type).toBeUndefined();
+    expect(row.save_effect).toBeUndefined();
+    expect(row.attack_bonus).toBeUndefined();
+    expect(row.damage_dice_primary).toBeUndefined();
+  });
+
+  it('[0] advisory click logs record-only ability_use, zero save/attack/damage', async () => {
+    const handleSaveRoll = vi.fn();
+    const handleAttack = vi.fn();
+    const handleDamage = vi.fn();
+    const res = await resolveLairRow({
+      action: row,
+      monsterName: 'Young Gold Dragon 1',
+      campaignName: 'test-campaign',
+      setPopupHtml: vi.fn(),
+      handleSaveRoll,
+      handleAttack,
+      handleDamage,
+      deps: { addEntry: vi.fn(() => Promise.resolve()) },
+    });
+    expect(res).toEqual({ resolved: true, affordance: 'advisory' });
+    expect(handleSaveRoll).not.toHaveBeenCalled();
+    expect(handleAttack).not.toHaveBeenCalled();
+    expect(handleDamage).not.toHaveBeenCalled();
+  });
+
+  it('[0] advisory log record names glimpse the future + initiative 20 GM-enforced', () => {
+    const entry = buildLairAdvisoryLog({ monsterName: 'Young Gold Dragon 1', action: row });
+    expect(entry.type).toBe('ability_use');
+    expect(entry.description).toMatch(/casts glimpse the future/i);
+    expect(entry.description).toMatch(/initiative 20 \(GM-enforced/i);
+  });
+
+  it('sibling [1] stays the MA-1779 nameless inert dict (untouched)', () => {
+    const sibling = young.lair_actions[1];
+    expect(typeof sibling).toBe('object');
+    expect(sibling.name).toBeUndefined();
+    expect(isLairRowClickable(sibling)).toBe(false);
+    expect(lairRowAffordance(sibling)).toBeNull();
+  });
+
+  it('scope guard: lair block stays exactly 2 elements, only [0] clickable', () => {
+    expect(young.lair_actions).toHaveLength(2);
+    expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+  });
+});
