@@ -457,19 +457,25 @@ describe('MA-1753 young-blue-dragon ceiling collapse chip render + press lock', 
     return row ? row.querySelector('.mc-dice-link-lair') : null;
   }
 
-  it('[0] arms exactly ONE "DC 15 Dexterity" lair chip; nameless siblings render static (1 chip total)', () => {
+  // MA-1754 bumped the young-blue chip census 1→2: [1] was named
+  // "Collapsing Ceiling" (distinct from [0]); only [2] sand cloud renders static.
+  it('[0]+[1] arm TWO "DC 15 Dexterity" lair chips; [2] sand cloud renders static (2 chips total)', () => {
     const m = makeMonster({ name: 'Young Blue Dragon', lair_actions: youngBlue.lair_actions });
     const creatures = [{ name: 'Young Blue Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 155, maxHp: 155, ac: 19, conditions: [] }, ...CREATURES];
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Blue Dragon 1', creatures })} />);
     const links = lairLinks();
-    expect(links).toHaveLength(1);
-    expect(links[0].textContent).toContain('DC 15 Dexterity');
-    expect(links[0].getAttribute('role')).toBe('button');
-    expect(links[0].getAttribute('title')).toMatch(/initiative 20/);
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link.textContent).toContain('DC 15 Dexterity');
+      expect(link.getAttribute('role')).toBe('button');
+      expect(link.getAttribute('title')).toMatch(/initiative 20/);
+    }
     expect(chipForRowName('Ceiling Collapse')).toBeTruthy();
-    const ceilingRow = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('ceiling collapses'));
-    expect(ceilingRow).toBeTruthy();
-    expect(ceilingRow.querySelector('.mc-dice-link-lair')).toBeTruthy();
+    expect(chipForRowName('Collapsing Ceiling')).toBeTruthy();
+    const sandRow = Array.from(document.querySelectorAll('.mc-section .mc-action'))
+      .find(el => el.textContent.includes('cloud of sand'));
+    expect(sandRow).toBeTruthy();
+    expect(sandRow.querySelector('.mc-dice-link-lair')).toBeNull();
   });
 
   it('chip press → save seam at authored DC 15 DEX, autoDamageFormula 3d6, dcSuccess none, saveConditions prone+restrained', async () => {
@@ -478,6 +484,22 @@ describe('MA-1753 young-blue-dragon ceiling collapse chip render + press lock', 
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Blue Dragon 1', creatures })} />);
     addEntry.mockClear();
     fireEvent.click(chipForRowName('Ceiling Collapse'));
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    const call = ROLLERS.rollSavingThrow.mock.calls[0];
+    expect(call[0]).toBe('DEX');
+    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Dexterity', dcSuccess: 'none', attackerName: 'Young Blue Dragon 1', targetName: 'TestPC' });
+    expect(call[2].autoDamageFormula).toBe('3d6');
+    expect(call[2].saveConditions).toEqual(['prone', 'restrained']);
+    const entries = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
+    expect(entries).toHaveLength(0);
+  });
+
+  it('MA-1754 [1] chip press → save seam at DC 15 DEX, autoDamageFormula 3d6, dcSuccess none, saveConditions prone+restrained', async () => {
+    const m = makeMonster({ name: 'Young Blue Dragon', lair_actions: youngBlue.lair_actions });
+    const creatures = [{ name: 'Young Blue Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 155, maxHp: 155, ac: 19, conditions: [] }, ...CREATURES];
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Blue Dragon 1', creatures })} />);
+    addEntry.mockClear();
+    fireEvent.click(chipForRowName('Collapsing Ceiling'));
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
     const call = ROLLERS.rollSavingThrow.mock.calls[0];
     expect(call[0]).toBe('DEX');

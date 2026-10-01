@@ -2226,18 +2226,21 @@ describe('MA-0176 ancient-blue-dragon ceiling collapse data lock', () => {
     expect(adultCeiling.description).toBe(VERBATIM);
   });
 
-  // MA-1753 INVERTED this pin: young-blue raw-string [0] was structured into
-  // the named "Ceiling Collapse" save row; its nameless ceiling-dict sibling
-  // [1] (MA-1754 lane) and the page-90 variants stay FALSE-locked inert.
-  it('scope guard: nameless ceiling dicts elsewhere stay inert; young-blue [0] fixed MA-1753, sibling [1] stays inert', () => {
+  // MA-1753 INVERTED this pin for [0]; MA-1754 INVERTS it for [1]: the
+  // duplicated nameless ceiling dict got its own distinct name
+  // "Collapsing Ceiling" + full mechanic keys (byte-twin of [0]). Only the
+  // sand-cloud dict [2] (MA-1755 lane) and other page-90 variants stay inert.
+  it('scope guard: nameless ceiling dicts elsewhere stay inert; young-blue [0]/[1] fixed MA-1753/MA-1754', () => {
     const variants = monstersData.filter(m => Array.isArray(m.lair_actions) &&
       m.lair_actions.some(la => typeof la === 'object' && la && la.description === VERBATIM && !la.name));
-    expect(variants.length).toBeGreaterThanOrEqual(1);
+    // MA-1754 flipped the last nameless carrier (young-blue [1]) — every
+    // verbatim ceiling dict app-wide is now named.
+    expect(variants).toHaveLength(0);
     for (const v of variants) {
       expect(['adult-blue-dragon', 'ancient-blue-dragon']).not.toContain(v.index);
       for (const [i, la] of v.lair_actions.entries()) {
         if (typeof la === 'object' && la && la.description === VERBATIM &&
-            !(v.index === 'young-blue-dragon' && i === 0)) {
+            !(v.index === 'young-blue-dragon' && (i === 0 || i === 1))) {
           expect(la.name).toBeUndefined();
           expect(isLairRowClickable(la)).toBe(false);
         }
@@ -2247,7 +2250,68 @@ describe('MA-0176 ancient-blue-dragon ceiling collapse data lock', () => {
     expect(young.lair_actions.filter(la => typeof la === 'string')).toHaveLength(0);
     expect(young.lair_actions[0].name).toBe('Ceiling Collapse');
     expect(isLairRowClickable(young.lair_actions[0])).toBe(true);
-    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
+  });
+
+  // MA-1754: young-blue-dragon lair_actions[1] ceiling collapse was a
+  // NAMELESS dict (MA-1748 name-gate twin — save_dc/save_type authored, prose
+  // complete, but isLairRowClickable's !row.name gate → static span, zero
+  // affordance, zero adjudication). Data-only fix: distinct RAW-anchored name
+  // "Collapsing Ceiling" ([0] took "Ceiling Collapse") + byte-twin of the
+  // MA-1753 [0] key set: 3d6 Bludgeoning + dc_success "none" (prose has NO
+  // half-on-success clause — RAW success deals zero, bug-file "half" rejected)
+  // + save_effect carrying canonical Prone AND Restrained.
+  describe('MA-1754 young-blue-dragon collapsing ceiling data lock', () => {
+    const row = monstersData.find(m => m.index === 'young-blue-dragon').lair_actions[1];
+    it('row is now a structured clickable SAVE row named Collapsing Ceiling (was nameless inert dict)', () => {
+      expect(typeof row).toBe('object');
+      expect(row.name).toBe('Collapsing Ceiling');
+      expect(isLairRowClickable(row)).toBe(true);
+      expect(lairRowAffordance(row)).toBe('save');
+      expect(canRollExpression(row.damage_dice_primary)).toBe(true);
+    });
+    it('name is DISTINCT from sibling [0] Ceiling Collapse; 3-element array preserved', () => {
+      const lairs = monstersData.find(m => m.index === 'young-blue-dragon').lair_actions;
+      expect(lairs).toHaveLength(3);
+      expect(lairs[0].name).toBe('Ceiling Collapse');
+      expect(row.name).not.toBe(lairs[0].name);
+      expect(lairs[2].name).toBeUndefined();
+      expect(isLairRowClickable(lairs[2])).toBe(false);
+    });
+    it('DC 15 Dexterity save mechanics byte-mirror fixed sibling [0]', () => {
+      expect(row.save_dc).toBe(15);
+      expect(row.save_type).toBe('Dexterity');
+      expect(row.damage_dice_primary).toBe('3d6');
+      expect(row.damage_type_primary).toBe('Bludgeoning');
+      expect(row.dc_success).toBe('none');
+      const ref = monstersData.find(m => m.index === 'young-blue-dragon').lair_actions[0];
+      expect(Object.keys(row)).toEqual(Object.keys(ref));
+    });
+    it('RAW prose has NO half-on-success clause — dc_success none, not half', () => {
+      expect(row.description).not.toMatch(/half as much/i);
+      expect(row.save_effect).toMatch(/Success: no damage\.$/i);
+    });
+    it('save_effect carries canonical Prone AND Restrained condition words', () => {
+      const conds = extractConditionsFromSaveEffect(row.save_effect).map(c => String(c).toLowerCase());
+      expect(conds).toContain('prone');
+      expect(conds).toContain('restrained');
+    });
+    it('click routes through handleSaveRoll (save affordance), no zone/refusal lane', async () => {
+      const setPopupHtml = vi.fn();
+      const handleSaveRoll = vi.fn();
+      const res = await resolveLairRow({
+        action: row,
+        monsterName: 'Young Blue Dragon',
+        campaignName: 'test-campaign',
+        setPopupHtml,
+        handleSaveRoll,
+        handleAttack: vi.fn(),
+        handleDamage: vi.fn(),
+      });
+      expect(res).toEqual({ resolved: true, affordance: 'save' });
+      expect(handleSaveRoll).toHaveBeenCalledWith(row, null, []);
+      expect(setPopupHtml).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -5123,12 +5187,20 @@ describe('MA-1753 young-blue-dragon ceiling collapse data lock', () => {
     expect(handleDamage).not.toHaveBeenCalled();
   });
 
-  it('sibling collision control: [1] nameless ceiling dict stays inert (MA-1754 lane); [2] sand cloud untouched; THREE index-bound rows kept', () => {
+  // MA-1754 INVERTED this pin: [1] was named "Collapsing Ceiling" with [0]'s
+  // full mechanic key set; only [2] (MA-1755 sand-cloud lane) stays inert.
+  it('sibling collision control (MA-1754 inverted): [1] armed as distinct-named Collapsing Ceiling byte-twin of [0]; [2] sand cloud untouched; THREE index-bound rows kept', () => {
     expect(young.lair_actions).toHaveLength(3);
     expect(typeof young.lair_actions.filter(la => typeof la === 'string')[0]).toBe('undefined');
-    expect(young.lair_actions[1].name).toBeUndefined();
+    expect(young.lair_actions[1].name).toBe('Collapsing Ceiling');
     expect(young.lair_actions[1].description).toBe(VERBATIM);
-    expect(isLairRowClickable(young.lair_actions[1])).toBe(false);
+    expect(isLairRowClickable(young.lair_actions[1])).toBe(true);
+    expect(young.lair_actions[1].save_dc).toBe(15);
+    expect(young.lair_actions[1].save_type).toBe('Dexterity');
+    expect(young.lair_actions[1].damage_dice_primary).toBe('3d6');
+    expect(young.lair_actions[1].damage_type_primary).toBe('Bludgeoning');
+    expect(young.lair_actions[1].dc_success).toBe('none');
+    expect(Object.keys(young.lair_actions[1])).toEqual(Object.keys(ceiling));
     expect(young.lair_actions[2].name).toBeUndefined();
     expect(young.lair_actions[2].save_type).toBe('Constitution');
     expect(ceiling.name).not.toBe(young.lair_actions[1].name);
