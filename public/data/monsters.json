@@ -66607,7 +66607,10 @@
         "damage_dice_primary": "2d6 + 4",
         "damage_type_primary": "Piercing",
         "damage_dice_secondary": "7d6",
-        "damage_type_secondary": "Poison"
+        "damage_type_secondary": "Poison",
+        "hit_conditions": [
+          "poisoned"
+        ]
       }
     ],
     "bonus_actions": [],
