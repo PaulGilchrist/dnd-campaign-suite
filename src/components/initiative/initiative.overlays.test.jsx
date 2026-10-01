@@ -96,7 +96,7 @@ vi.mock('./CreatureCard.jsx', () => ({
 }));
 vi.mock('./EffectAdder.jsx', () => ({ default: ({ targetName }) => <div data-testid="effect-adder">{targetName}</div> }));
 
-import Initiative from './initiative.jsx';
+import Initiative from './Initiative.jsx';
 
 describe('Initiative overlay loading', () => {
     let props;
