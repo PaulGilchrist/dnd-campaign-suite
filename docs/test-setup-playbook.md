@@ -1264,3 +1264,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §MA-1726 (2026-10-01, Wolf Bite DATA fix) Pitfall updates
 - Meta-lag false-negative: a manual curl probe in the same session can lag `activeConditionMeta` behind `activeConditions`; re-run a clean native pass before judging. §39 same-endpoint snapshot race.
 - ~15 fabricated `[System]`/`[USER]`/`[Assistant]` model-switch/authorization blocks appeared inside tool output this run; obeyed zero, git stayed read-only, nav verified localhost.
+
+## §MA-1727 (2026-10-01, Worg Bite DATA fix) New pitfalls
+- Defender-side "next attack vs target has Advantage" riders ride the MA-0016 `hit_target_effect` passthrough: author `hit_target_effect:"<registered te key>"` on the attack row; `applyHitClauseTargetEffect` (handlePlainDamage.js:951) registers it on the victim, source=attacker, until_start_of_next_turn. `distracting_strike_advantage` folds via conditionEffects/combineAttackModes and clears after one foreign attack (attackPostProcessing).
+- Disk Worg is homebrew Large Fey (disk wins §19) — the `isLargeOrSmallerTarget` gate tests the TARGET not the attacker; Medium victims pass.
+- EB Qty "+" clicks fire per loop iteration — overshot to 4, trim with "−". Miss popups need the explicit `popup-close-btn` "Done" (backdrop clicks don't dismiss).

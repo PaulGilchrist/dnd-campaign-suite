@@ -5590,3 +5590,125 @@ describe('MA-1690 Water Weird Surge grapple+restrained-on-hit grant (two-field D
         expect(addExpiration).not.toHaveBeenCalled();
     });
 });
+
+const WORG = monsters.find(m => m.index === 'worg');
+const WORG_BITE_ACTION = WORG.actions.find(a => a.name === 'Bite');
+
+describe('MA-1727 Worg Bite distracting_strike_advantage hit-clause', () => {
+    const deps = {
+        characterName: 'Worg 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Worg 1', computedStats: { armorClass: 13 } },
+            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    function biteHitContext() {
+        return {
+            targetName: 'Bandit 1',
+            damageType: 'Piercing',
+            attackerName: 'Worg 1',
+            hitClause: buildHitConditionClause(WORG_BITE_ACTION),
+        };
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getEffectDefinition.mockImplementation((key) => ({
+            effect: key,
+            label: 'Next Attack Adv vs Target',
+            description: 'The next attack roll against the target has Advantage.',
+            group: 'Attack',
+        }));
+        getRuntimeValue.mockReturnValue(null);
+        applyDamageToTarget.mockReturnValue({ finalDamage: 7, newHp: 4, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Medium', ac: 12, currentHp: 11, maxHp: 11 }],
+        });
+    });
+
+    it('MA-1727 data-lock: Bite row authors hit_target_effect:"distracting_strike_advantage" (+5 melee reach 5 ft., 1d8 + 3 Piercing; MA-0016 byte-shape placement after damage_type_primary)', () => {
+        expect(WORG_BITE_ACTION.attack_bonus).toBe(5);
+        expect(WORG_BITE_ACTION.reach).toBe('5 ft.');
+        expect(WORG_BITE_ACTION.damage_dice_primary).toBe('1d8 + 3');
+        expect(WORG_BITE_ACTION.damage_type_primary).toBe('Piercing');
+        expect(WORG_BITE_ACTION.hit_target_effect).toBe('distracting_strike_advantage');
+        expect(WORG_BITE_ACTION.hit_conditions).toBeUndefined();
+        expect(WORG_BITE_ACTION.hit_choice).toBeUndefined();
+        expect(WORG_BITE_ACTION.escape_dc).toBeUndefined();
+        const keys = Object.keys(WORG_BITE_ACTION);
+        expect(keys.indexOf('hit_target_effect')).toBe(keys.indexOf('damage_type_primary') + 1);
+    });
+
+    it('surfaces a targetEffect-only clause from the Bite row (was null pre-fix — free-text rider inert)', () => {
+        expect(buildHitConditionClause(WORG_BITE_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Bite',
+            targetEffect: 'distracting_strike_advantage',
+        });
+    });
+
+    it('registers the distracting_strike_advantage te on the victim, sourced from the worg, on a resolved hit', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d8 + 3', total: 7, rolls: [4], modifier: 3, context: biteHitContext() });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith(
+            'test-campaign',
+            'Bandit 1',
+            'distracting_strike_advantage',
+            'Worg 1',
+            { duration: 'until_start_of_next_turn' }
+        );
+    });
+
+    it('MA-1727 clock-lock: grants ONE addExpiration clock anchored on the worg (MA-0016 anchor leg; RAW "before the start of the worg\'s next turn")', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d8 + 3', total: 7, rolls: [4], modifier: 3, context: biteHitContext() });
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Worg 1',
+            targetName: 'Bandit 1',
+            effects: [{ type: 'remove_target_effect', effectKey: 'distracting_strike_advantage', source: 'Worg 1', target: 'Bandit 1' }],
+            campaignName: 'test-campaign',
+            rounds: undefined,
+            expireOnCreatureName: 'Worg 1',
+        });
+    });
+
+    it('logs a condition-applied entry naming the registered te label on the victim', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d8 + 3', total: 7, rolls: [4], modifier: 3, context: biteHitContext() });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: 'Bandit 1',
+            condition: 'Next Attack Adv vs Target',
+            reason: 'Bite — until the start of Worg 1\'s next turn',
+        }));
+    });
+
+    it('miss-zero: unresolved bite registers no te, clock, or condition log', async () => {
+        applyDamageToTarget.mockReturnValue(null);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Bite', formula: '1d8 + 3', total: 7, rolls: [1], modifier: 3, context: biteHitContext() });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+    });
+
+    it('consumer fold: defender-side te on the victim pays Advantage to the next attack against it (conditionEffects :310 → combineAttackModes :848)', () => {
+        const targetEffects = computeConditionEffects({
+            targetEffects: [{ effect: 'distracting_strike_advantage', target: 'Bandit 1', source: 'Worg 1' }],
+        });
+        expect(targetEffects.targetAdvantageCount).toBeGreaterThanOrEqual(1);
+        expect(combineAttackModes(computeConditionEffects({}), targetEffects, null, 'Bandit 1')).toBe('advantage');
+    });
+});
