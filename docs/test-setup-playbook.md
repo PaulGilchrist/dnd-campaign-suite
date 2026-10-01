@@ -1246,3 +1246,9 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Staged-condition breath w/o `staged_paralysis` disk key = FLAT spray of all prose condition words on fail (stagedParalysisForAction null Modal:287; extractor Helpers:377 -> applySaveFailConditions :487/:692); activeConditionMeta cosmetic clobber races conditions POST (:503).
 - Silver fog lair fix = {name:'Fog Cloud', advisory:'fog_cloud'} advisory-affordance (monsterLairActions:27->:41), NOT zone (adult-bronze differs); name alone insufficient.
 - Save-row success default: computeDamageAfterSave applyDamage:87-95 fail=raw/half=floor; Modal :268 dc_success??'half' threads default; single-target constrict-style save rows auto-adjudicate inline vs dropdown target (no AOE picker). escape_dc prose inert unless action.escape_dc authored (Helpers:906).
+
+## §MA-1718 (2026-10-01, Wight Life Drain DATA fix) New pitfalls
+- `save_hp_max_reduce: {"equal_to": "damage"}` structured key arms the max-HP drain rider via `parseSaveHpMaxReduce` (MonsterCardHelpers) → `applyHpMaxReduce` (saveProcessing). Prose is never parsed — missing key = byte-inert rider. Mirror succubus/vampire holder byte-shape.
+- The seam pays the max-HP reduction on BOTH save faces (reduced by damage TAKEN, incl. half-side) — twin-canonical per saveProcessing.js:1312. A fail-only rider would need new structured grammar (future ticket); do not chase prose-vs-seam success-face divergence.
+- `playwright_browser_type` with stale refs silently lands elsewhere; use native setter + `dispatchEvent('input')` to drive the EB filter.
+- Arming direction: the attacker's own initiative-row target select must list the victim or the chip refuses ("no target armed"); flush `.popup-overlay` via click, re-arm, re-press.
