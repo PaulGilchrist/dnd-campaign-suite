@@ -66934,7 +66934,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The yochlol casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15): At Will: Detect Thoughts, Gaseous Form (self only), Web; 1/Day: Dominate Person",
+        "description": "The yochlol casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15): <strong>At Will:</strong> <em>Detect Thoughts</em>, <em>Gaseous Form</em> (self only), <em>Web</em>; <strong>1/Day:</strong> <em>Dominate Person</em>",
         "save_dc": 15,
         "save_type": "Charisma"
       }
