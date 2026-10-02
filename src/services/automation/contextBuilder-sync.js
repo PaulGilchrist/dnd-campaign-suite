@@ -18,6 +18,8 @@ import { selectBrutalStrikeRiders } from '../combat/brutalStrikeSelection.js';
 import { resolveDiceExpression } from '../combat/automation/automationExpressions.js';
 import { isResilientSphereActive } from '../combat/automation/automationPassives.js';
 import { CONDITIONS_THAT_CANNOT_ACT } from '../combat/conditions/conditionEffects.js';
+import { addEntry } from '../ui/logService.js';
+import { addExpiration } from '../rules/effects/expirationQueue.js';
 
 // Canonical sneak-attack ally clause: the ally must not have the Incapacitated condition.
 function allyIsIncapacitated(c) {
@@ -273,16 +275,83 @@ function buildBlockedAttackContext(attack, playerName, targetName, playerStats, 
     };
 }
 
-function buildBrutalStrikeEffect(option, playerName, targetName) {
-    return {
-        target: targetName,
-        source: playerName,
-        option: option.name,
-        effect: option.effect,
-        value: option.effect === 'next_attack_bonus' ? (option.value || 5) : (option.value || null),
-        noOpportunityAttacks: option.noOpportunityAttacks || false,
-        duration: 'until_start_of_next_turn',
-    };
+// CLA-044: resolve a Brutal Strike option to a registered te grant.
+// Data-driven over ALL rider option keys (lv9 push_15ft/speed_reduction,
+// lv13/17 adds disadvantage_on_next_save/next_attack_bonus). Feet parsed
+// from option.value token ("15_ft_until_start_of_next_turn") or effect key
+// ("push_15ft") — registered te consumers compute te.value||10, so value
+// MUST be numeric (MA-0995/MA-1147 byte-shape).
+function brutalStrikeFeet(option, fallback) {
+    const fromValue = Number(String(option.value ?? '').match(/(\d+)/)?.[1]);
+    if (Number.isFinite(fromValue)) return fromValue;
+    const fromEffect = Number(String(option.effect ?? '').match(/(\d+)/)?.[1]);
+    if (Number.isFinite(fromEffect)) return fromEffect;
+    return fallback;
+}
+
+function brutalStrikeTeForOption(option, playerName, targetName) {
+    if (option.effect === 'disadvantage_on_next_save' || option.effect === 'next_attack_bonus') {
+        return {
+            te: {
+                target: targetName,
+                source: playerName,
+                option: option.name,
+                effect: option.effect,
+                value: option.effect === 'next_attack_bonus' ? (option.value || 5) : (option.value || null),
+                noOpportunityAttacks: option.noOpportunityAttacks || false,
+                duration: 'until_start_of_next_turn',
+            },
+            replace: false,
+            clock: false,
+        };
+    }
+    if (option.effect === 'speed_reduction') {
+        return {
+            te: {
+                target: targetName,
+                source: playerName,
+                option: option.name,
+                effect: 'speed_reduction',
+                value: brutalStrikeFeet(option, 15),
+                duration: 'until_start_of_next_turn',
+            },
+            // Hamstring: "only one at a time — the most recent one"
+            replace: true,
+            clock: true,
+        };
+    }
+    if (String(option.effect || '').startsWith('push')) {
+        // MA-0079/MA-0138 push marker te: instant, NO clock (badge residual).
+        return {
+            te: {
+                target: targetName,
+                source: playerName,
+                option: option.name,
+                effect: 'push',
+                value: brutalStrikeFeet(option, 15),
+                duration: 'instant',
+            },
+            replace: true,
+            clock: false,
+        };
+    }
+    console.error(`[brutalStrike] Unregistered Brutal Strike option effect "${option.effect}" — no grant`);
+    return null;
+}
+
+function logBrutalStrikeGrant(option, te, playerName, targetName, campaignName) {
+    const desc = te.effect === 'speed_reduction'
+        ? `${option.name}: ${targetName} speed reduced ${te.value} ft until start of ${playerName}'s next turn`
+        : te.effect === 'push'
+            ? `${option.name}: ${targetName} pushed ${te.value} ft straight away (token position GM-enforced)`
+            : `${option.name} applied to ${targetName}`;
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: option.name,
+        description: desc,
+        targetName,
+    }).catch((e) => { console.error('[brutalStrike:log-error]', e); });
 }
 
 // Brutal Strike: add extra damage dice when active
@@ -292,14 +361,27 @@ function applyBrutalStrikeEffectChoices(brutalStrikeRider, playerName, targetNam
 
     let storedEffects = campaignTargetEffects();
     const riderOptions = brutalStrikeRider.options || [];
+    const clockEffects = [];
     for (const choiceName of effectChoices) {
         const option = riderOptions.find(o => o.name === choiceName);
         if (!option) continue;
-        if (option.effect === 'disadvantage_on_next_save' || option.effect === 'next_attack_bonus') {
-            storedEffects = [...storedEffects, buildBrutalStrikeEffect(option, playerName, targetName)];
+        const grant = brutalStrikeTeForOption(option, playerName, targetName);
+        if (!grant) continue;
+        if (grant.replace) {
+            storedEffects = storedEffects.filter(te => !(te.target === targetName && te.effect === grant.te.effect && te.source === playerName && te.option === option.name));
         }
+        storedEffects = [...storedEffects, grant.te];
+        if (grant.clock) {
+            clockEffects.push({ type: 'remove_target_effect', effectKey: grant.te.effect, source: playerName, option: option.name, target: targetName });
+        }
+        logBrutalStrikeGrant(option, grant.te, playerName, targetName, campaignName);
     }
     setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
+    if (clockEffects.length > 0) {
+        // ONE anchored clock (MA-0995/MA-1147/FT-082 pattern): fires at the
+        // attacker's next turn-start, scoped by effect+source+option+target.
+        addExpiration({ attackerName: playerName, targetName, effects: clockEffects, campaignName, rounds: undefined, expireOnCreatureName: playerName });
+    }
 }
 
 function applyBrutalStrikeEffects(playerName, targetName, playerStats, campaignName) {

@@ -5,6 +5,9 @@
  */
 export const CAMPAIGN_KEYS = new Set([
     'targetEffects',
+    // CLA-044: top-level activeCreatureName is truth (initiative Next writes it
+    // via storage.set; SSE lands it in the campaign store — the cs mirror lags).
+    'activeCreatureName',
     'pendingSavePrompts',
     'coverRefresh',
     'warCasterReactions',

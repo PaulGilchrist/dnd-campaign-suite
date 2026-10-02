@@ -96,8 +96,8 @@ describe('CLA-182: attackRollBonuses hit-time brutal strike rider selection', ()
             effect: 'next_attack_bonus',
             value: 5,
         })]);
-        const log = addEntry.mock.calls.map(c => c[1]).find(e => e?.type === 'ability_use');
-        expect(log.abilityName).toBe('Improved Brutal Strike');
+        const log = addEntry.mock.calls.map(c => c[1]).find(e => e?.type === 'ability_use' && e?.abilityName === 'Improved Brutal Strike');
+        expect(log).toBeDefined();
     });
 
     it('applies Staggering Blow targetEffect from the improved rider options', async () => {

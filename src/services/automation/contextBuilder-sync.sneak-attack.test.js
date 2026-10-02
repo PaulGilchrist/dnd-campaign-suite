@@ -48,6 +48,7 @@ vi.mock('../combat/auras/coronaAuraUtils.js', () => ({
 
 vi.mock('./handlers/spells/sanctuaryHandler.js', () => ({
   endSanctuary: vi.fn(),
+  handle: vi.fn(),
 }));
 
 vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({

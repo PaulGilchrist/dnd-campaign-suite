@@ -484,9 +484,10 @@ describe('useCharActionsAttackHandlers', () => {
             expect(buildCtx).toHaveBeenCalledWith(attack);
         });
 
-        it('should skip buildCtx/rollAttack when attack is null', async () => {
+        it('CLA-044: refuses to arm sticky when attack is null', async () => {
             const buildCtx = vi.fn(() => Promise.resolve({ hitBonus: 6 }));
             const rollAttack = vi.fn();
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
 
             const brutalChoice = {
                 useBrutalStrike: true,
@@ -501,22 +502,19 @@ describe('useCharActionsAttackHandlers', () => {
 
             handlers.handleBrutalStrikeConfirm(brutalChoice, null);
 
-            expect(deps.setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_brutalStrikeActive', true, campaignName);
-            expect(deps.setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_brutalStrikeEffects', ['option1'], campaignName);
-            expect(oncePerTurn.markOncePerTurn).toHaveBeenCalledWith('Brutal Strike', '_BrutalStrike_usedRound', basePlayerStats, campaignName);
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'TestFighter',
-                abilityName: 'Brutal Strike',
-            }));
+            expect(deps.setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_brutalStrikeActive', true, campaignName);
+            expect(deps.setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_brutalStrikeEffects', ['option1'], campaignName);
+            expect(oncePerTurn.markOncePerTurn).not.toHaveBeenCalled();
             expect(deps.setModalState).toHaveBeenCalledWith({ recklessAttackModal: null });
             expect(buildCtx).not.toHaveBeenCalled();
             expect(rollAttack).not.toHaveBeenCalled();
+            consoleErrorSpy.mockRestore();
         });
 
-        it('should handle missing attack name gracefully in log entry', async () => {
-            const buildCtx = vi.fn(() => Promise.resolve({ hitBonus: 6 }));
+        it('CLA-044: clears sticky when buildCtx rejects so it cannot ride a later attack', async () => {
+            const buildCtx = vi.fn(() => Promise.reject(new Error('build failed')));
             const rollAttack = vi.fn();
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
 
             const brutalChoice = {
                 useBrutalStrike: true,
@@ -527,16 +525,21 @@ describe('useCharActionsAttackHandlers', () => {
                 buildCtx,
                 rollAttack,
             });
+            deps.getRuntimeValue.mockImplementation((key, rk) => {
+                if (rk === '_brutalStrikeActive') return true;
+                return null;
+            });
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = null;
+            const attack = { name: 'Longsword', hitBonus: 6 };
 
             handlers.handleBrutalStrikeConfirm(brutalChoice, attack);
+            await new Promise(process.nextTick);
+            await new Promise(process.nextTick);
 
-            expect(deps.setModalState).toHaveBeenCalledWith({ recklessAttackModal: null });
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('no effect'),
-            }));
-            expect(buildCtx).not.toHaveBeenCalled();
+            expect(deps.setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_brutalStrikeActive', null, campaignName);
+            expect(deps.setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_brutalStrikeEffects', null, campaignName);
+            expect(rollAttack).not.toHaveBeenCalled();
+            consoleErrorSpy.mockRestore();
         });
 
         it('should handle buildCtx rejection', async () => {

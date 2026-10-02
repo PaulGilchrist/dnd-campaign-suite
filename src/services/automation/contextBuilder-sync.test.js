@@ -76,13 +76,14 @@ vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
   handle: vi.fn(),
 }));
 
-vi.mock('./handlers/spells/sanctuaryHandler.js', () => ({
+vi.mock('./handlers/spells/sanctuaryHandler.js', () => ({ handle: vi.fn(),
   endSanctuary: vi.fn(),
 }));
 
 vi.mock('../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js', () => ({
   isProtectionFromEvilAndGoodActive: vi.fn().mockReturnValue(false),
   isCreatureWarded: vi.fn().mockReturnValue(false),
+  handle: vi.fn(),
 }));
 
 vi.mock('../combat/automation/automationService.js', () => ({

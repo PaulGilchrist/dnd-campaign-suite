@@ -225,11 +225,14 @@ function RecklessAttackHost({ mergedModalState, playerStats, campaignName, handl
             hasBrutalStrike={rm.hasBrutalStrike || false}
             brutalStrikeOptions={rm.brutalStrikeOptions || []}
             maxEffects={rm.maxEffects || 1}
+            // CLA-044: brutalOnly must forward rm.attack — the modal emits
+            // (choice) only; dropping the attack swallowed the roll and left
+            // _brutalStrikeActive sticky for the NEXT attack (retroactive dice).
             onConfirm={rm.mode === 'brutalOnly'
-                ? (choice) => handleBrutalStrikeConfirm({ ...choice, riderName: rm.riderName })
+                ? (choice) => handleBrutalStrikeConfirm({ ...choice, riderName: rm.riderName }, rm.attack)
                 : (attack, choice) => handleRecklessAttackConfirm(attack, { ...choice, riderName: rm.riderName })}
             onCancel={rm.mode === 'brutalOnly'
-                ? (choice) => handleBrutalStrikeCancel(choice)
+                ? () => handleBrutalStrikeCancel(rm.attack)
                 : () => handleRecklessAttackCancel(rm.attack)}
         />
     );

@@ -94,35 +94,62 @@ export default function useCharActionsAttackHandlers({
         return false;
     }
 
-    // Opens the Reckless Attack / Brutal Strike chooser when one is owed this
-    // turn. Returns true when the modal consumed the click.
-    function openRecklessChoiceModal(attack) {
+    // CLA-044: refusal convention (playbook §5) — automation + <feature>_refused,
+    // zero spend. Attack itself proceeds normally (Reckless advantage stays).
+    function logBrutalStrikeRefused(riderName) {
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            automationType: 'brutal_strike_refused',
+            name: riderName,
+            description: `${riderName}: already used this turn — once per turn, chooser refused`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[useCharActionsAttackHandlers:refusal-log-error]', e); });
+    }
+
+    function computeChoiceState() {
         const hasRecklessFeature = specialActions?.some(
             a => a.effect === 'advantage_attacks_advantage_against' && a.trigger === 'first_attack_of_turn'
         );
         const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
         const isRecklessActive = activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
-        const offeredKey = '_recklessAttack_offeredThisTurn';
-        const offeredValue = getRuntimeValue(playerName, offeredKey);
-        const currentCreature = getActiveCreatureName(campaignName);
+        // CLA-044/CLA-004-era: top-level activeCreatureName is truth (the cs
+        // mirror frozen mid-walk made the latch comparison permanently stale,
+        // re-offering the chooser every attack). Fall back to cs cache only.
+        const currentCreature = getRuntimeValue('campaign', 'activeCreatureName', campaignName) || getActiveCreatureName(campaignName);
+        const offeredValue = getRuntimeValue(playerName, '_recklessAttack_offeredThisTurn');
         const isOfferedThisTurn = offeredValue && offeredValue.activeCreature === currentCreature;
 
-        const { hasBrutalStrike, brutalStrikeOptions, maxEffects, riderName } = readBrutalStrikeOffer(passives);
-
-        const brutalStrikeUsedKey = '_BrutalStrike_usedRound';
-        const brutalStrikeUsedValue = getRuntimeValue(playerName, brutalStrikeUsedKey, campaignName);
-        const brutalStrikeUsedThisTurn = brutalStrikeUsedValue && brutalStrikeUsedValue.activeCreature === currentCreature;
+        const offer = readBrutalStrikeOffer(passives);
+        const brutalStrikeUsedValue = getRuntimeValue(playerName, '_BrutalStrike_usedRound', campaignName);
+        // Latch stamps the HOLDER (FT-082) and clears at round wrap
+        // (navigationHandlers PLAYER_ROUND_LATCH_KEYS) — holder match spends it.
+        const brutalStrikeUsedThisTurn = !!brutalStrikeUsedValue
+            && (brutalStrikeUsedValue.activeCreature === playerName || brutalStrikeUsedValue.activeCreature === currentCreature);
 
         const recklessOwed = hasRecklessFeature && !isRecklessActive && !isOfferedThisTurn;
-        const brutalOwed = hasRecklessFeature && isRecklessActive && hasBrutalStrike && !brutalStrikeUsedThisTurn;
+        const brutalActive = hasRecklessFeature && isRecklessActive && offer.hasBrutalStrike;
+        const brutalOwed = brutalActive && !brutalStrikeUsedThisTurn;
+
+        return { recklessOwed, brutalOwed, brutalSpentButActive: brutalActive && brutalStrikeUsedThisTurn, offer };
+    }
+
+    // Opens the Reckless Attack / Brutal Strike chooser when one is owed this
+    // turn. Returns true when the modal consumed the click.
+    function openRecklessChoiceModal(attack) {
+        const { recklessOwed, brutalOwed, brutalSpentButActive, offer } = computeChoiceState();
+
+        if (brutalSpentButActive) {
+            logBrutalStrikeRefused(offer.riderName);
+        }
 
         if (recklessOwed) {
-            setModalState({ recklessAttackModal: { attack, mode: 'full', hasBrutalStrike, brutalStrikeOptions, maxEffects, riderName } });
+            setModalState({ recklessAttackModal: { attack, mode: 'full', ...offer } });
             return true;
         }
 
         if (brutalOwed) {
-            setModalState({ recklessAttackModal: { attack, mode: 'brutalOnly', hasBrutalStrike: true, brutalStrikeOptions, maxEffects, riderName } });
+            setModalState({ recklessAttackModal: { attack, mode: 'brutalOnly', hasBrutalStrike: true, brutalStrikeOptions: offer.brutalStrikeOptions, maxEffects: offer.maxEffects, riderName: offer.riderName } });
             return true;
         }
         return false;
@@ -151,7 +178,9 @@ export default function useCharActionsAttackHandlers({
             const newEffects = [...storedEffects, { target: playerName, source: playerName, effect: 'reckless_attack', duration: 'until_start_of_next_turn' }];
             setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName);
         }
-        const currentCreature = getActiveCreatureName(campaignName);
+        // CLA-044: stamp the holder (top-level truth first) — the frozen cs
+        // mirror stamp made the offered-latch unreadable next turn.
+        const currentCreature = getRuntimeValue('campaign', 'activeCreatureName', campaignName) || getActiveCreatureName(campaignName);
         setRuntimeValue(playerName, '_recklessAttack_offeredThisTurn', { round: 1, activeCreature: currentCreature }, campaignName);
 
         if (brutalStrikeChoice?.useBrutalStrike) {
@@ -176,12 +205,17 @@ export default function useCharActionsAttackHandlers({
         }).catch((e) => { console.error("[CharActions] Error:", e); }).finally(() => {
             if (brutalStrikeChoice?.useBrutalStrike) {
                 setRuntimeValue(playerName, '_brutalStrikeNoAdvantage', null, campaignName);
+                // CLA-044 sticky safety: the sticky is consumed synchronously
+                // inside buildCtx; anything left after this lane is stale — clear it.
+                if (brutalStrikeChoice?.useBrutalStrike) {
+                    clearBrutalStrikeSticky();
+                }
             }
         });
     }
 
     function handleRecklessAttackCancel(attack) {
-        const currentCreature = getActiveCreatureName(campaignName);
+        const currentCreature = getRuntimeValue('campaign', 'activeCreatureName', campaignName) || getActiveCreatureName(campaignName);
         setRuntimeValue(playerName, '_recklessAttack_offeredThisTurn', { round: 1, activeCreature: currentCreature }, campaignName);
         setModalState({ recklessAttackModal: null });
         buildCtx(attack).then(ctx => {
@@ -190,8 +224,22 @@ export default function useCharActionsAttackHandlers({
         }).catch((e) => { console.error("[CharActions] Error:", e); });
     }
 
+    // CLA-044 sticky safety: the arming attack is the consuming attack — if
+    // no attack was threaded or the ctx fails, the sticky is cleared here so
+    // it can never ride a later unrelated attack.
+    function clearBrutalStrikeSticky() {
+        setRuntimeValue(playerName, '_brutalStrikeActive', null, campaignName);
+        setRuntimeValue(playerName, '_brutalStrikeEffects', null, campaignName);
+    }
+
     function handleBrutalStrikeConfirm(brutalStrikeChoice, attack) {
-        if (brutalStrikeChoice?.useBrutalStrike) {
+        if (!attack) {
+            console.error('[useCharActionsAttackHandlers] brutalOnly confirm without attack — not arming sticky');
+            setModalState({ recklessAttackModal: null });
+            return;
+        }
+        const consumed = !!brutalStrikeChoice?.useBrutalStrike;
+        if (consumed) {
             setRuntimeValue(playerName, '_brutalStrikeActive', true, campaignName);
             setRuntimeValue(playerName, '_brutalStrikeEffects', brutalStrikeChoice.effectChoices, campaignName);
             markOncePerTurn('Brutal Strike', '_BrutalStrike_usedRound', playerStats, campaignName).catch((e) => { console.error("[CharActions] Error:", e); });
@@ -201,19 +249,24 @@ export default function useCharActionsAttackHandlers({
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: riderName,
-                description: `${playerName} uses ${riderName} on ${attack?.name || 'attack'} — ${effectNames}`,
+                description: `${playerName} uses ${riderName} on ${attack.name} — ${effectNames}`,
             }).catch((e) => { console.error("[useCharActionsAttackHandlers:log-error]", e); });
         }
         setModalState({ recklessAttackModal: null });
-        if (attack) {
-            buildCtx(attack).then(ctx => {
-                const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
-                rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-            }).catch((e) => { console.error("[CharActions] Error:", e); });
-        }
+        buildCtx(attack).then(ctx => {
+            const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
+            rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
+        }).catch((e) => { console.error("[CharActions] Error:", e); }).finally(() => {
+            // rollBrutalStrikeAttack consumes the sticky synchronously on the
+            // hit path; anything still armed here is leftover — clear it.
+            if (consumed) {
+                clearBrutalStrikeSticky();
+            }
+        });
     }
 
     function handleBrutalStrikeCancel(attack) {
+        clearBrutalStrikeSticky();
         setModalState({ recklessAttackModal: null });
         if (attack) {
             buildCtx(attack).then(ctx => {

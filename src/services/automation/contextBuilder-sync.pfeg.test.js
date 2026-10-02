@@ -27,12 +27,13 @@ vi.mock('../combat/auras/duplicityAuraUtils.js', () => ({ getDuplicityAdvantageA
 vi.mock('../combat/auras/lionAuraUtils.js', () => ({ getLionDisadvantageAgainst: vi.fn() }));
 vi.mock('../combat/auras/coronaAuraUtils.js', () => ({ getCoronaSaveDisadvantage: vi.fn() }));
 vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({ isActive: vi.fn(), isAuraTarget: vi.fn(), handle: vi.fn() }));
-vi.mock('./handlers/spells/sanctuaryHandler.js', () => ({ endSanctuary: vi.fn() }));
+vi.mock('./handlers/spells/sanctuaryHandler.js', () => ({ endSanctuary: vi.fn(), handle: vi.fn() }));
 
 const WARDED = ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead'];
 vi.mock('../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js', () => ({
   isProtectionFromEvilAndGoodActive: vi.fn(() => false),
   isCreatureWarded: vi.fn((type) => WARDED.some(t => t.toLowerCase() === String(type).toLowerCase())),
+  handle: vi.fn(),
 }));
 vi.mock('../combat/automation/automationService.js', () => ({ collectWeaponMastery: vi.fn().mockReturnValue({ baseMastery: null, extraMasteries: [] }) }));
 vi.mock('../combat/brutalStrikeSelection.js', () => ({ selectBrutalStrikeRiders: vi.fn().mockReturnValue({}) }));
