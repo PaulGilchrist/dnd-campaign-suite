@@ -67,6 +67,17 @@ export function getWardingBondAcBonus(characterName, campaignName) {
     return wardBuff ? Number(wardBuff.acBonus) || 0 : 0;
 }
 
+// MN-002: Bait and Switch grants the chosen creature +N AC until the start of
+// the maneuvering fighter's next turn — the defender rides dedicated runtime
+// keys (baitAndSwitchActive/Bonus), mirrored from the attacker-side
+// computeDefensiveBonuses seam so ANY attacker's roll folds the buff (the
+// contextBuilder-map cover fold never runs gridless).
+export function getBaitAndSwitchAcBonus(characterName, campaignName) {
+    if (!characterName) return 0;
+    if (!getRuntimeValue(characterName, 'baitAndSwitchActive', campaignName)) return 0;
+    return Number(getRuntimeValue(characterName, 'baitAndSwitchBonus', campaignName) || 0);
+}
+
 // MA-0341: Bandit Captain Parry grants +2 AC against the triggering attack —
 // the stamp rides the defender's activeBuffs (same channel as shield /
 // Shield of Faith / SP-125 warding_bond acBonus) and is consumed by the next

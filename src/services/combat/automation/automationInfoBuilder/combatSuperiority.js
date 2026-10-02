@@ -86,5 +86,40 @@ export const combatSuperiorityHandlers = {
             usesMax: auto.uses_max || 4,
             hasAutomation: true
         }
+    },
+
+    // MN-002: movement maneuvers (Bait and Switch) — the collector dropped these
+    // rows pre-render because DISPATCH had no entry and buildAttackInfo returned
+    // null (psionic.js telekinetic_movement template). maneuverName must ride the
+    // info: handleCombatSuperiorityMovement reads action.automation.maneuverName
+    // and the merged special-action row carries the info as its .automation.
+    'combat_superiority_movement': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'combat_superiority_movement',
+            name: feature.name,
+            description: feature.description || '',
+            maneuverName: auto.maneuverName || feature.name,
+            effect: auto.effect || 'ac_bonus_and_swap',
+            range: auto.range || '5_ft',
+            hasAutomation: true
+        }
+    },
+
+    // MN-002 sibling: skill-check maneuvers (e.g. Evasive Footwork). Router
+    // routes this type to specialActions and executeSkillCheckManeuver consumes
+    // it (pendingSkillCheckBonus) — same builder gap closed.
+    'combat_superiority_skill_check': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'combat_superiority_skill_check',
+            name: feature.name,
+            description: feature.description || '',
+            maneuverName: auto.maneuverName || feature.name,
+            skills: auto.skills || [],
+            ability: auto.ability || null,
+            initiativeBonus: !!auto.initiativeBonus,
+            hasAutomation: true
+        }
     }
 }

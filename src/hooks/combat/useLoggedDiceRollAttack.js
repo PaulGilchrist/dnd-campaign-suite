@@ -11,6 +11,7 @@ import {
     getWardingBondAcBonus,
     getParryAcBonus,
     getGuardianProtectionAcBonus,
+    getBaitAndSwitchAcBonus,
 } from './loggedDiceRollUtils.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { endSanctuary } from '../../services/automation/handlers/spells/sanctuaryHandler.js';
@@ -33,6 +34,13 @@ import { processSaveRoll } from './saveProcessing.js';
 import { processInitiativeRoll } from './initiativeProcessing.js';
 import { consumeFeatsOfChaos } from './globalFeats.js';
 import { consumeArmedRestoreBalance } from '../../services/combat/restoreBalanceState.js';
+
+// MN-002: Bait and Switch AC fold for ANY attacker — max with the attacker-side
+// context value; both read the same defender keys, so no double-count.
+function foldBaitAndSwitchAc(ctx, defenderName, campaignName) {
+    const attackerSide = Number(ctx.baitAndSwitchBonus) || 0;
+    ctx.baitAndSwitchBonus = Math.max(attackerSide, getBaitAndSwitchAcBonus(defenderName, campaignName));
+}
 
 // Sanctuary / blocker pre-phase for attack rolls. Returns true when the roll
 // must be aborted (blocked attacker or unresolved sanctuary save).
@@ -494,6 +502,8 @@ export function createLogAndShow(deps) {
         // MA-1463: Shield Guardian Protection +5 AC riding the defender's
         // ONE-SHOT activeBuffs stamp (MA-1170 shield fold channel).
         ctx._guardianProtectionAcBonus = getGuardianProtectionAcBonus(acTargetName, campaignName);
+        // MN-002: fold the defender's Bait and Switch AC buff for ANY attacker.
+        foldBaitAndSwitchAc(ctx, acTargetName, campaignName);
 
         // Bi die size for bardic inspiration defense (attack-only)
         ctx._biDieSize = resolveBiDieSize(rollType, target, campaignName, characters);

@@ -161,6 +161,22 @@ describe('useCharActionsModalHandlers - combat superiority', () => {
       expect(mockSetPopupHtml).not.toHaveBeenCalled();
       expect(mockSetModalState).toHaveBeenCalledWith({ baitAndSwitchChoiceModal: null });
     });
+
+    // MN-002: grant log must reach the campaign log (mirror rally flush).
+    it('flushes executeBaitAndSwitchChoice logEntries to the campaign log', async () => {
+      const grantEntry = {
+        type: 'ability_use',
+        characterName: 'TestChar',
+        abilityName: 'Bait and Switch',
+        description: 'Bait and Switch: Orc gains +7 AC until the start of TestChar\'s next turn.',
+      };
+      executeBaitAndSwitchChoice.mockResolvedValue({ payload: '<p>Applied</p>', logEntries: [grantEntry] });
+      const handlers = getHandlers();
+      const modalData = makeModalData({ dieValue: 7, maneuverName: 'Bait and Switch' });
+      await handlers.handleBaitAndSwitchChoiceConfirm('Orc', modalData);
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', grantEntry);
+      expect(mockSetModalState).toHaveBeenCalledWith({ baitAndSwitchChoiceModal: null });
+    });
   });
 
   describe('handleCommanderStrikeChoiceConfirm', () => {

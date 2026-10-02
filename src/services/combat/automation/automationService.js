@@ -78,6 +78,13 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     // handleUseMagicDevice (GM-adjudicated activation toggle: activeBuffs
     // entry + ability_use log + clause summary popup).
     'use_magic_device',
+    // MN-002: the Special Actions movement/skill-check maneuver rows
+    // (Bait and Switch, Ambush, Tactical Assessment) dispatch
+    // handleCombatSuperiorityMovement / handleCombatSuperioritySkillCheck →
+    // executeMovementManeuver / executeSkillCheckManeuver (die roll + spend +
+    // baitAndSwitchChoice chooser / pendingSkillCheckBonus fold).
+    'combat_superiority_movement',
+    'combat_superiority_skill_check',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

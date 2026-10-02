@@ -63,13 +63,28 @@ const MODAL_DISPATCH = {
     fiendishLegacy: (payload, d) => d.setFiendishLegacyModal(payload),
 };
 
+// MN-002: single-use choice modals live in the CharActions tree; the grid
+// bridges them via the window events useCharActionsEventListeners listens on
+// (mirror of useCombatSuperiorityModal's CHOICE_MODAL_EVENTS).
+const CHOICE_MODAL_EVENTS = {
+    baitAndSwitchChoice: 'bait-and-switch-modal-show',
+    commanderStrikeChoice: 'commander-strike-modal-show',
+    rallyChoice: 'rally-choice-modal-show',
+    sweepingAttackTarget: 'sweeping-attack-modal-show',
+};
+
 function dispatchModalResult(modalName, payload, d) {
     if (modalName?.includes('Savant')) {
         d.setSavantModal(payload);
         return;
     }
     const setter = MODAL_DISPATCH[modalName];
-    if (setter) setter(payload, d);
+    if (setter) {
+        setter(payload, d);
+        return;
+    }
+    const eventName = CHOICE_MODAL_EVENTS[modalName];
+    if (eventName) window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
 }
 
 // Build the dismissable popup HTML for a generic automation popup result.
@@ -741,6 +756,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         if (delegateAutomationClick(auto, { handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick })) return;
         const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
         if (!result) return;
+        // MN-002: grid previously dropped handler logEntries — flush the die
+        // roll/spend logs (mirror finalizeAutomationOutcome). Handlers that log
+        // directly (initiativeHandler etc.) return no logEntries: no duplicates.
+        if (result.logEntries) {
+            result.logEntries.forEach(entry => addEntry(campaignName, entry).catch((e) => { console.error("[charSpecialActions:log-error]", e); }));
+        }
         if (result.type === 'modal') {
             dispatchModalResult(result.modalName, result.payload, {
                 playerStats, campaignName,

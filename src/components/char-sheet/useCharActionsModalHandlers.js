@@ -55,6 +55,10 @@ export default function useCharActionsModalHandlers({
         if (result.payload) {
             setPopupHtml(result.payload);
         }
+        // MN-002: grant log was never flushed — mirror handleRallyChoiceConfirm.
+        if (result?.logEntries) {
+            result.logEntries.forEach(entry => addEntry(modalData.campaignName, entry).catch((e) => { console.error("[useCharActionsModalHandlers:log-error]", e); }));
+        }
         setModalState({ baitAndSwitchChoiceModal: null });
     }
 

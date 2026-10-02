@@ -152,3 +152,65 @@ describe('combatSuperiorityHandlers – know_enemy', () => {
         expect(result.name).toBe('Know Foe')
     })
 })
+
+// MN-002: movement/skill-check maneuvers were dropped pre-render because
+// DISPATCH had no entries — collector specialActions bucket stayed empty.
+describe('combatSuperiorityHandlers – combat_superiority_movement', () => {
+    it('builds Bait and Switch movement info and carries maneuverName', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority_movement',
+            maneuverName: 'Bait and Switch',
+            effect: 'ac_bonus_and_swap',
+            range: '5_ft',
+        }, 'Bait and Switch')
+        const result = combatSuperiorityHandlers.combat_superiority_movement(feature, BASE_STATS)
+
+        expect(result).toMatchObject({
+            type: 'combat_superiority_movement',
+            name: 'Bait and Switch',
+            maneuverName: 'Bait and Switch',
+            effect: 'ac_bonus_and_swap',
+            range: '5_ft',
+            hasAutomation: true,
+        })
+    })
+
+    it('falls back to feature name and default effect/range', () => {
+        const feature = makeFeature({ type: 'combat_superiority_movement' }, 'Bait and Switch')
+        const result = combatSuperiorityHandlers.combat_superiority_movement(feature, BASE_STATS)
+        expect(result.maneuverName).toBe('Bait and Switch')
+        expect(result.effect).toBe('ac_bonus_and_swap')
+        expect(result.range).toBe('5_ft')
+    })
+})
+
+describe('combatSuperiorityHandlers – combat_superiority_skill_check', () => {
+    it('builds skill-check info and carries skills/ability/initiativeBonus', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority_skill_check',
+            maneuverName: 'Tactical Assessment',
+            skills: ['History', 'Investigation'],
+            ability: 'INT',
+            initiativeBonus: false,
+        }, 'Tactical Assessment')
+        const result = combatSuperiorityHandlers.combat_superiority_skill_check(feature, BASE_STATS)
+
+        expect(result).toMatchObject({
+            type: 'combat_superiority_skill_check',
+            name: 'Tactical Assessment',
+            maneuverName: 'Tactical Assessment',
+            skills: ['History', 'Investigation'],
+            ability: 'INT',
+            initiativeBonus: false,
+            hasAutomation: true,
+        })
+    })
+
+    it('defaults skills to empty array and initiativeBonus to false', () => {
+        const feature = makeFeature({ type: 'combat_superiority_skill_check' }, 'Ambush')
+        const result = combatSuperiorityHandlers.combat_superiority_skill_check(feature, BASE_STATS)
+        expect(result.skills).toEqual([])
+        expect(result.ability).toBeNull()
+        expect(result.initiativeBonus).toBe(false)
+    })
+})
