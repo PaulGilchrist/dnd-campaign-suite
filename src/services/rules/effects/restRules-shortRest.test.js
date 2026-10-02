@@ -184,6 +184,54 @@ describe('applyShortRest', () => {
       const level2Updates = getBatchUpdates()
       expect(level2Updates.spell_slots_level_2).toBe(2)
 
+      // CLA-011: consumed budget (0) refuses — zero slot updates + refusal log
+      vi.clearAllMocks()
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'spell_slots_level_1') return 0
+        if (key === 'arcaneRecoveryLevels') return 0
+        return undefined
+      })
+      const spentWizard = makeStats({
+        class: { name: 'Wizard' },
+        level: 4,
+        spellAbilities: { spell_slots_level_1: 4 },
+        automation: { passives: [{ type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' }] },
+      })
+      await applyShortRest(spentWizard, CAMPAIGN)
+      const spentUpdates = getBatchUpdates()
+      expect(spentUpdates.spell_slots_level_1).toBeUndefined()
+      expect(spentUpdates.arcaneRecoveryLevels).toBeUndefined()
+      const refusalLog = vi.mocked(addEntry).mock.calls
+        .map(c => c[1])
+        .find(e => e && e.automationType === 'arcane_recovery_refused')
+      expect(refusalLog).toBeDefined()
+
+      // CLA-011: apply consumes the budget (arcaneRecoveryLevels -> 0) + apply log
+      vi.clearAllMocks()
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'spell_slots_level_1') return 0
+        return undefined
+      })
+      await applyShortRest(wizardStats, CAMPAIGN)
+      const applyUpdates = getBatchUpdates()
+      expect(applyUpdates.spell_slots_level_1).toBe(2)
+      expect(applyUpdates.arcaneRecoveryLevels).toBe(0)
+      const applyLog = vi.mocked(addEntry).mock.calls
+        .map(c => c[1])
+        .find(e => e && e.automationType === 'arcane_recovery_applied')
+      expect(applyLog).toBeDefined()
+      expect(applyLog.description).toContain('level 1')
+
+      // CLA-011: manual partial budget caps recovery
+      vi.clearAllMocks()
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'spell_slots_level_1') return 0
+        if (key === 'arcaneRecoveryLevels') return 1
+        return undefined
+      })
+      await applyShortRest(wizardStats, CAMPAIGN)
+      expect(getBatchUpdates().spell_slots_level_1).toBe(1)
+
       // Warlock Pact Magic
       vi.clearAllMocks()
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {

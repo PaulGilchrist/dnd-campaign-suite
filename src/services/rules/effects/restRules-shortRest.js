@@ -136,8 +136,49 @@ function addFontOfInspirationUpdates(name, playerStats, updates, campaignName) {
   }
 }
 
-// Arcane Recovery: Wizard spell slot recovery on short rest
-function addArcaneRecoveryUpdates(name, playerStats, updates) {
+// CLA-011: budget model — remaining spell-slot levels (null = full/re-armed
+// by the LONG_REST_RESOURCES null reset, 0 = spent), capped by ceil(level/2).
+function resolveArcaneRecoveryBudget(name, playerStats, campaignName) {
+  const maxBudget = Math.ceil(playerStats.level / 2)
+  const stored = getRuntimeValue(name, 'arcaneRecoveryLevels', campaignName)
+  return Math.min(maxBudget, stored == null ? maxBudget : Number(stored))
+}
+
+// CLA-011: refusals log once per rest attempt (automation + arcane_recovery_refused).
+function refuseArcaneRecovery(name, campaignName) {
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'arcane_recovery_refused',
+    characterName: name,
+    description: `${name} cannot use Arcane Recovery — already used since the last long rest.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[restRules] Error logging arcane recovery refusal:', e); })
+}
+
+// Ascending lv1→5 auto-allocation, budget-capped, no slots level 6+.
+// Returns [slotsRecovered, detail].
+function recoverArcaneSlotsUpTo(name, playerStats, budget, updates) {
+  let slotsRecovered = 0
+  const detail = []
+  for (const level of [1, 2, 3, 4, 5]) {
+    if (slotsRecovered >= budget) break
+    const slotKey = `spell_slots_level_${level}`
+    const max = playerStats.spellAbilities?.[slotKey] || 0
+    const current = Number(getRuntimeValue(name, slotKey) ?? max)
+    const toRecover = Math.min(max - current, Math.floor((budget - slotsRecovered) / level))
+    if (toRecover > 0) {
+      updates[slotKey] = current + toRecover
+      detail.push(`${toRecover}x level ${level}`)
+      slotsRecovered += level * toRecover
+    }
+  }
+  return [slotsRecovered, detail]
+}
+
+// Arcane Recovery: Wizard spell slot recovery on short rest.
+// CLA-011: once per long rest (classes.json lv1 automation uses_max:1,
+// recharge:'long_rest'). Consumes the budget on apply; refusals logged.
+function addArcaneRecoveryUpdates(name, playerStats, updates, campaignName) {
   const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(
     p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels'
   )
@@ -146,24 +187,21 @@ function addArcaneRecoveryUpdates(name, playerStats, updates) {
     console.error('[restRules] applyShortRest: playerStats.level is missing for wizard arcane recovery')
     throw new Error('playerStats.level is required for arcane recovery')
   }
-  const wizardLevel = playerStats.level
-  const maxSlotsToRecover = Math.ceil(wizardLevel / 2)
-  let slotsRecovered = 0
-  // Only recover slots level 5 and lower (no level 6+)
-  const slotLevels = [1, 2, 3, 4, 5]
-  for (const level of slotLevels) {
-    if (slotsRecovered >= maxSlotsToRecover) break
-    const slotKey = `spell_slots_level_${level}`
-    const max = playerStats.spellAbilities?.[slotKey] || 0
-    const current = Number(getRuntimeValue(name, slotKey) ?? max)
-    const available = max - current
-    if (available > 0) {
-      const remaining = maxSlotsToRecover - slotsRecovered
-      const toRecover = Math.min(available, Math.floor(remaining / level))
-      updates[slotKey] = current + toRecover
-      slotsRecovered += level * toRecover
-    }
+  const budget = resolveArcaneRecoveryBudget(name, playerStats, campaignName)
+  if (!(budget > 0)) {
+    refuseArcaneRecovery(name, campaignName)
+    return
   }
+  const [slotsRecovered, detail] = recoverArcaneSlotsUpTo(name, playerStats, budget, updates)
+  if (slotsRecovered === 0) return
+  updates.arcaneRecoveryLevels = 0
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'arcane_recovery_applied',
+    characterName: name,
+    description: `${name} recovers spell slots via Arcane Recovery: ${detail.join(', ')} (${slotsRecovered}/${Math.ceil(playerStats.level / 2)} levels).`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[restRules] Error logging arcane recovery apply:', e); })
 }
 
 // Signature Spells: Reset per-spell used flags on short or long rest
@@ -390,7 +428,7 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
 
   if (!skipAutoRecovery) {
     addFontOfInspirationUpdates(name, playerStats, updates, campaignName)
-    addArcaneRecoveryUpdates(name, playerStats, updates)
+    addArcaneRecoveryUpdates(name, playerStats, updates, campaignName)
   }
 
   addSignatureSpellResets(name, playerStats, updates, campaignName)

@@ -443,10 +443,62 @@ describe('ShortRestModal', () => {
       fireEvent.click(screen.getByText(/Recover Spell Slots/));
       fireEvent.click(screen.getByText('Complete Short Rest'));
       await act(async () => {});
-      const slotCalls = setRuntimeValueMock.mock.calls.filter(
-        (call) => typeof call[1] === 'string' && call[1].startsWith('spell_slots_level_')
+      // CLA-011: recovery + once-per-long-rest consumption now ride ONE merged batch write.
+      const batchCalls = setRuntimeBatchMock.mock.calls.filter(
+        (call) => call[1] && typeof call[1] === 'object' && 'spell_slots_level_1' in call[1]
       );
-      expect(slotCalls.length).toBeGreaterThan(0);
+      expect(batchCalls.length).toBeGreaterThan(0);
+      expect(batchCalls[0][1].spell_slots_level_1).toBe(4);
+      expect(batchCalls[0][1].arcaneRecoveryLevels).toBe(0);
+    });
+
+    it('CLA-011: consumes arcane recovery budget on apply', async () => {
+      setupGetRuntimeValue({ arcaneRecoveryLevels: 3, spell_slots_level_1: 2 });
+      const playerStats = createPlayerStats({
+        class: { name: 'Wizard', major: { name: 'Wizard' } },
+        automation: { passives: [{ type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' }] },
+        spellAbilities: { spell_slots_level_1: 4, spell_slots_level_2: 3, spells: [] },
+      });
+      render(
+        <ShortRestModal
+          playerStats={playerStats}
+          campaignName={mockCampaignName}
+          onClose={vi.fn()}
+          onComplete={vi.fn()}
+        />
+      );
+      fireEvent.click(screen.getByText(/Recover Spell Slots/));
+      fireEvent.click(screen.getByText('Complete Short Rest'));
+      await act(async () => {});
+      const batchCall = setRuntimeBatchMock.mock.calls.find(
+        (call) => call[1] && typeof call[1] === 'object' && 'spell_slots_level_1' in call[1]
+      );
+      expect(batchCall).toBeDefined();
+      expect(batchCall[1].arcaneRecoveryLevels).toBe(0);
+    });
+
+    it('CLA-011: re-arms when budget is null (long rest reset)', () => {
+      setupGetRuntimeValue({ arcaneRecoveryLevels: null });
+      renderModal({
+        class: { name: 'Wizard', major: { name: 'Wizard' } },
+        automation: { passives: [{ type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' }] },
+      });
+      expect(screen.getByText('Arcane Recovery')).toBeInTheDocument();
+    });
+
+    it('CLA-011: logs arcane_recovery_refused when a spent wizard completes a short rest', async () => {
+      setupGetRuntimeValue({ arcaneRecoveryLevels: 0 });
+      const { addEntry } = await import('../../services/ui/logService.js');
+      renderModal({
+        class: { name: 'Wizard', major: { name: 'Wizard' } },
+        automation: { passives: [{ type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' }] },
+      });
+      fireEvent.click(screen.getByText('Complete Short Rest'));
+      await act(async () => {});
+      const refusal = vi.mocked(addEntry).mock.calls
+        .map(c => c[1])
+        .find((e) => e && e.automationType === 'arcane_recovery_refused');
+      expect(refusal).toBeDefined();
     });
   });
 

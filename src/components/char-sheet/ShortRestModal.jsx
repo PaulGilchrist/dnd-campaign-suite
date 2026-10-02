@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { setTempHp } from '../../services/automation/handlers/buffs/tempHpService.js'
 import { rollDice } from '../../services/dice/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels, applyShortRest } from '../../services/rules/effects/restRules.js'
@@ -12,9 +12,14 @@ import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.j
 import { loadSpellData } from '../../services/ui/dataLoader.js'
 import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx'
 
+// CLA-011: single merged batch write (slots + consumption) and once-per-long-rest
+// consumption: arcaneRecoveryLevels 0 = spent (LONG_REST_RESOURCES null = re-armed).
+// Returns { slotsRecovered, detail } for the short-rest log.
 function recoverArcaneSlots(playerStats, campaignName) {
     const maxSlotsToRecover = Math.ceil(playerStats.level / 2);
     let slotsRecovered = 0;
+    const updates = {};
+    const detail = [];
     for (const level of [1, 2, 3, 4, 5]) {
         if (slotsRecovered >= maxSlotsToRecover) break;
         const slotKey = `spell_slots_level_${level}`;
@@ -24,10 +29,17 @@ function recoverArcaneSlots(playerStats, campaignName) {
         if (available > 0) {
             const remaining = maxSlotsToRecover - slotsRecovered;
             const toRecover = Math.min(available, Math.floor(remaining / level));
-            setRuntimeValue(playerStats.name, slotKey, current + toRecover, campaignName);
-            slotsRecovered += level * toRecover;
+            if (toRecover > 0) {
+                updates[slotKey] = current + toRecover;
+                detail.push(`${toRecover}x level ${level}`);
+                slotsRecovered += level * toRecover;
+            }
         }
     }
+    if (slotsRecovered === 0) return { slotsRecovered, detail };
+    updates.arcaneRecoveryLevels = 0;
+    setRuntimeBatch(playerStats.name, updates, campaignName);
+    return { slotsRecovered, detail };
 }
 
 function applyNaturalRecoverySelections(playerStats, campaignName, naturalRecoverySelections) {
@@ -55,8 +67,9 @@ function applyRequestedRestorations(ctx) {
         applySorcerousRestorationState(playerStats, campaignName, restoreAmount);
     }
     // UI-driven: Arcane Recovery
+    let arcaneRecoveryResult = null;
     if (ctx.arcaneRecovery && ctx.arcaneRecoveryAvailable && ctx.arcaneRecoveryRequested) {
-        recoverArcaneSlots(playerStats, campaignName);
+        arcaneRecoveryResult = recoverArcaneSlots(playerStats, campaignName);
     }
     // UI-driven: Natural Recovery
     const selections = ctx.naturalRecoverySelections;
@@ -64,6 +77,7 @@ function applyRequestedRestorations(ctx) {
     if (ctx.naturalRecovery && ctx.naturalRecoveryAvailable && hasNaturalRecoverySelections) {
         applyNaturalRecoverySelections(playerStats, campaignName, selections);
     }
+    return arcaneRecoveryResult;
 }
 
 function findClassLevel(playerStats) {
@@ -141,7 +155,7 @@ function collectRestoredResources(playerStats, campaignName, ctx) {
     return { restoredResources, naturalRecoveryDetail };
 }
 
-function buildShortRestLogEntries({ playerStats, hitDie, rollLog, hpBeforeRest, displayHp, naturalRecoveryDetail, mealConsumed, restoredResources }) {
+function buildShortRestLogEntries({ playerStats, hitDie, rollLog, hpBeforeRest, displayHp, naturalRecoveryDetail, arcaneRecoveryDetail, mealConsumed, restoredResources }) {
     const logEntries = [];
     logEntries.push(`${playerStats.name} takes a short rest.`);
     if (rollLog.length > 0) {
@@ -158,6 +172,9 @@ function buildShortRestLogEntries({ playerStats, hitDie, rollLog, hpBeforeRest, 
     }
     if (naturalRecoveryDetail) {
         logEntries.push(`Natural Recovery: ${naturalRecoveryDetail}`);
+    }
+    if (arcaneRecoveryDetail) {
+        logEntries.push(`Arcane Recovery: ${arcaneRecoveryDetail}`);
     }
     if (mealConsumed) {
         logEntries.push('Replenishing Meal consumed: +1d8 HP');
@@ -182,8 +199,10 @@ function computeSorcererRestFlags(playerStats) {
 function computeWizardRestFlags(playerStats) {
     const isWizard = playerStats?.class?.name === 'Wizard';
     const arcaneRecovery = isWizard && (playerStats.automation?.passives ?? []).find(a => a.type === 'resource_restoration' && a.resourceKey === 'arcaneRecoveryLevels');
+    // CLA-011: null/undefined = re-armed full budget (LONG_REST_RESOURCES null reset);
+    // 0 = spent since last long rest. Data: uses_max:1, recharge:'long_rest'.
     const arcaneRecoveryCur = getRuntimeValue(playerStats.name, 'arcaneRecoveryLevels');
-    const arcaneRecoveryAvailable = !!arcaneRecovery && arcaneRecoveryCur !== null && arcaneRecoveryCur !== 0;
+    const arcaneRecoveryAvailable = !!arcaneRecovery && (arcaneRecoveryCur == null || Number(arcaneRecoveryCur) > 0);
     const arcaneRecoveryMaxSlots = isWizard ? Math.ceil(playerStats.level / 2) : 0;
     // CLA-226: automationRouter routes memorize_spell into specialActions (automationRouter.js:589),
     // matching the signature_spells gate pattern in restRules-shortRest.js — gate must read that bucket.
@@ -713,12 +732,27 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setRuntimeValue(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
         setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
 
-        applyRequestedRestorations({
+        const arcaneRecoveryResult = applyRequestedRestorations({
             playerStats, campaignName, restoreAmount,
             sorcRestoration, restorationAvailable, restorationRequested,
             arcaneRecovery, arcaneRecoveryAvailable, arcaneRecoveryRequested,
             naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections,
         });
+
+        // CLA-011: refusal must be visible — feature is once per long rest (uses_max:1).
+        if (arcaneRecovery && !arcaneRecoveryAvailable) {
+            addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'arcane_recovery_refused',
+                characterName: playerStats.name,
+                description: `${playerStats.name} cannot use Arcane Recovery — already used since the last long rest.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[ShortRestModal] Error logging Arcane Recovery refusal:', e); });
+        }
+
+        const arcaneRecoveryDetail = arcaneRecoveryResult && arcaneRecoveryResult.slotsRecovered > 0
+            ? `recovered ${arcaneRecoveryResult.detail.join(', ')} (${arcaneRecoveryResult.slotsRecovered}/${arcaneRecoveryMaxSlots} levels)`
+            : null;
 
         const { restoredResources, naturalRecoveryDetail } = collectRestoredResources(playerStats, campaignName, {
             arcaneRecoveryRequested, restorationRequested, naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections, hasFontOfInspiration,
@@ -726,7 +760,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         const logEntries = buildShortRestLogEntries({
             playerStats, hitDie, rollLog, hpBeforeRest,
             displayHp: Math.min(playerStats.hitPoints, currentHp),
-            naturalRecoveryDetail, mealConsumed, restoredResources,
+            naturalRecoveryDetail, arcaneRecoveryDetail, mealConsumed, restoredResources,
         });
         addEntry(campaignName, { type: 'short_rest', message: logEntries.join(' | ') }).catch(err => {
             console.error('[ShortRestModal] Failed to log short rest:', err);
