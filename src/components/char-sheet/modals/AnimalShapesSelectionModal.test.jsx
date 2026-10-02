@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AnimalShapesSelectionModal from './AnimalShapesSelectionModal.jsx';
 
 // Mock dataLoader.loadMonsters to return controlled beast data
-// Filtering rules: type='beast' (case-insensitive), CR <= maxCR, size Small or Large only
+// Filtering rules: type='beast' (case-insensitive), CR <= maxCR, size Tiny/Small/Medium/Large (RAW "Large or smaller")
 const mockBeasts = [
     {
         index: 'wolf',
@@ -97,6 +97,15 @@ const mockBeasts = [
         speed: { walk: 40, fly: 60 },
         actions: [{ name: 'Horns' }, { name: 'Wings' }],
     },
+    {
+        index: 'giant-elk',
+        name: 'Giant Elk',
+        type: 'Beast',
+        size: 'Huge',
+        challenge_rating: '2',
+        speed: { walk: 60 },
+        actions: [{ name: 'Hooves' }],
+    },
 ];
 
 vi.mock('../../../services/ui/dataLoader.js', () => ({
@@ -149,7 +158,7 @@ describe('AnimalShapesSelectionModal', () => {
         it('renders the instruction text with CR limit', async () => {
             render(<AnimalShapesSelectionModal {...baseProps} />);
             await waitFor(() => {
-                expect(screen.getByText(/Choose a beast form \(CR 4 or lower, Small or Large\)/)).toBeInTheDocument();
+                expect(screen.getByText(/Choose a beast form \(CR 4 or lower, Large or smaller\)/)).toBeInTheDocument();
             });
         });
 
@@ -180,16 +189,18 @@ describe('AnimalShapesSelectionModal', () => {
             });
         });
 
-        it('excludes creatures that are not Small or Large size', async () => {
+        it('includes Tiny, Small, Medium and Large beasts (RAW "Large or smaller"), excludes Huge', async () => {
             render(<AnimalShapesSelectionModal {...baseProps} />);
             await waitFor(() => {
                 const beasts = document.querySelectorAll('.animal-shapes-beast-name');
                 const names = Array.from(beasts).map(el => el.childNodes[0].textContent.trim());
-                // Medium creatures (Hippogriff) should be excluded
-                expect(names).not.toContain('Hippogriff');
-                // Tiny creatures (Rat, Owl) should be excluded
-                expect(names).not.toContain('Rat');
-                expect(names).not.toContain('Owl');
+                // Medium creatures (Hippogriff) are selectable (CR 1)
+                expect(names).toContain('Hippogriff');
+                // Tiny creatures (Rat, Owl) are selectable (CR 0)
+                expect(names).toContain('Rat');
+                expect(names).toContain('Owl');
+                // Huge creatures (Giant Elk) are excluded even at CR <= 4
+                expect(names).not.toContain('Giant Elk');
             });
         });
     });

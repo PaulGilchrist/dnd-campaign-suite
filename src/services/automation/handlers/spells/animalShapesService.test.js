@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../../encounters/combatData.js', () => ({
@@ -30,7 +31,7 @@ vi.mock('../../../ui/storage.js', () => ({
   },
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -69,6 +70,7 @@ function setupCombatContext(creatures = [creature]) {
     return undefined;
   });
   setRuntimeValue.mockClear();
+  setRuntimeObject.mockClear();
   addEntry.mockClear();
   storage.set.mockClear();
 }
@@ -95,8 +97,9 @@ describe('animalShapesService', () => {
         campaignName,
       });
       expect(result.ok).toBe(true);
-      expect(setRuntimeValue).toHaveBeenCalledWith(targetName, 'tempHp', 13, campaignName);
-      expect(setRuntimeValue).toHaveBeenCalledWith(targetName, 'animalShapesTempHp', 13, campaignName);
+      expect(setRuntimeObject).toHaveBeenCalledWith(targetName, { tempHp: 13, animalShapesTempHp: 13 }, campaignName);
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(targetName, 'tempHp', expect.anything(), campaignName);
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(targetName, 'animalShapesTempHp', expect.anything(), campaignName);
       expect(creature.maxHp).toBe(13);
       expect(creature.ac).toBe(11);
       expect(creature.speed).toEqual({ walk: 40 });
@@ -194,6 +197,45 @@ describe('animalShapesService', () => {
       expect(newEffects).toHaveLength(2);
       expect(newEffects.find(e => e.target === targetName)).toBeDefined();
       expect(newEffects.find(e => e.target === 'OldTarget')).toBeDefined();
+    });
+
+    it('first transform captures TRUE original and grants THP once', async () => {
+      const fresh = { name: targetName, type: 'player', maxHp: 50, ac: 18, speed: { walk: 30 }, currentHp: 45 };
+      getCombatContext.mockResolvedValue({ creatures: [fresh] });
+      getRuntimeValue.mockImplementation((key, subKey) => {
+        if (key === 'campaign' && subKey === 'targetEffects') return [];
+        if (key === casterName && subKey === 'pendingExpirations') return [];
+        return undefined;
+      });
+      setRuntimeObject.mockClear();
+
+      await confirmAnimalShapesTransform({ targetName, beast, casterName, spell: { name: 'Animal Shapes', level: 8 }, campaignName });
+
+      expect(fresh.polymorphOriginal).toEqual({ maxHp: 50, ac: 18, speed: { walk: 30 } });
+      expect(setRuntimeObject).toHaveBeenCalledWith(targetName, { tempHp: 13, animalShapesTempHp: 13 }, campaignName);
+    });
+
+    it('re-form keeps TRUE polymorphOriginal and does NOT re-grant THP', async () => {
+      const fresh = { name: targetName, type: 'player', maxHp: 50, ac: 18, speed: { walk: 30 }, currentHp: 45 };
+      getCombatContext.mockResolvedValue({ creatures: [fresh] });
+      getRuntimeValue.mockImplementation((key, subKey) => {
+        if (key === 'campaign' && subKey === 'targetEffects') return [];
+        if (key === casterName && subKey === 'pendingExpirations') return [];
+        return undefined;
+      });
+      await confirmAnimalShapesTransform({ targetName, beast, casterName, spell: { name: 'Animal Shapes', level: 8 }, campaignName });
+      expect(fresh.polymorphOriginal).toEqual({ maxHp: 50, ac: 18, speed: { walk: 30 } });
+      expect(fresh.maxHp).toBe(13);
+
+      setRuntimeObject.mockClear();
+      const biggerBeast = { ...beast, index: 'polar-bear', name: 'Polar Bear', hit_points: 42, armor_class: 12 };
+      await confirmAnimalShapesTransform({ targetName, beast: biggerBeast, casterName, spell: { name: 'Animal Shapes', level: 8 }, campaignName });
+
+      expect(fresh.polymorphOriginal).toEqual({ maxHp: 50, ac: 18, speed: { walk: 30 } });
+      expect(fresh.maxHp).toBe(42);
+      expect(fresh.ac).toBe(12);
+      const tempHpWrites = setRuntimeObject.mock.calls.filter(call => 'tempHp' in (call[1] || {}));
+      expect(tempHpWrites).toHaveLength(0);
     });
 
     it('should handle existing pendingExpirations during confirm transform', async () => {
@@ -325,8 +367,36 @@ describe('animalShapesService', () => {
 
       revertAnimalShapes(targetName, campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(targetName, 'tempHp', 0, campaignName);
-      expect(setRuntimeValue).toHaveBeenCalledWith(targetName, 'animalShapesTempHp', 0, campaignName);
+      expect(setRuntimeObject).toHaveBeenCalledWith(targetName, { tempHp: 0, animalShapesTempHp: 0 }, campaignName);
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(targetName, 'tempHp', expect.anything(), campaignName);
+      expect(cs.creatures[0].polymorphOriginal).toBeUndefined();
+    });
+
+    it('reverts THP fully when animalShapesTempHp persists at granted value', () => {
+      const cs = {
+        creatures: [{
+          ...creature,
+          polymorphOriginal: { maxHp: 10, ac: 14, speed: { walk: 30 } },
+          animalShapesSource: casterName,
+          beastName: 'Wolf',
+          maxHp: 13,
+          ac: 11,
+          speed: { walk: 40 },
+        }],
+      };
+      getCombatSummary.mockReturnValue(cs);
+      getRuntimeValue.mockImplementation((key, subKey) => {
+        if (key === 'campaign' && subKey === 'targetEffects') return [];
+        if (key === casterName && subKey === 'pendingExpirations') return [];
+        if (key === targetName && subKey === 'animalShapesTempHp') return 13;
+        if (key === targetName && subKey === 'tempHp') return 13;
+        return undefined;
+      });
+      setRuntimeObject.mockClear();
+
+      revertAnimalShapes(targetName, campaignName);
+
+      expect(setRuntimeObject).toHaveBeenCalledWith(targetName, { tempHp: 0, animalShapesTempHp: 0 }, campaignName);
     });
 
     it('should return true when changes were made', () => {

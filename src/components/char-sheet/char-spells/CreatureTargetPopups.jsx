@@ -40,7 +40,7 @@ const CREATURE_POPUP_RENDERERS = [
 ];
 
 const ANIMAL_SHAPES_RENDERERS = [
-    (h) => ({ guard: h.flowAnimalShapes, title: 'Animal Shapes', icon: 'fa-paw', targets: creatureTargets, description: 'Choose any number of willing creatures you can see within range. Each target will be transformed into a beast of your choice (CR 4 or lower, Small or Large). No concentration required. Duration: 24 hours.', confirmLabel: 'Cast Animal Shapes', confirmIcon: 'fa-paw', onConfirm: h.handleAnimalShapesTargetConfirm, onSkip: h.handleAnimalShapesSkip }),
+    (h) => ({ guard: h.flowAnimalShapes, title: 'Animal Shapes', icon: 'fa-paw', targets: creatureTargets, description: 'Choose any number of willing creatures you can see within range. Each target will be transformed into a beast of your choice (CR 4 or lower, Large or smaller). No concentration required. Duration: 24 hours.', confirmLabel: 'Cast Animal Shapes', confirmIcon: 'fa-paw', onConfirm: h.handleAnimalShapesTargetConfirm, onSkip: h.handleAnimalShapesSkip }),
 ];
 
 const LATE_CREATURE_POPUP_RENDERERS = [

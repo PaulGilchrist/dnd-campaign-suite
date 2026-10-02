@@ -47,7 +47,7 @@ function AnimalShapesSelectionModal({ targets, maxCR, campaignName, title = 'Ani
                     return cr <= (maxCR || 4);
                 });
 
-                const allowedSizes = ['Small', 'Large'];
+                const allowedSizes = ['Tiny', 'Small', 'Medium', 'Large'];
                 creatureList = creatureList.filter(m => {
                     const size = (m.size || '').toLowerCase();
                     return allowedSizes.some(s => s.toLowerCase() === size);
@@ -143,7 +143,7 @@ function AnimalShapesSelectionModal({ targets, maxCR, campaignName, title = 'Ani
             <div className="sp-modal">
                 <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
                 <div className="sp-body">
-                    <p>Choose a beast form (CR {maxCR || 4} or lower, Small or Large) for each target:</p>
+                    <p>Choose a beast form (CR {maxCR || 4} or lower, Large or smaller) for each target:</p>
                     <div className="animal-shapes-target-sections">
                         {targets.map((targetName) => {
                             const filtered = getFilteredBeasts(targetName);

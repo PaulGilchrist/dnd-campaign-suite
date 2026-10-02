@@ -88,7 +88,7 @@ describe('animalShapesHandler', () => {
       expect(result.payload.casterName).toBe(casterName);
       expect(result.payload.campaignName).toBe(campaignName);
       expect(result.payload.maxCR).toBe(4);
-      expect(result.payload.allowedSizes).toEqual(['Small', 'Large']);
+      expect(result.payload.allowedSizes).toEqual(['Tiny', 'Small', 'Medium', 'Large']);
       expect(result.payload.spell).toEqual({ name: 'Animal Shapes', level: 8 });
       expect(result.payload.spellLevel).toBe(8);
     });

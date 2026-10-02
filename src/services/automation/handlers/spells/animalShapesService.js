@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary, setCombatSummaryCache, getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -63,11 +63,14 @@ export async function confirmAnimalShapesTransform({ targetName, beast, casterNa
     const beastHp = typeof beast.hit_points === 'number' ? beast.hit_points : 0;
     const beastAc = typeof beast.armor_class === 'number' ? beast.armor_class : 10;
 
-    creature.polymorphOriginal = {
-        maxHp: creature.maxHp ?? beastHp,
-        ac: creature.ac ?? beastAc,
-        speed: creature.speed,
-    };
+    const isFirstTransform = !creature.polymorphOriginal;
+    if (isFirstTransform) {
+        creature.polymorphOriginal = {
+            maxHp: creature.maxHp ?? beastHp,
+            ac: creature.ac ?? beastAc,
+            speed: creature.speed,
+        };
+    }
     creature.animalShapesSource = casterName;
     creature.animalShapesBeast = {
         name: beast.name,
@@ -83,8 +86,9 @@ export async function confirmAnimalShapesTransform({ targetName, beast, casterNa
     creature.ac = beastAc;
     creature.speed = beast.speed;
 
-    setRuntimeValue(targetName, 'tempHp', beastHp, campaignName);
-    setRuntimeValue(targetName, 'animalShapesTempHp', beastHp, campaignName);
+    if (isFirstTransform) {
+        setRuntimeObject(targetName, { tempHp: beastHp, animalShapesTempHp: beastHp }, campaignName);
+    }
 
     await storage.set('combatSummary', cs, campaignName);
     setCombatSummaryCache(cs, campaignName);
@@ -151,6 +155,7 @@ function revertAnimalShapesCreature(cs, targetName) {
     delete creature.animalShapesSource;
     delete creature.animalShapesBeast;
     delete creature.beastName;
+    delete creature.polymorphOriginal;
     return { changed: true, caster };
 }
 
@@ -184,8 +189,7 @@ export function revertAnimalShapes(targetName, campaignName) {
     const storedTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
     if (animalShapesTempHp > 0) {
         const remaining = Math.max(0, storedTempHp - animalShapesTempHp);
-        setRuntimeValue(targetName, 'tempHp', remaining, campaignName);
-        setRuntimeValue(targetName, 'animalShapesTempHp', 0, campaignName);
+        setRuntimeObject(targetName, { tempHp: remaining, animalShapesTempHp: 0 }, campaignName);
     }
 
     clearCasterAnimalShapesExpiration(animalShapesCaster, targetName, campaignName);

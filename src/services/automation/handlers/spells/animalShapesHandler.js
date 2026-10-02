@@ -4,7 +4,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 const ANIMAL_SHAPES_EFFECT = 'animal_shapes';
 const ANIMAL_SHAPES_MAX_CR = 4;
-const ALLOWED_SIZES = ['Small', 'Large'];
+const ALLOWED_SIZES = ['Tiny', 'Small', 'Medium', 'Large'];
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};

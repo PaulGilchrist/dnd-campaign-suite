@@ -183,7 +183,7 @@ describe('AnimalShapesSelectionModal - utility rendering', () => {
         it('displays the correct CR limit in the instruction paragraph', async () => {
             render(<AnimalShapesSelectionModal {...makeProps({ maxCR: 2 })} />);
             await waitFor(() => {
-                expect(screen.getByText(/Choose a beast form \(CR 2 or lower, Small or Large\)/)).toBeInTheDocument();
+                expect(screen.getByText(/Choose a beast form \(CR 2 or lower, Large or smaller\)/)).toBeInTheDocument();
             });
         });
     });
