@@ -140,26 +140,28 @@ function gateTruePolymorph({ spell, campaignName, cfSetPending }) {
   return false;
 }
 
-async function gateCharmPerson({ spell, campaignName, cfSetPending, playerStats }) {
+async function gateCharmPerson({ spell, campaignName, cfSetPending, playerStats, characters }) {
   const targets = await resolveHumanoids(campaignName, playerStats.name);
   if (targets.length > 0) {
     cfSetPending('charmPerson', makePending('charmPerson', spell, {
       range: spell.range || '30 feet',
       creatureTargets: targets,
       maxTargets: extractMaxTargets(spell),
+      characters,
     }));
     return true;
   }
   return false;
 }
 
-function gateCharmMonster({ spell, campaignName, cfSetPending, playerStats }) {
+function gateCharmMonster({ spell, campaignName, cfSetPending, playerStats, characters }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('charmMonster', makePending('charmMonster', spell, {
       range: spell.range || '30 feet',
       creatureTargets,
       maxTargets: extractMaxTargets(spell),
+      characters,
     }));
     return true;
   }

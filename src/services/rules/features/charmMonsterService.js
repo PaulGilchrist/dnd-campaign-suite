@@ -35,7 +35,7 @@ async function executeCharmMonsterAction(action, playerStats, campaignName, mapN
 }
 
 // Multi-target path: charmMonsterTargets array from CreatureSelectionModal
-async function charmMonsterMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel }) {
+async function charmMonsterMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters }) {
     const targetAdvantages = {};
     for (const targetName of targetNames) {
         targetAdvantages[targetName] = await getTargetHealthAdvantage(targetName, campaignName);
@@ -51,6 +51,7 @@ async function charmMonsterMultipleTargets({ spell, targetNames, playerStats, ca
         metaCtx: {
             charmMonsterTargets: targetNames,
             charmMonsterAdvantages: targetAdvantages,
+            characters: characters || [],
         },
         spell,
         spellSlotLevel: slotLevel,
@@ -83,7 +84,7 @@ export async function triggerCharmMonster(spell, metaCtx, playerStats, campaignN
 
     const targetNames = metaCtx?.charmMonsterTargets;
     if (Array.isArray(targetNames) && targetNames.length > 0) {
-        return await charmMonsterMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel });
+        return await charmMonsterMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters: metaCtx?.characters });
     }
 
     const targetName = metaCtx?.targetName || await resolveCharmMonsterTarget(playerStats, campaignName);
@@ -101,6 +102,9 @@ export async function triggerCharmMonster(spell, metaCtx, playerStats, campaignN
             saveDc: spellSaveDc,
             targetName: targetName,
             advantage: advantage,
+        },
+        metaCtx: {
+            characters: metaCtx?.characters || [],
         },
         spell,
         spellSlotLevel: slotLevel,

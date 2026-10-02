@@ -159,12 +159,12 @@ export function useComplexSpellHandlers({ createConfirmHandler, playerStats, cam
 
   const handleCharmPersonConfirm = React.useCallback(async (pending, result) => {
     const targetNames = Array.isArray(result) ? result : [result]
-    await triggerCharmPerson(pending.spell, { charmPersonTargets: targetNames }, playerStats, campaignName, null)
+    await triggerCharmPerson(pending.spell, { charmPersonTargets: targetNames, characters: pending.characters || [] }, playerStats, campaignName, null)
   }, [playerStats, campaignName])
 
   const handleCharmMonsterConfirm = React.useCallback(async (pending, result) => {
     const targetNames = Array.isArray(result) ? result : [result]
-    await triggerCharmMonster(pending.spell, { charmMonsterTargets: targetNames }, playerStats, campaignName, null)
+    await triggerCharmMonster(pending.spell, { charmMonsterTargets: targetNames, characters: pending.characters || [] }, playerStats, campaignName, null)
   }, [playerStats, campaignName])
 
   const handleBanishmentConfirm = React.useCallback(async (pending, result) => {

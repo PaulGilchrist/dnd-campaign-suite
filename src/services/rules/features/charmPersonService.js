@@ -72,7 +72,7 @@ async function executeCharmAction(action, playerStats, campaignName, mapName) {
 }
 
 // Multi-target path: charmPersonTargets array from CreatureSelectionModal
-async function charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel }) {
+async function charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters }) {
     const humanoidTargets = [];
     const nonHumanoidTargets = [];
     for (const targetName of targetNames) {
@@ -108,6 +108,34 @@ async function charmMultipleTargets({ spell, targetNames, playerStats, campaignN
         metaCtx: {
             charmPersonTargets: humanoidTargets,
             charmPersonAdvantages: targetAdvantages,
+            characters: characters || [],
+        },
+        spell,
+        spellSlotLevel: slotLevel,
+    };
+
+    return await executeCharmAction(action, playerStats, campaignName, mapName);
+}
+
+async function charmSingleTarget({ spell, metaCtx, playerStats, campaignName, mapName, spellSaveDc, slotLevel, targetName }) {
+    const humanoid = await isTargetHumanoid(targetName, campaignName);
+    if (!humanoid) {
+        logNonHumanoidRejection(targetName, playerStats, campaignName);
+        return charmInfoPopup(`No effect. ${targetName} is not a Humanoid.`);
+    }
+
+    const advantage = await getTargetHealthAdvantage(targetName, campaignName);
+
+    const action = {
+        name: 'Charm Person',
+        automation: {
+            type: 'charm_person',
+            saveDc: spellSaveDc,
+            targetName: targetName,
+            advantage: advantage,
+        },
+        metaCtx: {
+            characters: metaCtx?.characters || [],
         },
         spell,
         spellSlotLevel: slotLevel,
@@ -139,7 +167,7 @@ export async function triggerCharmPerson(spell, metaCtx, playerStats, campaignNa
 
     const targetNames = metaCtx?.charmPersonTargets;
     if (Array.isArray(targetNames) && targetNames.length > 0) {
-        return await charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel });
+        return await charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters: metaCtx?.characters });
     }
 
     const targetName = metaCtx?.targetName || await resolveCharmTarget(playerStats, campaignName);
@@ -147,26 +175,5 @@ export async function triggerCharmPerson(spell, metaCtx, playerStats, campaignNa
         return charmInfoPopup('No target selected for Charm Person.');
     }
 
-    // Check: Target is not a Humanoid
-    const humanoid = await isTargetHumanoid(targetName, campaignName);
-    if (!humanoid) {
-        logNonHumanoidRejection(targetName, playerStats, campaignName);
-        return charmInfoPopup(`No effect. ${targetName} is not a Humanoid.`);
-    }
-
-    const advantage = await getTargetHealthAdvantage(targetName, campaignName);
-
-    const action = {
-        name: 'Charm Person',
-        automation: {
-            type: 'charm_person',
-            saveDc: spellSaveDc,
-            targetName: targetName,
-            advantage: advantage,
-        },
-        spell,
-        spellSlotLevel: slotLevel,
-    };
-
-    return await executeCharmAction(action, playerStats, campaignName, mapName);
+    return await charmSingleTarget({ spell, metaCtx, playerStats, campaignName, mapName, spellSaveDc, slotLevel, targetName });
 }

@@ -10,6 +10,7 @@ import { rollD20 } from '../../../dice/diceRoller.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { spellNoticePopup } from './areaSpellUtils.js';
+import { getAuraConditionImmunities, auraCoversCondition, logAuraConditionImmunity } from '../../../combat/auras/auraConditionImmunity.js';
 
 function dispatchSaveResult({ campaignName, promptId, targetName, saveType, saveDc, saveResult }) {
     sendSaveResult(campaignName, targetName, {
@@ -70,7 +71,37 @@ async function logSaveSuccess({ campaignName, casterName, action, targetName, dc
     }).catch((e) => { console.error(logPrefix, e); });
 }
 
-async function applyCharmFailure({ campaignName, casterName, action, targetName, dc, saveResult, rollType, logPrefix }) {
+// CLA-020: Aura of Devotion — Charmed is SUPPRESSED (save still fails, condition
+// never lands) for the aura host and allies in range. Membership/range gating rides
+// computeAuraComboEffects — the same verified model CLA-019 threaded for Frightened.
+async function applyCharmImmunityLeg({ campaignName, casterName, action, targetName, dc, saveResult, rollType, logPrefix, auraImmunities }) {
+    logAuraConditionImmunity({ campaignName, targetName, conditionKey: 'charmed', auraImmunities, sourceAbility: action.name });
+    await addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: saveResult.roll ?? 0,
+        total: saveResult.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: casterName,
+        rollType,
+        targetName,
+        saveDc: dc,
+        saveType: 'WIS',
+        success: false,
+        description: `${targetName} failed WIS save against ${action.name} but is immune to Charmed — condition not applied.`,
+    }).catch((e) => { console.error(logPrefix, e); });
+}
+
+async function applyCharmFailure({ campaignName, casterName, action, targetName, dc, saveResult, rollType, logPrefix, characters }) {
+    const auraImmunities = await getAuraConditionImmunities({ targetName, characters });
+    if (auraCoversCondition(auraImmunities, 'charmed')) {
+        await applyCharmImmunityLeg({ campaignName, casterName, action, targetName, dc, saveResult, rollType, logPrefix, auraImmunities });
+        return 'immune';
+    }
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
@@ -119,6 +150,7 @@ async function applyCharmFailure({ campaignName, casterName, action, targetName,
         success: false,
         description: `${targetName} failed WIS save against ${action.name} and is Charmed.`,
     }).catch((e) => { console.error(logPrefix, e); });
+    return 'charmed';
 }
 
 // Target names from metaCtx (multi-target) or single targetName.
@@ -136,8 +168,8 @@ function resolveCharmTargetNames(action, auto, config) {
 }
 
 // One target's cast-time WIS save: prompt, NPC auto-roll, outcome legs.
-// Returns 'saved' or 'charmed'.
-async function charmOneTarget({ campaignName, casterName, action, auto, config, cs, dc, targetName, charmAdvantages }) {
+// Returns 'saved', 'immune' (CLA-020 aura-covered failed save), or 'charmed'.
+async function charmOneTarget({ campaignName, casterName, action, auto, config, cs, dc, targetName, charmAdvantages, characters }) {
     const targetCreature = cs.creatures.find(c => c.name === targetName);
     const isTargetNpc = targetCreature && targetCreature.type !== 'player';
     const targetAdvantage = charmAdvantages[targetName] || auto.advantage || false;
@@ -179,8 +211,15 @@ async function charmOneTarget({ campaignName, casterName, action, auto, config, 
         await logSaveSuccess({ campaignName, casterName, action, targetName, dc, saveResult, rollType: config.rollType, logPrefix: config.logPrefix });
         return 'saved';
     }
-    await applyCharmFailure({ campaignName, casterName, action, targetName, dc, saveResult, rollType: config.rollType, logPrefix: config.logPrefix });
-    return 'charmed';
+    return await applyCharmFailure({ campaignName, casterName, action, targetName, dc, saveResult, rollType: config.rollType, logPrefix: config.logPrefix, characters });
+}
+
+function buildCharmSummary({ charmedTargets, savedTargets, immuneTargets }) {
+    const immuneTail = immuneTargets.length > 0 ? ` ${immuneTargets.length} creature(s) immune: ${immuneTargets.join(', ')}.` : '';
+    if (charmedTargets.length > 0) {
+        return `${charmedTargets.length} creature(s) charmed: ${charmedTargets.join(', ')}. ${savedTargets.length} creature(s) saved: ${savedTargets.join(', ')}.${immuneTail}`;
+    }
+    return `No creatures charmed. ${savedTargets.length} creature(s) saved: ${savedTargets.join(', ')}.${immuneTail}`;
 }
 
 export async function handleCharmSpell(action, playerStats, campaignName, config) {
@@ -206,27 +245,18 @@ export async function handleCharmSpell(action, playerStats, campaignName, config
         attackScope: targetNames.length > 1 ? 'single' : 'single',
     });
 
-    let charmedCount = 0;
-    let savedCount = 0;
+    const charmAdvantages = action.metaCtx?.[config.advantagesKey] || {};
+    const characters = action.metaCtx?.characters || [];
+
     const charmedTargets = [];
     const savedTargets = [];
-
-    const charmAdvantages = action.metaCtx?.[config.advantagesKey] || {};
-
+    const immuneTargets = [];
     for (const targetName of targetNames) {
-        const outcome = await charmOneTarget({ campaignName, casterName, action, auto, config, cs, dc, targetName, charmAdvantages });
-        if (outcome === 'charmed') {
-            charmedCount++;
-            charmedTargets.push(targetName);
-        } else {
-            savedCount++;
-            savedTargets.push(targetName);
-        }
+        const outcome = await charmOneTarget({ campaignName, casterName, action, auto, config, cs, dc, targetName, charmAdvantages, characters });
+        if (outcome === 'charmed') charmedTargets.push(targetName);
+        else if (outcome === 'immune') immuneTargets.push(targetName);
+        else savedTargets.push(targetName);
     }
 
-    const summary = charmedCount > 0
-        ? `${charmedCount} creature(s) charmed: ${charmedTargets.join(', ')}. ${savedCount} creature(s) saved: ${savedTargets.join(', ')}.`
-        : `No creatures charmed. ${savedCount} creature(s) saved: ${savedTargets.join(', ')}.`;
-
-    return spellNoticePopup(action.name, summary);
+    return spellNoticePopup(action.name, buildCharmSummary({ charmedTargets, savedTargets, immuneTargets }));
 }
