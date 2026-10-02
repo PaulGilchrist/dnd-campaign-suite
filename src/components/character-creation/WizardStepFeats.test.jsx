@@ -317,6 +317,34 @@ describe('WizardStepFeats', () => {
     });
   });
 
+  describe('FT-001 Ability Score Improvement serialization', () => {
+    const asiFeat = { index: 'ability-score-improvement', name: 'Ability Score Improvement', type: 'General Feat', prerequisites: { level: 4 }, repeatable: true };
+
+    it('adds Ability Score Improvement to feats when ticked', () => {
+      const mockOnChange = vi.fn();
+      renderComponent({
+        allFeats: [asiFeat],
+        formData: { ...mockFormData, rules: '2024', level: 8, feats: ['Magic Initiate'] },
+        onArrayFieldChange: mockOnChange,
+      });
+      const row = [...document.querySelectorAll('.list-item')].find(el => el.textContent.includes('Ability Score Improvement'));
+      fireEvent.click(row.querySelector('.list-item-checkbox'));
+      expect(mockOnChange).toHaveBeenCalledWith('feats', ['Magic Initiate', 'Ability Score Improvement']);
+    });
+
+    it('removes Ability Score Improvement from feats when un-ticked', () => {
+      const mockOnChange = vi.fn();
+      renderComponent({
+        allFeats: [asiFeat],
+        formData: { ...mockFormData, rules: '2024', level: 8, feats: ['Magic Initiate', 'Ability Score Improvement'] },
+        onArrayFieldChange: mockOnChange,
+      });
+      const row = [...document.querySelectorAll('.list-item')].find(el => el.textContent.includes('Ability Score Improvement'));
+      fireEvent.click(row.querySelector('.list-item-checkbox'));
+      expect(mockOnChange).toHaveBeenCalledWith('feats', ['Magic Initiate']);
+    });
+  });
+
   describe('Edge cases', () => {
     it('should render the wizard step title when allFeats is null or undefined', () => {
       const { rerender } = render(<WizardStepFeats formData={mockFormData} allFeats={null} onArrayFieldChange={vi.fn()} preSelectedFeats={[]} />);

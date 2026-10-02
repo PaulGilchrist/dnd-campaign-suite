@@ -172,6 +172,7 @@ function AbilityScoreCard({
 }) {
   const baseScoreError = errors[`ability_${index}_baseScore`];
   const miscIncreaseError = errors[`ability_${index}_miscIncrease`];
+  const totalScoreError = errors[`ability_${index}_totalScore`];
   return (
     <div className={`ability-score-card ${isBackgroundAbilityScore ? 'bg-ability-score' : ''}`}>
       {isBackgroundAbilityScore && (
@@ -216,9 +217,10 @@ function AbilityScoreCard({
         />
         {miscIncreaseError && <span className="error-message">{miscIncreaseError}</span>}
       </div>
-      <div className={`total-score ${totalScore > scoreCap ? 'error' : ''}`}>
+      <div className={`total-score ${totalScoreError || totalScore > scoreCap ? 'error' : ''}`}>
         Total: <strong>{totalScore}</strong>
         {totalScore > scoreCap && <span className="error-message"> (max {scoreCap})</span>}
+        {totalScoreError && !(totalScore > scoreCap) && <span className="error-message"> {totalScoreError}</span>}
       </div>
     </div>
   );

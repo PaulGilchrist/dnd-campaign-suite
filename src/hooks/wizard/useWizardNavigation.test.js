@@ -30,7 +30,7 @@ describe('useWizardNavigation', () => {
 
   function renderWizard(step = 1, formData = mockFormData, races = mockRacesData, classes = mockClassSubtypes, ruleset = mockRuleset) {
     return renderHook(
-      ({ step: s, formData: f, races: r, classes: c, ruleset: rl }) => useWizardNavigation(s, f, r, c, rl),
+      ({ step: s, formData: f, races: r, classes: c, ruleset: rl }) => useWizardNavigation(s, f, r, { classSubtypes: c, ruleset: rl }),
       { initialProps: { step, formData, races, classes, ruleset } }
     );
   }

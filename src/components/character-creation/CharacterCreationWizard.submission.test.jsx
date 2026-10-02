@@ -9,7 +9,7 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
-import { validateStep, validateFinalFormData } from '../../config/utils.js';
+import { validateStep, validateFinalFormData, validateAbilityTotals } from '../../config/utils.js';
 import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
 
 const mockFormData = {
@@ -262,6 +262,7 @@ vi.mock('../../config/steps-config.js', () => {
 vi.mock('../../config/utils.js', () => ({
   validateStep: vi.fn(() => Promise.resolve({})),
   validateFinalFormData: vi.fn(() => ({})),
+  validateAbilityTotals: vi.fn(() => Promise.resolve({})),
 }));
 
 describe('CharacterCreationWizard - Submission', () => {
@@ -295,6 +296,7 @@ describe('CharacterCreationWizard - Submission', () => {
     }));
     validateStep.mockImplementation(() => Promise.resolve({}));
     validateFinalFormData.mockImplementation(() => ({}));
+    validateAbilityTotals.mockImplementation(() => Promise.resolve({}));
   });
 
   function renderWizard(props = {}) {
@@ -334,7 +336,7 @@ describe('CharacterCreationWizard - Submission', () => {
     });
 
     await waitFor(() => {
-      expect(validateStep).toHaveBeenCalledWith(12, mockFormData, { racesData: [], classSubtypes: [], ruleset: '5e' });
+      expect(validateStep).toHaveBeenCalledWith(12, mockFormData, { racesData: [], classSubtypes: [], ruleset: '5e', allFeats: expect.any(Array) });
     });
   });
 
@@ -391,6 +393,21 @@ describe('CharacterCreationWizard - Submission', () => {
 
     await waitFor(() => {
       expect(mockSetErrors).toHaveBeenCalledWith({ name: 'Name is required' });
+      expect(localOnComplete).not.toHaveBeenCalled();
+    });
+  });
+
+  it('FT-001: refuses submit and surfaces errors when an ability total exceeds the cap', async () => {
+    validateAbilityTotals.mockImplementation(() => Promise.resolve({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' }));
+    const localOnComplete = vi.fn();
+    renderWizard({ onComplete: localOnComplete, characterData: { rules: '2024' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Create Character'));
+    });
+
+    await waitFor(() => {
+      expect(mockSetErrors).toHaveBeenCalledWith({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
       expect(localOnComplete).not.toHaveBeenCalled();
     });
   });

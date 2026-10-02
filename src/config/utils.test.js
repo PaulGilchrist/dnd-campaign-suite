@@ -348,5 +348,68 @@ describe('character-creation/utils', () => {
         expect(await utils.validateStep(8, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
       });
     });
+
+    describe('step 9 ability total cap (FT-001)', () => {
+      beforeEach(() => {
+        vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
+      });
+
+      const abilities2024 = [
+        { name: 'Strength', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+        { name: 'Dexterity', baseScore: 14, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+        { name: 'Constitution', baseScore: 14, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+        { name: 'Intelligence', baseScore: 8, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
+        { name: 'Wisdom', baseScore: 18, featIncrease: 2, backgroundIncrease: 1, miscIncrease: 0 },
+        { name: 'Charisma', baseScore: 16, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
+      ];
+
+      it('blocks a total above 20 with an ability_${i}_totalScore error', async () => {
+        const errors = await utils.validateStep(9, { level: 8, rules: '2024', abilities: abilities2024, feats: ['Magic Initiate', 'Ability Score Improvement'] }, { racesData: [], classSubtypes: [], ruleset: '2024' });
+        expect(errors).toHaveProperty('ability_4_totalScore');
+      });
+
+      it('accepts legal allocations at the cap', async () => {
+        const legal = abilities2024.map(a => (a.name === 'Wisdom' ? { ...a, featIncrease: 1 } : a));
+        const errors = await utils.validateStep(9, { level: 8, rules: '2024', abilities: legal, feats: ['Magic Initiate', 'Ability Score Improvement'] }, { racesData: [], classSubtypes: [], ruleset: '2024' });
+        expect(errors).toEqual({});
+      });
+    });
+  });
+
+  describe('validateAbilityTotals', () => {
+    beforeEach(() => {
+      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
+    });
+
+    const base = [
+      { name: 'Wisdom', baseScore: 18, featIncrease: 2, backgroundIncrease: 1, miscIncrease: 0 },
+    ];
+
+    it('returns no errors for empty abilities', async () => {
+      expect(await utils.validateAbilityTotals({ abilities: [] })).toEqual({});
+    });
+
+    it('flags Wisdom 18+1+2=21 over the cap of 20', async () => {
+      const errors = await utils.validateAbilityTotals({ level: 8, rules: '2024', abilities: base });
+      expect(errors).toHaveProperty('ability_0_totalScore');
+    });
+
+    it('applies the level 20 cap of 24', async () => {
+      expect(await utils.validateAbilityTotals({ level: 20, rules: '2024', abilities: base })).toEqual({});
+      expect(await utils.validateAbilityTotals({ level: 20, rules: '2024', abilities: [{ ...base[0], featIncrease: 6 }] })).toHaveProperty('ability_0_totalScore');
+    });
+
+    it('honors a selected feat that raises the cap (Epic Boon max_value 30)', async () => {
+      const boon = { name: 'Boon Of Fortitude', ability_score_increase: { max_value: 30 } };
+      const formData = { level: 20, rules: '2024', abilities: [{ ...base[0], featIncrease: 11 }], feats: ['Boon Of Fortitude'] };
+      expect(await utils.validateAbilityTotals(formData, { allFeats: [boon] })).toEqual({});
+      expect(await utils.validateAbilityTotals({ ...formData, feats: [] }, { allFeats: [boon] })).toHaveProperty('ability_0_totalScore');
+    });
+
+    it('does not honor unselected cap-raising feats', async () => {
+      const boon = { name: 'Boon Of Fortitude', ability_score_increase: { max_value: 30 } };
+      const formData = { level: 8, rules: '2024', abilities: base, feats: [] };
+      expect(await utils.validateAbilityTotals(formData, { allFeats: [boon] })).toHaveProperty('ability_0_totalScore');
+    });
   });
 });

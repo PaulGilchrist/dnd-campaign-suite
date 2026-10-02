@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import './CharacterCreationWizard.css';
-import { validateStep, validateFinalFormData } from '../../config/utils.js';
+import { validateStep, validateFinalFormData, validateAbilityTotals } from '../../config/utils.js';
 import WizardHeader from './WizardHeader.jsx';
 import WizardProgressBar from './WizardProgressBar.jsx';
 import WizardFooter from './WizardFooter.jsx';
@@ -210,7 +210,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     goToStep,
     getStepEnabled,
     isSaveEnabled,
-   } = useWizardNavigation(isEditing ? 2 : 1, formData, racesData, classSubtypes, ruleset);
+   } = useWizardNavigation(isEditing ? 2 : 1, formData, racesData, { classSubtypes, ruleset, allFeats: feats });
 
   // Skills
   const {
@@ -287,6 +287,25 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
 
     const featAbilityAssignments = useMemo(() => formData.featAbilityChoices || {}, [formData.featAbilityChoices]);
 
+   // Cap gate: block Save/Next while any ability total exceeds the effective cap (FT-001)
+   const [abilityCapErrors, setAbilityCapErrors] = useState({});
+   const abilityCapKey = useMemo(() => JSON.stringify({
+     abilities: (formData.abilities || []).map(a => [a.name, a.baseScore, a.featIncrease, a.backgroundIncrease, a.miscIncrease]),
+     feats: (formData.feats || []).map(f => (typeof f === 'string' ? f : f?.name)),
+     level: formData.level,
+     ruleset,
+   }), [formData.abilities, formData.feats, formData.level, ruleset]);
+   useEffect(() => {
+     let cancelled = false;
+     validateAbilityTotals(formData, { allFeats: feats, racesData, ruleset }).then(errs => {
+       if (!cancelled) {
+         setAbilityCapErrors(prev => (JSON.stringify(prev) === JSON.stringify(errs) ? prev : errs));
+       }
+     });
+     return () => { cancelled = true; };
+   }, [abilityCapKey]); // eslint-disable-line react-hooks/exhaustive-deps
+   const abilitiesWithinCap = Object.keys(abilityCapErrors).length === 0;
+
    // Handlers
   const handleRulesetChange = useCallback(async (newRuleset) => {
     setRuleset(newRuleset);
@@ -359,7 +378,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
      }, [navigateNext, resetErrors]);
 
   const handleSubmit = useCallback(async () => {
-    const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset });
+    const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats: feats });
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
       return;
@@ -369,8 +388,13 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
       setErrors(finalErrors);
       return;
         }
+    const abilityErrors = await validateAbilityTotals(formData, { allFeats: feats, racesData, ruleset });
+    if (Object.keys(abilityErrors).length > 0) {
+      setErrors(abilityErrors);
+      return;
+        }
     onComplete(formData);
-      }, [currentStep, formData, racesData, classSubtypes, ruleset, onComplete, setErrors]);
+      }, [currentStep, formData, racesData, classSubtypes, ruleset, feats, onComplete, setErrors]);
 
   const renderStep = useCallback(() => {
     return (
@@ -513,7 +537,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
               ruleset={ruleset}
               getStepEnabled={getStepEnabled}
               goToStep={goToStep}
-              isSaveEnabled={isSaveEnabled}
+              isSaveEnabled={isSaveEnabled && abilitiesWithinCap}
               onSave={handleSubmit}
             />
             <div className="wizard-content">

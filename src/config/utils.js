@@ -1,6 +1,7 @@
 import { get } from 'lodash';
 import { REQUIRED_FIELDS } from './constants.js';
 import { loadValidationRules, getCachedPointBuyCosts } from '../services/ui/dataLoader.js';
+import { computeRaceBuffs } from '../services/character/raceBuffService.js';
 
 /**
  * Get point buy costs synchronously from the cached JSON data.
@@ -63,6 +64,56 @@ const abilityScoreChecks = (ability, baseScore, totalScore, thresholds) => [
   { key: 'totalScore', failed: totalScore > thresholds.maxTotal, message: `Total score (base + improvements + misc) cannot exceed ${thresholds.maxTotal}` },
   { key: 'miscIncrease', failed: parseInt(ability.miscIncrease) < 0, message: 'Misc bonus must be 0 or above' },
 ];
+
+const computeAbilityTotalCap = (rules, level, allFeats, selectedFeats, ruleset) => {
+  let cap = get(rules, level >= 20 ? 'ability_score_max.level_20' : 'point_buy.max_total_score') ?? (level >= 20 ? 24 : 20);
+  const selectedNames = (selectedFeats || []).map(f => (typeof f === 'string' ? f : f?.name));
+  (allFeats || []).forEach(feat => {
+    if (!selectedNames.includes(feat.name)) return;
+    const maxValue = feat.ability_score_increase?.max_value;
+    if (ruleset === '2024' && typeof maxValue === 'number' && maxValue > cap) {
+      cap = maxValue;
+    } else if (ruleset === '5e' && typeof feat.description === 'string' && /maximum of 30/i.test(feat.description)) {
+      cap = 30;
+    }
+  });
+  return cap;
+};
+
+const computeRacialIncreases = (formData, racesData, ruleset) => {
+  const racialIncreases = {};
+  if (ruleset !== '5e' || !formData?.race?.name) return racialIncreases;
+  const fullRace = (racesData || []).find(r => r.name === formData.race.name);
+  if (!fullRace) return racialIncreases;
+  const raceBuffs = computeRaceBuffs(fullRace, { race: { name: fullRace.name, subrace: formData.race.subrace || null }, rules: ruleset }, '5e');
+  raceBuffs.abilityScoreIncreases.forEach(b => { racialIncreases[b.name] = (racialIncreases[b.name] || 0) + b.amount; });
+  if (formData.race.subrace?.name) {
+    const subraceBuffs = computeRaceBuffs(fullRace, { race: { subrace: { name: formData.race.subrace.name } } }, '5e');
+    subraceBuffs.abilityScoreIncreases.forEach(b => { racialIncreases[b.name] = (racialIncreases[b.name] || 0) + b.amount; });
+  }
+  return racialIncreases;
+};
+
+/**
+ * Gate total ability scores against the effective cap (base + feat + background + misc + racial).
+ * Blocks wizard Save/Next while any allocation would exceed the cap (FT-001).
+ */
+export async function validateAbilityTotals(formData, { allFeats = [], racesData = [], ruleset } = {}) {
+  const errors = {};
+  const abilities = formData?.abilities || [];
+  if (abilities.length === 0) return errors;
+  const rs = ruleset || formData.rules || '5e';
+  const rules = await loadValidationRules(rs);
+  const cap = computeAbilityTotalCap(rules, formData.level || 1, allFeats, formData.feats, rs);
+  const racialIncreases = computeRacialIncreases(formData, racesData, rs);
+  abilities.forEach((ability, index) => {
+    const totalScore = calculateTotalScore(ability) + (racialIncreases[ability.name] || 0);
+    if (totalScore > cap) {
+      errors[`ability_${index}_totalScore`] = `${ability.name} total ${totalScore} exceeds the maximum of ${cap}`;
+    }
+  });
+  return errors;
+}
 
 export async function validateAbility(ability, index, ruleset = '5e', level = 1) {
   const rules = await loadValidationRules(ruleset);
@@ -157,6 +208,8 @@ const validateSubclassStep = (formData, context) => {
   return newErrors;
 };
 
+const validateAbilitiesStep = (formData, context) => validateAbilityTotals(formData, context);
+
 const stepValidators = {
   2: validateBasicsStep,
   3: validateRaceStep,
@@ -164,6 +217,7 @@ const stepValidators = {
   5: validateBackgroundStep,
   6: validateClassStep,
   7: validateSubclassStep,
+  9: validateAbilitiesStep,
 };
 
 /**

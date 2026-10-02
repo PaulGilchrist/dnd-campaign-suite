@@ -109,81 +109,6 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
     formDataRef.current = formData;
   }, [formData]);
 
-  useEffect(() => {
-    if (!allFeats || allFeats.length === 0 || !formData.feats || formData.feats.length === 0) {
-      setFeatAbilityChoices([]);
-      return;
-    }
-
-    const key = `${formData.rules}|${formData.feats.map(f => typeof f === 'string' ? f : f.name).join(',')}`;
-    if (key === lastProcessedKey.current) return;
-    lastProcessedKey.current = key;
-
-    const buffs = computeAllFeatBuffs(formData, allFeats);
-    const choices = buffs.abilityScoreIncreases.filter(inc => inc.isChoice && inc.name === 'any');
-
-    if (choices.length === 0) {
-      setFeatAbilityChoices([]);
-      return;
-    }
-
-    const grouped = buildGroupedChoices(choices);
-    setFeatAbilityChoices(grouped);
-
-    const selectedFeatNames = new Set(formData.feats.map(f => typeof f === 'string' ? f : f.name).filter(Boolean));
-
-    const savedChoices = formData.featAbilityChoices || {};
-
-    const filteredChoices = {};
-    Object.keys(savedChoices).forEach(key => {
-      const featName = key.split('-').slice(0, -1).join('-');
-      if (selectedFeatNames.has(featName)) {
-        filteredChoices[key] = savedChoices[key];
-      }
-    });
-
-    const migratedChoices = {};
-    Object.keys(savedChoices).forEach(oldKey => {
-      if (!isNaN(oldKey.split('-').pop())) return;
-      const baseName = oldKey;
-      const existing = savedChoices[oldKey];
-      const matchingGroup = grouped.find(g => g.featName === baseName);
-      if (matchingGroup) {
-        migratedChoices[matchingGroup.id] = existing;
-      }
-    });
-    const mergedChoices = { ...filteredChoices, ...migratedChoices };
-
-    const needsInit = grouped.some(group => {
-      const saved = mergedChoices[group.id];
-      if (!saved) return true;
-      if (group.type === 'choice') return !saved.mode;
-      return !saved.assignment;
-    });
-
-    if (needsInit) {
-      const initChoices = { ...mergedChoices };
-      grouped.forEach(group => {
-        const saved = mergedChoices[group.id];
-        if (group.type === 'choice') {
-          const mode = saved?.mode || 'single';
-          initChoices[group.id] = {
-            mode,
-            assignments: {
-              single: saved?.assignments?.single || group.options.single.abilityNames[0],
-              dual: saved?.assignments?.dual || [group.options.dual.abilityNames[0], ''],
-            },
-          };
-        } else {
-          initChoices[group.id] = {
-            assignment: saved?.assignment || group.abilityNames[0],
-          };
-        }
-      });
-      setFormData(prev => ({ ...prev, featAbilityChoices: initChoices }));
-    }
-  }, [allFeats, formData.feats, formData.rules, formData, setFormData]);
-
   const recomputeFeatIncreases = useCallback((abilities, savedChoices, grouped) => {
     abilities.forEach(a => { a.featIncrease = 0; });
 
@@ -231,6 +156,98 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
 
     return abilities;
   }, []);
+
+  const rollbackFeatIncreases = useCallback((grouped, savedChoices) => {
+    const current = formDataRef.current;
+    const hasStaleChoices = Object.keys(current.featAbilityChoices || {}).length > 0;
+    const hasOrphanIncreases = (current.abilities || []).some(a => (a.featIncrease || 0) !== 0);
+    if (!hasStaleChoices && !hasOrphanIncreases) return;
+    const abilities = (current.abilities || []).map(a => ({ ...a }));
+    recomputeFeatIncreases(abilities, savedChoices, grouped);
+    setFormData(prev => ({ ...prev, abilities, featAbilityChoices: savedChoices }));
+  }, [recomputeFeatIncreases, setFormData]);
+
+  useEffect(() => {
+    if (!formData.feats || formData.feats.length === 0) {
+      setFeatAbilityChoices([]);
+      rollbackFeatIncreases([], {});
+      return;
+    }
+    if (!allFeats || allFeats.length === 0) return;
+
+    const key = `${formData.rules}|${formData.feats.map(f => typeof f === 'string' ? f : f.name).join(',')}`;
+    if (key === lastProcessedKey.current) return;
+    lastProcessedKey.current = key;
+
+    const buffs = computeAllFeatBuffs(formData, allFeats);
+    const choices = buffs.abilityScoreIncreases.filter(inc => inc.isChoice && inc.name === 'any');
+
+    if (choices.length === 0) {
+      setFeatAbilityChoices([]);
+      rollbackFeatIncreases([], {});
+      return;
+    }
+
+    const grouped = buildGroupedChoices(choices);
+    setFeatAbilityChoices(grouped);
+
+    const selectedFeatNames = new Set(formData.feats.map(f => typeof f === 'string' ? f : f.name).filter(Boolean));
+
+    const savedChoices = formData.featAbilityChoices || {};
+
+    const filteredChoices = {};
+    Object.keys(savedChoices).forEach(key => {
+      const featName = key.split('-').slice(0, -1).join('-');
+      if (selectedFeatNames.has(featName)) {
+        filteredChoices[key] = savedChoices[key];
+      }
+    });
+
+    const migratedChoices = {};
+    Object.keys(savedChoices).forEach(oldKey => {
+      if (!isNaN(oldKey.split('-').pop())) return;
+      const baseName = oldKey;
+      const existing = savedChoices[oldKey];
+      const matchingGroup = grouped.find(g => g.featName === baseName);
+      if (matchingGroup) {
+        migratedChoices[matchingGroup.id] = existing;
+      }
+    });
+    const mergedChoices = { ...filteredChoices, ...migratedChoices };
+
+    const needsInit = grouped.some(group => {
+      const saved = mergedChoices[group.id];
+      if (!saved) return true;
+      if (group.type === 'choice') return !saved.mode;
+      return !saved.assignment;
+    });
+
+    const removedKeys = Object.keys(savedChoices).filter(key => !(key in mergedChoices));
+
+    if (needsInit || removedKeys.length > 0) {
+      const initChoices = { ...mergedChoices };
+      grouped.forEach(group => {
+        const saved = mergedChoices[group.id];
+        if (group.type === 'choice') {
+          const mode = saved?.mode || 'single';
+          initChoices[group.id] = {
+            mode,
+            assignments: {
+              single: saved?.assignments?.single || group.options.single.abilityNames[0],
+              dual: saved?.assignments?.dual || [group.options.dual.abilityNames[0], ''],
+            },
+          };
+        } else {
+          initChoices[group.id] = {
+            assignment: saved?.assignment || group.abilityNames[0],
+          };
+        }
+      });
+      const abilities = (formDataRef.current.abilities || []).map(a => ({ ...a }));
+      recomputeFeatIncreases(abilities, initChoices, grouped);
+      setFormData(prev => ({ ...prev, abilities, featAbilityChoices: initChoices }));
+    }
+  }, [allFeats, formData.feats, formData.rules, formData, setFormData, recomputeFeatIncreases, rollbackFeatIncreases]);
 
   const handleFeatAbilityChoice = useCallback((id, slotIndex, abilityName) => {
     const currentFormData = formDataRef.current;

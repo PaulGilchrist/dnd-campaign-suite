@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { validateStep } from '../../config/utils.js';
 
-function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ruleset) {
+function useWizardNavigation(initialStep, formData, racesData, { classSubtypes = [], ruleset, allFeats = [] } = {}) {
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [isNextDisabled, setIsNextDisabled] = useState(false);
   const [step2Valid, setStep2Valid] = useState(false);
@@ -39,13 +39,13 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
   }, [formData.class, classSubtypes]);
 
   const navigateNext = useCallback(async () => {
-    const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset });
+    const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats });
     if (Object.keys(stepErrors).length === 0) {
       setCurrentStep(prev => prev + 1);
       return true;
     }
     return false;
-  }, [currentStep, formData, racesData, classSubtypes, ruleset]);
+  }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats]);
 
   const navigatePrevious = useCallback(() => {
     setCurrentStep(prev => prev - 1);
@@ -57,11 +57,11 @@ function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ru
 
   useEffect(() => {
     const checkValidation = async () => {
-      const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset });
+      const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats });
       setIsNextDisabled(Object.keys(stepErrors).length > 0);
     };
     checkValidation();
-  }, [currentStep, formData, racesData, classSubtypes, ruleset]);
+  }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats]);
 
   useEffect(() => {
     const checkStep2 = async () => {
