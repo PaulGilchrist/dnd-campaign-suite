@@ -5,7 +5,7 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
-import { getMonsterSaveBonuses } from '../../../encounters/encounterToInitiative.js';
+import { getMonsterSaveBonuses, getNextUniqueMonsterName } from '../../../encounters/encounterToInitiative.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -240,24 +240,67 @@ function applyThrallTempHp(creature, playerStats, campaignName) {
     setTempHpOnKey(creature.name, 'tempHp', tempHp, campaignName);
 }
 
-function pushSummonedEffect(targetEffects, creature, casterName, noConcentration) {
-    const existingSummoned = targetEffects.find(
-        te => te.target === creature.name && te.effect === 'summoned' && te.source === casterName
-    );
-    if (existingSummoned) return;
-    targetEffects.push({
-        target: creature.name,
+// SP-005: unique combatant name + one 'summoned' te marker PER spawn.
+// The old dedup-by-name silently dropped markers for repeat same-variant
+// summons (all sharing the bare variant name), emptying te across multi-cast.
+// SP-004 mirrors this: unique name first, then a FRESH marker array appended
+// with spread (never mutated in place — dirty-check new===old skips the POST).
+function buildSummonedMarker(creatureName, casterName, noConcentration) {
+    return {
+        target: creatureName,
         source: casterName,
         effect: 'summoned',
         summonSource: 'spell',
         duration: noConcentration ? '1_minute' : 'concentration',
-    });
+    };
+}
+
+// SP-005 defect A: a leveled summon whose slot could NOT be paid (popup
+// advisory, base lv exhausted) must REFUSE — zero spawn, zero `summons` log,
+// no higher-slot auto-upcast. Driven by the payment outcome stamped onto
+// metaCtx by prepareSpellCast so PASS casts (which paid at stage 1) are never
+// blocked; free/psionic/quick-ritual casts stay allowed. Only fires when
+// slotConsumed is explicitly false (undefined = unstamped legacy callers/tests).
+function resolveUnpaidSummonRefusal(action) {
+    const mc = action.metaCtx || {};
+    if (mc.freeCastUsed === true || mc.quickRitualUsed === true || mc._psionicUsed === true) return null;
+    if (mc.slotConsumed === false) {
+        return `No spell slot available at level ${getSlotLevel(action)} — ${action.name} summon refused.`;
+    }
+    return null;
+}
+
+async function refuseUnpaidSummon(action, playerStats, campaignName, reason) {
+    const casterName = playerStats.name;
+    await addEntry(campaignName, {
+        type: 'automation',
+        characterName: casterName,
+        automationType: 'summon_refused',
+        name: action.name,
+        description: `${casterName} — ${reason}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[summonSpiritHandler:refused-log-error]', e); });
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: action.automation?.type,
+            description: reason,
+            automation: action.automation,
+        },
+    };
 }
 
 async function performSummon(action, playerStats, campaignName, variant) {
     const auto = action.automation;
     const casterName = playerStats.name;
     const slotLevel = getSlotLevel(action);
+
+    const refusalReason = resolveUnpaidSummonRefusal(action);
+    if (refusalReason) {
+        return refuseUnpaidSummon(action, playerStats, campaignName, refusalReason);
+    }
 
     const combatSummary = getCombatSummary(campaignName);
     if (!combatSummary) {
@@ -279,7 +322,11 @@ async function performSummon(action, playerStats, campaignName, variant) {
 
     const { isPhantasmalFreeCast, halveHp } = resolveSummonFlags(playerStats, action);
 
-    const creature = buildSpiritCreature({ monster, displayName: variant.name, casterName, initiativeValue, slotLevel, auto, playerStats, options: { noConcentration, createThrall, warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp } });
+    // SP-005 defect B: reuse the EB unique-name helper so repeat same-variant
+    // summons never collide on the bare name ("Animated Object (Medium) 1/2/3").
+    const displayName = getNextUniqueMonsterName(variant.name, combatSummary.creatures);
+
+    const creature = buildSpiritCreature({ monster, displayName, casterName, initiativeValue, slotLevel, auto, playerStats, options: { noConcentration, createThrall, warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp } });
     if (isPhantasmalFreeCast) {
         creature.phantasmal = true;
         creature.spectral = true;
@@ -290,8 +337,7 @@ async function performSummon(action, playerStats, campaignName, variant) {
         applyThrallTempHp(creature, playerStats, campaignName);
     }
 
-    const targetEffects = getTargetEffects();
-    pushSummonedEffect(targetEffects, creature, casterName, noConcentration);
+    const targetEffects = [...getTargetEffects(), buildSummonedMarker(creature.name, casterName, noConcentration)];
 
     combatSummary.creatures.sort((a, b) => {
         const aInit = a.initiative === '' || a.initiative === undefined ? 0 : Number(a.initiative);
@@ -309,8 +355,8 @@ async function performSummon(action, playerStats, campaignName, variant) {
             { type: 'remove_summoned_creatures', spell: action.name },
         ], campaignName, rounds });
     }
-    storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
-    setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
+    await storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
+    await setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
     const summonLabel = auto.typeLabel || variant.name;

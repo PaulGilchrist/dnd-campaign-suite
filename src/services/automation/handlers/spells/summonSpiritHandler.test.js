@@ -44,19 +44,23 @@ vi.mock('../buffs/tempHpService.js', () => ({
     setTempHpOnKey: vi.fn(),
 }));
 
-vi.mock('../../../encounters/encounterToInitiative.js', () => ({
-    getMonsterSaveBonuses: vi.fn().mockImplementation((monster) => {
-        const map = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
-        for (const [abbr] of Object.entries(map)) {
-            if (monster.saving_throws?.[abbr]?.modifier != null) {
-                map[abbr] = monster.saving_throws[abbr].modifier;
+vi.mock('../../../encounters/encounterToInitiative.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        getMonsterSaveBonuses: vi.fn().mockImplementation((monster) => {
+            const map = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+            for (const [abbr] of Object.entries(map)) {
+                if (monster.saving_throws?.[abbr]?.modifier != null) {
+                    map[abbr] = monster.saving_throws[abbr].modifier;
+                }
             }
-        }
-        return map;
-    }),
-}));
+            return map;
+        }),
+    };
+});
 
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
@@ -68,11 +72,11 @@ import { setTempHpOnKey } from '../buffs/tempHpService.js';
 describe('summonSpiritHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        const targetEffects = [];
-        getRuntimeValue.mockImplementation((_entity, key) => {
-            if (key === 'targetEffects') return targetEffects;
-            return null;
-        });
+        // SP-005: store-backed targetEffects so a fresh [...] write (no longer
+        // mutated in place) is observable via getRuntimeValue across multi-cast.
+        const store = { targetEffects: [] };
+        getRuntimeValue.mockImplementation((_entity, key) => (key in store ? store[key] : null));
+        setRuntimeValue.mockImplementation((_entity, key, value) => { store[key] = value; });
         getCombatSummary.mockReturnValue({
             creatures: [
                 { name: 'TestCaster', initiative: '15', initiativeBonus: 3 },
@@ -230,7 +234,7 @@ describe('summonSpiritHandler', () => {
 
             const result = await confirmSummonSpirit(makeAction(), mockPlayerStats, mockCampaignName, 'Bestial Spirit (Air)');
 
-            const added = combatSummary.creatures.find(c => c.name === 'Bestial Spirit (Air)');
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Bestial Spirit (Air)'));
             expect(added).toBeDefined();
             expect(added.initiative).toBe('14.9');
             expect(added.summonedBy).toBe('TestCaster');
@@ -238,7 +242,7 @@ describe('summonSpiritHandler', () => {
             expect(added.maxHp).toBe(20);
             expect(added.ac).toBe(11);
 
-            const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === 'Bestial Spirit (Air)');
+            const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Bestial Spirit (Air)'));
             expect(effect).toMatchObject({
                 effect: 'summoned',
                 source: 'TestCaster',
@@ -252,7 +256,7 @@ describe('summonSpiritHandler', () => {
                 type: 'summons',
                 characterName: 'TestCaster',
                 summonName: 'Bestial Spirit',
-                summonedCreatures: ['Bestial Spirit (Air)'],
+                summonedCreatures: ['Bestial Spirit (Air) 1'],
             }));
             expect(result.type).toBe('popup');
         });
@@ -264,7 +268,7 @@ describe('summonSpiritHandler', () => {
 
             await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Bestial Spirit (Air)');
 
-            const added = combatSummary.creatures.find(c => c.name === 'Bestial Spirit (Air)');
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Bestial Spirit (Air)'));
             expect(added.ac).toBe(11);
             expect(added.maxHp).toBe(20 + 5 * (4 - 2));
         });
@@ -279,7 +283,7 @@ describe('summonSpiritHandler', () => {
 
             await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
 
-            const added = combatSummary.creatures.find(c => c.name === 'Animated Object (Medium)');
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Animated Object (Medium)'));
             expect(added.ac).toBe(15);
             expect(added.maxHp).toBe(10);
         });
@@ -294,7 +298,7 @@ describe('summonSpiritHandler', () => {
 
             const result = await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
 
-            const added = combatSummary.creatures.find(c => c.name === 'Animated Object (Medium)');
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Animated Object (Medium)'));
             expect(added).toBeDefined();
             expect(added.summonedBy).toBe('TestCaster');
             expect(added.summonSource).toBe('spell');
@@ -302,7 +306,7 @@ describe('summonSpiritHandler', () => {
             expect(added.maxHp).toBe(10);
             expect(added.speed.walk).toBe('30 ft.');
 
-            const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === 'Animated Object (Medium)');
+            const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Animated Object (Medium)'));
             expect(effect).toMatchObject({
                 effect: 'summoned',
                 source: 'TestCaster',
@@ -321,7 +325,7 @@ describe('summonSpiritHandler', () => {
 
             await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Bestial Spirit (Land)');
 
-            const added = combatSummary.creatures.find(c => c.name === 'Bestial Spirit (Land)');
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Bestial Spirit (Land)'));
             expect(added.actions[0].description).toContain('+6');
             expect(added.actions[0].description).toContain('1d8+2+3');
             expect(added.actions[0].attack_bonus).toBe(6);
@@ -373,14 +377,14 @@ describe('summonSpiritHandler', () => {
 
                 await confirmSummonSpirit(makeAberrantAction(), mockPlayerStats, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
 
-                const added = combatSummary.creatures.find(c => c.name === 'Aberrant Spirit (Mind Flayer)');
+                const added = combatSummary.creatures.find(c => c.name?.startsWith('Aberrant Spirit (Mind Flayer)'));
                 expect(added).toBeDefined();
                 expect(added.ac).toBe(11);
                 expect(added.maxHp).toBe(40);
                 expect(added.actions.map(a => a.name)).toEqual(['Psychic Slam']);
                 expect(setTempHpOnKey).not.toHaveBeenCalled();
 
-                const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === 'Aberrant Spirit (Mind Flayer)');
+                const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Aberrant Spirit (Mind Flayer)'));
                 expect(effect).toMatchObject({ effect: 'summoned', duration: 'concentration' });
                 expect(addConcentration).toHaveBeenCalledWith(combatSummary, 'TestCaster', 'Summon Aberration', 13);
             });
@@ -402,11 +406,11 @@ describe('summonSpiritHandler', () => {
 
                 await confirmSummonSpirit(makeAberrantAction(), createThrallWarlock, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
 
-                const added = combatSummary.creatures.find(c => c.name === 'Aberrant Spirit (Mind Flayer)');
+                const added = combatSummary.creatures.find(c => c.name?.startsWith('Aberrant Spirit (Mind Flayer)'));
                 expect(added.actions.map(a => a.name)).toContain('Psychic Strike');
-                expect(setTempHpOnKey).toHaveBeenCalledWith('Aberrant Spirit (Mind Flayer)', 'tempHp', expect.any(Number), mockCampaignName);
+                expect(setTempHpOnKey).toHaveBeenCalledWith('Aberrant Spirit (Mind Flayer) 1', 'tempHp', expect.any(Number), mockCampaignName);
 
-                const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === 'Aberrant Spirit (Mind Flayer)');
+                const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Aberrant Spirit (Mind Flayer)'));
                 expect(effect).toMatchObject({ effect: 'summoned', duration: '1_minute' });
                 expect(addConcentration).not.toHaveBeenCalled();
                 expect(addExpiration).not.toHaveBeenCalled();
@@ -440,7 +444,7 @@ describe('summonSpiritHandler', () => {
 
                 await confirmSummonSpirit(freeCastAction(), phantasmalPlayerStats, mockCampaignName, 'Bestial Spirit (Land)');
 
-                const added = combatSummary.creatures.find(c => c.name === 'Bestial Spirit (Land)');
+                const added = combatSummary.creatures.find(c => c.name?.startsWith('Bestial Spirit (Land)'));
                 expect(added.maxHp).toBe(15);
                 expect(added.currentHp).toBe(15);
                 expect(added.phantasmal).toBe(true);
@@ -453,7 +457,7 @@ describe('summonSpiritHandler', () => {
 
                 await confirmSummonSpirit(makeAction({ metaCtx: { slotLevel: 2 } }), phantasmalPlayerStats, mockCampaignName, 'Bestial Spirit (Land)');
 
-                const added = combatSummary.creatures.find(c => c.name === 'Bestial Spirit (Land)');
+                const added = combatSummary.creatures.find(c => c.name?.startsWith('Bestial Spirit (Land)'));
                 expect(added.maxHp).toBe(30);
                 expect(added.phantasmal).toBeUndefined();
             });
@@ -513,14 +517,14 @@ describe('summonSpiritHandler', () => {
 
                     await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, variant.name);
 
-                    const added = combatSummary.creatures.find(c => c.name === variant.name);
+                    const added = combatSummary.creatures.find(c => c.name?.startsWith(variant.name));
                     expect(added).toBeDefined();
                     expect(added.ac).toBe(12);
                     expect(added.maxHp).toBe(30);
                     expect(added.summonedBy).toBe('TestCaster');
                     expect(added.monsterIndex).toBe(variant.monsterIndex);
 
-                    const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target === variant.name);
+                    const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith(variant.name));
                     expect(effect).toMatchObject({ effect: 'summoned', source: 'TestCaster', duration: 'concentration' });
                     expect(addConcentration).toHaveBeenCalledWith(combatSummary, 'TestCaster', 'Summon Fey', 13);
 
@@ -543,7 +547,7 @@ describe('summonSpiritHandler', () => {
 
                 await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Fey Spirit (Trickster)');
 
-                const added = combatSummary.creatures.find(c => c.name === 'Fey Spirit (Trickster)');
+                const added = combatSummary.creatures.find(c => c.name?.startsWith('Fey Spirit (Trickster)'));
                 expect(added.ac).toBe(12);
                 expect(added.maxHp).toBe(40);
             });
@@ -554,6 +558,65 @@ describe('summonSpiritHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toBe('No summon variant selected.');
+        });
+    });
+
+    describe('SP-005 zero-slot refusal + multi-cast uniqueness', () => {
+        const aoAction = (metaCtx) => ({
+            name: 'Animate Objects',
+            automation: { type: 'summon_spirit', typeLabel: 'Animated Object', scale: false, variants: [{ name: 'Animated Object (Medium)', monsterIndex: 'animated-object-medium' }] },
+            spell: { level: 5, duration: 'Concentration, up to 1 minute', concentration: true },
+            metaCtx,
+        });
+
+        it('refuses a paid slot cast that failed to pay — popup + summon_refused, zero spawn, zero summons log', async () => {
+            loadMonsters.mockResolvedValue(mockMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+
+            const result = await confirmSummonSpirit(aoAction({ slotConsumed: false }), mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('refused');
+            expect(combatSummary.creatures.some(c => c.name?.startsWith('Animated Object'))).toBe(false);
+            expect(addConcentration).not.toHaveBeenCalled();
+            const summonsLogs = addEntry.mock.calls.filter(c => c[1]?.type === 'summons');
+            expect(summonsLogs).toHaveLength(0);
+            const refusalLogs = addEntry.mock.calls.filter(c => c[1]?.automationType === 'summon_refused');
+            expect(refusalLogs).toHaveLength(1);
+        });
+
+        it('allows a paid slot cast (slotConsumed true) — spawns normally (PASS-safe)', async () => {
+            loadMonsters.mockResolvedValue(mockMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+
+            await confirmSummonSpirit(aoAction({ slotConsumed: true }), mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
+
+            expect(combatSummary.creatures.some(c => c.name === 'Animated Object (Medium) 1')).toBe(true);
+            expect(getRuntimeValue('campaign', 'targetEffects').some(te => te.target === 'Animated Object (Medium) 1')).toBe(true);
+        });
+
+        it('two same-variant casts get unique names + one te marker each (no collision, no te loss)', async () => {
+            loadMonsters.mockResolvedValue(mockMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+
+            await confirmSummonSpirit(aoAction({ slotConsumed: true }), mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
+            await confirmSummonSpirit(aoAction({ slotConsumed: true }), mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
+
+            const names = combatSummary.creatures.filter(c => c.name?.startsWith('Animated Object (Medium)')).map(c => c.name);
+            expect(names).toEqual(['Animated Object (Medium) 1', 'Animated Object (Medium) 2']);
+            expect(new Set(names).size).toBe(2);
+
+            const te = getRuntimeValue('campaign', 'targetEffects').filter(te => te.effect === 'summoned' && te.target?.startsWith('Animated Object (Medium)'));
+            expect(te.map(t => t.target)).toEqual(['Animated Object (Medium) 1', 'Animated Object (Medium) 2']);
+        });
+
+        it('leaves a free cast (freeCastUsed) unrefused even when slotConsumed false', async () => {
+            loadMonsters.mockResolvedValue(mockMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+
+            await confirmSummonSpirit(aoAction({ slotConsumed: false, freeCastUsed: true }), mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
+
+            expect(combatSummary.creatures.some(c => c.name?.startsWith('Animated Object'))).toBe(true);
         });
     });
 
@@ -637,7 +700,7 @@ describe('summonSpiritHandler', () => {
 
             await confirmSummonSpirit(action, lv17Cleric, mockCampaignName, 'Celestial Spirit (Avenger)');
 
-            const added = combatSummary.creatures.find(c => c.name === 'Celestial Spirit (Avenger)');
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Celestial Spirit (Avenger)'));
             expect(added.actions[0].damage_dice_primary).toBe('2d6+2+5');
             expect(added.actions[0].attack_bonus).toBe(9);
         });
@@ -697,7 +760,7 @@ describe('summonSpiritHandler', () => {
 
             await confirmSummonSpirit(action, lv17Cleric, mockCampaignName, 'Celestial Spirit (Defender)');
 
-            const added = combatSummary.creatures.find(c => c.name === 'Celestial Spirit (Defender)');
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Celestial Spirit (Defender)'));
             expect(added.reactions).toHaveLength(1);
             expect(added.reactions[0].name).toBe('Healing Touch');
             expect(added.reactions[0].damage_dice_primary).toBe('2d8+5');
@@ -746,7 +809,7 @@ describe('summonSpiritHandler', () => {
                 spell: { level: 4, duration: 'Concentration, up to 1 hour', concentration: true },
             };
             await confirmSummonSpirit(action, lv20Wizard, mockCampaignName, 'Construct Spirit (Clay)');
-            const added = combatSummary.creatures.find(c => c.name === 'Construct Spirit (Clay)');
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Construct Spirit (Clay)'));
             expect(added.reactions[0].automation).toMatchObject({ effect: 'attack', attack: 'Slam' });
             expect(added.actions[0].attack_bonus).toBe(11);
             expect(added.actions[0].damage_dice_primary).toBe('1d8+4+4');

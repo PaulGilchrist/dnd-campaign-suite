@@ -858,6 +858,11 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   stampModifiedSpell({ modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName });
 
   result.modifiedSpell = modifiedSpell;
+  // SP-005: carry the payment outcome onto metaCtx so downstream modal/perform
+  // handlers (summon lane) can enforce a refuse when a leveled slot cast could not
+  // pay — the popup advisory is UI-only, so the handler seam needs the truth too.
+  result.metaCtx.slotConsumed = result.slotConsumed;
+  result.metaCtx.freeCastUsed = result.freeCastUsed;
   return result;
 }
 
