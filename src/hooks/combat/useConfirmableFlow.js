@@ -9,6 +9,27 @@ const FREE_CAST_SPELLS = [
   'shield of faith', 'magic missile'
 ];
 
+// CLA-086: byte-twin of the metamagic lane's slot-level backfill
+// (useSpellMetamagicGates.js:134-136). The gated confirm lane pays the slot at
+// pending.spell.upcastLevel via prepareSpellCast, but the applyFn runners
+// (runCureWounds/runHealingWord) build their metaCtx from the base
+// pending.spellLevel written by makePending — so an upcast paid a higher slot
+// yet resolved at the base level. Stamp the paid level onto the pending metaCtx
+// carrier before applyFn so downstream resolvers see the slot actually consumed.
+export function stampPaidSlotLevel(pending) {
+  if (!pending.spell || pending.spell.level === 0) return;
+  if (!pending.metaCtx) pending.metaCtx = {};
+  if (!pending.metaCtx.slotLevel && pending.spell.upcastLevel) {
+    pending.metaCtx.slotLevel = pending.spell.upcastLevel;
+  }
+}
+
+// CLA-086: the slot level the confirm lane actually pays — the stamped upcast
+// level when present, else the base makePending spellLevel.
+export function paidSpellLevel(pending) {
+  return pending.metaCtx?.slotLevel || pending.spellLevel || 0;
+}
+
 export function rollbackSpellSlot(playerName, spellName, spellLevel, playerStats, campaignName) {
   const isWarlock = playerStats.class?.name === 'Warlock';
   const isFreeCast = spellName && FREE_CAST_SPELLS.some(name => (spellName || '').toLowerCase() === name);
@@ -62,6 +83,10 @@ export function useConfirmableFlow(playerStats, campaignName) {
         return next;
       });
 
+      // CLA-086: canonical stamp — the level paid by prepareSpellCast below,
+      // carried on pending.metaCtx so applyFn's heal metaCtx resolves at it.
+      stampPaidSlotLevel(pending);
+
       const targets = getTargets ? getTargets(pending, result) : null;
       addEntry(campaignName, {
         type: 'spell',
@@ -69,7 +94,7 @@ export function useConfirmableFlow(playerStats, campaignName) {
         targetName: targets?.[0] || null,
         targets: targets,
         spellName: pending.spellName,
-        spellLevel: pending.spellLevel || 0,
+        spellLevel: paidSpellLevel(pending),
         castingTime: pending.castingTime,
         timestamp: Date.now(),
       }).catch((e) => { console.error("[useConfirmableFlow:log-error]", e); });
@@ -120,7 +145,9 @@ export function useConfirmableFlow(playerStats, campaignName) {
         timestamp: Date.now(),
       }).catch((e) => { console.error("[useConfirmableFlow:log-error]", e); });
 
-      rollbackSpellSlot(playerStats.name, pending.spellName, pending.spellLevel || 0, playerStats, campaignName);
+      // CLA-086: refund the slot level actually consumed (the upcast level),
+      // not the base makePending.spellLevel.
+      rollbackSpellSlot(playerStats.name, pending.spellName, pending.spell?.upcastLevel || pending.spellLevel || 0, playerStats, campaignName);
     };
   }, [playerStats, campaignName]);
 

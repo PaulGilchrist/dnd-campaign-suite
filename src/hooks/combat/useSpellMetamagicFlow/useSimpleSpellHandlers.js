@@ -209,12 +209,18 @@ function buildHealingWordPopup(spellName, healResult) {
   }
 }
 
+// CLA-086: prefer the confirm-handler's canonical paid-slot stamp
+// (useConfirmableFlow.stampPaidSlotLevel) over the base makePending spellLevel.
+function healSlotLevel(pending) {
+  return pending.metaCtx?.slotLevel || pending.spellLevel
+}
+
 async function runHealingWord(d, pending, result) {
   const targetName = result.targetName
   if (!targetName) return
   const healResult = await triggerHealingWord(
     pending.spell,
-    { targetName, slotLevel: pending.spellLevel },
+    { targetName, slotLevel: healSlotLevel(pending) },
     d.playerStats,
     d.campaignName,
     null
@@ -227,7 +233,7 @@ async function runHealingWord(d, pending, result) {
 async function runCureWounds(d, pending, result) {
   const targetName = result.targetName
   if (!targetName) return
-  d.onExecute(pending.spell, { targetName, slotLevel: pending.spellLevel })
+  d.onExecute(pending.spell, { targetName, slotLevel: healSlotLevel(pending) })
 }
 
 async function runHex(d, pending, result) {
