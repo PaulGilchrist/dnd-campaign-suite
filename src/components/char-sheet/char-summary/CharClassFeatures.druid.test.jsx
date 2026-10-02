@@ -166,6 +166,20 @@ describe('DruidFeatures (via CharClassFeatures entry point)', () => {
       render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
       expect(screen.getByText(/Wild Shape Uses:/).parentElement).toHaveTextContent(/3\/3/);
     });
+
+    it('CLA-013: Infinity max (5e lv20 Archdruid) renders Unlimited instead of a numeric counter', () => {
+      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
+        maxWildShapeUses: Infinity,
+        maxWildShapeChallengeRating: 1,
+        beastKnownForms: 0,
+        wildShapeLimitations: 'walk, swim, or fly',
+      });
+      const stats = buildPlayerStats({ level: 20 });
+      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
+      expect(screen.getByText(/Unlimited/)).toBeInTheDocument();
+      expect(screen.getByText(/Wild Shape Uses:/).parentElement).toHaveTextContent(/Unlimited/);
+      expect(screen.queryByTestId('tracked-resource-wildShapeUses')).not.toBeInTheDocument();
+    });
   });
 
   describe('circle of the stars', () => {

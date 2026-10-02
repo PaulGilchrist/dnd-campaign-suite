@@ -9,6 +9,7 @@ import { evaluateAutoExpression, resolveNumericExpression } from '../../../comba
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { setTempHp } from './tempHpService.js'
 import { cleanupWildShape } from '../class-druid/wildShapeCreatureBuilder.js';
+import { hasUnlimitedWildShape } from '../../../rules/features/archdruidWildShapeService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 
@@ -246,10 +247,13 @@ function handleDashSpeedBonus(action, auto, playerStats, campaignName) {
 }
 
 // Wild Shape ON leg consumes a use, shows the form chooser; OFF leg cleans up (CLA-391).
+// 5e lv20 Archdruid (CLA-013): the refusal gate is skipped (unlimited uses) and the
+// OFF leg logs an explicit free-revert token. 2024 hosts never match the helper.
 async function handleShapeShift(action, auto, playerStats, campaignName, targetName) {
     const storedWSBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const formActive = (Array.isArray(storedWSBuffs) ? storedWSBuffs : []).some(b => b.name === action.name);
-    if (!formActive) {
+    const unlimitedWS = hasUnlimitedWildShape(playerStats);
+    if (!formActive && !unlimitedWS) {
         const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
         const currentWS = Number(getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName) ?? maxWS);
         if (currentWS <= 0) {
@@ -303,6 +307,19 @@ async function handleShapeShift(action, auto, playerStats, campaignName, targetN
         description: `${playerStats.name} deactivated Wild Shape.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[buffHandler] Wild Shape log error:', e); });
+
+    if (unlimitedWS) {
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'shape_shift_reverted',
+            automationDetail: 'archdruid_free_revert',
+            characterName: playerStats.name,
+            creatureName: playerStats.name,
+            abilityName: action.name,
+            description: `${playerStats.name} reverts to normal form for free (Archdruid — no action or bonus action required, CLA-013). No Wild Shape use consumed.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[buffHandler] Archdruid revert log error:', e); });
+    }
 
     return {
         type: 'popup',

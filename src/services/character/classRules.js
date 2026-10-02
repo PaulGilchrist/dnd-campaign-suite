@@ -2,6 +2,7 @@ import { cloneDeep, merge } from 'lodash';
 import utils from '../ui/utils.js'
 import { getCategories } from './featureCategories.js'
 import { mergeCategorizedFeatures, addFeatures } from './featureCategorizationUtils.js'
+import { hasUnlimitedWildShape } from '../rules/features/archdruidWildShapeService.js'
 
 const featureCategories = getCategories('5e');
 
@@ -55,9 +56,9 @@ const classRules = {
             }
             return maxWildShapeChallengeRating
          },
-     getDruidWildShapeUses: () => {
-        // 5e Rules: Always 2 uses per day
-        return 2;
+     getDruidWildShapeUses: (playerStats) => {
+        // 5e Rules: 2 uses per day; lv20 Archdruid is unlimited (CLA-013)
+        return hasUnlimitedWildShape(playerStats) ? Infinity : 2;
     },
      getDruidBeastKnownForms: () => {
         // 5e Rules: No limit on known forms (returns null or 0)
@@ -116,8 +117,9 @@ const classRules = {
       getDruidFeatures: (playerStats) => {
             const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
             const classSpecific = classLevel?.class_specific;
-            const maxWildShapeChallengeRating = classRules.getDruidMaxWildShapeChallengeRating(playerStats);
-            const maxWildShapeUses = 2;
+             const maxWildShapeChallengeRating = classRules.getDruidMaxWildShapeChallengeRating(playerStats);
+             // CLA-013: lv20 Archdruid (2014) — unlimited Wild Shape uses.
+             const maxWildShapeUses = hasUnlimitedWildShape(playerStats) ? Infinity : 2;
             const beastKnownForms = 0;
             let wildShapeLimitations = 'walk only (no swim or fly)';
             if (classSpecific?.wild_shape_fly) {

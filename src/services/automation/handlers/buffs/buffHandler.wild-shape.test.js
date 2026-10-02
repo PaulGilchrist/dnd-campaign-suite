@@ -160,4 +160,101 @@ describe('buffHandler Wild Shape uses-gate (CLA-391)', () => {
     expect(log).toBeDefined();
     expect(log.description).toContain('deactivated Wild Shape');
   });
+
+  describe('CLA-013 5e lv20 Archdruid — unlimited uses', () => {
+    const makeUnlimitedDruidStats = (overrides = {}) => makeDruidStats({
+      rules: '5e',
+      ...overrides,
+      class: {
+        major: { name: 'Druid' },
+        class_levels: [{ level: 20, features: [{ name: 'Archdruid' }] }],
+        ...(overrides.class || {}),
+      },
+    });
+
+    it('ON leg at 0 uses is NOT refused — shows the form chooser, no wild_shape_refused log', async () => {
+      mockRuntime({ activeBuffs: [], wildShapeUses: 0 });
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+
+      const result = await handle(makeAction(), makeUnlimitedDruidStats(), campaignName, null);
+
+      expect(buffToggle.toggleBuff).toHaveBeenCalled();
+      expect(result.payload.type).toBe('wild_shape_select');
+      const refusal = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'wild_shape_refused');
+      expect(refusal).toBeUndefined();
+    });
+
+    it('ON leg with NO runtime counter at all (5e data has no wild_shape field) still activates', async () => {
+      mockRuntime({ activeBuffs: [], wildShapeUses: null });
+      runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+
+      const result = await handle(makeAction(), makeUnlimitedDruidStats(), campaignName, null);
+
+      expect(result.payload.type).toBe('wild_shape_select');
+    });
+
+    it('OFF leg logs the shape_shift_reverted free-revert token for Archdruid hosts', async () => {
+      mockRuntime({
+        activeBuffs: [{ name: 'Wild Shape', effect: 'shape_shift', blocksSpellcasting: true }],
+        wildShapeUses: 0,
+      });
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+
+      await handle(makeAction(), makeUnlimitedDruidStats(), campaignName, null);
+
+      const entries = logService.addEntry.mock.calls.map(c => c[1]);
+      const revert = entries.find(e => e.automationType === 'shape_shift_reverted');
+      expect(revert).toBeDefined();
+      expect(revert.type).toBe('automation');
+      expect(revert.characterName).toBe('Wild_Sage_Druid');
+      expect(revert.description).toContain('free');
+      expect(entries.find(e => e.type === 'ability_use').description).toContain('deactivated Wild Shape');
+    });
+
+    it('OFF leg for NON-Archdruid hosts stays unchanged — no shape_shift_reverted token', async () => {
+      mockRuntime({
+        activeBuffs: [{ name: 'Wild Shape', effect: 'shape_shift', blocksSpellcasting: true }],
+        wildShapeUses: 3,
+      });
+      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+
+      await handle(makeAction(), makeDruidStats(), campaignName, null);
+
+      const revert = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'shape_shift_reverted');
+      expect(revert).toBeUndefined();
+    });
+
+    it('5e lv19 Druid (finite) is still refused at 0 uses', async () => {
+      mockRuntime({ activeBuffs: [], wildShapeUses: 0 });
+      const lv19Stats = makeUnlimitedDruidStats({
+        level: 19,
+        class: { major: { name: 'Druid' }, class_levels: [{ level: 19, wild_shape: 2 }] },
+      });
+
+      const result = await handle(makeAction(), lv19Stats, campaignName, null);
+
+      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
+      expect(result.payload.description).toContain('No Wild Shape uses remaining');
+      const refusal = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'wild_shape_refused');
+      expect(refusal).toBeDefined();
+    });
+
+    it('2024 lv20 host (finite wild_shape: 4) is still refused at 0 uses — byte-identical', async () => {
+      mockRuntime({ activeBuffs: [], wildShapeUses: 0 });
+      const stats2024 = makeDruidStats({ rules: '2024' });
+
+      const result = await handle(makeAction(), stats2024, campaignName, null);
+
+      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
+      expect(result.payload.description).toContain('No Wild Shape uses remaining');
+      const refusal = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'wild_shape_refused');
+      expect(refusal).toBeDefined();
+      const revert = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'shape_shift_reverted');
+      expect(revert).toBeUndefined();
+    });
+  });
 });

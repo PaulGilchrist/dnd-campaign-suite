@@ -6031,6 +6031,7 @@
         "range": "Self",
         "casting_time": "1 action",
         "level": 7,
+        "classes": [],
         "dc": {
             "dc_type": "CHA",
             "dc_success": "none"

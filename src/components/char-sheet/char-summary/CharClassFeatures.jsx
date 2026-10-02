@@ -264,6 +264,19 @@ function NaturalRecoverySection({ naturalRecoveryFreeCast, naturalRecoveryFreeCa
     );
 }
 
+// CLA-013: 5e lv20 Archdruid reports Infinity max — render the unlimited
+// surface (Number.isFinite guard, mirrors SetConditionModal's maxTargets pattern).
+function WildShapeUsesCounter({ druidFeatures, playerStats, campaignName }) {
+    if (!Number.isFinite(druidFeatures?.maxWildShapeUses)) {
+        return (
+            <div><b>Wild Shape Uses: </b><span className="automation-badge"><i className="fa-solid fa-infinity"></i> Unlimited</span> <span className="text-muted">(Archdruid)</span></div>
+        );
+    }
+    return (
+        <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures.maxWildShapeUses} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+    );
+}
+
 const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const druidFeatures = getClassFeatures(playerStats);
     const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
@@ -297,7 +310,7 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                 {hasNaturalRecovery && <NaturalRecoverySection naturalRecoveryFreeCast={naturalRecoveryFreeCast} naturalRecoveryFreeCastUsed={naturalRecoveryFreeCastUsed} />}
                 <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
                 <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
-                <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                <WildShapeUsesCounter druidFeatures={druidFeatures} playerStats={playerStats} campaignName={campaignName} />
                 {wrathOfTheSeaActive && (
                     <span className="automation-badge"><i className="fa-solid fa-water"></i> Wrath of the Sea Active</span>
                 )}

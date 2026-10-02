@@ -252,6 +252,54 @@ describe('wildShapeCreatureBuilder', () => {
             ]);
         });
 
+        it('decrements wildShapeUses for finite (lv<20) druids', async () => {
+            const cs = { creatures: [{ name: 'Maribelle', type: 'player' }] };
+            getCombatContext.mockResolvedValue(cs);
+
+            await activateWildShape('Maribelle', giantSpider, druidStats, campaignName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'wildShapeUses', 1, campaignName);
+        });
+
+        it('CLA-013: skips the decrement AND notes "none consumed" for 5e lv20 Archdruid', async () => {
+            const cs = { creatures: [{ name: 'Maribelle', type: 'player' }] };
+            getCombatContext.mockResolvedValue(cs);
+            const unlimitedStats = {
+                name: 'Maribelle',
+                level: 20,
+                rules: '5e',
+                class: { major: { name: 'Druid' }, class_levels: [{ level: 20, features: [{ name: 'Archdruid' }] }] },
+            };
+
+            await activateWildShape('Maribelle', giantSpider, unlimitedStats, campaignName);
+
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('Maribelle', 'wildShapeUses', expect.any(Number), campaignName);
+            const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
+            expect(log.description).toContain('unlimited uses (Archdruid), none consumed');
+        });
+
+        it('keeps the byte-identical consume + log for 2024 lv20 hosts (finite wild_shape: 4)', async () => {
+            const cs = { creatures: [{ name: 'Maribelle', type: 'player' }] };
+            getCombatContext.mockResolvedValue(cs);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === 'campaign' && key === 'targetEffects') return [];
+                if (name === 'Maribelle' && key === 'wildShapeUses') return 4;
+                return undefined;
+            });
+            const stats2024 = {
+                name: 'Maribelle',
+                level: 20,
+                rules: '2024',
+                class: { major: { name: 'Druid' }, class_levels: [{ level: 20, wild_shape: 4, features: [{ name: 'Archdruid' }] }] },
+            };
+
+            await activateWildShape('Maribelle', giantSpider, stats2024, campaignName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'wildShapeUses', 3, campaignName);
+            const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
+            expect(log.description).toBe('Maribelle activated Wild Shape as Giant Spider (CR 1).');
+        });
+
         it('does not add lunarFormAction when no monsters loaded', async () => {
             const cs = { creatures: [{ name: 'Maribelle', type: 'player', initiative: '20' }] };
             getCombatContext.mockResolvedValue(cs);

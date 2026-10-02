@@ -148,6 +148,24 @@ describe('classRules', () => {
     it('returns 2 (5e rules)', () => {
       expect(classRules.getDruidWildShapeUses()).toBe(2);
     });
+
+    it('returns Infinity for lv20 Archdruid (CLA-013 unlimited Wild Shape)', () => {
+      const playerStats = {
+        rules: '5e',
+        level: 20,
+        class: { name: 'Druid', class_levels: [{ level: 20, features: [{ name: 'Archdruid' }] }] },
+      };
+      expect(classRules.getDruidWildShapeUses(playerStats)).toBe(Infinity);
+    });
+
+    it('returns 2 for lv19 Druid (finite before the capstone)', () => {
+      const playerStats = {
+        rules: '5e',
+        level: 19,
+        class: { name: 'Druid', class_levels: [{ level: 19 }] },
+      };
+      expect(classRules.getDruidWildShapeUses(playerStats)).toBe(2);
+    });
   });
 
   describe('getDruidBeastKnownForms', () => {
@@ -393,6 +411,24 @@ describe('classRules', () => {
       expect(result.maxWildShapeChallengeRating).toBe(0);
       expect(result.beastKnownForms).toBe(0);
       expect(result.wildShapeLimitations).toBe('walk only (no swim or fly)');
+    });
+
+    it('reports Infinity maxWildShapeUses for lv20 Archdruid (CLA-013)', () => {
+      const playerStats = {
+        rules: '5e',
+        level: 20,
+        class: { name: 'Druid', class_levels: [{ level: 20, features: [{ name: 'Archdruid' }] }] },
+      };
+      expect(classRules.getDruidFeatures(playerStats).maxWildShapeUses).toBe(Infinity);
+    });
+
+    it('keeps maxWildShapeUses finite (2) at lv19', () => {
+      const playerStats = {
+        rules: '5e',
+        level: 19,
+        class: { name: 'Druid', class_levels: [{ level: 19 }] },
+      };
+      expect(classRules.getDruidFeatures(playerStats).maxWildShapeUses).toBe(2);
     });
 
     it('sets wildShapeLimitations based on fly flag', () => {

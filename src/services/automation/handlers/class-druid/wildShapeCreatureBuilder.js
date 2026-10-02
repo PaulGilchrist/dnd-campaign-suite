@@ -6,6 +6,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { setTempHp } from '../buffs/tempHpService.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 import { getMonsterSaveBonuses } from '../../../encounters/encounterToInitiative.js';
+import { hasUnlimitedWildShape } from '../../../rules/features/archdruidWildShapeService.js';
 
 const WILD_SHAPE_EFFECT = 'wild_shape';
 
@@ -93,6 +94,25 @@ async function applyCircleOfTheMoon(combatSummary, druidName, baseMonster, druid
     }
 }
 
+function spendAndLogWildShapeUse(druidName, baseMonster, druidStats, campaignName) {
+    // CLA-013: 5e lv20 Archdruid activations never consume a use (unlimited).
+    const unlimitedWS = hasUnlimitedWildShape(druidStats);
+    if (!unlimitedWS) {
+        const maxWS = druidStats.class?.class_levels?.find(cl => cl.level === druidStats.level)?.wild_shape || 0;
+        const currentWS = Number(getRuntimeValue(druidName, 'wildShapeUses', campaignName) ?? maxWS);
+        setRuntimeValue(druidName, 'wildShapeUses', currentWS - 1, campaignName);
+    }
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: druidName,
+        abilityName: 'Wild Shape',
+        description: unlimitedWS
+            ? `${druidName} activated Wild Shape as ${baseMonster.name} (CR ${baseMonster.challenge_rating}) — unlimited uses (Archdruid), none consumed.`
+            : `${druidName} activated Wild Shape as ${baseMonster.name} (CR ${baseMonster.challenge_rating}).`,
+    }).catch((e) => { console.error("[wildShapeCreatureBuilder:log-error]", e); });
+}
+
 export async function activateWildShape(druidName, baseMonster, druidStats, campaignName) {
     setRuntimeValue(druidName, 'activeConditions', [], campaignName);
 
@@ -127,16 +147,7 @@ export async function activateWildShape(druidName, baseMonster, druidStats, camp
     ];
     setRuntimeValue('campaign', 'targetEffects', updatedTargetEffects, campaignName);
 
-    const maxWS = druidStats.class?.class_levels?.find(cl => cl.level === druidStats.level)?.wild_shape || 0;
-    const currentWS = Number(getRuntimeValue(druidName, 'wildShapeUses', campaignName) ?? maxWS);
-    setRuntimeValue(druidName, 'wildShapeUses', currentWS - 1, campaignName);
-
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: druidName,
-        abilityName: 'Wild Shape',
-        description: `${druidName} activated Wild Shape as ${baseMonster.name} (CR ${baseMonster.challenge_rating}).`,
-    }).catch((e) => { console.error("[wildShapeCreatureBuilder:log-error]", e); });
+    spendAndLogWildShapeUse(druidName, baseMonster, druidStats, campaignName);
 
     return { name: baseMonster.name, index: baseMonster.index };
 }
