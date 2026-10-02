@@ -199,6 +199,10 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         overchannelSpellLevel: context.overchannelSpellLevel,
         secondaryFormula: context.autoDamageSecondaryFormula,
         secondaryDamageType: context.autoDamageSecondaryDamageType,
+        // CLA-036: Bestial Fury rider marker + bonus dict ride the auto-damage
+        // transport to the hit-confirmed seam (undefined = byte-inert).
+        bestialFuryRider: context.bestialFuryRider,
+        bestialFuryBonus: context.bestialFuryBonus,
         ...secondaryConditionTransportField(context),
         ripostePopup: context.ripostePopup,
         source: autoDamageSourceRef?.current || characterName,

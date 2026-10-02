@@ -3,7 +3,7 @@
 // @cleaned-by-ai
 // @improved-by-ai
 // @cleaned-by-ai
-import { handle, confirmPrimalCompanionSummon, handleCommand, handleRestore, handleBonusActionCommand, applyBonusActionCommand } from './primalCompanionHandler.js';
+import { handle, confirmPrimalCompanionSummon, handleCommand, handleRestore, handleBonusActionCommand, applyBonusActionCommand, resolveBestialFuryStrikeGate, resolveBestialFuryMarkStrike, resolveBestialFuryBonus, BESTIAL_FURY_STRIKES_KEY, BESTIAL_FURY_MARK_LATCH_KEY } from './primalCompanionHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -16,6 +16,7 @@ vi.mock('../../../ui/logService.js', () => ({
 
 vi.mock('../../../encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
+    getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 vi.mock('../../../ui/storage.js', () => ({
@@ -47,7 +48,7 @@ vi.mock('../../../encounters/encounterToInitiative.js', () => ({
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
+import { getCombatSummary, getCurrentCombatRound } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 
@@ -607,5 +608,310 @@ describe('primalCompanionHandler', () => {
             expect(result.payload.automation).toBe(action.automation);
         });
 
+    });
+
+    // CLA-036 — Bestial Fury: double-strike economy + Hunter's Mark extra-Force rider.
+    describe('CLA-036 Bestial Fury lanes', () => {
+        const furyPlayerStats = {
+            name: 'TestRanger',
+            level: 11,
+            proficiency: 3,
+            abilities: [{ name: 'Wisdom', bonus: 3 }],
+            spellAbilities: { toHit: 9, saveDc: 16 },
+            class: {
+                name: 'Ranger',
+                major: {
+                    name: 'Beast Master',
+                    features: [{
+                        name: 'Bestial Fury',
+                        automation: [
+                            { type: 'primal_companion_double_strike', casting_time: 'passive' },
+                            { type: 'primal_companion_double_strike_damage', trigger: 'companion_beasts_strike_hit', damageExpression: '1d6', damageType: 'Force', oncePerTurn: true },
+                        ],
+                    }],
+                },
+            },
+        };
+        let runtimeStore;
+        let currentRound;
+
+        beforeEach(() => {
+            runtimeStore = {};
+            currentRound = 1;
+            getCombatSummary.mockReset();
+            getCurrentCombatRound.mockImplementation(() => currentRound);
+            getRuntimeValue.mockImplementation((scope, key) => {
+                if (scope === 'campaign' && key === 'targetEffects') return [];
+                const bag = runtimeStore[scope] || {};
+                return bag[key] ?? null;
+            });
+            setRuntimeValue.mockImplementation(async (scope, key, value) => {
+                runtimeStore[scope] = runtimeStore[scope] || {};
+                runtimeStore[scope][key] = value;
+            });
+            addEntry.mockResolvedValue({});
+        });
+
+        const furyStrikeAction = () => ({
+            name: "Beast's Strike",
+            attack_bonus: 9,
+            damage_dice_primary: '1d8+2+3',
+            damage_type_primary: 'Force',
+            bestial_fury_double_strike: true,
+            bestial_fury_bonus: { expression: '1d6', damageType: 'Force' },
+        });
+
+        describe('resolveBestialFuryBonus', () => {
+            it('reads the app-data 1d6 Force automation expression', () => {
+                expect(resolveBestialFuryBonus(furyPlayerStats)).toEqual({ expression: '1d6', damageType: 'Force' });
+            });
+
+            it('falls back to 1d6 Force without the feature', () => {
+                expect(resolveBestialFuryBonus({ name: 'X' })).toEqual({ expression: '1d6', damageType: 'Force' });
+            });
+        });
+
+        describe('summon stamps', () => {
+            it('Fury summon arms the strike gate + rider transport with provenance', async () => {
+                getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '12' }] });
+                loadMonsters.mockResolvedValue(mockMonsters);
+
+                await confirmPrimalCompanionSummon(makeAction(), furyPlayerStats, mockCampaignName, 'Beast of the Land');
+
+                const cs = storage.set.mock.calls[0][1];
+                const companion = cs.creatures.find(c => c.name === 'Primal Companion (Beast of the Land)');
+                expect(companion.summonedBy).toBe('TestRanger');
+                expect(companion.bestialFury).toBe(true);
+                const strike = companion.actions.find(a => a.name === "Beast's Strike");
+                expect(strike.bestial_fury_double_strike).toBe(true);
+                expect(strike.bestial_fury_bonus).toEqual({ expression: '1d6', damageType: 'Force' });
+                // Save-row twin stays byte-inert (Charge never passes the attack-chip gate).
+                const charge = companion.actions.find(a => a.name === "Beast's Strike — Charge");
+                expect(charge.bestial_fury_double_strike).toBeUndefined();
+                expect(charge.bestial_fury_bonus).toBeUndefined();
+            });
+
+            it('non-Fury summon stays byte-inert (no stamps)', async () => {
+                getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '12' }] });
+                loadMonsters.mockResolvedValue(mockMonsters);
+
+                await confirmPrimalCompanionSummon(makeAction(), mockPlayerStats, mockCampaignName, 'Beast of the Land');
+
+                const cs = storage.set.mock.calls[0][1];
+                const companion = cs.creatures.find(c => c.name === 'Primal Companion (Beast of the Land)');
+                expect(companion.bestialFury).toBe(false);
+                expect(companion.actions[0].bestial_fury_double_strike).toBeUndefined();
+                expect(companion.actions[0].bestial_fury_bonus).toBeUndefined();
+            });
+        });
+
+        describe('handleCommand arming', () => {
+            it('Fury command arms the 2-strike counter + logs the grant', async () => {
+                getRuntimeValue.mockImplementation((scope, key) => {
+                    if (key === 'primalCompanionType') return 'Beast of the Land';
+                    const bag = runtimeStore[scope] || {};
+                    return bag[key] ?? null;
+                });
+                const action = makeAction({ automation: { type: 'primal_companion_command' } });
+
+                const result = await handleCommand(action, furyPlayerStats, mockCampaignName);
+
+                expect(result.payload.description).toContain('Bestial Fury: beast attacks twice!');
+                expect(setRuntimeValue).toHaveBeenCalledWith('Primal Companion (Beast of the Land)', BESTIAL_FURY_STRIKES_KEY, { round: 1, used: 0 }, mockCampaignName);
+                const grant = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'bestial_fury_command');
+                expect(grant).toBeDefined();
+                expect(grant.characterName).toBe('TestRanger');
+            });
+
+            it('non-Fury command writes no counter and logs no grant', async () => {
+                getRuntimeValue.mockImplementation((scope, key) => {
+                    if (key === 'primalCompanionType') return 'Beast of the Land';
+                    const bag = runtimeStore[scope] || {};
+                    return bag[key] ?? null;
+                });
+                const action = makeAction({ automation: { type: 'primal_companion_command' } });
+
+                await handleCommand(action, mockPlayerStats, mockCampaignName);
+
+                expect(setRuntimeValue).not.toHaveBeenCalledWith('Primal Companion (Beast of the Land)', BESTIAL_FURY_STRIKES_KEY, expect.anything(), mockCampaignName);
+                expect(addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'bestial_fury_command')).toBeUndefined();
+            });
+        });
+
+        describe('resolveBestialFuryStrikeGate (double-strike economy)', () => {
+            const companion = 'Primal Companion (Beast of the Land)';
+
+            it('is byte-inert for unstamped rows (zero write, zero log)', () => {
+                const refused = resolveBestialFuryStrikeGate({
+                    campaignName: mockCampaignName, monsterName: 'Bandit 1', action: { name: 'Scimitar', attack_bonus: 4 }, setPopupHtml: vi.fn(),
+                });
+                expect(refused).toBe(false);
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(addEntry).not.toHaveBeenCalled();
+            });
+
+            it('allows exactly two strikes per command then refuses the third (zero roll)', () => {
+                const setPopupHtml = vi.fn();
+                const press = () => resolveBestialFuryStrikeGate({
+                    campaignName: mockCampaignName, monsterName: companion, action: furyStrikeAction(), setPopupHtml,
+                });
+
+                expect(press()).toBe(false);
+                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 1, used: 1 });
+                expect(press()).toBe(false);
+                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 1, used: 2 });
+
+                expect(press()).toBe(true);
+                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 1, used: 2 });
+                expect(setPopupHtml).toHaveBeenCalled();
+                const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'bestial_fury_refused');
+                expect(refusal).toBeDefined();
+                expect(refusal.characterName).toBe(companion);
+            });
+
+            it('command re-issue resets the counter mid-round for two fresh strikes', async () => {
+                const press = () => resolveBestialFuryStrikeGate({
+                    campaignName: mockCampaignName, monsterName: companion, action: furyStrikeAction(), setPopupHtml: vi.fn(),
+                });
+                press(); press();
+                expect(press()).toBe(true);
+
+                runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY] = { round: 1, used: 0 };
+                expect(press()).toBe(false);
+                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 1, used: 1 });
+            });
+
+            it('round-wrap re-arms the counter (stale stamp reads fresh)', () => {
+                runtimeStore[companion] = { [BESTIAL_FURY_STRIKES_KEY]: { round: 1, used: 2 } };
+                currentRound = 2;
+                const refused = resolveBestialFuryStrikeGate({
+                    campaignName: mockCampaignName, monsterName: companion, action: furyStrikeAction(), setPopupHtml: vi.fn(),
+                });
+                expect(refused).toBe(false);
+                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 2, used: 1 });
+            });
+        });
+
+        describe('resolveBestialFuryMarkStrike (Hunter\'s Mark rider)', () => {
+            const companion = 'Primal Companion (Beast of the Land)';
+            let rollDamage;
+
+            function seedBoard(target) {
+                getCombatSummary.mockReturnValue({
+                    creatures: [
+                        { name: companion, type: 'npc', summonedBy: 'TestRanger', bestialFury: true },
+                        { name: 'TestRanger', type: 'player', concentration: target ? { spell: "Hunter's Mark", dc: 17, target } : null },
+                        { name: 'Bandit 1', type: 'npc' },
+                    ],
+                });
+            }
+
+            const autoHit = (targetName = 'Bandit 1') => ({
+                name: "Beast's Strike",
+                formula: '1d8+2+3',
+                total: 7,
+                attackerName: companion,
+                targetName,
+                bestialFuryRider: true,
+                bestialFuryBonus: { expression: '1d6', damageType: 'Force' },
+            });
+
+            beforeEach(() => {
+                rollDamage = vi.fn().mockResolvedValue({});
+            });
+
+            it('is byte-inert when the auto-damage carries no Fury marker', async () => {
+                seedBoard('Bandit 1');
+                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: 'Bandit 1', autoDamage: { name: 'Scimitar', targetName: 'ElderPaladin' }, rollDamage });
+                expect(res).toBeNull();
+                expect(addEntry).not.toHaveBeenCalled();
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
+            it('first HIT under Hunter\'s Mark folds a separate 1d6 Force leg, logs trigger + grant, latches the round', async () => {
+                seedBoard('Bandit 1');
+
+                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit(), rollDamage });
+
+                const logs = addEntry.mock.calls.map(c => c[1]);
+                const trigger = logs.find(e => e.automationType === 'companion_beasts_strike_hit');
+                expect(trigger).toBeDefined();
+                expect(trigger.characterName).toBe(companion);
+                expect(res).not.toBeNull();
+                expect(rollDamage).toHaveBeenCalledTimes(1);
+                const leg = rollDamage.mock.calls[0][0];
+                expect(leg.formula).toBe('1d6');
+                expect(leg.context.damageType).toBe('Force');
+                expect(leg.context.attackerName).toBe(companion);
+                expect(leg.context.targetName).toBe('Bandit 1');
+                expect(leg.name).toContain('Bestial Fury');
+                expect(runtimeStore[companion][BESTIAL_FURY_MARK_LATCH_KEY]).toBe(1);
+                expect(logs.find(e => e.automationType === 'bestial_fury_mark_bonus')).toBeDefined();
+            });
+
+            it('second HIT same turn: trigger still logs, rider gated off once per turn (no extra die)', async () => {
+                seedBoard('Bandit 1');
+                runtimeStore[companion] = { [BESTIAL_FURY_MARK_LATCH_KEY]: 1 };
+
+                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit(), rollDamage });
+
+                expect(res).toBeNull();
+                expect(rollDamage).not.toHaveBeenCalled();
+                const logs = addEntry.mock.calls.map(c => c[1]);
+                expect(logs.find(e => e.automationType === 'companion_beasts_strike_hit')).toBeDefined();
+                expect(logs.find(e => e.automationType === 'bestial_fury_refused')).toBeDefined();
+            });
+
+            it('HIT on an unmarked target folds nothing (trigger logged, no refusal needed)', async () => {
+                seedBoard('Bandit 1');
+                getCombatSummary.mockReturnValue({
+                    creatures: [
+                        { name: companion, summonedBy: 'TestRanger' },
+                        { name: 'TestRanger', concentration: { spell: "Hunter's Mark", dc: 17, target: 'Bandit 1' } },
+                        { name: 'Bandit 2', type: 'npc' },
+                    ],
+                });
+
+                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit('Bandit 2'), rollDamage });
+
+                expect(res).toBeNull();
+                expect(rollDamage).not.toHaveBeenCalled();
+                const logs = addEntry.mock.calls.map(c => c[1]);
+                expect(logs.find(e => e.automationType === 'companion_beasts_strike_hit')).toBeDefined();
+                expect(logs.find(e => e.automationType === 'bestial_fury_mark_bonus')).toBeUndefined();
+            });
+
+            it('no Hunter\'s Mark concentration at all: trigger logged, zero fold', async () => {
+                seedBoard(null);
+
+                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit(), rollDamage });
+
+                expect(res).toBeNull();
+                expect(rollDamage).not.toHaveBeenCalled();
+                expect(addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'companion_beasts_strike_hit')).toBeDefined();
+            });
+
+            it('next round re-folds (stale latch)', async () => {
+                seedBoard('Bandit 1');
+                runtimeStore[companion] = { [BESTIAL_FURY_MARK_LATCH_KEY]: 1 };
+                currentRound = 2;
+
+                const res = await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: autoHit(), rollDamage });
+
+                expect(res).not.toBeNull();
+                expect(rollDamage).toHaveBeenCalledTimes(1);
+                expect(runtimeStore[companion][BESTIAL_FURY_MARK_LATCH_KEY]).toBe(2);
+            });
+
+            it('rolls the transported bonus expression (custom die respected)', async () => {
+                seedBoard('Bandit 1');
+                const auto = autoHit();
+                auto.bestialFuryBonus = { expression: '2d6', damageType: 'Force' };
+
+                await resolveBestialFuryMarkStrike({ campaignName: mockCampaignName, monsterName: companion, autoDamage: auto, rollDamage });
+
+                expect(rollDamage.mock.calls[0][0].formula).toBe('2d6');
+            });
+        });
     });
 });
