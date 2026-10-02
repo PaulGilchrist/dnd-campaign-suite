@@ -1,10 +1,8 @@
 // @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// CLA-064: Countercharm — trigger gate (failed save vs charmed/frightened),
+// uses:1 numeric pool + long_rest re-arm, campaignName on the remove seam,
+// machine-truth roll log rolls:[a,b] mode:"advantage".
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { handle } from './countercharmHandler.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -12,6 +10,10 @@ import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { removeCondition } from '../../../combat/conditions/conditionSaveService.js';
+import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
+import { logConditionEvent } from '../../../encounters/combatLoggingService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getLongRestResources } from '../../../rules/effects/restRules-constants.js';
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -29,6 +31,14 @@ vi.mock('../../../combat/conditions/conditionSaveService.js', () => ({
   removeCondition: vi.fn(),
 }));
 
+vi.mock('../../../combat/conditions/savePromptService.js', () => ({
+  sendSaveResult: vi.fn(),
+}));
+
+vi.mock('../../../encounters/combatLoggingService.js', () => ({
+  logConditionEvent: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn(),
 }));
@@ -40,15 +50,20 @@ vi.mock('../../common/infoPopup.js', () => ({
   })),
 }));
 
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(() => Promise.resolve()),
+}));
+
 // ── Helpers ────────────────────────────────────────────────────
 
-const campaignName = 'TestCampaign';
+const campaignName = 'test-campaign';
 const mapName = 'tavern-map';
 
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestHero',
-    level: 5,
+    level: 7,
     proficiency: 3,
     ...overrides,
   };
@@ -58,7 +73,14 @@ function makeAction(automation = {}) {
   return {
     name: 'Countercharm',
     automation: {
+      type: 'countercharm',
+      trigger: 'failed_save_charmed_or_frightened',
       range: '30 ft',
+      conditions: ['charmed', 'frightened'],
+      effect: 'reroll_with_advantage',
+      uses: 1,
+      recharge: 'long_rest',
+      casting_time: '1 reaction',
       ...automation,
     },
   };
@@ -77,335 +99,421 @@ function makeAttackResult(overrides = {}) {
   };
 }
 
-function makeAttackEvent(overrides = {}) {
-  return {
-    rollType: 'attack',
-    d20: 8,
-    bonus: 2,
-    targetAc: 13,
-    hit: false,
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
 function makeSaveEvent(overrides = {}) {
   return {
     rollType: 'save',
     d20: 8,
-    bonus: 2,
-    saveDc: 13,
+    bonus: -1,
+    saveDc: 14,
     saveResult: 'failure',
     saveType: 'Wisdom',
-    actionName: 'Charm Person',
+    saveConditions: ['charmed'],
+    actionName: 'Fey Charm',
     timestamp: Date.now(),
     ...overrides,
   };
 }
 
-function makeCheckEvent(overrides = {}) {
-  return {
-    rollType: 'check',
-    d20: 8,
-    bonus: 2,
-    checkName: 'Persuasion',
-    timestamp: Date.now(),
-    ...overrides,
-  };
+function qualifyingSave(targetName = 'AberrantSorcerer', overrides = {}) {
+  findLastAttack.mockResolvedValue(makeAttackResult({
+    attackEvent: makeSaveEvent(overrides),
+    attackerName: 'Dryad',
+    targetName,
+  }));
+}
+
+function mockRandomDie(die) {
+  vi.spyOn(Math, 'random').mockReturnValue((die - 1) / 20);
+}
+
+function refusalLogs() {
+  return addEntry.mock.calls
+    .map(c => c[1])
+    .filter(e => e && e.type === 'automation' && e.automationType === 'countercharm_refused');
+}
+
+function abilityUseLogs() {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e && e.type === 'ability_use');
+}
+
+function rollLogs() {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e && e.type === 'roll');
 }
 
 // ── Tests ──────────────────────────────────────────────────────
 
-describe('countercharmHandler.handle', () => {
+describe('countercharmHandler.handle — trigger gate (CLA-064)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findLastAttack.mockResolvedValue(makeAttackResult());
     getCombatContext.mockResolvedValue({
       creatures: [
         { name: 'TestHero', type: 'player' },
-        { name: 'Ally1', type: 'player' },
-        { name: 'Goblin', type: 'npc' },
+        { name: 'AberrantSorcerer', type: 'player' },
+        { name: 'Dryad', type: 'npc' },
       ],
     });
     isWithinRange.mockResolvedValue(true);
+    getRuntimeValue.mockResolvedValue(undefined);
   });
 
-  describe('no recent roll', () => {
-    it('should return popup when findLastAttack returns no attackEvent', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Countercharm');
-      expect(result.payload.description).toContain('No recent D20 test found');
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('save roll type', () => {
-    const saveRollTests = [
-      { targetName: 'TestHero', label: 'self', expectedTarget: 'TestHero' },
-      { targetName: 'Ally1', label: 'ally', expectedTarget: 'Ally1' },
-      { targetName: 'Goblin', label: 'NPC', expectedTarget: 'Goblin' },
-    ];
+  it('refuses with popup + countercharm_refused log when there is no recent roll', async () => {
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-    it.each(saveRollTests)(
-      'should identify $label as target when they failed their save',
-      async ({ targetName, expectedTarget }) => {
-        const ps = makePlayerStats();
-        const action = makeAction();
-        findLastAttack.mockResolvedValue(makeAttackResult({
-          attackEvent: makeSaveEvent({ d20: 5, saveDc: 14, saveResult: 'failure' }),
-          targetName,
-        }));
-
-        const result = await handle(action, ps, campaignName, mapName);
-
-        expect(result.payload.description).toContain(`Target: ${expectedTarget}`);
-        expect(result.payload.description).toContain('Original Wisdom save');
-      },
-    );
-
-    it('should display no effect when save already succeeded', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ d20: 15, saveDc: 13, saveResult: 'success' }),
-        targetName: 'TestHero',
-      }));
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Succeeded');
-      expect(result.payload.description).toContain('already succeeded');
-    });
-
-    it('should display still a failure when reroll does not meet DC', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ d20: 3, saveDc: 15, saveResult: 'failure' }),
-        targetName: 'TestHero',
-      }));
-      vi.spyOn(Math, 'random').mockReturnValue(0.1);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Failed');
-      expect(result.payload.description).toContain('Still a failure');
-    });
-
-    it('should display turned failure into success when reroll meets DC', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ d20: 3, saveDc: 15, saveResult: 'failure' }),
-        targetName: 'TestHero',
-      }));
-      vi.spyOn(Math, 'random').mockReturnValue(0.95);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('turned a failure into a success');
-    });
-
-    it('should remove charmed and frightened conditions when save is converted to success', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ d20: 3, saveDc: 15, saveResult: 'failure' }),
-        targetName: 'TestHero',
-      }));
-      vi.spyOn(Math, 'random').mockReturnValue(0.95);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(removeCondition).toHaveBeenCalledWith({
-        combatSummary: expect.any(Object),
-        creatureName: 'TestHero',
-        condition: 'charmed',
-        getRuntimeValue: expect.any(Function),
-        setRuntimeValue: expect.any(Function),
-      });
-      expect(removeCondition).toHaveBeenCalledWith({
-        combatSummary: expect.any(Object),
-        creatureName: 'TestHero',
-        condition: 'frightened',
-        getRuntimeValue: expect.any(Function),
-        setRuntimeValue: expect.any(Function),
-      });
-    });
-
-    it('should not remove conditions when save already succeeded', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ d20: 15, saveDc: 13, saveResult: 'success' }),
-        targetName: 'TestHero',
-      }));
-
-      await handle(action, ps, campaignName, null);
-
-      expect(removeCondition).not.toHaveBeenCalled();
-    });
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('No recent D20 test found');
+    const refusals = refusalLogs();
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0].automationDetail).toBe('no_roll');
+    expect(abilityUseLogs()).toHaveLength(0);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  describe('attack roll type', () => {
-    const attackRollTests = [
-      {
-        label: 'miss into hit',
-        event: makeAttackEvent({ d20: 8, targetAc: 13, hit: false }),
-        random: 0.95,
-        expectedTexts: ['MISS', 'turned a miss into a hit'],
-      },
-      {
-        label: 'still a miss',
-        event: makeAttackEvent({ d20: 2, targetAc: 18, hit: false }),
-        random: 0.05,
-        expectedTexts: ['MISS', 'Still a miss'],
-      },
-      {
-        label: 'already hit',
-        event: makeAttackEvent({ d20: 15, targetAc: 13, hit: true }),
-        random: null,
-        expectedTexts: ['already succeeded'],
-      },
-    ];
+  it('refuses a failed ATTACK roll (rollType gate)', async () => {
+    findLastAttack.mockResolvedValue(makeAttackResult({
+      attackEvent: { rollType: 'attack', d20: 5, bonus: 7, targetAc: 13, hit: false, timestamp: Date.now() },
+      attackerName: 'Dryad',
+      targetName: 'TestHero',
+    }));
 
-    it.each(attackRollTests)(
-      'should display correct outcome when $label',
-      async ({ event, random, expectedTexts }) => {
-        const ps = makePlayerStats();
-        const action = makeAction();
-        findLastAttack.mockResolvedValue(makeAttackResult({
-          attackEvent: event,
-          attackerName: 'TestHero',
-        }));
-        if (random !== null) {
-          vi.spyOn(Math, 'random').mockReturnValue(random);
-        }
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        const result = await handle(action, ps, campaignName, null);
-
-        for (const text of expectedTexts) {
-          expect(result.payload.description).toContain(text);
-        }
-      },
-    );
+    expect(result.payload.description).toContain('refused');
+    expect(refusalLogs()[0].automationDetail).toBe('rollType_attack');
+    expect(rollLogs()).toHaveLength(0);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  describe('ability check roll type', () => {
-    it('should identify character who made the check', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeCheckEvent({ d20: 8 }),
-        attackerName: 'TestHero',
-      }));
+  it('refuses an ability CHECK roll', async () => {
+    findLastAttack.mockResolvedValue(makeAttackResult({
+      attackEvent: { rollType: 'check', d20: 5, bonus: 2, checkName: 'Persuasion', timestamp: Date.now() },
+      attackerName: 'TestHero',
+      targetName: 'TestHero',
+    }));
 
-      const result = await handle(action, ps, campaignName, null);
+    await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('Target: TestHero');
-      expect(result.payload.description).toContain('Persuasion');
-      expect(result.payload.description).toContain('Reroll with Advantage');
+    expect(refusalLogs()[0].automationDetail).toBe('rollType_check');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('refuses a save that already SUCCEEDED', async () => {
+    qualifyingSave('AberrantSorcerer', { d20: 18, saveResult: 'success' });
+
+    await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(refusalLogs()[0].automationDetail).toBe('save_succeeded');
+    expect(removeCondition).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('refuses a failed save with no charmed/frightened evidence', async () => {
+    qualifyingSave('AberrantSorcerer', { saveConditions: [], actionName: 'Ray of Sickness' });
+    getRuntimeValue.mockImplementation(async () => undefined);
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(refusalLogs()[0].automationDetail).toBe('not_charmed_or_frightened');
+    expect(result.payload.description).toContain('Charmed or Frightened');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('accepts a failed save whose evidence is the target freshly-applied charmed condition', async () => {
+    qualifyingSave('AberrantSorcerer', { saveConditions: [] });
+    mockRandomDie(20);
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'AberrantSorcerer' && key === 'activeConditions') return ['charmed'];
+      return undefined;
     });
 
-    it('should display "Ability check" when checkName is missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeCheckEvent({ d20: 8, checkName: null }),
-        attackerName: 'TestHero',
-      }));
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      const result = await handle(action, ps, campaignName, null);
+    expect(refusalLogs()).toHaveLength(0);
+    expect(result.payload.description).toContain('Target: AberrantSorcerer');
+    expect(result.payload.description).toContain('turned a failure into a success');
+  });
 
-      expect(result.payload.description).toContain('Ability check');
+  it('refuses when the roller is out of range', async () => {
+    qualifyingSave('AberrantSorcerer');
+    isWithinRange.mockResolvedValue(false);
+
+    await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(refusalLogs()[0].automationDetail).toBe('out_of_range');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+});
+
+describe('countercharmHandler.handle — reroll machine truth', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'TestHero', type: 'player' },
+        { name: 'AberrantSorcerer', type: 'player' },
+        { name: 'Dryad', type: 'npc' },
+      ],
+    });
+    isWithinRange.mockResolvedValue(true);
+    getRuntimeValue.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('logs a roll entry with rolls:[original,new] mode:"advantage" on fire', async () => {
+    qualifyingSave('AberrantSorcerer', { d20: 8, bonus: -1, saveDc: 14 });
+    mockRandomDie(17);
+
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(rollLogs()).toHaveLength(1);
+    const roll = rollLogs()[0];
+    expect(roll.rolls).toEqual([8, 17]);
+    expect(roll.mode).toBe('advantage');
+    expect(roll.total).toBe(17);
+    expect(roll.bonus).toBe(-1);
+    expect(roll.saveDc).toBe(14);
+    expect(roll.characterName).toBe('AberrantSorcerer');
+    expect(roll.success).toBe(true);
+  });
+
+  it('on convert-success updates saveResult-<Target> machine truth and logs save_result', async () => {
+    qualifyingSave('AberrantSorcerer', { d20: 8, bonus: -1, saveDc: 14 });
+    mockRandomDie(17);
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'AberrantSorcerer' && key === 'activeConditions') return ['charmed'];
+      return undefined;
     });
 
-    it('should display improved or unchanged result based on reroll', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      // Low original roll, high random → improvement
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeCheckEvent({ d20: 5 }),
-        attackerName: 'TestHero',
-      }));
-      vi.spyOn(Math, 'random').mockReturnValue(0.95);
+    expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'AberrantSorcerer', {
+      success: true,
+      roll: 17,
+      total: 16,
+      saveBonus: -1,
+      rawRolls: [8, 17],
+      mode: 'advantage',
+    });
+    const converted = addEntry.mock.calls.map(c => c[1]).filter(e => e && e.type === 'save_result');
+    expect(converted).toHaveLength(1);
+    expect(converted[0].success).toBe(true);
+    expect(converted[0].targetName).toBe('AberrantSorcerer');
+    expect(converted[0].description).toContain('SUCCESS');
+  });
 
-      let result = await handle(action, ps, campaignName, null);
-      expect(result.payload.description).toContain('improved the result');
+  it('still-fail: no saveResult write, no removeCondition, popup says Still a failure', async () => {
+    qualifyingSave('AberrantSorcerer', { d20: 3, bonus: -1, saveDc: 15 });
+    mockRandomDie(4);
 
-      // High original roll, low random → unchanged
-      vi.spyOn(Math, 'random').mockReturnValue(0.05);
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeCheckEvent({ d20: 15 }),
-        attackerName: 'TestHero',
-      }));
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      result = await handle(action, ps, campaignName, null);
-      expect(result.payload.description).not.toContain('improved the result');
+    expect(result.payload.description).toContain('Still a failure');
+    expect(sendSaveResult).not.toHaveBeenCalled();
+    expect(removeCondition).not.toHaveBeenCalled();
+    expect(logConditionEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('countercharmHandler.handle — condition lift seam (CLA-064)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    qualifyingSave('AberrantSorcerer', { d20: 3, bonus: -1, saveDc: 15 });
+    mockRandomDie(20);
+    getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'TestHero', type: 'player' },
+        { name: 'AberrantSorcerer', type: 'player' },
+      ],
+    });
+    isWithinRange.mockResolvedValue(true);
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'AberrantSorcerer' && key === 'activeConditions') return ['charmed'];
+      return undefined;
     });
   });
 
-  describe('custom feature name', () => {
-    it('should use custom name in popup and description', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'Bardic Countercharm',
-        automation: { range: '30 ft' },
-      };
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ saveResult: 'failure' }),
-        targetName: 'TestHero',
-      }));
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-      const result = await handle(action, ps, campaignName, null);
+  it('calls removeCondition WITH campaignName for each active mind condition', async () => {
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      expect(result.payload.name).toBe('Bardic Countercharm');
-      expect(result.payload.description).toContain('<b>Bardic Countercharm</b>');
+    expect(removeCondition).toHaveBeenCalledTimes(1);
+    expect(removeCondition).toHaveBeenCalledWith({
+      combatSummary: expect.any(Object),
+      creatureName: 'AberrantSorcerer',
+      condition: 'charmed',
+      getRuntimeValue: expect.any(Function),
+      setRuntimeValue: expect.any(Function),
+      campaignName: 'test-campaign',
     });
   });
 
-  describe('logging', () => {
-    it('should log ability use with correct data', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ saveResult: 'failure' }),
-        targetName: 'TestHero',
-      }));
+  it('logs `condition removed` for each lifted condition', async () => {
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      await handle(action, ps, campaignName, null);
+    expect(logConditionEvent).toHaveBeenCalledWith({
+      campaignName: 'test-campaign',
+      action: 'removed',
+      creatureName: 'AberrantSorcerer',
+      conditionLabel: 'Charmed',
+    });
+  });
 
-      expect(addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'TestHero',
-        abilityName: 'Countercharm',
-        description: expect.stringContaining('TestHero used Countercharm on TestHero'),
-        targetName: 'TestHero',
-        timestamp: expect.any(Number),
-      });
+  it('lifts frightened too when present', async () => {
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'AberrantSorcerer' && key === 'activeConditions') return ['charmed', 'frightened'];
+      return undefined;
     });
 
-    it('should include creature types and outcome in log description', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      findLastAttack.mockResolvedValue(makeAttackResult({
-        attackEvent: makeSaveEvent({ saveResult: 'failure' }),
-        targetName: 'TestHero',
-      }));
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      await handle(action, ps, campaignName, null);
+    expect(removeCondition).toHaveBeenCalledTimes(2);
+    expect(logConditionEvent).toHaveBeenCalledTimes(2);
+  });
 
-      const logCall = addEntry.mock.calls[0][1];
-      expect(logCall.description).toContain('Source: player');
-      expect(logCall.description).toContain('Target: player');
-      expect(logCall.description).toContain('save');
-      expect(logCall.description).toContain('Outcome:');
+  it('does not call removeCondition for a condition the target does not carry', async () => {
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'AberrantSorcerer' && key === 'activeConditions') return ['frightened'];
+      return undefined;
     });
+
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(removeCondition).toHaveBeenCalledTimes(1);
+    expect(removeCondition.mock.calls[0][0].condition).toBe('frightened');
+  });
+});
+
+describe('countercharmHandler.handle — uses:1 pool (CLA-064)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    qualifyingSave('AberrantSorcerer', { d20: 8, bonus: -1, saveDc: 14 });
+    mockRandomDie(17);
+    getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestHero', type: 'player' }] });
+    isWithinRange.mockResolvedValue(true);
+    getRuntimeValue.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('spends 1 use as a numeric runtime key on the bard', async () => {
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 0, 'test-campaign');
+    expect(result.payload.description).toContain('Uses remaining: 0');
+    expect(abilityUseLogs()).toHaveLength(1);
+    expect(abilityUseLogs()[0].description).toContain('Uses remaining: 0');
+  });
+
+  it('refuses at 0 with countercharm_refused log, zero spend, zero reroll', async () => {
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'TestHero' && key === 'countercharmUses') return 0;
+      return undefined;
+    });
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(result.payload.description).toContain('no uses remaining');
+    expect(refusalLogs()[0].automationDetail).toBe('uses_exhausted');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(rollLogs()).toHaveLength(0);
+    expect(addEntry.mock.calls.filter(c => c[1].type === 'ability_use')).toHaveLength(0);
+  });
+
+  it('honors a partially-spent numeric pool (stored 1 of auto.uses)', async () => {
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'TestHero' && key === 'countercharmUses') return 1;
+      return undefined;
+    });
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 0, 'test-campaign');
+    expect(result.payload.description).toContain('Uses remaining: 0');
+  });
+
+  it('treats a null stored pool (missing key) as re-armed, not exhausted', async () => {
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'TestHero' && key === 'countercharmUses') return null;
+      return null;
+    });
+
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(refusalLogs()).toHaveLength(0);
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 0, 'test-campaign');
+  });
+
+  it('self-heals a stale non-numeric pool back to max instead of pinning refusals (CLA-027)', async () => {
+    getRuntimeValue.mockImplementation(async (name, key) => {
+      if (name === 'TestHero' && key === 'countercharmUses') return { current: 0 };
+      return undefined;
+    });
+
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'countercharmUses', 0, 'test-campaign');
+    expect(refusalLogs()).toHaveLength(0);
+  });
+});
+
+describe('CLA-064 Countercharm Long Rest re-arm', () => {
+  it('registers countercharmUses in LONG_REST_RESOURCES', () => {
+    expect(getLongRestResources()).toContain('countercharmUses');
+  });
+});
+
+describe('countercharmHandler.handle — popup/log surface on success', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    qualifyingSave('AberrantSorcerer', { d20: 8, bonus: -1, saveDc: 14 });
+    mockRandomDie(17);
+    getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'TestHero', type: 'player' },
+        { name: 'AberrantSorcerer', type: 'player' },
+      ],
+    });
+    isWithinRange.mockResolvedValue(true);
+    getRuntimeValue.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('logs ability_use with correct actor/ability/target', async () => {
+    await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    const use = abilityUseLogs()[0];
+    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      type: 'ability_use',
+      characterName: 'TestHero',
+      abilityName: 'Countercharm',
+      targetName: 'AberrantSorcerer',
+    }));
+    expect(use.description).toContain('TestHero used Countercharm on AberrantSorcerer');
+    expect(use.description).toContain('Source: player');
+    expect(use.description).toContain('Outcome: success');
+  });
+
+  it('shows original vs reroll vs DC in the popup', async () => {
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(result.payload.name).toBe('Countercharm');
+    expect(result.payload.description).toContain('Original Wisdom save: d20(8) + -1 = 7 vs DC 14');
+    expect(result.payload.description).toContain('Reroll with Advantage');
+    expect(result.payload.description).toContain('16 vs DC 14 → Succeeded');
   });
 });

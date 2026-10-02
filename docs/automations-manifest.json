@@ -1450,7 +1450,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-064-countercharm-lift-400-ungated.md",
+      "verified": "verified",
       "class": "Bard",
       "triggerConditions": "Trigger: failed_save_charmed_or_frightened; Action: 1 reaction; Range: 30 ft",
       "expectedBehavior": "You can use musical notes or words of power to disrupt mind-influencing effects. If you or a creature within 30 feet of you fails a saving throw against an effect that applies the Charmed or Frightened condition, you can take a Reaction to cause the save to be rerolled, and the new roll has Advantage."

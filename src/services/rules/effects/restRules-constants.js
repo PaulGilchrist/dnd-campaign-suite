@@ -229,10 +229,13 @@ export const LONG_REST_RESOURCES = [
    // re-arm here is the harmless superset that stops a spent numeric 0 pinning
    // the pool past a long rest via the server override.
    'warPriestUses',
-   // CLA-388: a paid-but-unspent Wild Companion Find Familiar grant must not survive a
-   // Long Rest ("the familiar disappears when you finish a Long Rest") — null re-arm.
-   '_Wild_Companion_freeCast'
- ]
+    // CLA-388: a paid-but-unspent Wild Companion Find Familiar grant must not survive a
+    // Long Rest ("the familiar disappears when you finish a Long Rest") — null re-arm.
+    '_Wild_Companion_freeCast',
+    // CLA-064: Countercharm recharge:"long_rest" (classes.json lv7) — numeric uses
+    // pool on the bard; null re-arm (handler reads `stored ?? auto.uses`).
+    'countercharmUses'
+  ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]
