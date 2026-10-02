@@ -103,7 +103,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-002-abjure-foes-no-cd-cost-wrong-dc.md",
+      "verified": "verified",
       "class": "Paladin",
       "triggerConditions": "Action: 1 action; Range: 60 ft; Save: undefined",
       "expectedBehavior": "As a Action, expend one use of Channel Divinity. Target creatures equal to Charisma modifier (minimum 1) within 60 feet. Each makes Wisdom save or has Frightened condition for 1 minute or until taking damage. While Frightened, can only do one of: move, take action, or take Bonus Action."

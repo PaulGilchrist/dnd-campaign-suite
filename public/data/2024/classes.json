@@ -7239,6 +7239,8 @@
               "condition": "frightened",
               "effect": "add_condition",
               "bonusExpression": "CHA modifier",
+              "duration": "1_minute",
+              "resourceCost": "channel_divinity",
               "casting_time": "1 action"
             }
           }
