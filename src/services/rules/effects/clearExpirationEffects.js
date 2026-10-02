@@ -78,6 +78,8 @@ const ACTIVE_BUFF_NAME_CLEANUP = {
     // BUG CLA-198: stop the recurring radiant tick when the
     // 1-minute transformation buff expires.
     'Inner Radiance': (targetName, campaignName) => setRuntimeValue(targetName, 'innerRadianceActive', null, campaignName),
+    // BUG CLA-402: drop the telepathic bond anchor when the Awakened Mind buff expires.
+    'Awakened Mind': (targetName, campaignName) => setRuntimeValue(targetName, 'awakenedMindTarget', null, campaignName),
     'Barkskin': (targetName, campaignName) => removeTargetEffectsIfChanged(campaignName, te => te.effect !== 'barkskin'),
 };
 

@@ -267,6 +267,26 @@ describe('clearExpirationEffects effect types (via clearAllExpirationEffects)', 
       expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'innerRadianceActive', null, 'MyCampaign');
     });
 
+    it('BUG CLA-402: clears awakenedMindTarget when the Awakened Mind buff expires', () => {
+      const myList = [
+        { target: 'Human', effects: [{ type: 'remove_active_buff', buffName: 'Awakened Mind' }], appliedRound: 1 },
+      ];
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'Human' && key === 'activeBuffs') return [
+          { name: 'Awakened Mind', effect: 'telepathic_speech', duration: 'warlock_level_minutes' },
+        ];
+        if (name === 'Human' && key === 'awakenedMindTarget') return 'Bandit 1';
+        if (key === KEY && name === 'Goblin') return myList;
+        if (key === KEY) return [];
+        return null;
+      });
+
+      clearAllExpirationEffects('Goblin', 'MyCampaign');
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'activeBuffs', [], 'MyCampaign');
+      expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'awakenedMindTarget', null, 'MyCampaign');
+    });
+
     it('removes haste buff without adding lethargy conditions', () => {
       const myList = [
         { target: 'Human', effects: [{ type: 'remove_active_buff', buffName: 'Haste' }], appliedRound: 1 },

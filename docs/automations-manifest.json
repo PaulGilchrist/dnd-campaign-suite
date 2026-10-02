@@ -536,7 +536,7 @@
       "handler": "src/services/automation/handlers/buffs/buffHandler.js (telepathic_speech — activation target-selection modal :92/:607, effect application :781)",
       "router": "n/a (temp_buff)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/temp.js (temp_buff)",
-      "verified": "broken — see .opencode/plans/bug-CLA-402-awakened-mind-activation-inert.md",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Bonus Action: choose one creature within 30 ft; duration = Warlock level in minutes",
       "expectedBehavior": "Bonus Action, choose one creature within 30 feet. Communicate telepathically while within a number of miles equal to Charisma modifier (minimum 1 mile). Duration: minutes equal to Warlock level.",

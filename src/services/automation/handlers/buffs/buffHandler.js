@@ -659,7 +659,7 @@ export async function confirmTelepathicSpeech(action, playerStats, campaignName,
     if (!wasActive) {
         addExpiration({ attackerName: playerName, targetName: playerName, effects: [
             { type: 'remove_active_buff', buffName: featureName }
-        ], campaignName });
+        ], campaignName, rounds: durationMinutes * 10 });
     }
 
     await addEntry(campaignName, {
