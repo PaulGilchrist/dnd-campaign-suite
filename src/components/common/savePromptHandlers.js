@@ -53,12 +53,12 @@ export function createFanaticalFocusHandler({ campaignName, characters, activeMa
   };
 }
 
-export function createDisciplinedSurvivorHandler({ campaignName, current, currentFocusPoints, disciplinedSurvivorAvailable, setRerollUsedForSave, submitSaveResult }) {
+export function createDisciplinedSurvivorHandler({ campaignName, characters, activeMapName, current, currentFocusPoints, disciplinedSurvivorAvailable, setRerollUsedForSave, submitSaveResult }) {
   return async () => {
     if (!disciplinedSurvivorAvailable || !current) return;
     setRerollUsedForSave(true);
     setRuntimeValue(current.targetName, 'focusPoints', currentFocusPoints - 1, campaignName);
-    const result = await doReroll({ campaignName: null, characters: [], activeMapName: null, current, extraBonus: 0 });
+    const result = await doReroll({ campaignName, characters, activeMapName, current, extraBonus: 0 });
     submitReroll({ submitSaveResult, result, current, bonusDetail: '(-1 Focus Point)', note: 'disciplined_survivor_reroll', healingName: 'Disciplined Survivor', healingNote: 'disciplined_survivor_hp_restore' });
   };
 }

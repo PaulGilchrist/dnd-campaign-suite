@@ -1796,7 +1796,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-087-reroll-save-bonus-zero.md",
+      "verified": "verified",
       "class": "Monk",
       "triggerConditions": "Trigger: failed_saving_throw",
       "expectedBehavior": "Proficiency in all saving throws. When you fail a saving throw, expend 1 Focus Point to reroll it."

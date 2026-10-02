@@ -26,9 +26,9 @@ export function useSaveRerollHandlers({
     if (!disciplinedSurvivorAvailable || !current) return;
     setRerollUsedForSave(true);
     setRuntimeValue(current.targetName, 'focusPoints', currentFocusPoints - 1, campaignName);
-    const handler = createDisciplinedSurvivorHandler({ campaignName, current, currentFocusPoints, disciplinedSurvivorAvailable, setRerollUsedForSave, submitSaveResult });
+    const handler = createDisciplinedSurvivorHandler({ campaignName, characters, activeMapName, current, currentFocusPoints, disciplinedSurvivorAvailable, setRerollUsedForSave, submitSaveResult });
     await handler();
-  }, [disciplinedSurvivorAvailable, currentFocusPoints, current, campaignName, submitSaveResult, setRerollUsedForSave]);
+  }, [disciplinedSurvivorAvailable, currentFocusPoints, current, campaignName, characters, activeMapName, submitSaveResult, setRerollUsedForSave]);
 
   const handleIndomitable = useCallback(async () => {
     if (!indomitableAvailable || !current) return;
