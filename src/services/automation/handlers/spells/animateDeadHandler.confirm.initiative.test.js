@@ -40,6 +40,19 @@ vi.mock('../../../encounters/encounterToInitiative.js', () => ({
         }
         return map;
     }),
+    getNextUniqueMonsterName: (baseName, creatures) => {
+        const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const numberedPattern = new RegExp(`^${escaped} (\\d+)$`);
+        let maxNum = 0;
+        let hasExact = false;
+        for (const c of creatures) {
+            if (c.name === baseName) hasExact = true;
+            const m = c.name.match(numberedPattern);
+            if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+        }
+        if (hasExact && maxNum === 0) return `${baseName} 1`;
+        return `${baseName} ${maxNum + 1}`;
+    },
 }));
 
 import { confirmAnimateDead } from './animateDeadHandler.js';
@@ -113,7 +126,7 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.initiative).toBe('12');
     });
 
@@ -133,7 +146,7 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         // initiativeValue = parseInt('10', 10) = 10
         // Then initiativeValue = 10 || (random) = 10
         expect(skeleton.initiative).toBe('10');
@@ -155,7 +168,7 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         // With no initiative, falls back to Math.floor(random * 20) + 1 + bonus
         // The value should be a string of a positive number
         expect(skeleton.initiative).toMatch(/^\d+$/);
@@ -177,7 +190,7 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.initiative).toMatch(/^\d+$/);
     });
 
@@ -199,7 +212,7 @@ describe('confirmAnimateDead - initiative', () => {
         );
 
         const indices = combatSummary.creatures.map(c => c.name);
-        const skeletonIdx = indices.indexOf('Skeleton');
+        const skeletonIdx = indices.indexOf('Skeleton 1');
         const goblinIdx = indices.indexOf('Goblin');
         expect(skeletonIdx).toBeLessThan(goblinIdx);
     });
@@ -274,7 +287,7 @@ describe('confirmAnimateDead - initiative sorting edge cases', () => {
         );
 
         const indices = combatSummary.creatures.map(c => c.name);
-        const skeletonIdx = indices.indexOf('Skeleton');
+        const skeletonIdx = indices.indexOf('Skeleton 1');
         const goblinIdx = indices.indexOf('Goblin');
         expect(skeletonIdx).toBeLessThan(goblinIdx);
     });
@@ -297,7 +310,7 @@ describe('confirmAnimateDead - initiative sorting edge cases', () => {
         );
 
         const indices = combatSummary.creatures.map(c => c.name);
-        const skeletonIdx = indices.indexOf('Skeleton');
+        const skeletonIdx = indices.indexOf('Skeleton 1');
         const goblinIdx = indices.indexOf('Goblin');
         expect(skeletonIdx).toBeLessThan(goblinIdx);
     });
@@ -318,7 +331,7 @@ describe('confirmAnimateDead - initiative sorting edge cases', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.initiative).toBe('10');
     });
 });

@@ -106,14 +106,13 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
     // POST the individual property directly instead of accumulating into a "campaign" wrapper.
     if (characterKey === 'campaign') {
       const fullUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(propertyName)}`;
-      fetch(fullUrl, {
+      notify(characterKey);
+      return fetch(fullUrl, {
         method: 'POST',
         mode: 'cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value })
       }).catch((e) => { console.error("[useRuntimeState] Error:", e); });
-      notify(characterKey);
-      return;
     }
 
    const obj = Object.fromEntries(store);

@@ -40,6 +40,19 @@ vi.mock('../../../encounters/encounterToInitiative.js', () => ({
         }
         return map;
     }),
+    getNextUniqueMonsterName: (baseName, creatures) => {
+        const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const numberedPattern = new RegExp(`^${escaped} (\\d+)$`);
+        let maxNum = 0;
+        let hasExact = false;
+        for (const c of creatures) {
+            if (c.name === baseName) hasExact = true;
+            const m = c.name.match(numberedPattern);
+            if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+        }
+        if (hasExact && maxNum === 0) return `${baseName} 1`;
+        return `${baseName} ${maxNum + 1}`;
+    },
 }));
 
 import { handle } from './animateDeadHandler.js';

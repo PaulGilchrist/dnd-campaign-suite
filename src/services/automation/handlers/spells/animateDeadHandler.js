@@ -4,7 +4,7 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
-import { getMonsterSaveBonuses } from '../../../encounters/encounterToInitiative.js';
+import { getMonsterSaveBonuses, getNextUniqueMonsterName } from '../../../encounters/encounterToInitiative.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const MAX_TARGETS_KEY = 'animateDeadMaxTargets';
@@ -37,8 +37,7 @@ async function loadMonsterData(monsterIndex) {
     return monster;
 }
 
-function buildCreatureEntry(baseName, monster, initiativeValue, index) {
-    const name = index === 0 ? baseName : `${baseName} ${index + 1}`;
+function buildCreatureEntry(name, monster, initiativeValue) {
     const npcHp = monster.hit_points || 10;
     return {
         name,
@@ -86,15 +85,13 @@ export async function handle(action, playerStats, campaignName) {
     };
 }
 
-function summonSwarm({ combatSummary, targetEffects, creatureNames, baseName, monster, initiativeValue, count, casterName }) {
+function summonSwarm({ combatSummary, summonedMarkers, creatureNames, baseName, monster, initiativeValue, count, casterName }) {
     for (let i = 0; i < (count || 0); i++) {
-        const creature = buildCreatureEntry(baseName, monster, initiativeValue, i);
+        const name = getNextUniqueMonsterName(baseName, combatSummary.creatures);
+        const creature = buildCreatureEntry(name, monster, initiativeValue);
         combatSummary.creatures.push(creature);
-        const existingSummoned = targetEffects.find(te => te.target === creature.name && te.effect === 'summoned' && te.source === casterName);
-        if (!existingSummoned) {
-            targetEffects.push({ target: creature.name, source: casterName, effect: 'summoned' });
-        }
-        creatureNames.push(creature.name);
+        summonedMarkers.push({ target: name, source: casterName, effect: 'summoned' });
+        creatureNames.push(name);
     }
 }
 
@@ -136,11 +133,11 @@ export async function confirmAnimateDead(action, playerStats, campaignName, { zo
         return infoPopup(action.name, 'Failed to load zombie monster data.', action.automation);
     }
 
-    let targetEffects = getTargetEffects();
     const creatureNames = [];
+    const summonedMarkers = [];
 
-    summonSwarm({ combatSummary, targetEffects, creatureNames, baseName: 'Skeleton', monster: skeletonMonster, initiativeValue, count: skeletonCount, casterName });
-    summonSwarm({ combatSummary, targetEffects, creatureNames, baseName: 'Zombie', monster: zombieMonster, initiativeValue, count: zombieCount, casterName });
+    summonSwarm({ combatSummary, summonedMarkers, creatureNames, baseName: 'Skeleton', monster: skeletonMonster, initiativeValue, count: skeletonCount, casterName });
+    summonSwarm({ combatSummary, summonedMarkers, creatureNames, baseName: 'Zombie', monster: zombieMonster, initiativeValue, count: zombieCount, casterName });
 
     combatSummary.creatures.sort((a, b) => {
         const aInit = a.initiative === '' || a.initiative === undefined ? 0 : parseInt(a.initiative, 10);
@@ -148,8 +145,10 @@ export async function confirmAnimateDead(action, playerStats, campaignName, { zo
         return bInit - aInit;
     });
 
-    storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
-    setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
+    const targetEffects = [...getTargetEffects(), ...summonedMarkers];
+
+    await storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
+    await setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
     const zombieLabel = pluralCountLabel(zombieCount, 'Zombie');

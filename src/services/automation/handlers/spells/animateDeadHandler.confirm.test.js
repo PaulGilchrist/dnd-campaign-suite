@@ -40,10 +40,23 @@ vi.mock('../../../encounters/encounterToInitiative.js', () => ({
         }
         return map;
     }),
+    getNextUniqueMonsterName: (baseName, creatures) => {
+        const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const numberedPattern = new RegExp(`^${escaped} (\\d+)$`);
+        let maxNum = 0;
+        let hasExact = false;
+        for (const c of creatures) {
+            if (c.name === baseName) hasExact = true;
+            const m = c.name.match(numberedPattern);
+            if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+        }
+        if (hasExact && maxNum === 0) return `${baseName} 1`;
+        return `${baseName} ${maxNum + 1}`;
+    },
 }));
 
 import { confirmAnimateDead } from './animateDeadHandler.js';
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 
@@ -120,8 +133,8 @@ describe('confirmAnimateDead - basic flow', () => {
         expect(result.payload.description).toContain('right after you');
 
         const creatures = combatSummary.creatures;
-        expect(creatures.find(c => c.name === 'Skeleton')).toBeDefined();
-        expect(creatures.find(c => c.name === 'Zombie')).toBeDefined();
+        expect(creatures.find(c => c.name === 'Skeleton 1')).toBeDefined();
+        expect(creatures.find(c => c.name === 'Zombie 1')).toBeDefined();
         expect(creatures.find(c => c.name === 'Zombie 2')).toBeDefined();
     });
 
@@ -360,9 +373,9 @@ describe('confirmAnimateDead - creature creation', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton).toBeDefined();
-        expect(skeleton.name).toBe('Skeleton');
+        expect(skeleton.name).toBe('Skeleton 1');
         expect(skeleton.type).toBe('npc');
         expect(skeleton.monsterType).toBe('Undead');
         expect(skeleton.ac).toBe(13);
@@ -381,9 +394,9 @@ describe('confirmAnimateDead - creature creation', () => {
             { zombieCount: 1 },
         );
 
-        const zombie = combatSummary.creatures.find(c => c.name === 'Zombie');
+        const zombie = combatSummary.creatures.find(c => c.name === 'Zombie 1');
         expect(zombie).toBeDefined();
-        expect(zombie.name).toBe('Zombie');
+        expect(zombie.name).toBe('Zombie 1');
         expect(zombie.type).toBe('npc');
         expect(zombie.monsterType).toBe('Undead');
         expect(zombie.ac).toBe(8);
@@ -402,7 +415,7 @@ describe('confirmAnimateDead - creature creation', () => {
             { skeletonCount: 3 },
         );
 
-        expect(combatSummary.creatures.find(c => c.name === 'Skeleton')).toBeDefined();
+        expect(combatSummary.creatures.find(c => c.name === 'Skeleton 1')).toBeDefined();
         expect(combatSummary.creatures.find(c => c.name === 'Skeleton 2')).toBeDefined();
         expect(combatSummary.creatures.find(c => c.name === 'Skeleton 3')).toBeDefined();
     });
@@ -417,7 +430,7 @@ describe('confirmAnimateDead - creature creation', () => {
             { zombieCount: 2 },
         );
 
-        expect(combatSummary.creatures.find(c => c.name === 'Zombie')).toBeDefined();
+        expect(combatSummary.creatures.find(c => c.name === 'Zombie 1')).toBeDefined();
         expect(combatSummary.creatures.find(c => c.name === 'Zombie 2')).toBeDefined();
     });
 
@@ -431,7 +444,7 @@ describe('confirmAnimateDead - creature creation', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.targetName).toBeNull();
         expect(skeleton.concentration).toBeNull();
     });
@@ -463,9 +476,8 @@ describe('confirmAnimateDead - creature creation', () => {
     });
 
     it('creates summoned target effects for each creature', async () => {
-        const targetEffects = [];
         getRuntimeValue.mockImplementation((_entity, key) => {
-            if (key === 'targetEffects') return targetEffects;
+            if (key === 'targetEffects') return [];
             return null;
         });
 
@@ -476,21 +488,21 @@ describe('confirmAnimateDead - creature creation', () => {
             { skeletonCount: 1, zombieCount: 1 },
         );
 
-        expect(targetEffects).toHaveLength(2);
-        expect(targetEffects.find(te => te.target === 'Skeleton')).toMatchObject({
+        const writtenTe = setRuntimeValue.mock.calls.find(call => call[1] === 'targetEffects')[2];
+        expect(writtenTe).toHaveLength(2);
+        expect(writtenTe.find(te => te.target === 'Skeleton 1')).toMatchObject({
             source: 'TestCaster',
             effect: 'summoned',
         });
-        expect(targetEffects.find(te => te.target === 'Zombie')).toMatchObject({
+        expect(writtenTe.find(te => te.target === 'Zombie 1')).toMatchObject({
             source: 'TestCaster',
             effect: 'summoned',
         });
     });
 
-    it('does not duplicate summoned effects for same creature', async () => {
-        const targetEffects = [];
+    it('spawns uniquely-numbered creatures per cast', async () => {
         getRuntimeValue.mockImplementation((_entity, key) => {
-            if (key === 'targetEffects') return targetEffects;
+            if (key === 'targetEffects') return [];
             return null;
         });
 
@@ -501,7 +513,8 @@ describe('confirmAnimateDead - creature creation', () => {
             { skeletonCount: 2 },
         );
 
-        const skeletonEffects = targetEffects.filter(te => te.target === 'Skeleton');
-        expect(skeletonEffects).toHaveLength(1);
+        const writtenTe = setRuntimeValue.mock.calls.find(call => call[1] === 'targetEffects')[2];
+        expect(writtenTe.filter(te => te.target === 'Skeleton 1')).toHaveLength(1);
+        expect(writtenTe.filter(te => te.target === 'Skeleton 2')).toHaveLength(1);
     });
 });

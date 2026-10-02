@@ -40,6 +40,19 @@ vi.mock('../../../encounters/encounterToInitiative.js', () => ({
         }
         return map;
     }),
+    getNextUniqueMonsterName: (baseName, creatures) => {
+        const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const numberedPattern = new RegExp(`^${escaped} (\\d+)$`);
+        let maxNum = 0;
+        let hasExact = false;
+        for (const c of creatures) {
+            if (c.name === baseName) hasExact = true;
+            const m = c.name.match(numberedPattern);
+            if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+        }
+        if (hasExact && maxNum === 0) return `${baseName} 1`;
+        return `${baseName} ${maxNum + 1}`;
+    },
 }));
 
 import { confirmAnimateDead } from './animateDeadHandler.js';
@@ -350,7 +363,7 @@ describe('confirmAnimateDead - save bonuses', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.saveBonuses).toBeDefined();
         expect(skeleton.saveBonuses.dex).toBe(4);
         expect(skeleton.saveBonuses.con).toBe(2);
@@ -366,7 +379,7 @@ describe('confirmAnimateDead - save bonuses', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.saveBonuses).toBeDefined();
     });
 });
@@ -445,7 +458,7 @@ describe('confirmAnimateDead - resistances and immunities', () => {
         );
 
         const combatSummary = getCombatSummary(mockCampaignName);
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.resistances).toEqual(['bludgeoning', 'piercing']);
     });
 
@@ -471,7 +484,7 @@ describe('confirmAnimateDead - resistances and immunities', () => {
         );
 
         const combatSummary = getCombatSummary(mockCampaignName);
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.immunities).toEqual(['bludgeoning']);
     });
 
@@ -496,7 +509,7 @@ describe('confirmAnimateDead - resistances and immunities', () => {
         );
 
         const combatSummary = getCombatSummary(mockCampaignName);
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton');
+        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
         expect(skeleton.immunities).toEqual(['poison']);
     });
 });
