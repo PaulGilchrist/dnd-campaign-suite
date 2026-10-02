@@ -25,6 +25,8 @@ function turnStartGateKey(round, creatureName) {
 const PLAYER_ROUND_LATCH_KEYS = [
     // CLA-370: pass roundToSet — the cache still shows the old round here.
     '_CunningStrike_usedRound',
+    // CLA-016: Assassinate first-round sneak bonus once-per-round latch re-arms at round wrap.
+    '_assassinate_usedRound',
     '_Charge_Attack_usedRound',
     '_FastHands_usedRound',
     '_CunningAction_usedRound',

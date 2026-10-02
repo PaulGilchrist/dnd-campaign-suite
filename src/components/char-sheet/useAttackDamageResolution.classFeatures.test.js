@@ -3,10 +3,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-    rollExpressionDoubled: vi.fn(),
-}));
+vi.mock('../../services/dice/diceRoller.js', async (importOriginal) => {
+    const real = await importOriginal();
+    return { ...real, rollExpression: vi.fn(), rollExpressionDoubled: vi.fn() };
+});
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
@@ -196,6 +196,7 @@ describe('useAttackDamageResolution - class features', () => {
                 ],
             });
             getCurrentCombatRound.mockReturnValue(1);
+            mockBuildCtxSync.mockReturnValue(Promise.resolve({ targetName: 'Goblin', sneakAttackDice: 9 }));
             const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
             await resolveAttackDamage(makeAttack());
             await tick();
@@ -203,6 +204,49 @@ describe('useAttackDamageResolution - class features', () => {
             expect(mockRollDamage).toHaveBeenCalledWith(
                 { name: 'Rapier', formula: expect.stringContaining('2d6 [Sneak Attack]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
             );
+        });
+
+        it('skips Assassinate when Sneak Attack applied no dice (CLA-016)', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', hasActed: false, type: 'player' },
+                    { name: 'Goblin', type: 'npc' },
+                ],
+            });
+            getCurrentCombatRound.mockReturnValue(1);
+            mockBuildCtxSync.mockReturnValue(Promise.resolve({ targetName: 'Goblin', sneakAttackDice: 0 }));
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('2d6');
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                { name: 'Rapier', formula: expect.not.stringContaining('[Sneak Attack]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
+            );
+        });
+
+        it('grants the Assassinate bonus only once per round (CLA-016 latch)', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', hasActed: false, type: 'player' },
+                    { name: 'Goblin', type: 'npc' },
+                ],
+            });
+            getCurrentCombatRound.mockReturnValue(1);
+            mockBuildCtxSync.mockReturnValue(Promise.resolve({ targetName: 'Goblin', sneakAttackDice: 9 }));
+            const store = {};
+            getRuntimeValue.mockImplementation((_name, key) => (key === 'resumeRef' ? {} : store[key] ?? null));
+            setRuntimeValue.mockImplementation((_name, key, value) => { store[key] = value; });
+            const sneak2d6Calls = () => rollExpression.mock.calls.filter(c => c[0] === '2d6').length;
+
+            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: makeAssassinateStats() });
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(sneak2d6Calls()).toBe(1);
+            expect(store['_assassinate_usedRound']).toBe(1);
+
+            await resolveAttackDamage(makeAttack());
+            await tick();
+            expect(sneak2d6Calls()).toBe(1);
         });
 
         it('skips Assassinate when player has already acted', async () => {

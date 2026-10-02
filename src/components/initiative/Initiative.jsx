@@ -54,6 +54,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, 'elementalAttunementActive', null, campaignName)
     setRuntimeValue(creatureName, 'elementalAttunementElement', null, campaignName)
     setRuntimeValue(creatureName, '_CunningStrike_usedRound', null, campaignName)
+    // CLA-016: Assassinate first-round sneak bonus once-per-round latch re-arms on initiative roll.
+    setRuntimeValue(creatureName, '_assassinate_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_Charge_Attack_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_FastHands_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_CunningAction_usedRound', null, campaignName)
