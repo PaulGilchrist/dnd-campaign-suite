@@ -1820,7 +1820,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Wizard",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Choose two Wizard spells from Divination school (no higher than level 2), add to spellbook for free. Whenever you gain access to a new level of spell slots, add one Divination school spell to spellbook for free."
