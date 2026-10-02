@@ -30,6 +30,10 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../services/combat/auras/auraConditionImmunity.js', () => ({
+    getAuraConditionImmunities: vi.fn().mockResolvedValue({ immunities: [], immunitySources: {} }),
+}));
+
 describe('createEffectAdderHandlers', () => {
     let handlers;
     let campaignName;
@@ -116,8 +120,8 @@ describe('createEffectAdderHandlers', () => {
             ability: 'wis',
         };
 
-        it('should call addCondition, storage.set, setCombatSummary, logConditionEvent, and clear target on success', () => {
-            handlers.handleApplyEffect('conditions', conditionData);
+        it('should call addCondition, storage.set, setCombatSummary, logConditionEvent, and clear target on success', async () => {
+            await handlers.handleApplyEffect('conditions', conditionData);
 
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -145,7 +149,7 @@ describe('createEffectAdderHandlers', () => {
             expect(setEffectAdderTarget).toHaveBeenCalledWith(null);
         });
 
-        it('should find target by suffix name (e.g. "Alice the Wizard") in characters array', () => {
+        it('should find target by suffix name (e.g. "Alice the Wizard") in characters array', async () => {
             characters.push({ name: 'Alice the Wizard', computedStats: { hitPoints: 25 } });
             const cs = cloneDeep(mockCombatSummary);
             cs.creatures.push({ name: 'Alice the Wizard', type: 'player' });
@@ -158,7 +162,7 @@ describe('createEffectAdderHandlers', () => {
                 setCombatSummary,
             });
 
-            handlersAlt.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Alice the Wizard', dc: 10, ability: 'con' });
+            await handlersAlt.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Alice the Wizard', dc: 10, ability: 'con' });
 
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -175,8 +179,8 @@ describe('createEffectAdderHandlers', () => {
             );
         });
 
-        it('should find target in combatSummary creatures when not in characters array', () => {
-            handlers.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Goblin', dc: 10, ability: 'con' });
+        it('should find target in combatSummary creatures when not in characters array', async () => {
+            await handlers.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Goblin', dc: 10, ability: 'con' });
 
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -193,8 +197,8 @@ describe('createEffectAdderHandlers', () => {
             );
         });
 
-        it('should not apply any side effects when condition key is unknown', () => {
-            handlers.handleApplyEffect('conditions', { conditionKey: 'nonexistent', target: 'Alice', dc: 10, ability: 'con' });
+        it('should not apply any side effects when condition key is unknown', async () => {
+            await handlers.handleApplyEffect('conditions', { conditionKey: 'nonexistent', target: 'Alice', dc: 10, ability: 'con' });
 
             expect(conditionSaveService.addCondition).not.toHaveBeenCalled();
             expect(storage.set).not.toHaveBeenCalled();
@@ -203,8 +207,8 @@ describe('createEffectAdderHandlers', () => {
             expect(setEffectAdderTarget).not.toHaveBeenCalled();
         });
 
-        it('should use default DC and ability when not provided', () => {
-            handlers.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Alice' });
+        it('should use default DC and ability when not provided', async () => {
+            await handlers.handleApplyEffect('conditions', { conditionKey: 'blinded', target: 'Alice' });
 
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
                 expect.objectContaining({

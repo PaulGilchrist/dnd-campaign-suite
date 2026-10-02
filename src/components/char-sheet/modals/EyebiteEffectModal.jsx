@@ -4,6 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addExpiration } from '../../../services/rules/effects/expirations.js';
 import { rollD20 } from '../../../services/dice/diceRoller.js';
 import { playerIsImmuneToCondition } from '../../../services/combat/automation/automationService.js';
+import { getAuraConditionImmunities, auraCoversCondition, logAuraConditionImmunity } from '../../../services/combat/auras/auraConditionImmunity.js';
 import { sendSavePrompt, sendSaveResult } from '../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../services/automation/common/damageRollback.js';
@@ -188,12 +189,18 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
         const targetCharacter = characters?.find(c => utils.getName(c.name) === targetName);
         const targetStats = targetCharacter?.computedStats || targetCharacter || targetCreature;
 
+        // CLA-019: aura-granted condition immunities (Aura of Courage) ride the gate.
+        const auraImmunities = await getAuraConditionImmunities({ targetName, characters });
         if (targetStats && playerIsImmuneToCondition({
             conditionKey: effect.condition,
             playerStats: targetStats,
             getRuntimeValue,
             campaignName,
+            auraImmunities: auraImmunities.immunities,
         })) {
+            if (auraCoversCondition(auraImmunities, effect.condition)) {
+                logAuraConditionImmunity({ campaignName, targetName, conditionKey: effect.condition, auraImmunities, sourceAbility: featureName });
+            }
             storeSpellLastAttack(campaignName, {
                 casterName: attackerName,
                 spellName: featureName,
@@ -276,31 +283,39 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
         const conditionLabel = effect.condition.charAt(0).toUpperCase() + effect.condition.slice(1);
 
         if (!success) {
-            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== effect.condition);
-            setRuntimeValue(targetName, 'activeConditions', [...filtered, effect.condition], campaignName);
+            // CLA-019: aura-covered conditions are suppressed on a failed save
+            // (save still fails, condition never lands; suppression is logged).
+            const auraImmunities = await getAuraConditionImmunities({ targetName, characters });
+            const auraCovered = auraCoversCondition(auraImmunities, effect.condition);
+            if (auraCovered) {
+                logAuraConditionImmunity({ campaignName, targetName, conditionKey: effect.condition, auraImmunities, sourceAbility: featureName });
+            } else {
+                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                const filtered = conditions.filter(c => String(c).toLowerCase() !== effect.condition);
+                setRuntimeValue(targetName, 'activeConditions', [...filtered, effect.condition], campaignName);
 
-            addExpiration({ attackerName, targetName, effects: [
-                { type: effect.condition, condition: effect.condition },
-            ], campaignName });
+                addExpiration({ attackerName, targetName, effects: [
+                    { type: effect.condition, condition: effect.condition },
+                ], campaignName });
 
-            const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const effectKey = `eyebite_${effect.key}`;
-            const newTargetEffects = [...targetEffects, {
-                target: targetName,
-                effect: effectKey,
-                source: attackerName,
-                condition: effect.condition,
-                duration: 'concentration',
-            }];
-            setRuntimeValue('campaign', 'targetEffects', newTargetEffects, campaignName);
+                const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+                const effectKey = `eyebite_${effect.key}`;
+                const newTargetEffects = [...targetEffects, {
+                    target: targetName,
+                    effect: effectKey,
+                    source: attackerName,
+                    condition: effect.condition,
+                    duration: 'concentration',
+                }];
+                setRuntimeValue('campaign', 'targetEffects', newTargetEffects, campaignName);
+            }
 
             addTargetResult(campaignName, {
                 targetName,
                 saveResult: 'failure',
                 roll: detail.roll ?? 0,
                 total: detail.total ?? 0,
-                conditions: [effect.condition],
+                conditions: auraCovered ? [] : [effect.condition],
                 appliedDamage: 0,
             });
 
@@ -315,22 +330,26 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
                 description: `${targetName} failed WIS save against Eyebite (${effect.label}).`,
             }).catch((e) => { console.error("[eyebiteEffectModal:log-error]", e); });
 
-            await addEntry(campaignName, {
-                type: 'condition',
-                action: 'applied',
-                characterName: targetName,
-                condition: conditionLabel,
-                reason: 'Eyebite spell',
-                note: `${targetName} gains the ${conditionLabel} condition from Eyebite.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error("[eyebiteEffectModal:log-error]", e); });
+            if (!auraCovered) {
+                await addEntry(campaignName, {
+                    type: 'condition',
+                    action: 'applied',
+                    characterName: targetName,
+                    condition: conditionLabel,
+                    reason: 'Eyebite spell',
+                    note: `${targetName} gains the ${conditionLabel} condition from Eyebite.`,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error("[eyebiteEffectModal:log-error]", e); });
+            }
 
             setPopup({
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: featureName,
-                    description: `${targetName} failed on WIS save against ${featureName}. ${targetName} gains the ${conditionLabel} condition.`,
+                    description: auraCovered
+                        ? `${targetName} failed on WIS save against ${featureName}. Immune to ${conditionLabel} (aura) — unaffected.`
+                        : `${targetName} failed on WIS save against ${featureName}. ${targetName} gains the ${conditionLabel} condition.`,
                 },
             });
         } else {
@@ -365,7 +384,7 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
         }
 
         setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
-    }, [pendingPrompts, attackerName, campaignName, saveDc, featureName]);
+    }, [pendingPrompts, attackerName, campaignName, saveDc, featureName, characters]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

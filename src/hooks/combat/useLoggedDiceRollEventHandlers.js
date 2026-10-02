@@ -8,6 +8,7 @@ import {
   normalizeSaveType,
 } from '../../services/rules/combat/applyDamage.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { getAuraConditionImmunities, auraCoversCondition, logAuraConditionImmunity } from '../../services/combat/auras/auraConditionImmunity.js';
 import { stripSummonedFromCombatSummary } from '../../services/combat/summons/summonedCreatureService.js';
 import { resolveCreatureType } from '../../services/combat/creatureTypeResolver.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -114,15 +115,23 @@ function applyConditionToTarget(targetName, condKey, campaignName) {
     setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], campaignName);
 }
 
-function applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName }) {
+// CLA-019: aura-granted condition immunities (Aura of Courage Frightened) gate the
+// PC-prompt failed-save statusEffects seam via computeAuraComboEffects' verified
+// membership + range model; suppressed applications land an automation log.
+async function applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName }) {
     const targetName = pending.targetName;
     const attackerName = pending.attackerName || pending.sourceAttackerName || null;
     const { targetCreature, targetStats, attackerCreature } = resolveStatusEffectTargets(combatSummary, charactersRef, targetName, attackerName);
+    const aura = await getAuraConditionImmunities({ targetName, characters: charactersRef.current });
     const effectsToExpire = [];
     for (const effect of pending.statusEffects) {
         const condKey = String(effect).toLowerCase();
         if (!attackerName) {
             console.error('[save-result-handler] Status effect missing attacker for', condKey, ':', { promptId: detail.promptId, pendingKeys: Object.keys(pending), characterName });
+        }
+        if (auraCoversCondition(aura, condKey)) {
+            logAuraConditionImmunity({ campaignName: pending.campaignName, targetName, conditionKey: condKey, auraImmunities: aura });
+            continue;
         }
         if (isTargetImmuneToConditionKey(targetStats, condKey, attackerCreature, pending.campaignName)) {
             continue;
@@ -516,7 +525,7 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
     await applyOverchannelSelfDamage({ pending, characterName, campaignName, charactersRef, logEntry });
 
     if (!detail.success && pending.statusEffects?.length > 0) {
-        applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName });
+        await applyFailedSaveStatusEffects({ detail, pending, combatSummary, charactersRef, characterName });
     }
 
     // MA-0298: Soul Tome trap failed-save grant (fail-only, zero on success).

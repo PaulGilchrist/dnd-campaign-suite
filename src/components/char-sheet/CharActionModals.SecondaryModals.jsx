@@ -71,7 +71,7 @@ import { applyTelekineticMovement } from '../../services/automation/handlers/cla
 import { confirmCreateUndead } from '../../services/automation/handlers/spells/createUndeadHandler.js';
 import { confirmSummonSpirit } from '../../services/automation/handlers/spells/summonSpiritHandler.js';
 
-function SpellEffectModals({ mergedModalState, setModalState, setPopupHtml }) {
+function SpellEffectModals({ mergedModalState, setModalState, setPopupHtml, characters }) {
     return (
         <>
             {mergedModalState.saveAttackHealModal && (
@@ -101,6 +101,7 @@ function SpellEffectModals({ mergedModalState, setModalState, setPopupHtml }) {
             {mergedModalState.fearModal && (
                 <FearModal
                     {...mergedModalState.fearModal}
+                    characters={characters}
                     onClose={() => setModalState({ fearModal: null })}
                 />
             )}
@@ -723,7 +724,7 @@ function SecondaryModals({
                     rangeFt={5}
                 />
             )}
-            <SpellEffectModals mergedModalState={mergedModalState} setModalState={setModalState} setPopupHtml={setPopupHtml} />
+            <SpellEffectModals mergedModalState={mergedModalState} setModalState={setModalState} setPopupHtml={setPopupHtml} characters={characters} />
             <DivineSparkFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} playerStats={playerStats} campaignName={campaignName} handleDivineInterventionCast={handleDivineInterventionCast} />
             <WarMagicFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} campaignName={campaignName} />
             {mergedModalState.sacredWeaponModal && (

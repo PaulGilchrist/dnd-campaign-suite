@@ -6,6 +6,24 @@ import { addExpiration } from '../../../../services/rules/effects/expirations.js
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { logConditionApplied, logSaveResultEntry } from './saveResultLogging.js';
+import { getAuraConditionImmunities, auraCoversCondition, logAuraConditionImmunity } from '../../../../services/combat/auras/auraConditionImmunity.js';
+
+// CLA-019: Aura of Courage — Frightened is SUPPRESSED (save still fails, condition
+// never lands) for the aura host and allies in range. Membership/range gating rides
+// computeAuraComboEffects — the same verified model applyDamage uses for resistances.
+async function resolveFearImmunityLeg(campaignName, { casterName, targetName, saveDc, saveType, detail, auraImmunities, actionName }) {
+    logAuraConditionImmunity({ campaignName, targetName, conditionKey: 'frightened', auraImmunities, sourceAbility: actionName });
+    await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: false, detail, logPrefix: '[FearModal]' });
+    addTargetResult(campaignName, {
+        targetName,
+        saveResult: 'failure',
+        roll: detail.roll ?? 0,
+        total: detail.total ?? 0,
+        conditions: [],
+        appliedDamage: 0,
+    });
+    return { targetName, success: false, roll: detail.roll, total: detail.total, saveBonus: detail.saveBonus ?? 0, conditionApplied: false };
+}
 import {
     useCarefulSpellSelection,
     usePendingPromptsCleanup,
@@ -33,6 +51,7 @@ function FearModal({
     metamagicCareful,
     metamagicHeighten,
     onClose,
+    characters = [],
 }) {
     const [pendingPrompts, setPendingPrompts] = useState([]);
     usePendingPromptsCleanup(setPendingPrompts);
@@ -91,28 +110,33 @@ function FearModal({
                 if (carefulSpellProtected) {
                     results.push(await resolveNpcCarefulSave(campaignName, { casterName, targetName, saveDc, saveType, roll: save.saveRoll, total: save.saveTotal, saveBonus: save.saveBonus, logPrefix: '[FearModal]' }));
                 } else if (!save.success) {
-                    results.push(await resolveNpcSaveFailure(campaignName, {
-                        casterName,
-                        targetName,
-                        saveDc,
-                        saveType,
-                        roll: save.saveRoll,
-                        total: save.saveTotal,
-                        saveBonus: save.saveBonus,
-                        logPrefix: '[FearModal]',
-                        applyConditions: (targetName, campaignName) => {
-                            applyFrightenedToTarget(targetName, campaignName);
-                            addExpiration({ attackerName: casterName, targetName, effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
-                            trackFearEffect(casterName, targetName, saveDc, campaignName);
-                        },
-                        conditionNames: ['Frightened'],
-                        failSummary: {
-                            condition: 'Frightened',
-                            reason: 'Fear spell',
-                            note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
-                        },
-                        conditions: ['frightened'],
-                    }));
+                    const auraImmunities = await getAuraConditionImmunities({ targetName, characters });
+                    if (auraCoversCondition(auraImmunities, 'frightened')) {
+                        results.push(await resolveFearImmunityLeg(campaignName, { casterName, targetName, saveDc, saveType, detail: { roll: save.saveRoll, total: save.saveTotal, saveBonus: save.saveBonus }, auraImmunities, actionName: action.name }));
+                    } else {
+                        results.push(await resolveNpcSaveFailure(campaignName, {
+                            casterName,
+                            targetName,
+                            saveDc,
+                            saveType,
+                            roll: save.saveRoll,
+                            total: save.saveTotal,
+                            saveBonus: save.saveBonus,
+                            logPrefix: '[FearModal]',
+                            applyConditions: (targetName, campaignName) => {
+                                applyFrightenedToTarget(targetName, campaignName);
+                                addExpiration({ attackerName: casterName, targetName, effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
+                                trackFearEffect(casterName, targetName, saveDc, campaignName);
+                            },
+                            conditionNames: ['Frightened'],
+                            failSummary: {
+                                condition: 'Frightened',
+                                reason: 'Fear spell',
+                                note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
+                            },
+                            conditions: ['frightened'],
+                        }));
+                    }
                 } else {
                     results.push(await resolveNpcSaveSuccess(campaignName, { casterName, targetName, saveDc, saveType, roll: save.saveRoll, total: save.saveTotal, saveBonus: save.saveBonus, logPrefix: '[FearModal]' }));
                 }
@@ -130,7 +154,7 @@ function FearModal({
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
         return { results, prompts };
-    }, [campaignName, playerStats.name, action.name, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, applyFrightenedToTarget, trackFearEffect]);
+    }, [campaignName, playerStats.name, action.name, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, applyFrightenedToTarget, trackFearEffect, characters]);
 
     const handleSaveResult = useCallback(async (event) => {
         const detail = event.detail;
@@ -144,30 +168,35 @@ function FearModal({
         const casterName = playerStats.name;
 
         if (!success) {
-            applyFrightenedToTarget(targetName, campaignName);
-            addExpiration({ attackerName: casterName, targetName, effects: [
-                { type: 'condition', condition: 'frightened' },
-            ], campaignName });
-            trackFearEffect(casterName, targetName, saveDc, campaignName);
+            const auraImmunities = await getAuraConditionImmunities({ targetName, characters });
+            if (auraCoversCondition(auraImmunities, 'frightened')) {
+                await resolveFearImmunityLeg(campaignName, { casterName, targetName, saveDc, saveType, detail, auraImmunities, actionName: action.name });
+            } else {
+                applyFrightenedToTarget(targetName, campaignName);
+                addExpiration({ attackerName: casterName, targetName, effects: [
+                    { type: 'condition', condition: 'frightened' },
+                ], campaignName });
+                trackFearEffect(casterName, targetName, saveDc, campaignName);
 
-            await logConditionApplied(campaignName, {
-                targetName,
-                condition: 'Frightened',
-                reason: 'Fear spell',
-                note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
-                logPrefix: '[FearModal]',
-            });
+                await logConditionApplied(campaignName, {
+                    targetName,
+                    condition: 'Frightened',
+                    reason: 'Fear spell',
+                    note: `${targetName} drops what it was holding, becomes Frightened, and must take the Dash action to move away from ${casterName} on each of its turns.`,
+                    logPrefix: '[FearModal]',
+                });
 
-            await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: false, detail, logPrefix: '[FearModal]' });
+                await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: false, detail, logPrefix: '[FearModal]' });
 
-            addTargetResult(campaignName, {
-                targetName,
-                saveResult: 'failure',
-                roll: detail.roll ?? 0,
-                total: detail.total ?? 0,
-                conditions: ['frightened'],
-                appliedDamage: 0,
-            });
+                addTargetResult(campaignName, {
+                    targetName,
+                    saveResult: 'failure',
+                    roll: detail.roll ?? 0,
+                    total: detail.total ?? 0,
+                    conditions: ['frightened'],
+                    appliedDamage: 0,
+                });
+            }
         } else {
             await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success: true, detail, logPrefix: '[FearModal]' });
 
@@ -184,7 +213,7 @@ function FearModal({
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
         dropPendingPrompt(setPendingPrompts, detail.promptId, onClose);
-    }, [campaignName, saveDc, saveType, pendingPrompts, applyFrightenedToTarget, trackFearEffect, playerStats.name, onClose]);
+    }, [campaignName, saveDc, saveType, pendingPrompts, applyFrightenedToTarget, trackFearEffect, playerStats.name, onClose, characters, action.name]);
 
     useSaveResultListener(pendingPrompts, handleSaveResult);
 

@@ -2,6 +2,7 @@ import { rollD20 } from '../../dice/diceRoller.js'
 import { getMonsterData } from '../../npcs/monsterUtils.js'
 import { getAbilitySaveBonus } from './conditionUtils.js'
 import { computeAuraBonus } from '../auras/auraOfProtection.js'
+import { auraCoversCondition, logAuraConditionImmunity } from '../auras/auraConditionImmunity.js'
 import { playerIsImmuneToCondition } from '../automation/automationService.js'
 import { getAuraOfPuritySaveAdvantageConditions, isAuraOfPurityActive } from '../../automation/handlers/buffs/auraOfPurityHandler.js'
 import { isCircleOfPowerActive } from '../../automation/handlers/buffs/circleOfPowerHandler.js'
@@ -113,13 +114,29 @@ function removeCondition({ combatSummary, creatureName, condition, getRuntimeVal
     }
 }
 
-function addCondition({ combatSummary, creatureName, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats }) {
+// CLA-019: aura-covered condition → suppression log only (Aura of Courage/Aura of
+// Devotion). Rides the same computeAuraComboEffects membership model as resistances.
+function auraSuppressesCondition(creatureName, conditionDef, campaignName, aura) {
+    if (!auraCoversCondition(aura, conditionDef.key)) return false
+    logAuraConditionImmunity({ campaignName, targetName: creatureName, conditionKey: conditionDef.key, auraImmunities: aura })
+    return true
+}
+
+// auraImmunities/auraImmunitySources: optional CLA-019 channel pre-computed by the
+// async seam via computeAuraComboEffects (Aura of Courage/Aura of Devotion). Callers
+// that omit it stay byte-identical. Returns { suppressed } so callers can keep the
+// log ledger honest (skip their own "applied" log when suppressed).
+function addCondition({ combatSummary, creatureName, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats, auraImmunities, auraImmunitySources }) {
     if (!combatSummary || !combatSummary.creatures) {
         console.error(`[addCondition] combatSummary is null/undefined or missing creatures when adding ${conditionDef.key} to ${creatureName}`)
-        return
+        return { suppressed: false }
     }
     const creature = combatSummary.creatures.find(c => c.name === creatureName)
-    if (!creature) return
+    if (!creature) return { suppressed: false }
+
+    if (auraSuppressesCondition(creatureName, conditionDef, campaignName, { immunities: auraImmunities, immunitySources: auraImmunitySources })) {
+        return { suppressed: true }
+    }
 
     if (playerStats && getRuntimeValue && campaignName) {
         if (playerIsImmuneToCondition({
@@ -128,7 +145,7 @@ function addCondition({ combatSummary, creatureName, conditionDef, dc, ability, 
             getRuntimeValue,
             campaignName,
         })) {
-            return
+            return { suppressed: true }
         }
     }
 
@@ -136,10 +153,14 @@ function addCondition({ combatSummary, creatureName, conditionDef, dc, ability, 
     const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionDef.key.toLowerCase())
     setRuntimeValue(creature.name, 'activeConditions', [...filtered, conditionDef.key], campaignName)
 
+    stampConditionMeta({ creature, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName })
+    return { suppressed: false }
+}
+
+function stampConditionMeta({ creature, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName }) {
     const existingMeta = getRuntimeValue(creature.name, 'activeConditionMeta', campaignName) || {}
     const metaKey = conditionDef.key.toLowerCase()
-    const shouldStoreMeta = dc || ability
-    if (shouldStoreMeta) {
+    if (dc || ability) {
         setRuntimeValue(creature.name, 'activeConditionMeta', {
             ...existingMeta,
             [metaKey]: {

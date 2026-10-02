@@ -7,6 +7,7 @@ import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { getAuraConditionImmunities, splitAuraCoveredConditions, logAuraConditionImmunity } from '../../services/combat/auras/auraConditionImmunity.js';
 import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
 import { registerTargetEffect, getActiveTargetEffect, getEffectDefinition, abilitySaveDisadvantageActive } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
@@ -657,7 +658,7 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
             await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
         }
     } else {
-        applyDamagelessSaveConditions({ context, saveDc, saveSuccess, saveTotal, applyTarget: targetName || characterName, attackerName, campaignName });
+        await applyDamagelessSaveConditions({ context, saveDc, saveSuccess, saveTotal, applyTarget: targetName || characterName, attackerName, campaignName });
     }
     await armRepeatSaveClause({ saveSuccess, context, campaignName, attackerName, applyTarget: targetName || characterName, saveDc, saveType });
 }
@@ -1044,23 +1045,38 @@ async function grantDreamPlaneBanishment({ context, campaignName, attackerName, 
 }
 
 // MA-0017: damageless save effects (e.g. Dominate Mind) must still apply conditions on a failed save.
-function applyDamagelessSaveConditions({ context, saveDc, saveSuccess, saveTotal, applyTarget, attackerName, campaignName }) {
+async function applyDamagelessSaveConditions({ context, saveDc, saveSuccess, saveTotal, applyTarget, attackerName, campaignName }) {
     if (saveDc == null || saveSuccess !== false) return;
     const saveConditions = context?.saveConditions || [];
     if (saveConditions.length <= 0) return;
     const targetChar = (context._characters || []).find(c => c.name === applyTarget);
-    const applied = applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    const applied = await applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
     // MA-0639: fail-by-N margin rider lands ONLY when the base condition
     // actually landed (RAW: "unconscious WHILE poisoned" — immunity to the
     // base save_effect blocks the rider too).
     if (applied) applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attackerName, campaignName });
 }
 
-function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName }) {
+// CLA-019: aura-granted condition immunities (Aura of Courage Frightened, Aura of
+// Devotion Charmed) consult computeAuraComboEffects — the same verified membership +
+// range model applyDamage consumes for aura-granted resistances. Covered conditions
+// are suppressed with an automation log; remaining conditions ride the existing path.
+async function resolveAuraConditionSplit({ saveConditions, applyTarget, context, campaignName }) {
+    const auraImmunities = await getAuraConditionImmunities({ targetName: applyTarget, characters: context?._characters });
+    const { covered, applicable } = splitAuraCoveredConditions(saveConditions, auraImmunities);
+    for (const cond of covered) {
+        logAuraConditionImmunity({ campaignName, targetName: applyTarget, conditionKey: cond, auraImmunities, sourceAbility: context?.actionName || context.name });
+    }
+    return applicable;
+}
+
+async function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName }) {
     if (saveConditions.length <= 0 || saveSuccess) return false;
     const targetStats = targetChar?.computedStats || targetChar;
+    const applicable = await resolveAuraConditionSplit({ saveConditions, applyTarget, context, campaignName });
+    if (applicable.length <= 0) return false;
     const isImmune = targetStats && playerIsImmuneToCondition({
-        conditionKey: saveConditions[0],
+        conditionKey: applicable[0],
         playerStats: targetStats,
         getRuntimeValue,
         campaignName,
@@ -1068,14 +1084,14 @@ function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, ap
     if (isImmune) return false;
     const currentConditions = getRuntimeValue(applyTarget, 'activeConditions') || [];
     const newConditions = [...currentConditions];
-    for (const cond of saveConditions) {
+    for (const cond of applicable) {
         if (!newConditions.some(c => String(c).toLowerCase() === cond)) {
             newConditions.push(cond);
         }
     }
     setRuntimeValue(applyTarget, 'activeConditions', newConditions, campaignName);
-    stampConditionMetaAndLogClauses({ applyTarget, saveConditions, attackerName, context, campaignName });
-    const conditionNames = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+    stampConditionMetaAndLogClauses({ applyTarget, saveConditions: applicable, attackerName, context, campaignName });
+    const conditionNames = applicable.map(c => c.charAt(0).toUpperCase() + c.slice(1));
     addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
@@ -1443,7 +1459,7 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
         ...buildSecondarySaveDamagePopupFields({ secondaryOutcome, effectiveD20ForSave, saveTotal, saveSuccess }),
     });
 
-    const applied = applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    const applied = await applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
     // MA-1351: damage-bearing save legs (Pseudodragon Sting — the save
     // adjudicates its own 2d4 pool, unlike the MA-0560/MA-1000 rider-only
     // composites) reach applySaveDamage, NOT applyDamagelessSaveConditions —

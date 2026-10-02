@@ -119,26 +119,41 @@ function activeBuffGrantsImmunity(playerStats, lowerCondition, getRuntimeValue, 
     )
 }
 
+// CLA-019: aura-granted condition immunities (Aura of Courage/Aura of Devotion) —
+// pre-computed by the async seam via computeAuraComboEffects (verified membership
+// + range model). Callers without the channel pass nothing and stay byte-identical.
+function auraImmunityMatches(auraImmunities, lowerCondition) {
+    return Array.isArray(auraImmunities) && auraImmunities.some(i => String(i).toLowerCase() === lowerCondition)
+}
+
+function staticImmunityMatches(playerStats, lowerCondition) {
+    return Array.isArray(playerStats.immunities) &&
+        playerStats.immunities.some(imm => String(imm).toLowerCase() === lowerCondition)
+}
+
 export function playerIsImmuneToCondition({
     conditionKey,
     playerStats,
     getRuntimeValue,
     campaignName,
     sourceCreatureType,
+    auraImmunities,
 }) {
     if (!conditionKey || !playerStats) return false
 
     const lowerCondition = String(conditionKey).toLowerCase()
+
+    if (auraImmunityMatches(auraImmunities, lowerCondition)) {
+        return true
+    }
 
     if (isWardedConditionImmunity(lowerCondition, playerStats, campaignName, sourceCreatureType)) {
         return true
     }
 
     // Check playerStats.immunities array (race immunities like "Magical Sleep")
-    if (playerStats.immunities && Array.isArray(playerStats.immunities)) {
-        if (playerStats.immunities.some(imm => String(imm).toLowerCase() === lowerCondition)) {
-            return true
-        }
+    if (staticImmunityMatches(playerStats, lowerCondition)) {
+        return true
     }
 
     const allFeatures = playerStats.allFeatures || []

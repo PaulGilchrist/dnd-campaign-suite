@@ -2,16 +2,21 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import storage from '../../services/ui/storage.js'
 import { CONDITIONS } from '../../services/combat/conditions/conditionUtils.js'
 import { addCondition } from '../../services/combat/conditions/conditionSaveService.js'
+import { getAuraConditionImmunities } from '../../services/combat/auras/auraConditionImmunity.js'
 import { addConcentration } from '../../services/combat/concentration/concentrationService.js'
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
 import { cloneDeep } from 'lodash'
 
-function applyConditionTabEffect({ combatSummary, campaignName, characters, setCombatSummary, data }) {
+// CLA-019: aura-granted condition immunities (Aura of Courage) gate the GM add seam —
+// addCondition suppresses + logs when the target is covered by an in-range aura.
+async function applyConditionTabEffect({ combatSummary, campaignName, characters, setCombatSummary, data }) {
     const conditionDef = CONDITIONS.find(c => c.key === data.conditionKey)
     if (!conditionDef) return false
     const targetCharacter = characters.find(c => c.name === data.target || c.name.startsWith(data.target + ' '))
     const targetStats = targetCharacter?.computedStats || targetCharacter
-    addCondition({ combatSummary, creatureName: data.target, conditionDef, dc: data.dc, ability: data.ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats: targetStats })
+    const aura = await getAuraConditionImmunities({ targetName: data.target, characters })
+    const result = addCondition({ combatSummary, creatureName: data.target, conditionDef, dc: data.dc, ability: data.ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats: targetStats, auraImmunities: aura.immunities, auraImmunitySources: aura.immunitySources })
+    if (result?.suppressed) return 'suppressed'
     storage.set('combatSummary', combatSummary, campaignName)
     setCombatSummary(cloneDeep(combatSummary))
     logConditionEvent({ campaignName, action: 'applied', creatureName: data.target, conditionLabel: conditionDef.label, dc: data.dc, ability: data.ability })
@@ -61,12 +66,16 @@ export function createEffectAdderHandlers({
     setEffectAdderTarget,
     setCombatSummary,
 }) {
-    const handleApplyEffect = function handleApplyEffect(tab, data) {
+    const handleApplyEffect = async function handleApplyEffect(tab, data) {
         if (!combatSummary) return
 
         if (tab === 'conditions') {
-            const applied = applyConditionTabEffect({ combatSummary, campaignName, characters, setCombatSummary, data })
-            if (!applied) return
+            const outcome = await applyConditionTabEffect({ combatSummary, campaignName, characters, setCombatSummary, data })
+            if (outcome === 'suppressed') {
+                setEffectAdderTarget(null)
+                return
+            }
+            if (!outcome) return
         } else if (tab === 'effects') {
             applyEffectTabEntry(campaignName, data)
         } else if (tab === 'concentration') {
