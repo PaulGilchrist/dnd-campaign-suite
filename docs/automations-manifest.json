@@ -296,7 +296,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-010-arcane-charge-ungated-unlogged.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action: 1 action",
       "expectedBehavior": "When you use Action Surge, teleport up to 30 feet before or after the additional action."
