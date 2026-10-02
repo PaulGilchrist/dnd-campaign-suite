@@ -69,9 +69,12 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
     if (onBeforeBiDefense) {
       await onBeforeBiDefense({ dieValue, dieSize, newAc, willMiss, targetName });
     }
-    const currentUses = resolveInspirationUses(getRuntimeValue(targetName, 'bardicInspirationUses', campaignName));
-    if (currentUses > 0) {
-      await setRuntimeValue(targetName, 'bardicInspirationUses', currentUses - 1, campaignName);
+    const grantedBy = getRuntimeValue(targetName, 'bardicInspirationGrantedBy', campaignName);
+    if (grantedBy !== targetName) {
+      const currentUses = resolveInspirationUses(getRuntimeValue(targetName, 'bardicInspirationUses', campaignName));
+      if (currentUses > 0) {
+        await setRuntimeValue(targetName, 'bardicInspirationUses', currentUses - 1, campaignName);
+      }
     }
     if (willMiss && setPopupHtml) {
       setPopupHtml({ ...popupHtml, hit: false, isAutoMiss: true });

@@ -129,6 +129,35 @@ describe('AttackResultPopup', () => {
       });
     });
 
+    it('does NOT decrement the numeric pool on self-granted defense (grant already paid the pool)', async () => {
+      getRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === 'bardicInspirationUses') return 3;
+        if (prop === 'bardicInspirationGrantedBy') return 'Bard';
+        return null;
+      });
+
+      renderPopup({
+        popupHtml: {
+          name: 'Test Attack',
+          type: 'd20',
+          rolls: [18],
+          bonus: 3,
+          hit: true,
+          bardicInspirationDefense: true,
+          bardicInspirationDefenseTargetName: 'Bard',
+        },
+        campaignName: 'test-campaign',
+        onClose: vi.fn(),
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /Bardic Inspiration - Defense/i }));
+
+      await waitFor(() => {
+        expect(setRuntimeValue).toHaveBeenCalledWith('Bard', 'bardicInspirationDie', null, 'test-campaign');
+      });
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('Bard', 'bardicInspirationUses', expect.any(Number), 'test-campaign');
+    });
+
     it('decrements bardicInspirationUses for number, object, and string formats when > 0', async () => {
       // Number format
       getRuntimeValue.mockImplementation((_key, prop) => {

@@ -450,8 +450,8 @@ function CharSheetContent({
         handleStrokeOfLuck(playerStats, campaignName, popupHtml, featureKey);
     }, [playerStats, campaignName, popupHtml]);
 
-    const handleBardicInspirationWrapped = React.useCallback(async (_dieValue, _dieSize) => {
-        await handleBardicInspiration(playerStats, campaignName, popupHtml);
+    const handleBardicInspirationWrapped = React.useCallback(async (dieValue, dieSize) => {
+        await handleBardicInspiration(playerStats, campaignName, popupHtml, dieValue, dieSize);
     }, [playerStats, campaignName, popupHtml]);
 
     const handleBiDefenseCombatSummaryWrapped = React.useCallback(async ({ dieValue: _dieValue, newAc: _newAc, willMiss: _willMiss }) => {

@@ -103,11 +103,56 @@ describe('bardicInspirationHandler.handle', () => {
         payload: {
           type: 'automation_info',
           name: action.name,
+          automationType: 'bardic_inspiration_refused',
           description: `${action.name} has no uses remaining. Recharges on a Long Rest.`,
           automation: action.automation,
         },
       });
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('logs an automation/bardic_inspiration_refused entry at 0 uses', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+
+      await handle(action, playerStats, campaignName);
+
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'automation',
+        characterName: playerName,
+        automationType: 'bardic_inspiration_refused',
+      }));
+    });
+
+    it('refuses when pool is an unparseable non-numeric value (NaN cannot bypass the gate)', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue('not-a-number');
+
+      const result = await handle(action, playerStats, campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.automationType).toBe('bardic_inspiration_refused');
+    });
+
+    it('grants when a stale corrupt object pool holds a positive current and rewrites the pool numeric', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (name === playerName && key === 'bardicInspirationUses') return { current: 2, max: 5 };
+        return null;
+      });
+
+      await applyBardicInspiration({
+        action,
+        playerStats,
+        campaignName,
+        targetName: 'Fighter',
+        dieSize: 8,
+        hasCombatOptions: false,
+      });
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        playerName,
+        'bardicInspirationUses',
+        1,
+        campaignName,
+      );
     });
   });
 
@@ -397,6 +442,34 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         { current: 1, max: 1 },
         campaignName,
       );
+    });
+
+    it('does not clobber the bard pool with the grant object on self-grant and keeps the pool decrement numeric', async () => {
+      const calls = [];
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (name === playerName && key === 'bardicInspirationUses') return 3;
+        return null;
+      });
+      useRuntimeState.setRuntimeValue.mockImplementation((name, key, val) => {
+        calls.push([name, key, val]);
+        return Promise.resolve();
+      });
+
+      await applyBardicInspiration({
+        action,
+        playerStats,
+        campaignName,
+        targetName: playerName,
+        dieSize: 12,
+        hasCombatOptions: false,
+      });
+
+      expect(calls).toContainEqual([playerName, 'bardicInspirationUses', 2]);
+      const poolWrites = calls.filter(([, key]) => key === 'bardicInspirationUses');
+      expect(poolWrites.length).toBe(1);
+      expect(typeof poolWrites[0][2]).toBe('number');
+      expect(calls).toContainEqual([playerName, 'bardicInspirationDie', '12']);
+      expect(calls).toContainEqual([playerName, 'bardicInspirationGrantedBy', playerName]);
     });
   });
 

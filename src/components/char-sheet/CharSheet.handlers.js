@@ -73,27 +73,30 @@ export function handleStrokeOfLuck(playerStats, campaignName, popupHtml, feature
     }).catch((e) => { console.error('[CharSheet] Error logging Stroke of Luck:', e); });
 }
 
-export async function handleBardicInspiration(playerStats, campaignName, popupHtml) {
+export async function handleBardicInspiration(playerStats, campaignName, popupHtml, dieValue, dieSize) {
     if (!playerStats) return;
     const playerName = playerStats.name;
-    const biDie = getRuntimeValue(playerName, 'bardicInspirationDie', campaignName);
-    if (!biDie) return;
+    const biDie = Number(dieValue);
+    if (!Number.isFinite(biDie) || biDie <= 0) {
+        console.error('[CharSheet] handleBardicInspiration: popup passed no rolled BI die value — aborting spend:', { dieValue, dieSize });
+        return;
+    }
+    const biDieSize = Number(dieSize) || Number(getRuntimeValue(playerName, 'bardicInspirationDie', campaignName)) || 6;
+    const dieSizeLabel = `d${biDieSize}`;
     const grantedBy = getRuntimeValue(playerName, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
     const ph = popupHtml || {};
     const checkName = ph.name || 'Ability Check';
-    const d20 = ph.rolls?.[0] || 0;
-    const bonus = ph.bonus || 0;
-    const modifier = ph.modifier || 0;
-    const dieSize = ph.dieSize || 'd6';
-    const originalTotal = d20 + bonus + modifier;
+    const d20 = Number(ph.rolls?.[0]) || 0;
+    const modTotal = (Number(ph.bonus) || 0) + (Number(ph.modifier) || 0);
+    const originalTotal = d20 + modTotal;
     const modifiedTotal = originalTotal + biDie;
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: 'Bardic Inspiration',
-        description: `${playerName} used Bardic Inspiration (1d${dieSize}): +${biDie} to ${checkName} (d20 ${d20} + ${bonus + modifier} = ${originalTotal} → ${modifiedTotal}). Inspiration granted by ${grantedBy}.`,
+        description: `${playerName} used Bardic Inspiration (1${dieSizeLabel}): +${modifiedTotal} to ${checkName} (d20 ${d20} + ${modTotal} = ${originalTotal} → ${modifiedTotal}). Inspiration granted by ${grantedBy}.`,
         dieValue: biDie,
-        dieSize,
+        dieSize: dieSizeLabel,
         timestamp: Date.now(),
     });
     setRuntimeValue(playerName, 'bardicInspirationDie', null, campaignName);

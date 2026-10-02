@@ -585,7 +585,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-027-bi-spend-log-corruption-self-grant-crash.md",
+      "verified": "verified",
       "class": "Bard",
       "triggerConditions": "Action: 1 bonus action; Action: bonus_action; Range: 60_ft",
       "expectedBehavior": "You can inspire others through stirring words or music. Up to three times per day, you can add one of your Bardic Inspiration dice to one ability check made by one other creature of your choice. You can do so when any creature (including yourself) makes an ability check after you say the words or perform the musical piece. You must be able to see the creature, and the creature must be able to hear you. Your Bardic Inspiration die is a d6."

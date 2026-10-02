@@ -191,24 +191,68 @@ describe('handleBardicInspiration', () => {
   it('logs ability_use and clears BI die when BI die is set', async () => {
     const { addEntry } = await import('../../services/ui/logService.js');
     const stats = createPlayerStats();
-    mockStore.set('Test Character:bardicInspirationDie', 'd6');
+    mockStore.set('Test Character:bardicInspirationDie', '6');
     mockStore.set('Test Character:bardicInspirationGrantedBy', 'Bard');
-    const popupHtml = { name: 'Persuasion Check', rolls: [15], bonus: 3, modifier: 2, dieSize: 'd6' };
+    const popupHtml = { name: 'Persuasion Check', rolls: [15], bonus: 3, modifier: 2 };
 
-    await handleBardicInspiration(stats, campaignName, popupHtml);
+    await handleBardicInspiration(stats, campaignName, popupHtml, 3, 6);
 
     expect(addEntry).toHaveBeenCalled();
     expect(mockStore.get('Test Character:bardicInspirationDie')).toBe(null);
     expect(mockStore.get('Test Character:bardicInspirationGrantedBy')).toBe(null);
   });
 
+  it('logs the rolled die value and numeric adjusted total in the exact spend shape', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
+    const stats = createPlayerStats();
+    mockStore.set('Test Character:bardicInspirationDie', '12');
+    mockStore.set('Test Character:bardicInspirationGrantedBy', 'Bard');
+    const popupHtml = { name: 'Insight', rolls: [10], bonus: 9, modifier: 0 };
+
+    await handleBardicInspiration(stats, campaignName, popupHtml, 2, 12);
+
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.description).toBe(
+      'Test Character used Bardic Inspiration (1d12): +21 to Insight (d20 10 + 9 = 19 → 21). Inspiration granted by Bard.',
+    );
+    expect(entry.dieValue).toBe(2);
+    expect(typeof entry.dieValue).toBe('number');
+    expect(entry.dieSize).toBe('d12');
+  });
+
+  it('uses numeric math for the adjusted total even when popup args arrive as strings', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
+    const stats = createPlayerStats();
+    mockStore.set('Test Character:bardicInspirationDie', '12');
+    mockStore.set('Test Character:bardicInspirationGrantedBy', 'Bard');
+    const popupHtml = { name: 'Insight', rolls: ['10'], bonus: '9', modifier: '0' };
+
+    await handleBardicInspiration(stats, campaignName, popupHtml, '2', '12');
+
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.description).toContain('19 → 21');
+    expect(entry.description).not.toContain('1912');
+    expect(entry.dieValue).toBe(2);
+    expect(entry.dieSize).toBe('d12');
+  });
+
+  it('aborts without logging when the popup passes no rolled die value', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
+    const stats = createPlayerStats();
+    mockStore.set('Test Character:bardicInspirationDie', '12');
+
+    await handleBardicInspiration(stats, campaignName, { name: 'Insight', rolls: [10], bonus: 9 });
+
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+
   it('uses default checkName when popupHtml.name is missing', async () => {
     const { addEntry } = await import('../../services/ui/logService.js');
     const stats = createPlayerStats();
-    mockStore.set('Test Character:bardicInspirationDie', 'd6');
+    mockStore.set('Test Character:bardicInspirationDie', '6');
     mockStore.set('Test Character:bardicInspirationGrantedBy', 'Ally');
 
-    await handleBardicInspiration(stats, campaignName, { rolls: [15], bonus: 3, modifier: 0 });
+    await handleBardicInspiration(stats, campaignName, { rolls: [15], bonus: 3, modifier: 0 }, 4, 6);
 
     expect(addEntry).toHaveBeenCalled();
     const entry = addEntry.mock.calls[0][1];

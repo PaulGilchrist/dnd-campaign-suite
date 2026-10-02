@@ -6,6 +6,18 @@ import { addEntry } from '../../../ui/logService.js';
 
 import { executeHandler } from '../../index.js';
 
+function resolveNumericPool(raw, fallback) {
+    if (typeof raw === 'object' && raw !== null) {
+        const n = Number(raw.current);
+        return Number.isFinite(n) ? n : 0;
+    }
+    if (raw != null) {
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : 0;
+    }
+    return fallback;
+}
+
 function resolveBardicDieSize(playerStats) {
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
     return classLevel?.bardic_die || classLevel?.class_specific?.bardic_inspiration_die || 6;
@@ -31,13 +43,22 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         : 0;
 
     if (usesMax > 0) {
-        const currentUses = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? usesMax);
-        if (currentUses <= 0) {
+        const currentUses = resolveNumericPool(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName), usesMax);
+        if (!(currentUses > 0)) {
+            addEntry(campaignName, {
+                type: 'automation',
+                characterName: playerStats.name,
+                automationType: 'bardic_inspiration_refused',
+                name: action.name,
+                description: `${action.name}: no uses remaining. Recharges on a Long Rest.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[bardicInspirationHandler:refusal-log-error]', e); });
             return {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: action.name,
+                    automationType: 'bardic_inspiration_refused',
                     description: `${action.name} has no uses remaining. Recharges on a Long Rest.`,
                     automation: auto,
                 },
@@ -99,13 +120,20 @@ export async function applyBardicInspiration({ action, playerStats, campaignName
         : 0;
 
     if (usesMax > 0) {
-        const currentUses = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? usesMax);
+        const currentUses = resolveNumericPool(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName), usesMax);
         await setRuntimeValue(playerStats.name, 'bardicInspirationUses', currentUses - 1, campaignName);
     }
 
     await setRuntimeValue(targetName, 'bardicInspirationDie', String(dieSize), campaignName);
     await setRuntimeValue(targetName, 'bardicInspirationGrantedBy', playerStats.name, campaignName);
-    await setRuntimeValue(targetName, 'bardicInspirationUses', { current: 1, max: 1 }, campaignName);
+    // Self-grant: the target key shares the bard's numeric pool namespace —
+    // writing the {current,max} grant token there would clobber the pool and
+    // crash the sheet. The numeric pool (already decremented above) plus the
+    // die/grantedBy keys are the self-grant state; granted-token consumers
+    // fall back to the bard pool.
+    if (targetName !== playerStats.name) {
+        await setRuntimeValue(targetName, 'bardicInspirationUses', { current: 1, max: 1 }, campaignName);
+    }
 
     if (hasCombatOptions) {
         const options = auto.options || ['defense_add_to_ac', 'offense_add_to_damage'];
