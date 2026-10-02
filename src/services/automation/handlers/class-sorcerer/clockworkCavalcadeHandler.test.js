@@ -226,7 +226,12 @@ describe('clockworkCavalcadeHandler', () => {
 
     describe('confirmClockworkCavalcadeHeal', () => {
         it('heals across the distribution and consumes a use', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('1');
+            useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+                if (key === USES_KEY) return '1';
+                if (key === 'currentHitPoints') return 20;
+                if (key === 'hitPoints') return 50;
+                return null;
+            });
             getCombatContext.mockResolvedValue(makeCombatSummary([
                 { name: 'Ally', type: 'player', currentHp: 20, maxHp: 50 },
                 { name: 'Enemy', type: 'npc', currentHp: 30, maxHp: 40 },
@@ -248,14 +253,16 @@ describe('clockworkCavalcadeHandler', () => {
         });
 
         it('caps total healing at the pool', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('1');
+            useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === USES_KEY) return '1';
+                if (key === 'currentHitPoints') return 1;
+                if (key === 'hitPoints') return 100;
+                return null;
+            });
             getCombatContext.mockResolvedValue(makeCombatSummary([
                 { name: 'Ally', type: 'player', currentHp: 1, maxHp: 100 },
                 { name: 'Enemy', type: 'npc', currentHp: 1, maxHp: 100 },
             ]));
-            useRuntimeState.getRuntimeValue
-                .mockReturnValueOnce('1')
-                .mockReturnValue('1');
 
             await confirmClockworkCavalcadeHeal(
                 makeAction(),
@@ -302,6 +309,114 @@ describe('clockworkCavalcadeHandler', () => {
                 type: 'ability_use',
                 abilityName: 'Clockwork Cavalcade',
             }));
+        });
+
+        it('heals player targets from runtime HP despite combatSummary stub maxHp:1 (CLA-055)', async () => {
+            getCombatContext.mockResolvedValue(makeCombatSummary([
+                { name: 'AasimarTest', type: 'player', currentHp: 1, maxHp: 1 },
+                { name: 'FeyRanger', type: 'player', currentHp: 1, maxHp: 1 },
+            ]));
+            useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+                if (key === USES_KEY) return '1';
+                if (name === 'AasimarTest' && key === 'currentHitPoints') return 80;
+                if (name === 'AasimarTest' && key === 'hitPoints') return 143;
+                if (name === 'FeyRanger' && key === 'currentHitPoints') return 40;
+                if (name === 'FeyRanger' && key === 'hitPoints') return 89;
+                return null;
+            });
+
+            const result = await confirmClockworkCavalcadeHeal(
+                makeAction(),
+                makePlayerStats(),
+                CAMPAIGN,
+                { AasimarTest: 63, FeyRanger: 37 },
+                100
+            );
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'AasimarTest', 63, CAMPAIGN);
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'FeyRanger', 37, CAMPAIGN);
+            const hpLogs = addEntry.mock.calls.filter(c => c[1].type === 'hp_change');
+            expect(hpLogs.map(c => c[1]).find(l => l.targetName === 'AasimarTest')).toEqual(expect.objectContaining({
+                delta: 63, currentHp: 143, maxHp: 143, isHealing: true,
+            }));
+            expect(hpLogs.map(c => c[1]).find(l => l.targetName === 'FeyRanger')).toEqual(expect.objectContaining({
+                delta: 37, currentHp: 77, maxHp: 89, isHealing: true,
+            }));
+            expect(result.payload.description).toContain('restored 100 HP');
+            expect(getUsesCalls()[0][2]).toBe(0);
+        });
+
+        it('clamps player healing at runtime max HP', async () => {
+            getCombatContext.mockResolvedValue(makeCombatSummary([
+                { name: 'AasimarTest', type: 'player', currentHp: 1, maxHp: 1 },
+            ]));
+            useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === USES_KEY) return '1';
+                if (key === 'currentHitPoints') return 140;
+                if (key === 'hitPoints') return 143;
+                return null;
+            });
+
+            await confirmClockworkCavalcadeHeal(
+                makeAction(),
+                makePlayerStats(),
+                CAMPAIGN,
+                { AasimarTest: 63 },
+                100
+            );
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'AasimarTest', 3, CAMPAIGN);
+            const hpLog = addEntry.mock.calls.map(c => c[1]).find(l => l.type === 'hp_change');
+            expect(hpLog.delta).toBe(3);
+            expect(hpLog.currentHp).toBe(143);
+        });
+
+        it('spends pool by actual healed amount, not allocated amount', async () => {
+            getCombatContext.mockResolvedValue(makeCombatSummary([
+                { name: 'Ally', type: 'player', currentHp: 1, maxHp: 1 },
+                { name: 'Enemy', type: 'npc', currentHp: 30, maxHp: 40 },
+            ]));
+            useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === USES_KEY) return '1';
+                if (key === 'currentHitPoints') return 133;
+                if (key === 'hitPoints') return 143;
+                return null;
+            });
+
+            const result = await confirmClockworkCavalcadeHeal(
+                makeAction(),
+                makePlayerStats(),
+                CAMPAIGN,
+                { Ally: 50, Enemy: 50 },
+                100
+            );
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Ally', 10, CAMPAIGN);
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Enemy', 10, CAMPAIGN);
+            expect(result.payload.description).toContain('restored 20 HP');
+        });
+
+        it('keeps npc healing resolved from combatSummary (unchanged path)', async () => {
+            getCombatContext.mockResolvedValue(makeCombatSummary([
+                { name: 'Bandit 1', type: 'npc', currentHp: 4, maxHp: 11 },
+            ]));
+            useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === USES_KEY) return '1';
+                return null;
+            });
+
+            await confirmClockworkCavalcadeHeal(
+                makeAction(),
+                makePlayerStats(),
+                CAMPAIGN,
+                { 'Bandit 1': 7 },
+                100
+            );
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 1', 7, CAMPAIGN);
+            const hpLog = addEntry.mock.calls.map(c => c[1]).find(l => l.type === 'hp_change');
+            expect(hpLog.delta).toBe(7);
+            expect(hpLog.maxHp).toBe(11);
         });
     });
 

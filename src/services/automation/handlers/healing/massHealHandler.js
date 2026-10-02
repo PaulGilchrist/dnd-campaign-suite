@@ -112,13 +112,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-function resolveTargetMaxHp(combatSummary, targetName, playerStats) {
+// PC combatSummary entries are 1/1 placeholders (campaign-select re-seed); player max HP
+// truth is the runtime 'hitPoints' key — mirror MassHealModal.jsx / hpModifier.js.
+function resolveTargetMaxHp(combatSummary, targetName, playerStats, campaignName) {
     const creature = combatSummary?.creatures?.find(c => c.name === targetName);
-    return creature?.maxHp || playerStats.hitPoints || 0;
+    if (creature && creature.type !== 'player') return creature.maxHp || playerStats.hitPoints || 0;
+    const storedMax = getRuntimeValue(targetName, 'hitPoints', campaignName);
+    if (storedMax != null && storedMax !== '') return Number(storedMax);
+    return (creature && creature.maxHp) || playerStats.hitPoints || 0;
 }
 
 async function healMassHealTarget({ combatSummary, targetName, userAmount, totalPool, playerStats, playerName, campaignName, bonusDetails, distributionSize, spell }) {
-    const maxHp = resolveTargetMaxHp(combatSummary, targetName, playerStats);
+    const maxHp = resolveTargetMaxHp(combatSummary, targetName, playerStats, campaignName);
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
     const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
     const missingHp = maxHp - currentHp;

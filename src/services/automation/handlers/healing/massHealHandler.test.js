@@ -204,6 +204,32 @@ describe('massHealHandler', () => {
             );
         });
 
+        it('heals player targets from runtime HP despite combatSummary stub maxHp:1 (CLA-055)', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'AasimarTest', maxHp: 1, currentHp: 1, type: 'player' },
+                    { name: 'FeyRanger', maxHp: 1, currentHp: 1, type: 'player' },
+                ],
+            });
+            getAllyList.mockReturnValue(['AasimarTest', 'FeyRanger']);
+            getRuntimeValue.mockImplementation((name, prop) => {
+                if (prop === 'activeConditions') return [];
+                if (name === 'AasimarTest' && prop === 'currentHitPoints') return 80;
+                if (name === 'AasimarTest' && prop === 'hitPoints') return 143;
+                if (name === 'FeyRanger' && prop === 'currentHitPoints') return 40;
+                if (name === 'FeyRanger' && prop === 'hitPoints') return 89;
+                return null;
+            });
+
+            const distribution = { AasimarTest: 63, FeyRanger: 37 };
+
+            const result = await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'AasimarTest', 63, campaignName);
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'FeyRanger', 37, campaignName);
+            expect(result.payload.description).toContain('healed 100 HP');
+        });
+
         it('logs hp_change for each target', async () => {
             const distribution = { Fighter: 100, Rogue: 50 };
 

@@ -127,7 +127,7 @@ export function createMassHealHandler(config) {
         for (const targetName of finalTargets) {
             if (alreadyHealedThisRound(targetName, campaignName, currentRound, useCurrentRound)) continue;
 
-            const maxHp = resolveTargetMaxHp(combatSummary, playerStats, targetName);
+            const maxHp = resolveTargetMaxHp(combatSummary, playerStats, targetName, campaignName);
             const currentHp = resolveStoredCurrentHp(targetName, campaignName, maxHp);
             const rollResult = rollMassHealDice(healExpression, maximize, playerStats, targetName, campaignName);
             if (!rollResult) continue;
@@ -202,8 +202,14 @@ function stampHealedThisRound(targetName, campaignName, currentRound, useCurrent
     setRuntimeValue(targetName, `prayerOfHealing_lastUsedRound_${targetName}`, currentRound, campaignName);
 }
 
-function resolveTargetMaxHp(combatSummary, playerStats, targetName) {
-    return combatSummary?.creatures?.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
+// PC combatSummary entries are 1/1 placeholders (campaign-select re-seed); player max HP
+// truth is the runtime 'hitPoints' key — mirror MassHealModal.jsx / hpModifier.js.
+function resolveTargetMaxHp(combatSummary, playerStats, targetName, campaignName) {
+    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
+    if (creature && creature.type !== 'player') return creature.maxHp || playerStats.hitPoints || 0;
+    const storedMax = getRuntimeValue(targetName, 'hitPoints', campaignName);
+    if (storedMax != null && storedMax !== '') return Number(storedMax);
+    return (creature && creature.maxHp) || playerStats.hitPoints || 0;
 }
 
 function resolveStoredCurrentHp(targetName, campaignName, fallbackMaxHp) {

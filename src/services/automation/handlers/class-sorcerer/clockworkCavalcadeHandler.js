@@ -119,20 +119,29 @@ export async function consumeUse(action, playerStats, campaignName) {
     };
 }
 
+// PC combatSummary entries are 1/1 placeholders (campaign-select re-seed); player HP truth
+// is the runtime 'hitPoints'/'currentHitPoints' keys — mirror MassHealModal.jsx / hpModifier.js.
+function resolveCubeTargetMaxHp(creature, targetName, playerStats, campaignName) {
+    if (creature && creature.type !== 'player') return Number(creature.maxHp) || 0;
+    const storedMax = getRuntimeValue(targetName, 'hitPoints', campaignName);
+    if (storedMax != null && storedMax !== '') return Number(storedMax);
+    return Number(playerStats.hitPoints) || (creature ? Number(creature.maxHp) || 0 : 0);
+}
+
+function resolveCubeTargetCurrentHp(creature, targetName, maxHp, campaignName) {
+    if (creature && creature.type !== 'player') return creature.currentHp ?? maxHp;
+    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    return storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+}
+
 async function healCubeTarget({ combatSummary, playerStats, campaignName, featureName, playerName, targetName, userAmount, remainingPool }) {
     const amount = Number(userAmount) || 0;
     if (amount <= 0) return null;
 
     const creatures = combatSummary && combatSummary.creatures ? combatSummary.creatures : [];
     const creature = creatures.find(c => c.name === targetName);
-    const maxHp = (creature && creature.maxHp) || playerStats.hitPoints || 0;
-    let currentHp;
-    if (creature && creature.type === 'player') {
-        const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-        currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-    } else {
-        currentHp = creature ? (creature.currentHp ?? maxHp) : maxHp;
-    }
+    const maxHp = resolveCubeTargetMaxHp(creature, targetName, playerStats, campaignName);
+    const currentHp = resolveCubeTargetCurrentHp(creature, targetName, maxHp, campaignName);
     const missingHp = Math.max(0, maxHp - currentHp);
     const actualHeal = Math.min(amount, missingHp, remainingPool);
 
