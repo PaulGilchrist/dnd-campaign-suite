@@ -39,6 +39,8 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_Stones_Endurance_usedRound',
     // CLA-393: Wrath of the Sea once-per-turn attack latch re-arms at round wrap.
     '_Wrath_of_the_Sea_usedRound',
+    // CLA-004: Action Surge once-per-turn latch re-arms at round wrap.
+    'actionSurgeUsedThisRound',
     // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
     '_Warding_Flare_usedRound',
     // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.

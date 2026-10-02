@@ -68,6 +68,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_Stones_Endurance_usedRound', null, campaignName)
     // CLA-393: Wrath of the Sea once-per-turn attack latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Wrath_of_the_Sea_usedRound', null, campaignName)
+    // CLA-004: Action Surge once-per-turn latch re-arms at round wrap.
+    setRuntimeValue(creatureName, 'actionSurgeUsedThisRound', null, campaignName)
     // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Warding_Flare_usedRound', null, campaignName)
     // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.

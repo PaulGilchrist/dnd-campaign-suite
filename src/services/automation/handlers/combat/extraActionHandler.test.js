@@ -15,7 +15,11 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(),
-  loadCombatSummary: vi.fn(),
+  loadCombatSummary: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -108,7 +112,7 @@ describe('extraActionHandler.handle', () => {
     it('blocks when current round > 1', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ firstRoundOnly: true });
-      combatData.getCurrentCombatRound.mockReturnValue(2);
+      combatData.loadCombatSummary.mockResolvedValue({ round: 2, creatures: [] });
 
       const result = await handle(action, ps, campaignName);
 
@@ -193,13 +197,13 @@ describe('extraActionHandler.handle', () => {
   });
 
   describe('oncePerTurn check', () => {
-    it('blocks when usedThisRound equals currentRound (including undefined===undefined)', async () => {
+    it('blocks when usedThisRound equals currentRound', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ oncePerTurn: true, uses: 2 });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce(2)
         .mockReturnValueOnce(1);
-      combatData.getCurrentCombatRound.mockReturnValue(1);
+      combatData.loadCombatSummary.mockResolvedValue({ round: 1, creatures: [] });
 
       const result = await handle(action, ps, campaignName);
 
@@ -214,7 +218,7 @@ describe('extraActionHandler.handle', () => {
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce(2)
         .mockReturnValue(undefined);
-      combatData.getCurrentCombatRound.mockReturnValue(1);
+      combatData.loadCombatSummary.mockResolvedValue({ round: 1, creatures: [] });
 
       const result = await handle(action, ps, campaignName);
 
@@ -226,10 +230,9 @@ describe('extraActionHandler.handle', () => {
     it('allows in a new round when usedThisRound !== currentRound', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ oncePerTurn: true, uses: 2 });
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(2)
-        .mockReturnValue(undefined);
-      combatData.getCurrentCombatRound.mockReturnValue(2);
+      useRuntimeState.getRuntimeValue.mockImplementation((_n, key) =>
+        key === 'actionSurgeUses' ? 2 : 1);
+      combatData.loadCombatSummary.mockResolvedValue({ round: 2, creatures: [] });
 
       const result = await handle(action, ps, campaignName);
 
@@ -256,11 +259,10 @@ describe('extraActionHandler.handle', () => {
   });
 
   describe('oncePerCombat and firstRoundOnly interaction', () => {
-    it('passes oncePerCombat but blocks on firstRoundOnly', async () => {
+    it('blocks firstRoundOnly in later rounds (oncePerCombat shares the fresh round)', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ oncePerCombat: true, firstRoundOnly: true, uses: 1 });
-      combatData.loadCombatSummary.mockResolvedValue({ round: 1, creatures: [] });
-      combatData.getCurrentCombatRound.mockReturnValue(3);
+      const action = makeAction({ firstRoundOnly: true, uses: 1 });
+      combatData.loadCombatSummary.mockResolvedValue({ round: 3, creatures: [] });
 
       const result = await handle(action, ps, campaignName);
 
@@ -287,7 +289,7 @@ describe('extraActionHandler.handle', () => {
     it('blocks on firstRoundOnly before checking uses', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ firstRoundOnly: true, uses: 5 });
-      combatData.getCurrentCombatRound.mockReturnValue(3);
+      combatData.loadCombatSummary.mockResolvedValue({ round: 3, creatures: [] });
 
       const result = await handle(action, ps, campaignName);
 
