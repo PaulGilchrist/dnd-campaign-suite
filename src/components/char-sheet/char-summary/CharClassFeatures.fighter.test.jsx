@@ -1,9 +1,10 @@
 // @improved-by-ai
 // @cleaned-by-ai
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import FighterFeatures from './CharClassFeatures.jsx';
+import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => null),
@@ -39,7 +40,7 @@ vi.mock('../modals/WeaponKindMasteryModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../common/Popup.jsx', () => ({
+vi.mock('../../common/popup.jsx', () => ({
   default: function MockPopup({ html, onClickOrKeyDown }) {
     return (
       <div onClick={onClickOrKeyDown}>
@@ -375,6 +376,50 @@ describe('FighterFeatures', () => {
       const { container } = render(<FighterFeatures playerStats={stats} campaignName="test" />);
       expect(container.textContent).toContain('Fighting Styles:');
       expect(container.textContent).not.toContain('N/A');
+    });
+
+    describe('badge popup (bug-CLA-005 collateral)', () => {
+      afterEach(() => {
+        vi.mocked(loadFightingStyles).mockResolvedValue([]);
+      });
+
+      const badgeStats = () => buildPlayerStats({
+        level: 18,
+        class: {
+          name: 'Fighter',
+          major: {},
+          subclass: {},
+          class_levels: Array(18).fill(null).map((_, i) => ({ level: i + 1 })),
+          fightingStyles: ['Unarmed Fighting', 'Interception'],
+        },
+      });
+
+      it('clicking a fighting style badge renders the popup without throwing', async () => {
+        vi.mocked(loadFightingStyles).mockResolvedValue([
+          { name: 'Unarmed Fighting', description: 'UNARMED_POPUP_DESC' },
+          { name: 'Interception', description: 'INTERCEPTION_POPUP_DESC' },
+        ]);
+        const { container } = render(<FighterFeatures playerStats={badgeStats()} campaignName="test" />);
+        await act(async () => {});
+        const badge = [...container.querySelectorAll('span.clickable')].find(s => s.textContent === 'Unarmed Fighting');
+        fireEvent.click(badge);
+        expect(screen.getByText('UNARMED_POPUP_DESC')).toBeInTheDocument();
+        expect(screen.getByText('Interception')).toBeInTheDocument();
+      });
+
+      it('clicking the added style badge opens its own popup and dismisses', async () => {
+        vi.mocked(loadFightingStyles).mockResolvedValue([
+          { name: 'Unarmed Fighting', description: 'UNARMED_POPUP_DESC' },
+          { name: 'Interception', description: 'INTERCEPTION_POPUP_DESC' },
+        ]);
+        const { container } = render(<FighterFeatures playerStats={badgeStats()} campaignName="test" />);
+        await act(async () => {});
+        const badge = [...container.querySelectorAll('span.clickable')].find(s => s.textContent === 'Interception');
+        fireEvent.click(badge);
+        expect(screen.getByText('INTERCEPTION_POPUP_DESC')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('INTERCEPTION_POPUP_DESC'));
+        expect(screen.queryByText('INTERCEPTION_POPUP_DESC')).not.toBeInTheDocument();
+      });
     });
   });
 

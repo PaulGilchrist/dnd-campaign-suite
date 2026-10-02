@@ -8,6 +8,7 @@ import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
 import { getAuraRangeFromStats } from '../../../services/combat/auras/auraOfProtection.js';
+import Popup from '../../common/popup.jsx';
 function barbarianRageScaling2024(classLevel) {
     return {
         extraAttacks: classLevel?.extra_attacks || 0,
