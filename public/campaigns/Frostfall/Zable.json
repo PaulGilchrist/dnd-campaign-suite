@@ -1,0 +1,108 @@
+{
+    "name": "Zable",
+    "level": 2,
+    "alignment": "True Neutral",
+    "abilities": [
+        {
+            "name": "Strength",
+            "baseScore": 8,
+            "featIncrease": 0,
+            "backgroundIncrease": 0,
+            "miscIncrease": 0
+        },
+        {
+            "name": "Dexterity",
+            "baseScore": 15,
+            "featIncrease": 0,
+            "backgroundIncrease": 1,
+            "miscIncrease": 0
+        },
+        {
+            "name": "Constitution",
+            "baseScore": 14,
+            "featIncrease": 0,
+            "backgroundIncrease": 0,
+            "miscIncrease": 0
+        },
+        {
+            "name": "Intelligence",
+            "baseScore": 8,
+            "featIncrease": 0,
+            "backgroundIncrease": 0,
+            "miscIncrease": 0
+        },
+        {
+            "name": "Wisdom",
+            "baseScore": 10,
+            "featIncrease": 0,
+            "backgroundIncrease": 0,
+            "miscIncrease": 0
+        },
+        {
+            "name": "Charisma",
+            "baseScore": 15,
+            "featIncrease": 0,
+            "backgroundIncrease": 2,
+            "miscIncrease": 0
+        }
+    ],
+    "class": {
+        "name": "Sorcerer",
+        "subclass": {
+            "name": "Clockwork Sorcery"
+        },
+        "divineOrder": "",
+        "primalOrder": ""
+    },
+    "expertSkills": [],
+    "feats": [
+        "Alert",
+        "Lucky"
+    ],
+    "fightingStyles": [],
+    "race": {
+        "name": "Human",
+        "subrace": {
+            "name": ""
+        }
+    },
+    "immunities": [],
+    "inventory": {
+        "backpack": [],
+        "equipped": [],
+        "gold": 10,
+        "magicItems": []
+    },
+    "languages": [
+        "Common"
+    ],
+    "resistances": [],
+    "skillProficiencies": [
+        "Insight",
+        "Stealth",
+        "Persuasion",
+        "Deception",
+        "Perception"
+    ],
+    "toolProficiencies": [
+        "Thieves' Tools"
+    ],
+    "specialActions": [],
+    "spells": [
+        "Acid Splash",
+        "Mind Sliver",
+        "Fire Bolt",
+        "Minor Illusion",
+        "Chromatic Orb",
+        "Mage Armor",
+        "Shield"
+    ],
+    "magicInitiateInstances": [],
+    "rules": "2024",
+    "xp": 0,
+    "xpMode": "milestone",
+    "background": "Wayfarer",
+    "image": "images/Zable.png",
+    "imageName": "390.jpg",
+    "imagePath": ""
+}
