@@ -316,14 +316,14 @@ describe('spellCastService', () => {
     })
 
     describe('error handling', () => {
-      it('throws when activeConditions is not an array', async () => {
+      it('throws when activeConditions is not an array (corrupt non-null value)', async () => {
         const spell = makeSpell('Fireball')
         const playerStats = makePlayerStats()
         const metaCtx = makeMetaCtx()
 
-        // Override the default mockImplementation to return null for activeConditions
+        // SP-002: null/absent is empty-state (no throw) — only corrupt non-null aborts.
         runtimeStateMock.getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
-          if (propertyName === 'activeConditions') return null
+          if (propertyName === 'activeConditions') return 'not-an-array'
           return undefined
         })
 

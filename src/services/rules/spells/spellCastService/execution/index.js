@@ -113,12 +113,14 @@ function resolveMagicalAmbushInvisible(playerStats, campaignName) {
         throw new Error('playerStats.automation.passives is required for magical ambush check');
     }
     const magicalAmbush = passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
+    // SP-002: a missing/null caster activeConditions key (e.g. after an Admin clear) is a
+    // legitimate empty state — treat it as [] instead of aborting the already-paid cast.
     const rawConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
-    if (rawConditions == null || !Array.isArray(rawConditions)) {
+    if (rawConditions != null && !Array.isArray(rawConditions)) {
         console.error('[spellCast] casterConditions: activeConditions is not an array');
         throw new Error('activeConditions must be an array for caster');
     }
-    const casterConditions = rawConditions;
+    const casterConditions = rawConditions == null ? [] : rawConditions;
     return magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
 }
 

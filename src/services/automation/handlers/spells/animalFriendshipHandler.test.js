@@ -192,9 +192,10 @@ describe('animalFriendshipHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+            // SP-002: 24h duration rides the §5 hours×600 rounds clock.
             expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Wolf', effects: expect.arrayContaining([
                     expect.objectContaining({ type: 'charmed', condition: 'charmed' }),
-                ]), campaignName });
+                ]), campaignName, rounds: 24 * 60 * 10 });
         });
 
         it('handles failed save: logs condition entry', async () => {
@@ -297,6 +298,37 @@ describe('animalFriendshipHandler', () => {
 
             // Should only process 2 targets (Wolf and Hawk), not Snake
             expect(createSaveListener).toHaveBeenCalledTimes(2);
+        });
+
+        it('SP-002: lv2 slot adjudicates two Beasts with own saves and charms on fails', async () => {
+            setupBaseMocks({ success: false });
+            buildSaveDc.mockReturnValue(17);
+            getRuntimeValue.mockReturnValue([]);
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'Wolf 1', type: 'npc', saveBonuses: { WIS: 2 } },
+                    { name: 'Wolf 2', type: 'npc', saveBonuses: { WIS: 1 } },
+                ],
+            });
+            rollSaveForCreature
+                .mockReturnValueOnce({ roll: 5, total: 7, bonus: 2, success: false, rawRolls: [5] })
+                .mockReturnValueOnce({ roll: 8, total: 9, bonus: 1, success: false, rawRolls: [8] });
+
+            const action = makeAction({ targetNames: ['Wolf 1', 'Wolf 2'], saveDc: 17 });
+            action.spellSlotLevel = 2;
+
+            const result = await handle(action, makePlayerStats(), campaignName, null);
+
+            // One save listener + one NPC auto-roll + one ability_use per Beast
+            expect(createSaveListener).toHaveBeenCalledTimes(2);
+            expect(rollSaveForCreature).toHaveBeenCalledTimes(2);
+            const abilityUses = addEntry.mock.calls.filter(c => c[1]?.type === 'ability_use');
+            expect(abilityUses.length).toBe(2);
+            const saveResults = addEntry.mock.calls.filter(c => c[1]?.type === 'save_result');
+            expect(saveResults.length).toBe(2);
+            expect(saveResults.map(c => c[1].targetName).sort()).toEqual(['Wolf 1', 'Wolf 2']);
+            expect(saveResults.every(c => c[1].saveDc === 17 && c[1].success === false)).toBe(true);
+            expect(result.payload.description).toContain('affects 2 creature');
         });
 
         it('returns popup with summary for mixed results', async () => {

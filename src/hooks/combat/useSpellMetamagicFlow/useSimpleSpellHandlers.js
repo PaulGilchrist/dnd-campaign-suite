@@ -30,8 +30,6 @@ import { consumeMaterial } from '../../../services/rules/spells/materialComponen
 import { addEntry } from '../../../services/ui/logService.js'
 import { rollbackSpellSlot } from '../useConfirmableFlow.js'
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js'
-import { isFreeCastAuthorized } from '../../../services/rules/spells/spellPreparationService.js'
-import { prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js'
 
 // Shared runner helpers — every handler body is a small module-level function
 // invoked with (d, pending, result), where d carries the hook's render-scoped
@@ -159,16 +157,17 @@ async function runPolymorph(d, pending, result) {
   showPopupIfPayload(d, popup)
 }
 
+// SP-002: createConfirmHandler already paid the slot at the stamped paid level
+// (stampPaidSlotLevel / CLA-086). Re-preparing here double-drank a base slot per
+// cast AND pinned effectiveSpellLevel to 1 (MA-0127 Aid-family twin) — upcast lv2
+// paid lv2 but adjudicated one Beast at lv1. Forward the paid level to the trigger
+// so lv2 adjudicates 2 Beasts at lv2 (Banishment SP-012 lane shape).
 async function runAnimalFriendship(d, pending, result) {
-  const freeCastAuthorized = isFreeCastAuthorized(d.playerStats.name, pending.spellName, pending.spellLevel, d.playerStats, d.campaignName)
-  const preparedResult = await prepareSpellCast(pending.spell, { targetNames: result }, {
-    playerName: d.playerStats.name,
-    playerStats: d.playerStats,
-    campaignName: d.campaignName,
-    isUpcast: false,
-    freeCastAuthorized,
-  })
-  d.onExecute(preparedResult.modifiedSpell, preparedResult.metaCtx)
+  const slotLevel = pending.metaCtx?.slotLevel || pending.spellLevel
+  const spell = slotLevel && slotLevel !== pending.spell.level
+    ? { ...pending.spell, level: slotLevel, baseLevel: pending.spell.level }
+    : pending.spell
+  d.onExecute(spell, { targetNames: toArray(result), slotLevel })
 }
 
 async function runRevivify(d, pending, result) {

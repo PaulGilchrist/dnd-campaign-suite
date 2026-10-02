@@ -541,6 +541,9 @@ async function gateAnimalFriendship({ spell, campaignName, cfSetPending }) {
       range: spell.range || '30 feet',
       rangeFt: 30,
       creatureTargets: beastTargets,
+      // SP-002: upcast threads through the picker cap — "one additional Beast per
+      // slot level above 1st" (extractMaxTargets: lv1→1, lv2→2 …, cf. Banishment SP-012).
+      maxTargets: extractMaxTargets(spell) || 1,
     }));
     return true;
   }

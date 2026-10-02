@@ -234,13 +234,35 @@ describe('helpers.js — applyPowerWordHealToTarget', () => {
   });
 
   it('throws when activeConditions is not an array', async () => {
-    getRuntimeValue.mockReturnValue(null);
+    getRuntimeValue.mockReturnValue('not-an-array');
 
     const playerStats = makePlayerStats();
 
     await expect(
       applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign'),
     ).rejects.toThrow('activeConditions must be an array');
+  });
+
+  it('SP-002: null activeConditions key is empty conditions, not an abort', async () => {
+    getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'TestWizard', maxHp: 100, currentHp: 50, type: 'player' }],
+    });
+    getRuntimeValue.mockImplementation((char, key) => {
+      if (key === 'currentHitPoints') return 30;
+      if (key === 'activeConditions') return null;
+      return undefined;
+    });
+
+    const playerStats = makePlayerStats();
+    await applyPowerWordHealToTarget('TestWizard', playerStats, 'test-campaign');
+
+    expect(applyHealingToTarget).toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith(
+      'TestWizard',
+      'activeConditions',
+      expect.anything(),
+      'test-campaign',
+    );
   });
 
   it('disables conditions case-insensitively', async () => {

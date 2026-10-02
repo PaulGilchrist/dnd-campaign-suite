@@ -332,24 +332,29 @@ describe('executeSpellCast — early resolutions', () => {
   /* ---------------------------------------------------------------- */
 
   describe('missing activeConditions', () => {
-    it('throws when activeConditions is null', async () => {
+    it('SP-002: does not abort the cast when caster activeConditions is null', async () => {
       getRuntimeValue.mockImplementation((playerName, key, _cn) => {
         if (key === 'activeConditions') return null;
         return undefined;
       });
+      // Keep the cast flowing to a benign early return after the ambush check.
+      getSilenceSource.mockReturnValue('SilenceCaster');
+      isCreatureInSilenceZone.mockReturnValue(true);
 
-      await expect(
-        executeSpellCast(makeSpell(), makeMetaCtx(), {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        }),
-      ).rejects.toThrow('activeConditions must be an array for caster');
+      const result = await executeSpellCast(makeSpell({ components: ['V'] }), makeMetaCtx(), {
+        rollAttack: vi.fn(),
+        rollDamage: vi.fn(),
+        playerStats: makePlayerStats(),
+        getTargetInfo: async () => ({ name: 'Goblin' }),
+        campaignName: 'test-campaign',
+      });
+
+      // Must NOT reject; treated as empty caster conditions, cast proceeds
+      // (silence early-return proves the ambush check no longer aborts).
+      expect(result).toBeDefined();
     });
 
-    it('throws when activeConditions is not an array', async () => {
+    it('throws when activeConditions is not an array (corrupt non-null value)', async () => {
       getRuntimeValue.mockImplementation((playerName, key, _cn) => {
         if (key === 'activeConditions') return 'not-an-array';
         return undefined;

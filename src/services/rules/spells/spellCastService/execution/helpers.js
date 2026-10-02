@@ -210,12 +210,13 @@ function powerWordHealDamage({ combatSummary, targetName, playerStats, campaignN
 
 function powerWordHealConditions(targetName, campaignName) {
     const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
+    // SP-002 sibling: a target with no activeConditions key has nothing to strip — [] is empty, not fatal.
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName);
-    if (storedConditions == null || !Array.isArray(storedConditions)) {
+    if (storedConditions != null && !Array.isArray(storedConditions)) {
         console.error('[spellCast] applyPowerWordHealToTarget: activeConditions is not an array');
         throw new Error('activeConditions must be an array');
     }
-    const conditions = storedConditions;
+    const conditions = storedConditions == null ? [] : storedConditions;
     const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
     const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
     if (newConditions.length !== conditions.length) {

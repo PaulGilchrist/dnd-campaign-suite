@@ -412,16 +412,30 @@ describe('spellResolution', () => {
       ).toThrow('playerStats.automation.passives is required for magical ambush check');
     });
 
-    it('throws when activeConditions is null', () => {
+    it('SP-002: null activeConditions resolves as empty casterConditions', () => {
       getRuntimeValue.mockReturnValue(null);
-      const playerStats = makePlayerStats();
+      const playerStats = makePlayerStats({ automation: { passives: [] } });
 
-      expect(() =>
-        resolveSpellResolution(makeSpell(), {}, playerStats, 'test-campaign', null),
-      ).toThrow('activeConditions must be an array for caster');
+      const result = resolveSpellResolution(makeSpell(), {}, playerStats, 'test-campaign', null);
+
+      expect(result).not.toBeNull();
+      expect(result.casterConditions).toEqual([]);
+      expect(result.hasInvisible).toBe(false);
     });
 
-    it('throws when activeConditions is not an array', () => {
+    it('SP-002: absent activeConditions key (undefined) resolves as empty casterConditions', () => {
+      getRuntimeValue.mockImplementation((_name, key) => (key === 'activeConditions' ? undefined : undefined));
+      const playerStats = makePlayerStats({
+        automation: { passives: [{ type: 'passive_rule', effect: 'magical_ambush' }] },
+      });
+
+      const result = resolveSpellResolution(makeSpell(), {}, playerStats, 'test-campaign', null);
+
+      expect(result.casterConditions).toEqual([]);
+      expect(result.hasInvisible).toBe(false);
+    });
+
+    it('throws when activeConditions is not an array (corrupt non-null value)', () => {
       getRuntimeValue.mockReturnValue('not-an-array');
       const playerStats = makePlayerStats();
 

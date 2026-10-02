@@ -34,8 +34,9 @@ function resolveAmbushFlags(playerStats, campaignName) {
         throw new Error('playerStats.automation.passives is required for magical ambush check');
     }
     const magicalAmbush = passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
-    const casterConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
-    if (casterConditions == null || !Array.isArray(casterConditions)) {
+    // SP-002 twin: missing/null caster activeConditions is an empty condition list, not an abort.
+    const casterConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) ?? [];
+    if (!Array.isArray(casterConditions)) {
         console.error('[spellCast] casterConditions: activeConditions is not an array');
         throw new Error('activeConditions must be an array for caster');
     }

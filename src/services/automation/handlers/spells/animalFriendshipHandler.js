@@ -98,10 +98,12 @@ async function applyAnimalFriendshipCharm({ campaignName, casterName, action: _a
         appliedDamage: 0,
     });
 
-    // Add long rest expiration (24-hour duration)
+    // Add long rest expiration (24-hour duration). SP-002: rounds clock per §5
+    // (hours×600 → 24h = 14400 rounds); no anchor leg, so the long-buff clock is the
+    // sole expiry — the took-damage charm-clear stays the engine-wide early-end leg.
     addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'charmed', condition: 'charmed' },
-    ], campaignName });
+    ], campaignName, rounds: 24 * 60 * 10 });
 
     // Track for early end on damage
     trackAnimalFriendshipTarget(casterName, targetName, campaignName);
