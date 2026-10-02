@@ -1665,7 +1665,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-080-death-strike-additive-triple-damage.md",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Trigger: first_round_sneak_attack_hit; Once per turn: no",
       "expectedBehavior": "When you hit with Sneak Attack on first round of combat, target makes Constitution save (DC 8 + Dex mod + Prof Bonus) or attack's damage is doubled."

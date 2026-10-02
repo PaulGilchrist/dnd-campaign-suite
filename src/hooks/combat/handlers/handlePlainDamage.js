@@ -199,6 +199,10 @@ async function resolveDeathStrike({ applyResult, context, combatSummary, target,
         });
         const dsSaveResult = await waitForSaveResult(promptId);
         if (!dsSaveResult.success) {
+            // CLA-080: the base damage was already applied eagerly above, so a
+            // failed save pays only the EXTRA half as a delta leg — applying
+            // 2× here on top of the base dealt 3× total. RAW: total = 2× base.
+            const deltaTotal = adjustedTotal;
             const doubledTotal = adjustedTotal * 2;
             const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
@@ -207,9 +211,9 @@ async function resolveDeathStrike({ applyResult, context, combatSummary, target,
                 characterName,
                 rollType: 'save-damage',
                 name: 'Death Strike',
-                formula: `2× ${formula}`,
+                formula: `+1× ${formula}`,
                 rolls,
-                total: doubledTotal,
+                total: deltaTotal,
                 modifier,
                 damageType,
                 targetName: target.name,
@@ -220,10 +224,11 @@ async function resolveDeathStrike({ applyResult, context, combatSummary, target,
                 saveBonus: dsSaveResult.bonus,
                 saveRawRolls: dsSaveResult.rawRolls,
                 finalDamage: null,
-                note: 'death_strike_damage_roll_before_apply',
+                description: `${target.name} failed the save — ${characterName}'s attack damage doubled (total ${doubledTotal}); extra ${deltaTotal} applied on top of the base already dealt.`,
+                note: 'death_strike_double_delta',
             });
 
-            dsApplyResult = await applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance || false, attackerName: characterName });
+            dsApplyResult = await applyDamageToTarget(combatSummary, target.name, deltaTotal, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance || false, attackerName: characterName });
             if (!applyResult) {
                 applyResult = dsApplyResult;
             }

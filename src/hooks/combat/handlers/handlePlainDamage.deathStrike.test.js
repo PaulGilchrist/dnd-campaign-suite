@@ -176,6 +176,35 @@ describe('Plain damage death strike', () => {
             });
         }
 
+        it('re-arms for the next hit: consumes only this target death_strike, keeps other effects', async () => {
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign') return [
+                    { effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'strength' },
+                    { effect: 'no_healing', target: 'Goblin', source: 'Slaad' },
+                    { effect: 'death_strike', target: 'Other', saveDc: 15, saveType: 'strength' },
+                ];
+                if (key === 'Goblin' && prop === 'currentHitPoints') return 5;
+                if (key === 'Goblin' && prop === 'hitPoints') return 10;
+                return null;
+            });
+
+            const fn = createFn();
+            const promise = fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            dispatchSaveResult('test-guid-1234', { success: false, roll: 5, bonus: 2, rawRolls: [5] });
+
+            await promise.catch(() => { });
+
+            const cleanupCall = setRuntimeValue.mock.calls.find(
+                (call) => call[0] === 'campaign' && call[1] === 'targetEffects'
+            );
+            const cleaned = cleanupCall[2];
+            expect(cleaned.some(te => te.effect === 'death_strike' && te.target === 'Goblin')).toBe(false);
+            expect(cleaned.some(te => te.effect === 'no_healing')).toBe(true);
+            expect(cleaned.some(te => te.effect === 'death_strike' && te.target === 'Other')).toBe(true);
+        });
+
         it('sends save prompt when death strike effect is present and save fails', async () => {
             setupDeathStrikeRuntime();
 
@@ -219,7 +248,7 @@ describe('Plain damage death strike', () => {
             );
         });
 
-        it('applies doubled damage when save fails', async () => {
+        it('applies only the extra-half delta when save fails (total = 2× base, CLA-080)', async () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
@@ -230,11 +259,18 @@ describe('Plain damage death strike', () => {
 
             await promise.catch(() => { });
 
-            // On save failure, doubledTotal = adjustedTotal * 2 = 8 * 2 = 16
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 16, ['slashing'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestFighter' });
+            // CLA-080: base 8 is applied eagerly, then the failed save pays ONLY
+            // the +adjustedTotal delta (8) — two legs summing to 16 = 2× base.
+            // The old defect applied 16 EXTRA (total 3× base) — never again.
+            const slashCalls = applyDamageToTarget.mock.calls.filter(
+                (call) => call[1] === 'Goblin' && JSON.stringify(call[3]) === JSON.stringify(['slashing'])
+            );
+            expect(slashCalls.map(c => c[2])).toEqual([8, 8]);
+            expect(slashCalls.reduce((sum, c) => sum + c[2], 0)).toBe(16);
+            expect(slashCalls.some(c => c[2] === 16)).toBe(false);
         });
 
-        it('does not apply doubled damage when save succeeds', async () => {
+        it('applies base damage only when save succeeds (hpΔ = 1×, CLA-080)', async () => {
             setupDeathStrikeRuntime();
 
             const fn = createFn();
@@ -245,17 +281,12 @@ describe('Plain damage death strike', () => {
 
             await promise.catch(() => { });
 
-            // On save success, doubled damage should NOT be applied
-            expect(applyDamageToTarget).not.toHaveBeenCalledWith(
-                expect.any(Object),
-                'Goblin',
-                expect.any(Number),
-                ['slashing'],
-                'test-campaign',
-                expect.any(Array),
-                false,
-                'TestFighter'
+            // Save success: ONLY the eager base leg (8) — no delta, no doubling.
+            const slashCalls = applyDamageToTarget.mock.calls.filter(
+                (call) => call[1] === 'Goblin' && JSON.stringify(call[3]) === JSON.stringify(['slashing'])
             );
+            expect(slashCalls).toHaveLength(1);
+            expect(slashCalls[0][2]).toBe(8);
 
             // Verify the popup was NOT updated with death strike doubled flag
             const popupCalls = deps.setPopupHtml.mock.calls;
@@ -309,14 +340,15 @@ describe('Plain damage death strike', () => {
                     type: 'roll',
                     rollType: 'save-damage',
                     name: 'Death Strike',
-                    formula: '2× 1d8+3',
-                    total: 16,
+                    formula: '+1× 1d8+3',
+                    total: 8,
                     saveType: 'strength',
                     saveDc: 15,
                     saveResult: 'failure',
                     saveRoll: 8,
                     saveBonus: 2,
-                    note: 'death_strike_damage_roll_before_apply',
+                    description: expect.stringContaining('damage doubled (total 16)'),
+                    note: 'death_strike_double_delta',
                 })
             );
         });
