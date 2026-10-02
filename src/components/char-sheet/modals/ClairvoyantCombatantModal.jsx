@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { KEY as EXPIRATION_KEY } from '../../../services/rules/effects/expirations.js';
+import { getCurrentCombatRound } from '../../../services/encounters/combatData.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
 
 function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetName, saveType, saveDc, currentUses, maxUses, pactSlotLevel, pactSlotsAvailable, pactMagicRecharge, onClose }) {
     const [step, setStep] = useState('info'); // 'info' | 'result'
@@ -19,13 +21,20 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
     const handleConfirm = async () => {
         setStep('result');
 
+        // CLA-053: ALL player-store mutations ride ONE merged
+        // setRuntimeObject — per-key setRuntimeValue fires a separate
+        // full-store replace POST per call and the /<CharName> replace-route
+        // can reorder network-side, resurrecting stale keys (§39: a mid-branch
+        // snapshot landing last restored a save-success buff here live).
+        const playerUpdates = {};
+
         // Spend a use or expend Pact Magic slot
         if (hasUse) {
-            await setRuntimeValue(playerName, 'clairvoyantCombatantUses', currentUses + 1, campaignName);
+            playerUpdates.clairvoyantCombatantUses = currentUses + 1;
         } else if (needsPactSlot) {
             const slotKey = `spell_slots_level_${pactSlotLevel}`;
             const currentSlots = Number(getRuntimeValue(playerName, slotKey, campaignName) ?? playerStats.spellAbilities?.[slotKey] ?? 0);
-            await setRuntimeValue(playerName, slotKey, currentSlots - 1, campaignName);
+            playerUpdates[slotKey] = currentSlots - 1;
             await addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,
@@ -36,7 +45,7 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
         }
 
         // Set the combat advantage/disadvantage effects via targetEffects
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+        const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
         const newEffect = {
             target: targetName,
             source: featureName,
@@ -48,21 +57,39 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
             defenderDisadvantage: true,
         };
         const updatedEffects = [...storedEffects, newEffect];
-        setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
+        await setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
 
-        // Store the active target for contextBuilder
-        await setRuntimeValue(playerName, 'clairvoyantCombatantTarget', targetName, campaignName);
+        // CLA-053: ONE merged 1-minute expiry clock (rounds = minutes×10 = 10,
+        // playbook §5; anchor dropped — same-round anchor expiry never fires, §38)
+        // covering te + activeBuffs + bond-target key in a single queue entry
+        // (expirationQueue addExpiration byte-shape, folded into the merged write).
+        const storedQueue = getRuntimeValue(playerName, EXPIRATION_KEY, campaignName);
+        playerUpdates[EXPIRATION_KEY] = [
+            ...(Array.isArray(storedQueue) ? storedQueue : []),
+            {
+                target: playerName,
+                effects: [
+                    { type: 'remove_target_effect', effectKey: 'clairvoyant_combatant', source: featureName, target: targetName },
+                    { type: 'remove_active_buff', buffName: featureName },
+                    { type: 'clear_runtime_value', creatureName: playerName, key: 'clairvoyantCombatantTarget' },
+                ],
+                appliedRound: getCurrentCombatRound(campaignName),
+                expiryRounds: 10,
+                expireOnCreatureName: null,
+            },
+        ];
 
-        // Also add to activeBuffs for ConditionEffectBadges to detect advantage
+        // Store the active target for contextBuilder + activeBuffs for badges
+        playerUpdates.clairvoyantCombatantTarget = targetName;
         const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
         const activeBuffs = Array.isArray(storedBuffs) ? storedBuffs : [];
-        const newBuffs = [...activeBuffs, {
+        playerUpdates.activeBuffs = [...activeBuffs, {
             name: featureName,
             effect: 'clairvoyant_combatant',
             duration: '1_minute',
             target: targetName,
         }];
-        setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+        setRuntimeObject(playerName, playerUpdates, campaignName);
 
         // Create save listener
         const { promptId } = createSaveListener(campaignName, {
@@ -102,20 +129,31 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
                     timestamp: Date.now(),
                 }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); });
             } else {
-                // Target succeeded — remove the effects
+                // Target succeeded — remove the effects (campaign te store is a
+                // separate route; every player-store key merges into ONE write §39).
                 const filteredEffects = (getRuntimeValue('campaign', 'targetEffects', campaignName) || []).filter(
                     e => !(e.target === targetName && e.source === featureName && e.effect === 'clairvoyant_combatant')
                 );
-                setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
+                await setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
 
-                // Clear the active target
-                await setRuntimeValue(playerName, 'clairvoyantCombatantTarget', null, campaignName);
+                // Cancel the armed clock (endSelfBuffOnTrigger shape) — an un-cancelled
+                // clock would strip a later pact-magic-refire grant's buff early.
+                const queue = getRuntimeValue(playerName, EXPIRATION_KEY, campaignName);
+                const keptQueue = Array.isArray(queue)
+                    ? queue.filter(en => !(en.target === playerName && Array.isArray(en.effects)
+                        && en.effects.some(ef => ef.type === 'remove_target_effect' && ef.effectKey === 'clairvoyant_combatant' && ef.source === featureName)))
+                    : queue;
 
-                // Remove from activeBuffs
+                // Clear the active target + remove from activeBuffs
                 const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
                 const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
                 const filteredBuffs = buffs.filter(b => !(b.effect === 'clairvoyant_combatant' && b.target === targetName));
-                setRuntimeValue(playerName, 'activeBuffs', filteredBuffs, campaignName);
+
+                setRuntimeObject(playerName, {
+                    clairvoyantCombatantTarget: null,
+                    activeBuffs: filteredBuffs,
+                    ...(Array.isArray(queue) ? { [EXPIRATION_KEY]: keptQueue } : {}),
+                }, campaignName);
 
                 await addEntry(campaignName, {
                     type: 'save_result',

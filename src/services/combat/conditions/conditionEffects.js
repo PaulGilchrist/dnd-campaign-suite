@@ -457,13 +457,20 @@ const LATE_TARGET_EFFECT_HANDLERS = {
     effects.hurlThroughHell = true;
   },
   // Handle Clairvoyant Combatant — target has Disadvantage on attacks against you, you have Advantage on attacks against target
+  // CLA-053 defender-leg fold fix: the te rides on the BONDED creature's bucket, so
+  // "bonded has Disadvantage on attacks against you" must fold on the ATTACKER side —
+  // verified byte-shape slasher_enhanced_critical (:318) via combineAttackModes (:849)
+  // attackerEffects.targetAttackDisadvantageCount. The old targetDisadvantageCount fold
+  // was only read when the te holder was the DEFENDER (defenders attacking themselves).
+  // Attackers other than the bonded creature are over-granted a Disadvantage vs the
+  // bonded creature (§42-channel approximation of the RAW "against you" scoping).
   clairvoyant_combatant: (effects, te) => {
     if (te.attackerAdvantage) {
       bumpCount(effects, 'targetAdvantageCount');
       effects.targetAdvantageReasons.push('Clairvoyant Combatant');
     }
     if (te.defenderDisadvantage) {
-      bumpCount(effects, 'targetDisadvantageCount');
+      bumpCount(effects, 'targetAttackDisadvantageCount');
     }
   },
   // Handle Foresight — the target has Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it (unless attacker has Blindsight or Truesight)

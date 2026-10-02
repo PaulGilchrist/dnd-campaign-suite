@@ -1,4 +1,5 @@
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js'
+import { confirmTelepathicSpeech } from '../../services/automation/handlers/buffs/buffHandler.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
@@ -331,8 +332,18 @@ export default function useCharActionsAutomation({
                     confirmIcon: 'fa-brain',
                     description: 'Choose one creature within 30 feet to communicate with telepathically.',
                     featureDescription: `Range: ${Math.max(1, playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 1)} mile(s) | Duration: ${playerStats.level} minute(s)`,
-                    onTargetSelected: async (_targetName) => {
+                    onTargetSelected: async (targetName) => {
                         setModalState({ secondaryTargetModal: null });
+                        // CLA-053: the picker confirm was a zero-effect no-op —
+                        // confirmTelepathicSpeech is the SOLE writer of
+                        // awakenedMindTarget + the Awakened Mind activeBuff +
+                        // the bond log. Chain it (pattern: useModalHandlers.js
+                        // flurry onTargetSelected → executeFlurryWithHealing).
+                        const confirmResult = await confirmTelepathicSpeech(speechAction, playerStats, campaignName, targetName);
+                        if (confirmResult?.type === 'popup') {
+                            setPopupHtml(confirmResult.payload);
+                        }
+                        if (onBuffsChange) onBuffsChange();
                     },
                     onSkip: () => {
                         setModalState({ secondaryTargetModal: null });

@@ -265,12 +265,15 @@ describe('computeConditionEffects — targetEffects', () => {
     expect(result.conditionToApply).toBe('incapacitated');
   });
 
-  it('sets targetAdvantageCount and targetDisadvantageCount for clairvoyant_combatant', () => {
+  it('settles attackerAdvantage + attacker-side targetAttackDisadvantageCount for clairvoyant_combatant (CLA-053 fold fix)', () => {
     const result = computeConditionEffects({ targetEffects: [
       { effect: 'clairvoyant_combatant', attackerAdvantage: true, defenderDisadvantage: true },
     ] });
     expect(result.targetAdvantageCount).toBe(1);
-    expect(result.targetDisadvantageCount).toBe(1);
+    // Defender-leg fold: te rides on the bonded creature — its own attacks
+    // take Disadvantage (attacker-bucket channel, combineAttackModes:849).
+    expect(result.targetAttackDisadvantageCount).toBe(1);
+    expect(result.targetDisadvantageCount).toBe(0);
   });
 
   it('sets all foresight fields for foresight effect', () => {

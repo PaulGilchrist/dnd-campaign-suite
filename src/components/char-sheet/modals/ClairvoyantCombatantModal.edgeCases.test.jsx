@@ -18,6 +18,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   clearRuntimeState: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
@@ -166,13 +167,13 @@ describe('ClairvoyantCombatantModal - edge cases', () => {
       fireEvent.click(screen.getByRole('button', { name: /Clairvoyant Combatant/ }));
 
       await waitFor(() => {
-        const calls = useRuntimeState.setRuntimeValue.mock.calls;
-        const buffsCall = calls.find(
-          c => c[0] === 'Paladin1' && c[1] === 'activeBuffs'
+        // CLA-053: buffs ride the merged setRuntimeObject payload (§39)
+        const objCall = useRuntimeState.setRuntimeObject.mock.calls.find(
+          c => c[0] === 'Paladin1'
         );
-        expect(buffsCall).toBeDefined();
-        expect(buffsCall[2]).toContainEqual(existingBuff);
-        expect(buffsCall[2]).toContainEqual(expect.objectContaining({
+        expect(objCall).toBeDefined();
+        expect(objCall[1].activeBuffs).toContainEqual(existingBuff);
+        expect(objCall[1].activeBuffs).toContainEqual(expect.objectContaining({
           effect: 'clairvoyant_combatant',
         }));
       });
@@ -189,18 +190,17 @@ describe('ClairvoyantCombatantModal - edge cases', () => {
         effect: 'blessing',
         target: 'Goblin1',
       };
-      // Use a mutable store so getRuntimeValue reflects setRuntimeValue writes
+      // Use a mutable store so getRuntimeValue reflects merged writes (§39)
       const store = { activeBuffs: [matchingBuff, otherBuff] };
       useRuntimeState.getRuntimeValue.mockImplementation((key, prop, _campaign) => {
         if (key === 'campaign' && prop === 'targetEffects') return [];
         if (key === 'Paladin1' && prop === 'activeBuffs') return store.activeBuffs;
         return null;
       });
-      useRuntimeState.setRuntimeValue.mockImplementation((player, prop, value) => {
-        if (player === 'Paladin1' && prop === 'activeBuffs') {
-          store.activeBuffs = value;
+      useRuntimeState.setRuntimeObject.mockImplementation((player, obj) => {
+        if (player === 'Paladin1' && Array.isArray(obj.activeBuffs)) {
+          store.activeBuffs = obj.activeBuffs;
         }
-        return Promise.resolve();
       });
       const props = makeProps({ currentUses: 1, maxUses: 3 });
       renderModal(props);
@@ -218,14 +218,13 @@ describe('ClairvoyantCombatantModal - edge cases', () => {
       window.dispatchEvent(successEvent);
 
       await waitFor(() => {
-        const calls = useRuntimeState.setRuntimeValue.mock.calls;
-        const buffCalls = calls.filter(
-          c => c[0] === 'Paladin1' && c[1] === 'activeBuffs'
+        // CLA-053: success filtering writes through the merged setRuntimeObject
+        const calls = useRuntimeState.setRuntimeObject.mock.calls.filter(
+          c => c[0] === 'Paladin1' && Array.isArray(c[1]?.activeBuffs)
         );
-        // Get the last call (from handleSaveResult filtering)
-        const lastBuffCall = buffCalls[buffCalls.length - 1];
-        expect(lastBuffCall[2]).toContainEqual(otherBuff);
-        expect(lastBuffCall[2]).not.toContainEqual(matchingBuff);
+        const lastBuffs = calls[calls.length - 1][1].activeBuffs;
+        expect(lastBuffs).toContainEqual(otherBuff);
+        expect(lastBuffs).not.toContainEqual(matchingBuff);
       });
     });
   });

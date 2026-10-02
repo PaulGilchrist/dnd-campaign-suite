@@ -334,9 +334,12 @@ describe('conditionEffects', () => {
 
       it('handles crusher_enhanced_critical and clairvoyant_combatant', () => {
         expect(computeConditionEffects({ targetEffects: [{ effect: 'crusher_enhanced_critical' }] }).targetAdvantageCount).toBe(1);
+        // CLA-053: defenderDisadvantage folds ATTACKER-side (te rides the bonded
+        // creature's bucket — its own attacks take Disadvantage vs the holder).
         const clairResult = computeConditionEffects({ targetEffects: [{ effect: 'clairvoyant_combatant', attackerAdvantage: true, defenderDisadvantage: true }] });
         expect(clairResult.targetAdvantageCount).toBe(1);
-        expect(clairResult.targetDisadvantageCount).toBe(1);
+        expect(clairResult.targetAttackDisadvantageCount).toBe(1);
+        expect(clairResult.targetDisadvantageCount).toBe(0);
       });
 
       it('handles multiattack_defense and escape_the_horde', () => {

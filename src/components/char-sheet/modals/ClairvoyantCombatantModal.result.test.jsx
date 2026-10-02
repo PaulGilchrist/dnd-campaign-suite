@@ -18,6 +18,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   clearRuntimeState: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──

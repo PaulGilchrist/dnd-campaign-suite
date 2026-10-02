@@ -11,6 +11,13 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
     executeSpellCast: vi.fn(),
 }));
 
+// CLA-053: telepathicSpeech onTargetSelected now chains the real confirm producer;
+// this file pins modal-map plumbing only — stub the confirm service (§45).
+vi.mock('../../services/automation/handlers/buffs/buffHandler.js', () => ({
+    confirmTelepathicSpeech: vi.fn(() => Promise.resolve({ type: 'popup', payload: { type: 'automation_info', name: 'Stub', description: '' } })),
+    handle: vi.fn(),
+}));
+
 describe('useCharActionsAutomation', () => {
     setupBeforeEach();
 

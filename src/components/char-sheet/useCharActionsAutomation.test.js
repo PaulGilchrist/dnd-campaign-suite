@@ -5,6 +5,9 @@ import useCharActionsAutomation from './useCharActionsAutomation.js';
 
 vi.mock('../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
     onSpellSelected: vi.fn(),
+    // CLA-053: the lane now loads buffHandler (confirmTelepathicSpeech), whose
+    // transitive chain pulls automation/index — extend the partial mock (§45).
+    handle: vi.fn(),
 }));
 
 vi.mock('../../services/rules/spells/spellCastService.js', () => ({

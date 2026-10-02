@@ -1215,7 +1215,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-053-awakened-mind-bond-producer-inert.md",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Action: passive; Duration: 1_minute",
       "expectedBehavior": "When you form a telepathic bond with a creature using Awakened Mind, force that creature to make Wisdom save. On failed save, creature has Disadvantage on attack rolls against you, and you have Advantage on attack rolls against that creature for the duration. Once per Short or Long Rest (or expend Pact Magic spell slot to restore)."

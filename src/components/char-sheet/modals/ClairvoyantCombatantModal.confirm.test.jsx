@@ -18,6 +18,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   clearRuntimeState: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
@@ -78,10 +79,10 @@ describe('ClairvoyantCombatantModal - confirm flow', () => {
       fireEvent.click(screen.getByRole('button', { name: /Clairvoyant Combatant/ }));
 
       await waitFor(() => {
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        // CLA-053: player-store keys ride ONE merged setRuntimeObject (§39)
+        expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
           'Paladin1',
-          'clairvoyantCombatantUses',
-          2,
+          expect.objectContaining({ clairvoyantCombatantUses: 2 }),
           'test-campaign',
         );
       });
@@ -114,10 +115,9 @@ describe('ClairvoyantCombatantModal - confirm flow', () => {
       fireEvent.click(screen.getByRole('button', { name: /Clairvoyant Combatant/ }));
 
       await waitFor(() => {
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
           'Paladin1',
-          'clairvoyantCombatantTarget',
-          'Goblin1',
+          expect.objectContaining({ clairvoyantCombatantTarget: 'Goblin1' }),
           'test-campaign',
         );
       });
@@ -129,12 +129,11 @@ describe('ClairvoyantCombatantModal - confirm flow', () => {
       fireEvent.click(screen.getByRole('button', { name: /Clairvoyant Combatant/ }));
 
       await waitFor(() => {
-        const calls = useRuntimeState.setRuntimeValue.mock.calls;
-        const buffsCall = calls.find(
-          c => c[0] === 'Paladin1' && c[1] === 'activeBuffs'
+        const objCall = useRuntimeState.setRuntimeObject.mock.calls.find(
+          c => c[0] === 'Paladin1'
         );
-        expect(buffsCall).toBeDefined();
-        expect(buffsCall[2]).toContainEqual(expect.objectContaining({
+        expect(objCall).toBeDefined();
+        expect(objCall[1].activeBuffs).toContainEqual(expect.objectContaining({
           name: 'Clairvoyant Combatant',
           effect: 'clairvoyant_combatant',
           target: 'Goblin1',
@@ -212,10 +211,9 @@ describe('ClairvoyantCombatantModal - confirm flow', () => {
       fireEvent.click(screen.getByRole('button', { name: /Clairvoyant Combatant/ }));
 
       await waitFor(() => {
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
           'Paladin1',
-          'spell_slots_level_2',
-          2,
+          expect.objectContaining({ spell_slots_level_2: 2 }),
           'test-campaign',
         );
       });

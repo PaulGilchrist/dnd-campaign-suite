@@ -11,10 +11,16 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../common/savePrompt.js', () => ({
-  buildSaveDc: vi.fn(),
-  createSaveListener: vi.fn(),
-}));
+vi.mock('../../common/savePrompt.js', async (importActual) => {
+  const actual = await importActual();
+  return {
+    ...actual,
+    createSaveListener: vi.fn(),
+  };
+});
+// CLA-053: real buildSaveDc via importActual — the handler now routes the
+// data token saveDc:'ability' through it (the old local resolver returned
+// the STRING 'ability', making every save compare always-fail).
 
 import { handle } from './clairvoyantCombatantHandler.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -150,8 +156,8 @@ describe('clairvoyantCombatantHandler.handle', () => {
     });
   });
 
-  describe('save DC computation', () => {
-    it('should use custom saveDc when provided', async () => {
+  describe('save DC computation (CLA-053: routed through buildSaveDc)', () => {
+    it('should use numeric saveDc passthrough when provided', async () => {
       mockRuntimeValues(0, 'AwakenedTarget');
 
       const result = await handle(
@@ -164,30 +170,32 @@ describe('clairvoyantCombatantHandler.handle', () => {
       expect(result.payload.saveDc).toBe(18);
     });
 
-    it('should compute save DC when auto.saveDc is not provided', async () => {
+    it('should return a NUMBER, never the string "ability", for saveDc:"ability" + saveAbility:"CHA"', async () => {
       mockRuntimeValues(0, 'AwakenedTarget');
 
+      // The shipped Great Old One lv6 row shape (2024/classes.json).
       const result = await handle(
-        { automation: { type: 'clairvoyant_combatant', saveType: 'WIS' } },
+        { automation: { type: 'clairvoyant_combatant', saveType: 'WIS', saveDc: 'ability', saveAbility: 'CHA', duration: '1_minute', pactMagicRecharge: true, uses: 1 } },
         makePlayerStats(),
         campaignName,
         null,
       );
 
-      expect(result.payload.saveDc).toBe(15);
+      expect(typeof result.payload.saveDc).toBe('number');
+      expect(result.payload.saveDc).toBe(8 + 3 + 4); // 8 + CHA(3) + proficiency(4)
     });
 
-    it('should fallback to bonus 3 when no matching ability found', async () => {
-      mockRuntimeValues(0, 'AwakenedTarget');
+    it('should compute DC 16 on the lv14 HexWarlock byte-shape host', async () => {
+      mockRuntimeValues(0, 'Bandit 1');
 
       const result = await handle(
-        { automation: { type: 'clairvoyant_combatant', saveType: 'INT' } },
-        makePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }] }),
+        { automation: { type: 'clairvoyant_combatant', saveType: 'WIS', saveDc: 'ability', saveAbility: 'CHA', duration: '1_minute', pactMagicRecharge: true, uses: 1 } },
+        makePlayerStats({ level: 14, proficiency: 5, abilities: [{ name: 'Charisma', bonus: 3 }] }),
         campaignName,
         null,
       );
 
-      expect(result.payload.saveDc).toBe(8 + 4 + 3);
+      expect(result.payload.saveDc).toBe(16); // 8 + PB 5 + CHA 3
     });
 
     it('should fallback to WIS saveType when auto.saveType is not provided', async () => {
@@ -203,18 +211,17 @@ describe('clairvoyantCombatantHandler.handle', () => {
       expect(result.payload.saveType).toBe('WIS');
     });
 
-    it('should compute save DC with correct ability bonus when ability exists', async () => {
+    it('should default to CON ability when saveDc:"ability" omits saveAbility', async () => {
       mockRuntimeValues(0, 'AwakenedTarget');
 
       const result = await handle(
-        { automation: { type: 'clairvoyant_combatant', saveType: 'CHA' } },
-        makePlayerStats(),
+        { automation: { type: 'clairvoyant_combatant', saveType: 'WIS', saveDc: 'ability' } },
+        makePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }, { name: 'Constitution', bonus: 2 }] }),
         campaignName,
         null,
       );
 
-      expect(result.payload.saveDc).toBe(8 + 4 + 3);
-      expect(result.payload.saveType).toBe('CHA');
+      expect(result.payload.saveDc).toBe(8 + 2 + 4); // CON default per buildSaveDc
     });
   });
 });

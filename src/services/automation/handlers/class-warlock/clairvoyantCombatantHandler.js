@@ -1,10 +1,14 @@
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { infoPopup } from '../../common/infoPopup.js';
+import { buildSaveDc } from '../../common/savePrompt.js';
 import { findPactSlotLevel, hasPactSlotAvailable } from './pactMagicUtils.js';
 
-// Build save DC
+// Build save DC — CLA-053: the data authors saveDc:'ability' + saveAbility:'CHA';
+// the old `auto.saveDc || …` shortcut returned the STRING 'ability' (always-fail
+// compares), and the fallback read auto.saveType (WIS) instead of saveAbility (CHA).
+// buildSaveDc is the verified seam (savePrompt.js:12 handles 'ability').
 function resolveClairvoyantSaveDc(auto, playerStats) {
-    return auto.saveDc || 8 + playerStats.proficiency + (playerStats.abilities?.find(a => a.name === auto.saveType)?.bonus || 3);
+    return buildSaveDc(auto, playerStats);
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
