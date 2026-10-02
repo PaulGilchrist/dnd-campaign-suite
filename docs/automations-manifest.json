@@ -224,7 +224,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-007-animal-speaker-druid-misattribution-clause-inert.md",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "You can cast the Beast Sense and Speak with Animals spells but only as Rituals. Wisdom is your spellcasting ability for them."
