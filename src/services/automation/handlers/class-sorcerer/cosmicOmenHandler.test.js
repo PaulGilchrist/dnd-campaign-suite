@@ -324,8 +324,8 @@ describe('cosmicOmenHandler', () => {
         });
     });
 
-    describe('playerName fix regression', () => {
-        it('sets cosmicOmenPendingBonus on playerName not literal "cosmicOmen"', async () => {
+    describe('canonical store regression (CLA-065)', () => {
+        it('sets cosmicOmenPendingBonus under literal "cosmicOmen" not playerName', async () => {
             setupRuntimeValues({
                 cosmicomenUses: 1,
                 cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
@@ -339,8 +339,29 @@ describe('cosmicOmenHandler', () => {
                 (call) => call[1] === 'cosmicOmenPendingBonus'
             );
             expect(pendingCall).toBeDefined();
-            expect(pendingCall[0]).toBe('CustomPlayerName');
-            expect(pendingCall[0]).not.toBe('cosmicOmen');
+            expect(pendingCall[0]).toBe('cosmicOmen');
+            expect(pendingCall[0]).not.toBe('CustomPlayerName');
+            expect(pendingCall[3]).toBe('test-campaign');
+        });
+
+        it('writes the exact JSON shape consumers parse ({value,type})', async () => {
+            setupRuntimeValues({
+                cosmicomenUses: 1,
+                cosmicOmenEffect: JSON.stringify({ type: 'Woe', isEven: false, starMapRoll: 7 }),
+            });
+            rollExpression.mockReturnValue({ total: 5 });
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            const pendingCall = setRuntimeValue.mock.calls.find(
+                (call) => call[0] === 'cosmicOmen' && call[1] === 'cosmicOmenPendingBonus'
+            );
+            expect(pendingCall).toBeDefined();
+            // Consumers: JSON.parse(raw); pending.value number > 0; pending.type === 'Weal'
+            const pending = JSON.parse(pendingCall[2]);
+            expect(typeof pending.value).toBe('number');
+            expect(pending.value).toBe(5);
+            expect(pending.type).toBe('Woe');
         });
     });
 });

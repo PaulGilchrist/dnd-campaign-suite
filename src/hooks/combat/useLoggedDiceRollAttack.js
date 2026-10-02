@@ -441,7 +441,7 @@ async function processRollTypeTail({ rollType, target, targetName, combatSummary
     }
 
     if (rollType === 'initiative') {
-        await processInitiativeRoll({ characterName, campaignName, context: ctx, bonus, effectiveD20Roll: ctx.effectiveD20Roll, r1: ctx.r1, r2: ctx.r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus: ctx.cosmicOmenAppliedBonus, characters: ctx._characters });
+        await processInitiativeRoll({ characterName, campaignName, context: ctx, bonus, effectiveD20Roll: ctx.effectiveD20Roll, r1: ctx.r1, r2: ctx.r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus: ctx.cosmicOmenAppliedBonus, cosmicOmenDetail: ctx.cosmicOmenDetail, characters: ctx._characters });
     }
 }
 

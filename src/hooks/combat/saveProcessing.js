@@ -158,7 +158,7 @@ async function processPlayerSave({ target, characterName, campaignName, context,
 // Cosmic Omen: apply global pending bonus to effectiveD20
 function applyCosmicOmenToSave(effectiveD20, campaignName) {
     let adjusted = effectiveD20;
-    const cosmicOmenPendingRawSave2 = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
+    const cosmicOmenPendingRawSave2 = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', campaignName);
     if (!cosmicOmenPendingRawSave2) return adjusted;
     try {
         const pending = JSON.parse(cosmicOmenPendingRawSave2);

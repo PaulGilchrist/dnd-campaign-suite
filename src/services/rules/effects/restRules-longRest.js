@@ -526,6 +526,10 @@ function resetStarMapOnLongRest(name, playerStats, campaignName, logEntries) {
       isEven,
       starMapRoll,
     }), campaignName, true)
+    // CLA-065: an armed-but-unspent ±1d6 pending bonus lives under the
+    // canonical global 'cosmicOmen' store ("until you finish your next Long
+    // Rest" semantics) — a fresh Star Map supersedes it, so clear it here.
+    setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true)
     clearAllExpirationEffects(name, campaignName)
     logEntries.push(`Cosmic Omen Star Map: ${starMapRoll} → ${omenType}`)
   }

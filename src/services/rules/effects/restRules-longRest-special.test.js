@@ -173,6 +173,33 @@ describe('restRules - long rest special features', () => {
       )
     })
 
+    it('CLA-065: clears unspent cosmicOmenPendingBonus from the global cosmicOmen store', async () => {
+      vi.clearAllMocks()
+      vi.mocked(rollD20).mockReturnValue(4)
+      const druidStats = makeStats({
+        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
+        level: 6,
+        abilities: [{ name: 'Wisdom', bonus: 4 }],
+      })
+      await applyLongRest(druidStats, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'cosmicOmen', 'cosmicOmenPendingBonus', null, CAMPAIGN, true,
+      )
+    })
+
+    it('CLA-065: does not clear the pending store for Druid below level 6', async () => {
+      vi.clearAllMocks()
+      const druidStats = makeStats({
+        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
+        level: 5,
+        abilities: [{ name: 'Wisdom', bonus: 4 }],
+      })
+      await applyLongRest(druidStats, CAMPAIGN)
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'cosmicOmen', 'cosmicOmenPendingBonus', expect.anything(), CAMPAIGN, expect.anything(),
+      )
+    })
+
     it('does not roll Cosmic Omen for Druid below level 6', async () => {
       vi.clearAllMocks()
       const druidStats = makeStats({

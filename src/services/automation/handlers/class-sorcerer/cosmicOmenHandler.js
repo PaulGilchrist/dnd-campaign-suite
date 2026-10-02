@@ -70,7 +70,13 @@ export async function handle(action, playerStats, campaignName) {
 
     await consumeOmenUses(usesMax, playerName, featureName, campaignName);
 
-    await setRuntimeValue(playerName, 'cosmicOmenPendingBonus', JSON.stringify({
+    // CLA-065: pending bonus lives under the canonical global 'cosmicOmen'
+    // store — ALL consumer lanes (d20RollComputation attack/check/initiative,
+    // saveProcessing NPC save, SavePromptModal PC save) read
+    // getRuntimeValue('cosmicOmen','cosmicOmenPendingBonus'). Writing it under
+    // the druid's own name key left every consumer reading an empty store, so
+    // the ±1d6 never folded and the pending leaked through the Long Rest.
+    await setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', JSON.stringify({
         value: d6Value,
         type: omenEffect.type,
     }), campaignName);

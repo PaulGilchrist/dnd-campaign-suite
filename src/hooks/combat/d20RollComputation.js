@@ -24,7 +24,7 @@ function computeStarryDragonFloor(characterName, campaignName, name, rollType) {
 // Cosmic Omen: apply global pending bonus to next d20 roll by anyone (not save rolls)
 function applyCosmicOmen(rollType, campaignName) {
     if (rollType === 'save') return { bonus: 0, detail: null };
-    const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
+    const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', campaignName);
     if (!cosmicOmenPendingRaw) return { bonus: 0, detail: null };
     try {
         const pending = JSON.parse(cosmicOmenPendingRaw);
@@ -32,7 +32,7 @@ function applyCosmicOmen(rollType, campaignName) {
             const isWeal = pending.type === 'Weal';
             const bonus = isWeal ? pending.value : -pending.value;
             setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
-            return { bonus, detail: `(${bonus} from ${pending.type})` };
+            return { bonus, detail: `(${bonus >= 0 ? '+' : ''}${bonus} from ${pending.type})` };
         }
     } catch (_e) { /* ignore */ }
     return { bonus: 0, detail: null };

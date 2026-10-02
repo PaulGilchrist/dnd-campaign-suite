@@ -6,13 +6,18 @@ import { clearAllExpirationEffects } from '../../services/rules/effects/expirati
 import { clearHuntersMarkConcentration } from '../../services/rules/effects/restRules.js';
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js';
 
-export async function processInitiativeRoll({ characterName, campaignName, context, bonus, effectiveD20Roll, r1, r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus, characters }) {
+export async function processInitiativeRoll({ characterName, campaignName, context, bonus, effectiveD20Roll, r1, r2, setPopupHtml, availableSuperiorityManeuvers, cosmicOmenAppliedBonus, cosmicOmenDetail, characters }) {
     const firstName = utils.getName(characterName);
     const tandemFtBonus = Number(getRuntimeValue(firstName, 'tandemFootworkBonus', campaignName) ?? 0);
     if (tandemFtBonus > 0) {
         setRuntimeValue(firstName, 'tandemFootworkBonus', 0, campaignName);
     }
-    const totalBonus = bonus + tandemFtBonus;
+    // CLA-065: the armed Cosmic Omen ±1d6 folds here too — computeD20Roll
+    // consumed the pending and folded it into the logged bonus, but this tail
+    // rebuilt the popup + tracker initiative from the BASE bonus only, so the
+    // omen vanished from both surfaces.
+    const omenBonus = cosmicOmenAppliedBonus || 0;
+    const totalBonus = bonus + tandemFtBonus + omenBonus;
     const combatSummary = await loadCombatSummary(campaignName);
     if (combatSummary) {
         const creature = combatSummary.creatures.find(
@@ -38,6 +43,7 @@ export async function processInitiativeRoll({ characterName, campaignName, conte
         name: 'Initiative',
         rolls: [r1, r2],
         bonus: totalBonus,
+        bonusDetail: cosmicOmenDetail || undefined,
         characterName,
         campaignName,
         availableSuperiorityManeuvers,

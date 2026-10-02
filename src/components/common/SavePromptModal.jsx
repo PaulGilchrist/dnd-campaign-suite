@@ -136,14 +136,14 @@ function computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModi
 }
 
 function consumeCosmicOmen(campaignName) {
-  const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus');
+  const cosmicOmenPendingRaw = getRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', campaignName);
   if (cosmicOmenPendingRaw) {
     try {
       const pending = JSON.parse(cosmicOmenPendingRaw);
       if (pending && typeof pending.value === 'number' && pending.value > 0) {
         const isWeal = pending.type === 'Weal';
         const bonus = isWeal ? pending.value : -pending.value;
-        const detail = `(${bonus} from ${pending.type})`;
+        const detail = `(${bonus >= 0 ? '+' : ''}${bonus} from ${pending.type})`;
         setRuntimeValue('cosmicOmen', 'cosmicOmenPendingBonus', null, campaignName, true);
         return { bonus, detail };
       }
