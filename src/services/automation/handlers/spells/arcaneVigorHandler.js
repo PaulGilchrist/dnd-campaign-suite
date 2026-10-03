@@ -1,7 +1,12 @@
 import { getHitDieSize } from '../../../rules/effects/restRules.js';
+import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 
+// SP-007: read the paid slot level off the forwarded metaCtx (stamped by the
+// cast lane) and fall back to the prepared spell's effective level — upcasts
+// must resolve dice/level at the slot actually consumed, not the base 2.
 function resolveSlotLevel(action) {
-    return action.metaCtx?.slotLevel || action.metaCtx?.modifiedSpell?.level || action.metaCtx?.upcastLevel || 2;
+    return action.metaCtx?.slotLevel || action.metaCtx?.modifiedSpell?.level || action.metaCtx?.upcastLevel
+        || action.spell?.upcastLevel || action.spell?.level || 2;
 }
 
 function resolveDiceCount(action, slotLevel) {
@@ -26,9 +31,11 @@ export function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    // SP-007: spellcasting_ability carries shorthand ('INT') while playerStats.abilities
+    // names are full words ('Intelligence') — resolve via the canonical abilityLookup
+    // (same seam automationExpressions uses live) so the modifier is never silently 0.
     const spellcastingAbility = playerStats.spellAbilities?.spellcasting_ability || 'INT';
-    const abilityObj = playerStats.abilities?.find(a => a.name === spellcastingAbility);
-    const spellcastingAbilityModifier = abilityObj?.bonus || 0;
+    const spellcastingAbilityModifier = getAbilityModifier(playerStats.abilities, spellcastingAbility);
 
     const diceCount = resolveDiceCount(action, slotLevel);
 

@@ -121,11 +121,34 @@ describe('arcaneVigorHandler.handle', () => {
     it('uses spellcasting_ability from spellAbilities', () => {
       const ps = makePlayerStats({
         spellAbilities: { spellcasting_ability: 'WIS' },
-        abilities: [{ name: 'WIS', bonus: 4 }],
+        abilities: [{ name: 'Wisdom', bonus: 4 }],
       });
       const result = handle(makeAction(), ps, campaignName, null);
       expect(result.payload.spellcastingAbility).toBe('WIS');
       expect(result.payload.spellcastingAbilityModifier).toBe(4);
+    });
+
+    // SP-007: shorthand 'INT' must resolve against full-word ability names.
+    it('SP-007: resolves INT shorthand against full-word ability names', () => {
+      const ps = makePlayerStats({
+        spellAbilities: { spellcasting_ability: 'INT' },
+        abilities: [
+          { name: 'Strength', bonus: -1 },
+          { name: 'Intelligence', bonus: 5 },
+          { name: 'Charisma', bonus: 2 },
+        ],
+      });
+      const result = handle(makeAction(), ps, campaignName, null);
+      expect(result.payload.spellcastingAbilityModifier).toBe(5);
+    });
+
+    it('SP-007: resolves full-word spellcasting_ability values too', () => {
+      const ps = makePlayerStats({
+        spellAbilities: { spellcasting_ability: 'Intelligence' },
+        abilities: [{ name: 'Intelligence', bonus: 5 }],
+      });
+      const result = handle(makeAction(), ps, campaignName, null);
+      expect(result.payload.spellcastingAbilityModifier).toBe(5);
     });
 
     it('defaults to INT when spellcasting_ability is missing', () => {
@@ -272,11 +295,44 @@ describe('arcaneVigorHandler.handle', () => {
     it('handles Charisma spellcasting ability for sorcerer', () => {
       const ps = makePlayerStats({
         spellAbilities: { spellcasting_ability: 'CHA' },
-        abilities: [{ name: 'CHA', bonus: 5 }],
+        abilities: [{ name: 'Charisma', bonus: 5 }],
       });
       const result = handle(makeAction(), ps, campaignName, null);
       expect(result.payload.spellcastingAbility).toBe('CHA');
       expect(result.payload.spellcastingAbilityModifier).toBe(5);
+    });
+
+    // SP-007: lv3 upcast must resolve diceCount=3 from spell heal_at_slot_level
+    // and stamp slotLevel 3 even when metaCtx carries no slot level — the paid
+    // level rides the spell object (modifiedSpell.level / upcastLevel).
+    it('SP-007: lv3 upcast resolves slotLevel 3 and diceCount 3 from spell object', () => {
+      const action = makeAction({
+        metaCtx: {},
+        spell: {
+          name: 'Arcane Vigor',
+          level: 3,
+          upcastLevel: 3,
+          heal_at_slot_level: { '2': '2 short rest dice', '3': '3 short rest dice' },
+        },
+      });
+      const result = handle(action, makePlayerStats(), campaignName, null);
+      expect(result.payload.slotLevel).toBe(3);
+      expect(result.payload.diceCount).toBe(3);
+    });
+
+    // SP-007: metaCtx.slotLevel (paid slot threaded) takes priority.
+    it('SP-007: metaCtx.slotLevel threads the paid level for diceCount', () => {
+      const action = makeAction({
+        metaCtx: { slotLevel: 3 },
+        spell: {
+          name: 'Arcane Vigor',
+          level: 2,
+          heal_at_slot_level: { '2': '2 short rest dice', '3': '3 short rest dice' },
+        },
+      });
+      const result = handle(action, makePlayerStats(), campaignName, null);
+      expect(result.payload.slotLevel).toBe(3);
+      expect(result.payload.diceCount).toBe(3);
     });
   });
 
@@ -293,7 +349,8 @@ describe('arcaneVigorHandler.handle', () => {
       const ps = makePlayerStats({ spellAbilities: null });
       const result = handle(makeAction(), ps, campaignName, null);
       expect(result.payload.spellcastingAbility).toBe('INT');
-      expect(result.payload.spellcastingAbilityModifier).toBe(0);
+      // SP-007: INT default now resolves against full-word ability names.
+      expect(result.payload.spellcastingAbilityModifier).toBe(3);
     });
 
     it('handles action with no name gracefully', () => {

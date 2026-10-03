@@ -13,9 +13,11 @@ function ArcaneVigorModal({ hitDieSize, spellcastingAbility, spellcastingAbility
 
     const storedHitDice = Number(getRuntimeValue(playerName, 'shortRestHitDice', campaignName) ?? diceCount);
     const availableHitDice = Math.max(0, storedHitDice - rolledDice.length);
+    // SP-007: the slot level caps dice (lv2 → max 2, lv3 → max 3) regardless of pool size.
+    const diceCapReached = rolledDice.length >= diceCount;
 
     const handleRollDie = () => {
-        if (availableHitDice <= 0) return;
+        if (availableHitDice <= 0 || diceCapReached) return;
         const { total, rolls } = rollDice(1, hitDieSize);
         const newEntry = { roll: rolls[0], total };
         setRolledDice(prev => [...prev, newEntry]);
@@ -98,7 +100,7 @@ function ArcaneVigorModal({ hitDieSize, spellcastingAbility, spellcastingAbility
                         <button
                             className="char-btn"
                             onClick={handleRollDie}
-                            disabled={availableHitDice <= 0 || healingApplied}
+                            disabled={availableHitDice <= 0 || diceCapReached || healingApplied}
                         >
                             <i className="fa-solid fa-dice"></i> Roll One (d{hitDieSize})
                         </button>

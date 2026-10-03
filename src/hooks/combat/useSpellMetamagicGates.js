@@ -100,6 +100,16 @@ async function openPowerWordTargetModal({ spell, metaCtx, creatureTargets, multi
   setSecondaryTargetModal({ secondaryTargetModal: modalConfig });
 }
 
+// SP-007: backfill the paid upcast level onto a metaCtx carrier (byte-twin of the
+// CLA-086 confirm-lane stamp). prepareSpellCast snapshots its metaCtx argument into
+// result.metaCtx BEFORE any caller-side stamp, so the caller stamp alone never reaches
+// onExecute — generic automation handlers (arcane_vigor upcast) resolved at base 2.
+// Stamp BOTH carriers so the slot level actually consumed reaches downstream resolvers.
+function stampPaidSlotLevelOn(carrier, upcastLevel) {
+  if (!carrier || carrier.slotLevel || !upcastLevel) return;
+  carrier.slotLevel = upcastLevel;
+}
+
 // Non-sorcerer cast path: cantrip auto-leveling, concentration-preserving casts,
 // and the generic prepareSpellCast slot payment. Mirrors the original ordering exactly.
 async function handleNonSorcererCast(spell, metaCtx, {
@@ -132,9 +142,8 @@ async function handleNonSorcererCast(spell, metaCtx, {
       // stamps _psychicSpellsOverride and the execution resolver swaps to Psychic.
       usePsychicDamage: !!spell.usePsychicDamage,
     });
-    if (!metaCtx.slotLevel && upcastLevel) {
-      metaCtx.slotLevel = upcastLevel;
-    }
+    stampPaidSlotLevelOn(metaCtx, upcastLevel);
+    stampPaidSlotLevelOn(result.metaCtx, upcastLevel);
     if (consumedMaterial && !materialsWaived) await consumeMaterial(playerStats, consumedMaterial.itemName, campaignName);
     onExecute(result.modifiedSpell, result.metaCtx);
   }

@@ -384,20 +384,45 @@ describe('ArcaneVigorModal', () => {
       expect(typeof spellEntry.timestamp).toBe('number');
     });
 
-    it('logs the correct dice count and remaining hit dice for multiple rolls', async () => {
+    // SP-007: a big pool must NOT override the slot-level dice cap —
+    // lv2 (diceCount 2) blocks the 3rd roll and only logs 2 dice rolled.
+    it('caps rolls at diceCount (lv2 = 2) even with a large pool', async () => {
       getRuntimeValueMock.mockImplementation((_name, key) => {
-        if (key === 'shortRestHitDice') return 5;
+        if (key === 'shortRestHitDice') return 20;
         return null;
       });
-      renderModal({ hitDieSize: 8 });
+      renderModal({ hitDieSize: 6, diceCount: 2, slotLevel: 2 });
       fireEvent.click(screen.getByRole('button', { name: /Roll One/ }));
       fireEvent.click(screen.getByRole('button', { name: /Roll One/ }));
+      const rollBtn = screen.getByRole('button', { name: /Roll One/ });
+      expect(rollBtn).toBeDisabled();
+      fireEvent.click(rollBtn);
+      expect(screen.getByText(/Roll Total: 8 \+ 3 = 11 HP/)).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Apply Healing'));
+      await waitFor(() => {
+        const spellEntry = addEntry.mock.calls[0][1];
+        expect(spellEntry.diceRolled).toBe(2);
+        expect(spellEntry.hitDiceRemaining).toBe(18);
+      });
+    });
+
+    it('allows three rolls at lv3 upcast (diceCount 3)', async () => {
+      getRuntimeValueMock.mockImplementation((_name, key) => {
+        if (key === 'shortRestHitDice') return 20;
+        return null;
+      });
+      renderModal({ hitDieSize: 6, diceCount: 3, slotLevel: 3 });
       fireEvent.click(screen.getByRole('button', { name: /Roll One/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Roll One/ }));
+      expect(screen.getByRole('button', { name: /Roll One/ })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: /Roll One/ }));
+      expect(screen.getByRole('button', { name: /Roll One/ })).toBeDisabled();
       fireEvent.click(screen.getByText('Apply Healing'));
       await waitFor(() => {
         const spellEntry = addEntry.mock.calls[0][1];
         expect(spellEntry.diceRolled).toBe(3);
-        expect(spellEntry.hitDiceRemaining).toBe(2);
+        expect(spellEntry.spellLevel).toBe(3);
+        expect(spellEntry.hitDiceRemaining).toBe(17);
       });
     });
 
