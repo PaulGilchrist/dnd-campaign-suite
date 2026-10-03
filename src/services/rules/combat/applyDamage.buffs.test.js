@@ -120,6 +120,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
   it('merges resistanceTypes from activeBuffs for player', async () => {
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
+      .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
       .mockReturnValueOnce([{ resistanceTypes: ['fire'], resistanceTypes2: ['cold'] }])
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(30)
@@ -134,6 +135,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
   it('deduplicates resistanceTypes from multiple buffs', async () => {
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
+      .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
       .mockReturnValueOnce([
         { resistanceTypes: ['fire'] },
         { resistanceTypes: ['fire', 'cold'] },
@@ -151,6 +153,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
   it('handles non-array and null activeBuffs gracefully, combines base resistances with buffs', async () => {
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
+      .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
       .mockReturnValueOnce('not-an-array')
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(30)
@@ -163,6 +166,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
 
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
+      .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
       .mockReturnValueOnce(null)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(30)
@@ -175,6 +179,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
 
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
+      .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
       .mockReturnValueOnce([{ resistanceTypes: ['cold'] }])
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(30)

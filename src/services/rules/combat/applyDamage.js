@@ -8,6 +8,7 @@ import { rollConcentrationSave } from '../../combat/concentration/concentrationR
 import { cleanupConcentrationEffects } from '../../combat/concentration/concentrationService.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDamageReduction, getDamageResistances } from '../../combat/automation/automationPassives.js';
+import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js';
 import { computeAuraComboEffects } from '../../combat/auras/auraComboEffects.js';
 import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
 import { applyWardingBond } from '../../rules/features/wardingBondService.js';
@@ -212,6 +213,18 @@ function getPlayerPassiveResistances(creature, playerComputed, playerStats) {
     return getDamageResistances({ name: creature.name, automation: statsForPassives });
   }
   return [];
+}
+
+// FT-009: Boon Of Energy Resistance (2024 Epic Boon) — the Energy Resistances
+// benefit is a runtime chooser, not a static automation passive. Its chosen types
+// live ONLY under the runtime key `_Energy_Resistances_chosenTypes` (stamped by
+// boonOfEnergyResistanceHandler), and computedStats never refreshes on a mid-session
+// re-pick (CLA-336 §playerComputed staleness). So read the producer key LIVE at
+// hit-resolution and fold into the player's resistances — the CLA-336 Stormborn
+// live-read shape. Byte-inert for every character without the key set.
+function getBoonEnergyResistances(playerStats, campaignName) {
+  const chosen = getChosenRuntimeValue(playerStats, 'Energy Resistances', 'chosenTypes', campaignName);
+  return Array.isArray(chosen) ? chosen : [];
 }
 
 function addBuffResistances(resistances, activeBuffs) {
@@ -615,6 +628,14 @@ async function resolveCreatureDefenses(creature, targetName, isPlayer, character
     passiveResistances = getPlayerPassiveResistances(creature, playerComputed, playerStats);
     if (passiveResistances.length > 0) {
       resistances = [...new Set([...resistances, ...passiveResistances])];
+    }
+    // FT-009: fold the Energy Resistances chooser types LIVE into both resistances
+    // (halve the incoming damage) and passiveResistances (log the halving) so a
+    // mid-session chooser re-pick takes effect without a computedStats recompute.
+    const boonEnergyResistances = getBoonEnergyResistances(playerStats, campaignName);
+    if (boonEnergyResistances.length > 0) {
+      resistances = [...new Set([...resistances, ...boonEnergyResistances])];
+      passiveResistances = [...new Set([...passiveResistances, ...boonEnergyResistances])];
     }
   }
 

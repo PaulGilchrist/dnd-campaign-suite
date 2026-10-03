@@ -187,8 +187,11 @@ const rulesFactory = {
             mergeDefenseList(playerStats, 'resistances', [fiendishResilienceType]);
         }
 
-        // Resolve Boon Of Energy Resistance damage type resistances (2024 Epic Boon)
-        const boonEnergyResistances = getChosenRuntimeValue(playerStats, 'Boon Of Energy Resistance', 'chosenTypes');
+        // Resolve Boon Of Energy Resistance damage type resistances (2024 Epic Boon).
+        // The chooser (boonOfEnergyResistanceHandler) stamps the benefit action name
+        // "Energy Resistances" → runtime key `_Energy_Resistances_chosenTypes`.
+        // The consumer must read the SAME name (producer key), not the parent feat name.
+        const boonEnergyResistances = getChosenRuntimeValue(playerStats, 'Energy Resistances', 'chosenTypes');
         if (Array.isArray(boonEnergyResistances) && boonEnergyResistances.length > 0) {
             mergeDefenseList(playerStats, 'resistances', boonEnergyResistances);
         }

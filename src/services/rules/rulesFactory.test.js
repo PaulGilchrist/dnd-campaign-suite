@@ -394,7 +394,7 @@ describe('rulesFactory', () => {
         (_playerStats, name) => {
           if (name === 'Elemental Affinity') return 'Radiant'
           if (name === 'Fiendish Resilience') return 'Fire'
-          if (name === 'Boon Of Energy Resistance') return ['Necrotic', 'Poison']
+          if (name === 'Energy Resistances') return ['Necrotic', 'Poison']
           return null
         }
       )
@@ -405,13 +405,13 @@ describe('rulesFactory', () => {
       expect(result.resistances).toContain('Poison')
     })
 
-    it('does not add Boon Of Energy Resistance when array is empty', async () => {
+    it('does not add Energy Resistances when chosen array is empty', async () => {
       const { getChosenRuntimeValue } = await import(
         '../automation/common/choiceStorage.js'
       )
       vi.mocked(getChosenRuntimeValue).mockImplementation(
         (_playerStats, name) => {
-          if (name === 'Boon Of Energy Resistance') return []
+          if (name === 'Energy Resistances') return []
           return null
         }
       )
