@@ -619,6 +619,30 @@ describe('cleanupConcentrationEffects', () => {
         )
     })
 
+    // SP-014: beacon te stores caster (not source) — break must drain both
+    // beacon stamps for this caster and preserve every other targetEffect.
+    it('drains beacon_of_hope targetEffects stored via te.caster for the caster', () => {
+        const cs = createCombatSummary([])
+        const beaconSelf = { target: 'Alice', effect: 'beacon_of_hope', caster: 'Alice', duration: 'concentration' }
+        const beaconAlly = { target: 'Bob', effect: 'beacon_of_hope', caster: 'Alice', duration: 'concentration' }
+        const otherCasterBeacon = { target: 'Dave', effect: 'beacon_of_hope', caster: 'Charlie', duration: 'concentration' }
+        const unrelated = { source: 'Charlie', duration: 'concentration', effect: 'haste', target: 'Dave' }
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'campaign' && prop === 'targetEffects') return [beaconSelf, beaconAlly, otherCasterBeacon, unrelated]
+            return null
+        })
+        getCombatSummary.mockReturnValue(cs)
+
+        cleanupConcentrationEffects('Alice', 'Beacon of Hope', 'TestCampaign')
+
+        const teWrites = setRuntimeValue.mock.calls.filter(c => c[0] === 'campaign' && c[1] === 'targetEffects')
+        expect(teWrites.length).toBeGreaterThan(0)
+        const finalWrite = teWrites[teWrites.length - 1]
+        const survivors = finalWrite[2]
+        expect(survivors.some(te => te.effect === 'beacon_of_hope' && te.caster === 'Alice')).toBe(false)
+        expect(survivors).toEqual(expect.arrayContaining([otherCasterBeacon, unrelated]))
+    })
+
     it('cleans up faerie fire targetEffects and activeBuffs for the caster', () => {
         const cs = createCombatSummary([{ name: 'Bob' }])
         const targetEffects = [

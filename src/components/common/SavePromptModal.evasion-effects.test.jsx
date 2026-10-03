@@ -99,7 +99,10 @@ describe('SavePromptModal — Evasion Effects', () => {
 
   // ── Beacon of Hope advantage ──
 
-  it('grants advantage on WIS saves when beacon_of_hope targetEffect is active', async () => {
+  // SP-014: beacon te lives at CAMPAIGN ROOT targetEffects (producers write
+  // setRuntimeValue('campaign','targetEffects',…)); pins were inverted from the
+  // broken per-characters probe to the root channel with te.target matching.
+  it('grants advantage on WIS saves when beacon_of_hope root targetEffect is active', async () => {
     rollD20.mockReturnValueOnce(15).mockReturnValueOnce(18);
     const targetChar = {
       name: 'testTarget',
@@ -110,8 +113,13 @@ describe('SavePromptModal — Evasion Effects', () => {
         evasionEffects: [],
       },
       saveModifiers: [],
-      targetEffects: [{ effect: 'beacon_of_hope' }],
     };
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'targetEffects' && name === 'campaign') {
+        return [{ target: 'testTarget', effect: 'beacon_of_hope', caster: 'testCaster', duration: 'concentration' }];
+      }
+      return null;
+    });
 
     render(
       <SavePromptModal
@@ -191,8 +199,13 @@ describe('SavePromptModal — Evasion Effects', () => {
         evasionEffects: [],
       },
       saveModifiers: [],
-      targetEffects: [{ effect: 'beacon_of_hope' }],
     };
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'targetEffects' && name === 'campaign') {
+        return [{ target: 'testTarget', effect: 'beacon_of_hope', caster: 'testCaster', duration: 'concentration' }];
+      }
+      return null;
+    });
 
     render(
       <SavePromptModal
@@ -211,6 +224,51 @@ describe('SavePromptModal — Evasion Effects', () => {
 
     const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
     fireEvent.click(rollBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
+    });
+
+    // Normal roll (no advantage) = single d20
+    expect(rollD20).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Beacon of Hope does NOT cross-grant to un-beaconed targets ──
+
+  it('does not grant advantage when root beacon_of_hope te targets another creature', async () => {
+    rollD20.mockReturnValue(15);
+    const targetChar = {
+      name: 'testTarget',
+      level: 1,
+      class: { class_levels: [] },
+      computedStats: {
+        abilities: [{ name: 'Constitution', bonus: 3 }],
+        evasionEffects: [],
+      },
+      saveModifiers: [],
+    };
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'targetEffects' && name === 'campaign') {
+        return [{ target: 'someoneElse', effect: 'beacon_of_hope', caster: 'testCaster', duration: 'concentration' }];
+      }
+      return null;
+    });
+
+    render(
+      <SavePromptModal
+        campaignName="test-campaign"
+        characters={[targetChar]}
+        activeMapName={null}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger-wis'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Save' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Total:/i)).toBeInTheDocument();

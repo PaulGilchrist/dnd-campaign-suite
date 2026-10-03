@@ -368,7 +368,7 @@ const BADGE_SPECS = [
     {
         find: ctx => findDirect(ctx, 'beacon_of_hope'),
         guard: ctx => ctx.effects.beaconOfHope,
-        build: ctx => ({ label: 'Beacon of Hope', cls: 'effect-buff', icon: 'fa-heart-pulse', removable: true, removeAction: 'target_effect', effectType: 'beacon_of_hope', tooltip: `Beacon of Hope from ${ctx.te?.source || 'unknown'}: Advantage on WIS saves, death saves, and maximized healing` }),
+        build: ctx => ({ label: 'Beacon of Hope', cls: 'effect-buff', icon: 'fa-heart-pulse', removable: true, removeAction: 'target_effect', effectType: 'beacon_of_hope', tooltip: `Beacon of Hope from ${ctx.te?.source || ctx.te?.caster || 'unknown'}: Advantage on WIS saves, death saves, and maximized healing` }),
     },
     {
         guard: ctx => ctx.effects.hasteActive,

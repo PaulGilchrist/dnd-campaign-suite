@@ -121,9 +121,13 @@ function isDodgeDexAdvantage(current, campaignName) {
   return isDodgeActive && isDexSave;
 }
 
-function isBeaconOfHopeAdvantage(current, characters) {
-  const targetCharForBeacon = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
-  return !!targetCharForBeacon?.targetEffects?.some(te => te.effect === 'beacon_of_hope') && (current.saveType || '').toUpperCase() === 'WIS';
+// SP-014: beacon te lives at campaign ROOT targetEffects (producers write
+// setRuntimeValue('campaign','targetEffects',…)); the per-characters probe never
+// populated. Mirrors the root-read lane (useLoggedDiceRollSaves.js:315/:76) plus
+// te.target matching so another creature's beacon never grants cross-target.
+function isBeaconOfHopeAdvantage(current, campaignName) {
+  const rootTargetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+  return rootTargetEffects.some(te => te.target === current.targetName && te.effect === 'beacon_of_hope') && normalizeSaveType(current.saveType) === 'WIS';
 }
 
 function computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, characters }) {
@@ -136,7 +140,7 @@ function computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModi
   // advantage_attacks_and_saves) — mirrors the Dodge block shape.
   if (hasBuffEffect(current?.targetName, 'advantage_attacks_and_saves', campaignName)) return true;
   // Beacon of Hope: advantage on Wisdom saving throws
-  if (isBeaconOfHopeAdvantage(current, characters)) return true;
+  if (isBeaconOfHopeAdvantage(current, campaignName)) return true;
   // Circle of Power: blanket advantage on saving throws
   if (isCircleOfPowerActive(current.targetName, campaignName)) return true;
   // Holy Aura: advantage on all saving throws for warded targets

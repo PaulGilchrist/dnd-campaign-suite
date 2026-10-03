@@ -59,9 +59,11 @@ function clearAllConcentrations(campaignName, restingCreatureName) {
     }
 }
 
+// SP-014: some producers stamp the caster on te.caster instead of te.source
+// (beaconOfHopeHandler.js:103-110) — match either channel.
 function removeTargetEffectsByEffect(effectKey, source, campaignName) {
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const filtered = storedEffects.filter(te => !(te.effect === effectKey && te.source === source));
+    const filtered = storedEffects.filter(te => !(te.effect === effectKey && (te.source === source || te.caster === source)));
     if (filtered.length !== storedEffects.length) {
         setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true);
     }
@@ -356,6 +358,9 @@ async function cleanupConcentrationEffects(casterName, spellName, campaignName) 
 
     // Clean up Resilient Sphere targetEffects for this caster
     removeTargetEffectsByEffect('resilient_sphere', casterName, campaignName);
+
+    // Clean up Beacon of Hope targetEffects for this caster (te stores caster, not source)
+    removeTargetEffectsByEffect('beacon_of_hope', casterName, campaignName);
 
     // Clean up Faerie Fire targetEffects and activeBuffs for this caster
     clearFaerieFire(cs, casterName, campaignName);
