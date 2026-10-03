@@ -1,8 +1,15 @@
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getAbilityModifier } from '../../../shared/abilityLookup.js';
+import { buildSaveDc } from '../../common/savePrompt.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 const CHARMED_FRIGHTENED_CONDITIONS = ['charmed', 'frightened'];
+const DEFAULT_RANGE_FT = 120;
+
+function normalizeName(name) {
+    return String(name || '').trim().toLowerCase();
+}
 
 function findTriggeringSaveOrCondition(lastAttack) {
     if (!lastAttack) return null;
@@ -85,21 +92,46 @@ export async function handle(action, playerStats, campaignName) {
         };
     }
 
-    const prof = playerStats.proficiency || 0;
-    const chaBonus = getAbilityModifier(playerStats.abilities, 'CHA');
-    const saveDc = 8 + chaBonus + prof;
+    // CLA-034: data authors saveDc:"spell_save_dc" — resolve via the shared
+    // spell_save_dc seam (Ranger = 8 + WIS + PB), never a hardcoded ability.
+    const saveDc = buildSaveDc(auto, playerStats);
+
+    // CLA-034: data authors target:"different_creature" — the creature that
+    // made the triggering save is never a valid redirect target. 120 ft range
+    // goes through isWithinRange (gridless boards are lenient; advisory noted).
+    const rangeFt = rangeToFeet(auto?.range) || DEFAULT_RANGE_FT;
+    const eligibleTargets = [];
+    for (const creature of allCreatures) {
+        if (normalizeName(creature.name) === normalizeName(trigger.targetName)) continue;
+        if (!(await isWithinRange(playerStats.name, creature.name, rangeFt))) continue;
+        eligibleTargets.push(creature);
+    }
+
+    if (eligibleTargets.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} targets a DIFFERENT creature within ${rangeFt} feet — ${trigger.targetName} succeeded on that save and cannot be the target, and no other creature is eligible.`,
+                automation: auto,
+            },
+        };
+    }
 
     return {
         type: 'modal',
         modalName: 'beguilingTwist',
         payload: {
-            targets: allCreatures,
+            targets: eligibleTargets,
             action,
             playerStats,
             campaignName,
             conditionKey: trigger.conditionKey,
             saveDc,
             featureName,
+            rangeFt,
+            triggeredBy: trigger.targetName,
         },
     };
 }

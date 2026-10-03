@@ -39,6 +39,10 @@ function buildPromptPayload(config) {
         advantage: config.advantage || false,
         disadvantage: config.disadvantage || false,
         condition: config.condition || null,
+        // CLA-034: the condition(s) this save is rolled against (e.g. ['frightened']
+        // from a Fear Ray) — threaded so conditional_advantage passives can key on
+        // the SAVE's own condition instead of unrelated active conditions.
+        saveConditions: config.saveConditions || null,
         damageFormula: config.damageFormula || null,
         damageType: config.damageType || null,
         rawDamage: config.rawDamage || 0,

@@ -694,7 +694,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-034-beguiling-twist.md",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Advantage on saving throws to avoid/end Charmed or Frightened. When you or creature within 120 feet succeeds on save vs Charmed/Frightened, take Reaction to force different creature within 120 feet to make Wisdom save (your spell save DC) or be Charmed/Frightened for 1 minute."

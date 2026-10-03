@@ -168,6 +168,7 @@ describe('createSaveListener', () => {
             secondaryDamageType: null,
             secondaryRawDamage: 0,
             isSpellDamage: false,
+            saveConditions: null,
         });
     });
 
@@ -201,7 +202,24 @@ describe('createSaveListener', () => {
             secondaryDamageType: null,
             secondaryRawDamage: 0,
             isSpellDamage: false,
+            saveConditions: null,
         });
+    });
+
+    it('CLA-034: threads saveConditions from config onto the prompt payload', () => {
+        utils.guid.mockReturnValue('prompt-cla034');
+
+        createSaveListener(campaignName, {
+            targetName: 'Orc',
+            saveType: 'WIS',
+            saveDc: 17,
+            saveConditions: ['frightened'],
+        });
+
+        expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            promptId: 'prompt-cla034',
+            saveConditions: ['frightened'],
+        }));
     });
 
     it('resolves with event.detail when matching promptId is received', async () => {

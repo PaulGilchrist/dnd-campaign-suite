@@ -7,15 +7,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './beguilingTwistHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../../shared/abilityLookup.js', () => ({
-  getAbilityModifier: vi.fn(),
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -30,7 +30,10 @@ function makePlayerStats(overrides = {}) {
     name: playerName,
     level: 10,
     proficiency: 4,
-    abilities: [{ name: 'Charisma', bonus: 3 }],
+    abilities: [{ name: 'Wisdom', bonus: 3 }, { name: 'Charisma', bonus: -1 }],
+    // CLA-034: Ranger spellcasting is WIS — the spell_save_dc seam resolves
+    // 8 + WIS 3 + prof 4 = 15 here; CHA (-1) would wrongly give 11.
+    spellAbilities: { saveDc: 15, modifier: 3, spellCastingAbility: 'WIS' },
     ...overrides,
   };
 }
@@ -38,7 +41,14 @@ function makePlayerStats(overrides = {}) {
 function makeAction(automation = {}) {
   return {
     name: 'Beguiling Twist',
-    automation: { type: 'reaction_save', ...automation },
+    automation: {
+      type: 'reaction_save',
+      saveDc: 'spell_save_dc',
+      range: '120_ft',
+      duration: '1_minute',
+      target: 'different_creature',
+      ...automation,
+    },
   };
 }
 
@@ -56,6 +66,7 @@ describe('beguilingTwistHandler.handle', () => {
     getCombatContext.mockResolvedValue({
       creatures: defaultCreatures(),
     });
+    isWithinRange.mockResolvedValue(true);
     getRuntimeValue.mockImplementation((name, key, _campaign) => {
       if (name === 'campaign' && key === 'lastAttack') return null;
       return undefined;
@@ -139,7 +150,6 @@ describe('beguilingTwistHandler.handle', () => {
         };
         return undefined;
       });
-      getAbilityModifier.mockReturnValue(3);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -147,7 +157,10 @@ describe('beguilingTwistHandler.handle', () => {
       expect(result.modalName).toBe('beguilingTwist');
       expect(result.payload.conditionKey).toBe('charmed');
       expect(result.payload.saveDc).toBe(15);
-      expect(result.payload.targets).toEqual(defaultCreatures());
+      // CLA-034: target:"different_creature" — the triggering saver (playerName)
+      // must never appear in the redirect picker.
+      expect(result.payload.targets.map(t => t.name)).toEqual(['Ally1', 'Goblin']);
+      expect(result.payload.triggeredBy).toBe(playerName);
     });
 
     it('should return modal when lastAttack has condition frightened', async () => {
@@ -246,7 +259,6 @@ describe('beguilingTwistHandler.handle', () => {
     });
 
     it('should return modal when lastAttack saveType is charmed', async () => {
-      getAbilityModifier.mockReturnValue(3);
       getRuntimeValue.mockImplementation((name, key, _campaign) => {
         if (name === 'campaign' && key === 'lastAttack') return {
           rollType: 'save',
@@ -268,7 +280,6 @@ describe('beguilingTwistHandler.handle', () => {
     });
 
     it('should return modal when lastAttack saveType is frightened', async () => {
-      getAbilityModifier.mockReturnValue(3);
       getRuntimeValue.mockImplementation((name, key, _campaign) => {
         if (name === 'campaign' && key === 'lastAttack') return {
           rollType: 'save',
@@ -330,8 +341,8 @@ describe('beguilingTwistHandler.handle', () => {
     });
   });
 
-  describe('save DC calculation', () => {
-    it('should calculate DC as 8 + CHA bonus + proficiency', async () => {
+  describe('save DC calculation (CLA-034: spell_save_dc seam, never CHA)', () => {
+    function charmedTrigger() {
       getRuntimeValue.mockImplementation((name, key, _campaign) => {
         if (name === 'campaign' && key === 'lastAttack') return {
           rollType: 'condition',
@@ -341,53 +352,99 @@ describe('beguilingTwistHandler.handle', () => {
         };
         return undefined;
       });
-      getAbilityModifier.mockReturnValue(3);
+    }
+
+    it('should resolve DC from playerStats.spellAbilities.saveDc (spell_save_dc token)', async () => {
+      charmedTrigger();
+
+      // FeyRanger discriminator: WIS +3, PB +6 → 17; CHA −1 would wrongly give 13.
+      const result = await handle(
+        makeAction(),
+        { ...makePlayerStats(), proficiency: 6, spellAbilities: { saveDc: 17, modifier: 3, spellCastingAbility: 'WIS' } },
+        campaignName,
+      );
+
+      expect(result.payload.saveDc).toBe(17);
+    });
+
+    it('should NOT bake the CHA modifier into the DC', async () => {
+      charmedTrigger();
+
+      const result = await handle(
+        makeAction(),
+        { ...makePlayerStats(), proficiency: 6, spellAbilities: { saveDc: 17, modifier: 3, spellCastingAbility: 'WIS' } },
+        campaignName,
+      );
+
+      // 8 + CHA(-1) + 6 = 13 was the defect; must never surface.
+      expect(result.payload.saveDc).not.toBe(13);
+    });
+
+    it('should fall back to 8 + spellcasting modifier + proficiency when saveDc not precomputed', async () => {
+      charmedTrigger();
+
+      const result = await handle(
+        makeAction(),
+        { ...makePlayerStats(), proficiency: 6, spellAbilities: { modifier: 3, spellCastingAbility: 'WIS' } },
+        campaignName,
+      );
+
+      expect(result.payload.saveDc).toBe(17);
+    });
+  });
+
+  describe('range gating (CLA-034: isWithinRange seam)', () => {
+    it('should consult isWithinRange with the data 120 ft band', async () => {
+      getRuntimeValue.mockImplementation((name, key, _campaign) => {
+        if (name === 'campaign' && key === 'lastAttack') return {
+          rollType: 'save',
+          targetName: playerName,
+          saveResult: 'success',
+          saveConditions: ['frightened'],
+        };
+        return undefined;
+      });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(result.payload.saveDc).toBe(15);
+      expect(result.type).toBe('modal');
+      expect(isWithinRange).toHaveBeenCalledWith(playerName, 'Ally1', 120);
+      expect(isWithinRange).toHaveBeenCalledWith(playerName, 'Goblin', 120);
     });
 
-    it('should use custom proficiency and CHA modifier from stats', async () => {
+    it('should drop creatures reported out of range', async () => {
       getRuntimeValue.mockImplementation((name, key, _campaign) => {
         if (name === 'campaign' && key === 'lastAttack') return {
-          rollType: 'condition',
-          conditionKey: 'charmed',
+          rollType: 'save',
           targetName: playerName,
-          timestamp: Date.now(),
+          saveResult: 'success',
+          saveConditions: ['frightened'],
         };
         return undefined;
       });
-      getAbilityModifier.mockReturnValue(5);
+      isWithinRange.mockImplementation(async (_source, target) => target !== 'Goblin');
 
-      const result = await handle(
-        makeAction(),
-        { ...makePlayerStats(), proficiency: 6 },
-        campaignName,
-      );
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(result.payload.saveDc).toBe(19);
+      expect(result.payload.targets.map(t => t.name)).toEqual(['Ally1']);
     });
 
-    it('should default proficiency to 0 if missing', async () => {
+    it('should refuse with a popup when no eligible different creature remains', async () => {
       getRuntimeValue.mockImplementation((name, key, _campaign) => {
         if (name === 'campaign' && key === 'lastAttack') return {
-          rollType: 'condition',
-          conditionKey: 'charmed',
+          rollType: 'save',
           targetName: playerName,
-          timestamp: Date.now(),
+          saveResult: 'success',
+          saveConditions: ['frightened'],
         };
         return undefined;
       });
-      getAbilityModifier.mockReturnValue(3);
+      getCombatContext.mockResolvedValue({ creatures: [{ name: playerName, type: 'player' }] });
 
-      const result = await handle(
-        makeAction(),
-        { ...makePlayerStats(), proficiency: undefined },
-        campaignName,
-      );
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(result.payload.saveDc).toBe(11);
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('DIFFERENT creature');
     });
   });
 

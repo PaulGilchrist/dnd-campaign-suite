@@ -23,6 +23,7 @@ import { executeHandler, confirmSearingVengeance, skipSearingVengeance } from '.
 import { createSaveListener } from '../../services/automation/common/savePrompt.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { addExpiration } from '../../services/rules/effects/expirations.js'
+import { parseDurationRounds } from '../../services/rules/effects/durationParser.js'
 import { applyWarCasterReaction } from '../../services/automation/handlers/reactions/reactionSpellHandler.js'
 import { applyInspiringMovement } from '../../services/automation/handlers/reactions/reactionBonusHandler.js'
 import { normalizeAutoDamage, resolveAttackDamageStandalone } from './useAttackDamageResolution.js'
@@ -710,7 +711,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const handleBeguilingTwistConfirm = React.useCallback((targetName) => {
         if (!modalState.beguilingTwistModal) return;
-        const { playerStats: btPlayerStats, campaignName: btCampaignName, conditionKey, saveDc, featureName } = modalState.beguilingTwistModal;
+        const { playerStats: btPlayerStats, campaignName: btCampaignName, conditionKey, saveDc, featureName, triggeredBy, action: btAction } = modalState.beguilingTwistModal;
         setModalState({ beguilingTwistModal: null });
         if (!targetName) return;
 
@@ -718,13 +719,15 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
             targetName,
             saveType: 'WIS',
             saveDc,
+            condition: conditionKey,
+            saveConditions: [conditionKey],
         });
 
         addEntry(btCampaignName, {
             type: 'ability_use',
             characterName: btPlayerStats.name,
             abilityName: featureName,
-            description: `${btPlayerStats.name} used ${featureName} — ${targetName} must make WIS save (DC ${saveDc}) or be ${conditionKey} for 1 minute.`,
+            description: `${btPlayerStats.name} used ${featureName} — ${targetName} (different creature from ${triggeredBy || 'the saver'}) must make WIS save (DC ${saveDc}) or be ${conditionKey} for 1 minute (range 120 ft, GM-adjudicated).`,
             promptId,
         }).catch((e) => { console.error("[beguilingTwist] Error:", e); });
 
@@ -736,9 +739,12 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 const filtered = (Array.isArray(conditions) ? conditions : []).filter(c => String(c).toLowerCase() !== conditionKey);
                 setRuntimeValue(targetName, 'activeConditions', [...filtered, conditionKey], btCampaignName);
 
+                // CLA-034: "for 1 minute" = 10 rounds (CLA-033(a) clock family;
+                // parseDurationRounds marks minute tokens 0 → floor to 10).
+                const durationRounds = parseDurationRounds(btAction?.automation?.duration) || 10;
                 addExpiration({ attackerName: btPlayerStats.name, targetName, effects: [
                     { type: 'condition', condition: conditionKey }
-                ], campaignName: btCampaignName });
+                ], campaignName: btCampaignName, rounds: durationRounds });
 
                 addEntry(btCampaignName, {
                     type: 'save_result',

@@ -119,6 +119,12 @@ function buildPlayerSaveLogData({ targetName, characterName, actionName, effecti
     };
 }
 
+// CLA-034: hoisted so processPlayerSave stays under the complexity cap —
+// the ray/save row's own conditions ride the prompt for conditional_advantage gating.
+function resolvePromptSaveConditions(context) {
+    return context?.saveConditions || null;
+}
+
 async function processPlayerSave({ target, characterName, campaignName, context, logEntry, setPopupHtml, saveDc, saveType, attackerName, actionName, targetName }) {
     const hasSecondaryDamage = !!context?.autoDamageSecondaryFormula;
     const { promise } = createSaveListener(campaignName, {
@@ -127,6 +133,10 @@ async function processPlayerSave({ target, characterName, campaignName, context,
         saveDc,
         dcSuccess: context?.dcSuccess || 'half',
         attackerName: attackerName,
+        // CLA-034: the ray/save row's own conditions (e.g. ['frightened']) ride
+        // the prompt so conditional_advantage passives (Beguiling Twist) can key
+        // on the condition the save is actually rolled against.
+        saveConditions: resolvePromptSaveConditions(context),
         // CLA-324: monster-card save-based attacks are spell-like save attacks (eye rays,
         // magical rays) — flag spell-origin so against_spell gates can discriminate.
         isSpellDamage: true,

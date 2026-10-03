@@ -85,8 +85,18 @@ function resolveTargetSaveBonus(current, characters, campaignName) {
   };
 }
 
-function modifierListGrantsAdvantage(current, saveModifiers, activeConditions, campaignName) {
-  const conditionSet = new Set(activeConditions);
+// CLA-034: conditional_advantage passives with condition:"charmed"/"frightened"
+// (Beguiling Twist, Brave, Fey Ancestry) mean "advantage on saves AGAINST that
+// condition" — key on the condition this save is rolled against (prompt
+// condition/saveConditions), never on the target merely having the condition
+// active (which over-granted on unrelated saves and missed fresh saves).
+function saveConditionsOfPrompt(current) {
+  if (current.condition) return [current.condition];
+  return current.saveConditions || [];
+}
+
+function modifierListGrantsAdvantage(current, saveModifiers, campaignName) {
+  const saveConditions = saveConditionsOfPrompt(current);
   for (const mod of saveModifiers) {
     if (mod.target !== 'saving_throw' || mod.effect !== 'advantage') continue;
     if (mod.condition === 'against_spell') {
@@ -98,7 +108,7 @@ function modifierListGrantsAdvantage(current, saveModifiers, activeConditions, c
         (lastAttackOrigin.rollType === 'spell-save' && (!current.attackerName || lastAttackOrigin.attackerName === current.attackerName));
       if (spellOrigin) return true;
     }
-    if (mod.condition && conditionSet.has(mod.condition)) return true;
+    if (mod.condition && saveConditions.includes(mod.condition)) return true;
     if (mod.saveType && current.condition && mod.condition === current.condition) return true;
   }
   return false;
@@ -116,10 +126,10 @@ function isBeaconOfHopeAdvantage(current, characters) {
   return !!targetCharForBeacon?.targetEffects?.some(te => te.effect === 'beacon_of_hope') && (current.saveType || '').toUpperCase() === 'WIS';
 }
 
-function computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, activeConditions, characters }) {
+function computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, characters }) {
   if (current.advantage) return true;
   if (hasDisadvantage) return false;
-  if (saveModifiers && saveModifiers.length > 0 && modifierListGrantsAdvantage(current, saveModifiers, activeConditions, campaignName)) return true;
+  if (saveModifiers && saveModifiers.length > 0 && modifierListGrantsAdvantage(current, saveModifiers, campaignName)) return true;
   // Dodge: advantage on Dexterity saving throws only
   if (isDodgeDexAdvantage(current, campaignName)) return true;
   // CLA-394 Zealous Presence: blanket advantage on saving throws (buff effect
@@ -269,7 +279,7 @@ function auraBonusString(aura) {
 // Full save-roll resolution: evasion, advantage/disadvantage, dice, and all
 // bonus contributions (aura, cosmic omen, bane, bless, warding bond).
 async function computeSaveRollOutcome({ current, characters, campaignName, activeMapName, hasSelectedEvasion, forceRollTo20 }) {
-  const { saveBonus, saveModifiers, activeConditions } = resolveTargetSaveBonus(current, characters, campaignName);
+  const { saveBonus, saveModifiers } = resolveTargetSaveBonus(current, characters, campaignName);
 
   const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
   const auraBonus = aura.bonus;
@@ -278,7 +288,7 @@ async function computeSaveRollOutcome({ current, characters, campaignName, activ
   const hasEvasion = computeHasEvasion(current, campaignName, hasOwnEvasion, isIncapacitated, hasSelectedEvasion);
 
   const hasDisadvantage = getSaveDisadvantage(current, campaignName);
-  const hasAdvantage = computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, activeConditions, characters });
+  const hasAdvantage = computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModifiers, characters });
 
   const { roll1, roll2, finalRoll } = rollSaveDice(forceRollTo20, hasAdvantage, hasDisadvantage);
   const { bonus: cosmicOmenAppliedBonus, detail: cosmicOmenDetail } = consumeCosmicOmen(campaignName);
