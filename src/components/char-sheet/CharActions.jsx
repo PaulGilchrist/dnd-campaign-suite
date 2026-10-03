@@ -127,6 +127,7 @@ function PendingActionModalsHost({
                     replaceOptions={tacticalMasterModal.replaceOptions}
                     targetName={tacticalMasterModal.targetName}
                     isChoiceMode={tacticalMasterModal.isChoiceMode}
+                    featureName={tacticalMasterModal.featureName}
                     playerStats={playerStats}
                     campaignName={campaignName}
                     onConfirm={async (chosenMastery) => { await handleTacticalMasterConfirm(chosenMastery); await resumeAttackPipeline(); }}

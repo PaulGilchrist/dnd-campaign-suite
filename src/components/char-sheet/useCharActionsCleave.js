@@ -148,14 +148,19 @@ export default function useCharActionsCleave({
         const oldMastery = pending.baseMastery;
         const attackName = pending.attackName;
         const targetName = pending.targetName;
+        const featureName = pending.featureName || 'Tactical Master';
+        const isReplaceMode = featureName === 'Tactical Master';
         setTacticalMasterModal(null);
         if (!chosenMastery) return;
         if (targetName) {
+            const description = isReplaceMode
+                ? `${playerStats.name} used Tactical Master on ${attackName} against ${targetName} — changed mastery from ${oldMastery} to ${chosenMastery}`
+                : `${playerStats.name} used ${featureName} on ${attackName} against ${targetName} — applied ${chosenMastery} mastery in addition to ${oldMastery || "the weapon's mastery"}`;
             await addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,
-                abilityName: 'Tactical Master',
-                description: `${playerStats.name} used Tactical Master on ${attackName} against ${targetName} — changed mastery from ${oldMastery} to ${chosenMastery}`,
+                abilityName: featureName,
+                description,
                 targetName: targetName,
             }).catch((e) => { console.error("[useCharActionsCleave:log-error]", e); });
         }

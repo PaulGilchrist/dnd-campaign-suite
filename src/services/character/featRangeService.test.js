@@ -5,7 +5,8 @@
 // @cleaned-by-ai
 // @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest'
-import { computeFeatRangeEffects } from './featRangeService.js'
+import { computeFeatRangeEffects, matchesExtraReachCondition, resolveMeleeReachBonus } from './featRangeService.js'
+import { computeRangeEffect } from '../rules/combat/rangeValidation.js'
 import * as dataLoader from '../ui/dataLoader.js'
 
 vi.mock('../ui/dataLoader.js', () => ({
@@ -19,6 +20,7 @@ describe('computeFeatRangeEffects', () => {
     spellRangeBonus: 0,
     rangeMultiplier: 1,
     meleeReachBonus: 0,
+    meleeReachGrants: [],
     cantripRangeBonus: 0,
   }
 
@@ -189,6 +191,86 @@ describe('computeFeatRangeEffects', () => {
     })
     expect(result.ignoresMeleeDisadvantage).toBe(true)
     expect(result.meleeReachBonus).toBe(5)
+  })
+
+  // --- CLA-029: condition-gated extra reach (Battering Roots) ---
+
+  it('routes conditional extra_reach into meleeReachGrants, not the ungated bonus', async () => {
+    const result = await computeFeatRangeEffects([], '2024', {
+      automation: { passives: [
+        { name: 'Battering Roots', effect: 'extra_reach', bonusExpression: '10', condition: 'heavy_or_versatile_melee_weapon' },
+      ]},
+    })
+    expect(result.meleeReachBonus).toBe(0)
+    expect(result.meleeReachGrants).toEqual([{ bonus: 10, condition: 'heavy_or_versatile_melee_weapon', source: 'Battering Roots' }])
+  })
+
+  it('keeps unconditional extra_reach in meleeReachBonus alongside conditional grants', async () => {
+    const result = await computeFeatRangeEffects([], '2024', {
+      automation: { passives: [
+        { effect: 'extra_reach', bonusExpression: '5' },
+        { name: 'Battering Roots', effect: 'extra_reach', bonusExpression: '10', condition: 'heavy_or_versatile_melee_weapon' },
+      ]},
+    })
+    expect(result.meleeReachBonus).toBe(5)
+    expect(result.meleeReachGrants.length).toBe(1)
+  })
+
+  describe('matchesExtraReachCondition', () => {
+    it('matches Heavy or Versatile melee weapons', () => {
+      expect(matchesExtraReachCondition('heavy_or_versatile_melee_weapon', { properties: ['Versatile'] })).toBe(true)
+      expect(matchesExtraReachCondition('heavy_or_versatile_melee_weapon', { properties: ['Heavy', 'Two-Handed'] })).toBe(true)
+    })
+    it('rejects weapons without Heavy or Versatile', () => {
+      expect(matchesExtraReachCondition('heavy_or_versatile_melee_weapon', { properties: ['Finesse', 'Light', 'Monk'] })).toBe(false)
+      expect(matchesExtraReachCondition('heavy_or_versatile_melee_weapon', { properties: [] })).toBe(false)
+    })
+    it('is case-insensitive on tokens and properties', () => {
+      expect(matchesExtraReachCondition('HEAVY_OR_VERSATILE_MELEE_WEAPON', { properties: ['versatile'] })).toBe(true)
+    })
+    it('treats unknown condition tokens as no-match (fail closed)', () => {
+      expect(matchesExtraReachCondition('unknown_condition', { properties: ['Heavy'] })).toBe(false)
+    })
+    it('matches when condition is absent', () => {
+      expect(matchesExtraReachCondition(undefined, { properties: [] })).toBe(true)
+    })
+  })
+
+  describe('resolveMeleeReachBonus', () => {
+    const feats = {
+      meleeReachBonus: 0,
+      meleeReachGrants: [{ bonus: 10, condition: 'heavy_or_versatile_melee_weapon', source: 'Battering Roots' }],
+    }
+    it('applies the grant for a Versatile weapon', () => {
+      expect(resolveMeleeReachBonus(feats, { properties: ['Versatile'] }).meleeReachBonus).toBe(10)
+    })
+    it('withholds the grant for a Light/Finesse weapon', () => {
+      expect(resolveMeleeReachBonus(feats, { properties: ['Finesse', 'Light'] }).meleeReachBonus).toBe(0)
+    })
+    it('returns feats untouched when there are no grants', () => {
+      const plain = { meleeReachBonus: 5, meleeReachGrants: [] }
+      expect(resolveMeleeReachBonus(plain, { properties: [] })).toBe(plain)
+    })
+    it('tolerates a feats object without a meleeReachGrants key', () => {
+      const legacy = { meleeReachBonus: 3 }
+      expect(resolveMeleeReachBonus(legacy, { properties: ['Heavy'] })).toBe(legacy)
+    })
+    it('takes the max of the base bonus and a matching grant', () => {
+      const mixed = {
+        meleeReachBonus: 5,
+        meleeReachGrants: [{ bonus: 10, condition: 'heavy_or_versatile_melee_weapon', source: 'Battering Roots' }],
+      }
+      expect(resolveMeleeReachBonus(mixed, { properties: ['Heavy'] }).meleeReachBonus).toBe(10)
+    })
+    it('Battering Roots caps a Versatile Longsword at 18 ft but leaves a Shortsword at 8 ft', () => {
+      const longsword = resolveMeleeReachBonus(feats, { properties: ['Versatile'] })
+      const shortsword = resolveMeleeReachBonus(feats, { properties: ['Finesse', 'Light', 'Monk'] })
+      expect(computeRangeEffect(5, 15, longsword).mode).toBe('normal')
+      expect(computeRangeEffect(5, 18, longsword).mode).toBe('normal')
+      expect(computeRangeEffect(5, 19, longsword).mode).toBe('miss')
+      expect(computeRangeEffect(5, 8, shortsword).mode).toBe('normal')
+      expect(computeRangeEffect(5, 9, shortsword).mode).toBe('miss')
+    })
   })
 
   // --- playerStats edge cases ---

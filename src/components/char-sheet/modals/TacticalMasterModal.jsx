@@ -3,7 +3,8 @@ import { MASTERY_EFFECTS } from '../../../services/automation/handlers/combat/we
 import { loadWeaponMasteries } from '../../../hooks/combat/useActionPopup.js';
 import '../CharSheet.css';
 
-function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetName, playerStats: _playerStats, campaignName: _campaignName, onConfirm, onClose, isChoiceMode }) {
+function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetName, playerStats: _playerStats, campaignName: _campaignName, onConfirm, onClose, isChoiceMode, featureName }) {
+    const featureTitle = featureName || 'Tactical Master';
     const defaultOption = isChoiceMode && replaceOptions?.[0] ? replaceOptions[0] : baseMastery;
     const [selected, setSelected] = useState(defaultOption);
     const [applied, setApplied] = useState(false);
@@ -41,7 +42,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
             <div className="sp-overlay">
                 <div className="sp-modal">
                     <div className="sp-header">
-                        <i className="fa-solid fa-crosshairs"></i> Tactical Master
+                        <i className="fa-solid fa-crosshairs"></i> {featureTitle}
                     </div>
                     <div className="sp-body">
                         Mastery applied successfully.
@@ -58,12 +59,14 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
         <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
-                    <i className="fa-solid fa-crosshairs"></i> Tactical Master — {attackName}
+                    <i className="fa-solid fa-crosshairs"></i> {featureTitle} — {attackName}
                 </div>
                 <div className="sp-body">
                     <p dangerouslySetInnerHTML={{ __html: targetName ? `Choose a mastery property against <b>${targetName}</b>:` : 'Choose a mastery property:' }} />
                     <p style={{ opacity: 0.7, fontSize: '0.85em' }}>
-                        When you attack with a weapon whose mastery property you can use, you can replace that property with the Push, Sap, or Slow property for that attack.
+                        {isChoiceMode
+                            ? 'When you hit with this weapon, you can activate one of these mastery properties in addition to the mastery property you are already using.'
+                            : 'When you attack with a weapon whose mastery property you can use, you can replace that property with the Push, Sap, or Slow property for that attack.'}
                     </p>
                     <div style={{ textAlign: 'left', marginTop: '12px' }}>
                         {allOptions.map((m, i) => {

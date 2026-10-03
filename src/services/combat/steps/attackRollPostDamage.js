@@ -545,11 +545,12 @@ export function buildTacticalMasterStep() {
           replaceOptions: modalOptions,
           targetName,
           isChoiceMode: choiceMasteries.length > 0,
+          featureName: available.featureName || null,
         },
       });
       return {
         data: { _tacticalMasterPending: true },
-        modal: { type: 'tacticalMaster', props: { attackName: lastAttack.attackName, baseMastery: available.baseMastery, replaceOptions: modalOptions, targetName, isChoiceMode: choiceMasteries.length > 0 } },
+        modal: { type: 'tacticalMaster', props: { attackName: lastAttack.attackName, baseMastery: available.baseMastery, replaceOptions: modalOptions, targetName, isChoiceMode: choiceMasteries.length > 0, featureName: available.featureName || null } },
       };
     },
   };

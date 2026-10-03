@@ -10,6 +10,7 @@ import { getLionDisadvantageAgainst } from '../combat/auras/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
 import { isWithinRange } from '../rules/combat/rangeCheck.js';
+import { resolveMeleeReachBonus } from '../character/featRangeService.js';
 import { buildAttackContextSync } from './contextBuilder-sync.js';
 
 export function buildAttackContext({ attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects, opts }) {
@@ -38,7 +39,7 @@ export function buildAttackContext({ attack, playerStats, campaignName, mapName,
 
             const numericRange = rangeToFeet(attack.range) || 0;
             const isRanged = numericRange > 8;
-            const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
+            const feats = resolveMeleeReachBonus(featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 }, attack);
 
             const effectiveRangeBonus = computeIllusionRangeBonus(playerStats, attack, numericRange, feats);
 

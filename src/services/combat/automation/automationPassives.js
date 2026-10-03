@@ -57,6 +57,9 @@ function accumulateExtraMasteries(passive, acc) {
     if (!Array.isArray(passive.extraMastery)) return;
     for (const m of passive.extraMastery) {
         const bucket = CHOICE_MASTERY_NAMES.includes(m) ? acc.choiceMasteries : acc.extraMasteries;
+        if (bucket === acc.choiceMasteries && passive.name) {
+            acc.choiceFeatureName = passive.name;
+        }
         if (!bucket.includes(m)) {
             bucket.push(m);
         }
@@ -84,9 +87,29 @@ function accumulateMasteryPassive(passive, playerStats, baseName, weapon, acc) {
     accumulateExtraMasteries(passive, acc);
     if (Array.isArray(passive.replaceMastery) && passive.replaceMastery.length > 0) {
         acc.replaceMastery = passive.replaceMastery;
+        acc.replaceFeatureName = passive.name || acc.replaceFeatureName;
     }
     accumulateMasteryChoice(passive, playerStats, acc);
     accumulateKindMastery(passive, playerStats, baseName, weapon, acc);
+}
+
+// Decide which mastery list the chooser modal should offer, which feature
+// granted it, and whether baseMastery survives the kind-gate fallthrough.
+function resolveMasteryOptions(acc, baseMastery) {
+    if (acc.replaceMastery) {
+        if (baseMastery) {
+            // Tactical Master: only offer replacement when weapon has a usable mastery
+            return { replaceMasteryOptions: acc.replaceMastery, featureName: acc.replaceFeatureName, baseMastery };
+        }
+        return { replaceMasteryOptions: null, featureName: null, baseMastery };
+    }
+    if (acc.choiceMasteries.length > 0) {
+        return { replaceMasteryOptions: acc.choiceMasteries, featureName: acc.choiceFeatureName, baseMastery };
+    }
+    if (!acc.hasKindMasteryMatch) {
+        return { replaceMasteryOptions: null, featureName: null, baseMastery: null };
+    }
+    return { replaceMasteryOptions: null, featureName: null, baseMastery };
 }
 
 export function collectWeaponMastery(weaponName, playerStats) {
@@ -94,7 +117,7 @@ export function collectWeaponMastery(weaponName, playerStats) {
     const weapon = playerStats.equipment?.find(item => item.name === baseName);
     let baseMastery = weapon?.mastery || null;
 
-    const acc = { extraMasteries: [], replaceMastery: null, choiceMasteries: [], hasKindMasteryMatch: false };
+    const acc = { extraMasteries: [], replaceMastery: null, choiceMasteries: [], hasKindMasteryMatch: false, replaceFeatureName: null, choiceFeatureName: null };
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
         accumulateMasteryPassive(passive, playerStats, baseName, weapon, acc);
@@ -110,23 +133,14 @@ export function collectWeaponMastery(weaponName, playerStats) {
         baseMastery = null;
     }
 
-    let replaceMasteryOptions = null;
-    if (acc.replaceMastery) {
-        if (baseMastery) {
-            // Tactical Master: only offer replacement when weapon has a usable mastery
-            replaceMasteryOptions = acc.replaceMastery;
-        }
-    } else if (acc.choiceMasteries.length > 0) {
-        replaceMasteryOptions = acc.choiceMasteries;
-    } else if (!acc.hasKindMasteryMatch) {
-        baseMastery = null;
-    }
+    const { replaceMasteryOptions, featureName, baseMastery: finalBaseMastery } = resolveMasteryOptions(acc, baseMastery);
 
     return {
-        baseMastery,
+        baseMastery: finalBaseMastery,
         extraMasteries: [...new Set(acc.extraMasteries)],
         replaceMasteryOptions: replaceMasteryOptions || null,
         choiceMasteries: acc.choiceMasteries.length > 0 ? acc.choiceMasteries : null,
+        featureName: featureName || null,
     };
 }
 

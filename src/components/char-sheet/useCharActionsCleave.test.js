@@ -183,6 +183,36 @@ describe('useCharActionsCleave', () => {
             });
         });
 
+        it('logs the granting feature and additive wording for choice-mode (Battering Roots)', async () => {
+            const testDeps = createDeps();
+            const pending = {
+                baseMastery: 'Sap',
+                attackName: 'Longsword',
+                targetName: 'Goblin',
+                isChoiceMode: true,
+                featureName: 'Battering Roots',
+            };
+            const lastAttack = { targetName: 'Goblin' };
+            testDeps.getRuntimeValue
+                .mockReturnValueOnce(pending)
+                .mockReturnValueOnce(lastAttack);
+            const applyMasteryEffect = vi.fn();
+            const { handleTacticalMasterConfirm } = useCharActionsCleave({
+                ...testDeps,
+                applyMasteryEffect,
+            });
+            await handleTacticalMasterConfirm('Push');
+
+            expect(testDeps.addEntry).toHaveBeenCalledWith('test-campaign', {
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Battering Roots',
+                description: 'TestFighter used Battering Roots on Longsword against Goblin — applied Push mastery in addition to Sap',
+                targetName: 'Goblin',
+            });
+            expect(applyMasteryEffect).toHaveBeenCalledWith('Push', testDeps.playerStats, 'test-campaign', 'Goblin');
+        });
+
         it('returns early without applying mastery when lastAttack has no targetName', async () => {
             const testDeps = createDeps();
             const pending = { baseMastery: 'Piercing', attackName: 'Longsword', targetName: 'Goblin' };

@@ -358,5 +358,33 @@ describe('buildAttackRollDamageSteps - tacticalMaster', () => {
       });
       expect(result.data._tacticalMasterPending).toBe(true);
     });
+
+    it('threads the granting featureName through choice-mode modal props (Battering Roots)', async () => {
+      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
+        if (propertyName === 'lastAttack') return { hit: true, targetName: 'Goblin', attackName: 'Longsword' };
+        return null;
+      });
+      collectWeaponMastery.mockReturnValue({
+        baseMastery: 'Sap',
+        replaceMasteryOptions: ['Push', 'Topple'],
+        choiceMasteries: ['Push', 'Topple'],
+        featureName: 'Battering Roots',
+      });
+
+      const setModalState = vi.fn();
+      const ctx = makeCtx({
+        attack: { name: 'Longsword' },
+        playerStats: { automation: { actions: [] } },
+        setModalState: setModalState,
+      });
+      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
+      const result = await steps[tacticalIdx].handler(ctx);
+
+      expect(result.modal.props.featureName).toBe('Battering Roots');
+      expect(result.modal.props.isChoiceMode).toBe(true);
+      expect(setModalState).toHaveBeenCalledWith(expect.objectContaining({
+        tacticalMasterPending: expect.objectContaining({ featureName: 'Battering Roots' }),
+      }));
+    });
   });
 });
