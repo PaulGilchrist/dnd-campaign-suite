@@ -74,6 +74,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, 'actionSurgeUsedThisRound', null, campaignName)
     // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Warding_Flare_usedRound', null, campaignName)
+    // CLA-041: Branches of the Tree reaction round latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_Branches_of_the_Tree_usedRound', null, campaignName)
     // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_War_Magic_usedRound', null, campaignName)
     // FT-099: War Caster Reactive Spell once-per-round reaction latch re-arms at round wrap.

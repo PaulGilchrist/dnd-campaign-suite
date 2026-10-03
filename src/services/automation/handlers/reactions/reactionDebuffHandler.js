@@ -8,7 +8,7 @@ import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
-import { getActiveCreatureName, getCombatSummary, loadCombatSummary } from '../../../encounters/combatData.js';
+import { getActiveCreatureName, getCombatSummary, getCurrentCombatRound, loadCombatSummary } from '../../../encounters/combatData.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { createSaveListener } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -169,37 +169,134 @@ async function gateBranchesInRange({ featureName, auto, playerName, activeCreatu
     };
 }
 
-async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName) {
+// CLA-041: trigger "creature_starts_turn_within_30ft_while_raging" — the
+// Reaction is inert unless Rage is active. Same verified check as
+// createEffectAdderHandlers.js:47 / combatStanceHandler.js:235.
+function isPlayerRaging(playerName) {
+    const storedBuffs = getRuntimeValue(playerName, 'activeBuffs') || [];
+    return Array.isArray(storedBuffs) && storedBuffs.some(b => b && b.name === 'Rage');
+}
+
+// CLA-041: refusals log automation + branches_of_the_tree_refused + reason
+// token, zero spend, zero prompt (CLA-383 handleWardingFlare refuse shape).
+function branchesRefuse({ campaignName, playerName, featureName, action, auto, description, reason }) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: 'branches_of_the_tree_refused',
+        name: featureName,
+        description,
+        reason,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
+    return refused(infoPopup(action.name, description, auto));
+}
+
+// CLA-041 defect 1: the failed save must ACTUALLY teleport the target. There
+// is no grid token-movement consumer app-wide (§70 playbook) — the verified
+// model is CLA-384 warping_implosion_teleport / CLA-320 psychic teleport:
+// register a teleport marker te (value = RAW teleportRange 5 ft) alongside
+// speed_reduction in ONE merged write (§38) + record advisory log.
+async function applyBranchesFailedSave({ campaignName, playerName, activeCreatureName, featureName, saveDc, teleportRangeFt }) {
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const effects = Array.isArray(storedEffects) ? [...storedEffects] : [];
+    effects.push({
+        effect: 'branches_of_the_tree_teleport',
+        target: activeCreatureName,
+        source: featureName,
+        value: teleportRangeFt,
+        duration: 'instant',
+    });
+    effects.push({
+        effect: 'speed_reduction',
+        target: activeCreatureName,
+        source: featureName,
+        value: 1000,
+    });
+    await setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+
+    addExpiration({ attackerName: playerName, targetName: activeCreatureName, effects: [
+        { type: 'remove_target_effect', effectKey: 'speed_reduction', source: featureName, target: activeCreatureName }
+    ], campaignName, rounds: 1 });
+
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: 'branches_of_the_tree_teleported',
+        name: featureName,
+        targetName: activeCreatureName,
+        description: `${activeCreatureName} is teleported to an unoccupied space you can see within ${teleportRangeFt} feet of ${playerName} (or the nearest unoccupied space visible) — token position GM-enforced gridless (no token-movement consumer).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
+
+    addEntry(campaignName, {
+        type: 'save_result',
+        characterName: playerName,
+        targetName: activeCreatureName,
+        saveDc,
+        saveType: 'STR',
+        success: false,
+        description: `${activeCreatureName} failed STR save. ${activeCreatureName} is teleported and speed reduced to 0 until end of current turn.`,
+    }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
+}
+
+async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName, combatSummary) {
     const auto = action.automation;
     const featureName = action.name || 'Branches of the Tree';
     const playerName = playerStats.name;
+    const refuse = (description, reason) => branchesRefuse({ campaignName, playerName, featureName, action, auto, description, reason });
+
+    if (!isPlayerRaging(playerName)) {
+        return refuse(`${featureName} refused — Rage is not active. This Reaction triggers only while your Rage is active.`, 'not_raging');
+    }
 
     await loadCombatSummary(campaignName);
-    const activeCreatureName = getActiveCreatureName(campaignName);
+    // CLA-041 defect 2: campaign-root activeCreatureName is the truth — the
+    // cached cs mirror lags (useCharActionsAttackHandlers.js:119 seam;
+    // bug CLA-044 family: Next writes only top-level activeCreatureName).
+    const activeCreatureName = getRuntimeValue('campaign', 'activeCreatureName') || getActiveCreatureName(campaignName);
     if (!activeCreatureName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `No active creature found. ${featureName} triggers when a creature starts its turn within 30 feet.`,
-                automation: auto,
-            },
-        };
+        return refuse(`No active creature found. ${featureName} triggers when a creature starts its turn within 30 feet.`, 'no_active_creature');
+    }
+
+    // CLA-041 defect 5: once-per-round Reaction latch (_Warding_Flare_usedRound,
+    // CLA-383 shape); re-armed at round wrap via PLAYER_ROUND_LATCH_KEYS
+    // (navigationHandlers.js) + Initiative.jsx clear.
+    const latchKey = '_' + featureName.replace(/\s+/g, '_') + '_usedRound';
+    const currentRound = combatSummary?.round ?? getCurrentCombatRound(campaignName);
+    if (getRuntimeValue(playerName, latchKey) === currentRound) {
+        return refuse(`${featureName} has already been used this round — a Reaction can only be taken once per round. It re-arms when the next round begins.`, 'reaction_spent');
     }
 
     const outOfRange = await gateBranchesInRange({ featureName, auto, playerName, activeCreatureName, campaignName, _mapName });
-    if (outOfRange) return outOfRange;
+    if (outOfRange) {
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            automationType: 'branches_of_the_tree_refused',
+            name: featureName,
+            description: `${outOfRange.payload.description} — ${featureName} requires the creature starting its turn to be within 30 feet. Nothing spent.`,
+            reason: 'out_of_range',
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
+        return refused(outOfRange);
+    }
 
     const strMod = getAbilityModifier(playerStats.abilities, 'STR');
     const prof = playerStats.proficiency || 0;
     const saveDc = 8 + strMod + prof;
+    const teleportRangeFt = rangeToFeet(auto.teleportRange || '5 ft') || 5;
 
     const { promptId } = createSaveListener(campaignName, {
         targetName: activeCreatureName,
         saveType: 'STR',
         saveDc,
+        attackerName: playerName,
     });
+
+    // Reaction is spent when the save prompt is committed — stamp the latch
+    // awaited BEFORE consumers re-read (§39).
+    await setRuntimeValue(playerName, latchKey, currentRound, campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -212,32 +309,8 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
 
-        const isSuccessful = event.detail.success;
-
-        if (!isSuccessful) {
-            const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-            const effects = Array.isArray(storedEffects) ? [...storedEffects] : [];
-            effects.push({
-                effect: 'speed_reduction',
-                target: activeCreatureName,
-                source: featureName,
-                value: 1000,
-            });
-            await setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
-
-            addExpiration({ attackerName: playerName, targetName: activeCreatureName, effects: [
-                { type: 'remove_target_effect', effectKey: 'speed_reduction', source: featureName, target: activeCreatureName }
-            ], campaignName, rounds: 1 });
-
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerName,
-                targetName: activeCreatureName,
-                saveDc,
-                saveType: 'STR',
-                success: false,
-                description: `${activeCreatureName} failed STR save. ${activeCreatureName} is teleported and speed reduced to 0 until end of current turn.`,
-            }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
+        if (!event.detail.success) {
+            await applyBranchesFailedSave({ campaignName, playerName, activeCreatureName, featureName, saveDc, teleportRangeFt });
         } else {
             addEntry(campaignName, {
                 type: 'save_result',
@@ -255,7 +328,7 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName
 
     window.addEventListener('save-result', handleSaveResult);
 
-    return {
+    return applied({
         type: 'popup',
         payload: {
             type: 'automation_info',
@@ -263,7 +336,7 @@ async function handleTeleportAndSlow(action, playerStats, campaignName, _mapName
             targetName: activeCreatureName,
             description: `${activeCreatureName} must make a STR saving throw (DC ${saveDc}) or be teleported and have speed reduced to 0.`,
         },
-    };
+    });
 }
 
 async function applyImprovedWardingFlare(playerStats, campaignName, defenderName) {
@@ -575,7 +648,10 @@ const EFFECT_ROUTES = {
         tail: (ctx) => logWardingFlareTail({ action: ctx.action, playerStats: ctx.playerStats, playerName: ctx.playerName, featureName: ctx.featureName, campaignName: ctx.campaignName, attackerName: ctx.outcome.attackerName, result: ctx.outcome.response }),
     },
     teleport_and_slow: {
-        run: async (ctx) => applied(await handleTeleportAndSlow(ctx.action, ctx.playerStats, ctx.campaignName, ctx._mapName)),
+        run: async (ctx) => await handleTeleportAndSlow(ctx.action, ctx.playerStats, ctx.campaignName, ctx._mapName, ctx.combatSummary),
+        // CLA-041 defect 6: the handler logs its own ability_use spend row
+        // with promptId — suppress the generic tail to stop duplicate entries.
+        skipUseLogTail: true,
         tail: null,
     },
 };
@@ -617,6 +693,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (route.tail) {
         return route.tail({ action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary, outcome });
     }
+
+    if (route.skipUseLogTail) return outcome.response;
 
     addEntry(campaignName, {
         type: 'ability_use',

@@ -62,6 +62,7 @@ vi.mock('../../common/infoPopup.js', () => ({
 vi.mock('../../../encounters/combatData.js', () => ({
   getActiveCreatureName: vi.fn(),
   getCombatSummary: vi.fn(),
+  getCurrentCombatRound: vi.fn(() => 1),
   loadCombatSummary: vi.fn(),
 }));
 
@@ -119,18 +120,38 @@ function makeTeleportAction(automation = {}) {
       effect: 'teleport_and_slow',
       saveType: 'STR',
       saveDcExpression: '8 + STR modifier + proficiency_bonus',
-      range: '30_ft',
+      range: '30 ft',
+      teleportRange: '5 ft',
       ...automation,
     },
   };
 }
 
+// CLA-041: handler is rage-gated — default store has Rage ACTIVE (mirrors
+// combatStanceHandler writing activeBuffs {name:'Rage'} on rage press).
+function ragingStore(extra = {}) {
+  return (key, subkey) => {
+    if (subkey === 'activeBuffs') return [{ name: 'Rage', effect: 'stance' }];
+    if (Object.prototype.hasOwnProperty.call(extra, `${key}.${subkey}`)) return extra[`${key}.${subkey}`];
+    return null;
+  };
+}
+
+function getSaveHandler() {
+  return addEventListenerSpy.mock.calls.find(call => call[0] === 'save-result')?.[1];
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  useRuntimeState.getRuntimeValue.mockReturnValue(null);
+  useRuntimeState.getRuntimeValue.mockImplementation(ragingStore());
+  useRuntimeState.setRuntimeValue.mockResolvedValue(undefined);
   rangeValidation.rangeToFeet.mockReturnValue(30);
   rangeCheck.isWithinRange.mockResolvedValue(true);
   abilityLookup.getAbilityModifier.mockReturnValue(4);
+  combatData.getActiveCreatureName.mockReturnValue(null);
+  combatData.loadCombatSummary.mockResolvedValue(undefined);
+  combatData.getCombatSummary.mockReturnValue(null);
+  combatData.getCurrentCombatRound.mockReturnValue(1);
   addEventListenerSpy = vi.fn();
   removeEventListenerSpy = vi.fn();
   Object.defineProperty(window, 'addEventListener', { value: addEventListenerSpy, writable: true, configurable: true });
@@ -138,9 +159,113 @@ beforeEach(() => {
 });
 
 describe('branchesOfTheTree (teleport_and_slow)', () => {
+  it('refuses when Rage is not active, logs refusal, opens no save prompt (CLA-041 defect 3)', async () => {
+    useRuntimeState.getRuntimeValue.mockImplementation((key, subkey) => {
+      if (subkey === 'activeBuffs') return [];
+      return null;
+    });
+
+    const action = makeTeleportAction();
+    const result = await handle(action, makeBarbarianStats(), campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toMatch(/refused — Rage is not active/);
+    expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'automation',
+        automationType: 'branches_of_the_tree_refused',
+        characterName: 'Thulgar',
+        reason: 'not_raging',
+      })
+    );
+  });
+
+  it('refusal leg spends nothing — latch stays unstamped (CLA-041)', async () => {
+    useRuntimeState.getRuntimeValue.mockImplementation((key, subkey) => {
+      if (subkey === 'activeBuffs') return [];
+      return null;
+    });
+
+    await handle(makeTeleportAction(), makeBarbarianStats(), campaignName, mapName);
+
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+      'Thulgar',
+      '_Branches_of_the_Tree_usedRound',
+      expect.anything(),
+      campaignName
+    );
+  });
+
+  it('resolves trigger target from campaign-root activeCreatureName, not the stale cs mirror (CLA-041 defect 2)', async () => {
+    combatData.getActiveCreatureName.mockReturnValue('Wild_Sage_Druid');
+    useRuntimeState.getRuntimeValue.mockImplementation(ragingStore({
+      'campaign.activeCreatureName': 'Bandit 1',
+    }));
+
+    await handle(makeTeleportAction(), makeBarbarianStats(), campaignName, mapName);
+
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+      targetName: 'Bandit 1',
+      saveType: 'STR',
+      saveDc: 15,
+      attackerName: 'Thulgar',
+    });
+  });
+
+  it('falls back to cached cs mirror when campaign-root truth is absent', async () => {
+    combatData.getActiveCreatureName.mockReturnValue('Goblin');
+
+    const action = makeTeleportAction();
+    const result = await handle(action, makeBarbarianStats(), campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+      targetName: 'Goblin',
+      saveType: 'STR',
+      saveDc: 15,
+      attackerName: 'Thulgar',
+    });
+  });
+
+  it('refuses a second press in the same round via reaction latch (CLA-041 defect 5)', async () => {
+    combatData.getActiveCreatureName.mockReturnValue('Bandit 1');
+    useRuntimeState.getRuntimeValue.mockImplementation(ragingStore({
+      'Thulgar._Branches_of_the_Tree_usedRound': 1,
+    }));
+
+    const result = await handle(makeTeleportAction(), makeBarbarianStats(), campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toMatch(/already been used this round/);
+    expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'automation',
+        automationType: 'branches_of_the_tree_refused',
+        reason: 'reaction_spent',
+      })
+    );
+  });
+
+  it('stamps the once-per-round latch when the reaction is accepted (CLA-041 defect 5)', async () => {
+    combatData.getActiveCreatureName.mockReturnValue('Bandit 1');
+
+    await handle(makeTeleportAction(), makeBarbarianStats(), campaignName, mapName);
+
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Thulgar',
+      '_Branches_of_the_Tree_usedRound',
+      1,
+      campaignName
+    );
+  });
+
   it('returns popup when no active creature', async () => {
-    useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'test-campaign' && prop === 'activeCreatureName') return null;
+    useRuntimeState.getRuntimeValue.mockImplementation((key, subkey) => {
+      if (subkey === 'activeBuffs') return [{ name: 'Rage' }];
       return null;
     });
 
@@ -155,10 +280,12 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
   it('returns popup when out of range (map active, both on map)', async () => {
     combatData.getActiveCreatureName.mockReturnValue('Goblin');
     useRuntimeState.getRuntimeValue.mockImplementation((key, subkey) => {
+      if (subkey === 'activeBuffs') return [{ name: 'Rage' }];
       if (key === '__map__' && subkey === 'activeMapName') return 'test-map';
       return null;
     });
     const mockCombatSummary = {
+      round: 1,
       players: [{ name: 'Thulgar', gridX: 1, gridY: 1 }],
       creatures: [{ name: 'Goblin', gridX: 10, gridY: 10 }],
     };
@@ -173,6 +300,14 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
     expect(result.payload.description).toContain('out of range');
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'automation',
+        automationType: 'branches_of_the_tree_refused',
+        reason: 'out_of_range',
+      })
+    );
   });
 
   it('proceeds when no map active (assumes in range)', async () => {
@@ -188,16 +323,19 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
       targetName: 'Goblin',
       saveType: 'STR',
       saveDc: 15,
+      attackerName: 'Thulgar',
     });
   });
 
   it('proceeds when one creature not on map (assumes in range)', async () => {
     combatData.getActiveCreatureName.mockReturnValue('Goblin');
     useRuntimeState.getRuntimeValue.mockImplementation((key, subkey) => {
+      if (subkey === 'activeBuffs') return [{ name: 'Rage' }];
       if (key === '__map__' && subkey === 'activeMapName') return 'test-map';
       return null;
     });
     const mockCombatSummary = {
+      round: 1,
       players: [{ name: 'Thulgar', gridX: 5, gridY: 5 }],
       creatures: [{ name: 'Goblin' }], // no grid position
     };
@@ -221,25 +359,21 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
       targetName: 'Orc',
       saveType: 'STR',
       saveDc: 15, // 8 + 4 + 3
+      attackerName: 'Thulgar',
     });
   });
 
-  it('logs ability_use on trigger', async () => {
+  it('logs exactly ONE ability_use per press (CLA-041 defect 6 duplicate tail)', async () => {
     combatData.getActiveCreatureName.mockReturnValue('Goblin');
-    useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
     const action = makeTeleportAction();
     await handle(action, makeBarbarianStats(), campaignName, mapName);
 
-    expect(logService.addEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'Thulgar',
-        abilityName: 'Branches of the Tree',
-        description: expect.stringContaining('Goblin must make STR save'),
-      })
+    const abilityUseCalls = logService.addEntry.mock.calls.filter(
+      call => call[1]?.type === 'ability_use' && call[1]?.abilityName === 'Branches of the Tree'
     );
+    expect(abilityUseCalls).toHaveLength(1);
+    expect(abilityUseCalls[0][1].description).toContain('Goblin must make STR save');
   });
 
   it('on fail: adds speed_reduction targetEffect', async () => {
@@ -249,9 +383,7 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
     await handle(action, makeBarbarianStats(), campaignName, mapName);
 
     // Simulate save failure event
-    const saveHandler = addEventListenerSpy.mock.calls.find(
-      call => call[0] === 'save-result'
-    )?.[1];
+    const saveHandler = getSaveHandler();
     expect(saveHandler).toBeDefined();
 
     await saveHandler({
@@ -259,8 +391,8 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
     }).catch(() => {});
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
+      'campaign',
+      'targetEffects',
       expect.arrayContaining([
         expect.objectContaining({
           effect: 'speed_reduction',
@@ -273,19 +405,51 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
     );
   });
 
+  it('on fail: teleports — stamps branches_of_the_tree_teleport marker te in the SAME merged write (CLA-384 marker model)', async () => {
+    combatData.getActiveCreatureName.mockReturnValue('Bandit 1');
+    rangeValidation.rangeToFeet.mockImplementation(r => (String(r).includes('5') ? 5 : 30));
+
+    const action = makeTeleportAction();
+    await handle(action, makeBarbarianStats(), campaignName, mapName);
+
+    await getSaveHandler()({ detail: { promptId: 'test-prompt-id', success: false } });
+
+    const teWrite = useRuntimeState.setRuntimeValue.mock.calls.find(
+      call => call[0] === 'campaign' && call[1] === 'targetEffects'
+    );
+    expect(teWrite).toBeDefined();
+    expect(teWrite[2]).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        effect: 'branches_of_the_tree_teleport',
+        target: 'Bandit 1',
+        source: 'Branches of the Tree',
+        value: 5,
+      }),
+      expect.objectContaining({
+        effect: 'speed_reduction',
+        target: 'Bandit 1',
+      }),
+    ]));
+    expect(teWrite[2].filter(te => te.effect === 'branches_of_the_tree_teleport')).toHaveLength(1);
+
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'automation',
+        automationType: 'branches_of_the_tree_teleported',
+        targetName: 'Bandit 1',
+        description: expect.stringContaining('within 5 feet of Thulgar'),
+      })
+    );
+  });
+
   it('on fail: adds expiration to remove speed_reduction', async () => {
     combatData.getActiveCreatureName.mockReturnValue('Orc');
 
     const action = makeTeleportAction();
     await handle(action, makeBarbarianStats(), campaignName, mapName);
 
-    const saveHandler = addEventListenerSpy.mock.calls.find(
-      call => call[0] === 'save-result'
-    )?.[1];
-
-    await saveHandler({
-      detail: { promptId: 'test-prompt-id', success: false },
-    }).catch(() => {});
+    await getSaveHandler()({ detail: { promptId: 'test-prompt-id', success: false } });
 
     expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Thulgar', targetName: 'Orc', effects: [
         {
@@ -303,18 +467,13 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
     const action = makeTeleportAction();
     await handle(action, makeBarbarianStats(), campaignName, mapName);
 
-    const saveHandler = addEventListenerSpy.mock.calls.find(
-      call => call[0] === 'save-result'
-    )?.[1];
-
-    await saveHandler({
-      detail: { promptId: 'test-prompt-id', success: false },
-    }).catch(() => {});
+    await getSaveHandler()({ detail: { promptId: 'test-prompt-id', success: false } });
 
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({
         type: 'save_result',
+        characterName: 'Thulgar',
         targetName: 'Goblin',
         saveType: 'STR',
         saveDc: 15,
@@ -325,19 +484,12 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
   });
 
   it('on success: logs save_result with success, no effects', async () => {
-    vi.clearAllMocks();
     combatData.getActiveCreatureName.mockReturnValue('Orc');
 
     const action = makeTeleportAction();
     await handle(action, makeBarbarianStats(), campaignName, mapName);
 
-    const saveHandler = addEventListenerSpy.mock.calls.find(
-      call => call[0] === 'save-result'
-    )?.[1];
-
-    await saveHandler({
-      detail: { promptId: 'test-prompt-id', success: true },
-    }).catch(() => {});
+    await getSaveHandler()({ detail: { promptId: 'test-prompt-id', success: true } });
 
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
@@ -352,7 +504,7 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
     );
 
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-      campaignName,
+      'campaign',
       'targetEffects',
       expect.any(Array),
       campaignName
@@ -365,14 +517,8 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
     const action = makeTeleportAction();
     await handle(action, makeBarbarianStats(), campaignName, mapName);
 
-    const saveHandler = addEventListenerSpy.mock.calls.find(
-      call => call[0] === 'save-result'
-    )?.[1];
+    await getSaveHandler()({ detail: { promptId: 'test-prompt-id', success: false } });
 
-    await saveHandler({
-      detail: { promptId: 'test-prompt-id', success: false },
-    }).catch(() => {});
-
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', saveHandler);
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
   });
 });

@@ -1298,6 +1298,22 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // CLA-041: Branches of the Tree (Path of the World Tree lv6, 2024
+    // Barbarian) save-fail teleport marker. There is NO grid token-movement
+    // consumer app-wide (§70; CLA-320 psychic teleport / CLA-384 warping
+    // implosion accepted marker model) — the te records that the target was
+    // teleported to a space within 5 feet of the barbarian (GM-enforced
+    // position gridless); the value carries the RAW teleport range.
+    effect: 'branches_of_the_tree_teleport',
+    label: 'Tree-Branch Teleport',
+    description: 'The creature was teleported by Branches of the Tree to an unoccupied space within 5 feet of the barbarian (marker — token position is GM-enforced gridless; no token-movement consumer in this engine).',
+    icon: 'fa-tree',
+    cls: 'effect-neutral',
+    group: 'Movement',
+    fields: ['source', 'value'],
+    defaults: { value: 5 },
+  },
+  {
     // MA-1012: Ice Devil "Ice Spear" hit-clause composite rider ("Until the
     // end of its next turn, the target can't take a Bonus Action or Reaction,
     // its Speed decreases by 10 feet, and it can move or take one action on
