@@ -37,6 +37,38 @@ async function consumeProtectionFromPoisonSlot(pending, playerStats, campaignNam
   }
 }
 
+async function consumeBarkskinSlot(pending, playerStats, campaignName) {
+  // SP-013: consume the spell slot via prepareSpellCast, mirroring SP-085/SP-095 —
+  // the custom confirm previously bypassed it, so no lv2 slot was ever spent.
+  // Concentration is data-driven: 2024 barkskin is concentration:false (no
+  // concentration registered); the 5e twin (concentration:true) still registers.
+  const isCantrip = (pending.spell?.level === 0)
+  if (isCantrip || !pending.spell) return
+  const upcastLevel = pending.spell.upcastLevel
+  const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
+  // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
+  const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
+  const slotResult = await prepareSpellCast(pending.spell, {}, {
+    playerName: playerStats.name,
+    playerStats,
+    campaignName,
+    isUpcast,
+    upcastLevel,
+    freeCastAuthorized,
+  })
+  if (slotResult && slotResult.slotConsumed) {
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: playerStats.name,
+      abilityName: pending.spellName,
+      spellName: pending.spellName,
+      description: `${pending.spellName}: Expended a level ${(slotResult.modifiedSpell && slotResult.modifiedSpell.level) || pending.spellLevel || 0} spell slot.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error("[useCustomHandlers:log-error]", e); })
+  }
+}
+
 async function consumePassWithoutTraceSlot(pending, playerStats, campaignName) {
   // SP-085: consume the spell slot + register concentration via prepareSpellCast,
   // mirroring createConfirmHandler (useConfirmableFlow.js) — the custom confirm
@@ -77,14 +109,17 @@ export function useCustomHandlers({ playerStats, campaignName, cfClearPending, g
       timestamp: Date.now(),
     }).catch((e) => { console.error("[useCustomHandlers:log-error]", e); })
 
-    const popup = await applyBarkskinEffect(
-      { name: pending.spellName, spell: pending.spell, automation: { type: 'barkskin', range: pending.range } },
+    // SP-013: applyBarkskinEffect destructures a SINGLE object — the previous
+    // positional call left targetNames undefined so every cast returned null.
+    await consumeBarkskinSlot(pending, playerStats, campaignName)
+
+    const popup = await applyBarkskinEffect({
+      action: { name: pending.spellName, spell: pending.spell, automation: { type: 'barkskin', range: pending.range } },
       playerStats,
       campaignName,
-      null,
-      result,
-      characters
-    )
+      targetNames: result,
+      characters,
+    })
 
     if (popup && setPopupHtml) {
       setPopupHtml(popup.payload)

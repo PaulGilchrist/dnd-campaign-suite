@@ -11,6 +11,20 @@ function getBarkskinDuration(spell) {
     return spell.duration || 'Up to 1 hour';
 }
 
+// CLA-235 rounds-omission family: hours×600 / minutes×10 / rounds:N clock
+// (mirrors parseWebDurationRounds encoding). '1 hour' → 600; unparseable
+// durations stay Infinity (undefined rounds).
+function parseBarkskinDurationRounds(duration) {
+    const lower = String(duration || '').toLowerCase();
+    const hourMatch = lower.match(/(\d+)\s*_?\s*hour/);
+    if (hourMatch) return parseInt(hourMatch[1], 10) * 600;
+    const minuteMatch = lower.match(/(\d+)\s*_?\s*minute/);
+    if (minuteMatch) return parseInt(minuteMatch[1], 10) * 10;
+    const roundMatch = lower.match(/(\d+)\s*_?round/);
+    if (roundMatch) return parseInt(roundMatch[1], 10);
+    return undefined;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const spell = action.spell || {};
 
@@ -43,7 +57,7 @@ function getActiveBuffList(targetName, campaignName) {
     return Array.isArray(activeBuffs) ? activeBuffs : [];
 }
 
-function processBarkskinTarget({ targetName, targetCharacter, casterName, duration, campaignName, skippedTargets }) {
+function processBarkskinTarget({ targetName, targetCharacter, casterName, duration, rounds, campaignName, skippedTargets }) {
     const targetAc = targetCharacter?.computedStats?.armorClass ?? targetCharacter?.armorClass ?? 10;
 
     if (targetAc >= 17) {
@@ -65,7 +79,7 @@ function processBarkskinTarget({ targetName, targetCharacter, casterName, durati
 
     addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_active_buff', buffName: BARKSKIN_BUFF_NAME }
-    ], campaignName });
+    ], campaignName, rounds });
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -77,6 +91,29 @@ function processBarkskinTarget({ targetName, targetCharacter, casterName, durati
     return true;
 }
 
+// SP-013: EB-joined combatants are absent from the PC characters list —
+// resolve their AC from the combat summary so AC>=17 targets skip honestly
+// instead of defaulting to 10 and logging a false "AC becomes 17".
+function buildTargetAcFallbackMap(campaignName) {
+    const csAcMap = {};
+    const creatures = (getCombatSummary(campaignName) || {}).creatures || [];
+    for (const c of creatures) {
+        if (c && c.name != null && typeof c.ac === 'number') csAcMap[c.name] = c.ac;
+    }
+    return csAcMap;
+}
+
+function resolveTargetCharacter(targetName, characters, csAcMap) {
+    const map = {};
+    for (const char of (characters || [])) {
+        map[char.name] = char;
+    }
+    const character = map[targetName];
+    if (character) return character;
+    if (csAcMap[targetName] != null) return { name: targetName, armorClass: csAcMap[targetName] };
+    return undefined;
+}
+
 export async function applyBarkskin({ action, playerStats, campaignName, targetNames, characters }) {
     if (!targetNames || !Array.isArray(targetNames) || targetNames.length === 0) {
         return null;
@@ -84,22 +121,21 @@ export async function applyBarkskin({ action, playerStats, campaignName, targetN
 
     const spell = action.spell || {};
     const duration = getBarkskinDuration(spell);
+    const rounds = parseBarkskinDurationRounds(duration);
     const casterName = playerStats.name;
-
-    const targetCharacterMap = {};
-    for (const char of (characters || [])) {
-        targetCharacterMap[char.name] = char;
-    }
+    const csAcMap = buildTargetAcFallbackMap(campaignName);
 
     let appliedTargets = [];
     let skippedTargets = [];
 
     for (const targetName of targetNames) {
+        const targetCharacter = resolveTargetCharacter(targetName, characters, csAcMap);
         if (processBarkskinTarget({
     targetName,
-    targetCharacter: targetCharacterMap[targetName],
+    targetCharacter,
     casterName,
     duration,
+    rounds,
     campaignName,
     skippedTargets,
 })) {

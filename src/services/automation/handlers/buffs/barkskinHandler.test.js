@@ -180,7 +180,7 @@ describe('barkskinHandler.applyBarkskin', () => {
         expect(result.payload.description).toContain('Ally1');
 
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', expect.arrayContaining([expect.objectContaining({ name: 'Barkskin', effect: 'barkskin', sourceCharacter: 'TestWizard' })]), campaignName);
-        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'Ally1', effects: expect.arrayContaining([expect.objectContaining({ type: 'remove_active_buff', buffName: 'Barkskin' })]), campaignName });
+        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'Ally1', effects: expect.arrayContaining([expect.objectContaining({ type: 'remove_active_buff', buffName: 'Barkskin' })]), campaignName, rounds: 600 });
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, { type: 'ability_use', characterName: 'TestWizard', abilityName: 'Barkskin', description: expect.stringContaining('TestWizard cast Barkskin on Ally1') });
     });
 
@@ -351,6 +351,80 @@ describe('barkskinHandler.applyBarkskin', () => {
         });
         const buffsArg = useRuntimeState.setRuntimeValue.mock.calls[0][2];
         expect(buffsArg.find((b) => b.name === 'Barkskin').duration).toBe('Custom duration');
+    });
+
+    it('SP-013: skips an EB-joined combatant with cs AC >= 17 absent from characters', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValue([]);
+        combatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Knight', type: 'npc', ac: 18 }] });
+        const result = await applyBarkskin({
+            action: makeAction(),
+            playerStats: makePlayerStats(),
+            campaignName: campaignName,
+            targetNames: ['Knight'],
+            characters: [],
+        });
+        expect(result.payload.description).toContain('Barkskin failed on all 1 target(s)');
+        expect(result.payload.description).toContain('Knight (AC 18)');
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
+    });
+
+    it('SP-013: applies to an EB-joined combatant with cs AC 15 absent from characters', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
+        combatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin 1', type: 'npc', ac: 15 }] });
+        const result = await applyBarkskin({
+            action: makeAction(),
+            playerStats: makePlayerStats(),
+            campaignName: campaignName,
+            targetNames: ['Goblin 1'],
+            characters: [],
+        });
+        expect(result.payload.description).toContain('1 target(s) gained Barkskin');
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Goblin 1', 'activeBuffs', expect.arrayContaining([expect.objectContaining({ name: 'Barkskin', effect: 'barkskin' })]), campaignName);
+    });
+
+    it('SP-013: stamps rounds:600 clock for the 2024 "1 hour" duration', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
+        await applyBarkskin({
+            action: { name: 'Barkskin', spell: { duration: '1 hour' }, automation: { type: 'barkskin' } },
+            playerStats: makePlayerStats(),
+            campaignName: campaignName,
+            targetNames: ['Ally1'],
+            characters: [{ name: 'Ally1', computedStats: { armorClass: 9 } }],
+        });
+        expect(expirations.addExpiration).toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Ally1', rounds: 600 }));
+    });
+
+    it('SP-013: stamps rounds:600 clock for the 5e "Up to 1 hour" duration', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
+        await applyBarkskin({
+            action: { name: 'Barkskin', spell: { duration: 'Up to 1 hour' }, automation: { type: 'barkskin' } },
+            playerStats: makePlayerStats(),
+            campaignName: campaignName,
+            targetNames: ['Ally1'],
+            characters: [{ name: 'Ally1', computedStats: { armorClass: 9 } }],
+        });
+        expect(expirations.addExpiration).toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Ally1', rounds: 600 }));
+    });
+
+    it('SP-013: minutes duration fans to rounds x10 and unparseable stays undefined', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValueOnce([]).mockReturnValueOnce([]);
+        await applyBarkskin({
+            action: { name: 'Barkskin', spell: { duration: '10 minutes' }, automation: { type: 'barkskin' } },
+            playerStats: makePlayerStats(),
+            campaignName: campaignName,
+            targetNames: ['Ally1'],
+            characters: [{ name: 'Ally1', computedStats: { armorClass: 9 } }],
+        });
+        expect(expirations.addExpiration).toHaveBeenCalledWith(expect.objectContaining({ rounds: 100 }));
+        await applyBarkskin({
+            action: { name: 'Barkskin', spell: { duration: 'Custom duration' }, automation: { type: 'barkskin' } },
+            playerStats: makePlayerStats(),
+            campaignName: campaignName,
+            targetNames: ['Ally2'],
+            characters: [{ name: 'Ally2', computedStats: { armorClass: 9 } }],
+        });
+        expect(expirations.addExpiration).toHaveBeenLastCalledWith(expect.objectContaining({ targetName: 'Ally2', rounds: undefined }));
     });
 
     it('handles activeBuffs being null (not set)', async () => {

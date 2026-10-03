@@ -491,7 +491,7 @@ export function createLogAndShow(deps) {
         }
 
         // AC computation (attack-only)
-        const targetAc = computeTargetAc(ctx, target, characters);
+        const targetAc = computeTargetAc(ctx, target, characters, campaignName);
 
         const acTargetName = target?.name;
         ctx._shieldAcBonus = getShieldAcBonus(acTargetName, campaignName);

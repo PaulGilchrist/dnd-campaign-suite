@@ -325,7 +325,7 @@ export async function resolveHit({ characterName, campaignName, context, bonus: 
     const attackerName = context?.attackerName || characterName;
     const targetName = resolveHitTargetName(context, target);
 
-    const targetAc = computeTargetAc(context, target, characters);
+    const targetAc = computeTargetAc(context, target, characters, campaignName);
 
     const effectiveAc = computeEffectiveAc(context, target, targetAc);
     const state = computeInitialHitState(context, target, effectiveD20Roll, effectiveAc);
