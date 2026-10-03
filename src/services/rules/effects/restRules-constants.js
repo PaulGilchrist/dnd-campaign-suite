@@ -78,7 +78,8 @@ export const SHORT_REST_RESOURCES = [
   'actionSurgeUses',
   'actionSurgeUsedThisRound',
   'adrenalineRushUses',
-  '_celestialRevelationUses',
+  // CLA-048: Celestial Revelation recharge is 'long_rest' (2024 races.json) —
+  // it must NOT re-arm on a Short Rest; LONG_REST_RESOURCES owns the key.
   '_War_Gods_Blessing_active',
    'spellthiefUses',
    'strokeOfLuckUsed',

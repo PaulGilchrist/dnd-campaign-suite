@@ -281,12 +281,13 @@ describe('celestialRevelationHandler', () => {
             );
         });
 
-        it('adds expiration for chosen buff', async () => {
+        it('CLA-048: adds expiration with rounds:10 for the 1-minute buff', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
             await confirmCelestialRevelation(makePlayerStats(), 'Necrotic Shroud', campaignName);
 
-            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'remove_active_buff', buffName: 'Necrotic Shroud' }], campaignName });
+            // rounds must be 10 (1 minute) — omitted rounds => Infinity clock, buff never expires.
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'remove_active_buff', buffName: 'Necrotic Shroud' }], campaignName, rounds: 10 });
         });
 
         it('calls toggleBuff with correct effect for each transformation option', async () => {
@@ -417,7 +418,7 @@ describe('celestialRevelationHandler', () => {
                 'Heavenly Wings',
                 campaignName
             );
-            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'CustomSorcerer', targetName: 'CustomSorcerer', effects: expect.any(Array), campaignName });
+            expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'CustomSorcerer', targetName: 'CustomSorcerer', effects: expect.any(Array), campaignName, rounds: 10 });
             expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
                 'CustomSorcerer',
                 'Heavenly Wings',
@@ -441,6 +442,23 @@ describe('celestialRevelationHandler', () => {
                     description: 'Heavenly Wings used',
                 })
             );
+        });
+
+        it('CLA-048: logs exactly ONE ability_use entry (no attackRiderHandler double log)', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(1);
+
+            await confirmCelestialRevelation(makePlayerStats(), 'Heavenly Wings', campaignName);
+
+            expect(logService.addEntry).toHaveBeenCalledTimes(1);
+        });
+
+        it('CLA-048: no handleAttackRider dispatch — rider consumed by pipeline step', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(1);
+            const { handle: riderHandle } = await import('../combat/attackRiderHandler.js');
+
+            await confirmCelestialRevelation(makePlayerStats(), 'Heavenly Wings', campaignName);
+
+            expect(riderHandle).not.toHaveBeenCalled();
         });
 
         it('handles addEntry rejection gracefully', async () => {

@@ -1,4 +1,4 @@
-import { rollExpression } from '../../dice/diceRoller.js';
+import { rollExpression, parseConstant } from '../../dice/diceRoller.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../combat/automation/automationService.js';
@@ -448,16 +448,24 @@ export function buildCelestialRevelationStep() {
       const round = getCurrentCombatRound(ctx.campaignName);
       if (rider.oncePerTurn && getRuntimeValue(ctx.playerStats.name, usedKey, ctx.campaignName) === round) return { data: {} };
 
-      const r = rollExpression(rider.damageExpression);
-      if (r) {
-        const dt = (rider.damageType || '').toLowerCase();
-        const formula = `${ctx.formula} + ${rider.damageExpression} [${dt}]`;
-        const total = ctx.total + r.total;
-        const rolls = [...(ctx.rolls || []), ...r.rolls];
-        if (rider.oncePerTurn) setRuntimeValue(ctx.playerStats.name, usedKey, round, ctx.campaignName);
-        return { data: { formula, total, rolls } };
+      // CLA-048: rider tokens ('proficiency_bonus') are unrollable raw by
+      // diceRoller (NdM/constants only) — resolve first via automation token
+      // table (CLA-016 inert family), then roll dice or take the flat value.
+      // Spell-origin hits ("attack or a spell") have no rider consumer outside
+      // this attack pipeline (§70 zero-consumer advisory; GM-adjudicated).
+      const resolvedExpr = resolveDiceExpression(rider.damageExpression, ctx.playerStats);
+      const r = rollExpression(resolvedExpr);
+      const bonusValue = r ? r.total : parseConstant(resolvedExpr);
+      if (typeof bonusValue !== 'number' || !Number.isFinite(bonusValue) || bonusValue <= 0) {
+        console.error(`[celestialRevelation] Unresolvable rider damage expression "${rider.damageExpression}"`);
+        return { data: {} };
       }
-      return { data: {} };
+      const dt = (rider.damageType || '').toLowerCase();
+      const formula = `${ctx.formula} + ${resolvedExpr} [${dt}]`;
+      const total = ctx.total + bonusValue;
+      const rolls = [...(ctx.rolls || []), ...(r ? r.rolls : [])];
+      if (rider.oncePerTurn) setRuntimeValue(ctx.playerStats.name, usedKey, round, ctx.campaignName);
+      return { data: { formula, total, rolls } };
     },
   };
 }

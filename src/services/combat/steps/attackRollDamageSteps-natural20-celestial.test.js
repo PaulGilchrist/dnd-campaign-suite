@@ -52,6 +52,12 @@ vi.mock('../../dice/diceRoller.js', () => ({
     }
     return { total: 12, rolls: [6], modifier: 0 };
   }),
+  // CLA-048: celestial step consumes constants via parseConstant fallback.
+  parseConstant: vi.fn((formula) => {
+    if (!formula) return null;
+    const stripped = String(formula).replace(/\s*\[.*?\]\s*/g, '').trim();
+    return /^[+-]?\d+$/.test(stripped) ? parseInt(stripped, 10) : null;
+  }),
 }));
 
 vi.mock('../../rules/combat/damageUtils.js', () => ({

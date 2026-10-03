@@ -4,7 +4,6 @@ import { toggleBuff } from '../../common/buffToggle.js';
 import { addEntry } from '../../../ui/logService.js';
 import { handle as handleBuff } from '../buffs/buffHandler.js';
 import { handle as handleCondition } from '../buffs/conditionHandler.js';
-import { handle as handleAttackRider } from '../combat/attackRiderHandler.js';
 
 const TRANSFORMATION_EFFECTS = {
     'Heavenly Wings': {
@@ -97,22 +96,11 @@ async function applyHeavenlyWings(chosenOption, playerStats, campaignName) {
         popupDescriptions.push(buffResult.payload.description);
     }
 
-    // attack_rider for radiant damage on hit
-    const riderResult = await handleAttackRider({
-        name: chosenOption,
-        automation: {
-            type: 'attack_rider',
-            damageExpression: 'proficiency_bonus',
-            damageType: 'Radiant',
-            trigger: 'hit',
-            oncePerTurn: true,
-            casting_time: 'passive',
-        },
-    }, playerStats, campaignName, null);
-    if (riderResult?.type === 'popup' && riderResult.payload?.description) {
-        popupDescriptions.push(riderResult.payload.description);
-    }
-
+    // CLA-048: no handleAttackRider dispatch here — the Radiant rider is a
+    // passive consumed by buildCelestialRevelationStep (attackRollBonuses.js)
+    // off the collected automation.passives, same as Inner Radiance/Necrotic
+    // Shroud (dispatch parity). The old dispatch only double-logged a second
+    // ability_use and appended a false "ready" line to the confirm popup.
     return popupDescriptions;
 }
 
@@ -156,10 +144,11 @@ export async function confirmCelestialRevelation(playerStats, chosenOption, camp
     // Store the chosen transformation option
     await setRuntimeValue(playerStats.name, '_celestialRevelationOption', chosenOption, campaignName);
 
-    // Set up duration expiration (1 minute = 10 rounds)
+    // CLA-048: 1 minute = 10 rounds. Without rounds the clock is Infinity
+    // (expirationQueue rounds ?? Infinity) and the buff never auto-expires.
     addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
         { type: 'remove_active_buff', buffName: chosenOption }
-    ], campaignName });
+    ], campaignName, rounds: 10 });
 
     // Apply the chosen transformation's buff with the correct effect type
     const effectConfig = TRANSFORMATION_EFFECTS[chosenOption] || { buffEffect: chosenOption, description: '' };
