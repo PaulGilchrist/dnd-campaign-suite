@@ -46,6 +46,22 @@ export function getConsumedMaterial(spell) {
     return MATERIAL_REGISTRY[spell.name] || null;
 }
 
+// CLA-404: Beast Spells (Druid lv18) exception detection — a spell is blocked
+// in Beast form when its Material component has a cost specified or the spell
+// consumes it. Both rulesets carry cost/consumption only in the free-text
+// `material` field ("worth 200+ GP", "which the spell consumes"), so the text
+// is the primary detector; MATERIAL_REGISTRY is the name-based fallback for
+// trimmed spell refs. Registry rows are never added for this ticket: they are
+// backpack-gating consumers (useSpellMetamagicGates) and arming them is a
+// separate material-economy change.
+const COSTLY_OR_CONSUMED_MATERIAL_RE = /(\d[\d,]*\s*(?:gp|gold)|worth|consumes)/i;
+
+export function spellHasCostlyOrConsumedMaterial(spell) {
+    if (!spell) return false;
+    const material = typeof spell.material === 'string' ? spell.material : '';
+    return COSTLY_OR_CONSUMED_MATERIAL_RE.test(material) || !!getConsumedMaterial(spell);
+}
+
 export function hasMaterial(playerStats, itemName) {
     const backpack = playerStats.inventory?.backpack || [];
     return backpack.some(item => {

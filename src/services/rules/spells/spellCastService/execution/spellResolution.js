@@ -9,6 +9,9 @@ import { resolveSpellDamageWithTypes } from '../../../core/spellDamageUtils.js';
 import { normalizeCastingTime } from '../../../../shared/castingTimeUtils.js';
 
 // Buff block: a blocksSpellcasting buff denies the cast (logs and short-circuits).
+// NOTE: the live cast seam applies its blocksSpellcasting + CLA-404 Beast Spells
+// bypass in execution/blockChecks.js checkBlockedBySpellcastingBuff (the only
+// wired path); this mirror stays byte-shape for CLA-391 refusals.
 function checkBlockedByBuff(spell, playerStats, campaignName) {
     const buffs = getActiveBuffs(playerStats.name, campaignName);
     const blockingBuff = buffs.find(b => b.blocksSpellcasting);

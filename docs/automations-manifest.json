@@ -657,7 +657,7 @@
       "handler": "n/a — not implemented",
       "router": "n/a",
       "infoBuilder": "n/a",
-      "verified": "broken — see .opencode/plans/bug-CLA-404-beast-spells.md",
+      "verified": "verified",
       "class": "Druid",
       "triggerConditions": "Passive: while in Wild Shape Beast form — may cast spells lacking costly/consumed Material components",
       "expectedBehavior": "While using Wild Shape, you can cast spells in Beast form, except for any spell that has a Material component with a cost specified or that consumes its Material component.",

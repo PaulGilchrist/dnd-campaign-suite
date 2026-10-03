@@ -4,32 +4,57 @@ import { isForcecageBlocked } from '../../../../automation/handlers/spells/force
 import { isMazeBlocked } from '../../../../automation/handlers/spells/mazeHandler.js';
 import { isBanishmentBlocked } from '../../../../automation/handlers/spells/banishmentHandler.js';
 import { isImprisonmentBlocked } from '../../../../automation/handlers/spells/imprisonmentHandler.js';
+import { spellHasCostlyOrConsumedMaterial } from '../../materialComponents.js';
+
+// CLA-404: Beast Spells (Druid lv18 passive, both rulesets — the consumer reads
+// ruleset-agnostic automation.passives collected from classes.json).
+function hasBeastSpellsPassive(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'beast_spells');
+}
+
+export function beastSpellsAllowsCast(spell, playerStats) {
+    return hasBeastSpellsPassive(playerStats) && !spellHasCostlyOrConsumedMaterial(spell);
+}
 
 // CLA-391: refuse casts while a blocksSpellcasting buff (Wild Shape shape_shift)
 // is active. Refusal at this execution seam keeps the paid slot (§4 convention)
 // but must log and popup — never silent.
+// CLA-404: lv18+ Beast Spells bypasses the blanket block in Beast form; the cast
+// proceeds unless the spell has a Material component with a cost specified or that
+// consumes its Material component — those refuse with material-specific reasoning.
 export async function checkBlockedBySpellcastingBuff(spell, playerStats, campaignName) {
     const buffs = (await import('./spellResolution.js')).getActiveBuffs(playerStats.name, campaignName);
     const blockingBuff = buffs.find(b => b.blocksSpellcasting);
     if (!blockingBuff) return null;
+    const beastSpells = hasBeastSpellsPassive(playerStats);
+    if (beastSpellsAllowsCast(spell, playerStats)) return null;
+    const materialBlock = beastSpells;
     const blockName = blockingBuff.name || 'Shape-Shift';
     const refusalType = String(blockingBuff.effect || blockName).toLowerCase().replace(/\s+/g, '_') + '_refused';
+    const logDescription = materialBlock
+        ? `${spell.name} blocked — costly or consumed Material components are not allowed while in Beast form (Beast Spells exception).`
+        : `${spell.name} blocked — ${playerStats.name} cannot cast spells while under ${blockName}.`;
     await addEntry(campaignName, {
         type: 'automation',
         automationType: refusalType,
+        automationDetail: materialBlock ? 'material_component' : undefined,
         creatureName: playerStats.name,
         characterName: playerStats.name,
         name: blockName,
-        description: `${spell.name} blocked — ${playerStats.name} cannot cast spells while under ${blockName}.`,
+        description: logDescription,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[blockChecks:blocked-by-buff-log-error]", e); });
+    const popupDescription = materialBlock
+        ? `${spell.name} requires a Material component with a cost (or one the spell consumes) — Beast Spells does not allow it while ${playerStats.name} is in Beast form.`
+        : `${spell.name} cannot be cast while ${playerStats.name} is under ${blockName} — no Spellcasting is allowed.`;
     return {
         automationPopup: {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: blockName,
-                description: `${spell.name} cannot be cast while ${playerStats.name} is under ${blockName} — no Spellcasting is allowed.`,
+                description: popupDescription,
             },
         },
     };
