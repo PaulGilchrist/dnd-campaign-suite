@@ -731,7 +731,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-SP-015-bestial-spirit.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "A small, neutral beast appears in an unoccupied space within range. The beast's AC equals 11 + the spell's level. The beast has 20 Hit Points (Air only) or 30 Hit Points (Land and Water only), plus 5 for each spell level above 2. Its Speed is 30 feet, with Climb 30 feet (Land only), Fly 60 feet (Air only), or Swim 30 feet (Water only)."

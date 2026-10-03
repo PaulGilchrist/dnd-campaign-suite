@@ -440,4 +440,44 @@ describe('useSpellUpcastFlow', () => {
       }, 5)).toBeNull();
     });
   });
+
+  describe('buildUpcastLevels — summon HP ladder (SP-015)', () => {
+    const bestialSpell = {
+      name: 'Bestial Spirit',
+      level: 2,
+      automation: {
+        type: 'summon_spirit',
+        typeLabel: 'Bestial Spirit',
+        baseLevel: 2,
+        hpPerLevelAbove: 5,
+        variants: [],
+      },
+    };
+
+    it('builds slot radio rows for summon_spirit automation HP ladder', () => {
+      mockGetRuntimeValue.mockImplementation(() => null);
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
+      );
+      const levels = result.current.buildUpcastLevels(bestialSpell);
+      expect(levels.length).toBeGreaterThan(1);
+      expect(levels[0].level).toBe(2);
+      expect(levels.map(l => l.level)).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
+      expect(levels[0].availableSlots).toBe(3);
+      expect(levels[1].availableSlots).toBe(2);
+    });
+
+    it('does NOT arm upcast for summon without hpPerLevelAbove (scale:false)', () => {
+      const { result } = renderHook(() =>
+        useSpellUpcastFlow(makePlayerStats(), 'TestCampaign')
+      );
+      const spell = {
+        name: 'Animate Objects',
+        level: 5,
+        automation: { type: 'summon_spirit', typeLabel: 'Animated Object', scale: false, variants: [] },
+      };
+      const levels = result.current.buildUpcastLevels(spell);
+      expect(levels).toEqual([]);
+    });
+  });
 });

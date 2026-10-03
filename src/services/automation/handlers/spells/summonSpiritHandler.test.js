@@ -130,7 +130,7 @@ describe('summonSpiritHandler', () => {
         },
         {
             index: 'bestial-spirit-air', name: 'Bestial Spirit (Air)', type: 'beast',
-            armor_class: 11, hit_points: 20, damage_resistances: [], damage_immunities: [], immunities: [],
+            armor_class: 11, armor_class_scales_with_slot: true, hit_points: 20, damage_resistances: [], damage_immunities: [], immunities: [],
             saving_throws: { str: { modifier: 4 }, dex: { modifier: 0 }, con: { modifier: 3 }, int: { modifier: -3 }, wis: { modifier: 2 }, cha: { modifier: -3 } },
             actions: [{
                 name: "Beast's Strike",
@@ -143,7 +143,7 @@ describe('summonSpiritHandler', () => {
         },
         {
             index: 'bestial-spirit-land', name: 'Bestial Spirit (Land)', type: 'beast',
-            armor_class: 11, hit_points: 30, damage_resistances: [], damage_immunities: [], immunities: [],
+            armor_class: 11, armor_class_scales_with_slot: true, hit_points: 30, damage_resistances: [], damage_immunities: [], immunities: [],
             saving_throws: { str: { modifier: 4 }, dex: { modifier: 0 }, con: { modifier: 3 }, int: { modifier: -3 }, wis: { modifier: 2 }, cha: { modifier: -3 } },
             actions: [
                 {
@@ -164,7 +164,7 @@ describe('summonSpiritHandler', () => {
         },
         {
             index: 'bestial-spirit-water', name: 'Bestial Spirit (Water)', type: 'beast',
-            armor_class: 11, hit_points: 30, damage_resistances: [], damage_immunities: [], immunities: [],
+            armor_class: 11, armor_class_scales_with_slot: true, hit_points: 30, damage_resistances: [], damage_immunities: [], immunities: [],
             saving_throws: { str: { modifier: 4 }, dex: { modifier: 0 }, con: { modifier: 3 }, int: { modifier: -3 }, wis: { modifier: 2 }, cha: { modifier: -3 } },
             actions: [{
                 name: "Beast's Strike",
@@ -240,7 +240,9 @@ describe('summonSpiritHandler', () => {
             expect(added.summonedBy).toBe('TestCaster');
             expect(added.summonSource).toBe('spell');
             expect(added.maxHp).toBe(20);
-            expect(added.ac).toBe(11);
+            // SP-015: bestial-spirit-* blocks spell "AC equals 11 + the spell's
+            // level" and opt in via armor_class_scales_with_slot → 11 + slot 2.
+            expect(added.ac).toBe(13);
 
             const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Bestial Spirit (Air)'));
             expect(effect).toMatchObject({
@@ -261,7 +263,7 @@ describe('summonSpiritHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('scales HP by the slot level used but keeps base AC (SP-114)', async () => {
+        it('scales HP and AC by the slot level used for armor_class_scales_with_slot blocks (SP-015)', async () => {
             loadMonsters.mockResolvedValue(mockMonsters);
             const combatSummary = getCombatSummary(mockCampaignName);
             const action = makeAction({ metaCtx: { slotLevel: 4 } });
@@ -269,8 +271,47 @@ describe('summonSpiritHandler', () => {
             await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Bestial Spirit (Air)');
 
             const added = combatSummary.creatures.find(c => c.name?.startsWith('Bestial Spirit (Air)'));
-            expect(added.ac).toBe(11);
+            expect(added.ac).toBe(11 + 4);
             expect(added.maxHp).toBe(20 + 5 * (4 - 2));
+        });
+
+        it('SP-015: lv3 Land upcast spawns AC 14 and HP 35 with a slot-level 3 log', async () => {
+            loadMonsters.mockResolvedValue(mockMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+            const action = makeAction({ metaCtx: { slotLevel: 3 } });
+
+            await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Bestial Spirit (Land)');
+
+            const added = combatSummary.creatures.find(c => c.name?.startsWith('Bestial Spirit (Land)'));
+            expect(added.ac).toBe(14);
+            expect(added.maxHp).toBe(35);
+            expect(added.currentHp).toBe(35);
+            const logged = addEntry.mock.calls.find(c => c[1]?.type === 'summons');
+            expect(logged[1].description).toContain('slot level 3');
+            expect(logged[1].description).toContain('35/35 HP');
+        });
+
+        it('SP-015: unflagged summon blocks stay byte-identical — AC never gains the slot level (SP-114)', async () => {
+            loadMonsters.mockResolvedValue(mockMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+            const action = makeAction({
+                name: 'Animate Objects',
+                automation: { typeLabel: 'Animated Object', scale: false, variants: [{ name: 'Animated Object (Medium)', monsterIndex: 'animated-object-medium' }] },
+            });
+
+            await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
+            const ao = combatSummary.creatures.find(c => c.name?.startsWith('Animated Object (Medium)'));
+            expect(ao.ac).toBe(15);
+
+            const aberrant = makeAction({
+                name: 'Summon Aberration',
+                automation: { typeLabel: 'Aberrant Spirit', baseLevel: 4, hpPerLevelAbove: 5, variants: [{ name: 'Aberrant Spirit (Mind Flayer)', monsterIndex: 'aberrant-spirit-mind-flayer' }] },
+                metaCtx: { slotLevel: 5 },
+            });
+            await confirmSummonSpirit(aberrant, mockPlayerStats, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
+            const mf = combatSummary.creatures.find(c => c.name?.startsWith('Aberrant Spirit (Mind Flayer)'));
+            expect(mf.ac).toBe(11);
+            expect(mf.maxHp).toBe(40 + 5 * (5 - 4));
         });
 
         it('does not scale AC/HP when automation.scale is false', async () => {

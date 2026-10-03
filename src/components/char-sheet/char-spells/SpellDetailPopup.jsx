@@ -67,7 +67,11 @@ function computeIsUpcastable(spell, isCantrip) {
   const slotDmg = spell.damage?.damage_at_slot_level;
   const healAtSlotLevel = spell.heal_at_slot_level;
   const upcastAtSlot = spell.upcast_at_slot_level;
-  return !isCantrip && ((slotDmg && Object.keys(slotDmg).length > 1) || (healAtSlotLevel && Object.keys(healAtSlotLevel).length > 1) || (upcastAtSlot && Object.keys(upcastAtSlot).length > 1));
+  // SP-015: summon spells scale the creature's HP via automation.hpPerLevelAbove
+  // (Bestial Spirit "plus 5 for each spell level above 2") — they carry no
+  // damage/heal ladder, so the automation HP ladder arms the upcast selector.
+  const summonHpLadder = spell.automation?.type === 'summon_spirit' && Number(spell.automation?.hpPerLevelAbove) > 0;
+  return !isCantrip && ((slotDmg && Object.keys(slotDmg).length > 1) || (healAtSlotLevel && Object.keys(healAtSlotLevel).length > 1) || (upcastAtSlot && Object.keys(upcastAtSlot).length > 1) || summonHpLadder);
 }
 
 function SpellMeta({ isCantrip, spell, isPhantasmalFreeCast, isDispelMagicAsBonusAction, isWarlock, warlockSlotLevel, playerStats, showUpcastSelector, psionicSorceryAvailable }) {

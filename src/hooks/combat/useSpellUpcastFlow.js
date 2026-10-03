@@ -1,6 +1,25 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 
+// SP-015: summon_spirit HP ladder (Bestial Spirit "plus 5 per spell level
+// above 2") — no damage/heal table, so the automation HP ladder builds the
+// slot radio rows from baseLevel up to 9. scale:false blocks (Animate Objects,
+// Giant Insect) have no hpPerLevelAbove and stay inert.
+function summonHpLadderLevels(spell, getAvailableSlotCount) {
+  const auto = spell.automation;
+  if (!(auto && auto.type === 'summon_spirit' && Number(auto.hpPerLevelAbove) > 0)) return [];
+  const base = auto.baseLevel || spell.level || 1;
+  const ladder = [];
+  for (let level = base; level <= 9; level++) {
+    ladder.push({
+      level,
+      formula: `+${auto.hpPerLevelAbove} HP per slot level above ${base}`,
+      availableSlots: getAvailableSlotCount(level),
+    });
+  }
+  return ladder;
+}
+
 export function useSpellUpcastFlow(playerStats, campaignName) {
   const [pendingUpcast, setPendingUpcast] = React.useState(null);
 
@@ -56,7 +75,7 @@ export function useSpellUpcastFlow(playerStats, campaignName) {
           availableSlots: getAvailableSlotCount(level),
         }));
     }
-    return [];
+    return summonHpLadderLevels(spell, getAvailableSlotCount);
   }, [getAvailableSlotCount, playerStats.class?.name, playerStats.level]);
 
   const gateUpcast = React.useCallback((spell, afterUpcast, deductSlot = true) => {

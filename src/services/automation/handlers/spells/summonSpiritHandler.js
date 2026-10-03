@@ -131,9 +131,13 @@ function buildSpiritCreature({ monster, displayName, casterName, initiativeValue
     const baseHp = monster.hit_points || 10;
     const scale = auto.scale !== false;
 
-    // SP-114: canonical summon stat blocks scale Hit Points only — AC is always
-    // the base armor_class from monsters.json (never slot-scaled).
-    const ac = baseAc;
+    // SP-114: canonical summon stat blocks with a fixed block AC (Summon
+    // Aberration et al.) scale Hit Points only — AC stays the base
+    // armor_class from monsters.json. SP-015: a block that spells its AC as
+    // "11 + the spell's level" opts in via armor_class_scales_with_slot
+    // (bestial-spirit-* only) — every unflagged summon is byte-identical.
+    const acScales = scale && monster.armor_class_scales_with_slot === true;
+    const ac = baseAc + (acScales ? slotLevel : 0);
     const hp = resolveSummonedHp({ baseHp, auto, slotLevel, scale, halveHp: options.halveHp });
 
     const spellSaveDc = getSpellSaveDc(playerStats);

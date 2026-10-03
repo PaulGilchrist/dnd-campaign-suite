@@ -9236,10 +9236,12 @@
     "initiative": null,
     "initiative_details": null,
     "armor_class": 11,
+    "armor_class_scales_with_slot": true,
     "armor_class_details": null,
     "hit_points": 20,
     "hit_dice": "3d8+9",
     "speed": {
+      "walk": "30 ft.",
       "fly": "60 ft."
     },
     "ability_scores": {
@@ -9336,6 +9338,7 @@
     "initiative": null,
     "initiative_details": null,
     "armor_class": 11,
+    "armor_class_scales_with_slot": true,
     "armor_class_details": null,
     "hit_points": 30,
     "hit_dice": "4d8+12",
@@ -9444,6 +9447,7 @@
     "initiative": null,
     "initiative_details": null,
     "armor_class": 11,
+    "armor_class_scales_with_slot": true,
     "armor_class_details": null,
     "hit_points": 30,
     "hit_dice": "4d8+12",
