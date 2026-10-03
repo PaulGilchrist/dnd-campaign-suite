@@ -22,6 +22,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import { BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY } from '../../services/rules/features/boonOfCombatProwess.js';
 import {
   handleReroll,
   handleStrokeOfLuck,
@@ -53,6 +54,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/encounters/combatData.js', () => ({
   loadCombatSummary: vi.fn().mockResolvedValue({ creatures: [] }),
+  getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
@@ -152,14 +154,14 @@ describe('handleStrokeOfLuck', () => {
     mockStore.clear();
   });
 
-  it('CLA-339: stroke of luck use stamps strokeOfLuckUsed only, no boonOfCombatProwessUsed collateral, and logs ability_use', async () => {
+  it('CLA-339: stroke of luck use stamps strokeOfLuckUsed only, no boon round-latch collateral, and logs ability_use', async () => {
     const { addEntry } = await import('../../services/ui/logService.js');
     const stats = createPlayerStats();
 
     handleStrokeOfLuck(stats, campaignName, { name: 'Shortsword', rolls: [6], bonus: 8, hit: false }, 'strokeOfLuck');
 
     expect(mockStore.get('Test Character:strokeOfLuckUsed')).toBe(true);
-    expect(mockStore.get('Test Character:boonOfCombatProwessUsed')).toBeUndefined();
+    expect(mockStore.get(`Test Character:${BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY}`)).toBeUndefined();
     expect(addEntry).toHaveBeenCalled();
     const entry = addEntry.mock.calls.at(-1)[1];
     expect(entry.type).toBe('ability_use');
@@ -168,13 +170,19 @@ describe('handleStrokeOfLuck', () => {
     expect(entry.description).toContain('total 14 → 28');
   });
 
-  it('CLA-339: boon of combat prowess use stamps boonOfCombatProwessUsed only, not strokeOfLuckUsed', () => {
+  it('FT-007: boon of combat prowess use stamps the round latch, not strokeOfLuckUsed, and logs the conversion', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
     const stats = createPlayerStats();
 
-    handleStrokeOfLuck(stats, campaignName, { name: 'Shortsword', rolls: [4], bonus: 8, hit: false }, 'boonOfCombatProwess');
+    await handleStrokeOfLuck(stats, campaignName, { name: 'Shortsword', rolls: [4], bonus: 8, hit: false, targetName: 'Knight 1' }, 'boonOfCombatProwess');
 
-    expect(mockStore.get('Test Character:boonOfCombatProwessUsed')).toEqual(expect.any(Number));
+    expect(mockStore.get(`Test Character:${BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY}`)).toEqual(expect.any(Number));
     expect(mockStore.get('Test Character:strokeOfLuckUsed')).toBeUndefined();
+    expect(addEntry).toHaveBeenCalled();
+    const entry = addEntry.mock.calls.at(-1)[1];
+    expect(entry.type).toBe('ability_use');
+    expect(entry.abilityName).toBe('Boon of Combat Prowess');
+    expect(entry.description).toContain('Miss converted to Hit');
   });
 });
 

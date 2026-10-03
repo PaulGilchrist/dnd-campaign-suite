@@ -868,7 +868,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-FT-007-boon-of-combat-prowess.md",
+      "verified": "verified",
       "triggerConditions": "Trigger: attack_roll_miss",
       "expectedBehavior": "When you miss with an attack roll, you can hit instead. Once you use this benefit, you can't use it again until the start of your next turn."
     },

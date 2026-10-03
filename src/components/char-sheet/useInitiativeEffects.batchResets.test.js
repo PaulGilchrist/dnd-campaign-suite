@@ -48,6 +48,7 @@ vi.mock('../../services/automation/handlers/spells/shapechangeService.js', () =>
 }));
 
 import { getRuntimeValue, setRuntimeBatch } from '../../hooks/runtime/useRuntimeState.js';
+import { BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY } from '../../services/rules/features/boonOfCombatProwess.js';
 
 describe('useInitiativeEffects - batch resets and once-per-turn trackers', () => {
     const campaignName = 'test-campaign';
@@ -108,7 +109,7 @@ describe('useInitiativeEffects - batch resets and once-per-turn trackers', () =>
                 'dreadAmbushUsedThisTurn',
                 'hurlThroughHellTurnUsed',
                 'portentUsedThisTurn',
-                'boonOfCombatProwessUsed',
+                BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY,
                 'strokeOfLuckUsed',
             ]);
         });

@@ -20,6 +20,7 @@ import { isResilientSphereActive } from '../combat/automation/automationPassives
 import { CONDITIONS_THAT_CANNOT_ACT } from '../combat/conditions/conditionEffects.js';
 import { addEntry } from '../ui/logService.js';
 import { addExpiration } from '../rules/effects/expirationQueue.js';
+import { boonOfCombatProwessLocked } from '../rules/features/boonOfCombatProwess.js';
 
 // Canonical sneak-attack ally clause: the ally must not have the Incapacitated condition.
 function allyIsIncapacitated(c) {
@@ -855,7 +856,9 @@ function computeRerollAvailabilities(playerStats, playerName, campaignName) {
     const hasBoonOfCombatProwess = allAutomation.some(
         p => p.type === 'auto_reroll' && (p.effect === 'convert_miss_to_hit' || p.automation?.effect === 'convert_miss_to_hit')
     );
-    const boonOfCombatProwessAvailable = hasBoonOfCombatProwess && !getRuntimeValue(playerName, 'boonOfCombatProwessUsed');
+    // FT-007: round-latch consult — locked only for the rest of the round it
+    // was spent, re-arming at the holder's next turn (campaignName threaded).
+    const boonOfCombatProwessAvailable = hasBoonOfCombatProwess && !boonOfCombatProwessLocked(playerName, campaignName);
 
     const hasBoonOfFate = (playerStats.automation?.passives || []).some(
         p => p.type === 'modify_d20_roll'

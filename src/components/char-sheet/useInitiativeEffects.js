@@ -7,6 +7,7 @@ import * as storageService from '../../services/ui/storage.js';
 import { endInvisibility, endGreaterInvisibility } from '../../services/rules/features/invisibilityService.js';
 import { revertPolymorph } from '../../services/automation/handlers/spells/polymorphService.js';
 import { revertShapechange } from '../../services/automation/handlers/spells/shapechangeService.js';
+import { BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY } from '../../services/rules/features/boonOfCombatProwess.js';
 
 // INITIATIVE RESET: When adding a new once-per-turn tracker, reset it with
 // setRuntimeValue(playerStats.name, '_TrackerName_usedRound', null, campaignName)
@@ -90,8 +91,9 @@ function buildInitiativeUpdates(playerStats) {
         updates.relentlessUsedRound = null;
     }
 
-    // Reset Boon of Combat Prowess and Stroke of Luck on initiative (new turn)
-    updates.boonOfCombatProwessUsed = null;
+    // FT-007: reset Boon of Combat Prowess round latch + Stroke of Luck on
+    // initiative (new-combat backstop; round-wrap is the normal re-arm).
+    updates[BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY] = null;
     updates.strokeOfLuckUsed = null;
 
     return updates;
@@ -316,9 +318,8 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Clear Living Legend active state on initiative roll (new combat)
             clearLivingLegend(playerStats.name, campaignName);
 
-            // Reset Boon of Combat Prowess and Stroke of Luck for the rolling character
-            setRuntimeValue(playerStats.name, 'boonOfCombatProwessUsed', null, campaignName);
-            setRuntimeValue(playerStats.name, 'strokeOfLuckUsed', null, campaignName);
+            // FT-007: Boon of Combat Prowess round latch + Stroke of Luck reset
+            // are covered by buildInitiativeUpdates (batched at the end of handler).
 
             // Clear Living Legend active state on initiative roll (new combat)
             clearLivingLegend(playerStats.name, campaignName);

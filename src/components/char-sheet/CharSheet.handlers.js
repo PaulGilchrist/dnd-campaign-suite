@@ -8,6 +8,7 @@ import * as storageService from '../../services/ui/storage.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { evaluateAutoExpression } from '../../services/combat/automation/automationExpressions.js'
 import { isProficientSkillOrToolCheck } from '../../services/rules/psiBolsteredKnack.js'
+import { markBoonOfCombatProwessUsed } from '../../services/rules/features/boonOfCombatProwess.js'
 
 export function handleReroll(playerStats, campaignName, conditionEffects, rerollInfo) {
     if (!playerStats) return;
@@ -52,11 +53,29 @@ export function handleReroll(playerStats, campaignName, conditionEffects, reroll
     }
 }
 
+// FT-007 Boon of Combat Prowess: convert a missed attack roll into a hit,
+// stamp the once-per-turn round latch (re-arms at the holder's next turn /
+// round-wrap clears), and log the spend (mirrors the Stroke-of-Luck sibling —
+// every automation resolution logs).
+async function handleBoonOfCombatProwess(playerStats, campaignName, popupHtml) {
+    const playerName = playerStats.name;
+    const d20 = Number(popupHtml?.rolls?.[0]) || 0;
+    const bonus = Number(popupHtml?.bonus) || 0;
+    const total = d20 + bonus;
+    await markBoonOfCombatProwessUsed(playerName, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: 'Boon of Combat Prowess',
+        description: `${playerName} used Boon of Combat Prowess on ${popupHtml?.name || 'an attack roll'}: d20 ${d20} + ${bonus} = ${total}${popupHtml?.targetName ? ` vs ${popupHtml.targetName}` : ''} — Miss converted to Hit.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[CharSheet] Error logging Boon of Combat Prowess:', e); });
+}
+
 export function handleStrokeOfLuck(playerStats, campaignName, popupHtml, featureKey) {
     if (!playerStats) return;
     if (featureKey === 'boonOfCombatProwess') {
-        setRuntimeValue(playerStats.name, 'boonOfCombatProwessUsed', Date.now(), campaignName);
-        return;
+        return handleBoonOfCombatProwess(playerStats, campaignName, popupHtml);
     }
     setRuntimeValue(playerStats.name, 'strokeOfLuckUsed', true, campaignName);
     const d20 = Number(popupHtml?.rolls?.[0]) || 0;

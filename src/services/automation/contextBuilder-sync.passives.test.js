@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY } from '../rules/features/boonOfCombatProwess.js';
 
 vi.mock('./common/damageRoll.js', () => ({
   buildBaseAttackContext: vi.fn(),
@@ -421,7 +422,7 @@ describe('contextBuilder-sync: boon of combat prowess', () => {
 
   it('sets boonOfCombatProwess true when auto_reroll passive exists and not used', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'boonOfCombatProwessUsed') return false;
+      if (key === BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY) return undefined;
       return undefined;
     });
     const stats = {
@@ -437,7 +438,7 @@ describe('contextBuilder-sync: boon of combat prowess', () => {
 
   it('sets boonOfCombatProwess true when auto_reroll exists in reactions', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'boonOfCombatProwessUsed') return false;
+      if (key === BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY) return undefined;
       return undefined;
     });
     const stats = {
@@ -453,7 +454,7 @@ describe('contextBuilder-sync: boon of combat prowess', () => {
 
   it('sets boonOfCombatProwess false when auto_reroll passive exists but already used', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'boonOfCombatProwessUsed') return true;
+      if (key === BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY) return 1;
       return undefined;
     });
     const stats = {

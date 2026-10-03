@@ -67,6 +67,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_ShadowyDodge_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_ShadowyDodge_appliedAttack', null, campaignName)
     setRuntimeValue(creatureName, '_Slow_Fall_usedRound', null, campaignName)
+    // FT-007: Boon of Combat Prowess round latch re-arms at round wrap (start of holder's next turn).
+    setRuntimeValue(creatureName, '_Boon_of_Combat_Prowess_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_Stones_Endurance_usedRound', null, campaignName)
     // CLA-393: Wrath of the Sea once-per-turn attack latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Wrath_of_the_Sea_usedRound', null, campaignName)

@@ -47,7 +47,8 @@ vi.mock('../../services/automation/handlers/spells/shapechangeService.js', () =>
     revertShapechange: vi.fn(),
 }));
 
-import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch, getAllStoreKeys } from '../../hooks/runtime/useRuntimeState.js';
+import { BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY } from '../../services/rules/features/boonOfCombatProwess.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import * as storageService from '../../services/ui/storage.js';
 
@@ -404,27 +405,23 @@ describe('useInitiativeEffects - edge cases and missing coverage', () => {
         });
     });
 
-    describe('setRuntimeValue individual clears for Boon of Combat Prowess / Stroke of Luck', () => {
-        it('calls setRuntimeValue for boonOfCombatProwessUsed individually', () => {
+    describe('FT-007: Boon of Combat Prowess round latch + Stroke of Luck reset on initiative', () => {
+        it('batches the Boon round latch clear on initiative', () => {
             renderHookWithStats();
             dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'boonOfCombatProwessUsed',
-                null,
-                campaignName
-            );
+            const calls = vi.mocked(setRuntimeBatch).mock.calls;
+            const boonCall = calls.find(([, updates]) => BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY in updates);
+            expect(boonCall).toBeDefined();
+            expect(boonCall[1][BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY]).toBeNull();
         });
 
-        it('calls setRuntimeValue for strokeOfLuckUsed individually', () => {
+        it('batches the strokeOfLuckUsed clear on initiative', () => {
             renderHookWithStats();
             dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'strokeOfLuckUsed',
-                null,
-                campaignName
-            );
+            const calls = vi.mocked(setRuntimeBatch).mock.calls;
+            const strokeCall = calls.find(([, updates]) => 'strokeOfLuckUsed' in updates);
+            expect(strokeCall).toBeDefined();
+            expect(strokeCall[1].strokeOfLuckUsed).toBeNull();
         });
     });
 

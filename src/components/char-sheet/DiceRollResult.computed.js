@@ -50,8 +50,12 @@ function computeHomingStrikesApplied(rollType, homingStrikesBonus, isAutoMiss) {
     return rollType === 'attack' && Number(homingStrikesBonus) > 0 && !isAutoMiss;
 }
 
-function computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTotal }) {
+function computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTotal, missToHitApplied }) {
     if (isAutoMiss) return false;
+    // FT-007: Boon of Combat Prowess / Stroke-of-Luck conversions are
+    // authoritative hits even though the original total stays below AC — do
+    // not let the recompute below undo the conversion (CLA-320 mirror).
+    if (missToHitApplied) return true;
     if (targetName && hit !== undefined && effectiveAc !== undefined) return finalTotal >= effectiveAc;
     return hit;
 }
@@ -90,7 +94,7 @@ export function useDiceRollState(props) {
         hit, isAutoMiss,
         reliableTalent, d20Floor10, starryDragonFloor, strSaveReplace, strCheckReplace, strScore,
         wisCheckReplace, wisCheckMinBonus, luckyRerolled, luckyRerollValue,
-        targetName, homingStrikesBonus,
+        targetName, homingStrikesBonus, missToHitApplied,
     } = props;
 
     const {
@@ -152,7 +156,9 @@ export function useDiceRollState(props) {
     // (covers Shield of Faith, Shield, cover, reactions); otherwise recompute
     // from the forwarded per-bonus fields so computedHit agrees with hit.
     const effectiveAc = computeEffectiveAc(props);
-    const computedHit = computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTotal });
+    // FT-007: boonUsed (standalone offer click) or missToHitApplied (host
+    // AttackResultPopup conversion) both authoritatively flip a miss to a hit.
+    const computedHit = computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTotal, missToHitApplied: missToHitApplied || boonUsed });
 
     const isSaveDamageType = type === 'save-damage';
 

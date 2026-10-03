@@ -4,6 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import * as logService from '../../services/ui/logService.js';
 import Popup from './popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
+import { boonOfCombatProwessLocked } from '../../services/rules/features/boonOfCombatProwess.js';
 
 function resolveInspirationUses(raw) {
   if (typeof raw === 'object' && raw !== null) return raw.current;
@@ -21,6 +22,7 @@ function DiceRollPopupContent({ popupHtml, playerStats, missToHitApplied, boonUs
     <DiceRollResult
       {...popupHtml}
       hit={missToHitApplied || popupHtml?.hit}
+      missToHitApplied={missToHitApplied}
       autoDamage={popupHtml?.autoDamage}
       playerStats={playerStats}
       onBardicInspirationDefense={popupHtml?.bardicInspirationDefense ? onBardicInspirationDefense : undefined}
@@ -35,9 +37,10 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
   const [missToHitApplied, setMissToHitApplied] = useState(false);
   const hasBoonBeenUsedRef = useRef(false);
 
+  // FT-007: round-latch consult (campaignName threaded) — the boon re-arms
+  // at the start of the holder's next turn, not only on a new combat.
   if (popupHtml?.autoRerollForAttack && attackerName) {
-    const used = getRuntimeValue(attackerName, 'boonOfCombatProwessUsed');
-    hasBoonBeenUsedRef.current = !!used;
+    hasBoonBeenUsedRef.current = boonOfCombatProwessLocked(attackerName, campaignName);
   }
 
   const handleDone = useCallback((computedHit, chosenDamageType) => {
