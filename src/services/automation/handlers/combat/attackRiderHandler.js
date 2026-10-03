@@ -383,8 +383,9 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     }
 
     // Validate prerequisites and size limits before applying
-    const invalid = findInvalidChosenOption(chosenOptions, targetName, playerStats);
+    const invalid = findInvalidChosenOption(chosenOptions, targetName, playerStats, campaignName);
     if (invalid) {
+        logRiderOptionRefusal(campaignName, playerStats, action, targetName, invalid);
         return riderNotice(action.name, auto, `<b>${invalid.chosen.name}</b> cannot be used: ${invalid.validation.reason}`);
     }
 
@@ -469,12 +470,31 @@ async function markRiderOncePerTurnUsed(action, auto, playerStats, campaignName)
     await markOncePerTurn(action.name, usedKey, playerStats, campaignName);
 }
 
-function findInvalidChosenOption(chosenOptions, targetName, playerStats) {
+// FT-106: bind the campaign name so the injected size getter reads the live
+// combatSummary cache (cs creatures carry `size`) instead of returning null.
+function findInvalidChosenOption(chosenOptions, targetName, playerStats, campaignName) {
+    const sizeContextSync = (name) => getCombatContextSync(name, campaignName);
     for (const chosen of chosenOptions) {
-        const validation = validateCunningStrikeOption(chosen, targetName, playerStats, getCombatContextSync);
+        const validation = validateCunningStrikeOption(chosen, targetName, playerStats, sizeContextSync);
         if (!validation.valid) return { chosen, validation };
     }
     return null;
+}
+
+// FT-106: refusals log with a `<feature>_refused` reason token, zero spend,
+// latch left unmarked so the rider can be re-offered and a valid option picked.
+function logRiderOptionRefusal(campaignName, playerStats, action, targetName, invalid) {
+    const slug = String(action.name || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: `${slug}_refused`,
+        characterName: playerStats.name,
+        abilityName: action.name,
+        name: invalid.chosen.name,
+        targetName,
+        description: `${action.name} refused — ${invalid.chosen.name}: ${invalid.validation.reason} No effect applied, nothing spent.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
 }
 
 async function resolveStalkersFlurrySecondaryTargets(chosenOptions, targetName, campaignName) {

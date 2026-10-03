@@ -1,3 +1,5 @@
+import { getCombatSummary } from '../../../encounters/combatData.js';
+
 const SIZE_ORDER = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
 
 function hasRequiredToolOrItem(option, playerStats) {
@@ -75,20 +77,18 @@ export function validateCunningStrikeOption(option, targetName, playerStats, get
 }
 
 /**
- * Synchronous helper to get target info from combat context.
- * Removed localStorage dependency — now returns null so size validations
- * pass through (default assumption: target is valid size).
- * Accepts an optional `overrideContext` parameter for testing purposes.
+ * Synchronous helper to get target info from the combatSummary cache
+ * (src/services/encounters/combatData.js, kept fresh via SSE/initiative).
+ * Returns `{ name, size }` for a cached combatant whose size is known,
+ * or null when the size cannot be determined (lenient fallback: size
+ * validations pass through for unknown-size targets).
  */
-let _getCombatContextSyncOverride = null;
-
-export function getCombatContextSync(targetName, overrideContext) {
-    if (overrideContext !== undefined) return overrideContext;
-    if (_getCombatContextSyncOverride !== null) return _getCombatContextSyncOverride;
-    // Combat context is now managed via server/SSE only.
-    // Size validations that need this data should use the combatSummary
-    // from the initiative component state.
-    return null;
+export function getCombatContextSync(targetName, campaignName) {
+    if (!targetName) return null;
+    const combatSummary = getCombatSummary(campaignName);
+    const target = combatSummary?.creatures?.find(c => c.name === targetName);
+    if (!target?.size) return null;
+    return { name: targetName, size: target.size };
 }
 
 /**
