@@ -267,7 +267,12 @@ function refundGreaterRestorationNoEffects(d) {
 // Declarative handler registry: each spec maps a gated spell to its confirm
 // runner plus the target selectors handed to createConfirmHandler/createSkipHandler.
 const SIMPLE_SPELL_SPECS = [
-  { name: 'aid', key: 'Aid', run: applySpell(() => applyAidEffect, p => ({ automation: { type: 'aid', range: p.range, maxTargets: p.maxTargets } })) },
+  // SP-127: forward the paid slot level (stampPaidSlotLevel / CLA-086 seam) so an
+  // lv3 upcast resolves hpMaxIncreaseExpression at slot 3 (+10), not the base
+  // spell.level (+5). confirmTargets reports ONLY the chooser selection — the
+  // allTargets default stamped every combatant (plus a stray targetName) in the
+  // cast log; revivify/protectionFromEvilAndGood exact-list precedent.
+  { name: 'aid', key: 'Aid', run: applySpell(() => applyAidEffect, p => ({ automation: { type: 'aid', range: p.range, maxTargets: p.maxTargets }, spellSlotLevel: p.metaCtx?.slotLevel || p.spellLevel })), confirmTargets: (d, pending, sel) => toArray(sel) },
   // SP-011: forward the paid slot level (stampPaidSlotLevel / CLA-086 seam) so an
   // lv2 upcast stamps te slotLevel:2 and logs spellLevel:2 instead of resolving at
   // the base makePending level.
@@ -289,8 +294,11 @@ const SIMPLE_SPELL_SPECS = [
   { name: 'auraOfPurity', key: 'AuraOfPurity', run: applySpell(() => applyAuraOfPurityEffect, p => ({ automation: p.spell.automation || { type: 'aura_of_purity' } })) },
   { name: 'circleOfPower', key: 'CircleOfPower', run: applySpell(() => applyCircleOfPowerEffect, p => ({ automation: p.spell.automation || { type: 'circle_of_power', auraRange: 30 } }), showPopupIfPayload) },
   { name: 'compulsion', key: 'Compulsion', run: applySpell(() => applyCompulsionEffect, p => ({ automation: p.spell.automation || { type: 'compulsion' } }), showPopupIfPayload) },
-  { name: 'auraOfVitality', key: 'AuraOfVitality', run: applySpell(() => applyAuraOfVitalityEffect, p => ({ automation: p.spell.automation || { type: 'aura_of_vitality' }, spellSlotLevel: p.spellLevel }), showPopupIfPayload) },
-  { name: 'deathWard', key: 'DeathWard', run: applySpell(() => applyDeathWardEffect, p => ({ automation: p.spell.automation || { type: 'death_ward' }, spellSlotLevel: p.spellLevel }), showPopupIfPayload) },
+  // SP-127 twins: fold the paid upcast level (same one-liner as aid) —
+  // auraOfVitalityHandler.js:39 consumes spellSlotLevel so the fold is live;
+  // deathWardHandler never reads it (RAW static) — byte-harmless twin.
+  { name: 'auraOfVitality', key: 'AuraOfVitality', run: applySpell(() => applyAuraOfVitalityEffect, p => ({ automation: p.spell.automation || { type: 'aura_of_vitality' }, spellSlotLevel: p.metaCtx?.slotLevel || p.spellLevel }), showPopupIfPayload) },
+  { name: 'deathWard', key: 'DeathWard', run: applySpell(() => applyDeathWardEffect, p => ({ automation: p.spell.automation || { type: 'death_ward' }, spellSlotLevel: p.metaCtx?.slotLevel || p.spellLevel }), showPopupIfPayload) },
   { name: 'heroism', key: 'Heroism', run: applySpell(() => applyHeroism, p => ({ automation: p.spell.automation || { type: 'heroism' } }), showPopupIfPayload) },
   { name: 'greaterRestoration', key: 'GreaterRestoration', run: consumeThenApply('Diamond Dust (100 gp)', applySpell(() => confirmGreaterRestoration, p => ({ automation: { type: 'greater_restoration', range: p.range } }))) },
   { name: 'lesserRestoration', key: 'LesserRestoration', run: applySpell(() => applyLesserRestorationEffect, p => ({ automation: { type: 'lesser_restoration', range: p.range } })) },

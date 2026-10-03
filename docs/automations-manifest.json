@@ -176,7 +176,7 @@
       "handler": "src/services/automation/handlers/healing/aidHandler.js (handleAid + applyAid)",
       "router": "src/services/automation/index.js (aid :508)",
       "infoBuilder": "n/a (aid type — handled by the aid registry handler)",
-      "verified": "broken — see .opencode/plans/bug-SP-127-aid-upcast-slot-burned-base-heal.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Casting time: Bonus Action; up to 3 creatures within 30 ft",
       "expectedBehavior": "Your spell bolsters your allies with toughness and resolve. Choose up to three creatures within range. Each target's hit point maximum and current hit points increase by 5 for the duration (upcast: +5 per slot level above 1st)."

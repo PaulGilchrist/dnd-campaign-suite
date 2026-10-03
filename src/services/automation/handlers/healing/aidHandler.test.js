@@ -467,6 +467,72 @@ describe('aidHandler', () => {
       });
     });
 
+    it('SP-127: lv3 upcast resolves the paid slot — expression gets slot 3, +10 stacks and heals', async () => {
+      getRuntimeValue.mockImplementation((target, key) => {
+        if (key === 'aidHpMaxIncrease') return 5;
+        if (key === 'currentHitPoints') return 60;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      evaluateAutoExpression.mockImplementation((expr, _ps, _prof, _lvl, slotLevel) =>
+        (/spellSlotLevel/.test(expr) ? 5 + (slotLevel - 2) * 5 : 5));
+
+      const action = {
+        name: 'Aid',
+        automation: { type: 'aid' },
+        spell: {
+          level: 2,
+          automation: { hpMaxIncreaseExpression: '5 + ((spellSlotLevel - 2) * 5)' },
+        },
+        spellSlotLevel: 3,
+      };
+
+      const result = await applyAid(action, makePlayerStats(), campaignName, mapName, ['War_Cleric']);
+
+      expect(evaluateAutoExpression).toHaveBeenCalledWith(
+        '5 + ((spellSlotLevel - 2) * 5)',
+        expect.anything(),
+        expect.anything(),
+        2,
+        3,
+      );
+      expect(setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'aidHpMaxIncrease', 15, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'currentHitPoints', 70, campaignName);
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'hp_change',
+        targetName: 'War_Cleric',
+        delta: 10,
+        note: 'Aid (+10 HP max)',
+      }));
+      expect(result.payload.description).toContain('+10 HP maximum');
+    });
+
+    it('SP-127: lv2 base still resolves +5 — byte-identical legacy lane', async () => {
+      getRuntimeValue.mockImplementation((target, key) => {
+        if (key === 'aidHpMaxIncrease') return 0;
+        if (key === 'currentHitPoints') return 60;
+        if (key === 'activeBuffs') return [];
+        return null;
+      });
+      evaluateAutoExpression.mockImplementation((expr, _ps, _prof, _lvl, slotLevel) =>
+        (/spellSlotLevel/.test(expr) ? 5 + (slotLevel - 2) * 5 : 5));
+
+      const action = {
+        name: 'Aid',
+        automation: { type: 'aid' },
+        spell: {
+          level: 2,
+          automation: { hpMaxIncreaseExpression: '5 + ((spellSlotLevel - 2) * 5)' },
+        },
+        spellSlotLevel: 2,
+      };
+
+      await applyAid(action, makePlayerStats(), campaignName, mapName, ['War_Cleric']);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'aidHpMaxIncrease', 5, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'currentHitPoints', 65, campaignName);
+    });
+
     it('returns correct popup description with target count and hpIncrease', async () => {
       getRuntimeValue.mockImplementation((target, key) => {
         if (key === 'aidHpMaxIncrease') return 0;

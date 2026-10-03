@@ -4,6 +4,7 @@ import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import HexAbilityModal from './modals/HexAbilityModal.jsx'
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
+import CreatureSelectionModal from './modals/shared/CreatureSelectionModal.jsx'
 import TargetSpellPopups from './char-spells/TargetSpellPopups.jsx'
 
 import { getCategories } from '../../services/character/featureCategories.js'
@@ -65,9 +66,28 @@ function SpellCastPopups({ selectedBonusSpell, setSelectedBonusSpell, playerStat
     );
 }
 
-function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, hordeBreakerReady, hordeBreakerAttackItem, handleHordeBreakerTargetSelected, pendingHexSpell, handleHexAbilitySelected, handleHexCancel, pendingBarkskin, handleBarkskinConfirm, handleBarkskinSkip, pendingHealingWord, handleHealingWordConfirm, handleHealingWordSkip, pendingSanctuary, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingLesserRestorationTarget, setPendingLesserRestorationTarget, campaignName, modalState, setModalState, warBondBondModal, setWarBondBondModal, warBondMax, playerStats }) {
+function BonusAidSelectionModal({ pendingAid, handleAidConfirm, handleAidSkip, campaignName, attackerName }) {
+    if (!pendingAid) return null;
+    return (
+        <CreatureSelectionModal
+            title="Aid"
+            icon="fa-hand-holding-heart"
+            confirmLabel="Cast Aid"
+            description="Your spell bolsters your allies with toughness and resolve. Choose up to 3 creatures within range."
+            targets={pendingAid.creatureTargets}
+            maxTargets={pendingAid.maxTargets}
+            onConfirm={handleAidConfirm}
+            onSkip={handleAidSkip}
+            campaignName={campaignName}
+            attackerName={attackerName}
+        />
+    );
+}
+
+function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, hordeBreakerReady, hordeBreakerAttackItem, handleHordeBreakerTargetSelected, pendingHexSpell, handleHexAbilitySelected, handleHexCancel, pendingAid, handleAidConfirm, handleAidSkip, pendingBarkskin, handleBarkskinConfirm, handleBarkskinSkip, pendingHealingWord, handleHealingWordConfirm, handleHealingWordSkip, pendingSanctuary, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingLesserRestorationTarget, setPendingLesserRestorationTarget, campaignName, modalState, setModalState, warBondBondModal, setWarBondBondModal, warBondMax, playerStats }) {
     return (
         <>
+            <BonusAidSelectionModal pendingAid={pendingAid} handleAidConfirm={handleAidConfirm} handleAidSkip={handleAidSkip} campaignName={campaignName} attackerName={playerStats?.name} />
             {hordeBreakerTargets && (
                 <SecondaryTargetModal
                     title="Horde Breaker"
@@ -713,7 +733,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const { castAction: bonusCastAction } = useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta: { innateSorceryActive: !!displaySaveDcBonus }, cachedPosRef: cachedBonusCastPosRef, setModalState });
 
-    const { pendingMetamagic, pendingBarkskin, pendingHealingWord, pendingSanctuary, gateMetamagic, handleConfirm, handleSkip, handleBarkskinConfirm, handleBarkskinSkip, handleHealingWordConfirm, handleHealingWordSkip, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip } = useSpellMetamagicFlow({ playerStats: playerStats, campaignName: campaignName, onExecute: bonusCastAction, setSecondaryTargetModal: null, characters: characters, setPopupHtml: setPopupHtml });
+    // SP-127: 2024 Aid is a Bonus Action — its gated chooser needs a host on this
+    // lane too (row routing moved when casting_time became canonical Bonus Action).
+    const { pendingMetamagic, pendingAid, handleAidConfirm, handleAidSkip, pendingBarkskin, pendingHealingWord, pendingSanctuary, gateMetamagic, handleConfirm, handleSkip, handleBarkskinConfirm, handleBarkskinSkip, handleHealingWordConfirm, handleHealingWordSkip, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip } = useSpellMetamagicFlow({ playerStats: playerStats, campaignName: campaignName, onExecute: bonusCastAction, setSecondaryTargetModal: null, characters: characters, setPopupHtml: setPopupHtml });
     const [pendingLesserRestorationTarget, setPendingLesserRestorationTarget] = useState(null);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
@@ -889,6 +911,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                     pendingHexSpell={pendingHexSpell}
                     handleHexAbilitySelected={handleHexAbilitySelected}
                     handleHexCancel={handleHexCancel}
+                    pendingAid={pendingAid}
+                    handleAidConfirm={handleAidConfirm}
+                    handleAidSkip={handleAidSkip}
                     pendingBarkskin={pendingBarkskin}
                     handleBarkskinConfirm={handleBarkskinConfirm}
                     handleBarkskinSkip={handleBarkskinSkip}
