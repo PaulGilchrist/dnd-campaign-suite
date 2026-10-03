@@ -646,6 +646,36 @@ describe('useCharActionsAutomation', () => {
                 expect(deps.executeHandler).not.toHaveBeenCalled();
             });
 
+            it('CLA-399: logs refusal with battle_magic_refused token when trigger gate fails', async () => {
+                const grv = vi.fn((charKey, key, _cn) => {
+                    if (key === 'activeBuffs') return [];
+                    if (key === 'focusPoints') return 3;
+                    if (key === 'lastActionSpellCast') return null;
+                    return undefined;
+                });
+                const action = {
+                    name: 'Battle Magic',
+                    automation: {
+                        type: 'bonus_action_attack',
+                        trigger: 'after_casting_action_spell',
+                        action: 'bonus_action',
+                        weaponAttack: true,
+                    },
+                };
+
+                const deps = createDeps({ getRuntimeValue: grv });
+                const { handleAutomationAction } = getHandlers(deps);
+                await handleAutomationAction(action);
+
+                expect(deps.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                    type: 'automation',
+                    characterName: 'TestFighter',
+                    automationType: 'battle_magic_refused',
+                }));
+                expect(deps.addEntry.mock.calls[0][1].description).toContain('no_action_spell_cast');
+                expect(deps.executeHandler).not.toHaveBeenCalled();
+            });
+
             it('should skip trigger check when trigger is empty string', async () => {
                 const grv = vi.fn((charKey, key, _cn) => {
                     if (key === 'activeBuffs') return [];

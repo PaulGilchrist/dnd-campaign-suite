@@ -116,11 +116,21 @@ function gateFeatureOptionChoice({ auto, action, playerStats, campaignName, getR
 }
 
 // Check trigger conditions for gated actions
-async function gateTriggerRequirement({ auto, action, playerStats, campaignName, getRuntimeValue, setRuntimeValue, setPopupHtml }) {
+async function gateTriggerRequirement({ auto, action, playerStats, campaignName, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry }) {
     if (auto?.trigger && auto.trigger !== '' && auto.trigger === 'after_casting_action_spell') {
         const lastCast = getRuntimeValue(playerStats.name, 'lastActionSpellCast', campaignName);
         if (!lastCast) {
             setPopupHtml(`<b>${action.name}</b><br/>You must cast a spell with a casting time of an action first.`);
+            // CLA-399: refusals must log with a reason token (zero-spend).
+            const refusalSlug = String(action.name || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'action';
+            await addEntry(campaignName, {
+                type: 'automation',
+                characterName: playerStats.name,
+                automationType: `${refusalSlug}_refused`,
+                name: action.name,
+                description: `${action.name} refused — no_action_spell_cast: You must cast a spell with a casting time of an action first.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[useCharActionsAutomation:log-error]', e); });
             return false;
         }
         await setRuntimeValue(playerStats.name, 'lastActionSpellCast', 0, campaignName);
@@ -380,7 +390,7 @@ export default function useCharActionsAutomation({
         const fpProceed = await spendMonkFocusPoint({ action, auto, playerStats, playerName, campaignName, cloakActive, hasFlurryHealingHarm: HAS_FLURRY_HEALING_HARM, stunningStrikeArmed, stunningStrikeRound, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry });
         if (!fpProceed) return;
 
-        const triggerProceed = await gateTriggerRequirement({ auto, action, playerStats, campaignName, getRuntimeValue, setRuntimeValue, setPopupHtml });
+        const triggerProceed = await gateTriggerRequirement({ auto, action, playerStats, campaignName, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry });
         if (!triggerProceed) return;
 
         const result = await executeHandler(action, playerStats, campaignName, mapName, characters);

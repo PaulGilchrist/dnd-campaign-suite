@@ -633,7 +633,7 @@
       "handler": "src/services/automation/handlers/combat/bonusActionAttackHandler.js (bonus_action_attack; gated on lastActionSpellCast — src/components/char-sheet/useCharActionsAutomation.js :119, flag set by src/services/rules/spells/spellCastService/execution/index.js :62)",
       "router": "src/services/automation/index.js (bonus_action_attack :312)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (bonus_action_attack)",
-      "verified": "broken — see .opencode/plans/bug-CLA-399-battle-magic.md",
+      "verified": "verified",
       "class": "Bard",
       "triggerConditions": "Bonus Action: after casting a spell with an action casting time",
       "expectedBehavior": "After you cast a spell that has a casting time of an action, you can make one attack with a weapon as a Bonus Action."

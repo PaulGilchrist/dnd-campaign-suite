@@ -6,6 +6,7 @@ import { getPsychicSpellsConfig } from '../../../../automation/handlers/class-wa
 import { endFriendsOnHostileAction } from '../../../features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../../features/invisibilityService.js';
 import { resolveSpellDamageWithTypes } from '../../../core/spellDamageUtils.js';
+import { normalizeCastingTime } from '../../../../shared/castingTimeUtils.js';
 
 // Buff block: a blocksSpellcasting buff denies the cast (logs and short-circuits).
 function checkBlockedByBuff(spell, playerStats, campaignName) {
@@ -167,7 +168,7 @@ function resolveSpellResolution(spell, metaCtx, playerStats, campaignName, getTa
     }
     endInvisibilityOnHostileAction(playerStats.name, campaignName);
 
-    if (spell.casting_time === '1 action') {
+    if (normalizeCastingTime(spell.casting_time) === '1 action') {
         getRuntimeValue('__placeholder__', '__placeholder__'); // side-effect only: tracked via setRuntimeValue called in executeSpellCast
     }
 

@@ -282,6 +282,32 @@ describe('executeSpellCast', () => {
         'testCampaign',
       )
     })
+
+    it('CLA-399: arms lastActionSpellCast for 2024 "Action" casing', async () => {
+      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
+      const services = makeServices()
+      await executeSpellCast(makeSpell({ casting_time: 'Action' }), makeMetaCtx(), services)
+
+      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
+        'TestWizard',
+        'lastActionSpellCast',
+        1,
+        'testCampaign',
+      )
+    })
+
+    it('CLA-399: does not arm lastActionSpellCast for 2024 "Bonus Action" casing', async () => {
+      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
+      const services = makeServices()
+      await executeSpellCast(makeSpell({ casting_time: 'Bonus Action' }), makeMetaCtx(), services)
+
+      expect(runtime.setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestWizard',
+        'lastActionSpellCast',
+        1,
+        'testCampaign',
+      )
+    })
   })
 
   /* ---------------------------------------------------------------- */

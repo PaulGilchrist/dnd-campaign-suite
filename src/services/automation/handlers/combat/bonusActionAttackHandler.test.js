@@ -373,6 +373,134 @@ describe('bonusActionAttackHandler', () => {
             });
         });
 
+        describe('CLA-399 Battle Magic (weaponAttack:true, no uses)', () => {
+            const battleMagicAction = () => makeAction({
+                name: 'Battle Magic',
+                automation: {
+                    type: 'bonus_action_attack',
+                    trigger: 'after_casting_action_spell',
+                    action: 'bonus_action',
+                    weaponAttack: true,
+                    casting_time: '1 bonus action',
+                },
+            });
+
+            it('should emit attack_roll with normal weapon hitBonus/damage and log ability_use', async () => {
+                armCombat('Bandit 1');
+                const stats = makePlayerStats({
+                    attacks: [
+                        { name: 'Rapier', weaponType: 'melee', hitBonus: 9, damage: '1d8+4', damageType: 'Piercing', range: 5, properties: [] },
+                    ],
+                });
+
+                const result = await handle(battleMagicAction(), stats, CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('attack_roll');
+                expect(result.payload.attack.type).toBe('Bonus Action');
+                expect(result.payload.attack.hitBonus).toBe(9);
+                expect(result.payload.attack.damage).toBe('1d8+4');
+                expect(result.payload.attack.damageType).toBe('Piercing');
+                expect(result.payload.attack.autoDamageFormula).toBe('1d8+4');
+                expect(result.payload.attack.name).toContain('Battle Magic');
+                expect(result.payload.attack.name).toContain('Rapier');
+                expect(result.payload.targetName).toBe('Bandit 1');
+                expect(automationInfoPopup).not.toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    type: 'ability_use',
+                    abilityName: 'Battle Magic',
+                }));
+            });
+
+            it('should spend NO uses (no uses economy fabricated)', async () => {
+                armCombat('Bandit 1');
+                const stats = makePlayerStats({
+                    attacks: [
+                        { name: 'Rapier', weaponType: 'melee', hitBonus: 9, damage: '1d8+4', damageType: 'Piercing', range: 5, properties: [] },
+                    ],
+                });
+
+                await handle(battleMagicAction(), stats, CAMPAIGN_NAME, 'map', []);
+
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+            });
+
+            it('should refuse with battle_magic_refused log when no target armed', async () => {
+                getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestHero', targetName: null }], round: 1 });
+                getTargetFromAttacker.mockReturnValue(null);
+                const stats = makePlayerStats({
+                    attacks: [
+                        { name: 'Rapier', weaponType: 'melee', hitBonus: 9, damage: '1d8+4', damageType: 'Piercing', range: 5, properties: [] },
+                    ],
+                });
+
+                const result = await handle(battleMagicAction(), stats, CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toContain('No target selected');
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    type: 'automation',
+                    automationType: 'battle_magic_refused',
+                }));
+            });
+
+            it('should refuse with battle_magic_refused log when no usable weapon', async () => {
+                armCombat('Bandit 1');
+                const result = await handle(battleMagicAction(), makePlayerStats({ attacks: [] }), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toContain('No usable weapon');
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    type: 'automation',
+                    automationType: 'battle_magic_refused',
+                }));
+            });
+
+            it('should fall back to Unarmed Strike when no equipped weapon rows', async () => {
+                armCombat('Bandit 1');
+                const result = await handle(battleMagicAction(), makePlayerStats(), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('attack_roll');
+                expect(result.payload.attack.name).toBe('Battle Magic (Unarmed Strike)');
+            });
+
+            it('should keep a weaponAttack row with a different trigger on the popup path', async () => {
+                armCombat('Bandit 1');
+                const action = makeAction({
+                    name: 'Other Weapon Attack',
+                    automation: {
+                        type: 'bonus_action_attack',
+                        trigger: 'some_other_trigger',
+                        action: 'bonus_action',
+                        weaponAttack: true,
+                    },
+                });
+
+                const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('popup');
+                expect(automationInfoPopup).toHaveBeenCalledWith(action);
+            });
+
+            it('should keep a weaponAttack row with extraDamageExpression on the popup path', async () => {
+                armCombat('Bandit 1');
+                const action = makeAction({
+                    name: 'Rider Weapon Attack',
+                    automation: {
+                        type: 'bonus_action_attack',
+                        trigger: 'after_casting_action_spell',
+                        action: 'bonus_action',
+                        weaponAttack: true,
+                        extraDamageExpression: '1d4',
+                    },
+                });
+
+                const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('popup');
+                expect(automationInfoPopup).toHaveBeenCalledWith(action);
+            });
+        });
+
         describe('polearm trigger validation', () => {
             it('should reject when isPolearmWeapon returns false', async () => {
                 isPolearmWeapon.mockResolvedValue(false);

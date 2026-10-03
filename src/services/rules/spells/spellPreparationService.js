@@ -4,6 +4,7 @@ import { breakConcentration, addConcentration, cleanupConcentrationEffects } fro
 import * as storageService from '../../../services/ui/storage.js';
 import { isPsionicSpell, hasPsionicSorcery } from './metamagicRules.js';
 import { addEntry } from '../../ui/logService.js';
+import { normalizeCastingTime } from '../../shared/castingTimeUtils.js';
 
 const FREE_CAST_ENTRY_TYPES = ['free_spell', 'fey_reinforcements', 'misty_wanderer', 'dragon_companion'];
 
@@ -764,7 +765,8 @@ function applyWarlockSpellBreakerStamps(modifiedSpell, spell, playerStats, usePs
   if (canChangeDamageType && usePsychicDamage) {
     modifiedSpell._psychicSpellsOverride = true;
   }
-  if (isDispelMagicAsBonusAction && modifiedSpell.casting_time === '1 action') {
+  // CLA-399 sweep: 2024 spells.json stores 'Action' — normalize before comparing.
+  if (isDispelMagicAsBonusAction && normalizeCastingTime(modifiedSpell.casting_time) === '1 action') {
     modifiedSpell.casting_time = '1 bonus action';
   }
 }

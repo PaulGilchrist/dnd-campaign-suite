@@ -25,6 +25,7 @@ import { checkGlobeOfInvulnerability, checkForcecageBlocked, checkBlockedBySpell
 import { handlePowerWordHeal, handlePowerWordKill, handleMassSuggestion, handleCalmEmotions, handleHypnoticPatternEarly, handleConfusionEarly, handleShapechange, handleFear, handleConjureVolley, handleSilence, handleSleep } from './modalSpells.js';
 import { handleRegenerate, handleSeeInvisibility, handleFleshToStone, handleHoldMonster, handleBanishment, handleConfusion, handleMaze, handlePowerWordStun, handleHypnoticPattern, handleSlow, handleBane, handleBless, handleBeaconOfHope, handleMassSuggestion as handleMassSuggestionTrigger, handleSuggestion, handleCommand, handleOttoDance, handleResilientSphere, handleBlur, handleExpeditiousRetreat, handleFriends, handleCrownOfMadness, handleAnimalFriendship, handleDominateBeast, handleDominateMonster, handleDominatePerson, handleRayOfEnfeeblement, handleCompelledDuel, handleGlobeOfInvulnerability, handleForcecage, handleStinkingCloud, handleSleetStorm, handleFaerieFire, handleTashasHideousLaughter, handleImprisonment, handleHeroism, handleLongstrider, handleSpareTheDying, handleEnhanceAbility, handleProtectionFromEnergy, handleProtectionFromPoison, handleResistance, handleGenericAutomation } from './triggerSpells.js';
 import { computeRange, computeEmpoweredEvocation, computeBlessedStrikes, computeRadiantSoul, computeOverchannel } from './damageCalculation.js';
+import { normalizeCastingTime } from '../../../../shared/castingTimeUtils.js';
 import { handleSavePath } from './savePath.js';
 import { handleNoSavePath } from './noSavePath.js';
 import { handleHolyAura as handleHolyAuraTrigger } from './triggerSpells.js';
@@ -58,7 +59,9 @@ function applyHostileCastSideEffects(spell, playerStats, campaignName) {
     }
     endInvisibilityOnHostileAction(playerStats.name, campaignName);
 
-    if (spell.casting_time === '1 action') {
+    // CLA-399: 2024 spells.json stores 'Action'; normalize before comparing so the
+    // Battle Magic flag arms on both rulesets.
+    if (normalizeCastingTime(spell.casting_time) === '1 action') {
         setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);
     }
 }

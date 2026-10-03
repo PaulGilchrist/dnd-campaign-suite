@@ -450,6 +450,38 @@ describe('executeSpellCast — early resolutions', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'lastActionSpellCast', 1, 'test-campaign');
     });
 
+    it('CLA-399: sets lastActionSpellCast for 2024 "Action" casing', async () => {
+      await executeSpellCast(
+        makeSpell({ casting_time: 'Action' }),
+        makeMetaCtx(),
+        {
+          rollAttack: vi.fn(),
+          rollDamage: vi.fn(),
+          playerStats: makePlayerStats(),
+          getTargetInfo: async () => ({ name: 'Goblin' }),
+          campaignName: 'test-campaign',
+        },
+      );
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'lastActionSpellCast', 1, 'test-campaign');
+    });
+
+    it('CLA-399: does not set lastActionSpellCast for 2024 "Bonus Action" casing', async () => {
+      await executeSpellCast(
+        makeSpell({ casting_time: 'Bonus Action' }),
+        makeMetaCtx(),
+        {
+          rollAttack: vi.fn(),
+          rollDamage: vi.fn(),
+          playerStats: makePlayerStats(),
+          getTargetInfo: async () => ({ name: 'Goblin' }),
+          campaignName: 'test-campaign',
+        },
+      );
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestWizard', 'lastActionSpellCast', 1, 'test-campaign');
+    });
+
     it('does not set lastActionSpellCast for non-action spells', async () => {
       await executeSpellCast(
         makeSpell({ casting_time: '1 bonus action' }),

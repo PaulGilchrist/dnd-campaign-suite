@@ -156,11 +156,84 @@ async function resolveWarPriestLeg({ action, playerStats, campaignName, usesKey,
     };
 }
 
+// CLA-399: Battle Magic (2024 Valor lv14) declares weaponAttack:true with no
+// uses economy — it reached the terminal automationInfoPopup and never produced an
+// attack. Mirrors the verified resolveWarPriestLeg shape, minus uses-spending
+// (no uses in data = no fabricated uses economy).
+async function resolveWeaponAttackLeg({ action, playerStats, campaignName, refusal, logRefusal }) {
+    const cs = await getCombatContext(campaignName);
+    const target = getTargetFromAttacker(cs, playerStats.name);
+    const targetName = target?.name || null;
+    if (!targetName) {
+        const reason = `${action.name}: No target selected — no attack made.`;
+        await logRefusal(reason);
+        return refusal(reason);
+    }
+
+    const weapon = pickBonusAttackWeapon(playerStats);
+    if (!weapon) {
+        const reason = `${action.name}: No usable weapon or Unarmed Strike.`;
+        await logRefusal(reason);
+        return refusal(reason);
+    }
+
+    const attack = {
+        name: `${action.name || 'Battle Magic'} (${weapon.name})`,
+        type: 'Bonus Action',
+        range: weapon.range ?? MELEE_REACH_FEET,
+        hitBonus: weapon.hitBonus ?? (playerStats.proficiency || 0),
+        damage: weapon.damage,
+        damageType: weapon.damageType || 'Bludgeoning',
+        autoDamageFormula: weapon.damage,
+        autoDamageName: `${action.name || 'Battle Magic'} (${weapon.name})`,
+    };
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${action.name} — bonus-action ${weapon.name} attack on ${targetName}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[bonusActionAttackHandler:log-error]', e); });
+
+    return {
+        type: 'attack_roll',
+        payload: {
+            attack,
+            targetName,
+            sourceName: action.name,
+        },
+    };
+}
+
 function resolveUsesMax(auto, playerStats) {
     const rawUsesMax = auto.usesMax ?? (auto.uses_expression
         ? evaluateAutoExpression(auto.uses_expression, playerStats)
         : 0);
     return Number(rawUsesMax) || 0;
+}
+
+// Battle Magic's exact row shape (weaponAttack + after_casting_action_spell,
+// no extraDamage rider). Psychic Blades (different trigger + extraDamageExpression)
+// and all other rows keep their existing paths byte-identical.
+function isBattleMagicRow(auto) {
+    return auto?.weaponAttack === true && auto?.trigger === 'after_casting_action_spell' && !auto?.extraDamageExpression;
+}
+
+function dispatchLeg({ auto, isPolearm, usesMax, action, playerStats, campaignName, usesKey, refusal, logRefusal }) {
+    if (auto?.effect === 'disengage_end_grappled') {
+        return resolveDisengageLeg(action, playerStats, campaignName);
+    }
+    if (isPolearm) {
+        return resolvePoleStrikeLeg(action, playerStats, campaignName, usesKey, usesMax);
+    }
+    if (usesMax > 0) {
+        return resolveWarPriestLeg({ action, playerStats, campaignName, usesKey, usesMax, refusal, logRefusal });
+    }
+    if (isBattleMagicRow(auto)) {
+        return resolveWeaponAttackLeg({ action, playerStats, campaignName, refusal, logRefusal });
+    }
+    return automationInfoPopup(action);
 }
 
 export async function handle(action, playerStats, campaignName, _mapName, _allEquipment) {
@@ -211,17 +284,5 @@ export async function handle(action, playerStats, campaignName, _mapName, _allEq
         }
     }
 
-    if (auto?.effect === 'disengage_end_grappled') {
-        return resolveDisengageLeg(action, playerStats, campaignName);
-    }
-
-    if (isPolearm) {
-        return resolvePoleStrikeLeg(action, playerStats, campaignName, usesKey, usesMax);
-    }
-
-    if (usesMax > 0) {
-        return resolveWarPriestLeg({ action, playerStats, campaignName, usesKey, usesMax, refusal, logRefusal });
-    }
-
-    return automationInfoPopup(action);
+    return dispatchLeg({ auto, isPolearm, usesMax, action, playerStats, campaignName, usesKey, refusal, logRefusal });
 }
