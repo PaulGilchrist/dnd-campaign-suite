@@ -22,6 +22,8 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
+  // CLA-033: fired by the gated confirm lane's rider seam in useConfirmableFlow.
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({

@@ -50,6 +50,7 @@ describe('postCastRiderHandler.handle', () => {
                 saveType: 'WIS',
                 type: 'spell',
                 condition: 'Charmed or Frightened',
+                duration: '1_minute',
             },
         };
 
@@ -207,7 +208,8 @@ describe('postCastRiderHandler.handle', () => {
             campaignName,
         );
 
-        expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerStats.name, targetName: 'Enemy', effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
+        // CLA-033: the rider's 1_minute duration must stamp a 10-round clock.
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerStats.name, targetName: 'Enemy', effects: [{ type: 'condition', condition: 'frightened' }], campaignName, rounds: 10 });
 
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'save_result',

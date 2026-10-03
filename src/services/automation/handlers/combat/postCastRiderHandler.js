@@ -3,6 +3,7 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { parseDurationRounds } from '../../../rules/effects/durationParser.js';
 
 const RIDER_CONDITIONS = {
     'Charmed or Frightened': ['charmed', 'frightened'],
@@ -114,9 +115,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             })
             .catch((e) => { console.error("[postCastRider] addEntry Error:", e); });
 
+            // CLA-033: stamp the rider's 1-minute duration as a round clock
+            // (parseDurationRounds returns 0 for minute strings — the same
+            // `|| 10` pattern as reactionBonusHandler / CLA-334).
             addExpiration({ attackerName: playerStats.name, targetName, effects: [
                 { type: 'condition', condition: appliedCondition }
-            ], campaignName });
+            ], campaignName, rounds: parseDurationRounds(auto.duration) || 10 });
 
         }
         window.removeEventListener('save-result', handleSaveResult);

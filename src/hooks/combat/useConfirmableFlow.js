@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { addEntry } from '../../services/ui/logService.js'
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 import { incrementFreeCastResource, isFreeCastAuthorized, prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js'
+import { triggerPostCastRiderSaves } from '../../services/rules/spells/postCastRiderService.js'
 
 const FREE_CAST_SPELLS = [
   'bane', 'bless', 'beacon of hope', 'haste', 'aid', "heroes' feast", 'greater restoration', 'lesser restoration',
@@ -58,6 +59,20 @@ export function rollbackSpellSlot(playerName, spellName, spellLevel, playerStats
     if (available >= 0) {
       setRuntimeValue(playerName, baseKey, available + 1, campaignName);
     }
+  }
+}
+
+// CLA-033: the gated confirm lane bypasses executeSpellCast, so the
+// Beguiling Magic post-cast rider never fired here. Fire it centrally
+// (school + slot gated inside). Runners that hand off to onExecute
+// (runHex/runAnimalFriendship) reach runPostCastTriggers themselves and
+// stamp pending.postCastTriggersRan to opt out of this seam.
+async function fireConfirmLaneRider(pending, playerStats, campaignName) {
+  if (pending.postCastTriggersRan) return;
+  try {
+    await triggerPostCastRiderSaves(pending.spell, { ...(pending.metaCtx || {}), slotLevel: paidSpellLevel(pending) }, playerStats, campaignName, null);
+  } catch (e) {
+    console.error('[useConfirmableFlow:rider-error]', e);
   }
 }
 
@@ -119,6 +134,8 @@ export function useConfirmableFlow(playerStats, campaignName) {
       if (applyFn) {
         await applyFn(pending, result);
       }
+
+      await fireConfirmLaneRider(pending, playerStats, campaignName);
     };
   }, [playerStats, campaignName]);
 

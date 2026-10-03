@@ -167,6 +167,9 @@ async function runAnimalFriendship(d, pending, result) {
   const spell = slotLevel && slotLevel !== pending.spell.level
     ? { ...pending.spell, level: slotLevel, baseLevel: pending.spell.level }
     : pending.spell
+  // CLA-033: onExecute reaches runPostCastTriggers — opt out of the
+  // confirm-lane rider seam so Beguiling Magic fires exactly once.
+  pending.postCastTriggersRan = true
   d.onExecute(spell, { targetNames: toArray(result), slotLevel })
 }
 
@@ -238,6 +241,9 @@ async function runCureWounds(d, pending, result) {
 async function runHex(d, pending, result) {
   const targetName = Array.isArray(result) ? result[0] : result
   if (!targetName) return
+  // CLA-033: onExecute reaches runPostCastTriggers — opt out of the
+  // confirm-lane rider seam so Beguiling Magic fires exactly once.
+  pending.postCastTriggersRan = true
   d.onExecute(pending.spell, { targetName })
 }
 
