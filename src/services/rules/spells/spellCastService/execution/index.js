@@ -18,7 +18,7 @@ import { getPsychicSpellsConfig } from '../../../../automation/handlers/class-wa
 import { isInnateSorceryActive } from '../../../../combat/buffs/buffService.js';
 import { resolveSpellDamageWithTypes } from '../../../core/spellDamageUtils.js';
 import { triggerConfusion } from '../../../features/confusionService.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasRerollHealingOnes } from '../../../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasRerollHealingOnes, markFortifiedHealthUsedIfGranted } from '../../../../combat/automation/automationService.js';
 import { rollExpression, rollExpressionMaximized, applyHealingRerollOnes } from '../../../../dice/diceRoller.js';
 import { refundSpellBreakerSlot, applyHexEffects, applyPowerWordHealToTarget, applyPowerWordKillToTarget, triggerDispelMagic, triggerExpertDivination, triggerArcaneWard, applyRegenerateSpell } from './helpers.js';
 import { checkGlobeOfInvulnerability, checkForcecageBlocked, checkBlockedBySpellcastingBuff } from './blockChecks.js';
@@ -437,10 +437,16 @@ async function resolveGenericHeal({ spell, target, metaCtx, playerStats, campaig
     const targetChar = (characters || []).find(c => c.name === target.name);
     const targetStats = targetChar?.computedStats || targetChar;
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName, targetStats });
-    if (expression === 'max') {
-        return await applyMaxHeal({ spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails });
+    // FT-012: heal actually landed with a Fortified Health bonus folded in — stamp
+    // the once-per-turn latch on the passive OWNER's store (target, not caster),
+    // mirroring the healingHandler lanes (healingHandler.js markFortifiedIfHealed).
+    const healResult = expression === 'max'
+        ? await applyMaxHeal({ spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails })
+        : await applyRolledHeal({ spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails });
+    if (healResult && healResult.healAmount > 0) {
+        await markFortifiedHealthUsedIfGranted(bonusDetails, playerStats, targetStats, campaignName);
     }
-    return await applyRolledHeal({ spell, target, playerStats, characters, campaignName, expression, spellCastingMod, bonusHeal, bonusDetails });
+    return healResult;
 }
 
 // Generic healing path (spell.heal_at_slot_level) — returns genericHealResult.

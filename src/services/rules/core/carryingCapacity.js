@@ -11,7 +11,9 @@ export function getCarryingCapacity(playerStats) {
 export function applyMaxHpPassives(playerStats, hitPoints) {
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
-        if (passive.type === 'passive_rule' && passive.effect === 'max_hp_increase') {
+        // FT-012: Fortified Health (2024 Epic Boon) carries amount:40 under its
+        // own effect key — fold it identically to max_hp_increase on both rulesets.
+        if (passive.type === 'passive_rule' && (passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health')) {
             if (passive.amount) {
                 hitPoints += passive.amount;
             } else if (passive.bonusExpression) {

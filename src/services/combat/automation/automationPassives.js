@@ -5,6 +5,7 @@ import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js'
 import { applyGreatWeaponFighting } from '../../rules/core/greatWeaponFighting.js'
 import { markOncePerTurn } from '../../automation/common/oncePerTurn.js'
 import { buildAttackInfo } from './automationInfoBuilder.js'
+import { getCombatSummary } from '../../encounters/combatData.js'
 
 /**
  * Check if playerStats has a passive automation matching type and effect.
@@ -150,6 +151,18 @@ function describeHealingBonus(passive, bonus, requirePositive) {
     return { name: passive.name, amount: bonus };
 }
 
+// FT-012: round-scoped once-per-turn latch read, mirroring checkOncePerTurn's
+// stored-format semantics. markOncePerTurn stamps { round, activeCreature } on
+// the holder's own store; re-arm happens when round > storedRound (the existing
+// turn-start clears in Initiative.jsx / navigationHandlers also null the key).
+function fortifiedHealthLatchBlocks(statsName, campaignName) {
+    const stored = getRuntimeValue(statsName, '_fortifiedHealth_usedRound');
+    if (!stored) return false;
+    const currentRound = getCombatSummary(campaignName)?.round || 1;
+    if (typeof stored === 'number') return stored === currentRound;
+    return !(currentRound > stored?.round);
+}
+
 // Effects 'bonus_healing' and 'max_hp_increase'/'fortified_health' are mutually
 // exclusive on a single passive, so the branches never both fire for one entry.
 function healingPassiveContribution({ passive, stats, slotLevel, campaignName, requirePositive }) {
@@ -158,9 +171,8 @@ function healingPassiveContribution({ passive, stats, slotLevel, campaignName, r
         return describeHealingBonus(passive, evaluateAutoExpression(passive.bonusExpression, stats, undefined, undefined, slotLevel), requirePositive);
     }
     if ((passive.effect === 'max_hp_increase' || passive.effect === 'fortified_health') && passive.alsoSelfHealing?.extraHealingExpression) {
-        if (passive.alsoSelfHealing.oncePerTurn && campaignName) {
-            const stored = getRuntimeValue(stats.name, '_fortifiedHealth_usedRound');
-            if (stored) return null;
+        if (passive.alsoSelfHealing.oncePerTurn && campaignName && fortifiedHealthLatchBlocks(stats.name, campaignName)) {
+            return null;
         }
         return describeHealingBonus(passive, evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, stats), requirePositive);
     }
@@ -201,6 +213,24 @@ export function resolveHealingBonusesWithDetails(playerStats, { slotLevel, campa
 
 export async function markFortifiedHealthUsed(playerStats, campaignName) {
     return markOncePerTurn('Fortified Health', '_fortifiedHealth_usedRound', playerStats, campaignName);
+}
+
+// FT-012: spell-cast heal lanes (resolveGenericHeal) fold the passive OWNER's
+// Fortified Health bonus (targetStats may differ from the caster). Mark the
+// latch on every owner store whose passive actually fired this resolution —
+// symmetric with healingPassiveContribution's read (stats.name per owner).
+export async function markFortifiedHealthUsedIfGranted(bonusDetails, casterStats, targetStats, campaignName) {
+    if (!bonusDetails?.some(d => d.name === 'Fortified Health')) return;
+    const seen = new Set();
+    for (const stats of [casterStats, targetStats]) {
+        if (!stats?.name || seen.has(stats.name)) continue;
+        seen.add(stats.name);
+        const owns = (stats.automation?.passives || []).some(p =>
+            p.type === 'passive_rule' && p.effect === 'fortified_health' && p.alsoSelfHealing?.extraHealingExpression);
+        if (!owns) continue;
+        if (fortifiedHealthLatchBlocks(stats.name, campaignName)) continue;
+        await markFortifiedHealthUsed(stats, campaignName);
+    }
 }
 
 export function hasHealingMaximization(playerStats) {

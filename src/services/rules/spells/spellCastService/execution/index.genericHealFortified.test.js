@@ -1,13 +1,9 @@
-// @new-for-SP-092
-// @mocks-copied-from earlyReturns-generic.test.js
+// FT-012: generic spell-cast heal lane must mark the Fortified Health
+// once-per-turn latch on the passive OWNER's store when the bonus fires.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-/* ------------------------------------------------------------------ */
-/*  Mocks — all dependencies of execution/index.js                     */
-/* ------------------------------------------------------------------ */
-
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_playerName, _key, _campaignName) => undefined),
+  getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
@@ -59,7 +55,7 @@ vi.mock('../../../../automation/handlers/spells/sanctuaryHandler.js', () => ({
 }));
 
 vi.mock('../../../combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => null),
+  getCombatContext: vi.fn(() => Promise.resolve({ round: 3 })),
 }));
 
 vi.mock('../../../combat/applyHealing.js', () => ({
@@ -84,15 +80,15 @@ vi.mock('../../../../combat/buffs/buffService.js', () => ({
 }));
 
 vi.mock('../../../core/spellDamageUtils.js', () => ({
-  resolveSpellDamageWithTypes: vi.fn(() => ({ formula: '10d6', primaryType: 'Fire' })),
+  resolveSpellDamageWithTypes: vi.fn(() => ({ formula: null, primaryType: null })),
 }));
 
 vi.mock('../../../features/confusionService.js', () => ({
   triggerConfusion: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../combat/automation/automationService.js', () => ({
-  markFortifiedHealthUsedIfGranted: vi.fn(),
+vi.mock('../../../../combat/automation/automationService.js', () => ({
+  markFortifiedHealthUsedIfGranted: vi.fn(() => Promise.resolve()),
   resolveHealingBonusesWithDetails: vi.fn(() => ({ totalBonus: 0, details: [] })),
   hasHealingMaximizationForTarget: vi.fn(() => false),
   hasRerollHealingOnes: vi.fn(() => false),
@@ -121,7 +117,6 @@ vi.mock('./blockChecks.js', () => ({
   checkForcecageBlocked: vi.fn(() => Promise.resolve(null)),
   checkBlockedBySpellcastingBuff: vi.fn(() => Promise.resolve(null)),
 }));
-
 
 vi.mock('./modalSpells.js', () => ({
   handlePowerWordHeal: vi.fn(() => Promise.resolve({ handled: false })),
@@ -213,69 +208,116 @@ vi.mock('../../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
 
-/* ------------------------------------------------------------------ */
-/*  SUT import after mocks                                             */
-/* ------------------------------------------------------------------ */
-
 import { executeSpellCast } from './index.js';
 
 const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
-const { handleGenericAutomation: mockGenericAutomation } = await import('./triggerSpells.js');
+const { resolveHealingBonusesWithDetails, markFortifiedHealthUsedIfGranted } = await import('../../../../combat/automation/automationService.js');
 
-/* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
-/* ------------------------------------------------------------------ */
+const CAMPAIGN = 'test-campaign';
 
-function makePlayerStats() {
+function casterStats() {
   return {
-    name: 'TestWizard',
-    abilities: [{ name: 'Intelligence', bonus: 3 }],
+    name: 'Wild_Sage_Druid',
+    abilities: [{ name: 'Wisdom', bonus: 3 }],
     proficiency: 6,
-    spellAbilities: {
-      spellCastingAbility: 'Intelligence',
-      toHit: 9,
-      saveDc: 17,
-      modifier: 3,
-    },
+    spellAbilities: { spellCastingAbility: 'Wisdom', toHit: 9, saveDc: 17, modifier: 3 },
     automation: { passives: [] },
-    hitPoints: 82,
+    hitPoints: 138,
     level: 20,
   };
 }
 
-function makePrismaticSpray() {
+function targetStats() {
   return {
-    name: 'Prismatic Spray',
-    level: 7,
-    automation: { type: 'prismatic_spray', saveType: 'DEX', damage: '10d6', saveDc: 'spell_save_dc' },
+    name: 'Disciplined_Monk',
+    abilities: [{ name: 'Constitution', bonus: 2 }],
+    proficiency: 6,
+    automation: {
+      passives: [{
+        type: 'passive_rule',
+        effect: 'fortified_health',
+        name: 'Fortified Health',
+        amount: 40,
+        alsoSelfHealing: { extraHealingExpression: 'CON modifier', oncePerTurn: true },
+      }],
+    },
+    hitPoints: 183,
+    level: 20,
   };
 }
 
-/* ------------------------------------------------------------------ */
+const cureWounds = {
+  name: 'Cure Wounds',
+  level: 1,
+  school: 'Evocation',
+  casting_time: '1 action',
+  components: ['V', 'S'],
+  range: '30 feet',
+  heal_at_slot_level: { 1: '2d8 + MOD' },
+};
 
-describe('executeSpellCast routes metaCtx into handleGenericAutomation (SP-092)', () => {
+function makeServices(overrides = {}) {
+  return {
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    playerStats: casterStats(),
+    getTargetInfo: async () => ({ name: 'Disciplined_Monk' }),
+    attackerPos: null,
+    targetPos: null,
+    featEffects: {},
+    campaignName: CAMPAIGN,
+    mapName: 'testMap',
+    characters: [{ name: 'Disciplined_Monk', type: 'player', computedStats: targetStats() }],
+    ...overrides,
+  };
+}
+
+describe('executeSpellCast generic heal - Fortified Health latch (FT-012)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockReturnValue([]);
-    mockGenericAutomation.mockResolvedValue({ handled: true });
+    getRuntimeValue.mockImplementation((_char, key) => {
+      if (key === 'activeConditions' || key === 'targetEffects') return [];
+      if (key === 'hitPoints') return 183;
+      if (key === 'currentHitPoints') return 100;
+      return undefined;
+    });
+    markFortifiedHealthUsedIfGranted.mockResolvedValue(undefined);
   });
 
-  it('passes the caller metaCtx (with selectedTargets) to handleGenericAutomation', async () => {
-    const metaCtx = { selectedTargets: ['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2'] };
+  it('marks the latch when the Fortified Health bonus fired with actualHeal > 0', async () => {
+    resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Fortified Health', amount: 2 }] });
 
-    await executeSpellCast(makePrismaticSpray(), metaCtx, {
-      rollAttack: vi.fn(),
-      rollDamage: vi.fn(),
-      playerStats: makePlayerStats(),
-      getTargetInfo: async () => ({ name: 'Zombie 1' }),
-      campaignName: 'test-campaign',
-      mapName: 'map',
-      characters: [],
+    const services = makeServices();
+    const result = await executeSpellCast(cureWounds, { slotLevel: 1, targetName: 'Disciplined_Monk' }, services);
+
+    expect(result.healAmount).toBeGreaterThan(0);
+    expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(1);
+    const [details, caster, target] = markFortifiedHealthUsedIfGranted.mock.calls[0];
+    expect(details[0].name).toBe('Fortified Health');
+    expect(caster.name).toBe('Wild_Sage_Druid');
+    expect(target.name).toBe('Disciplined_Monk');
+  });
+
+  it('does not mark the latch when no Fortified Health bonus was folded', async () => {
+    resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
+
+    await executeSpellCast(cureWounds, { slotLevel: 1, targetName: 'Disciplined_Monk' }, makeServices());
+
+    expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(1);
+    expect(markFortifiedHealthUsedIfGranted.mock.calls[0][0]).toEqual([]);
+  });
+
+  it('does not mark the latch when the heal lands zero (target at full HP)', async () => {
+    resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Fortified Health', amount: 2 }] });
+    getRuntimeValue.mockImplementation((_char, key) => {
+      if (key === 'activeConditions' || key === 'targetEffects') return [];
+      if (key === 'hitPoints') return 183;
+      if (key === 'currentHitPoints') return 183;
+      return undefined;
     });
 
-    expect(mockGenericAutomation).toHaveBeenCalledTimes(1);
-    const callArgs = mockGenericAutomation.mock.calls[0];
-    expect(callArgs[0].metaCtx).toEqual(metaCtx);
-    expect(callArgs[0].metaCtx.selectedTargets).toEqual(['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2']);
+    await executeSpellCast(cureWounds, { slotLevel: 1, targetName: 'Disciplined_Monk' }, makeServices());
+
+    expect(markFortifiedHealthUsedIfGranted).not.toHaveBeenCalled();
   });
 });

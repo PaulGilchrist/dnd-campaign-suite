@@ -95,6 +95,7 @@ vi.mock('../../../features/confusionService.js', () => ({
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
+  markFortifiedHealthUsedIfGranted: vi.fn(),
   resolveHealingBonusesWithDetails: vi.fn(() => ({ totalBonus: 0, details: [] })),
   hasHealingMaximizationForTarget: vi.fn(() => false),
   hasRerollHealingOnes: vi.fn(() => false),
