@@ -82,6 +82,46 @@ describe('postCastHealService', () => {
       expect(result).toBeNull()
     })
 
+    // CLA-038: othersOnly must honor resolved target identity, not just range.
+    it('skips othersOnly when a touch spell targets only the caster', async () => {
+      const othersOnlyStats = {
+        ...baseStats,
+        automation: { passives: [{ type: 'post_cast_self_heal', name: 'Blessed Healer', othersOnly: true, healExpression: '2 + spell_slot_level' }] },
+      }
+      const result = await triggerPostCastSelfHeals({ ...healingSpell, range: 'Touch' }, { slotLevel: 1, targetNames: ['Cleric1'] }, othersOnlyStats, 'camp', 'map')
+      expect(result).toBeNull()
+      expect(applyHealingDirectly).not.toHaveBeenCalled()
+    })
+
+    it('skips othersOnly when targetName is only the caster', async () => {
+      const othersOnlyStats = {
+        ...baseStats,
+        automation: { passives: [{ type: 'post_cast_self_heal', name: 'Blessed Healer', othersOnly: true, healExpression: '2 + spell_slot_level' }] },
+      }
+      const result = await triggerPostCastSelfHeals({ ...healingSpell, range: '60 feet' }, { slotLevel: 1, targetName: 'Cleric1' }, othersOnlyStats, 'camp', 'map')
+      expect(result).toBeNull()
+      expect(applyHealingDirectly).not.toHaveBeenCalled()
+    })
+
+    it('applies othersOnly when at least one healed target is not the caster', async () => {
+      const othersOnlyStats = {
+        ...baseStats,
+        automation: { passives: [{ type: 'post_cast_self_heal', name: 'Blessed Healer', othersOnly: true, healExpression: '2 + spell_slot_level' }] },
+      }
+      const result = await triggerPostCastSelfHeals({ ...healingSpell, range: 'Touch' }, { slotLevel: 3, targetNames: ['Cleric1', 'Ally1'] }, othersOnlyStats, 'camp', 'map')
+      expect(result).toEqual([{ name: 'Blessed Healer', amount: 10, actualHeal: 10 }])
+      expect(applyHealingDirectly).toHaveBeenCalledWith(othersOnlyStats, 'Cleric1', 10, 'camp')
+    })
+
+    it('fires othersOnly when target identity is unknown (legacy fallback)', async () => {
+      const othersOnlyStats = {
+        ...baseStats,
+        automation: { passives: [{ type: 'post_cast_self_heal', name: 'Blessed Healer', othersOnly: true, healExpression: '2 + spell_slot_level' }] },
+      }
+      const result = await triggerPostCastSelfHeals({ ...healingSpell, range: 'Touch' }, { slotLevel: 1 }, othersOnlyStats, 'camp', 'map')
+      expect(result).toEqual([{ name: 'Blessed Healer', amount: 10, actualHeal: 10 }])
+    })
+
     it('applies healing when conditions are met', async () => {
       const result = await triggerPostCastSelfHeals(healingSpell, { slotLevel: 2 }, baseStats, 'camp', 'map')
       expect(applyHealingDirectly).toHaveBeenCalledWith(baseStats, baseStats.name, 10, 'camp')

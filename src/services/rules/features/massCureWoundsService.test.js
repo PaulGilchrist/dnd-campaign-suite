@@ -30,12 +30,17 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(),
 }));
 
+vi.mock('../spells/postCastHealService.js', () => ({
+    triggerPostCastSelfHeals: vi.fn(() => Promise.resolve(null)),
+}));
+
 const { rollExpression } = await import('../../dice/diceRoller.js');
 const { getCombatContext } = await import('../../rules/combat/damageUtils.js');
 const { applyHealingToTarget } = await import('../../rules/combat/applyHealing.js');
 const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../ui/logService.js');
 const { getDistanceFeet } = await import('../../rules/combat/rangeValidation.js');
+const { triggerPostCastSelfHeals } = await import('../spells/postCastHealService.js');
 
 const campaignName = 'TestCampaign';
 const mapName = 'testMap';
@@ -417,6 +422,51 @@ describe('massCureWoundsService', () => {
                 expect(result.targets).toHaveLength(6);
                 expect(result.totalHealed).toBeGreaterThan(0);
                 expect(result.totalHealed).toBe(result.targets.reduce((sum, t) => sum + t.healAmount, 0));
+            });
+        });
+
+        describe('CLA-038 blessed healer post-cast self-heal', () => {
+            it('triggers post-cast self-heals after healing creatures other than caster', async () => {
+                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
+                getRuntimeValue.mockReturnValue(1);
+                getCombatContext.mockResolvedValue(createCombatContext([], [
+                    { name: 'Goblin', maxHp: 7, currentHp: 1 },
+                ]));
+                await trigger(massCureWoundsSpell, { slotLevel: 5 });
+                expect(triggerPostCastSelfHeals).toHaveBeenCalledWith(
+                    massCureWoundsSpell,
+                    { slotLevel: 5, targetNames: ['Goblin'] },
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('does not trigger post-cast self-heals when nothing was healed', async () => {
+                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
+                getRuntimeValue.mockReturnValue(7);
+                getCombatContext.mockResolvedValue(createCombatContext([], [
+                    { name: 'Goblin', maxHp: 7, currentHp: 7 },
+                ]));
+                await trigger(massCureWoundsSpell, { slotLevel: 5 });
+                expect(triggerPostCastSelfHeals).not.toHaveBeenCalled();
+            });
+
+            it('triggers when caster plus others are healed', async () => {
+                rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
+                getRuntimeValue.mockReturnValue(1);
+                getCombatContext.mockResolvedValue(createCombatContext([], [
+                    { name: 'Cleric', maxHp: 50, currentHp: 1 },
+                    { name: 'Goblin', maxHp: 7, currentHp: 1 },
+                ]));
+                await trigger(massCureWoundsSpell, { slotLevel: 5 });
+                expect(triggerPostCastSelfHeals).toHaveBeenCalledWith(
+                    massCureWoundsSpell,
+                    { slotLevel: 5, targetNames: ['Cleric', 'Goblin'] },
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
             });
         });
     });

@@ -4,6 +4,7 @@ import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget, markFortifiedHealthUsed } from '../../../combat/automation/automationService.js';
+import { triggerPostCastSelfHeals } from '../../../rules/spells/postCastHealService.js';
 
 export function getSpellCastingMod(playerStats, spell) {
     const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
@@ -115,7 +116,7 @@ export function createMassHealHandler(config) {
         };
     }
 
-    async function confirmFn({ action, playerStats, campaignName, selectedTargetNames, healExpression, maximize, bonusHeal, bonusDetails, slotLevel: _slotLevel, currentRound }) {
+    async function confirmFn({ action, playerStats, campaignName, selectedTargetNames, healExpression, maximize, bonusHeal, bonusDetails, slotLevel, currentRound }) {
         const playerName = playerStats.name;
         const maxTargets = resolveMaxTargets(action.automation);
         const finalTargets = selectedTargetNames.slice(0, maxTargets);
@@ -169,6 +170,15 @@ export function createMassHealHandler(config) {
 
         if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
             await markFortifiedHealthUsed(playerStats, campaignName);
+        }
+
+        // CLA-038: mass heals restore HP to creatures other than the caster,
+        // so post-cast self-heal passives (e.g. Blessed Healer) must fire here.
+        if (results.some(r => r.healAmount > 0 && r.targetName !== playerName)) {
+            const metaCtx = { slotLevel, targetNames: results.map(r => r.targetName) };
+            await triggerPostCastSelfHeals(action.spell, metaCtx, playerStats, campaignName, undefined).catch(e => {
+                console.error('[massHealUtils] Post-cast self-heal failed:', e);
+            });
         }
 
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));

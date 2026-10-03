@@ -67,11 +67,28 @@ function resolvePostCastLevelContext(playerStats, metaCtx, spell, fnName, resour
     return { prof, level, slotLevel };
 }
 
+// Count creatures healed that are NOT the caster. Returns null when the
+// target set is unknown (caller must then fall back to the range guard).
+function countHealedOthers(metaCtx, playerStats) {
+    const names = Array.isArray(metaCtx?.targetNames)
+        ? metaCtx.targetNames
+        : (metaCtx?.targetName ? [metaCtx.targetName] : []);
+    if (names.length === 0) return null;
+    return names.filter(n => n && n !== playerStats.name).length;
+}
+
 // Resolve a passive's heal expression and roll it. Returns 0 when the
 // passive targets self-only spells or the roll is invalid/zero.
-function rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel }) {
-    if (heal.othersOnly && spell.range === 'Self') {
-        return 0;
+function rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel, healedOthers }) {
+    if (heal.othersOnly) {
+        if (spell.range === 'Self') {
+            return 0;
+        }
+        // Touch/ranged spells can still be cast on self; only fire when a
+        // creature other than the caster was actually healed (CLA-038).
+        if (healedOthers === 0) {
+            return 0;
+        }
     }
 
     let expression = heal.healExpression || '0';
@@ -101,10 +118,11 @@ export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, camp
     }
 
     const { prof, level, slotLevel } = resolvePostCastLevelContext(playerStats, metaCtx, spell, 'triggerPostCastSelfHeals', 'post-cast self heals');
+    const healedOthers = countHealedOthers(metaCtx, playerStats);
 
     const results = [];
     for (const heal of selfHeals) {
-        const amount = rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel });
+        const amount = rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel, healedOthers });
         if (amount <= 0) {
             continue;
         }
@@ -136,9 +154,10 @@ export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, camp
     }
 
     const { prof, level, slotLevel } = resolvePostCastLevelContext(playerStats, metaCtx, spell, 'triggerPostCastAllyHeals', 'post-cast ally heals');
+    const healedOthers = countHealedOthers(metaCtx, playerStats);
 
     for (const heal of allyHeals) {
-        const amount = rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel });
+        const amount = rollPostCastHealAmount({ heal, spell, playerStats, prof, level, slotLevel, healedOthers });
         if (amount <= 0) {
             continue;
         }

@@ -36,6 +36,10 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
   hasHealingMaximizationForTarget: vi.fn(),
 }));
 
+vi.mock('../../../rules/spells/postCastHealService.js', () => ({
+  triggerPostCastSelfHeals: vi.fn(() => Promise.resolve(null)),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { confirmMassCureWounds } from './massCureWoundsHandler.js';
@@ -49,6 +53,7 @@ import {
   markFortifiedHealthUsed,
   hasHealingMaximizationForTarget,
 } from '../../../combat/automation/automationService.js';
+import { triggerPostCastSelfHeals } from '../../../rules/spells/postCastHealService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -728,6 +733,74 @@ describe('confirmMassCureWounds', () => {
       });
 
       expect(result.payload.results).toHaveLength(2);
+    });
+  });
+
+  // ── CLA-038: Blessed Healer post-cast self-heal ─────────────
+  describe('CLA-038 post-cast self-heal trigger', () => {
+    beforeEach(() => {
+      triggerPostCastSelfHeals.mockResolvedValue(null);
+    });
+
+    it('triggers post-cast self-heals after healing others', async () => {
+      const playerStats = makePlayerStats();
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats,
+          campaignName,
+          selectedTargetNames: ['Fighter', 'Rogue'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
+
+      expect(triggerPostCastSelfHeals).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Mass Cure Wounds' }),
+        { slotLevel: 5, targetNames: expect.arrayContaining(['Fighter', 'Rogue']) },
+        playerStats,
+        campaignName,
+        undefined,
+      );
+    });
+
+    it('does not trigger post-cast self-heals when caster is the only healed target', async () => {
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['TestCleric'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
+
+      expect(triggerPostCastSelfHeals).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger when no target was actually healed', async () => {
+      getRuntimeValue.mockImplementation((_name, prop) => {
+        if (prop === 'currentHitPoints') return 45;
+        return null;
+      });
+      applyHealingToTarget.mockReturnValue({ actualHeal: 0, oldHp: 45, newHp: 45 });
+
+      await confirmMassCureWounds({
+          action: makeAction(),
+          playerStats: makePlayerStats(),
+          campaignName,
+          selectedTargetNames: ['Fighter'],
+          healExpression: '3d8 + 3',
+          maximize: false,
+          bonusHeal: 0,
+          bonusDetails: [],
+          slotLevel: 5,
+      });
+
+      expect(triggerPostCastSelfHeals).not.toHaveBeenCalled();
     });
   });
 });

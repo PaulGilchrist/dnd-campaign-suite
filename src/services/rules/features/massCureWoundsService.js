@@ -4,6 +4,7 @@ import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
+import { triggerPostCastSelfHeals } from '../spells/postCastHealService.js';
 
 const MASS_CURE_WOUNDS_NAME = 'Mass Cure Wounds';
 
@@ -105,6 +106,17 @@ function healMassTarget(combatSummary, target, ctx) {
     return { targetName, healAmount: actualHeal, rolls: rollResult.rolls, rawTotal: rollResult.total + bonusHeal };
 }
 
+// CLA-038: post-cast self-heal passives (e.g. Blessed Healer) fire when
+// this mass heal restored HP to at least one creature other than the caster.
+async function maybeTriggerBlessedHealer({ spell, results, casterName, playerStats, slotLevel, campaignName, mapName }) {
+    if (!results.some(r => r.healAmount > 0 && r.targetName !== casterName)) {
+        return;
+    }
+    await triggerPostCastSelfHeals(spell, { slotLevel, targetNames: results.map(r => r.targetName) }, playerStats, campaignName, mapName).catch(e => {
+        console.error('[massCureWoundsService] Post-cast self-heal failed:', e);
+    });
+}
+
 export async function triggerMassCureWounds(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isMassCureWounds(spell)) {
         return null;
@@ -149,6 +161,8 @@ export async function triggerMassCureWounds(spell, metaCtx, playerStats, campaig
     if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
         await markFortifiedHealthUsed(playerStats, campaignName);
     }
+
+    await maybeTriggerBlessedHealer({ spell, results, casterName, playerStats, slotLevel, campaignName, mapName: _mapName });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

@@ -449,7 +449,8 @@ async function runGenericHealPath({ spell, metaCtx, playerStats, campaignName, m
         genericHealResult = await resolveGenericHeal({ spell, target, metaCtx, playerStats, campaignName, characters, spellCastingMod });
     }
 
-    triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+    const healTargetCtx = { ...(metaCtx || {}), targetNames: target?.name ? [target.name] : undefined };
+    triggerPostCastSelfHeals(spell, healTargetCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast self-heal failed:', e);
     });
     const chaliceResult = await triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
@@ -485,7 +486,8 @@ async function runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, 
     const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
     applyHexEffects(spell, playerStats, campaignName, hexTarget, metaCtx?.hexAbility);
 
-    triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+    const triggerTargetCtx = { ...(metaCtx || {}), targetNames: metaCtx?.targetNames || (hexTarget ? [hexTarget] : undefined) };
+    triggerPostCastSelfHeals(spell, triggerTargetCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast self-heal failed:', e);
     });
     triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {

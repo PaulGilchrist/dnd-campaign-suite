@@ -781,7 +781,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-038-blessed-healer.md",
+      "verified": "verified",
       "class": "Cleric",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "When you cast a healing spell on others that targets one or more creatures other than yourself, you regain Hit Points equal to 2 plus the spell slot's level."
