@@ -1267,9 +1267,9 @@ function resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, ca
   return true;
 }
 
-function buildTargetEffectData({ target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature }) {
+function buildTargetEffectData({ target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses = null }) {
   const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name);
-  const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget });
+  const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget, attackerSenses });
   applyElusive(targetEffectData, target, targetComputed, targetConditions);
   applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, getAttackerCreature);
   return targetEffectData;
@@ -2103,7 +2103,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const attackerEffects = computeConditionEffects({ conditions: attackerConditions, saveModifiers: targetSaveModifiers, targetEffects: monsterTargetEffects, attackerSenses: monsterSensesArray })
     if (resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, campaignName, monsterName, name)) return;
 
-    const targetEffectData = buildTargetEffectData({ target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature });
+    const targetEffectData = buildTargetEffectData({ target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses: monsterSensesArray });
 
     const effectiveBonus = bonus + (targetEffectData.riderAttackBonus || 0);
 

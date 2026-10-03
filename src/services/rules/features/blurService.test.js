@@ -200,6 +200,43 @@ describe('blurService', () => {
                 expect(newEffects).toHaveLength(1);
                 expect(newEffects[0].target).toBe('Wizard');
             });
+
+            it('does not throw when campaign targetEffects is null (clean change-data)', async () => {
+                mockGetRuntimeValue
+                    .mockReturnValueOnce([])
+                    .mockReturnValueOnce(null);
+
+                await expect(callTrigger()).resolves.toMatchObject({ type: 'popup' });
+            });
+
+            it('writes blur targetEffect when campaign targetEffects is null (SP-019)', async () => {
+                mockGetRuntimeValue
+                    .mockReturnValueOnce([])
+                    .mockReturnValueOnce(null);
+
+                await callTrigger();
+
+                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
+                    2,
+                    'campaign',
+                    'targetEffects',
+                    [{ target: 'Wizard', source: 'Wizard', effect: 'blur', duration: 'concentration' }],
+                    campaignName,
+                );
+            });
+
+            it('logs the cast when campaign targetEffects is null (SP-019)', async () => {
+                mockGetRuntimeValue
+                    .mockReturnValueOnce([])
+                    .mockReturnValueOnce(null);
+
+                await callTrigger();
+
+                expect(mockAddEntry).toHaveBeenCalledWith(
+                    campaignName,
+                    expect.objectContaining({ spellName: 'Blur' }),
+                );
+            });
         });
 
         describe('return value', () => {

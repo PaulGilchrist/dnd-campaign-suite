@@ -25,10 +25,6 @@ export async function triggerBlur(spell, metaCtx, playerStats, campaignName, _ma
     // The spell ends early if you cast it again, so remove any existing Blur
     // from this caster before applying the new one.
     const rawEffects = getRuntimeValue('campaign', 'targetEffects');
-    if (rawEffects == null) {
-        console.error('[blurService] Missing array:', rawEffects);
-        throw new Error('Expected array, got ' + rawEffects);
-    }
     const effects = Array.isArray(rawEffects) ? rawEffects : [];
     const filtered = effects.filter(te => !(te.effect === 'blur' && te.source === playerStats.name));
 
