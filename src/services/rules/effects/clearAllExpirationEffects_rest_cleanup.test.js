@@ -101,6 +101,7 @@ import { clearAllExpirationEffects } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
+import { addEntry } from '../../ui/logService.js';
 
 const KEY = 'pendingExpirations';
 
@@ -508,5 +509,85 @@ describe('clearAllExpirationEffects — activeBuffs preservation', () => {
       ],
       'MyCampaign',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// clearAllExpirationEffects — SP-012 rest purge log names the actual spell
+// ---------------------------------------------------------------------------
+describe('clearAllExpirationEffects — SP-012 rest purge log names the spell', () => {
+  const restLogs = () => addEntry.mock.calls
+    .filter((c) => /^Rest; .+ ends\.$/.test(String(c[1]?.description)))
+    .map((c) => c[1]);
+
+  beforeEach(() => {
+    resetMocks();
+    stubUtilsNameIdentity();
+    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    getAllStoreKeys.mockReturnValue([]);
+    getCombatSummary.mockReturnValue(null);
+  });
+
+  it('names the concentrated spell (Banishment) when the caster rests while concentrating', () => {
+    getCombatSummary.mockReturnValue({
+      creatures: [{ name: 'Caster', concentration: { spell: 'Banishment', dc: 17 } }],
+    });
+
+    clearAllExpirationEffects('Caster', 'MyCampaign');
+
+    const logs = restLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0]).toEqual(expect.objectContaining({
+      type: 'ability_use',
+      characterName: 'Caster',
+      abilityName: 'Banishment',
+      description: 'Rest; Banishment ends.',
+    }));
+    expect(logs[0].description).not.toContain('Flesh to Stone');
+  });
+
+  it('keeps the byte-identical Flesh to Stone log when Flesh to Stone was concentrated', () => {
+    getAllStoreKeys.mockReturnValue(['_fleshToStone_Orc']);
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === KEY) return [];
+      if (key === '_fleshToStone_Orc') return { casterName: 'Caster' };
+      if (name === 'Orc' && key === 'activeConditions') return ['restrained'];
+      return null;
+    });
+    getCombatSummary.mockReturnValue({
+      creatures: [{ name: 'Caster', concentration: { spell: 'Flesh to Stone', dc: 17 } }],
+    });
+
+    clearAllExpirationEffects('Caster', 'MyCampaign');
+
+    const logs = restLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].description).toBe('Rest; Flesh to Stone ends.');
+    expect(logs[0].abilityName).toBe('Flesh to Stone');
+  });
+
+  it('logs nothing when resting with no concentration held and nothing cleaned', () => {
+    clearAllExpirationEffects('Caster', 'MyCampaign');
+
+    expect(restLogs().length).toBe(0);
+  });
+
+  it('names Flesh to Stone when only its stale tracking keys are cleaned', () => {
+    getAllStoreKeys.mockReturnValue(['_fleshToStone_Orc']);
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === KEY) return [];
+      if (key === '_fleshToStone_Orc') return { casterName: 'Caster' };
+      if (name === 'Orc' && key === 'activeConditions') return ['restrained'];
+      if (name === 'campaign' && key === 'targetEffects') return [
+        { effect: 'flesh_to_stone', target: 'Orc', source: 'Caster' },
+      ];
+      return null;
+    });
+
+    clearAllExpirationEffects('Caster', 'MyCampaign');
+
+    const logs = restLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].description).toBe('Rest; Flesh to Stone ends.');
   });
 });

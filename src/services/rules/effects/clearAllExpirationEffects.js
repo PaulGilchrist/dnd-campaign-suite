@@ -87,8 +87,20 @@ function removeTargetEffectsIfChanged(campaignName, predicate) {
     }
 }
 
-// Clean up Flesh to Stone recurring save tracking on rest
+// SP-012: resolve the spell the rest purge log should name — the caster's
+// concentration state in combatSummary (still set here; clearAllConcentrations runs
+// after this on the rest lanes) — falling back to Flesh to Stone only when its
+// tracking keys were actually cleaned.
+function resolveRestPurgeSpellName(characterName, campaignName, cleanedTracking) {
+    const csCreature = getCombatSummary(campaignName)?.creatures?.find(c => c.name === characterName);
+    if (csCreature?.concentration?.spell) return csCreature.concentration.spell;
+    return cleanedTracking ? 'Flesh to Stone' : null;
+}
+
+// Clean up Flesh to Stone recurring save tracking on rest.
+// SP-012: the purge log names the spell actually ending (no name = no log).
 function cleanFleshToStoneTracking(characterName, campaignName) {
+    let cleanedTracking = false;
     const ftsAllKeys = getAllStoreKeys();
     for (const ftsKey of ftsAllKeys) {
         if (typeof ftsKey !== 'string') continue;
@@ -105,12 +117,15 @@ function cleanFleshToStoneTracking(characterName, campaignName) {
         const ftsCleanedEffects = allTargetEffects.filter(te => !(te.target === ftsTargetName && te.effect === 'flesh_to_stone' && te.source === characterName));
         setRuntimeValue('campaign', 'targetEffects', ftsCleanedEffects, campaignName);
         setRuntimeValue('campaign', ftsKey, null, campaignName);
+        cleanedTracking = true;
     }
+    const spellName = resolveRestPurgeSpellName(characterName, campaignName, cleanedTracking);
+    if (!spellName) return;
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: characterName,
-        abilityName: 'Flesh to Stone',
-        description: 'Rest; Flesh to Stone ends.',
+        abilityName: spellName,
+        description: `Rest; ${spellName} ends.`,
     }).catch((e) => { console.error("[clearAllExpirationEffects:log-error]", e); });
 }
 
