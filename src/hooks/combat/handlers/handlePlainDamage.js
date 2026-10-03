@@ -118,7 +118,7 @@ async function rollAndApplySecondaryDamage({ combatSummary, target, context, sec
         finalDamage: secondaryFinalDamage,
         resistanceDetails: secondaryApplyResultData?.resistanceDetails || [],
     };
-    return { secondaryResult, secondaryFinalDamage };
+    return { secondaryResult, secondaryFinalDamage, applyResult: secondaryApplyResultData };
 }
 
 // MA-0889: advantage-gated secondary rider (Goblin Boss Scimitar/Shortbow —
@@ -160,6 +160,20 @@ async function rollAndApplySecondaryPlainDamage({ context, combatSummary, target
     const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
     const secondaryOutcome = await rollAndApplySecondaryDamage({ combatSummary, target, context, secondaryFormula, secondaryName, secondaryDamageType, damageSequenceId, campaignName, characters, characterName });
     if (!secondaryOutcome) return { applyResult: null, secondaryResult: null, secondaryFinalDamage: 0 };
+
+    // FT-015: when the SECONDARY leg alone reduced a Boon-of-Recovery holder
+    // to 0 HP, checkBoonOfRecoveryLastStand rewrote HP to its granted floor
+    // (1 + half max) and latched the one-shot. Applying the primary leg of the
+    // SAME hit next would read that freshly-intercepted HP as oldHp and shave it
+    // a second time (HP 72 -> 45). The whole hit is consumed by the intercept,
+    // so skip the primary leg and bubble the interception so HP stays at the
+    // intercepted value. Relentless Endurance / Death Ward / non-holders keep the
+    // primary leg below byte-identical (their floor-clamp already prevents a
+    // re-kill at HP 1).
+    if (secondaryOutcome.applyResult?.intercepted && secondaryOutcome.applyResult?.interceptedFeature === 'Boon of Recovery') {
+        clearReTriggeredSequence(damageSequenceId);
+        return { applyResult: secondaryOutcome.applyResult, secondaryResult: secondaryOutcome.secondaryResult, secondaryFinalDamage: 0 };
+    }
 
     const totalConcentrationDamage = reducedTotal + secondaryOutcome.secondaryResult.total;
     const primaryApplyResult = await applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], { campaignName, characters: characters, ignoreResistance: ignoreResistance, attackerName: characterName, suppressHpLog: true, damageSequenceId, concentrationTotalDamage: totalConcentrationDamage });

@@ -104,7 +104,7 @@ vi.mock('../../rules/spells/metamagicRules.js', () => ({
 }));
 
 import { rollExpression, rollExpressionDoubled } from '../../../services/dice/diceRoller.js';
-import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget, clearReTriggeredSequence } from '../../../services/rules/combat/applyDamage.js';
 import { endInvisibilityOnHostileAction } from '../../../services/rules/features/invisibilityService.js';
@@ -459,6 +459,73 @@ describe('Plain damage secondary damage', () => {
             expect(logCall.note).toBe('combined_damage_roll');
             const typesApplied = applyDamageToTarget.mock.calls.map(c => c[3][0]);
             expect(typesApplied).toEqual(['Necrotic', 'slashing']);
+        });
+    });
+
+    describe('FT-015 Boon of Recovery compound-row interception', () => {
+        // Fire Giant Flame Sword: primary slashing + secondary fire share one
+        // damageSequenceId. When the SECONDARY leg alone drops a Last Stand holder
+        // to 0, checkBoonOfRecoveryLastStand rewrites HP to the floor and latches.
+        // The PRIMARY leg of the same hit must NOT shave that intercepted HP.
+        function playerTargetContext() {
+            getRuntimeValue.mockImplementation((key) => {
+                if (key === 'campaign') return [];
+                if (key === 'hitPoints') return 143;
+                return null;
+            });
+            loadCombatSummary.mockResolvedValue({
+                creatures: [{ name: 'Disciplined_Monk', type: 'player', currentHp: 5, maxHp: 143 }],
+            });
+        }
+
+        it('skips the primary leg when the secondary leg was intercepted by Boon of Recovery', async () => {
+            playerTargetContext();
+            rollExpression.mockReturnValueOnce({ total: 10, rolls: [4, 3, 3], modifier: 0 });
+            applyDamageToTarget.mockReturnValueOnce({
+                intercepted: true, finalDamage: 0, newHp: 72, damageDealt: 10, oldHp: 5,
+                interceptedFeature: 'Boon of Recovery', damageReduced: true, resistanceDetails: [],
+            });
+
+            const fn = createFn();
+            await fn({ name: 'Flame Sword', formula: '4d6+7', total: 21, rolls: [4, 5, 6, 6], modifier: 7, context: { targetName: 'Disciplined_Monk', damageType: 'slashing', autoDamageSecondaryFormula: '3d6', autoDamageSecondaryName: 'Flame Sword', autoDamageSecondaryDamageType: 'fire', } });
+
+            // Only the secondary leg runs; the primary is consumed by the intercept.
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+            expect(clearReTriggeredSequence).toHaveBeenCalled();
+            // HP stays at the intercepted floor, not shaved by the primary leg.
+            expect(setRuntimeValue).toHaveBeenCalledWith('Disciplined_Monk', 'currentHitPoints', 72, 'test-campaign');
+
+            const popupCall = deps.setPopupHtml.mock.calls[0][0];
+            expect(popupCall.interceptedFeature).toBe('Boon of Recovery');
+            expect(popupCall.targetCurrentHp).toBe(72);
+        });
+
+        it('still applies the primary leg for a Relentless Endurance intercept (byte-identical)', async () => {
+            playerTargetContext();
+            rollExpression.mockReturnValueOnce({ total: 10, rolls: [4, 3, 3], modifier: 0 });
+            applyDamageToTarget
+                .mockReturnValueOnce({ intercepted: true, finalDamage: 0, newHp: 1, damageDealt: 10, oldHp: 5, interceptedFeature: 'Relentless Endurance', damageReduced: false })
+                .mockReturnValueOnce({ finalDamage: 5, newHp: 1, damageReduced: false });
+
+            const fn = createFn();
+            await fn({ name: 'Flame Sword', formula: '4d6+7', total: 21, rolls: [4, 5, 6, 6], modifier: 7, context: { targetName: 'Disciplined_Monk', damageType: 'slashing', autoDamageSecondaryFormula: '3d6', autoDamageSecondaryName: 'Flame Sword', autoDamageSecondaryDamageType: 'fire', } });
+
+            // Relentless Endurance keeps the existing two-leg flow (clamp-to-1 guard).
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+            expect(applyDamageToTarget.mock.calls[1][3]).toEqual(['slashing']);
+        });
+
+        it('still applies the primary leg when the secondary leg is NOT intercepted (non-holder)', async () => {
+            playerTargetContext();
+            rollExpression.mockReturnValueOnce({ total: 10, rolls: [4, 3, 3], modifier: 0 });
+            applyDamageToTarget
+                .mockReturnValueOnce({ finalDamage: 10, newHp: 0, damageReduced: false })
+                .mockReturnValueOnce({ finalDamage: 21, newHp: 0, damageReduced: false });
+
+            const fn = createFn();
+            await fn({ name: 'Flame Sword', formula: '4d6+7', total: 21, rolls: [4, 5, 6, 6], modifier: 7, context: { targetName: 'Disciplined_Monk', damageType: 'slashing', autoDamageSecondaryFormula: '3d6', autoDamageSecondaryName: 'Flame Sword', autoDamageSecondaryDamageType: 'fire', } });
+
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
         });
     });
 });

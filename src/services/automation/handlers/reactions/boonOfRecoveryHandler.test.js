@@ -55,7 +55,7 @@ describe('boonOfRecoveryHandler', () => {
         });
 
         describe('when last stand is available', () => {
-            it('should mark last stand as used, set HP to half max, clear death saves, filter unconscious, and post logs', async () => {
+            it('should mark last stand as used, set HP to 1 + half max, clear death saves, filter unconscious, and post logs', async () => {
                 const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                     if (key === 'boonOfRecoveryLastStandUsed') return undefined;
@@ -74,12 +74,12 @@ describe('boonOfRecoveryHandler', () => {
                 expect(result.payload.type).toBe('automation_info');
                 expect(result.payload.name).toBe('Boon Of Recovery');
                 expect(result.payload.description).toContain('TestFighter');
-                expect(result.payload.description).toContain('20 HP');
+                expect(result.payload.description).toContain('21 HP');
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'boonOfRecoveryLastStandUsed', true, campaignName
                 );
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                    playerName, 'currentHitPoints', 20, campaignName
+                    playerName, 'currentHitPoints', 21, campaignName
                 );
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                     playerName, 'deathSaves', [false, false, false], campaignName
@@ -93,8 +93,8 @@ describe('boonOfRecoveryHandler', () => {
                 expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
                     type: 'hp_change',
                     targetName: playerName,
-                    delta: 20,
-                    currentHp: 20,
+                    delta: 21,
+                    currentHp: 21,
                     maxHp: 40,
                     isHealing: true,
                     isUnconscious: false,
@@ -107,7 +107,7 @@ describe('boonOfRecoveryHandler', () => {
                 });
             });
 
-            it('should floor the heal amount for odd max HP values', async () => {
+            it('should drop to 1 + floored half max for odd max HP values', async () => {
                 const oddStats = { name: playerName, hitPoints: { max: 47 } };
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
                     if (key === 'boonOfRecoveryLastStandUsed') return undefined;
@@ -117,9 +117,9 @@ describe('boonOfRecoveryHandler', () => {
 
                 const result = await handle(mockAction, oddStats, campaignName);
 
-                expect(result.payload.description).toContain('23');
+                expect(result.payload.description).toContain('24');
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                    playerName, 'currentHitPoints', 23, campaignName
+                    playerName, 'currentHitPoints', 24, campaignName
                 );
             });
 
@@ -146,10 +146,10 @@ describe('boonOfRecoveryHandler', () => {
                 });
                 logService.addEntry.mockResolvedValue(undefined);
 
-                // fallback to level (10 -> 5)
+                // fallback to level (10 -> 1 + 5)
                 await handle(mockAction, { name: playerName, level: 10 }, campaignName);
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                    playerName, 'currentHitPoints', 5, campaignName
+                    playerName, 'currentHitPoints', 6, campaignName
                 );
                 vi.clearAllMocks();
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
@@ -157,10 +157,10 @@ describe('boonOfRecoveryHandler', () => {
                     return undefined;
                 });
 
-                // fallback to barbarianLevel (12 -> 6)
+                // fallback to barbarianLevel (12 -> 1 + 6)
                 await handle(mockAction, { name: playerName, barbarianLevel: 12 }, campaignName);
                 expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                    playerName, 'currentHitPoints', 6, campaignName
+                    playerName, 'currentHitPoints', 7, campaignName
                 );
                 vi.clearAllMocks();
                 runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {

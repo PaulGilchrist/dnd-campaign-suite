@@ -24,7 +24,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const maxHp = playerStats.hitPoints?.max || playerStats.barbarianLevel || playerStats.level || 1;
     const healAmount = Math.floor(maxHp / 2);
-    const newHp = Math.max(1, healAmount);
+    // Canonical floor: 1 + half max, clamped to max (matches boonOfRecoveryService).
+    const newHp = Math.min(1 + healAmount, maxHp);
 
     await setRuntimeValue(playerName, LAST_STAND_KEY, true, campaignName);
     await setRuntimeValue(playerName, 'currentHitPoints', newHp, campaignName);

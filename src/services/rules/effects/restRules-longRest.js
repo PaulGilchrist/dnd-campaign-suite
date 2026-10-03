@@ -691,6 +691,8 @@ export async function applyLongRest(playerStats, campaignName) {
     ['undyingSentinelUsed', false],
     ['relentlessEnduranceUsed', false],
     ['boonOfFateUsed', false],
+    // FT-015: Boon of Recovery (Last Stand) recharges on a long rest.
+    ['boonOfRecoveryLastStandUsed', false],
   ])
 
   resetSignatureSpells(name, campaignName)
