@@ -234,7 +234,9 @@ function gateAid({ spell, campaignName, cfSetPending }) {
 function gateBane({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
-    cfSetPending('bane', makePending('bane', spell, { range: spell.range || '30 feet', maxTargets: 3, creatureTargets }));
+    // SP-011: upcast-aware cap (RAW +1 target per slot above 1st) — Banishment/
+    // Hold Person extractMaxTargets precedent replaces the static lv1 hardcode.
+    cfSetPending('bane', makePending('bane', spell, { range: spell.range || '30 feet', maxTargets: extractMaxTargets(spell) || 3, creatureTargets }));
     return true;
   }
   return false;

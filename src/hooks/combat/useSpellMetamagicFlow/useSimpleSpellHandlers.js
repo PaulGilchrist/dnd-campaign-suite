@@ -268,7 +268,10 @@ function refundGreaterRestorationNoEffects(d) {
 // runner plus the target selectors handed to createConfirmHandler/createSkipHandler.
 const SIMPLE_SPELL_SPECS = [
   { name: 'aid', key: 'Aid', run: applySpell(() => applyAidEffect, p => ({ automation: { type: 'aid', range: p.range, maxTargets: p.maxTargets } })) },
-  { name: 'bane', key: 'Bane', run: applySpell(() => applyBaneEffect, p => ({ automation: { type: 'bane', range: p.range, maxTargets: p.maxTargets } })) },
+  // SP-011: forward the paid slot level (stampPaidSlotLevel / CLA-086 seam) so an
+  // lv2 upcast stamps te slotLevel:2 and logs spellLevel:2 instead of resolving at
+  // the base makePending level.
+  { name: 'bane', key: 'Bane', run: applySpell(() => applyBaneEffect, p => ({ automation: { type: 'bane', range: p.range, maxTargets: p.maxTargets }, level: p.metaCtx?.slotLevel || p.spellLevel, casting_time: p.castingTime })) },
   { name: 'bless', key: 'Bless', run: applySpell(() => applyBlessEffect, p => ({ automation: { type: 'bless', range: p.range, maxTargets: p.maxTargets } })) },
   { name: 'faerieFire', key: 'FaerieFire', run: triggerSpell(() => triggerFaerieFire, (p, r) => ({ targets: toArray(r) }), showPopupIfPayload) },
   { name: 'holyAura', key: 'HolyAura', run: applySpell(() => applyHolyAuraEffect, p => ({ automation: { type: 'holy_aura', duration: p.spell.duration, auraRange: 30, casting_time: p.castingTime } }), showPopupIfPresent) },

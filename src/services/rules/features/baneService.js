@@ -66,7 +66,12 @@ export async function applyBaneEffect(spell, playerStats, campaignName, mapName,
 
     const slotLevel = spell.level || 1;
     const castingTime = spell.casting_time || '1 action';
-    const saveDc = buildSaveDc(spell.automation || {}, playerStats) || playerStats.computedStats?.saveBonuses?.CHA + 8;
+    // SP-011: buildSaveDc's missing-saveDc default (10) is truthy, so the old
+    // `|| computedStats` fallback was dead and prompts baked DC 10. Stamp the
+    // canonical caster spell-save-DC token (Hold Person / Banishment lane shape)
+    // when the automation carries no explicit numeric saveDc.
+    const auto = { saveDc: 'spell_save_dc', ...(spell.automation || {}) };
+    const saveDc = buildSaveDc(auto, playerStats) || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
     const casterName = playerStats.name;
 
     const logTargets = [];

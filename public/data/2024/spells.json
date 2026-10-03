@@ -966,15 +966,15 @@
             "dc_success": "none"
         },
         "upcast_at_slot_level": {
-            "1": "1 target",
-            "2": "2 targets",
-            "3": "3 targets",
-            "4": "4 targets",
-            "5": "5 targets",
-            "6": "6 targets",
-            "7": "7 targets",
-            "8": "8 targets",
-            "9": "9 targets"
+            "1": "up to 3 targets",
+            "2": "up to 4 targets",
+            "3": "up to 5 targets",
+            "4": "up to 6 targets",
+            "5": "up to 7 targets",
+            "6": "up to 8 targets",
+            "7": "up to 9 targets",
+            "8": "up to 10 targets",
+            "9": "up to 11 targets"
         }
     },
     {

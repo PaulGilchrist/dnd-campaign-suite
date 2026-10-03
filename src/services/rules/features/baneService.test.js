@@ -224,7 +224,26 @@ describe('applyBaneEffect', () => {
         );
     });
 
-    it('falls back to computedStats saveBonuses when buildSaveDc returns nothing', async () => {
+    it('SP-011: stamps the spell_save_dc token when automation has no saveDc', async () => {
+        buildSaveDc.mockImplementation((auto) => (auto.saveDc === 'spell_save_dc' ? 17 : 10));
+        createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
+            promptId: 'test-prompt-id',
+        });
+
+        await applyBaneEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
+
+        expect(buildSaveDc).toHaveBeenCalledWith(
+            expect.objectContaining({ saveDc: 'spell_save_dc' }),
+            PLAYER_STATS,
+        );
+        expect(createSaveListener).toHaveBeenCalledWith(
+            CAMPAIGN_NAME,
+            expect.objectContaining({ saveDc: 17 }),
+        );
+    });
+
+    it('falls back to the caster spell save DC when buildSaveDc returns nothing', async () => {
         buildSaveDc.mockReturnValue(null);
         createSaveListener.mockReturnValue({
             promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
@@ -236,7 +255,7 @@ describe('applyBaneEffect', () => {
         expect(createSaveListener).toHaveBeenCalledWith(
             CAMPAIGN_NAME,
             expect.objectContaining({
-                saveDc: 11,
+                saveDc: PLAYER_STATS.spellAbilities.saveDc,
             }),
         );
     });
@@ -392,7 +411,9 @@ describe('applyBaneEffect', () => {
         expect(saveEntries.length).toBeGreaterThanOrEqual(1);
         expect(saveEntries[0][1].targetName).toBe('Goblin');
         expect(saveEntries[0][1].saveType).toBe('CHA');
-        expect(saveEntries[0][1].saveDc).toBe(11);
+        // SP-011: unstubbed buildSaveDc (cleared mock) falls back to the caster
+        // spell-save-DC lane (PLAYER_STATS.spellAbilities.saveDc), never DC 10/11.
+        expect(saveEntries[0][1].saveDc).toBe(PLAYER_STATS.spellAbilities.saveDc);
         expect(saveEntries[0][1].success).toBe(false);
     });
 

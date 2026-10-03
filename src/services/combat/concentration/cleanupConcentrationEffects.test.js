@@ -726,6 +726,36 @@ describe('cleanupConcentrationEffects', () => {
         }))
     })
 
+    it('SP-011: break log names the concentrated spell (Bane), not Flesh to Stone', () => {
+        getAllStoreKeys.mockReturnValue([])
+        getRuntimeValue.mockReturnValue(null)
+        getCombatSummary.mockReturnValue(null)
+
+        cleanupConcentrationEffects('Alice', 'Bane', 'TestCampaign')
+
+        const breakLogs = addEntry.mock.calls.filter(c => c[1]?.type === 'ability_use')
+        expect(breakLogs.length).toBe(1)
+        expect(breakLogs[0][1]).toEqual(expect.objectContaining({
+            characterName: 'Alice',
+            abilityName: 'Bane',
+            description: 'Concentration broken; Bane ends.',
+        }))
+        expect(breakLogs[0][1].description).not.toContain('Flesh to Stone')
+    })
+
+    it('SP-012 twin: break log names Banishment', () => {
+        getAllStoreKeys.mockReturnValue([])
+        getRuntimeValue.mockReturnValue(null)
+        getCombatSummary.mockReturnValue(null)
+
+        cleanupConcentrationEffects('Alice', 'Banishment', 'TestCampaign')
+
+        const breakLogs = addEntry.mock.calls.filter(c => c[1]?.type === 'ability_use')
+        expect(breakLogs.length).toBe(1)
+        expect(breakLogs[0][1].abilityName).toBe('Banishment')
+        expect(breakLogs[0][1].description).toBe('Concentration broken; Banishment ends.')
+    })
+
     it('cleans up all spell-specific effects in order', () => {
         const cs = createCombatSummary([{ name: 'Bob' }])
         const targetEffects = [

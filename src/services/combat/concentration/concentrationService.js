@@ -362,6 +362,18 @@ async function cleanupConcentrationEffects(casterName, spellName, campaignName) 
 
     // Clean up Tasha's Hideous Laughter targetEffects and conditions for this caster
     clearTashasHideousLaughter(casterName, campaignName);
+
+    // SP-011: generic break-name emitter — the log names the spell that was actually
+    // concentrated (previously hardcoded "Flesh to Stone", wrong for Bane SP-011 /
+    // Banishment SP-012 surfaces). Byte shape of the entry is preserved.
+    if (spellName) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: spellName,
+            description: `Concentration broken; ${spellName} ends.`,
+        }).catch((e) => { console.error("[concentrationService:log-error]", e); });
+    }
 }
 
 function cleanupHolyAuraEffects(casterName, campaignName) {
@@ -404,12 +416,6 @@ function cleanupFleshToStoneEffects(casterName, campaignName) {
         setRuntimeValue('campaign', key, null, campaignName);
         clearFleshToStonePrompt(campaignName, targetName);
     }
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: casterName,
-        abilityName: 'Flesh to Stone',
-        description: 'Concentration broken; Flesh to Stone ends.',
-    }).catch((e) => { console.error("[concentrationService:log-error]", e); });
 }
 
 function cleanupBuffsByName(casterName, buffName, campaignName) {
