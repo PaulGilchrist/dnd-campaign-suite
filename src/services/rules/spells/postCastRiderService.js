@@ -7,6 +7,17 @@ let soulstitchResolve = null;
 const ENCHANTMENT_SCHOOL = 'enchantment';
 const ILLUSION_SCHOOL = 'illusion';
 
+// CLA-037: casting_time casing normalization (spellSectionUtils actionCastingTimes
+// precedent). 2024 spells.json spells the field 'Action'; 5e spells.json spells it
+// '1 action' — the raw equality gate never passed for 2024 data. Bonus-action and
+// reaction spellings stay excluded; a missing casting_time stays excluded.
+const ACTION_CASTING_TIMES = ['1 action', 'action'];
+
+function isActionCastingTime(spell) {
+    const castingTime = String(spell.casting_time || '').trim().toLowerCase();
+    return ACTION_CASTING_TIMES.includes(castingTime);
+}
+
 function isEnchantmentOrIllusion(spell) {
     const school = (spell.school || '').toLowerCase();
     return school === ENCHANTMENT_SCHOOL || school === ILLUSION_SCHOOL;
@@ -244,7 +255,7 @@ export async function triggerBewitchingMagic(spell, metaCtx, playerStats, campai
         return null;
     }
 
-    if (spell.casting_time !== '1 action') {
+    if (!isActionCastingTime(spell)) {
         return null;
     }
 
@@ -255,25 +266,39 @@ export async function triggerBewitchingMagic(spell, metaCtx, playerStats, campai
 
     const results = [];
     for (const feature of bewitchingFeatures) {
-        const action = {
-            name: feature.name,
-            automation: {
-                type: 'bewitching_magic',
-                casting_time: 'passive',
-            },
-            school: spell.school,
-        };
-
-        try {
-            const result = await executeHandler(action, playerStats, campaignName, mapName);
-            if (result) {
-                results.push(result);
-            }
-        } catch (e) {
-            console.error(`[bewitchingMagic] Failed to execute ${feature.name}:`, e);
-            throw e;
+        const result = await runBewitchingFeature(feature, spell, playerStats, campaignName, mapName);
+        if (result) {
+            results.push(result);
         }
     }
 
     return results.length > 0 ? results : null;
+}
+
+async function runBewitchingFeature(feature, spell, playerStats, campaignName, mapName) {
+    const action = {
+        name: feature.name,
+        automation: {
+            type: 'bewitching_magic',
+            casting_time: 'passive',
+        },
+        school: spell.school,
+        // CLA-037: auto-lane marker — the trigger runs inside the CASTER's own
+        // cast resolution, so the school/slot/casting_time gates above are the
+        // authoritative gate; the handler skips the lastAttack re-gate here.
+        autoTrigger: true,
+    };
+
+    try {
+        const result = await executeHandler(action, playerStats, campaignName, mapName);
+        if (result?.type === 'modal') {
+            // CLA-037: the auto lane discards its return value, so bridge the
+            // modal to the sheet via window event (soulstitch-modal-show precedent).
+            window.dispatchEvent(new CustomEvent('bewitching-modal-show', { detail: result.payload }));
+        }
+        return result || null;
+    } catch (e) {
+        console.error(`[bewitchingMagic] Failed to execute ${feature.name}:`, e);
+        throw e;
+    }
 }

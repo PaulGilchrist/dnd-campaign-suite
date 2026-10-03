@@ -236,6 +236,8 @@ async function runStatusEffectsFallback({ spell, fullSpell, metaCtx, playerStats
     const target = await getTargetInfo();
     const context = {
         targetName: target?.name, attackerName: playerStats.name, ...metaCtx,
+        // CLA-037: spell-origin school stamp for the lastAttack producer.
+        spellSchool: spell.school || fullSpell?.school || null,
         saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
         saveType: spell.dc.dc_type, dcSuccess: spell.dc.dc_success,
         metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,

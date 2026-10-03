@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { addEntry } from '../../services/ui/logService.js'
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 import { incrementFreeCastResource, isFreeCastAuthorized, prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js'
-import { triggerPostCastRiderSaves } from '../../services/rules/spells/postCastRiderService.js'
+import { triggerPostCastRiderSaves, triggerBewitchingMagic } from '../../services/rules/spells/postCastRiderService.js'
 
 const FREE_CAST_SPELLS = [
   'bane', 'bless', 'beacon of hope', 'haste', 'aid', "heroes' feast", 'greater restoration', 'lesser restoration',
@@ -69,10 +69,18 @@ export function rollbackSpellSlot(playerName, spellName, spellLevel, playerStats
 // stamp pending.postCastTriggersRan to opt out of this seam.
 async function fireConfirmLaneRider(pending, playerStats, campaignName) {
   if (pending.postCastTriggersRan) return;
+  const metaCtx = { ...(pending.metaCtx || {}), slotLevel: paidSpellLevel(pending) };
   try {
-    await triggerPostCastRiderSaves(pending.spell, { ...(pending.metaCtx || {}), slotLevel: paidSpellLevel(pending) }, playerStats, campaignName, null);
+    await triggerPostCastRiderSaves(pending.spell, metaCtx, playerStats, campaignName, null);
   } catch (e) {
     console.error('[useConfirmableFlow:rider-error]', e);
+  }
+  // CLA-037: Bewitching Magic auto rider — same confirm-lane seam; school /
+  // slot / casting-time gates run inside the trigger.
+  try {
+    await triggerBewitchingMagic(pending.spell, metaCtx, playerStats, campaignName, null);
+  } catch (e) {
+    console.error('[useConfirmableFlow:bewitching-rider-error]', e);
   }
 }
 

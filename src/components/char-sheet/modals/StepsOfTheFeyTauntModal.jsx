@@ -9,13 +9,50 @@ import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.
 import { getCombatContext } from '../../../services/rules/combat/damageUtils.js';
 import '../CharSheet.css';
 
-function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, campaignName, saveDc, featureName, newCount, freeCastCountKey, onClose }) {
+function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, campaignName, saveDc, featureName, newCount, freeCastCountKey, unlimited, onClose }) {
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
     const [choice, setChoice] = useState(null);
 
     const playerName = playerStats.name;
-    const hasUses = newCount > 0;
+    // CLA-037: Bewitching Magic rides this modal with NO uses limit — unlimited
+    // keeps every lane selectable and decrementCount a no-op (no freeCastCountKey).
+    const isBewitching = mode === 'bewitchingMagic';
+    const hasUses = unlimited === true || newCount > 0;
+
+    const remainingText = unlimited === true ? 'unlimited — no uses limit' : `${newCount} remaining`;
+
+    const logFreeCast = (extraNote) => {
+        const logDescription = `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned).`;
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: extraNote ? `${logDescription} ${extraNote}` : logDescription,
+            freeCastsUnlimited: unlimited === true || undefined,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[bewitchingMagic] Error logging free cast:', e); });
+    };
+
+    const applyBewitchingFreeCast = () => {
+        logFreeCast('');
+        setResult({ description: `${featureName}: Cast Misty Step without expending a spell slot (${remainingText}). Teleport up to 30 feet — GM positions the token.` });
+        setApplied(true);
+    };
+
+    const declineBewitching = () => {
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            abilityName: featureName,
+            automationType: action?.automation?.type || 'bewitching_magic',
+            automationDetail: 'bewitching_magic_declined',
+            reason: 'player declined the free Misty Step',
+            description: `${featureName} declined — no free Misty Step cast.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[bewitchingMagic] Error logging decline:', e); });
+        onClose();
+    };
 
     const options = [
         {
@@ -96,7 +133,16 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     };
 
     const handleFreeCastSkip = () => {
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).`;
+        // CLA-037: every resolution logs — the plain free-cast lane previously set
+        // result text only, violating the app-wide "every automation must log" rule.
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned).`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[stepsOfTheFey] Error logging free cast:', e); });
+        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remainingText}).`;
         setResult({ description });
         setApplied(true);
     };
@@ -291,6 +337,26 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         setApplied(true);
     };
 
+    const renderBewitchingChoice = () => (
+        <div className="sp-overlay">
+            <div className="sp-modal">
+                <div className="sp-header">
+                    <i className="fa-solid fa-wand-sparkles"></i> {title || featureName}
+                </div>
+                <div className="sp-body">
+                    <p>Cast <b>Misty Step</b> without expending a spell slot?</p>
+                    <p>Bewitching Magic has no uses limit — the free teleport is always available after a qualifying cast. Teleport up to 30 feet — GM positions the token.</p>
+                </div>
+                <div className="sp-actions">
+                    <button className="sp-roll-btn" onClick={applyBewitchingFreeCast} data-testid="bewitching-free-cast-btn" type="button">
+                        <i className="fa-solid fa-wand-sparkles"></i> Misty Step (free cast)
+                    </button>
+                    <button className="sp-dismiss-btn" onClick={declineBewitching} type="button">Decline</button>
+                </div>
+            </div>
+        </div>
+    );
+
     const renderChoiceStep = () => (
         <div className="sp-overlay">
             <div className="sp-modal">
@@ -435,6 +501,10 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
 
     if (choice === 'dreadful') {
         return renderDreadfulConfirm();
+    }
+
+    if (isBewitching) {
+        return renderBewitchingChoice();
     }
 
     return renderChoiceStep();

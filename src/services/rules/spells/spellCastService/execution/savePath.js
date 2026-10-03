@@ -5,6 +5,11 @@ import { getCombatContext } from '../../../combat/damageUtils.js';
 import { computeEmpoweredEvocation } from './damageCalculation.js';
 import { fetchSpellOverlays, overlayTargetId } from '../../../../maps/spellOverlayService.js';
 
+// CLA-037: lastAttack spellSchool for the Bewitching Magic manual gate.
+function resolveStampSchool(spell, fullSpell) {
+    return fullSpell?.school || spell.school || null;
+}
+
 async function handleSavePath(opts) {
     const { fullSpell, metaCtx, playerStats, campaignName, mapName } = opts;
 
@@ -190,6 +195,10 @@ function buildSingleTargetSaveContext(target, mapName, { playerStats, metaCtx, f
         attackerName: playerStats.name,
         soulstitchCast: soulstitchSelection.length > 0,
         ...metaCtx,
+        // CLA-037: spell-origin school stamp — threaded to the save consumer's
+        // lastAttack stamp (handleNpcSaveDamage.storeSaveLastAttack) so the manual
+        // Bewitching Magic row can gate on the last cast's school.
+        spellSchool: resolveStampSchool(spell, fullSpell),
         damageType: effectiveDamageType,
         saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
         saveType: fullSpell.dc?.dc_type || spell.dc.dc_type,

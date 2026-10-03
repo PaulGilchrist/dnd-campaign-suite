@@ -72,6 +72,17 @@ export default function useCharActionsEventListeners({
         return () => window.removeEventListener('soulstitch-modal-show', handler);
     }, [setModalState]);
 
+    // bewitching-modal-show listener (CLA-037): the post-cast auto rider discards
+    // its modal return value, so postCastRiderService bridges it here — same
+    // soulstitch-modal-show lineage.
+    useEffect(() => {
+        const handler = (event) => {
+            setModalState({ stepsOfTheFeyTauntModal: event.detail });
+        };
+        window.addEventListener('bewitching-modal-show', handler);
+        return () => window.removeEventListener('bewitching-modal-show', handler);
+    }, [setModalState]);
+
     // potent-spellcasting-temp-hp listener
     useEffect(() => {
         const handler = async (event) => {

@@ -1,44 +1,76 @@
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 
-function bewitchingRefusal(action, auto) {
+// CLA-037: Bewitching Magic is a free Misty Step rider with NO uses limit in
+// data — it must never read or burn the foreign `_Steps_of_the_Fey_freeCastCount`
+// counter (Steps of the Fey owns that key; see stepsOfTheFeyHandler.js).
+
+function bewitchingRefusal(action, playerName, campaignName, reason) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        abilityName: action.name || 'Bewitching Magic',
+        automationType: action.automation?.type || 'bewitching_magic',
+        automationDetail: 'bewitching_magic_refused',
+        reason,
+        description: `Bewitching Magic refused — ${reason}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[bewitchingMagic] Error logging refusal:', e); });
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name || 'Bewitching Magic',
             description: 'Bewitching Magic requires that your last spell cast was an enchantment or illusion spell.',
-            automation: auto,
+            automation: action.automation,
         },
     };
 }
 
-function passesBewitchingGate(lastAttack, playerName, action) {
-    if (!lastAttack) return false;
-    if (lastAttack.attackerName !== playerName) return false;
-    // Check spell school is enchantment or illusion
-    const school = (lastAttack.spellSchool || action.school || lastAttack.damageSchool || '').toLowerCase();
+function qualifiesSchool(school) {
     return school === 'enchantment' || school === 'illusion';
 }
 
+function resolveSchool(lastAttack, action) {
+    return (lastAttack?.spellSchool || lastAttack?.damageSchool || action?.school || '').toLowerCase();
+}
+
+// Manual-lane gate: returns a refusal reason, or null when the lastAttack qualifies.
+async function manualRefusalReason(playerName, campaignName) {
+    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
+    if (!lastAttack || lastAttack.attackerName !== playerName) {
+        return 'no qualifying spell cast by you in the current combat record';
+    }
+    const school = resolveSchool(lastAttack, null);
+    if (!qualifiesSchool(school)) {
+        return `last spell school was ${school || 'unknown'}, not enchantment or illusion`;
+    }
+    return null;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
     const playerName = playerStats.name;
 
-    const freeCastCountKey = '_Steps_of_the_Fey_freeCastCount';
-    const usesMax = evaluateAutoExpression('CHA modifier_min_1', playerStats) || 1;
-    const currentCount = Number(getRuntimeValue(playerName, freeCastCountKey, campaignName) ?? usesMax);
+    let refusalReason = null;
+    if (action.autoTrigger === true) {
+        // Auto lane (postCastRiderService.triggerBewitchingMagic): the trigger ran
+        // inside this caster's own cast resolution and already gated school + spell
+        // slot + action casting time, so the cast fact is authoritative here.
+        if (!qualifiesSchool(resolveSchool(null, action))) {
+            refusalReason = 'last spell cast was not an enchantment or illusion spell';
+        }
+    } else {
+        // Manual lane: gate on the campaign lastAttack stamp — the spell-save /
+        // spell-cast lanes now carry spellSchool (damageRollback / handleNpcSaveDamage).
+        refusalReason = await manualRefusalReason(playerName, campaignName);
+    }
 
-    const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
-
-    if (!passesBewitchingGate(lastAttack, playerName, action)) {
-        return bewitchingRefusal(action, auto);
+    if (refusalReason) {
+        return bewitchingRefusal(action, playerName, campaignName, refusalReason);
     }
 
     const cs = await getCombatContext(campaignName);
-
-    // All checks passed — open the Steps of the Fey modal
     const eligibleTargets = cs?.creatures?.filter(c => c.name !== playerName) || [];
     const saveDc = 8 + (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0) + (playerStats.proficiency || 0);
 
@@ -46,7 +78,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'modal',
         modalName: 'stepsOfTheFeyTaunt',
         payload: {
-            mode: 'stepsOfTheFey',
+            mode: 'bewitchingMagic',
             title: 'Bewitching Magic',
             targets: eligibleTargets,
             action,
@@ -54,8 +86,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             campaignName,
             saveDc,
             featureName: 'Bewitching Magic',
-            newCount: currentCount,
-            freeCastCountKey,
+            // CLA-037: unlimited free rider — no uses counter, no freeCastCountKey.
+            unlimited: true,
         },
     };
 }

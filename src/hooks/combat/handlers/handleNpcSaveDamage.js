@@ -18,6 +18,7 @@ import { resolveCreatureType } from '../../../services/combat/creatureTypeResolv
 import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasBuffEffect } from '../../../services/automation/common/buffToggle.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
+import { normalizeSchool } from '../../../services/automation/common/damageRollback.js';
 import { triggerViciousMockeryForGeneric } from '../../../services/rules/features/viciousMockeryService.js';
 import { grantInfernalWound } from '../../../services/rules/features/infernalWoundService.js';
 import { stagePetrifyingBiteTargets } from '../../../services/rules/features/cockatricePetrifyService.js';
@@ -538,11 +539,15 @@ function buildSavePopupData({ name, formula, rolls, modifier, target, saveResult
     };
 }
 
-function buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage }) {
+function buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage, spellSchool }) {
     const saveOutcome = isSoulstitchProtected ? 'success' : (saveResult.success ? 'success' : 'failure');
     return {
         attackerName: attackerName || null,
         targetName: target.name,
+        // CLA-037: spell-origin school stamp threaded from the cast context
+        // (savePath buildSingleTargetSaveContext) so the manual Bewitching Magic
+        // row gate can ever pass for spell-save lanes.
+        spellSchool: normalizeSchool(spellSchool),
         d20: saveResult.roll,
         d20Rolls: saveResult.rawRolls || [saveResult.roll],
         bonus: saveResult.bonus,
@@ -566,11 +571,11 @@ function buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets
 }
 
 function storeSaveLastAttack({ context, campaignName, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage, characterName }) {
-    const { attackerName, statusEffects, affectedTargets } = context || {};
+    const { attackerName, statusEffects, affectedTargets, spellSchool } = context || {};
     if (!attackerName || !target?.name) {
         console.error('[useLoggedDiceRollDamage] lastAttack missing required fields:', { attackerName, targetName: target?.name, characterName });
     }
-    const entry = buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage });
+    const entry = buildSaveLastAttackEntry({ attackerName, statusEffects, affectedTargets, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage, spellSchool });
     setRuntimeValue('campaign', 'lastAttack', entry, campaignName);
 }
 

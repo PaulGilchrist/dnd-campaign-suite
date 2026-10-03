@@ -288,6 +288,7 @@ describe('SaveAttackAoeModal - Damage resolution', () => {
         saveType: 'DEX',
         saveDc: 15,
         attackScope: 'aoe',
+        spellSchool: null,
       });
 
       expect(damageRollback.addTargetResult).toHaveBeenCalledWith('test-campaign', expect.objectContaining({

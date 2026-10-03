@@ -140,6 +140,11 @@ export async function findMostRecentRollAcrossCreatures(campaignName) {
     };
 }
 
+// CLA-037: lastAttack spellSchool normalization (empty/missing -> null).
+export function normalizeSchool(value) {
+    return (value || '').toLowerCase() || null;
+}
+
 /**
  * Create a lastAttack entry for a save-based spell (single-target or AoE).
  * Call this at the start of a spell handler before the target loop.
@@ -157,7 +162,7 @@ export async function findMostRecentRollAcrossCreatures(campaignName) {
  * @param {number} [config.damageOnFailure] - Base damage on failed save (0 for condition-only spells)
  */
 export function storeSpellLastAttack(campaignName, config) {
-    const { casterName, spellName, saveType, saveDc, attackScope, damageFormula, damageType, damageOnSuccess, damageOnFailure } = config;
+    const { casterName, spellName, saveType, saveDc, attackScope, damageFormula, damageType, damageOnSuccess, damageOnFailure, spellSchool } = config;
 
     if (!casterName) console.warn('[storeSpellLastAttack] casterName is missing');
     if (!spellName) console.warn('[storeSpellLastAttack] spellName is missing');
@@ -168,6 +173,9 @@ export function storeSpellLastAttack(campaignName, config) {
         attackerName: casterName || null,
         attackName: spellName || null,
         rollType: 'spell-save',
+        // CLA-037: spell-origin school stamp (lowercased) so the manual Bewitching
+        // Magic row can gate on the last cast's school; null for non-spell lanes.
+        spellSchool: normalizeSchool(spellSchool),
         saveType: saveType || null,
         saveDc: saveDc ?? 0,
         attackScope: attackScope || 'aoe',

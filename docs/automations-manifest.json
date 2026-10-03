@@ -743,7 +743,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-037-bewitching-magic.md",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Immediately after casting an Enchantment or Illusion spell using an action and a spell slot, cast Misty Step as part of the same action without expending a spell slot."

@@ -8,6 +8,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { triggerBewitchingMagic } from '../../../../services/rules/spells/postCastRiderService.js';
 import { registerTargetEffect, abilitySaveDisadvantageActive } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../../services/rules/effects/expirationQueue.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
@@ -21,6 +22,20 @@ import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.
 import { handleOverchannelSelfDamage } from '../../../../hooks/combat/handlers/handleOverchannelSelfDamage.js';
 import { hasSoulstitchProtection, clearSoulstitchStamp } from '../../../../hooks/combat/loggedDiceRollUtils.js';
 import { setTempHp } from '../../../../services/automation/handlers/buffs/tempHpService.js';
+
+// CLA-037: spell-origin school stamp for the Bewitching Magic manual gate.
+function resolveActionSpellSchool(action) {
+    return action?.spell?.school || null;
+}
+
+// CLA-037: Bewitching Magic auto rider — this automation-modal lane never
+// reaches runPostCastTriggers; school/slot/casting-time gates run inside the
+// trigger. Fire-and-forget so resolution is not blocked.
+function fireBewitchingRider(action, playerStats, campaignName, storeLastAttack) {
+    if (!action?.spell || storeLastAttack === false) return;
+    triggerBewitchingMagic(action.spell, { slotLevel: action.spell.level }, playerStats, campaignName, null)
+        .catch((e) => { console.error('[SaveAttackAoeModal] Bewitching Magic rider error:', e); });
+}
 
 // Decide the NPC's save roll against the AoE DC, honouring heighten / rider / slow disadvantage.
 function computeNpcSave(targetName, ctx) {
@@ -1361,6 +1376,8 @@ function SaveAttackAoeModal({
             saveType,
             saveDc,
             attackScope: 'aoe',
+            // CLA-037: spell-origin school stamp for the Bewitching Magic manual gate.
+            spellSchool: resolveActionSpellSchool(action),
         });
 
         const results = [];
@@ -1400,6 +1417,8 @@ function SaveAttackAoeModal({
         }
 
         persistAndNotify(combatSummary, campaignName);
+
+        fireBewitchingRider(action, playerStats, campaignName, storeLastAttack);
 
         if (overchannelActive) {
             await handleOverchannelSelfDamage(playerStats.name, campaignName,

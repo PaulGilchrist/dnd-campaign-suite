@@ -521,6 +521,52 @@ describe('postCastRiderService', () => {
       const result = await triggerBewitchingMagic({ name: 'Unknown Spell' }, { slotLevel: 1 }, stats, 'camp', 'map')
       expect(result).toBeNull()
     })
+
+    // CLA-037: 2024 spells.json spells casting_time 'Action' — the raw
+    // !== '1 action' gate never fired for 2024 data.
+    it('accepts 2024 "Action" casing (defect 1 regression pin)', async () => {
+      executeHandler.mockResolvedValue({ success: true })
+      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+      for (const castingTime of ['Action', '1 Action', 'ACTION', ' Action ']) {
+        executeHandler.mockClear()
+        const result = await triggerBewitchingMagic({ ...enchantmentSpell, casting_time: castingTime }, { slotLevel: 1 }, stats, 'camp', 'map')
+        expect(result).toEqual([{ success: true }])
+      }
+    })
+
+    it('still excludes bonus action / reaction casings after normalization', async () => {
+      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+      for (const castingTime of ['Bonus Action', '1 bonus action', 'Reaction', '1 reaction']) {
+        const result = await triggerBewitchingMagic({ ...enchantmentSpell, casting_time: castingTime }, { slotLevel: 1 }, stats, 'camp', 'map')
+        expect(result).toBeNull()
+      }
+      expect(executeHandler).not.toHaveBeenCalled()
+    })
+
+    it('marks the auto-lane action with autoTrigger and forwards the spell school', async () => {
+      executeHandler.mockResolvedValue({ success: true })
+      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+      await triggerBewitchingMagic({ ...enchantmentSpell, school: 'Illusion' }, { slotLevel: 1 }, stats, 'camp', 'map')
+      expect(executeHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ autoTrigger: true, school: 'Illusion' }),
+        stats,
+        'camp',
+        'map',
+      )
+    })
+
+    it('bridges a modal handler result to the bewitching-modal-show window event', async () => {
+      executeHandler.mockResolvedValue({ type: 'modal', modalName: 'stepsOfTheFeyTaunt', payload: { mode: 'bewitchingMagic', unlimited: true } })
+      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+      const seen = []
+      const listener = (e) => seen.push(e.detail)
+      window.addEventListener('bewitching-modal-show', listener)
+      const result = await triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      window.removeEventListener('bewitching-modal-show', listener)
+      expect(seen).toHaveLength(1)
+      expect(seen[0].mode).toBe('bewitchingMagic')
+      expect(result).toHaveLength(1)
+    })
   })
 
   describe('confirmSoulstitchSelection', () => {
