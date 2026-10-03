@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
+    setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
@@ -49,7 +50,7 @@ function makePlayerStats(overrides = {}) {
 
 function makeCombatSummary(creatureNames = []) {
     return {
-        creatures: creatureNames.map((name) => ({ name })),
+        creatures: creatureNames.map((name) => ({ name, type: 'player' })),
     };
 }
 
@@ -61,10 +62,16 @@ describe('auraOfLifeHandler', () => {
     });
 
     describe('handle', () => {
-        it('returns popup with all creature targets including caster', async () => {
+        // SP-008: party-membership picker (selected allies + caster), NO
+        // 5-target cap (Aura of Protection copy removed), honest 10-minute copy.
+        it('returns popup with party targets including caster, no target cap', async () => {
             combatData.getCombatSummary.mockResolvedValue(
                 makeCombatSummary(['Cleric', 'Ally1', 'Ally2', 'Enemy1'])
             );
+            useRuntimeState.getRuntimeValue.mockImplementation((entity, key) => {
+                if (entity === 'Cleric' && key === 'selectedAllies') return ['Ally1', 'Ally2'];
+                return null;
+            });
 
             const action = {
                 name: 'Aura of Life',
@@ -77,11 +84,24 @@ describe('auraOfLifeHandler', () => {
                 payload: expect.objectContaining({
                     type: 'automation_info',
                     name: 'Aura of Life',
-                    creatureTargets: ['Cleric', 'Ally1', 'Ally2', 'Enemy1'],
-                    maxTargets: 5,
+                    creatureTargets: ['Cleric', 'Ally1', 'Ally2'],
                     automation: { type: 'aura_of_life' },
                 }),
             });
+            expect(result.payload).not.toHaveProperty('maxTargets');
+            expect(result.payload.description).toMatch(/30-foot Emanation/);
+            expect(result.payload.description).toMatch(/Concentration, up to 10 minutes/);
+        });
+
+        it('falls back leniently to player combatants when no allies are configured', async () => {
+            const cs = makeCombatSummary(['Cleric', 'Ally1', 'Enemy1']);
+            cs.creatures[2].type = 'monster';
+            combatData.getCombatSummary.mockResolvedValue(cs);
+            useRuntimeState.getRuntimeValue.mockReturnValue(null);
+
+            const result = await handle({ name: 'Aura of Life' }, makePlayerStats(), campaignName, null);
+
+            expect(result.payload.creatureTargets).toEqual(['Cleric', 'Ally1']);
         });
 
         it('returns error popup when no combat context', async () => {
@@ -114,11 +134,10 @@ describe('auraOfLifeHandler', () => {
 
             expect(result).toEqual({
                 type: 'popup',
-                payload: expect.objectContaining({
+                payload:                 expect.objectContaining({
                     type: 'automation_info',
                     name: 'Aura of Life',
                     creatureTargets: [],
-                    maxTargets: 5,
                 }),
             });
         });
@@ -167,42 +186,27 @@ describe('auraOfLifeHandler', () => {
                 }),
             });
 
-            // Verify activeBuffs were set for each target
-            expect(vi.mocked(useRuntimeState.setRuntimeValue))
-                .toHaveBeenCalledWith('Ally1', 'activeBuffs', expect.arrayContaining([
-                    expect.objectContaining({
-                        name: 'Aura of Life',
-                        effect: 'aura_of_life',
-                        resistanceTypes: ['Necrotic'],
-                        sourceCharacter: 'Cleric',
-                    }),
-                ]), campaignName);
-
-            expect(vi.mocked(useRuntimeState.setRuntimeValue))
-                .toHaveBeenCalledWith('Ally2', 'activeBuffs', expect.arrayContaining([
-                    expect.objectContaining({
-                        name: 'Aura of Life',
-                        effect: 'aura_of_life',
-                        resistanceTypes: ['Necrotic'],
-                        sourceCharacter: 'Cleric',
-                    }),
-                ]), campaignName);
-
-            // Verify HP max protection flag
-            expect(vi.mocked(useRuntimeState.setRuntimeValue))
-                .toHaveBeenCalledWith('Ally1', 'auraOfLifeHpMaxProtected', true, campaignName);
-            expect(vi.mocked(useRuntimeState.setRuntimeValue))
-                .toHaveBeenCalledWith('Ally2', 'auraOfLifeHpMaxProtected', true, campaignName);
-
-            // Verify turnStartEffects were updated for each target
-            expect(vi.mocked(useRuntimeState.setRuntimeValue))
-                .toHaveBeenCalledWith('Ally1', 'turnStartEffects', expect.arrayContaining([
-                    expect.objectContaining({ type: 'aura_of_life_turn_start_heal' }),
-                ]), campaignName);
-            expect(vi.mocked(useRuntimeState.setRuntimeValue))
-                .toHaveBeenCalledWith('Ally2', 'turnStartEffects', expect.arrayContaining([
-                    expect.objectContaining({ type: 'aura_of_life_turn_start_heal' }),
-                ]), campaignName);
+            // SP-008: ONE merged write per target — buff (with honest
+            // 10-minute duration label), HP-max flag, and turn-start heal
+            // land in a single setRuntimeObject snapshot.
+            for (const ally of ['Ally1', 'Ally2']) {
+                expect(vi.mocked(useRuntimeState.setRuntimeObject))
+                    .toHaveBeenCalledWith(ally, expect.objectContaining({
+                        activeBuffs: expect.arrayContaining([
+                            expect.objectContaining({
+                                name: 'Aura of Life',
+                                effect: 'aura_of_life',
+                                duration: 'Concentration, up to 10 minutes',
+                                resistanceTypes: ['Necrotic'],
+                                sourceCharacter: 'Cleric',
+                            }),
+                        ]),
+                        auraOfLifeHpMaxProtected: true,
+                        turnStartEffects: expect.arrayContaining([
+                            expect.objectContaining({ type: 'aura_of_life_turn_start_heal' }),
+                        ]),
+                    }), campaignName);
+            }
 
             // Verify targetEffects were set on campaign entity
             expect(vi.mocked(useRuntimeState.setRuntimeValue))
@@ -215,13 +219,21 @@ describe('auraOfLifeHandler', () => {
                     }),
                 ]), campaignName, true);
 
-            // Verify expirations were registered for each target
+            // SP-008: explicit 10-minute clock (rounds 100) — the old
+            // rounds:undefined + expireOnCreatureName:<caster> anchor expired
+            // the aura at the caster's round-2 turn-start (~1 round).
             expect(vi.mocked(expirations.addExpiration)).toHaveBeenCalledTimes(2);
-            expect(vi.mocked(expirations.addExpiration))
-                .toHaveBeenCalledWith({ attackerName: 'Cleric', targetName: 'Ally1', effects: expect.arrayContaining([
+            for (const ally of ['Ally1', 'Ally2']) {
+                const calls = vi.mocked(expirations.addExpiration).mock.calls.map(c => c[0]);
+                const entry = calls.find(c => c.targetName === ally);
+                expect(entry).toBeTruthy();
+                expect(entry.rounds).toBe(100);
+                expect(entry.expireOnCreatureName).toBeUndefined();
+                expect(entry.effects).toEqual(expect.arrayContaining([
                     { type: 'remove_active_buff', buffName: 'Aura of Life' },
                     { type: 'aura_of_life_hp_protection_end' },
-                ]), campaignName, rounds: undefined, expireOnCreatureName: 'Cleric' });
+                ]));
+            }
 
             // Verify concentration was set with correct parameters
             // Note: handler passes getCombatSummary result directly (Promise) without await
@@ -258,11 +270,13 @@ describe('auraOfLifeHandler', () => {
             };
             await applyAuraOfLife(action, makePlayerStats(), campaignName, null, ['Ally1']);
 
-            // Verify setRuntimeValue was NOT called for activeBuffs (dedup check)
-            const buffSetCalls = vi.mocked(useRuntimeState.setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'Ally1' && call[1] === 'activeBuffs'
-            );
-            expect(buffSetCalls).toHaveLength(0);
+            // Dedup check: the merged write must carry the existing buffs
+            // array unchanged (no duplicate Aura of Life entry appended).
+            const merged = vi.mocked(useRuntimeState.setRuntimeObject).mock.calls
+                .find(call => call[0] === 'Ally1');
+            expect(merged).toBeTruthy();
+            expect(merged[1].activeBuffs).toHaveLength(1);
+            expect(merged[1].activeBuffs[0].name).toBe('Aura of Life');
         });
 
         it('does not duplicate turnStartEffect if already present', async () => {
@@ -282,11 +296,13 @@ describe('auraOfLifeHandler', () => {
             };
             await applyAuraOfLife(action, makePlayerStats(), campaignName, null, ['Ally1']);
 
-            // Verify turnStartEffects was NOT updated (dedup check)
-            const turnEffectCalls = vi.mocked(useRuntimeState.setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'Ally1' && call[1] === 'turnStartEffects'
-            );
-            expect(turnEffectCalls).toHaveLength(0);
+            // Dedup check: merged write carries the existing turn-start heal
+            // entry without appending a duplicate.
+            const merged = vi.mocked(useRuntimeState.setRuntimeObject).mock.calls
+                .find(call => call[0] === 'Ally1');
+            expect(merged).toBeTruthy();
+            expect(merged[1].turnStartEffects).toHaveLength(1);
+            expect(merged[1].turnStartEffects[0].type).toBe('aura_of_life_turn_start_heal');
         });
 
         it('replaces existing targetEffect entry instead of duplicating', async () => {
@@ -362,10 +378,12 @@ describe('auraOfLifeHandler', () => {
             await applyAuraOfLife(action, customStats, campaignName, null, ['Ally1']);
 
             // Verify caster name used in buff sourceCharacter
-            expect(vi.mocked(useRuntimeState.setRuntimeValue))
-                .toHaveBeenCalledWith('Ally1', 'activeBuffs', expect.arrayContaining([
-                    expect.objectContaining({ sourceCharacter: 'HighPriest' }),
-                ]), campaignName);
+            expect(vi.mocked(useRuntimeState.setRuntimeObject))
+                .toHaveBeenCalledWith('Ally1', expect.objectContaining({
+                    activeBuffs: expect.arrayContaining([
+                        expect.objectContaining({ sourceCharacter: 'HighPriest' }),
+                    ]),
+                }), campaignName);
 
             // Verify caster name used in targetEffects source
             expect(vi.mocked(useRuntimeState.setRuntimeValue))

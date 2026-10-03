@@ -10,6 +10,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 import { getMonsterData } from '../../services/npcs/monsterUtils.js';
 import { getAllyList } from '../useAllySelection.js';
+import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -152,7 +153,9 @@ const simpleGates = [
   { name: 'Regenerate', level: 7, pendingKey: 'pendingRegenerate' },
   { name: 'Healing Word', level: 1, pendingKey: 'pendingHealingWord' },
   { name: 'Cure Wounds', level: 1, pendingKey: 'pendingCureWounds' },
-  { name: 'Aura of Life', level: 4, pendingKey: 'pendingAuraOfLife' },
+  // SP-008: Aura of Life gate is now party-membership based (selected
+  // allies ∪ party) — goblin-only fixture no longer opens it; pinned in its
+  // own block below.
   { name: 'Aura of Purity', level: 4, pendingKey: 'pendingAuraOfPurity' },
   { name: 'Circle of Power', level: 9, pendingKey: 'pendingCircleOfPower' },
   { name: 'Compulsion', level: 4, pendingKey: 'pendingCompulsion' },
@@ -549,5 +552,70 @@ describe('useSpellMetamagicFlow — Resistance damage types', () => {
       'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning',
       'Necrotic', 'Piercing', 'Poison', 'Radiant', 'Slashing', 'Thunder',
     ]);
+  });
+});
+
+// ── SP-008: Aura of Life party-membership gate ─────────────────────────────
+
+describe('useSpellMetamagicFlow — Aura of Life party gate (SP-008)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
+  });
+
+  it('opens the picker with selected allies and no target cap', () => {
+    getRuntimeValue.mockImplementation((name, key) => (key === 'selectedAllies' ? ['Goblin B', 'Goblin C'] : 3));
+
+    const { result } = renderHook(() =>
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
+    );
+    act(() => {
+      result.current.gateMetamagic(makeSpell({ name: 'Aura of Life', level: 4 }));
+    });
+
+    const pending = result.current.pendingAuraOfLife;
+    expect(pending).not.toBeNull();
+    expect(pending.creatureTargets).toEqual(['Goblin B', 'Goblin C']);
+    expect(pending).not.toHaveProperty('maxTargets');
+  });
+
+  it('falls back leniently to player combatants when allies are unconfigured', () => {
+    getCombatSummary.mockImplementation(() => ({
+      creatures: [
+        { name: 'TestSorcerer', type: 'player' },
+        { name: 'AasimarTest', type: 'player' },
+        { name: 'Goblin A', type: 'monster' },
+      ],
+    }));
+    getRuntimeValue.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
+    );
+    act(() => {
+      result.current.gateMetamagic(makeSpell({ name: 'Aura of Life', level: 4 }));
+    });
+
+    expect(result.current.pendingAuraOfLife.creatureTargets).toEqual(['TestSorcerer', 'AasimarTest']);
+  });
+
+  it('stays closed when no party membership exists on the board', () => {
+    getCombatSummary.mockImplementation(() => ({
+      creatures: [
+        { name: 'Goblin A', type: 'monster', currentHp: 0 },
+        { name: 'Goblin B' },
+        { name: 'Goblin C' },
+      ],
+    }));
+    getRuntimeValue.mockImplementation((name, key) => (key === 'selectedAllies' ? null : 3));
+
+    const { result } = renderHook(() =>
+      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
+    );
+    act(() => {
+      result.current.gateMetamagic(makeSpell({ name: 'Aura of Life', level: 4 }));
+    });
+
+    expect(result.current.pendingAuraOfLife).toBeFalsy();
   });
 });

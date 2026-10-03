@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
   getAllStoreKeys: vi.fn(() => []),
 }));
 
@@ -106,7 +107,7 @@ vi.mock('../../../hooks/useAllySelection.js', () => ({
 }));
 
 import { clearAllExpirationEffects, applyTurnStartEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
@@ -453,10 +454,9 @@ describe('clearExpirationEffects — remove_aura_of_life_buff', () => {
       [],
       'MyCampaign',
     );
-    expect(setRuntimeValue).toHaveBeenCalledWith(
+    expect(setRuntimeObject).toHaveBeenCalledWith(
       'Cleric',
-      'auraOfLifeHpMaxProtected',
-      false,
+      expect.objectContaining({ auraOfLifeHpMaxProtected: false }),
       'MyCampaign',
     );
   });

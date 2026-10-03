@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import storage from '../../ui/storage.js';
@@ -70,6 +70,8 @@ function clearHasteSaveAdvantage(targetName, campaignName) {
     }, campaignName);
 }
 
+const AURA_OF_LIFE_CLEANUP_BUFF_NAME = 'Aura of Life';
+
 // Extra cleanup keyed by buffName, run after the buff itself is removed
 // from remove_active_buff expirations.
 const ACTIVE_BUFF_NAME_CLEANUP = {
@@ -81,13 +83,29 @@ const ACTIVE_BUFF_NAME_CLEANUP = {
     // BUG CLA-402: drop the telepathic bond anchor when the Awakened Mind buff expires.
     'Awakened Mind': (targetName, campaignName) => setRuntimeValue(targetName, 'awakenedMindTarget', null, campaignName),
     'Barkskin': (targetName, campaignName) => removeTargetEffectsIfChanged(campaignName, te => te.effect !== 'barkskin'),
+    // SP-008: when the Aura of Life buff expires, strip the aura_of_life te
+    // badge, the HP-max protection flag and the turn-start heal entry in the
+    // same pass — before this leg the te badge persisted after the buff was
+    // purged ("badge lies"). Per-target keys go out as ONE merged write
+    // (§39: un-awaited per-key setRuntimeValue calls to the same endpoint
+    // reorder network-side and can resurrect a purged key).
+    'Aura of Life': (targetName, campaignName, attackerName) => {
+        removeTargetEffectsIfChanged(campaignName, te => !(te.effect === 'aura_of_life' && te.target === targetName && te.source === attackerName));
+        const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
+        const turnEffects = Array.isArray(getRuntimeValue(targetName, 'turnStartEffects', campaignName)) ? getRuntimeValue(targetName, 'turnStartEffects', campaignName) : [];
+        setRuntimeObject(targetName, {
+            activeBuffs: buffs.filter(b => b.name !== AURA_OF_LIFE_CLEANUP_BUFF_NAME),
+            auraOfLifeHpMaxProtected: false,
+            turnStartEffects: turnEffects.filter(e => e.type !== 'aura_of_life_turn_start_heal'),
+        }, campaignName);
+    },
 };
 
-function handleRemoveActiveBuff(effect, targetName, _attackerName, campaignName) {
+function handleRemoveActiveBuff(effect, targetName, attackerName, campaignName) {
     removeBuffByName(targetName, effect.buffName, campaignName);
     const cleanup = ACTIVE_BUFF_NAME_CLEANUP[effect.buffName];
     if (cleanup) {
-        cleanup(targetName, campaignName);
+        cleanup(targetName, campaignName, attackerName);
     }
 }
 
@@ -277,9 +295,12 @@ function handleBreakConcentration(_effect, targetName, _attackerName, campaignNa
     }
 }
 
-function handleRemoveAuraOfLifeBuff(effect, targetName, _attackerName, campaignName) {
+function handleRemoveAuraOfLifeBuff(effect, targetName, attackerName, campaignName) {
     removeBuffByName(targetName, effect.buffName, campaignName);
-    setRuntimeValue(targetName, 'auraOfLifeHpMaxProtected', false, campaignName);
+    const cleanup = ACTIVE_BUFF_NAME_CLEANUP['Aura of Life'];
+    if (cleanup) {
+        cleanup(targetName, campaignName, attackerName);
+    }
 }
 
 function handleBaitAndSwitchClear(_effect, targetName, _attackerName, campaignName) {

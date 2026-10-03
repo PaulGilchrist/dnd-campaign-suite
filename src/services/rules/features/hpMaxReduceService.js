@@ -125,6 +125,42 @@ function logSaveFaceHpMaxReduce({ saveOutcome, target, attackerName, attackName,
     });
 }
 
+// SP-008: Aura of Life RAW — "your Hit Point maximums can't be reduced"
+// while inside the aura. Producer-side gate at the shared hp-max-drain
+// core (MA-1489 attack lane + MA-1547 save lane ride this same seam):
+// while the target's auraOfLifeHpMaxProtected flag is set (granted by
+// auraOfLifeHandler, cleared by its expiry/concentration-break legs), the
+// drain is refused honestly — damage itself still resolves upstream.
+function isAuraOfLifeHpMaxProtected(targetName, campaignName) {
+    return getRuntimeValue(targetName, 'auraOfLifeHpMaxProtected', campaignName) === true;
+}
+
+function logAuraOfLifeBlock({ attackName, target, attackerName, damage, logEntry }) {
+    logEntry({
+        type: 'automation',
+        automationType: 'hp_max_reduce_blocked',
+        characterName: target.name,
+        sourceName: attackerName,
+        abilityName: attackName,
+        description: `${target.name}'s Hit Point maximum can't be reduced — protected by Aura of Life (Necrotic drain of ${damage} blocked on the maximum; GM-enforced RAW).`,
+        timestamp: Date.now(),
+    });
+}
+
+// Early-return legs of applyHpMaxReduce: zero-damage log and the SP-008
+// Aura of Life block (hoisted to hold the complexity cap, §45).
+function preGateHpMaxReduce({ attackName, target, amount, attackerName, logEntry, campaignName }) {
+    if (amount <= 0) {
+        logHpMaxReduceZero({ attackName, target, attackerName, logEntry });
+        return 'zero';
+    }
+    if (isAuraOfLifeHpMaxProtected(target.name, campaignName)) {
+        logAuraOfLifeBlock({ attackName, target, attackerName, damage: amount, logEntry });
+        return null;
+    }
+    return undefined;
+}
+
 async function writeHpMaxDrain({ target, combatSummary, damage, newMax, campaignName }) {
     if (target.type === 'player') {
         await pcHpMaxDrainWrite({ target, damage, newMax, campaignName });
@@ -149,10 +185,8 @@ async function writeHpMaxDrain({ target, combatSummary, damage, newMax, campaign
 // post-drain ledger so producers can compose their own face detail.
 export async function applyHpMaxReduce({ attackName, target, damage, combatSummary, characters, campaignName, attackerName, logEntry, saveOutcome = null }) {
     const amount = Number(damage) || 0;
-    if (amount <= 0) {
-        logHpMaxReduceZero({ attackName, target, attackerName, logEntry });
-        return 'zero';
-    }
+    const gate = preGateHpMaxReduce({ attackName, target, amount, attackerName, logEntry, campaignName });
+    if (gate !== undefined) return gate;
     const existing = findStandingHpMaxReduce(target.name);
     const baseMax = Number.isInteger(existing?.baseMax) ? existing.baseMax : resolveHpMaxBase({ target, combatSummary, campaignName });
     if (!Number.isInteger(baseMax) || baseMax <= 0) {

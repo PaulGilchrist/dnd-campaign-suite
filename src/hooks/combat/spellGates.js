@@ -1,7 +1,8 @@
-import { getCombatSummary } from '../../services/encounters/combatData.js';
+import { getCombatSummary, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getAllyList } from '../useAllySelection.js';
 import { getCsAndTargets, extractMaxTargets, resolveHumanoids, resolveBeasts, makePending, isSpareTheDyingTarget } from './spellGateHelpers.js';
 import { isCreatureDead } from '../../services/shared/hpModifier.js';
+import { resolveAuraOfLifeParty } from '../../services/automation/handlers/buffs/auraOfLifeHandler.js';
 
 // ── Spell gate handlers ──────────────────────────────────────────────────────
 // All gates take a single options object:
@@ -602,8 +603,13 @@ function gateRevivify({ spell, campaignName, cfSetPending, playerStats, setPopup
   return true;
 }
 
-function gateAuraOfLife({ spell, campaignName, cfSetPending }) {
-  const { creatureTargets } = getCsAndTargets(campaignName);
+async function gateAuraOfLife({ spell, campaignName, cfSetPending, playerStats }) {
+  // SP-008: aura is a 30-ft Emanation over the party — picker cap = party
+  // membership (selected allies chip, lenient party fallback), no numeric
+  // cap, gridless-lenient (no distance gate). The summary cache can be cold
+  // (page reload) — fall back to the async loader so the gate never leaks.
+  const cs = getCombatSummary(campaignName) || await loadCombatSummary(campaignName);
+  const creatureTargets = resolveAuraOfLifeParty(campaignName, playerStats.name, cs?.creatures || []);
   if (creatureTargets.length > 0) {
     cfSetPending('auraOfLife', makePending('auraOfLife', spell, { range: spell.range || '30 feet', creatureTargets }));
     return true;
