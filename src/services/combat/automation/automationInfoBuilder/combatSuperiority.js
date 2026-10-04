@@ -140,5 +140,27 @@ export const combatSuperiorityHandlers = {
             oncePerTurn: !!auto.oncePerTurn,
             hasAutomation: true
         }
+    },
+
+    // MN-004: Commanding Presence reaction row — same builder gap as MN-002/003
+    // (collector `if (!info) continue` dropped the row, so it never rendered in
+    // Reactions). maneuverName + reaction fields ride the info; executeCommandingPresenceReaction
+    // consumes it. saveDc stays the 'ability' token (MN-020) — buildSaveDc resolves
+    // 8 + CHA + PB at prompt time, not at collect time.
+    'combat_superiority_commanding_presence_reaction': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'combat_superiority_commanding_presence_reaction',
+            name: feature.name,
+            description: feature.description || '',
+            maneuverName: auto.maneuverName || feature.name,
+            reactionSaveType: auto.reactionSaveType || 'WIS',
+            reactionEffect: auto.reactionEffect || 'disadvantage_next_attack',
+            reactionDuration: auto.reactionDuration || 'until_end_of_next_turn',
+            reactionRange: auto.reactionRange || '30_ft',
+            saveDc: 'ability',
+            saveAbility: auto.saveAbility || 'CHA',
+            hasAutomation: true
+        }
     }
 }

@@ -68,6 +68,8 @@ const PLAYER_ROUND_LATCH_KEYS = [
     'pendingRiposteDieValue',
     // MN-003: Commander's Strike once-per-turn grant latch re-arms at round wrap.
     '_Commanders_Strike_usedRound',
+    // MN-004: Commanding Presence reaction round latch re-arms at round wrap.
+    '_Commanding_Presence_usedRound',
     'surgeUsedRound',
     'illusoryRealityUsedRound',
     'portentUsedThisTurn',

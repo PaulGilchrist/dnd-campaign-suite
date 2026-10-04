@@ -146,16 +146,19 @@ function applyTargetLuckyFeat({ rollType, forcedMode, context, campaignName, r1,
     return unchanged;
 }
 
-function buildBonusDetailParts({ bonus, sacredWeaponBonus, sunderingBlowBonus, cosmicOmenAppliedBonus, cosmicOmenDetail, pendingSkillCheckAppliedBonus, pendingSkillCheckDetail, baneAttackPenalty, baneDisplayLabel, subtractDiePenalty, subtractDieDisplayLabel, blessAttackBonus, burstOfIngenuityBonus }) {
+function buildBonusDetailParts({ bonus, sacredWeaponBonus, sunderingBlowBonus, cosmicOmenAppliedBonus, cosmicOmenDetail, pendingSkillCheckAppliedBonus, pendingSkillCheckDetail, baneAttackPenalty, baneDisplayLabel, subtractDiePenalty, subtractDieDisplayLabel, blessAttackBonus, burstOfIngenuityBonus, rollType }) {
+    // MN-004 cosmetic: the roll is not always an attack — skill checks showed
+    // "(+5 to hit)". Only label the bonus "to hit" on attack rolls.
+    const hitLabel = rollType === 'attack' ? ' to hit' : '';
     const parts = [];
     if (sacredWeaponBonus > 0) {
         const baseBonus = bonus - sacredWeaponBonus;
         if (baseBonus !== 0) {
-            parts.push((baseBonus > 0 ? '+' : '') + baseBonus + ' to hit');
+            parts.push((baseBonus > 0 ? '+' : '') + baseBonus + hitLabel);
         }
         parts.push('+' + sacredWeaponBonus + ' Sacred Weapon');
     } else if (bonus > 0) {
-        parts.push('+' + bonus + ' to hit');
+        parts.push('+' + bonus + hitLabel);
     }
     if (sunderingBlowBonus > 0) parts.push('+' + sunderingBlowBonus + ' [Sundering Blow]');
     if (cosmicOmenAppliedBonus !== 0 && cosmicOmenDetail) parts.push(cosmicOmenDetail);
@@ -283,6 +286,7 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
         subtractDieDisplayLabel,
         blessAttackBonus,
         burstOfIngenuityBonus,
+        rollType,
     });
     const finalBonusDetail = bonusDetailParts.length > 0 ? '(' + bonusDetailParts.join(', ') + ')' : undefined;
 

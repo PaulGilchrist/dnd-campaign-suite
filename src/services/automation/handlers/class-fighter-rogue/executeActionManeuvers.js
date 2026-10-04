@@ -8,6 +8,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import {
     findManeuver,
     checkSuperiorityDice,
@@ -597,6 +598,33 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
 
 // ── Commanding Presence Reaction ────────────────────────────────────────
 
+// MN-004: reaction-economy round latch (CLA-383 Warding Flare shape) — stamped
+// when the forced save is offered (reaction spent), re-armed at round wrap via
+// PLAYER_ROUND_LATCH_KEYS + Initiative.jsx clearPlayerRoundFlags.
+const COMMANDING_PRESENCE_LATCH_KEY = '_Commanding_Presence_usedRound';
+
+function commandingPresenceRefuse(playerStats, featureName, campaignName, description, reason) {
+    // MN-003 §5: refusals log directly (modal-returning lanes bypass the
+    // logEntries flusher), spend nothing, stamp nothing.
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerStats.name,
+        automationType: 'commanding_presence_refused',
+        name: featureName,
+        description,
+        reason,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[executeActionManeuvers:log-error]", e); });
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description,
+        },
+    };
+}
+
 function getCommandingPresenceTargetHp(creature) {
     if (creature.type === 'player') {
         return {
@@ -631,22 +659,17 @@ async function buildCommandingPresenceTargetModal({ action, auto, maneuver, play
         };
     }
 
-    const rangeFt = auto.reactionRange === '30_ft' ? 30 : 30;
+    const rangeFt = rangeToFeet(auto.reactionRange || '30_ft');
     const validTargets = await collectCommandingPresenceTargets(cs, playerStats, campaignName, rangeFt);
 
     if (validTargets.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: maneuver.name,
-                description: `${maneuver.name}: No creatures within 30 feet to target.`,
-            },
-        };
+        return commandingPresenceRefuse(playerStats, maneuver.name, campaignName,
+            `${maneuver.name}: No creatures within ${rangeFt} feet to target.`, 'no_target_in_range');
     }
 
-    const saveDc = auto.saveDc === 'ability' ? playerStats.abilityDc || 8 : (auto.saveDc || 8);
-    const saveType = auto.saveType || auto.reactionSaveType || 'WIS';
+    // MN-020: resolve the 'ability' token at prompt time, never bake at collect.
+    const saveDc = buildSaveDc(auto, playerStats);
+    const saveType = auto.reactionSaveType || auto.saveType || 'WIS';
 
     return {
         type: 'modal',
@@ -667,37 +690,59 @@ async function buildCommandingPresenceTargetModal({ action, auto, maneuver, play
                 return result;
             },
             onSkip: async () => {
-                await addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: maneuver.name,
-                    description: `${playerStats.name} used ${maneuver.name} as a reaction but chose not to target a creature.`,
-                }).catch((e) => { console.error("[executeActionManeuvers:log-error]", e); });
+                // Skipping declines the reaction — nothing was spent (no latch, no die).
+                commandingPresenceRefuse(playerStats, maneuver.name, campaignName,
+                    `${playerStats.name} declined ${maneuver.name} — no target chosen, Reaction not used.`, 'declined');
             },
         },
     };
 }
 
-async function applyCommandingPresenceDisadvantage(reactionEffect, reactionDuration, playerStats, targetName, campaignName) {
-    if (reactionEffect === 'disadvantage_next_attack' || reactionEffect === 'attack_roll_disadvantage') {
-        const durationInTurns = reactionDuration === 'until_end_of_next_turn' ? 2 : 1;
-        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-        const hasDisadvantage = conditions.some(c => String(c).toLowerCase() === 'disadvantage');
-        if (!hasDisadvantage) {
-            await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'disadvantage'], campaignName);
-        }
-        await addExpiration({ attackerName: playerStats.name, targetName, effects: [
-            { type: 'condition', condition: 'disadvantage' },
-        ], campaignName, rounds: durationInTurns });
-        return ` ${targetName} has Disadvantage on their next attack roll.`;
+// MN-004: registered te channel (targetEffectDefinitions.js `disadvantage_next_attack`,
+// folded by contextBuilder-sync and consumed by attackPostProcessing) replaces the old
+// `activeConditions 'disadvantage'` write — that phantom string had no consumer folding
+// it into attack resolution, so the penalty never applied. One expiration clock removes
+// the te at the end of the source's next turn (rounds: 2, MA-0711 codification).
+async function applyCommandingPresenceDisadvantage(reactionDuration, playerStats, targetName, campaignName) {
+    const storedEffects = [...(getRuntimeValue('campaign', 'targetEffects', campaignName) || [])];
+    const te = {
+        effect: 'disadvantage_next_attack',
+        target: targetName,
+        source: playerStats.name,
+        duration: reactionDuration || 'until_end_of_next_turn',
+        appliedRound: getCurrentCombatRound(campaignName),
+        timestamp: Date.now(),
+    };
+    const teIndex = storedEffects.findIndex(
+        other => other.effect === 'disadvantage_next_attack' && other.target === targetName && other.source === playerStats.name
+    );
+    if (teIndex === -1) {
+        storedEffects.push(te);
+    } else {
+        storedEffects[teIndex] = te;
     }
-    if (reactionEffect === 'save_disadvantage') {
-        return ` ${targetName} has Disadvantage on their next saving throw.`;
-    }
-    return '';
+    await setRuntimeValue('campaign', 'targetEffects', storedEffects, campaignName);
+
+    await addExpiration({ attackerName: playerStats.name, targetName, effects: [
+        { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
+    ], campaignName, rounds: 2 });
+
+    addEntry(campaignName, {
+        type: 'condition',
+        characterName: targetName,
+        action: 'applied',
+        condition: 'Disadvantage on next attack roll',
+        reason: `${playerStats.name}'s Commanding Presence (failed Wisdom save)`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[executeActionManeuvers:log-error]", e); });
+
+    return ` ${targetName} has Disadvantage on their next attack roll (until the end of ${playerStats.name}'s next turn).`;
 }
 
+// MN-004: the die was already spent on the triggering skill check — this reaction
+// is free reaction economy (RAW 2024 Battle Master). No rollManeuverDie /
+// expendSuperiorityDie / checkSuperiorityDice here; a second expend drained the
+// pool by 2 for one maneuver and gated the reaction behind stale dice state.
 export async function executeCommandingPresenceReaction(action, playerStats, campaignName, maneuverName) {
     const maneuver = await findManeuver(maneuverName, playerStats.rules);
 
@@ -705,34 +750,56 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
         return buildManeuverNotFoundPopup(maneuverName, maneuverName);
     }
 
-    const { superiorityDice, hasDiceRemaining } = checkSuperiorityDice(playerStats, campaignName);
-
-    if (!hasDiceRemaining) {
-        return buildNoDiceRemainingPopup(maneuver.name);
+    const featureName = action.name || `${maneuver.name} (Reaction)`;
+    const currentRound = getCurrentCombatRound(campaignName);
+    const usedRound = getRuntimeValue(playerStats.name, COMMANDING_PRESENCE_LATCH_KEY, campaignName);
+    if (usedRound === currentRound) {
+        return commandingPresenceRefuse(playerStats, featureName, campaignName,
+            `${featureName} has already been used this round — a Reaction can only be taken once per round. It re-arms when the next round begins.`,
+            'already_used_this_round');
     }
 
     const auto = action.automation || {};
     const targetName = auto.targetName;
-    const reactionEffect = auto.reactionEffect || 'disadvantage_next_attack';
-    const reactionDuration = auto.reactionDuration || 'until_end_of_next_turn';
 
     // If no target is pre-set, show a modal to select one
     if (!targetName) {
         return buildCommandingPresenceTargetModal({ action, auto, maneuver, playerStats, campaignName, maneuverName });
     }
 
-    const { dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
-    await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
+    const rangeFt = rangeToFeet(auto.reactionRange || '30_ft');
+    const inRange = await isWithinRange(playerStats.name, targetName, rangeFt);
+    if (!inRange) {
+        return commandingPresenceRefuse(playerStats, featureName, campaignName,
+            `${targetName} is out of range — ${maneuver.name} requires a creature within ${rangeFt} feet.`,
+            'no_target_in_range');
+    }
 
-    const logEntry = {
+    // Stamp BEFORE the forced save is offered: the reaction is spent at this moment,
+    // and consumers must observe the latch (MN-003 stamp-then-await shape).
+    await setRuntimeValue(playerStats.name, COMMANDING_PRESENCE_LATCH_KEY, currentRound, campaignName);
+
+    const saveDc = buildSaveDc(auto, playerStats);
+    const saveType = auto.reactionSaveType || auto.saveType || 'WIS';
+
+    const { promise } = createSaveListener(campaignName, { targetName, saveType, saveDc });
+
+    addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
-        abilityName: maneuver.name,
-        description: `Used ${maneuver.name} as a reaction on ${targetName}. ${dieDescription}`,
-    };
+        abilityName: featureName,
+        description: `${playerStats.name} used ${maneuver.name} as a Reaction — ${targetName} must make a ${saveType} save (DC ${saveDc}) or have Disadvantage on their next attack roll.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[executeActionManeuvers:log-error]", e); });
 
-    let description = `<b>${maneuver.name}</b> (Reaction)<br/>${dieDescription}<br/>Target: ${targetName}.`;
-    description += await applyCommandingPresenceDisadvantage(reactionEffect, reactionDuration, playerStats, targetName, campaignName);
+    const saveResult = await promise;
+
+    let description = `<b>${maneuver.name}</b> (Reaction)<br/>Target: ${targetName}.`;
+    if (saveResult.success) {
+        description += ` ${targetName} succeeded their ${saveType} save (DC ${saveDc}) — no effect.`;
+    } else {
+        description += await applyCommandingPresenceDisadvantage(auto.reactionDuration, playerStats, targetName, campaignName);
+    }
 
     return {
         type: 'popup',
@@ -741,6 +808,5 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
             name: maneuver.name,
             description,
         },
-        logEntries: [logEntry],
     };
 }
