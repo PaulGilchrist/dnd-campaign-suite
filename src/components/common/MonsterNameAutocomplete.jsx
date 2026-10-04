@@ -32,7 +32,9 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
           }, [value]);
 
     useEffect(() => {
-        if (initialFocus && inputRef.current) inputRef.current.focus();
+        // preventScroll: refocusing on remount (cards re-key on runtimeStateTick each
+        // turn) must not natively scroll the initiative carousel back to this card.
+        if (initialFocus && inputRef.current) inputRef.current.focus({ preventScroll: true });
          // eslint-disable-next-line react-hooks/exhaustive-deps
          }, []);
 
@@ -84,7 +86,7 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
         setShowSuggestions(false);
         onChange(name);
         if (onCommit) onCommit(name);
-        if (inputRef.current) inputRef.current.focus();
+        if (inputRef.current) inputRef.current.focus({ preventScroll: true });
          };
 
     const handleBlur = () => {
@@ -129,7 +131,6 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
                  onKeyDown={handleKeyDown}
                  onBlur={handleBlur}
                  className="monster-autocomplete-input"
-                 autoFocus={initialFocus}
                  />
                 {showSuggestions && list.length > 0 && (
                     <ul ref={listRef} className="monster-autocomplete-list">
