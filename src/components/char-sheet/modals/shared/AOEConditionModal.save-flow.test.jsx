@@ -36,6 +36,13 @@ vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
     persistAndNotify: vi.fn(),
 }));
 
+// SP-024: fail grants now stamp ONE addExpiration clock per failing target
+// (end-of-next-turn anchor) — mock the barrel so expiry registration is assertable
+// and the real expirationQueue (needs combatData.getCurrentCombatRound) stays inert.
+vi.mock('../../../../services/rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 // Re-import mocked modules
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';

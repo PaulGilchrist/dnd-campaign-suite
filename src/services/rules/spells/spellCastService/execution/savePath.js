@@ -99,6 +99,10 @@ function buildConditionOnlyAoePopup({ fullSpell, spell, metaCtx, playerStats, ca
                 campaignName,
                 shape: aoeShape,
                 range: rangeFeet,
+                // SP-024: duration rides the payload so the modal can derive the
+                // fail-grant expiry clock from spell data (round/instantaneous →
+                // end-of-next-turn anchor; minute/hour/concentration → spell-duration lifecycle).
+                duration: fullSpell.duration || spell.duration,
                 saveType: resolveAoeSaveType(fullSpell, spell, 'CON'),
                 saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
                 effects: automationEffects.fail,

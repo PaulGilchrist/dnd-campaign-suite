@@ -5,6 +5,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -32,6 +33,29 @@ function isTargetExcludedByTraps(c, attackerName) {
 
 function buildAppliedConditions(effects) {
     return (effects || []).map(e => e.condition || e.type).filter(Boolean);
+}
+
+// SP-024: condition-only AoE fail grants must carry an expiry clock — before this
+// the granted condition persisted permanently. Clock derived from spell duration data
+// (threaded via savePath payload), not hardcoded:
+//   round-based ("1 round") / "Instantaneous" → ONE rounds:1 clock anchored on the
+//   caster — the app's documented "end of your next turn" convention, drains at round
+//   wrap (CLA-045 precedent, expirationQueue.js rounds drain + expireOnCreatureName anchor);
+//   minute/hour/day/"until dispelled"/concentration durations (Entangle/Grease twins
+//   joining this lane) → no round clock: their condition lives with the spell-duration
+//   lifecycle, and a rounds:1 clock here would cut them short (§9 concentration residual).
+function resolveConditionClock({ duration, casterName }) {
+    const text = String(duration || '').toLowerCase();
+    if (/minute|hour|day|dispel|concentration/.test(text)) return null;
+    const roundMatch = text.match(/(\d+)\s*rounds?/);
+    return { rounds: roundMatch ? parseInt(roundMatch[1], 10) : 1, expireOnCreatureName: casterName };
+}
+
+// Generic 'condition' expiration type — clearExpirationEffects.js routes it through
+// removeConditionEverywhere (the verified condition-removal lane, massFear precedent).
+// A raw condition-name type ('blinded') has NO handler there and would drain silent no-op.
+function buildExpirationEffects(conditionList) {
+    return (conditionList || []).map(e => ({ type: 'condition', condition: e.condition || e.type })).filter(x => x.condition);
 }
 
 function buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName }) {
@@ -85,7 +109,7 @@ function buildSaveResultRecord(targetName, success, detail) {
     };
 }
 
-async function resolveNpcTarget({ campaignName, casterName, targetName, target, saveType, saveDc, heightenTarget, conditionList, conditionLabel, carefulSpellProtected, applyConditionsToTarget }) {
+async function resolveNpcTarget({ campaignName, casterName, targetName, target, saveType, saveDc, heightenTarget, conditionList, conditionLabel, carefulSpellProtected, applyConditionsToTarget, registerConditionExpiry }) {
     const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
     const saveRoll = heightenTarget === targetName ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
     const saveTotal = saveRoll + saveBonus;
@@ -125,6 +149,7 @@ async function resolveNpcTarget({ campaignName, casterName, targetName, target, 
 
     if (!success) {
         applyConditionsToTarget(targetName, conditionList, campaignName);
+        registerConditionExpiry(targetName, conditionList);
 
         await addEntry(campaignName, {
             type: 'condition',
@@ -160,7 +185,16 @@ async function resolveNpcTarget({ campaignName, casterName, targetName, target, 
             conditions: appliedConditions,
             appliedDamage: 0,
         });
-        return null;
+        // SP-024 secondary: return a fail record (was null) so ResultsSummaryModal
+        // counts failed targets — display-only, conditions/logs untouched.
+        return {
+            targetName,
+            success: false,
+            roll: saveRoll,
+            total: saveTotal,
+            saveBonus,
+            conditionApplied: true,
+        };
     }
 
     await addEntry(campaignName, {
@@ -202,6 +236,7 @@ function AOEConditionModal({
     campaignName,
     _shape,
     range,
+    duration,
     saveType,
     saveDc,
     effects,
@@ -258,6 +293,21 @@ function AOEConditionModal({
         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
     }, []);
 
+    // SP-024: ONE addExpiration per failing target (all fail conditions in a single
+    // clock — §38/CLA-045: sequential addExpiration calls race, one clock survives).
+    const registerConditionExpiry = useCallback((targetName, conditionList) => {
+        const clock = resolveConditionClock({ duration, casterName: playerStats.name });
+        if (!clock) return;
+        addExpiration({
+            attackerName: playerStats.name,
+            targetName,
+            effects: buildExpirationEffects(conditionList),
+            campaignName,
+            rounds: clock.rounds,
+            expireOnCreatureName: clock.expireOnCreatureName,
+        });
+    }, [duration, campaignName, playerStats.name]);
+
     const resolveAllSaves = useCallback(async (selectedNames) => {
         const combatSummary = getCombatSummary(campaignName);
         if (!combatSummary) return { results: [], prompts: [] };
@@ -285,6 +335,7 @@ function AOEConditionModal({
                 const npcResult = await resolveNpcTarget({
                     campaignName, casterName: playerStats.name, targetName, target, saveType, saveDc,
                     heightenTarget, conditionList, conditionLabel, carefulSpellProtected, applyConditionsToTarget,
+                    registerConditionExpiry,
                 });
                 if (npcResult) results.push(npcResult);
             } else {
@@ -322,7 +373,7 @@ function AOEConditionModal({
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
         return { results, prompts };
-    }, [campaignName, playerStats.name, action.name, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, effects, conditionLabel, applyConditionsToTarget]);
+    }, [campaignName, playerStats.name, action.name, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry]);
 
     const handleSaveResult = useCallback(async (event) => {
         const detail = event.detail;
@@ -337,6 +388,7 @@ function AOEConditionModal({
         if (!success) {
             const conditionList = effects || [{ type: 'blinded', condition: 'blinded' }];
             applyConditionsToTarget(targetName, conditionList, campaignName);
+            registerConditionExpiry(targetName, conditionList);
 
             await addEntry(campaignName, buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName: playerStats.name })).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
             await addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: false, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
@@ -359,7 +411,7 @@ function AOEConditionModal({
             }
             return updated;
         });
-    }, [campaignName, saveDc, saveType, pendingPrompts, effects, conditionLabel, applyConditionsToTarget, playerStats.name]);
+    }, [campaignName, saveDc, saveType, pendingPrompts, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry, playerStats.name]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -500,6 +552,7 @@ function AOEConditionModal({
         if (!success) {
             const conditionList = effects || [{ type: 'blinded', condition: 'blinded' }];
             applyConditionsToTarget(targetName, conditionList, campaignName);
+            registerConditionExpiry(targetName, conditionList);
 
             addEntry(campaignName, buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName: playerStats.name })).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
             addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: false, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
@@ -513,7 +566,7 @@ function AOEConditionModal({
 
         ctx.setResults(prev => [...prev, buildSaveResultRecord(targetName, success, detail)]);
         ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
-    }, [campaignName, saveDc, saveType, effects, conditionLabel, applyConditionsToTarget, playerStats.name]);
+    }, [campaignName, saveDc, saveType, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry, playerStats.name]);
 
     if (isOverlayTargeted && activeOverlay) {
         return (
