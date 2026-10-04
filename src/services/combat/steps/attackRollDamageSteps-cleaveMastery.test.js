@@ -384,7 +384,10 @@ describe('buildAttackRollDamageSteps - cleaveMastery', () => {
       expect(isWithinRange).toHaveBeenCalled();
     });
 
-    it('resolves HP for player creatures using runtime values', async () => {
+    // WM-001 stale-pin inversion: player allies are no longer offered as
+    // Cleave second targets (the feature attacks a second creature, not the
+    // party). Players are excluded before HP resolution.
+    it('excludes player allies from candidates', async () => {
       getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
         if (propertyName === 'lastAttack') return { hit: true, targetName: 'Orc' };
         if (propertyName === 'currentHitPoints') return 15;
@@ -409,10 +412,41 @@ describe('buildAttackRollDamageSteps - cleaveMastery', () => {
         },
       });
       const cleaveIdx = steps.map((s) => s.name).indexOf('cleaveMastery');
+      const result = await steps[cleaveIdx].handler(ctx);
+
+      expect(result.data).toEqual({});
+      expect(setSecondaryTargetModal).not.toHaveBeenCalled();
+    });
+
+    it('resolves HP for enemy candidates', async () => {
+      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
+        if (propertyName === 'lastAttack') return { hit: true, targetName: 'Orc' };
+        return null;
+      });
+      loadCombatSummary.mockResolvedValue({
+        creatures: [
+          { name: 'Orc', currentHp: 10 },
+          { name: 'Goblin', currentHp: 5 },
+          { name: 'Skeleton', currentHp: 0 },
+        ],
+      });
+      collectWeaponMastery.mockReturnValue({ baseMastery: 'Cleave', extraMasteries: [] });
+
+      const setSecondaryTargetModal = vi.fn();
+      const ctx = makeCtx({
+        setSecondaryTargetModal: setSecondaryTargetModal,
+        attack: { name: 'Greataxe' },
+        playerStats: {
+          automation: { actions: [] },
+          name: 'TestChar',
+        },
+      });
+      const cleaveIdx = steps.map((s) => s.name).indexOf('cleaveMastery');
       await steps[cleaveIdx].handler(ctx);
 
-      expect(getRuntimeValue).toHaveBeenCalledWith('Ally', 'currentHitPoints');
-      expect(getRuntimeValue).toHaveBeenCalledWith('Ally', 'hitPoints');
+      expect(setSecondaryTargetModal).toHaveBeenCalledTimes(1);
+      const offered = setSecondaryTargetModal.mock.calls[0][0].targets.map((t) => t.name);
+      expect(offered).toEqual(['Goblin']);
     });
 
     it('resolves HP for non-player creatures using creature properties', async () => {
@@ -585,7 +619,7 @@ describe('buildAttackRollDamageSteps - cleaveMastery', () => {
       );
     });
 
-    it('handles onSkip callback (no-op)', async () => {
+    it('onSkip closes the modal without consuming the latch (WM-001)', async () => {
       getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
         if (propertyName === 'lastAttack') return { hit: true, targetName: 'Orc', attackName: 'Greataxe', damageFormula: '1d12+4', damageType: 'slashing' };
         return null;
@@ -599,6 +633,7 @@ describe('buildAttackRollDamageSteps - cleaveMastery', () => {
       collectWeaponMastery.mockReturnValue({ baseMastery: 'Cleave', extraMasteries: [] });
 
       const setSecondaryTargetModal = vi.fn();
+      const setRuntimeValue = (await import('../../../hooks/runtime/useRuntimeState.js')).setRuntimeValue;
       const ctx = makeCtx({
         setSecondaryTargetModal: setSecondaryTargetModal,
         attack: { name: 'Greataxe' },
@@ -612,7 +647,10 @@ describe('buildAttackRollDamageSteps - cleaveMastery', () => {
       await steps[cleaveIdx].handler(ctx);
 
       const onSkip = setSecondaryTargetModal.mock.calls[0][0].onSkip;
-      expect(() => onSkip()).not.toThrow();
+      onSkip();
+      expect(setSecondaryTargetModal).toHaveBeenLastCalledWith(null);
+      const latchWrites = setRuntimeValue.mock.calls.filter((c) => c[1] === '_Cleave_UsedRound');
+      expect(latchWrites).toHaveLength(0);
     });
   });
 });

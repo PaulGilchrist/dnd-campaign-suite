@@ -10,6 +10,19 @@ import { applyMasteryEffect } from '../../automation/handlers/combat/weaponMaste
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
 import { addCondition } from '../../combat/conditions/conditionSaveService.js';
+import { checkOncePerTurn, markOncePerTurn } from '../../automation/common/oncePerTurn.js';
+
+const CLEAVE_LATCH_KEY = '_Cleave_UsedRound';
+
+function logCleaveBlocked(ctx, targetName) {
+  addEntry(ctx.campaignName, {
+    type: 'automation blocked',
+    characterName: ctx.playerStats.name,
+    abilityName: 'Cleave',
+    description: `Cleave already used this turn — extra attack refused (cleave_refused once_per_turn).`,
+    targetName: targetName || null,
+  }).catch((e) => { console.error('[attackRollPostDamage:log-error]', e); });
+}
 
 export function buildFeatureRidersStep() {
   return {
@@ -372,23 +385,37 @@ function resolveCleaveCreatureHp(creature, ps) {
   return { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
 }
 
+// WM-001: Cleave targets a second creature — never the attacker, never the
+// already-hit first target, never an ally (player), never a dead creature.
+// Gridless boards cannot gate adjacency (phantom/tokenless targets cannot be
+// ranged — playbook §5 lenient); token positions on a map get the RAW 5-ft
+// of-first + within-reach gates.
+function cleaveCandidateEligible(c, attackerName, firstTargetName) {
+  if (!c || c.name === attackerName || c.name === firstTargetName) return false;
+  if (c.type === 'player') return false;
+  return true;
+}
+
 async function collectCleaveSecondTargets(ctx, cs, lastAttack, firstTarget) {
+  const attackerName = ctx.playerStats.name;
+  const firstTargetName = lastAttack.targetName;
   const hasMapPositions = !!ctx.playerStats?.mapName && !!firstTarget?.position;
   if (!hasMapPositions) {
     return cs.creatures
-      .filter(c => c.name !== lastAttack.targetName)
-      .map(c => ({ ...c, ...resolveCleaveCreatureHp(c, ctx.playerStats) }));
+      .filter(c => cleaveCandidateEligible(c, attackerName, firstTargetName))
+      .map(c => ({ ...c, ...resolveCleaveCreatureHp(c, ctx.playerStats) }))
+      .filter(c => c.currentHp > 0);
   }
-  const attackerName = ctx.playerStats.name;
   const reach = 8;
   const secondTargets = [];
   for (const c of cs.creatures) {
-    if (c.name === lastAttack.targetName) continue;
+    if (!cleaveCandidateEligible(c, attackerName, firstTargetName)) continue;
     const nearFirst = await isWithinRange(firstTarget.name, c.name, 5);
     const nearAttacker = await isWithinRange(attackerName, c.name, reach);
-    if (nearFirst && nearAttacker) {
-      secondTargets.push({ ...c, ...resolveCleaveCreatureHp(c, ctx.playerStats) });
-    }
+    if (!nearFirst || !nearAttacker) continue;
+    const resolved = { ...c, ...resolveCleaveCreatureHp(c, ctx.playerStats) };
+    if (!(resolved.currentHp > 0)) continue;
+    secondTargets.push(resolved);
   }
   return secondTargets;
 }
@@ -400,37 +427,45 @@ function rollCleaveAttack(ctx, targetAc) {
   const attackBonus = abilityMod + (ctx.playerStats.proficiency || 0);
   const d20Roll = Math.floor(Math.random() * 20) + 1;
   const totalRoll = d20Roll + attackBonus;
-  return totalRoll >= targetAc;
+  return { d20Roll, attackBonus, totalRoll, hit: totalRoll >= targetAc };
 }
 
-async function handleCleaveTargetSelected(ctx, cleaveTargetName) {
-  if (!cleaveTargetName || !ctx.rollDamage) return;
+function logCleaveAttackRoll(ctx, cleaveTargetName, roll, targetAc) {
+  addEntry(ctx.campaignName, {
+    type: 'roll',
+    characterName: ctx.playerStats.name,
+    rollType: 'attack',
+    name: `${ctx._cleaveAttackInfo.attackName} (Cleave)`,
+    rolls: [roll.d20Roll],
+    total: roll.d20Roll,
+    bonus: roll.attackBonus,
+    bonusDetail: `(+${roll.attackBonus} to hit)`,
+    targetName: cleaveTargetName,
+    targetAc,
+    effectiveAc: targetAc,
+    hit: roll.hit,
+    isAutoMiss: false,
+    isCrit: false,
+  }).catch((e) => { console.error('[attackRollPostDamage:log-error]', e); });
+}
 
-  const combatSummary = await getCombatContext(ctx.campaignName);
-  const target = combatSummary?.creatures?.find(c => c.name === cleaveTargetName);
-  const targetAc = target?.ac || 0;
-  const hit = rollCleaveAttack(ctx, targetAc);
+function resolveCleaveHit(ctx, cleaveTargetName, cleaveFormula, damageResult) {
+  const context = {
+    targetName: cleaveTargetName,
+    damageType: ctx._cleaveAttackInfo.damageType,
+    attackerName: ctx.playerStats.name,
+  };
+  ctx.rollDamage({ name: `${ctx._cleaveAttackInfo.attackName} (Cleave)`, formula: cleaveFormula, total: damageResult.total, rolls: damageResult.rolls, modifier: 0, context: context });
+  addEntry(ctx.campaignName, {
+    type: 'ability_use',
+    characterName: ctx.playerStats.name,
+    abilityName: 'Cleave',
+    description: `${ctx.playerStats.name} used Cleave on ${ctx._cleaveAttackInfo.attackName} against ${cleaveTargetName}`,
+    targetName: cleaveTargetName,
+  }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
+}
 
-  const cleaveFormula = ctx._cleaveAttackInfo?.damageFormula || '0';
-  const damageResult = hit ? rollExpression(cleaveFormula) : null;
-
-  if (hit && damageResult) {
-    const context = {
-      targetName: cleaveTargetName,
-      damageType: ctx._cleaveAttackInfo.damageType,
-      attackerName: ctx.playerStats.name,
-    };
-    ctx.rollDamage({ name: `${ctx._cleaveAttackInfo.attackName} (Cleave)`, formula: cleaveFormula, total: damageResult.total, rolls: damageResult.rolls, modifier: 0, context: context });
-    addEntry(ctx.campaignName, {
-      type: 'ability_use',
-      characterName: ctx.playerStats.name,
-      abilityName: 'Cleave',
-      description: `${ctx.playerStats.name} used Cleave on ${ctx._cleaveAttackInfo.attackName} against ${cleaveTargetName}`,
-      targetName: cleaveTargetName,
-    }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
-    return;
-  }
-
+function resolveCleaveMiss(ctx, cleaveTargetName, cleaveFormula) {
   const context = {
     targetName: cleaveTargetName,
     damageType: ctx._cleaveAttackInfo.damageType,
@@ -445,6 +480,38 @@ async function handleCleaveTargetSelected(ctx, cleaveTargetName) {
     description: `${ctx.playerStats.name} used Cleave on ${ctx._cleaveAttackInfo.attackName} against ${cleaveTargetName} — Miss`,
     targetName: cleaveTargetName,
   }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
+}
+
+async function consumeCleaveLatch(ctx) {
+  const latched = await checkOncePerTurn('Cleave', CLEAVE_LATCH_KEY, ctx.playerStats.name, ctx.campaignName);
+  if (latched) {
+    logCleaveBlocked(ctx, ctx._cleaveAttackInfo?.lastTargetName);
+    ctx.setSecondaryTargetModal?.(null);
+    return true;
+  }
+  await markOncePerTurn('Cleave', CLEAVE_LATCH_KEY, ctx.playerStats, ctx.campaignName);
+  return false;
+}
+
+async function handleCleaveTargetSelected(ctx, cleaveTargetName) {
+  if (!cleaveTargetName || !ctx.rollDamage) return;
+  if (await consumeCleaveLatch(ctx)) return;
+
+  const combatSummary = await getCombatContext(ctx.campaignName);
+  const target = combatSummary?.creatures?.find(c => c.name === cleaveTargetName);
+  const targetAc = target?.ac || 0;
+  const roll = rollCleaveAttack(ctx, targetAc);
+  const cleaveFormula = ctx._cleaveAttackInfo?.damageFormula || '0';
+  const damageResult = roll.hit ? rollExpression(cleaveFormula) : null;
+
+  ctx.setSecondaryTargetModal?.(null);
+  logCleaveAttackRoll(ctx, cleaveTargetName, roll, targetAc);
+
+  if (roll.hit && damageResult) {
+    resolveCleaveHit(ctx, cleaveTargetName, cleaveFormula, damageResult);
+    return;
+  }
+  resolveCleaveMiss(ctx, cleaveTargetName, cleaveFormula);
 }
 
 export function buildCleaveMasteryStep() {
@@ -462,6 +529,12 @@ export function buildCleaveMasteryStep() {
       const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
       if (!allMasteries.includes('Cleave')) return { data: {} };
 
+      const latched = await checkOncePerTurn('Cleave', CLEAVE_LATCH_KEY, ctx.playerStats.name, ctx.campaignName);
+      if (latched) {
+        logCleaveBlocked(ctx, lastAttack.targetName);
+        return { data: {} };
+      }
+
       const cs = await loadCombatSummary(ctx.campaignName);
       const firstTarget = cs?.creatures?.find(c => c.name === lastAttack.targetName);
       const secondTargets = await collectCleaveSecondTargets(ctx, cs, lastAttack, firstTarget);
@@ -475,13 +548,14 @@ export function buildCleaveMasteryStep() {
         attackName: lastAttack.attackName,
         damageFormula: cleaveDamageFormula || lastAttack.damageFormula,
         damageType: lastAttack.damageType || 'same_as_weapon',
+        lastTargetName: lastAttack.targetName,
       };
 
       ctx.setSecondaryTargetModal?.({
         title: 'Cleave — Choose Second Target',
         targets: secondTargets,
         onTargetSelected: (cleaveTargetName) => handleCleaveTargetSelected(ctx, cleaveTargetName),
-        onSkip: () => {},
+        onSkip: () => ctx.setSecondaryTargetModal?.(null),
         featureDescription: 'On a hit, the second creature takes weapon damage (no ability modifier to damage unless negative). Once per turn.',
       });
 
