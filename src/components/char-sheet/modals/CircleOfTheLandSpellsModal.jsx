@@ -20,11 +20,14 @@ function CircleOfTheLandSpellsModal({ playerStats, campaignName, onClose }) {
 
     const handleSelectLandType = (landType) => {
         setRuntimeValue(name, '_circleOfTheLandType', landType.name, campaignName)
+        // CLA-050: log the fixed granted levels alongside the choice so the
+        // campaign log records the exact prepared-spell decision.
+        const levelNote = landType.spells.map(s => `${s.name} (level ${s.level})`).join(', ')
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: name,
             abilityName: 'Circle of the Land Spells',
-            description: `Chose land type: ${landType.name}`,
+            description: `Chose land type: ${landType.name}. Always-prepared at fixed levels: ${levelNote}`,
         }).catch((e) => { console.error("[circleOfTheLandSpellsModal:log-error]", e); })
         onClose()
     }

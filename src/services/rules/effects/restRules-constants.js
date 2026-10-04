@@ -175,6 +175,9 @@ export const LONG_REST_RESOURCES = [
   'naturalRecoveryFreeCast',
   'naturalRecoveryFreeCastUsed',
   'naturalRecoverySlots',
+  // CLA-050: Circle of the Land land choice is re-made after each Long Rest —
+  // cleared in the atomic batch so the badge/spell grants drop and the chooser re-prompts.
+  '_circleOfTheLandType',
   'wardingflareUses',
   '_Star_Map_freeCastCount',
   '_Dragon_Companion_freeCastCount',

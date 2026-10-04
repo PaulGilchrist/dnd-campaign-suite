@@ -20,6 +20,18 @@ function summonHpLadderLevels(spell, getAvailableSlotCount) {
   return ladder;
 }
 
+// CLA-050: Circle of the Land fixed-level rows offer exactly one cast level —
+// no free upcast range; formula resolved at the stamped level.
+function fixedLevelRow(spell, getAvailableSlotCount) {
+  const fixed = spell?._circleOfTheLandFixedLevel;
+  if (fixed == null) return null;
+  const formula = (spell.damage?.damage_at_slot_level && spell.damage.damage_at_slot_level[fixed])
+    || (spell.heal_at_slot_level && spell.heal_at_slot_level[fixed])
+    || (spell.upcast_at_slot_level && spell.upcast_at_slot_level[fixed])
+    || '';
+  return [{ level: fixed, formula, availableSlots: getAvailableSlotCount(fixed) }];
+}
+
 export function useSpellUpcastFlow(playerStats, campaignName) {
   const [pendingUpcast, setPendingUpcast] = React.useState(null);
 
@@ -41,6 +53,8 @@ export function useSpellUpcastFlow(playerStats, campaignName) {
   }, []);
 
   const buildUpcastLevels = React.useCallback((spell) => {
+    const fixedRow = fixedLevelRow(spell, getAvailableSlotCount);
+    if (fixedRow) return fixedRow;
     const slotDmg = spell.damage?.damage_at_slot_level;
     const healAtSlotLevel = spell.heal_at_slot_level;
     const upcastAtSlotLevel = spell.upcast_at_slot_level;

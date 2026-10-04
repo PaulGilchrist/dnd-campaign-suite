@@ -685,4 +685,14 @@ describe('applyLongRest', () => {
       await expect(applyLongRest(celestialStats, CAMPAIGN)).rejects.toThrow('playerStats.level is required')
     })
   })
+
+  describe('CLA-050 Circle of the Land rechoice cadence', () => {
+    it('clears _circleOfTheLandType in the atomic long-rest batch so the land must be re-chosen', async () => {
+      vi.clearAllMocks()
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(setRuntimeBatch).toHaveBeenCalled()
+      expect(getBatchUpdates()).toHaveProperty('_circleOfTheLandType')
+      expect(getBatchUpdates()._circleOfTheLandType).toBeNull()
+    })
+  })
 })

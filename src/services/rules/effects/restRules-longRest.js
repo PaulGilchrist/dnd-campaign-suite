@@ -444,7 +444,6 @@ function resetNaturalRecoveryTracking(charData) {
   charData.naturalRecoveryFreeCast = null
   charData.naturalRecoveryFreeCastUsed = null
   charData.naturalRecoverySlots = null
-  charData._circleOfTheLandType = null
 }
 
 // Chef: Bolstering Treats crafted and Replenishing Meals reset on Long Rest.

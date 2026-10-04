@@ -18,6 +18,14 @@ export function resolveSpellDamageAtLevel(spell, playerLevel) {
         const bestLevel = lvls.length > 0 ? Math.max(...lvls) : Object.keys(dmgObj)[0];
         return dmgObj[bestLevel];
     }
+    // CLA-050: Circle of the Land fixed-level rows resolve their damage formula
+    // at the stamped level; cantrip-tier ladders (Fire Bolt) keep character scaling.
+    if (spell._circleOfTheLandFixedLevel != null) {
+        const direct = dmgObj[spell._circleOfTheLandFixedLevel];
+        if (direct) return direct;
+        const lvls = Object.keys(dmgObj).map(Number).filter(l => l <= playerLevel);
+        return lvls.length > 0 ? dmgObj[Math.max(...lvls)] : dmgObj[Object.keys(dmgObj)[0]];
+    }
     return dmgObj[Object.keys(dmgObj)[0]];
 }
 

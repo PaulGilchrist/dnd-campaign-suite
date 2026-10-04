@@ -309,4 +309,34 @@ describe('spellDamageUtils', () => {
       });
     });
   });
+
+  // CLA-050: Circle of the Land fixed-level rows resolve their damage formula
+  // at the stamped level, not the spells-DB base level.
+  describe('resolveSpellDamageAtLevel — CLA-050 fixed-level rows', () => {
+    const burningHands = (level, fixed) => ({
+      name: 'Burning Hands',
+      level,
+      ...(fixed != null ? { _circleOfTheLandFixedLevel: fixed } : {}),
+      damage: { damage_type: 'Fire', damage_at_slot_level: { '1': '3d8', '2': '4d8', '3': '5d8' } },
+    });
+
+    it('resolves the formula at the fixed level for stamped rows', () => {
+      expect(resolveSpellDamageAtLevel(burningHands(3, 3), 20)).toBe('5d8');
+    });
+
+    it('keeps character-level scaling for a fixed-level cantrip-tier ladder (Fire Bolt)', () => {
+      const fireBolt = {
+        name: 'Fire Bolt',
+        level: 3,
+        _circleOfTheLandFixedLevel: 3,
+        damage: { damage_type: 'Fire', damage_at_slot_level: { '0': '1d10', '5': '2d10', '11': '3d10', '17': '4d10' } },
+      };
+      expect(resolveSpellDamageAtLevel(fireBolt, 20)).toBe('4d10');
+      expect(resolveSpellDamageAtLevel(fireBolt, 4)).toBe('1d10');
+    });
+
+    it('leaves unstamped rows at the base tier (byte-identical legacy)', () => {
+      expect(resolveSpellDamageAtLevel(burningHands(1, null), 20)).toBe('3d8');
+    });
+  });
 });

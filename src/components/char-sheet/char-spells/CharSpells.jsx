@@ -21,6 +21,11 @@ import './CharSpells.css'
 
 function resolveSpellDamageDisplay(spell, dmgObj, playerStats) {
     const isCantrip = spell.level === 0;
+    // CLA-050: Circle of the Land fixed-level rows show their formula at the
+    // stamped level; cantrip-tier ladders (Fire Bolt) keep character scaling.
+    if (spell._circleOfTheLandFixedLevel != null && dmgObj[spell._circleOfTheLandFixedLevel]) {
+        return dmgObj[spell._circleOfTheLandFixedLevel];
+    }
     let damageDisplay = isCantrip ? dmgObj[Math.max(...Object.keys(dmgObj).map(Number).filter(l => l <= playerStats.level))] || dmgObj[Object.keys(dmgObj)[0]] : dmgObj[Object.keys(dmgObj)[0]];
     if (spell.name === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
         damageDisplay = damageDisplay.replace('1d6', '1d10');

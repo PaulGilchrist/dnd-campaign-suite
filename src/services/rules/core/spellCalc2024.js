@@ -121,10 +121,17 @@ function addMajorSubclassSpells(spellAbilities, playerStats) {
             if (knownSpell) {
                 knownSpell.prepared = 'Always';
             } else {
-                spellAbilities.spells.push({
+                const spellEntry = {
                     name: spellName,
                     prepared: 'Always'
-                });
+                };
+                // CLA-050: Circle of the Land land spells are cast at their fixed
+                // classes.json level (arid Fire Bolt is a level 3 cast, not a cantrip).
+                // Stamp the fixed level so it survives the spells-DB detail remap.
+                if (isCircleOfLand) {
+                    spellEntry._circleOfTheLandFixedLevel = spellLevel;
+                }
+                spellAbilities.spells.push(spellEntry);
             }
         }
     });
@@ -648,6 +655,13 @@ function remapSpellRow(spell, allSpells, mageHandLegerdemainActive) {
     // so the lv5 Telekinetic Master row survives the slot-level filter below.
     if (spell._telekineticMasterFreeCast) {
         copy._telekineticMasterFreeCast = true;
+    }
+    // CLA-050: carry the Circle of the Land fixed level across the detail remap
+    // (classes.json land levels are canonical): display, slot cost and damage
+    // formula all resolve at the stamped level, not the spells-DB base level.
+    if (spell._circleOfTheLandFixedLevel != null) {
+        copy._circleOfTheLandFixedLevel = spell._circleOfTheLandFixedLevel;
+        copy.level = spell._circleOfTheLandFixedLevel;
     }
     if (mageHandLegerdemainActive && copy.name === 'Mage Hand') {
         // Bonus-action casting time + invisible hand markers (popup + cast path).
