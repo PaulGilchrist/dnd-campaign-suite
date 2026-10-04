@@ -15,6 +15,7 @@ vi.mock('../../common/targetResolver.js', () => ({
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+  setRuntimeObject: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -189,11 +190,11 @@ describe('reactionDebuffHandler — uses decrement & logging', () => {
       });
       const result1 = await handle(action, makePlayerStats(), campaignName, mapName);
       expect(result1.type).toBe('popup');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
         'Bard',
-        'cuttingwordsUses',
-        1,
-        campaignName
+        expect.objectContaining({ cuttingwordsUses: 1 }),
+        campaignName,
+        expect.anything()
       );
 
       vi.clearAllMocks();
@@ -207,11 +208,11 @@ describe('reactionDebuffHandler — uses decrement & logging', () => {
       });
       const result2 = await handle(action2, makePlayerStats(), campaignName, mapName);
       expect(result2.type).toBe('popup');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
         'Bard',
-        'cuttingwordsUses',
-        1,
-        campaignName
+        expect.objectContaining({ cuttingwordsUses: 1 }),
+        campaignName,
+        expect.anything()
       );
 
       vi.clearAllMocks();
@@ -225,11 +226,11 @@ describe('reactionDebuffHandler — uses decrement & logging', () => {
       });
       const result3 = await handle(action3, makePlayerStats(), campaignName, mapName);
       expect(result3.type).toBe('popup');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
         'Bard',
-        'cuttingwordsUses',
-        2,
-        campaignName
+        expect.objectContaining({ cuttingwordsUses: 2 }),
+        campaignName,
+        expect.anything()
       );
     });
 
@@ -239,11 +240,11 @@ describe('reactionDebuffHandler — uses decrement & logging', () => {
       const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
       expect(result.type).toBe('popup');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
         'Bard',
-        'bardicInspirationUses',
-        3,
-        campaignName
+        expect.objectContaining({ bardicInspirationUses: 3 }),
+        campaignName,
+        expect.anything()
       );
     });
   });

@@ -10,6 +10,7 @@ vi.mock('../../common/targetResolver.js', () => ({
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+  setRuntimeObject: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -343,11 +344,11 @@ describe('CLA-071: Cutting Words — Verification Test', () => {
 
       await handle(action, makeBardStats(), campaignName, mapName);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
         'CuttingWordsBard',
-        'bardicInspirationUses',
-        3,
-        campaignName
+        expect.objectContaining({ bardicInspirationUses: 3 }),
+        campaignName,
+        expect.anything()
       );
     });
 

@@ -47,6 +47,10 @@ const PLAYER_ROUND_LATCH_KEYS = [
     'actionSurgeUsedThisRound',
     // CLA-383: Warding Flare reaction round latch re-arms at round wrap.
     '_Warding_Flare_usedRound',
+    // CLA-071: Cutting Words reaction round latch + attack-instance marker re-arm at round wrap.
+    '_Cutting_Words_usedRound',
+    '_Cutting_Words_appliedAttack',
+    '_Cutting_Words_flushTs',
     // CLA-041: Branches of the Tree reaction round latch re-arms at round wrap.
     '_Branches_of_the_Tree_usedRound',
     // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.

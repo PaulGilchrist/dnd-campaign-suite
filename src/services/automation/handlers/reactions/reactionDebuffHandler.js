@@ -1,5 +1,5 @@
 import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
@@ -18,13 +18,13 @@ function getRuntimeUsesKey(featureName) {
 }
 
 // Reverse the original damage when an attack that hit is turned into a miss.
-function reverseHitDamage(combatSummary, attackResult, defenderName, nowMisses) {
+function reverseHitDamage(combatSummary, attackResult, defenderName, nowMisses, campaignName) {
     let defenderHp = null;
     let healedAmount = 0;
     if (nowMisses && defenderName) {
         const healAmount = attackResult.totalDamage || attackResult.primaryDamage || 0;
         if (healAmount > 0) {
-            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount);
+            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
             defenderHp = healResult?.newHp ?? null;
             healedAmount = healResult?.actualHeal ?? 0;
         }
@@ -71,7 +71,7 @@ async function handleAttackRollDebuff({ action, campaignName, attackerName, bard
     const reducedHit = ac != null ? (reducedD20 + bonus >= ac) : null;
     const defenderName = targetName;
 
-    const { defenderHp, healedAmount } = reverseHitDamage(combatSummary, attackResult, defenderName, hit === true && reducedHit === false);
+    const { defenderHp, healedAmount } = reverseHitDamage(combatSummary, attackResult, defenderName, hit === true && reducedHit === false, campaignName);
 
     let description = `<b>${action.name}</b><br/>Attacker: ${attackerName}<br/>Bardic Inspiration die: 1d${bardicDieSize} = <b>${biDieRoll}</b><br/>`;
     description += attackRollHtml('Attack roll:', d20, bonus, ac, hit ? 'HIT' : 'MISS');
@@ -101,7 +101,7 @@ async function handleDamageDebuff({ action, campaignName, attackerName, bardicDi
 
     let defenderHp = null;
     if (healAmount > 0) {
-        const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount);
+        const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
         defenderHp = healResult?.newHp ?? null;
     }
 
@@ -414,7 +414,20 @@ async function spendUse(playerName, budget, campaignName) {
 }
 
 const refused = (response) => ({ refused: true, response });
-const applied = (response, attackerName = null) => ({ refused: false, response, attackerName });
+const applied = (response, attackerName = null, extra = null) => ({ refused: false, response, attackerName, ...(extra || {}) });
+
+// CLA-071: one merged patch (latch + attack marker + BI spend) written through a
+// single channel so racing full-store POSTs (§39) cannot resurrect stale values.
+function buildBardicStampPatch({ gate, auto, playerStats, playerName, featureName }) {
+    const patch = {};
+    patch[gate.latchKey] = gate.currentRound;
+    patch[gate.appliedAttackKey] = gate.attackIdentity;
+    const budget = resolveUsesBudget(auto, playerStats, featureName);
+    if (budget.effectiveUsesMax > 0) {
+        patch[budget.effectiveUsesKey] = Math.max(0, currentUsesFor(playerName, budget) - 1);
+    }
+    return patch;
+}
 
 async function handleAttacksVsAlly({ action, auto, playerName, campaignName, _mapName, combatSummary }) {
     const attackResult = await findLastAttack(campaignName);
@@ -549,12 +562,55 @@ async function handleWardingFlare({ action, auto, playerName, featureName, campa
 
 async function bardicRangeRefusal({ auto, campaignName, playerName, attackerName, _mapName, featureName }) {
     const rangeFt = auto.range ? parseInt(auto.range.replace(/[^0-9]/g, '')) || 60 : 60;
-    if (!_mapName || rangeFt == null) return null;
-    const positions = await resolveMapPositions(campaignName, playerName);
+    if (!_mapName) return null;
+    const positions = await resolveMapPositions(campaignName, _mapName, playerName);
     if (!positions?.attackerPos || !positions?.targetPos) return null;
     const inRange = await isWithinRange(playerName, attackerName, rangeFt);
     if (inRange) return null;
     return refused(infoPopup(featureName, `${attackerName} is out of range.`, auto));
+}
+
+// CLA-071: attack-instance identity (CLA-310 shape) — the same resolved
+// lastAttack must never be subtracted from twice within the round.
+function bardicAttackIdentity(attackEvent, attackerName) {
+    if (attackEvent?.timestamp != null) return String(attackEvent.timestamp);
+    return `d20:${attackEvent?.d20 ?? '?'}+${attackEvent?.bonus ?? 0}:${attackerName ?? ''}`;
+}
+
+// CLA-071: refusals log automation + cutting_words_refused + reason token,
+// zero spend, zero stamp (CLA-383 / playbook §5 shape).
+function bardicRefuse({ campaignName, playerName, featureName, action, auto, description, reason }) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: featureName.toLowerCase().replace(/\s+/g, '_') + '_refused',
+        name: featureName,
+        description,
+        reason,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[reactionDebuff] Error:", e); });
+    return refused(infoPopup(action.name, description, auto));
+}
+
+// CLA-071: Reaction economy round latch (CLA-383 handleWardingFlare shape;
+// re-armed at round wrap via PLAYER_ROUND_LATCH_KEYS + Initiative.jsx clear)
+// + per-attack-instance marker so one trigger roll subtracts only once.
+function gateBardicReaction({ attackEvent, attackResult, attackerName, campaignName, featureName, playerName, combatSummary }) {
+    const isDamageLane = !!(attackEvent.damageTypes?.length || attackResult.totalDamage > 0);
+    const latchKey = '_' + featureName.replace(/\s+/g, '_') + '_usedRound';
+    const appliedAttackKey = '_' + featureName.replace(/\s+/g, '_') + '_appliedAttack';
+    const currentRound = combatSummary.round || 1;
+    if (Number(getRuntimeValue(playerName, latchKey, campaignName) ?? 0) === currentRound) {
+        return { refusal: `${featureName} has already been used this round — a Reaction can only be taken once per round. It re-arms when the next round begins.`, reason: 'reaction_spent' };
+    }
+    const attackIdentity = bardicAttackIdentity(attackEvent, attackerName);
+    if (getRuntimeValue(playerName, appliedAttackKey, campaignName) === attackIdentity) {
+        return { refusal: `${featureName} has already been applied to this roll — one trigger roll can only be subtracted once. Nothing spent.`, reason: 'attack_already_debuffed' };
+    }
+    if (isDamageLane && !attackEvent.targetName) {
+        return { refusal: `Could not determine who ${attackerName} damaged. Cannot apply ${featureName}.`, reason: 'no_defender' };
+    }
+    return { latchKey, appliedAttackKey, currentRound, attackIdentity, isDamageLane };
 }
 
 async function handleBardicRoll({ action, auto, playerStats, playerName, featureName, campaignName, _mapName, combatSummary }) {
@@ -568,25 +624,43 @@ async function handleBardicRoll({ action, auto, playerStats, playerName, feature
     const rangeRefusal = await bardicRangeRefusal({ auto, campaignName, playerName, attackerName, _mapName, featureName });
     if (rangeRefusal) return rangeRefusal;
 
+    const attackResult = await findLastAttack(campaignName);
+    const attackEvent = attackResult.attackEvent;
+
+    if (!attackEvent || attackResult.attackerName !== attackerName) {
+        return refused(infoPopup(featureName, `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`, auto));
+    }
+
+    const gate = gateBardicReaction({ attackEvent, attackResult, attackerName, campaignName, featureName, playerName, combatSummary });
+    if (gate.refusal) {
+        return bardicRefuse({ campaignName, playerName, featureName, action, auto, reason: gate.reason, description: gate.refusal });
+    }
+
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
     const bardicDieSize = classLevel?.bardic_die || 6;
     const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
 
-    const attackResult = await findLastAttack(campaignName);
-    const attackEvent = attackResult.attackEvent;
-    const hasAttack = attackEvent && attackResult.attackerName === attackerName;
+    // CLA-071 §39 single-channel writes: bake latch + marker + BI spend into the
+    // client store BEFORE dispatch (skipSync = store only, no racing POST), so the
+    // rollback heal's own full-store snapshot carries the final economy values.
+    // Refusals above never bake, so they cost nothing.
+    const stampPatch = buildBardicStampPatch({ gate, auto, playerStats, playerName, featureName });
+    setRuntimeObject(playerName, stampPatch, campaignName, true);
 
-    if (!hasAttack) {
-        return refused(infoPopup(featureName, `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`, auto));
+    let result;
+    if (gate.isDamageLane) {
+        result = await handleDamageDebuff({ action, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary });
+    } else {
+        result = await handleAttackRollDebuff({ action, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary });
     }
 
-    if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
-        const result = await handleDamageDebuff({ action, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary });
-        return applied(result, attackerName);
-    }
+    // Flush the baked store after dispatch: the no-heal lanes issue no other POST,
+    // and on heal lanes this body is byte-identical for the economy keys, so
+    // network reordering (§39) cannot resurrect a stale BI spend.
+    const flushKey = '_' + featureName.replace(/\s+/g, '_') + '_flushTs';
+    await setRuntimeObject(playerName, { ...stampPatch, [flushKey]: Date.now() }, campaignName);
 
-    const result = await handleAttackRollDebuff({ action, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary });
-    return applied(result, attackerName);
+    return applied(result, attackerName, { preSpent: true });
 }
 
 async function logAttacksVsAllyTail(playerName, featureName, campaignName, result) {
@@ -686,7 +760,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (outcome.refused) return outcome.response;
 
-    if (budget.effectiveUsesMax > 0) {
+    if (budget.effectiveUsesMax > 0 && !outcome.preSpent) {
         await spendUse(playerName, budget, campaignName);
     }
 
