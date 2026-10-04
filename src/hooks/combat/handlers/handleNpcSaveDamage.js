@@ -106,7 +106,8 @@ async function resolveSaveDisadvantage({ targetName, campaignName, damageType, a
         return true;
     }
     if (abilityScopedSaveDisadvantage(targetName, campaignName, saveType)) return true;
-    const coronaResult = getCoronaSaveDisadvantage({ targetName, campaignName, damageType, skipRangeCheck: true });
+    // CLA-063: awaited — the util is async; un-awaited it was always undefined.
+    const coronaResult = await getCoronaSaveDisadvantage({ targetName, campaignName, damageType, skipRangeCheck: true });
     if (coronaResult.disadvantage) return true;
     const elderChampionResult = await getElderChampionSaveDisadvantage({ attackerName, attackerStats, targetName });
     return !!elderChampionResult.disadvantage;

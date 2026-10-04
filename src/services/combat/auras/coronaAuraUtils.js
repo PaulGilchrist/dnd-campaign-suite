@@ -1,4 +1,5 @@
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
+import { getCombatContext, getCombatSummary } from '../../encounters/combatData.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 function isInCoronaEnemiesList(sourceName, targetName) {
@@ -17,27 +18,63 @@ function getCoronaBuffForTarget(playerName, targetName) {
     return coronaBuff;
 }
 
-export async function getCoronaSaveDisadvantage({ targetName, mapData, damageType }) {
-    const players = mapData?.players?.length ? mapData.players : [];
-    if (!players.length) return { disadvantage: false };
+// CLA-063: Fire/Radiant damage-type gate, shared by the async and sync lanes.
+function coronaDamageTypeMatches(coronaBuff, damageType) {
+    const applicableTypes = coronaBuff.enemiesDisadvantageSaves || [];
+    if (applicableTypes.length === 0) return false;
+    if (damageType) {
+        const normalizedType = damageType.charAt(0).toUpperCase() + damageType.slice(1).toLowerCase();
+        if (!applicableTypes.includes(normalizedType)) return false;
+    }
+    return true;
+}
+
+function resolveCoronaPlayers(mapData) {
+    if (mapData?.players?.length) return mapData.players;
+    return [];
+}
+
+export async function getCoronaSaveDisadvantage({ targetName, mapData, damageType, campaignName, skipRangeCheck }) {
+    let players = resolveCoronaPlayers(mapData);
+    if (!players.length) {
+        if (!skipRangeCheck) return { disadvantage: false };
+        const combatSummary = getCombatSummary(campaignName) || await getCombatContext(campaignName);
+        players = (combatSummary?.creatures || []).filter(c => c.type === 'player');
+    }
 
     for (const player of players) {
         if (player.name === targetName) continue;
         const coronaBuff = getCoronaBuffForTarget(player.name, targetName);
         if (!coronaBuff) continue;
 
-        const range = coronaBuff.distance || '60 ft';
-        const rangeNum = parseInt(range) || 60;
-
-        const inRange = await isWithinRange(player.name, targetName, rangeNum);
-        if (!inRange) continue;
-
-        const applicableTypes = coronaBuff.enemiesDisadvantageSaves || [];
-        if (applicableTypes.length === 0) continue;
-        if (damageType) {
-            const normalizedType = damageType.charAt(0).toUpperCase() + damageType.slice(1).toLowerCase();
-            if (!applicableTypes.includes(normalizedType)) continue;
+        if (!skipRangeCheck) {
+            const range = coronaBuff.distance || '60 ft';
+            const rangeNum = parseInt(range) || 60;
+            const inRange = await isWithinRange(player.name, targetName, rangeNum);
+            if (!inRange) continue;
         }
+
+        if (!coronaDamageTypeMatches(coronaBuff, damageType)) continue;
+        return { disadvantage: true, source: player.name };
+    }
+    return { disadvantage: false };
+}
+
+// CLA-063: sync lane for save consumers that cannot await (aoeService). Honors
+// skipRangeCheck by treating gridless/no-position targets as consulted-and-passes;
+// without the flag it cannot measure range, so it stays conservative-false.
+export function getCoronaSaveDisadvantageSync({ targetName, mapData, damageType, campaignName, skipRangeCheck }) {
+    if (!skipRangeCheck) return { disadvantage: false };
+    let players = resolveCoronaPlayers(mapData);
+    if (!players.length) {
+        const combatSummary = getCombatSummary(campaignName);
+        players = (combatSummary?.creatures || []).filter(c => c.type === 'player');
+    }
+    for (const player of players) {
+        if (player.name === targetName) continue;
+        const coronaBuff = getCoronaBuffForTarget(player.name, targetName);
+        if (!coronaBuff) continue;
+        if (!coronaDamageTypeMatches(coronaBuff, damageType)) continue;
         return { disadvantage: true, source: player.name };
     }
     return { disadvantage: false };

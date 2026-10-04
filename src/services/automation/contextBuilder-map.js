@@ -179,7 +179,8 @@ async function accumulateAuraCounts(base, playerStats, campaignName, mapData, ta
     if (!targetPos) {
         coronaOpts.skipRangeCheck = true;
     }
-    const coronaResult = getCoronaSaveDisadvantage(coronaOpts);
+    // CLA-063: awaited — the util is async; un-awaited it was always undefined.
+    const coronaResult = await getCoronaSaveDisadvantage(coronaOpts);
     if (coronaResult.disadvantage) {
         mapDis++;
     }

@@ -28,6 +28,10 @@ vi.mock('../../../../services/automation/common/savePrompt.js', () => ({
   createSaveListener: vi.fn(() => ({ promptId: 'test-prompt-id' })),
 }));
 
+vi.mock('../../../../services/combat/auras/coronaAuraUtils.js', () => ({
+  getCoronaSaveDisadvantageSync: vi.fn(() => ({ disadvantage: false })),
+}));
+
 // ── Re-import mocked modules ──
 
 import * as diceRoller from '../../../../services/dice/diceRoller.js';
@@ -196,7 +200,31 @@ describe('DivineSparkModal', () => {
       targetName: 'Orc Warrior',
       saveType: 'CON',
       saveDc: 13,
+      disadvantage: false,
     });
+  });
+
+  // CLA-063: Corona of Light — Radiant save vs a listed enemy must arm the
+  // prompt with disadvantage (machine-truth payload channel).
+  it('CLA-063: threads corona sunlight_aura disadvantage onto the save prompt payload', async () => {
+    const corona = await import('../../../../services/combat/auras/coronaAuraUtils.js');
+    corona.getCoronaSaveDisadvantageSync.mockReturnValue({ disadvantage: true, source: 'War_Cleric' });
+
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
+    });
+
+    expect(corona.getCoronaSaveDisadvantageSync).toHaveBeenCalledWith(expect.objectContaining({
+      targetName: 'Orc Warrior',
+      damageType: 'Radiant',
+      skipRangeCheck: true,
+    }));
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      targetName: 'Orc Warrior',
+      disadvantage: true,
+    }));
+    corona.getCoronaSaveDisadvantageSync.mockReturnValue({ disadvantage: false });
   });
 
   it('calculates save DC as 8 + wisModifier + 2', async () => {
@@ -208,6 +236,7 @@ describe('DivineSparkModal', () => {
       targetName: 'Orc Warrior',
       saveType: 'CON',
       saveDc: 15,
+      disadvantage: false,
     });
   });
 
@@ -457,6 +486,7 @@ describe('DivineSparkModal', () => {
       targetName: 'Orc Warrior',
       saveType: 'CON',
       saveDc: 10,
+      disadvantage: false,
     });
   });
 
@@ -469,6 +499,7 @@ describe('DivineSparkModal', () => {
       targetName: 'Orc Warrior',
       saveType: 'CON',
       saveDc: 8,
+      disadvantage: false,
     });
   });
 

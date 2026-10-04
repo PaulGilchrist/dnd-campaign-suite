@@ -20,10 +20,12 @@ export async function activateCoronaOfLight(action, playerStats, campaignName, s
     // Store selected enemies list on the caster's character key
     await setRuntimeValue(playerName, CORONA_ENEMIES_KEY, selectedEnemies, campaignName);
 
-    // Set up expiration for 1 minute (10 rounds)
+    // Set up expiration for 1 minute — CLA-063: explicit rounds clock
+    // (minutes×10, playbook §37); omitting rounds stamped expiryRounds:null
+    // (Infinity) so the buff never expired on the round counter.
     addExpiration({ attackerName: playerName, targetName: playerName, effects: [
         { type: 'remove_active_buff', buffName: action.name }
-    ], campaignName });
+    ], campaignName, rounds: 10 });
 
     // Log the ability use
     await addEntry(campaignName, {

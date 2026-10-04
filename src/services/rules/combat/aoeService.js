@@ -3,7 +3,7 @@ import { rollSaveForCreature, applyDamageToTarget, computeDamageAfterEvasion, ha
 import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { getCoronaSaveDisadvantage } from '../../combat/auras/coronaAuraUtils.js';
+import { getCoronaSaveDisadvantageSync } from '../../combat/auras/coronaAuraUtils.js';
 import { isCircleOfPowerActive } from '../../automation/handlers/buffs/circleOfPowerHandler.js';
 import { abilitySaveDisadvantageActive } from '../../combat/conditions/targetEffectDefinitions.js';
 
@@ -39,7 +39,9 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
 }
 
 function resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget, saveType) {
-  const coronaResult = getCoronaSaveDisadvantage({
+  // CLA-063: sync lane — getCoronaSaveDisadvantageSync honors skipRangeCheck
+  // gridless-lenient and falls back to combat-summary participants.
+  const coronaResult = getCoronaSaveDisadvantageSync({
     targetName: creature.name,
     campaignName,
     damageType,
@@ -97,7 +99,8 @@ export function sendAoePlayerSaves({ affected, rawDamage, damageType, saveDc, sa
       creature,
      });
 
-    const coronaResult = getCoronaSaveDisadvantage({
+    // CLA-063: sync lane, gridless-lenient (see resolveNpcSaveDisadvantage).
+    const coronaResult = getCoronaSaveDisadvantageSync({
       targetName: creature.name,
       campaignName,
       damageType,

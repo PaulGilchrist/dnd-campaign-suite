@@ -191,6 +191,53 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
             );
         });
 
+        // CLA-063: the util is async — the lane must AWAIT it. A Promise is
+        // truthy but carries no .disadvantage, so this pins the await fix.
+        it('CLA-063: awaited getCoronaSaveDisadvantage (Promise payload) forces disadvantage mode', async () => {
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'Goblin' && prop === 'activeConditions') return [];
+                return null;
+            });
+            getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: true, source: 'War_Cleric' });
+
+            await callHandler(createFn());
+
+            expect(getCoronaSaveDisadvantage).toHaveBeenCalledWith(expect.objectContaining({
+                targetName: 'Goblin',
+                damageType: 'fire',
+                skipRangeCheck: true,
+            }));
+            const popup = deps.setPopupHtml.mock.calls[0][0];
+            expect(popup.forcedMode).toBe('disadvantage');
+            expect(rollSaveForCreature).toHaveBeenCalledWith(
+                expect.any(Object),
+                'dex',
+                12,
+                true, // disadvantage
+                false
+            );
+        });
+
+        it('CLA-063: awaited resolve to disadvantage:false stays normal mode', async () => {
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'Goblin' && prop === 'activeConditions') return [];
+                return null;
+            });
+            getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: false });
+
+            await callHandler(createFn());
+
+            const popup = deps.setPopupHtml.mock.calls[0][0];
+            expect(popup.forcedMode).toBe('normal');
+            expect(rollSaveForCreature).toHaveBeenCalledWith(
+                expect.any(Object),
+                'dex',
+                12,
+                false,
+                false
+            );
+        });
+
         it('sets forcedMode to advantage when saveModifiers grant advantage', async () => {
             getRuntimeValue.mockImplementation((key, prop) => {
                 if (key === 'Goblin' && prop === 'activeConditions') return [];

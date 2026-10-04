@@ -4,6 +4,7 @@ import { hasHealingMaximization } from '../../../../services/combat/automation/a
 import { addEntry } from '../../../../services/ui/logService.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
 import { createSaveListener } from '../../../../services/automation/common/savePrompt.js';
+import { getCoronaSaveDisadvantageSync } from '../../../../services/combat/auras/coronaAuraUtils.js';
 
 function DivineSparkResultView({ result, targetName }) {
     if (!result) return null;
@@ -96,10 +97,21 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
         const damageAmount = rollResult.total;
         const saveDc = 8 + wisModifier + 2;
 
+        // CLA-063: Corona of Light — enemies in the bright light have
+        // Disadvantage on saves vs Fire/Radiant; the prompt payload flag is
+        // the machine-truth channel consumed by SavePromptModal getSaveDisadvantage.
+        const coronaSaveDisadvantage = getCoronaSaveDisadvantageSync({
+            targetName,
+            damageType,
+            campaignName,
+            skipRangeCheck: true,
+        }).disadvantage || false;
+
         const { promptId } = createSaveListener(campaignName, {
             targetName,
             saveType,
             saveDc,
+            disadvantage: coronaSaveDisadvantage,
         });
 
         const handleSaveResult = (event) => {

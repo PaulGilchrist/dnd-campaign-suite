@@ -33,6 +33,13 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => ({ keys: () => [] })),
 }));
 
+// CLA-063: getCoronaSaveDisadvantageSync participants fall back to the cached
+// combat summary — mock it so the cache stays cold (false) for legacy pins.
+vi.mock('../../encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(() => null),
+  getCombatContext: vi.fn(async () => null),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import {
@@ -52,6 +59,7 @@ import {
 import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getCombatSummary } from '../../encounters/combatData.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -430,6 +438,65 @@ describe('processAoeNpcs', () => {
       'campaign', 'targetEffects', [], 'TestCampaign'
     );
   });
+
+  // CLA-063: Corona of Light save-disadvantage on the AoE NPC lane (sync variant).
+  function seedCoronaCaster() {
+    getCombatSummary.mockReturnValue(makeCombatSummary([createPlayerCreature('TestHero')]));
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'TestHero' && prop === 'activeBuffs') {
+        return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
+      }
+      if (key === 'TestHero' && prop === 'coronaOfLightEnemies') {
+        return ['Goblin'];
+      }
+      return null;
+    });
+  }
+
+  it('applies corona sunlight_aura disadvantage to Fire saves on listed enemies', () => {
+    const npc = createNpcCreature('Goblin');
+    seedCoronaCaster();
+    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
+    computeDamageAfterEvasion.mockReturnValue(6);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
+
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
+
+    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, true, false);
+  });
+
+  it('does not apply corona disadvantage for non-Fire/Radiant damage types', () => {
+    const npc = createNpcCreature('Goblin');
+    seedCoronaCaster();
+    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
+    computeDamageAfterEvasion.mockReturnValue(6);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
+
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Cold', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
+
+    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, false, false);
+  });
+
+  it('does not apply corona disadvantage to unlisted enemies', () => {
+    const npc = createNpcCreature('Goblin');
+    seedCoronaCaster();
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'TestHero' && prop === 'activeBuffs') {
+        return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
+      }
+      if (key === 'TestHero' && prop === 'coronaOfLightEnemies') {
+        return ['Someone Else'];
+      }
+      return null;
+    });
+    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
+    computeDamageAfterEvasion.mockReturnValue(6);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
+
+    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
+
+    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, false, false);
+  });
 });
 
 // ── Tests for sendAoePlayerSaves ────────────────────────────────
@@ -484,6 +551,32 @@ describe('sendAoePlayerSaves', () => {
       rawDamage: 8,
       disadvantage: false,
     });
+  });
+
+  it('CLA-063: prompt carries corona sunlight_aura disadvantage for listed enemies vs Fire/Radiant', () => {
+    const player = createPlayerCreature('Hero');
+    utils.guid.mockReturnValue('guid-coro');
+    getCombatSummary.mockReturnValue(makeCombatSummary([createPlayerCreature('Wizard')]));
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'Wizard' && prop === 'activeBuffs') {
+        return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
+      }
+      if (key === 'Wizard' && prop === 'coronaOfLightEnemies') {
+        return ['Hero'];
+      }
+      return null;
+    });
+
+    sendAoePlayerSaves({
+      affected: [{ creature: player }], rawDamage: 8, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
+      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Fireball', attackerName: 'Wizard', formula: '3d6',
+    });
+
+    expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      targetName: 'Hero',
+      damageType: 'Fire',
+      disadvantage: true,
+    }));
   });
 
   it('returns pending list for all player creatures, calls sendSavePrompt once per player, generates unique prompt IDs', () => {

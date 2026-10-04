@@ -103,12 +103,13 @@ async function applyForcedSuccessSave({ context, combatSummary, target, characte
 }
 
 async function resolvePlayerSaveDisadvantage({ context, target, campaignName, characterName, targetEffects, restoreBalance, saveType }) {
-    const coronaDisadvantage = getCoronaSaveDisadvantage({
+    // CLA-063: awaited — the util is async; un-awaited it was always undefined.
+    const coronaDisadvantage = (await getCoronaSaveDisadvantage({
         targetName: target.name,
         campaignName,
         damageType: context?.damageType,
         skipRangeCheck: true,
-    }).disadvantage || false;
+    })).disadvantage || false;
     const elderChampionDisadvantage = await getElderChampionSaveDisadvantage({
         attackerName: characterName,
         attackerStats: context?.playerStats,

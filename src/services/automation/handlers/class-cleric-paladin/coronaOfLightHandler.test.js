@@ -76,7 +76,7 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 campaignName,
             );
 
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCleric', targetName: 'TestCleric', effects: [{ type: 'remove_active_buff', buffName: 'Corona of Light' }], campaignName });
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCleric', targetName: 'TestCleric', effects: [{ type: 'remove_active_buff', buffName: 'Corona of Light' }], campaignName, rounds: 10 });
 
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
@@ -101,7 +101,7 @@ describe('coronaOfLightHandler.activateCoronaOfLight', () => {
                 'TestCleric',
             );
 
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCleric', targetName: 'TestCleric', effects: [{ type: 'remove_active_buff', buffName: 'Custom Corona Name' }], campaignName });
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCleric', targetName: 'TestCleric', effects: [{ type: 'remove_active_buff', buffName: 'Custom Corona Name' }], campaignName, rounds: 10 });
 
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',

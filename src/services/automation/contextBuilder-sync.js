@@ -489,8 +489,10 @@ async function resolveLionAura(playerName, campaignName) {
     return noMapLion.disadvantage ? { mode: 'disadvantage' } : undefined;
 }
 
-function resolveCoronaAura(targetName, campaignName, damageType) {
-    const noMapCorona = getCoronaSaveDisadvantage({
+// CLA-063: async — the util is async; resolvers in the modeResolvers loop are
+// awaited, so the Promise unwraps at the seam (mirrors resolveWolfAura twins).
+async function resolveCoronaAura(targetName, campaignName, damageType) {
+    const noMapCorona = await getCoronaSaveDisadvantage({
         targetName,
         campaignName,
         damageType,
