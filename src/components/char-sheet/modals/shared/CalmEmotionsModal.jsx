@@ -4,7 +4,13 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { logSaveResultEntry } from './saveResultLogging.js';
-import { applyCalmEmotionsImmunity, applyCalmEmotionsCharmed } from '../../../../services/automation/handlers/spells/calmEmotionsHandler.js';
+import {
+    applyCalmEmotionsImmunity,
+    applyCalmEmotionsIndifferent,
+    resolveCalmEmotionsEligibility,
+    logCalmEmotionsEligibility,
+    registerCalmEmotionsExpiration,
+} from '../../../../services/automation/handlers/spells/calmEmotionsHandler.js';
 import {
     useCarefulSpellSelection,
     useSaveResultListener,
@@ -44,8 +50,16 @@ async function resolveCalmNpcSave(ctx, targetName, target) {
         });
         return { targetName, success: true, roll: saveRoll, total: saveTotal, saveBonus, conditionApplied: false };
     }
+
+    // SP-020 B6: NPC saves must appear in the log on both lanes.
+    await logSaveResultEntry(campaignName, { casterName, targetName, saveDc, saveType, success, detail: { roll: saveRoll, total: saveTotal, saveBonus }, logPrefix: '[calmEmotions]' });
+
     if (!success) {
-        await applyCalmEmotionsCharmed({ targetName, casterName, campaignName, dc: saveDc, creature: target, characters: [] });
+        if (choice === 'indifferent') {
+            await applyCalmEmotionsIndifferent({ targetName, casterName, campaignName, dc: saveDc });
+        } else {
+            await applyCalmEmotionsImmunity({ targetName, casterName, campaignName, dc: saveDc });
+        }
         await addTargetResult(campaignName, {
             targetName,
             saveResult: 'failure',
@@ -65,6 +79,7 @@ async function resolveCalmPlayerSave(ctx, targetName, results, prompts) {
         results.push({ targetName, success: true, roll: null, total: 0, saveBonus: 0, conditionApplied: false });
         return;
     }
+    // SP-020 B1: every target (players included) rolls before any effect.
     prompts.push({ ...issuePlayerSavePrompt(campaignName, { targetName, saveType, saveDc, casterName }), choice });
 }
 
@@ -82,10 +97,14 @@ function CalmEmotionsModal({
     const [pendingPrompts, setPendingPrompts] = useState([]);
     const [heightenTarget, setHeightenTarget] = useState(null);
     const [targetChoices, setTargetChoices] = useState({});
+    // SP-020 B7: inclusion is tracked separately from the effect choice so a
+    // single click flips it (the old code conflated the two maps).
+    const [excludedTargets, setExcludedTargets] = useState({});
+    // SP-020 B2/B4: Humanoid-only + sphere gate, resolved async.
+    const [gate, setGate] = useState({ ready: false, eligible: [], ineligible: [], advisory: [] });
 
     const { isCarefulSpell, isCarefulAlly } = useCarefulSpellSelection(metamagicCareful, playerStats.name);
 
-    // Default: all creatures included, default choice = immunity
     const combatSummary = getCombatSummary(campaignName);
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');
 
@@ -93,13 +112,26 @@ function CalmEmotionsModal({
 
     useEffect(() => {
         const defaultChoices = {};
-        const defaultIncluded = {};
         for (const c of eligibleTargets) {
-            defaultIncluded[c.name] = true;
-            defaultChoices[c.name] = 'immunity';
+            if (!(c.name in targetChoices)) defaultChoices[c.name] = 'immunity';
         }
-        setTargetChoices(prev => ({ ...prev, ...defaultChoices }));
-    }, [eligibleTargets]);
+        if (Object.keys(defaultChoices).length > 0) {
+            setTargetChoices(prev => ({ ...prev, ...defaultChoices }));
+        }
+    }, [eligibleTargets, targetChoices]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const res = await resolveCalmEmotionsEligibility({
+                campaignName,
+                casterName: playerStats.name,
+                creatures: combatSummary?.creatures || [],
+            });
+            if (!cancelled) setGate({ ready: true, ...res });
+        })();
+        return () => { cancelled = true; };
+    }, [campaignName, playerStats.name, combatSummary]);
 
     const resolveAllSaves = useCallback(async (selectedNames) => {
         const casterName = playerStats.name;
@@ -112,6 +144,12 @@ function CalmEmotionsModal({
             attackScope: 'aoe',
         });
 
+        // SP-020 B2/B4: record who cannot be affected + geometry advisories.
+        await logCalmEmotionsEligibility({ campaignName, casterName, ineligible: gate.ineligible, advisory: gate.advisory });
+
+        // SP-020 B5: 1-minute concentration duration clock (10 rounds).
+        registerCalmEmotionsExpiration({ casterName, campaignName });
+
         const results = [];
         const prompts = [];
 
@@ -121,17 +159,10 @@ function CalmEmotionsModal({
             const target = combatSummary.creatures.find(c => c.name === targetName);
             if (!target) continue;
 
-            const choice = targetChoices[targetName] || 'immunity';
+            const choice = targetChoices[targetName] === 'indifferent' ? 'indifferent' : 'immunity';
             const ctx = { ...saveCtx, choice };
 
-            // Immunity mode grants a buff directly — no save required
-            if (choice === 'immunity') {
-                await applyCalmEmotionsImmunity({ targetName, casterName, campaignName, dc: saveDc });
-                results.push({ targetName, success: true, skipped: true, choice });
-                continue;
-            }
-
-            // Charmed mode requires a save
+            // SP-020 B1: everyone saves first — effects only on a failed save.
             if (target.type === 'npc') {
                 results.push(await resolveCalmNpcSave(ctx, targetName, target));
             } else {
@@ -143,7 +174,7 @@ function CalmEmotionsModal({
         persistAndNotify(getCombatSummary(campaignName), campaignName);
 
         return { results, prompts };
-    }, [campaignName, playerStats.name, action.name, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, targetChoices, combatSummary]);
+    }, [campaignName, playerStats.name, action.name, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, targetChoices, combatSummary, gate]);
 
     const handleSaveResult = useCallback(async (event) => {
         const detail = event.detail;
@@ -157,10 +188,12 @@ function CalmEmotionsModal({
         const casterName = playerStats.name;
 
         if (!success) {
-            if (choice === 'immunity') {
-                await applyCalmEmotionsImmunity({ targetName, casterName, campaignName, dc: saveDc });
+            // SP-020 B3: failure grants immunity or registered advisory
+            // indifference — never the Charmed condition.
+            if (choice === 'indifferent') {
+                await applyCalmEmotionsIndifferent({ targetName, casterName, campaignName, dc: saveDc });
             } else {
-                await applyCalmEmotionsCharmed({ targetName, casterName, campaignName, dc: saveDc, creature: null, characters: [] });
+                await applyCalmEmotionsImmunity({ targetName, casterName, campaignName, dc: saveDc });
             }
 
             await addTargetResult(campaignName, {
@@ -201,15 +234,7 @@ function CalmEmotionsModal({
     useSaveResultListener(pendingPrompts, handleSaveResult);
 
     const handleToggleTarget = useCallback((targetName) => {
-        setTargetChoices(prev => {
-            const newIncluded = { ...prev };
-            if (newIncluded[targetName]) {
-                delete newIncluded[targetName];
-            } else {
-                newIncluded[targetName] = false;
-            }
-            return newIncluded;
-        });
+        setExcludedTargets(prev => ({ ...prev, [targetName]: !prev[targetName] }));
     }, []);
 
     const handleToggleChoice = useCallback((targetName, choice) => {
@@ -227,7 +252,10 @@ function CalmEmotionsModal({
         );
     }
 
-    const includedTargets = eligibleTargets.filter(c => targetChoices[c.name] !== false);
+    const displayedTargets = gate.ready
+        ? eligibleTargets.filter(c => gate.eligible.includes(c.name))
+        : eligibleTargets;
+    const includedTargets = displayedTargets.filter(c => !excludedTargets[c.name]);
 
     return (
         <div className="sp-overlay">
@@ -236,13 +264,13 @@ function CalmEmotionsModal({
                     <i className="fa-solid fa-hand-holding-heart"></i> Calm Emotions
                 </div>
                 <div className="sp-body">
-                    <p>Select creatures in the <strong>20-foot-radius sphere</strong>. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}).</p>
-                    <p className="sp-note">On a failed save, choose the effect for each creature.</p>
+                    <p>Select <strong>Humanoid</strong> creatures in the <strong>20-foot-radius sphere</strong>. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}).</p>
+                    <p className="sp-note">On a failed save, choose the effect for each creature. Indifference is a GM-enforced attitude (it ends if the target takes damage or witnesses an ally take damage).</p>
                     <div className="secondary-target-list">
-                        {eligibleTargets.map((target) => {
+                        {displayedTargets.map((target) => {
                             const name = target.name;
-                            const isIncluded = targetChoices[name] !== false;
-                            const choice = targetChoices[name] === false ? 'immunity' : (typeof targetChoices[name] === 'object' ? targetChoices[name]?.choice : targetChoices[name] || 'immunity');
+                            const isIncluded = !excludedTargets[name];
+                            const choice = targetChoices[name] === 'indifferent' ? 'indifferent' : 'immunity';
                             const isPlayer = target.type === 'player';
                             const hpDisplay = (!isPlayer && target.currentHp != null && target.maxHp != null)
                                 ? `${Math.round((target.currentHp / target.maxHp) * 100)}%`
@@ -284,11 +312,11 @@ function CalmEmotionsModal({
                                                 <input
                                                     type="radio"
                                                     name={`choice-${name}`}
-                                                    checked={choice === 'charmed'}
-                                                    onChange={() => handleToggleChoice(name, 'charmed')}
+                                                    checked={choice === 'indifferent'}
+                                                    onChange={() => handleToggleChoice(name, 'indifferent')}
                                                     onClick={e => e.stopPropagation()}
                                                 />
-                                                Apply Charmed
+                                                Become Indifferent
                                             </label>
                                         </div>
                                     )}
@@ -308,8 +336,8 @@ function CalmEmotionsModal({
                                 </div>
                             );
                         })}
-                        {eligibleTargets.length === 0 && (
-                            <p className="sp-note">No targets available.</p>
+                        {displayedTargets.length === 0 && (
+                            <p className="sp-note">No Humanoid targets available in the sphere.</p>
                         )}
                     </div>
                 </div>

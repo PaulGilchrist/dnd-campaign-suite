@@ -1,6 +1,6 @@
 // @improved-by-ai
 // @cleaned-by-ai
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CalmEmotionsModal from './CalmEmotionsModal.jsx';
 
@@ -36,7 +36,14 @@ vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
 
 vi.mock('../../../../services/automation/handlers/spells/calmEmotionsHandler.js', () => ({
     applyCalmEmotionsImmunity: vi.fn().mockResolvedValue(undefined),
-    applyCalmEmotionsCharmed: vi.fn().mockResolvedValue({ immune: false }),
+    applyCalmEmotionsIndifferent: vi.fn().mockResolvedValue(undefined),
+    resolveCalmEmotionsEligibility: vi.fn().mockImplementation(async ({ creatures }) => ({
+        eligible: (creatures || []).map(c => c.name),
+        ineligible: [],
+        advisory: [],
+    })),
+    logCalmEmotionsEligibility: vi.fn().mockResolvedValue(undefined),
+    registerCalmEmotionsExpiration: vi.fn(),
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -45,7 +52,7 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
-import { applyCalmEmotionsImmunity, applyCalmEmotionsCharmed } from '../../../../services/automation/handlers/spells/calmEmotionsHandler.js';
+import { applyCalmEmotionsImmunity, applyCalmEmotionsIndifferent, resolveCalmEmotionsEligibility, logCalmEmotionsEligibility, registerCalmEmotionsExpiration } from '../../../../services/automation/handlers/spells/calmEmotionsHandler.js';
 
 const campaignName = 'test-campaign';
 
@@ -89,6 +96,12 @@ beforeEach(() => {
     addEntry.mockResolvedValue(undefined);
     persistAndNotify.mockReturnValue(undefined);
     getAllyList.mockReturnValue(null);
+    resolveCalmEmotionsEligibility.mockImplementation(async ({ creatures }) => ({
+        eligible: (creatures || []).map(c => c.name),
+        ineligible: [],
+        advisory: [],
+    }));
+    logCalmEmotionsEligibility.mockResolvedValue(undefined);
 });
 
 describe('CalmEmotionsModal', () => {
@@ -196,7 +209,7 @@ describe('CalmEmotionsModal', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
             expect(onClose).toHaveBeenCalledTimes(1);
             expect(applyCalmEmotionsImmunity).not.toHaveBeenCalled();
-            expect(applyCalmEmotionsCharmed).not.toHaveBeenCalled();
+            expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalled();
             expect(sendSavePrompt).not.toHaveBeenCalled();
         });
     });
@@ -207,7 +220,7 @@ describe('CalmEmotionsModal', () => {
         it('renders empty target list when no creatures in combat', () => {
             getCombatSummary.mockReturnValue({ creatures: [] });
             render(<CalmEmotionsModal {...makeProps()} />);
-            expect(screen.getByText('No targets available.')).toBeInTheDocument();
+            expect(screen.getByText('No Humanoid targets available in the sphere.')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: /Cast Calm Emotions \(0\)/ })).toBeDisabled();
         });
 
@@ -250,13 +263,61 @@ describe('CalmEmotionsModal', () => {
         });
     });
 
+    // ── SP-020 fixes ──
+
+    describe('SP-020 fixes', () => {
+        it('B7: excludes and re-includes a target with a single checkbox click', async () => {
+            render(<CalmEmotionsModal {...makeProps()} />);
+            await waitFor(() => expect(screen.getByRole('button', { name: /Cast Calm Emotions \(3\)/ })).toBeInTheDocument());
+            const goblinCheckbox = document.querySelector('.secondary-target-row input[type=checkbox]');
+            await act(async () => { fireEvent.click(goblinCheckbox); });
+            expect(screen.getByRole('button', { name: /Cast Calm Emotions \(2\)/ })).toBeInTheDocument();
+            await act(async () => { fireEvent.click(goblinCheckbox); });
+            expect(screen.getByRole('button', { name: /Cast Calm Emotions \(3\)/ })).toBeInTheDocument();
+        });
+
+        it('B3: offers Become Indifferent instead of Apply Charmed', () => {
+            render(<CalmEmotionsModal {...makeProps()} />);
+            expect(screen.getAllByText('Become Indifferent')).toHaveLength(3);
+            expect(screen.queryByText('Apply Charmed')).not.toBeInTheDocument();
+        });
+
+        it('B2: hides ineligible (non-Humanoid) targets once the eligibility gate resolves', async () => {
+            resolveCalmEmotionsEligibility.mockImplementationOnce(async () => ({
+                eligible: ['Goblin', 'PlayerAlly'],
+                ineligible: [{ name: 'Orc', reason: 'not_humanoid' }],
+                advisory: ['no_map_lenient'],
+            }));
+            render(<CalmEmotionsModal {...makeProps()} />);
+            await waitFor(() => {
+                expect(document.querySelectorAll('.secondary-target-row')).toHaveLength(2);
+            });
+            expect(screen.queryByText('Orc')).not.toBeInTheDocument();
+        });
+
+        it('B5/B2: registers the duration clock and logs ineligible creatures on cast', async () => {
+            resolveCalmEmotionsEligibility.mockImplementationOnce(async () => ({
+                eligible: ['Goblin'],
+                ineligible: [{ name: 'Orc', reason: 'not_humanoid' }],
+                advisory: [],
+            }));
+            render(<CalmEmotionsModal {...makeProps()} />);
+            await waitFor(() => expect(screen.getByRole('button', { name: /Cast Calm Emotions \(1\)/ })).toBeInTheDocument());
+            await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Cast Calm Emotions/ })); });
+            expect(registerCalmEmotionsExpiration).toHaveBeenCalledWith({ casterName: 'Wizard1', campaignName });
+            expect(logCalmEmotionsEligibility).toHaveBeenCalledWith(expect.objectContaining({
+                ineligible: [{ name: 'Orc', reason: 'not_humanoid' }],
+            }));
+        });
+    });
+
     // ── Null combat summary ──
 
     describe('null combat summary', () => {
         it('handles null combat summary gracefully - no targets shown', () => {
             getCombatSummary.mockReturnValue(null);
             render(<CalmEmotionsModal {...makeProps()} />);
-            expect(screen.getByText('No targets available.')).toBeInTheDocument();
+            expect(screen.getByText('No Humanoid targets available in the sphere.')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: /Cast Calm Emotions \(0\)/ })).toBeDisabled();
         });
     });

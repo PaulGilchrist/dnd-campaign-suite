@@ -21,6 +21,7 @@ vi.mock('../../../ui/logService.js', () => ({
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../common/damageRollback.js', () => ({
@@ -53,7 +54,13 @@ vi.mock('../../../npcs/monsterUtils.js', () => ({
   getMonsterData: vi.fn(),
 }));
 
+vi.mock('../../../rules/effects/expirationQueue.js', () => ({
+  addExpiration: vi.fn(),
+}));
+
 import { handle } from './calmEmotionsHandler.js';
+import { addExpiration } from '../../../rules/effects/expirationQueue.js';
+import { getMonsterData } from '../../../npcs/monsterUtils.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -523,6 +530,71 @@ describe('calmEmotionsHandler - handle', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.description).toContain('No creatures affected');
+    });
+  });
+
+  describe('SP-020 fixes', () => {
+    it('B5: registers a 10-round calm_emotions_end expiration clock on the caster', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: true }),
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addExpiration).toHaveBeenCalledWith({
+        attackerName: 'TestWizard',
+        targetName: 'TestWizard',
+        effects: [{ type: 'calm_emotions_end', source: 'TestWizard' }],
+        campaignName,
+        rounds: 10,
+        expireOnCreatureName: null,
+      });
+    });
+
+    it('B2: non-Humanoid creatures are excluded from saves and logged ineligible', async () => {
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'EnemyGoblin' },
+          { name: 'Pseudodragon' },
+        ],
+      });
+      getMonsterData.mockImplementation(async (name) => {
+        if (String(name).startsWith('Pseudodragon')) return { name: 'Pseudodragon', type: 'Dragon' };
+        return { name: 'Bandit', type: 'Humanoid' };
+      });
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: true }),
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(createSaveListener).toHaveBeenCalledTimes(1);
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ targetName: 'EnemyGoblin' }));
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'automation',
+        automationType: 'calm_emotions_ineligible',
+        automationDetail: 'not_humanoid',
+        characterName: 'Pseudodragon',
+      }));
+    });
+
+    it('B4: no active map logs a lenient sphere advisory', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: true }),
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'automation',
+        automationType: 'calm_emotions_sphere_advisory',
+        automationDetail: 'no_map_lenient',
+      }));
     });
   });
 

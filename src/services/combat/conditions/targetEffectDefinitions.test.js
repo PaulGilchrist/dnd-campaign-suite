@@ -192,6 +192,14 @@ describe('targetEffectDefinitions', () => {
         expect(effectKeys).toContain('beacon_of_hope');
         expect(effectKeys).toContain('bless_bonus');
         expect(effectKeys).toContain('calm_emotions');
+        // SP-020 B3: advisory attitude te replacing the old Charmed substitute
+        const indifferent = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'indifferent');
+        expect(indifferent).toBeDefined();
+        expect(indifferent.group).toBe('Spells');
+        expect(indifferent.cls).toBe('effect-neutral');
+        expect(indifferent.icon).toBe('fa-handshake');
+        expect(indifferent.description).toContain('GM-enforced advisory');
+        expect(indifferent.description).toContain('takes damage');
         expect(effectKeys).toContain('circle_of_power');
         expect(effectKeys).toContain('clairvoyant_combatant');
         expect(effectKeys).toContain('compelled_duel');

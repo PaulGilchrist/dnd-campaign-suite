@@ -2,7 +2,7 @@ import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hoo
 import utils from '../../ui/utils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import storage from '../../ui/storage.js';
-import { breakConcentration, cleanupConcentrationEffects } from '../../combat/concentration/concentrationService.js';
+import { breakConcentration, cleanupConcentrationEffects, restoreSuppressedConditions } from '../../combat/concentration/concentrationService.js';
 import { revertPolymorph } from '../../automation/handlers/spells/polymorphService.js';
 import { revertAnimalShapes } from '../../automation/handlers/spells/animalShapesService.js';
 import { revertTruePolymorph } from '../../automation/handlers/spells/truePolymorphService.js';
@@ -284,6 +284,44 @@ function handleRemoveSummonedCreatures(effect, targetName, _attackerName, campai
     }).catch((e) => { console.error('[clearExpirationEffects:summon-expire-log-error]', e); });
 }
 
+// SP-020 B5: Calm Emotions 1-minute concentration clock expiry — strip the
+// caster's calm_emotions/indifferent targetEffects, restore suppressed
+// conditions, drop the immunity buffs and release the caster's concentration.
+// Idempotent: a concentration break sweeps the te and the clock together
+// (clearPendingExpirations), so this leg no-ops when the te is already gone.
+function handleCalmEmotionsEnd(effect, targetName, attackerName, campaignName) {
+    const casterName = effect.source || attackerName;
+    const cs = getCombatSummary(campaignName);
+    if (cs?.creatures) {
+        const casterCreature = cs.creatures.find(c => c.name === casterName);
+        if (casterCreature?.concentration && casterCreature.concentration.spell === 'Calm Emotions') {
+            casterCreature.concentration = null;
+            storage.set('combatSummary', cs, campaignName);
+        }
+    }
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const owned = storedEffects.filter(te =>
+        te.source === casterName && (te.effect === 'calm_emotions' || te.effect === 'indifferent'));
+    if (owned.length === 0) return;
+    for (const te of owned) {
+        restoreSuppressedConditions(te, campaignName);
+        if (te.effect !== 'calm_emotions' || !te.target) continue;
+        const buffs = readBuffs(te.target);
+        const filtered = buffs.filter(b => !(b.name === 'Calm Emotions' && b.sourceCharacter === casterName));
+        if (filtered.length !== buffs.length) {
+            setRuntimeValue(te.target, 'activeBuffs', filtered, campaignName);
+        }
+    }
+    setRuntimeValue('campaign', 'targetEffects', storedEffects.filter(te => !owned.includes(te)), campaignName);
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'calm_emotions_ended',
+        characterName: casterName,
+        description: `Calm Emotions ends (1 minute) — immunity lifts, suppressed conditions resume, and Indifferent attitudes return to normal.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[clearExpirationEffects:calm_emotions_end]', e); });
+}
+
 function handleBreakConcentration(_effect, targetName, _attackerName, campaignName) {
     const cs = getCombatSummary(campaignName);
     if (!cs) return;
@@ -398,6 +436,7 @@ const EXPIRATION_HANDLERS = {
     'break_concentration': handleBreakConcentration,
     'remove_regenerate_buff': clearFlagKeys(['regenerateActive', 'regenerateSource']),
     'remove_aura_of_life_buff': handleRemoveAuraOfLifeBuff,
+    'calm_emotions_end': handleCalmEmotionsEnd,
     'aura_of_life_hp_protection_end': (_effect, targetName, _attackerName, campaignName) => setRuntimeValue(targetName, 'auraOfLifeHpMaxProtected', false, campaignName),
     'bait_and_switch_clear': handleBaitAndSwitchClear,
     'clear_runtime_value': (effect, _targetName, _attackerName, campaignName) => setRuntimeValue(effect.creatureName, effect.key, null, campaignName),

@@ -449,4 +449,6 @@ export {
     addConcentration,
     buildConcentrationPopup,
     cleanupConcentrationEffects,
+    // SP-020: reused by the calm_emotions_end expiration handler.
+    restoreSuppressedConditions,
 }
