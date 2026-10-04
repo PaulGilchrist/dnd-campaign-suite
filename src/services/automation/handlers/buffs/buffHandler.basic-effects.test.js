@@ -65,6 +65,7 @@ import * as logService from '../../../ui/logService.js';
 import * as tempTeleportHandler from '../class-warlock/tempTeleportHandler.js';
 import * as vowOfEnmityHandler from '../class-cleric-paladin/vowOfEnmityHandler.js';
 import * as tempHpService from './tempHpService.js';
+import * as expirations from '../../../rules/effects/expirations.js';
 
 const campaignName = 'test-campaign';
 
@@ -293,13 +294,36 @@ describe('buffHandler.handle - basic effects', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toBe('Swift Step: +10 ft Speed for this Dash action.');
+      // FT-105: stamp must carry effect:'speed_boost' so charSummaryCalc's
+      // buffSpeedBonus fold displays the +10 (CLA-067 shape).
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         ps.name,
         'activeBuffs',
         expect.arrayContaining([
-          expect.objectContaining({ name: 'Swift Step', tempBuff: true, speedBonus: 10 }),
+          expect.objectContaining({ name: 'Swift Step', effect: 'speed_boost', speedBonus: 10 }),
         ]),
         campaignName,
+      );
+      // FT-105: ONE name-scoped remove_active_buff anchor — fires at the
+      // character's next turn-start (same-round expiry never fires, §38).
+      expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
+      expect(expirations.addExpiration).toHaveBeenCalledWith({
+        attackerName: ps.name,
+        targetName: ps.name,
+        effects: [{ type: 'remove_active_buff', buffName: 'Swift Step' }],
+        campaignName,
+        rounds: undefined,
+        expireOnCreatureName: ps.name,
+      });
+      // FT-105: the grant is logged with the +10 ft event details.
+      expect(logService.addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: ps.name,
+          abilityName: 'Swift Step',
+          description: expect.stringContaining('+10 ft Speed'),
+        }),
       );
     });
 
@@ -333,12 +357,22 @@ describe('buffHandler.handle - basic effects', () => {
           bonus: '10 ft',
         },
       };
-      const existingBuff = { name: 'Swift Step', tempBuff: true, speedBonus: 10, duration: 'same_action' };
-      runtimeState.getRuntimeValue.mockReturnValue([existingBuff]);
+      const legacyBuff = { name: 'Swift Step', tempBuff: true, speedBonus: 10, duration: 'same_action' };
+      const stampedBuff = { name: 'Swift Step', effect: 'speed_boost', speedBonus: 10, duration: 'same_action' };
+      runtimeState.getRuntimeValue.mockReturnValue([legacyBuff, stampedBuff, { name: 'Other Buff' }]);
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+      // FT-105 (§216 pin inversion): re-click replaces the stale stamp with
+      // ONE upgraded speed_boost entry — never a second duplicate.
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+      const written = runtimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs')[2];
+      expect(written.filter(b => b.name === 'Swift Step')).toHaveLength(1);
+      expect(written).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'Swift Step', effect: 'speed_boost', speedBonus: 10 }),
+        { name: 'Other Buff' },
+      ]));
+      expect(written.some(b => b.tempBuff)).toBe(false);
       expect(result.payload.description).toBe('Swift Step: +10 ft Speed for this Dash action.');
     });
 

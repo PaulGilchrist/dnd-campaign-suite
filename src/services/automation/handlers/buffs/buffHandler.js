@@ -47,10 +47,10 @@ function getPsionicEnergy(playerStats, campaignName) {
     return Number(stored ?? defaultMax);
 }
 
-function checkBuffGates(action, auto, playerStats, campaignName, _mapName) {
+async function checkBuffGates(action, auto, playerStats, campaignName, _mapName) {
     // dash_action trigger: temporary speed bonus
     if (auto?.trigger === 'dash_action' && auto?.effect === 'speed_bonus') {
-        const dashPopup = handleDashSpeedBonus(action, auto, playerStats, campaignName);
+        const dashPopup = await handleDashSpeedBonus(action, auto, playerStats, campaignName);
         if (dashPopup) return dashPopup;
     }
 
@@ -86,7 +86,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return delegate(action, playerStats, campaignName, _mapName);
     }
 
-    const gatePopup = checkBuffGates(action, auto, playerStats, campaignName, _mapName);
+    const gatePopup = await checkBuffGates(action, auto, playerStats, campaignName, _mapName);
     if (gatePopup) return gatePopup;
 
     // Telepathic Speech: defer to modal for target selection
@@ -220,20 +220,35 @@ function buildBuffTogglePopup({ action, auto, playerStats, targetName, wasActive
     };
 }
 
-function handleDashSpeedBonus(action, auto, playerStats, campaignName) {
+// FT-105 Charger (Improved Dash): stamp the CLA-067 Dash-speed shape —
+// effect:'speed_boost' + speedBonus consumed by charSummaryCalc's
+// buffSpeedBonus fold — via ONE merged write awaited BEFORE the popup
+// returns (§39). Expiry is a single name-scoped remove_active_buff anchor
+// firing at the character's next turn-start (same-round expiry never fires,
+// playbook §38 — accepted MA-0995/MA-1147 family residual; RAW is "for
+// that action").
+async function handleDashSpeedBonus(action, auto, playerStats, campaignName) {
     const bonusMatch = String(auto.bonus || '0 ft').match(/(\d+)/);
     const bonusAmount = bonusMatch ? parseInt(bonusMatch[1], 10) : 0;
     if (bonusAmount <= 0) return null;
 
-    const storedBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const name = playerStats.name;
+    const storedBuffs = getRuntimeValue(name, 'activeBuffs', campaignName);
     const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
-    const dashBuff = buffs.find(b => b.name === action.name && b.tempBuff);
-    if (!dashBuff) {
-        setRuntimeValue(playerStats.name, 'activeBuffs', [
-            ...buffs,
-            { name: action.name, tempBuff: true, speedBonus: bonusAmount, duration: auto.duration || 'same_action' },
-        ], campaignName);
-    }
+    const cleaned = buffs.filter(b => !(b.name === action.name && (b.effect === 'speed_boost' || b.tempBuff)));
+    await setRuntimeValue(name, 'activeBuffs', [
+        ...cleaned,
+        { name: action.name, effect: 'speed_boost', speedBonus: bonusAmount, duration: auto.duration || 'same_action' },
+    ], campaignName);
+    addExpiration({ attackerName: name, targetName: name, effects: [
+        { type: 'remove_active_buff', buffName: action.name },
+    ], campaignName, rounds: undefined, expireOnCreatureName: name });
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: name,
+        abilityName: action.name,
+        description: `${action.name}: +${bonusAmount} ft Speed for this Dash action (speed_boost).`,
+    }).catch((e) => { console.error("[buffHandler:log-error]", e); });
     return {
         type: 'popup',
         payload: {

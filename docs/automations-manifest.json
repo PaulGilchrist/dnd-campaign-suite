@@ -1107,7 +1107,7 @@
       "handler": "src/services/automation/handlers/buffs/buffHandler.js (temp_buff speed_bonus)",
       "router": "src/services/automation/index.js (temp_buff)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/temp.js (temp_buff)",
-      "verified": "broken — see .opencode/plans/bug-FT-105-improved-dash-speed-never-displayed-never-expires.md",
+      "verified": "verified",
       "class": "Feat",
       "triggerConditions": "Dash action",
       "expectedBehavior": "When you take the Dash action, your Speed increases by 10 feet for that action."
