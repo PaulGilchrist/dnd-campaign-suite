@@ -10,6 +10,7 @@ import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { triggerBewitchingMagic } from '../../../../services/rules/spells/postCastRiderService.js';
 import { registerTargetEffect, abilitySaveDisadvantageActive } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
+import { isCircleOfPowerActive } from '../../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { addExpiration } from '../../../../services/rules/effects/expirationQueue.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
@@ -327,7 +328,8 @@ function resolvePromptSecondaryOutcome(args) {
 
 function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, actionName, targetName, saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, secondary }) {
     if (!secondary) return null;
-    const finalDamage = resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage: secondary.rawDamage, success, saveType, dcSuccess });
+    // SP-023: Circle of Power zeroes every half-damage leg of the same save.
+    const finalDamage = resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage: secondary.rawDamage, success, saveType, dcSuccess, campaignName });
     if (finalDamage <= 0) return { rawDamage: secondary.rawDamage, finalDamage: 0, damageType: secondary.damageType };
     const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
     applyDamageToTarget(combatSummary, targetName, finalDamage, [secondary.damageType], { campaignName, characters, ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
@@ -363,11 +365,83 @@ function resolveSoulstitchOutcome(detail, isSoulstitchProtected) {
     };
 }
 
-function resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage, success, saveType, dcSuccess }) {
+// SP-023: Circle of Power (2024 circle-of-power) — an affected creature takes
+// NO damage if it succeeds on a save against a spell/magical effect that lets a
+// save take only half damage. Success-only zero: unlike Evasion, a failed save
+// still pays the normal half-rule damage (computeDamageAfterEvasion untouched).
+// Gate reads the caster-stamped circle_of_power root targetEffect
+// (te.source = aura caster, mirrors saveProcessing.js:342 /
+// useLoggedDiceRollSaves.js:101), so creatures outside the aura — e.g. the
+// attacking dragon itself — are never folded in.
+function circleOfPowerZeroOnSave(targetName, success, dcSuccess, campaignName) {
+    return success === true && dcSuccess === 'half' && isCircleOfPowerActive(targetName, campaignName);
+}
+
+function resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage, success, saveType, dcSuccess, campaignName }) {
     const targetChar = (combatSummary?.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
     const evasionEffects = targetChar?.computedStats?.evasionEffects;
     const evasionActive = hasEvasionForSave(evasionEffects, normalizeSaveType(saveType));
-    return computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
+    const damage = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
+    return circleOfPowerZeroOnSave(targetName, success, dcSuccess, campaignName) ? 0 : damage;
+}
+
+// Human-readable zero-on-save attribution for the prompt lane log (mirrors the
+// logQuickRollEvasion name channel, useLoggedDiceRollSaves.js:161).
+function resolvePromptZeroOnSaveReason({ combatSummary, targetName, success, rawDamage, finalDamage, saveType, campaignName }) {
+    if (!success || rawDamage <= 0 || finalDamage > 0) return null;
+    if (circleOfPowerZeroOnSave(targetName, success, 'half', campaignName)) return 'Circle of Power';
+    const targetChar = (combatSummary?.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
+    return hasEvasionForSave(targetChar?.computedStats?.evasionEffects, normalizeSaveType(saveType)) ? 'Evasion' : null;
+}
+
+function logRadiantSoulOncePerTurn({ campaignName, playerStats, damageType, targetName, radiantSoulChaMod, radiantSoulFlagKey }) {
+    setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
+    setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Radiant Soul',
+        description: `Radiant Soul: +${radiantSoulChaMod} ${damageType} damage added to ${targetName}'s damage roll (once per turn).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging Radiant Soul:', e); });
+}
+
+function buildPlayerSaveDamageLog({ playerStats, actionName, targetName, detailRoll, saveBonus, saveResult, saveType, saveDc, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, rawRolls, mode, zeroReason, finalDamage }) {
+    return {
+        type: 'roll',
+        characterName: playerStats.name,
+        rollType: 'save-damage',
+        name: actionName,
+        formula: targetDamageFormula,
+        rolls: damageRoll?.rolls ?? [],
+        total: rawDamage,
+        modifier: damageRoll?.modifier ?? 0,
+        damageType: damageType,
+        targetName,
+        saveType: saveType,
+        saveDc: saveDc,
+        dcSuccess: dcSuccess,
+        saveResult,
+        saveRoll: detailRoll,
+        saveBonus,
+        saveRawRolls: rawRolls,
+        mode,
+        ...(zeroReason ? { note: zeroReason } : {}),
+        finalDamage: finalDamage,
+        timestamp: Date.now(),
+    };
+}
+
+// Advantage/disadvantage fidelity for the chooser-lane prompt logs (§32: mode
+// is the only adv/dis truth; rawRolls carry both dice, SavePromptModal
+// dispatch detail channel — mirrors buildSaveRollLogData,
+// useLoggedDiceRollEventHandlers.js:386).
+function promptRollFidelity(detail) {
+    const detailRoll = detail.roll ?? 0;
+    return {
+        rawRolls: Array.isArray(detail.rawRolls) && detail.rawRolls.length === 2 ? detail.rawRolls : [detailRoll, detailRoll],
+        mode: detail.mode || 'normal',
+    };
 }
 
 function saveResultLabel(isSoulstitchProtected, success) {
@@ -1454,9 +1528,12 @@ function SaveAttackAoeModal({
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
     }
 
-    function applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey }) {
+    function applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason }) {
         const saveResult = success ? 'success' : 'failure';
         const detailRoll = detail.roll ?? 0;
+        // SP-023: adopt SavePromptModal's dispatch fidelity — distinct raw dice
+        // and the mode marker instead of the old [detailRoll, detailRoll] dup.
+        const { rawRolls, mode } = promptRollFidelity(detail);
         addEntry(campaignName, {
             type: 'roll',
             characterName: playerStats.name,
@@ -1468,47 +1545,43 @@ function SaveAttackAoeModal({
             saveResult,
             total: detail.total ?? 0,
             rolls: [detailRoll],
+            saveRawRolls: rawRolls,
+            mode,
             bonus: saveBonus,
             formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
 
-        const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
-        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
-
-        if (isRadiantSoulTarget) {
-            setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
-            setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
+        // SP-023: evasion-style zero-on-success (Circle of Power) gets named in
+        // the log (mirror of logQuickRollEvasion, useLoggedDiceRollSaves.js:161).
+        if (zeroReason) {
             addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: 'Radiant Soul',
-                description: `Radiant Soul: +${radiantSoulChaMod} ${damageType} damage added to ${targetName}'s damage roll (once per turn).`,
+                type: 'roll',
+                rollType: 'evasion',
+                characterName: targetName,
+                name: zeroReason,
+                targetName,
+                saveType,
+                saveDc,
+                saveResult: 'success',
+                dcSuccess,
+                saveRawRolls: rawRolls,
+                mode,
+                finalDamage: 0,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging Radiant Soul:', e); });
+            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging zero-on-save:', e); });
         }
 
-        addEntry(campaignName, {
-            type: 'roll',
-            characterName: playerStats.name,
-            rollType: 'save-damage',
-            name: actionName,
-            formula: targetDamageFormula,
-            rolls: damageRoll?.rolls ?? [],
-            total: rawDamage,
-            modifier: damageRoll?.modifier ?? 0,
-            damageType: damageType,
-            targetName,
-            saveType: saveType,
-            saveDc: saveDc,
-            dcSuccess: dcSuccess,
-            saveResult,
-            saveRoll: detailRoll,
-            saveBonus,
-            saveRawRolls: [detailRoll, detailRoll],
-            finalDamage: finalDamage,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });
+        if (finalDamage > 0) {
+            const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
+            applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
+
+            if (isRadiantSoulTarget) {
+                logRadiantSoulOncePerTurn({ campaignName, playerStats, damageType, targetName, radiantSoulChaMod, radiantSoulFlagKey });
+            }
+        }
+
+        addEntry(campaignName, buildPlayerSaveDamageLog({ playerStats, actionName, targetName, detailRoll, saveBonus, saveResult, saveType, saveDc, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, rawRolls, mode, zeroReason, finalDamage })).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player damage:', e); });
     }
 
     function logPlayerSaveSuccess({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
@@ -1544,7 +1617,8 @@ function SaveAttackAoeModal({
         const saveTotal = detail.total ?? 0;
 
         const combatSummary = getCombatSummary(campaignName);
-        const finalDamage = resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage, success, saveType: detail.saveType, dcSuccess });
+        const finalDamage = resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage, success, saveType: detail.saveType, dcSuccess, campaignName });
+        const zeroReason = resolvePromptZeroOnSaveReason({ combatSummary, targetName, success, rawDamage, finalDamage, saveType: detail.saveType, campaignName });
 
         if (isSoulstitchProtected) {
             logSoulstitchAutoSave({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
@@ -1552,8 +1626,8 @@ function SaveAttackAoeModal({
 
         const { radiantSoulFlagKey, isRadiantSoulTarget, targetDamageFormula, damageRoll } = resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignName, radiantSoulChaMod, overchannelActive, targetName });
 
-        if (finalDamage > 0) {
-            applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey });
+        if (finalDamage > 0 || zeroReason) {
+            applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason });
         }
 
         // MA-0563: secondary pool pays its own adjudicated leg (soulstitch
