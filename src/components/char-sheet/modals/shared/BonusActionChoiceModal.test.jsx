@@ -319,24 +319,51 @@ describe('BonusActionChoiceModal', () => {
 
   describe('campaign logging', () => {
     it('calls addEntry with correct log data on apply', async () => {
+        bonusActionHandler.applyBonusActionChoice.mockResolvedValue({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Cunning Action',
+                description: 'Dash selected.',
+                automation: baseAction.automation,
+            },
+        });
+        render(<BonusActionChoiceModal {...makeProps()} />);
+        selectOption(0);
+        fireEvent.click(screen.getByRole('button', { name: /Use Bonus Action/ }));
+        await waitFor(() => {
+            expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+                type: 'ability_use',
+                characterName: 'Rogue1',
+                abilityName: 'Cunning Action',
+                description: 'Dash selected — Speed doubled until the end of the turn',
+            });
+        });
+    });
+
+    // CLA-067: the old fallback mislabeled every Cunning Action option as "Object use".
+    it.each([
+      { optionIndex: 1, description: 'Disengage selected — No Opportunity Attacks until the end of the turn' },
+      { optionIndex: 2, description: 'Hide selected — Dexterity (Stealth) check initiated' },
+    ])('logs per-option suffix for option $description', async ({ optionIndex, description }) => {
       bonusActionHandler.applyBonusActionChoice.mockResolvedValue({
         type: 'popup',
         payload: {
           type: 'automation_info',
           name: 'Cunning Action',
-          description: 'Dash selected.',
+          description: 'selected.',
           automation: baseAction.automation,
         },
       });
       render(<BonusActionChoiceModal {...makeProps()} />);
-      selectOption(0);
+      selectOption(optionIndex);
       fireEvent.click(screen.getByRole('button', { name: /Use Bonus Action/ }));
       await waitFor(() => {
         expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
           type: 'ability_use',
           characterName: 'Rogue1',
           abilityName: 'Cunning Action',
-          description: 'Dash selected — Object use',
+          description,
         });
       });
     });

@@ -90,7 +90,7 @@ describe('CLA-067: Cunning Action (2024 Rogue)', () => {
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Cunning Action');
         expect(result.payload.description).toContain('Dash selected');
-        expect(result.payload.description).toContain('movement speed is doubled');
+        expect(result.payload.description).toContain('Speed doubled 30 → 60 ft');
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
             type: 'ability_use',
             characterName: 'RogueTest',

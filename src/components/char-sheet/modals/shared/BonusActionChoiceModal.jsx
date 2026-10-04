@@ -5,6 +5,17 @@ import '../../CharSheet.css';
 
 const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
 
+// CLA-067: per-option log suffix — the old fallback mislabeled Dash/Disengage/Hide
+// as "Object use".
+const CHOICE_LOG_SUFFIX = {
+    Dash: 'Speed doubled until the end of the turn',
+    Disengage: 'No Opportunity Attacks until the end of the turn',
+    Hide: 'Dexterity (Stealth) check initiated',
+    'Sleight of Hand': 'Dexterity (Sleight of Hand) check initiated',
+    'Thieves\' Tools': 'Thieves\' Tools check initiated',
+    'Use an Object': 'Object use',
+};
+
 function BonusActionChoiceModal({ action, options: optionsProp, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
@@ -20,7 +31,7 @@ function BonusActionChoiceModal({ action, options: optionsProp, playerStats, cam
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: action.name,
-            description: `${selected} selected — ${selected === 'Sleight of Hand' ? 'Dexterity (Sleight of Hand) check initiated' : selected === 'Thieves\' Tools' ? 'Thieves\' Tools check initiated' : 'Object use'}`,
+            description: `${selected} selected — ${CHOICE_LOG_SUFFIX[selected] || 'Bonus action used'}`,
         }).catch((e) => { console.error("[bonusActionChoiceModal:log-error]", e); });
 
         if (selected === 'Sleight of Hand') {

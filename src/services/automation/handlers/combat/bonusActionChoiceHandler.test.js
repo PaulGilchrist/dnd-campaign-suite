@@ -21,12 +21,17 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, applyBonusActionChoice } from './bonusActionChoiceHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
+import * as expirations from '../../../rules/effects/expirations.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -204,9 +209,9 @@ describe('applyBonusActionChoice — known options', () => {
     });
 
     it.each([
-        { action: makeAction(), option: 'Dash', expected: 'Dash selected: You take the Dash bonus action. Your movement speed is doubled until the end of the turn.' },
+        { action: makeAction(), option: 'Dash', expected: 'Dash selected: You take the Dash bonus action. Speed doubled 30 → 60 ft until the end of the turn.' },
         { action: makeAction(), option: 'Disengage', expected: 'Disengage selected: You take the Disengage bonus action. Your movement doesn\'t provoke opportunity attacks until the end of the turn.' },
-        { action: makeAction(), option: 'Hide', expected: 'Hide selected: You attempt to Hide. Make a Dexterity (Stealth) check to try to become hidden from creatures until the end of the turn.' },
+        { action: makeAction(), option: 'Hide', expected: 'Hide selected: Hide failed! Dexterity (Stealth) check undefined (d20: ? + 0) vs DC 15 — you remain visible.' },
         { action: makeFastHandsAction(), option: 'Sleight of Hand', expected: 'Sleight of Hand selected: You use Fast Hands to make a Dexterity (Sleight of Hand) check — pick pocket, palming a small object, hiding a small item, etc.' },
         { action: makeFastHandsAction(), option: 'Thieves\' Tools', expected: 'Thieves\' Tools selected: You use Fast Hands to use thieves\' tools to pick a lock or disarm a trap.' },
         { action: makeFastHandsAction(), option: 'Use an Object', expected: 'Use an Object selected: You use Fast Hands to use an object. Using a magic item that requires an action uses the Utilize action. Normal objects use the standard Action.' },
@@ -215,6 +220,15 @@ describe('applyBonusActionChoice — known options', () => {
         const result = await applyBonusActionChoice(action, ps, campaignName, option);
 
         expect(result.payload.description).toBe(expected);
+    });
+
+    it('Hide popup reports success with roll breakdown when the stealth check beats DC 15', async () => {
+        const ps = makePlayerStats({ abilities: [{ name: 'Dexterity', bonus: 8, skills: [{ name: 'Stealth', bonus: 11 }] }] });
+        useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => (key === 'lastAttack' ? { total: 25, d20: 14 } : null));
+
+        const result = await applyBonusActionChoice(makeAction(), ps, campaignName, 'Hide');
+
+        expect(result.payload.description).toBe('Hide selected: Hide successful! Dexterity (Stealth) check 25 (d20: 14 + 11) vs DC 15 — you gain the Invisible condition until you attack, take damage, or are detected.');
     });
 
     it('returns popup with automation payload for known options', async () => {
@@ -291,15 +305,145 @@ describe('applyBonusActionChoice — once-per-turn tracking', () => {
         );
     });
 
-    it('does not track when oncePerTurn is false or absent', async () => {
+    it('does not stamp latch keys when oncePerTurn is false or absent', async () => {
         const ps = makePlayerStats();
 
         await applyBonusActionChoice(makeAction({ oncePerTurn: false }), ps, campaignName, 'Dash');
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            ps.name, '_CunningAction_usedRound', expect.anything(), campaignName,
+        );
 
         vi.clearAllMocks();
         await applyBonusActionChoice(makeAction(), ps, campaignName, 'Dash');
-        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            ps.name, '_CunningAction_usedRound', expect.anything(), campaignName,
+        );
+    });
+});
+
+// ── applyBonusActionChoice: CLA-067 mechanical grants ──────────
+
+describe('applyBonusActionChoice — CLA-067 mechanical grants', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    });
+
+    it('Dash stamps a speed_boost buff doubling speed and a single expiry clock', async () => {
+        const ps = makePlayerStats({ speed: 40 });
+
+        await applyBonusActionChoice(makeAction(), ps, campaignName, 'Dash');
+
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+            ps.name, 'activeBuffs',
+            [{ name: 'Cunning Action', effect: 'speed_boost', speedBonus: 40, duration: 'until_end_of_turn' }],
+            campaignName,
+        );
+        expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
+        expect(expirations.addExpiration).toHaveBeenCalledWith({
+            attackerName: ps.name,
+            targetName: ps.name,
+            effects: [{ type: 'remove_active_buff', buffName: 'Cunning Action' }],
+            campaignName,
+            rounds: undefined,
+            expireOnCreatureName: ps.name,
+        });
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            abilityName: 'Cunning Action',
+            description: 'Dash: Speed doubled 40 → 80 ft until the end of the turn (+40 ft speed_boost).',
+        }));
+    });
+
+    it('Dash replaces a prior Cunning Action speed_boost instead of stacking', async () => {
+        const ps = makePlayerStats({ speed: 30 });
+        useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => (
+            key === 'activeBuffs' ? [{ name: 'Longstrider', effect: 'speed_boost', speedBonus: 10 }] : null
+        ));
+
+        await applyBonusActionChoice(makeAction(), ps, campaignName, 'Dash');
+
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+            ps.name, 'activeBuffs',
+            [
+                { name: 'Longstrider', effect: 'speed_boost', speedBonus: 10 },
+                { name: 'Cunning Action', effect: 'speed_boost', speedBonus: 30, duration: 'until_end_of_turn' },
+            ],
+            campaignName,
+        );
+    });
+
+    it('Disengage stamps self-target no_opportunity_attacks te with a single expiry clock', async () => {
+        const ps = makePlayerStats();
+
+        await applyBonusActionChoice(makeAction(), ps, campaignName, 'Disengage');
+
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'campaign', 'targetEffects',
+            [{ target: ps.name, source: 'Cunning Action', effect: 'no_opportunity_attacks', value: null, duration: 'until_start_of_next_turn' }],
+            campaignName,
+        );
+        expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
+        expect(expirations.addExpiration).toHaveBeenCalledWith({
+            attackerName: ps.name,
+            targetName: ps.name,
+            effects: [{ type: 'remove_target_effect', effectKey: 'no_opportunity_attacks', source: 'Cunning Action', target: ps.name }],
+            campaignName,
+            rounds: undefined,
+            expireOnCreatureName: ps.name,
+        });
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            abilityName: 'Cunning Action',
+            description: 'Disengage: movement doesn\'t provoke Opportunity Attacks until the end of the turn (no_opportunity_attacks).',
+        }));
+    });
+
+    it('Hide dispatches the stealth check lane and stamps Invisible + stealth buff on success', async () => {
+        const ps = makePlayerStats({ abilities: [{ name: 'Dexterity', bonus: 8, skills: [{ name: 'Stealth', bonus: 11 }] }] });
+        const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+        useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
+            if (key === 'lastAttack') return { total: 25, d20: 14 };
+            return null;
+        });
+
+        await applyBonusActionChoice(makeAction(), ps, campaignName, 'Hide');
+
+        expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'internal-skill-check' }));
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+            ps.name, 'activeConditions', ['invisible'], campaignName,
+        );
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+            ps.name, 'activeBuffs', [{ name: 'Hide', effect: 'advantage_on_stealth' }], campaignName,
+        );
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            abilityName: 'Cunning Action',
+            description: 'Hide: Stealth check 25 (d20: 14 + 11) vs DC 15 — Success. Gained the Invisible condition until you attack or take damage.',
+        }));
+        dispatchSpy.mockRestore();
+    });
+
+    it('Hide stamps nothing and logs failure when the stealth check fails', async () => {
+        const ps = makePlayerStats();
+        useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
+            if (key === 'lastAttack') return { total: 10, d20: 2 };
+            return null;
+        });
+
+        await applyBonusActionChoice(makeAction(), ps, campaignName, 'Hide');
+
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            ps.name, 'activeConditions', expect.anything(), campaignName,
+        );
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            ps.name, 'activeBuffs', expect.anything(), campaignName,
+        );
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            abilityName: 'Cunning Action',
+            description: 'Hide: Stealth check 10 (d20: 2 + 0) vs DC 15 — Failure. You remain visible.',
+        }));
     });
 });
 
