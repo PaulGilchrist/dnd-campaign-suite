@@ -85,6 +85,11 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     // baitAndSwitchChoice chooser / pendingSkillCheckBonus fold).
     'combat_superiority_movement',
     'combat_superiority_skill_check',
+    // MN-003: the Special Actions "Commander's Strike:" row dispatches
+    // handleCombatSuperiorityGrantAttack → executeGrantAttackManeuver (once-per-
+    // turn latch + 30-ft gate + die roll/spend + commanderStrikeChoice chooser →
+    // executeCommanderStrikeChoice arms commanderStrikeBonus on the ally).
+    'combat_superiority_grant_attack',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

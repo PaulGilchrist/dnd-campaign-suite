@@ -92,8 +92,14 @@ async function showCombatSuperioritySelection(action, auto, playerStats, campaig
 
     const knownManeuvers = getKnownManeuvers(playerStats, campaignName);
     const availableForAction = allManeuvers.filter(m => knownManeuvers.includes(m.name));
+    // MN-003: known < all no longer pins the modal to Select-View forever
+    // (known(9) !== all(20) meant array-confirm never executed and the Use
+    // flow was unreachable). Selection is only required when NOTHING is known
+    // yet; with known maneuvers the modal opens the Use flow (RadioItem list
+    // incl. grant_attack), and "Manage Maneuvers" re-arms selection explicitly
+    // via forceSelectionMode.
     const forceSelectionMode = auto?.forceSelectionMode === true;
-    const selectionMode = forceSelectionMode || knownManeuvers.length !== allManeuvers.length;
+    const selectionMode = forceSelectionMode || knownManeuvers.length === 0;
 
     return {
         type: 'modal',

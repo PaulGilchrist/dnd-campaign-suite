@@ -54,6 +54,7 @@ export {
     rollManeuverDie,
     executeBaitAndSwitchChoice,
     executeCommanderStrikeChoice,
+    applyCommanderStrikeTurnEnd,
     executeRallyChoice,
     executeSweepingAttack,
 } from './combatSuperiorityUtils.js';

@@ -13,6 +13,7 @@ import { applyEyeRaysTurnEnd } from '../../services/rules/features/beholderEyeRa
 import { applySoulTomeTrapTurnEnd } from '../../services/rules/features/soulTomeTrapService.js'
 import { applyRepeatSaveTurnEnd } from '../../services/rules/features/repeatSaveService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
+import { applyCommanderStrikeTurnEnd } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 
@@ -65,6 +66,8 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_Riposte_usedRound',
     '_Riposte_appliedAttack',
     'pendingRiposteDieValue',
+    // MN-003: Commander's Strike once-per-turn grant latch re-arms at round wrap.
+    '_Commanders_Strike_usedRound',
     'surgeUsedRound',
     'illusoryRealityUsedRound',
     'portentUsedThisTurn',
@@ -174,6 +177,11 @@ function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters
     // service-specific turn-end seams byte-identical.
     applyRepeatSaveTurnEnd(campaignName, activeCreatureName)
         .catch((e) => { console.error('[navigationHandlers] MA-0610 repeat save turn-end failed:', e) })
+    // MN-003: Commander's Strike — a die bonus armed on the OUTGOING creature
+    // that never landed its granted attack lapses at the end of its own turn
+    // (miss-persistence hygiene; idempotent, no-op without an armed bonus).
+    applyCommanderStrikeTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] MN-003 commander strike turn-end lapse failed:', e) })
 }
 
 /**

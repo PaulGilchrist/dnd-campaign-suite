@@ -202,7 +202,7 @@ assign(ROUTES, pushTo('actions'), [
     'resource_pool', 'open_hand_technique', 'spell_modifier', 'font_of_magic', 'divine_spark',
     'set_condition', 'sorcery_aura', 'sorcery_incarnate', 'nature_sanctuary',
     'warding_bond', 'war_magic_cantrip', 'war_magic_spell', 'arcane_charge',
-    'telekinetic_movement', 'combat_superiority_grant_attack', 'primal_companion_command',
+    'telekinetic_movement', 'primal_companion_command',
     'primal_companion_restore', 'remove_curse', 'spare_the_dying', 'bastion_of_law',
     'contact_patron', 'dragon_companion', 'stealth_attack',
 ])
@@ -238,7 +238,11 @@ assign(ROUTES, pushTo('bonusActions'), [
 assign(ROUTES, pushTo('specialActions'), [
     'temp_buff', 'temp_hp_buff', 'damage_aura', 'combat_stance', 'initiative_action',
     'starry_form', 'twinkling_constellations', 'tactical_mind', 'quivering_palm',
-    'combat_superiority_movement', 'combat_superiority_skill_check', 'living_legend',
+    'combat_superiority_movement', 'combat_superiority_skill_check',
+    // MN-003: Commander's Strike row must land in specialActions (interactive),
+    // mirroring the MN-002 movement/skill_check rows — previously routed to the
+    // data-only actions bucket so it was never offered as a clickable row.
+    'combat_superiority_grant_attack', 'living_legend',
     'cloak_of_shadows', 'holy_nimbus', 'holy_aura', 'avenging_angel', 'magical_cunning',
     'elder_champion', 'large_form', 'celestial_resilience', 'hunter_prey',
     'revelation_in_flesh', 'peerless_athlete', 'dragon_wings', 'clairvoyant_combatant',

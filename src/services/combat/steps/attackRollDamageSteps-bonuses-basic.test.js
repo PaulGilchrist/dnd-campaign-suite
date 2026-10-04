@@ -546,6 +546,7 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
       it('consumes commanderStrikeBonus', async () => {
         getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
           if (prop === 'commanderStrikeBonus') return 6;
+          if (prop === 'commanderStrikeSource') return "Commander's Strike";
           return null;
         });
 
@@ -556,7 +557,8 @@ describe('buildAttackRollDamageSteps - twoWeaponFighting, targetEffects, superio
         });
         const result = await steps[10].handler(ctx);
 
-        expect(result.data.formula).toBe('1d8+3 + 6 [same_as_weapon]');
+        // MN-003: die folds as [Commander's Strike], not the weapon damage type.
+        expect(result.data.formula).toBe("1d8+3 + 6 [Commander's Strike]");
         expect(setRuntimeValue).toHaveBeenCalledWith(
           'TestChar',
           'commanderStrikeBonus',

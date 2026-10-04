@@ -242,7 +242,10 @@ export function buildSuperiorityDieBonusesStep() {
       const csRaw = getRuntimeValue(ctx.playerStats.name, 'commanderStrikeBonus', ctx.campaignName);
       if (csRaw && Number(csRaw) > 0) {
         const val = Number(csRaw);
-        formula += ` + ${val} [${defaultDmg}]`;
+        // MN-003: fold the die as [Commander's Strike], not the weapon damage
+        // type (label lied). Read the source stamp BEFORE it is cleared below.
+        const csSource = getRuntimeValue(ctx.playerStats.name, 'commanderStrikeSource', ctx.campaignName) || "Commander's Strike";
+        formula += ` + ${val} [${csSource}]`;
         total += val;
         rolls = [...rolls, val];
         await setRuntimeValue(ctx.playerStats.name, 'commanderStrikeBonus', null, ctx.campaignName);

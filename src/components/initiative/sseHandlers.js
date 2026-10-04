@@ -2,6 +2,7 @@ import { cloneDeep } from 'lodash'
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { getActiveCreatureName, getCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js'
 import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval } from '../../services/rules/effects/expirations.js'
+import { applyCommanderStrikeTurnEnd } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js'
 
 /**
  * SSE overlay event handler - manages spell-overlay events
@@ -118,6 +119,10 @@ export function createSseEventHandler({
             const outgoingChar = characters.find(ch => ch.name === prevActive || ch.name.startsWith(prevActive + ' '))
             applyTurnEndConditionRemoval(prevActive, outgoingChar?.computedStats || outgoingChar, campaignName, true)
                 .catch((e) => { console.error('[sseHandlers] CLA-307 turn-end removal failed:', e) })
+            // MN-003: mirror the outgoing-creature Commander's Strike lapse clear
+            // (skipSync=true — GM client already POSTed; re-POST would echo-loop).
+            applyCommanderStrikeTurnEnd(campaignName, prevActive, true)
+                .catch((e) => { console.error('[sseHandlers] MN-003 commander strike turn-end lapse failed:', e) })
         }
         expireStaleEffects(campaignName, newActive)
 

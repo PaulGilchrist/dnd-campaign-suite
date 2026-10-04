@@ -94,6 +94,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_Riposte_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_Riposte_appliedAttack', null, campaignName)
     setRuntimeValue(creatureName, 'pendingRiposteDieValue', null, campaignName)
+    // MN-003: Commander's Strike once-per-turn grant latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_Commanders_Strike_usedRound', null, campaignName)
     setRuntimeValue(creatureName, 'surgeUsedRound', null, campaignName)
     setRuntimeValue(creatureName, 'illusoryRealityUsedRound', null, campaignName)
     setRuntimeValue(creatureName, 'portentUsedThisTurn', null, campaignName)

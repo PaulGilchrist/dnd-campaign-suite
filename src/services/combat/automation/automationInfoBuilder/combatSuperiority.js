@@ -121,5 +121,24 @@ export const combatSuperiorityHandlers = {
             initiativeBonus: !!auto.initiativeBonus,
             hasAutomation: true
         }
+    },
+
+    // MN-003: grant_attack maneuvers (Commander's Strike). Same builder gap as
+    // MN-002 — without it the collector (`if (!info) continue`) dropped the row
+    // before render, so the maneuver was never offered. maneuverName rides the
+    // info: handleCombatSuperiorityGrantAttack reads action.automation.maneuverName
+    // and executeGrantAttackManeuver consumes it (commanderStrikeChoice chooser).
+    'combat_superiority_grant_attack': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'combat_superiority_grant_attack',
+            name: feature.name,
+            description: feature.description || '',
+            maneuverName: auto.maneuverName || feature.name,
+            effect: auto.effect || 'grant_attack_damage',
+            range: auto.range || '30_ft',
+            oncePerTurn: !!auto.oncePerTurn,
+            hasAutomation: true
+        }
     }
 }

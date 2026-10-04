@@ -112,8 +112,12 @@ export function createLogDamageAndShow(deps) {
             return;
         }
 
-        // Apply superiority damage bonuses
-        const { total: boostedTotal, rolls: boostedRolls } = applySuperiorityDamageBonuses({ characterName, campaignName, formula, total, rolls, context });
+        // Apply superiority damage bonuses — MN-003: the folded formula (with
+        // the maneuver label, e.g. "+ 2 [Commander's Strike]") is what the
+        // damage log must read; un-stamped rolls pass through byte-identical.
+        const boosted = applySuperiorityDamageBonuses({ characterName, campaignName, formula, total, rolls, context });
+        const { total: boostedTotal, rolls: boostedRolls } = boosted;
+        formula = boosted.formula;
 
         const { saveDc, saveType, damageType, isAutoMiss, isAutoCrit, isCrit: ctxIsCrit } = context || {};
         const isCrit = isAutoCrit || ctxIsCrit;

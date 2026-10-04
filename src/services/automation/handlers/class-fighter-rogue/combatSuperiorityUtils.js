@@ -299,6 +299,28 @@ export async function executeCommanderStrikeChoice(action, playerStats, campaign
     };
 }
 
+// MN-003 miss-persistence hygiene: a commanderStrikeBonus armed on an ally
+// that never landed a hit by the END of that ally's own turn lapses — mirrors
+// the applyOutgoingTurnEndPasses cleanup family (stinking cloud / sleep shapes),
+// called from navigationHandlers.handleNextCreature + the sseHandlers echo
+// (skipSync there — server already holds the clear). Idempotent: only writes
+// when an armed bonus is actually present.
+export async function applyCommanderStrikeTurnEnd(campaignName, outgoingName, skipSync = false) {
+    if (!outgoingName) return;
+    const bonus = Number(getRuntimeValue(outgoingName, 'commanderStrikeBonus', campaignName) ?? 0);
+    if (!(bonus > 0)) return;
+    await setRuntimeValue(outgoingName, 'commanderStrikeBonus', null, campaignName, skipSync);
+    await setRuntimeValue(outgoingName, 'commanderStrikeActive', null, campaignName, skipSync);
+    await setRuntimeValue(outgoingName, 'commanderStrikeSource', null, campaignName, skipSync);
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'commanders_strike_lapsed',
+        characterName: outgoingName,
+        description: `Commander's Strike bonus lapsed: ${outgoingName} ended their turn without a hit. The ${bonus} Superiority Die bonus is spent.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[commanderStrikeTurnEnd] Error:', e); });
+}
+
 export async function executeRallyChoice({ action, playerStats, campaignName, chosenName, totalHp, extraHp: _extraHp, description }) {
     if (!chosenName || !playerStats || !campaignName) {
         return {

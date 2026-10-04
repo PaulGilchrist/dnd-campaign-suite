@@ -225,7 +225,10 @@ describe('combatSuperiorityHandler.handle', () => {
             expect(result.payload.knownManeuvers).toEqual(['Trip Attack', 'Pushing Attack']);
         });
 
-        it('enables selectionMode when some but not all maneuvers are known', async () => {
+        // MN-003: known < all no longer pins Select-View — with known maneuvers
+        // the modal opens the USE flow (selection reopens via "Manage Maneuvers"
+        // forceSelectionMode).
+        it('opens the use flow (selectionMode false) when some but not all maneuvers are known', async () => {
             dataLoader.loadManeuvers.mockResolvedValue([
                 { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
                 { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
@@ -245,7 +248,7 @@ describe('combatSuperiorityHandler.handle', () => {
             );
 
             expect(result.type).toBe('modal');
-            expect(result.payload.selectionMode).toBe(true);
+            expect(result.payload.selectionMode).toBe(false);
             expect(result.payload.knownManeuvers).toEqual(['Trip Attack']);
         });
 
@@ -292,7 +295,9 @@ describe('combatSuperiorityHandler.handle', () => {
             );
 
             expect(result.payload.maxOptions).toBe(2);
-            expect(result.payload.selectionMode).toBe(true);
+            // MN-003: known maneuvers open the USE flow — selectionMode is no
+            // longer derived from known !== all.
+            expect(result.payload.selectionMode).toBe(false);
         });
 
         it('applies level-based scaling to maxOptions', async () => {

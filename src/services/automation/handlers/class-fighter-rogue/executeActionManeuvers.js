@@ -7,6 +7,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import {
     findManeuver,
     checkSuperiorityDice,
@@ -191,11 +192,48 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
 
 // ── Grant Attack Maneuvers ──────────────────────────────────────────────
 
+// MN-003: once-per-Attack-action round latch on the grantor (CLA-071/MN-017
+// latch shape) — re-armed at round wrap via PLAYER_ROUND_LATCH_KEYS
+// (navigationHandlers.js) and Initiative.jsx clearPlayerRoundFlags. Refusals
+// roll nothing, spend nothing, stamp nothing (zero-spend reason tokens).
+const COMMANDERS_STRIKE_USED_ROUND_KEY = '_Commanders_Strike_usedRound';
+
+function commanderStrikeRefusal(maneuver, playerName, description, reason) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: maneuver.name,
+            description,
+        },
+        logEntries: [{
+            type: 'automation',
+            automationType: 'commanders_strike_refused',
+            name: maneuver.name,
+            characterName: playerName,
+            reason,
+            description,
+            timestamp: Date.now(),
+        }],
+    };
+}
+
 export async function executeGrantAttackManeuver(action, playerStats, campaignName, maneuverName) {
     const maneuver = await findManeuver(maneuverName, playerStats.rules);
 
     if (!maneuver) {
         return buildManeuverNotFoundPopup(maneuverName, maneuverName);
+    }
+
+    const currentRound = getCurrentCombatRound(campaignName);
+    const usedRound = Number(getRuntimeValue(playerStats.name, COMMANDERS_STRIKE_USED_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === Number(currentRound)) {
+        return commanderStrikeRefusal(
+            maneuver,
+            playerStats.name,
+            `${maneuver.name}: already directed a companion this turn — it can replace only one attack of the Attack action per turn. Nothing spent.`,
+            'already_used_this_turn'
+        );
     }
 
     const { superiorityDice, hasDiceRemaining } = checkSuperiorityDice(playerStats, campaignName);
@@ -204,32 +242,41 @@ export async function executeGrantAttackManeuver(action, playerStats, campaignNa
         return buildNoDiceRemainingPopup(maneuver.name);
     }
 
-    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
-    await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
-
+    // 30_ft range gate BEFORE roll/expend so a refusal never spends a die
+    // (gridless positions resolve LENIENT — consulted-and-passes is enough).
+    const rangeFt = rangeToFeet(maneuver.range || '30_ft');
     const cs = await getCombatContext(campaignName);
     const allies = (cs?.creatures || []).filter(c => c.name !== playerStats.name);
-    const options = allies.map(a => ({ label: a.name, value: a.name }));
+    const inRangeAllies = [];
+    for (const ally of allies) {
+        if (await isWithinRange(playerStats.name, ally.name, rangeFt)) {
+            inRangeAllies.push(ally);
+        }
+    }
+    const options = inRangeAllies.map(a => ({ label: a.name, value: a.name }));
 
     if (options.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: maneuver.name,
-                description: `${maneuver.name}: No allies available to receive the attack.`,
-            },
-        };
+        return commanderStrikeRefusal(
+            maneuver,
+            playerStats.name,
+            `${maneuver.name}: No willing companion within ${rangeFt} feet to direct. Nothing spent.`,
+            'no_ally_in_range'
+        );
     }
+
+    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
+    await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
+    // Latch stamp awaited BEFORE consumers read (§5: races lose writes).
+    await setRuntimeValue(playerStats.name, COMMANDERS_STRIKE_USED_ROUND_KEY, currentRound, campaignName);
 
     const logEntry = {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name}. ${dieDescription} Choose an ally to add this to their next attack.`,
+        description: `Used ${maneuver.name}. ${dieDescription} Expend 1 Superiority Die. Choose a willing companion within ${rangeFt} feet to add ${dieValue} to their next attack's damage roll on a hit.`,
     };
 
-    const description = `<b>${maneuver.name}</b><br/>${dieDescription} Choose a willing ally to add ${dieValue} to their next attack's damage roll.`;
+    const description = `<b>${maneuver.name}</b><br/>${dieDescription} Choose a willing ally within ${rangeFt} feet to add ${dieValue} to their next attack's damage roll on a hit.`;
 
     return {
         type: 'modal',

@@ -8,6 +8,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { getMonsterData } from '../../../npcs/monsterUtils.js';
+import { executeGrantAttackManeuver } from './executeActionManeuvers.js';
 import {
     findManeuver,
     checkSuperiorityDice,
@@ -54,6 +55,14 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
 
     if (!maneuver) {
         return buildManeuverNotFoundPopup(action.name, maneuverName);
+    }
+
+    // MN-003: funnel grant_attack through the single gated executor
+    // (executeGrantAttackManeuver: once-per-turn latch + 30-ft range gate +
+    // roll/spend + commanderStrikeChoice chooser). One source of truth —
+    // the old RUNNER duplicate opened the same modal without any gates.
+    if (maneuver.actionType === 'grant_attack') {
+        return executeGrantAttackManeuver(action, playerStats, campaignName, maneuverName);
     }
 
     const { superiorityDice, hasDiceRemaining } = checkSuperiorityDice(playerStats, campaignName);
@@ -125,17 +134,6 @@ const RUNNER_STEPS = [
     {
         test: m => m.effect === 'ally_movement',
         run: () => ` An ally can use its Reaction to move up to half its Speed without provoking Opportunity Attacks.`,
-    },
-    {
-        test: m => m.actionType === 'grant_attack',
-        run: async (m, d, ctx) => buildGrantAttackModal({
-    maneuver: m,
-    auto: ctx.auto,
-    description: d + ` Choose a willing ally to add ${ctx.dieValue} to their next attack's damage roll.`,
-    dieValue: ctx.dieValue,
-    playerStats: ctx.playerStats,
-    campaignName: ctx.campaignName,
-}),
     },
     {
         test: m => m.effect === 'ac_bonus_and_swap',
@@ -291,44 +289,6 @@ async function runManeuverSave(maneuver, auto, targetName, playerStats, campaign
     let description = ` Target made ${maneuver.saveType} save DC ${saveDc}: ${success ? 'Success' : 'Failure'}.`;
     description += await processManeuverSaveResult({ maneuver, targetName, saveDc, success, playerStats, campaignName });
     return description;
-}
-
-async function buildGrantAttackModal({ maneuver, auto, description, dieValue, playerStats, campaignName }) {
-    const cs = await getCombatContext(campaignName);
-    const allies = (cs?.creatures || []).filter(c => c.name !== playerStats.name);
-    const options = allies.map(a => ({ label: a.name, value: a.name }));
-
-    if (options.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: maneuver.name,
-                description: `${maneuver.name}: No allies available to receive the attack.`,
-                automation: auto,
-            },
-        };
-    }
-
-    const logEntry = {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: maneuver.name,
-        description,
-    };
-    return {
-        type: 'modal',
-        modalName: 'commanderStrikeChoice',
-        payload: {
-            playerStats,
-            campaignName,
-            dieValue,
-            maneuverName: maneuver.name,
-            options,
-            description,
-        },
-        logEntries: [logEntry],
-    };
 }
 
 async function buildBaitAndSwitchModal({ maneuver, description, dieValue, playerStats, campaignName }) {
