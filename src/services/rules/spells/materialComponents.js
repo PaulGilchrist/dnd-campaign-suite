@@ -70,6 +70,12 @@ export function hasMaterial(playerStats, itemName) {
     });
 }
 
+function findItemMetaKey(inventory, itemName) {
+    const meta = inventory?.itemMeta || {};
+    if (itemName in meta) return itemName;
+    return Object.keys(meta).find(key => key.toLowerCase() === itemName.toLowerCase()) || null;
+}
+
 export async function consumeMaterial(playerStats, itemName, campaignName) {
     const backpack = playerStats.inventory?.backpack || [];
     const materialIndex = backpack.findIndex(item => {
@@ -83,7 +89,28 @@ export async function consumeMaterial(playerStats, itemName, campaignName) {
     }
 
     const newBackpack = [...backpack];
-    newBackpack.splice(materialIndex, 1);
+    const newInventory = { ...playerStats.inventory, backpack: newBackpack };
+
+    const metaKey = findItemMetaKey(playerStats.inventory, itemName);
+    const metaQuantity = metaKey ? Number(playerStats.inventory.itemMeta[metaKey]?.quantity) : NaN;
+    if (Number.isFinite(metaQuantity) && metaQuantity > 1) {
+        // Multiple carried: decrement quantity, keep the backpack string so
+        // equipment checks (exact name match) keep finding the item.
+        newInventory.itemMeta = {
+            ...playerStats.inventory.itemMeta,
+            [metaKey]: { ...playerStats.inventory.itemMeta[metaKey], quantity: metaQuantity - 1 },
+        };
+    } else {
+        newBackpack.splice(materialIndex, 1);
+        if (metaKey) {
+            // Character PATCH deep-merges, so removed keys survive — zero
+            // the quantity instead; readers treat 0 as "not carried".
+            newInventory.itemMeta = {
+                ...playerStats.inventory.itemMeta,
+                [metaKey]: { ...playerStats.inventory.itemMeta[metaKey], quantity: 0 },
+            };
+        }
+    }
 
     const casterFile = getFileNameFromName(playerStats.name);
     const patchUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(casterFile)}`;
@@ -91,14 +118,14 @@ export async function consumeMaterial(playerStats, itemName, campaignName) {
         method: 'PATCH',
         mode: 'cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inventory: { ...playerStats.inventory, backpack: newBackpack } }),
+        body: JSON.stringify({ inventory: newInventory }),
     });
     if (!patchRes.ok) {
         const errText = await patchRes.text();
         console.error(`[materialComponents] PATCH error body: ${errText}`);
     }
 
-    setRuntimeValue(playerStats.name, 'inventory', { ...playerStats.inventory, backpack: newBackpack }, campaignName);
+    setRuntimeValue(playerStats.name, 'inventory', newInventory, campaignName);
 
     addEntry(campaignName, {
         type: 'material_consumed',

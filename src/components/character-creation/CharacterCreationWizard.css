@@ -1292,3 +1292,33 @@
 .character-creation-wizard .btn-remove-image:hover {
     background-color: var(--background-color-button-cancel-hover);
 }
+
+.character-creation-wizard .wizard-item-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.character-creation-wizard .wizard-item-meta-name {
+    flex: 0 0 180px;
+    font-weight: bold;
+}
+
+.character-creation-wizard .wizard-item-meta-qty {
+    flex: 0 0 80px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color-input);
+    border-radius: 4px;
+    background-color: var(--background-color-input);
+    color: var(--color-text);
+}
+
+.character-creation-wizard .wizard-item-meta-desc {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color-input);
+    border-radius: 4px;
+    background-color: var(--background-color-input);
+    color: var(--color-text);
+}

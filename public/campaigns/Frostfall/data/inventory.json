@@ -1,0 +1,76 @@
+{
+  "currency": {
+    "pp": 0,
+    "gp": 0,
+    "sp": 22,
+    "cp": 0
+  },
+  "items": [
+    {
+      "id": "bbb8b4f4-dc0b-49a5-80aa-cb0e0902b11f",
+      "name": "Bloodstone",
+      "quantity": 1,
+      "description": ""
+    },
+    {
+      "id": "0f43b88c-663d-4470-8752-5efc2b6cab00",
+      "name": "Compact Pry Bar",
+      "quantity": 1,
+      "description": ""
+    },
+    {
+      "id": "d54f71c0-d03d-4ba3-8f3d-dddbb8e84b39",
+      "name": "Gems",
+      "quantity": 8,
+      "description": ""
+    },
+    {
+      "id": "19c66408-dce7-4415-b576-e32dd1adc720",
+      "name": "Gold Inget",
+      "quantity": 1,
+      "description": ""
+    },
+    {
+      "id": "d61f5c1b-8c73-463c-b161-a5ec0b758713",
+      "name": "Gold Nuggets",
+      "quantity": 1,
+      "description": "Worth 73 GP"
+    },
+    {
+      "id": "3cadc1e4-9b99-4672-af96-64290e3886f5",
+      "name": "Gold Ore",
+      "quantity": 3,
+      "description": ""
+    },
+    {
+      "id": "bd9dc0e0-cd4e-4ad0-8c11-4f051156ee5b",
+      "name": "Leather Belt",
+      "quantity": 1,
+      "description": "Dwarf - May be magical (very high quality)"
+    },
+    {
+      "id": "7dcae3ef-15bc-4bf5-82d3-dfcae64ceed9",
+      "name": "Pick Axe",
+      "quantity": 2,
+      "description": ""
+    },
+    {
+      "id": "7e18883c-76a5-4f3f-b462-26f760e7c626",
+      "name": "Sending Stone",
+      "quantity": 2,
+      "description": ""
+    },
+    {
+      "id": "b6147295-637f-45f8-a167-0cb57f9c755f",
+      "name": "Silver Belt Buckle",
+      "quantity": 1,
+      "description": ""
+    },
+    {
+      "id": "906b3104-72e3-428f-bbfc-3afaac878a85",
+      "name": "Silver Inlayed Hammer",
+      "quantity": 1,
+      "description": ""
+    }
+  ]
+}

@@ -30,6 +30,7 @@ import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
 import Settlements from './components/settlements/Settlements.jsx';
 import Factions from './components/factions/Factions.jsx';
+import PartyInventory from './components/party-inventory/PartyInventory.jsx';
 import Log from './components/log/Log.jsx';
 import CampaignAdmin from './components/campaign-admin/CampaignAdmin.jsx';
 import SavePromptModal from './components/common/SavePromptModal.jsx';
@@ -207,6 +208,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     npcs: <NPCs campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} onViewInitiative={() => setActiveView('initiative')} />,
     settlements: <Settlements campaignName={campaignName} onBack={() => setActiveView(null)} />,
     factions: <Factions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
+    partyInventory: <PartyInventory campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} />,
     campaignRepair: (
       <CampaignAdmin
@@ -497,6 +499,12 @@ function App() {
     }
   };
 
+  const handleInventoryClick = () => {
+    if (activeView !== 'partyInventory') {
+      setActiveView('partyInventory');
+    }
+  };
+
   const handleFactionsClick = () => {
     if (activeView !== 'factions') {
       setActiveView('factions');
@@ -580,6 +588,7 @@ function App() {
           onDeleteCampaign={handleDeleteCampaign}
           isLocalhost={isLocalhost}
            onNPCsClick={handleNPCsClick}
+           onInventoryClick={handleInventoryClick}
            onSettlementsClick={handleSettlementsClick}
            onFactionsClick={handleFactionsClick}
           onLogClick={handleLogClick}

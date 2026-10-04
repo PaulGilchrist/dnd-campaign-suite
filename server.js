@@ -12,6 +12,7 @@ import npcsRoutes from './server/routes/npcs.js';
 import questsRoutes from './server/routes/quests.js';
 import factionsRoutes from './server/routes/factions.js';
 import settlementsRoutes from './server/routes/settlements.js';
+import inventoryRoutes from './server/routes/inventory.js';
 import campaignsBasic from './server/routes/campaigns-basic.js';
 import campaignsCharacter from './server/routes/campaigns-character.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
@@ -138,6 +139,9 @@ app.use(factionsRoutes);
 
 // Settlement routes
 app.use(settlementsRoutes);
+
+// Party inventory routes (must be before wildcard :campaign routes)
+app.use(inventoryRoutes);
 
 // Campaign basic routes (list campaigns, list character files)
 app.use(campaignsBasic);

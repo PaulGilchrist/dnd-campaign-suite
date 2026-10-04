@@ -158,8 +158,8 @@ describe('WizardStepInventory', () => {
     it('renders header, gold input, textareas, search buttons, and section labels', () => {
       render(<WizardStepInventory {...createMockProps()} />);
       expect(screen.getByText('Step 11: Inventory')).toBeInTheDocument();
-      expect(screen.getByRole('spinbutton')).toBeInTheDocument();
-      expect(screen.getAllByRole('textbox')).toHaveLength(2);
+      expect(screen.getByRole('spinbutton', { name: /Gold Pieces/i })).toBeInTheDocument();
+      expect(screen.getAllByRole('textbox')).toHaveLength(4);
       expect(
         screen.getAllByRole('button', { name: /Search Equipment/ })
       ).toHaveLength(2);
@@ -174,14 +174,14 @@ describe('WizardStepInventory', () => {
         formData: { inventory: { gold: 50 } },
       });
       render(<WizardStepInventory {...props} />);
-      expect(screen.getByRole('spinbutton')).toHaveValue(50);
+      expect(screen.getByRole('spinbutton', { name: /Gold Pieces/i })).toHaveValue(50);
     });
 
     it('calls onInventoryChange with parsed integer when gold changes', () => {
       const onInventoryChange = vi.fn();
       const props = createMockProps({ onInventoryChange });
       render(<WizardStepInventory {...props} />);
-      const goldInput = screen.getByRole('spinbutton');
+      const goldInput = screen.getByRole('spinbutton', { name: /Gold Pieces/i });
       fireEvent.change(goldInput, { target: { value: '100' } });
       expect(onInventoryChange).toHaveBeenCalledWith('gold', 100);
     });
@@ -190,7 +190,7 @@ describe('WizardStepInventory', () => {
       const onInventoryChange = vi.fn();
       const props = createMockProps({ onInventoryChange });
       render(<WizardStepInventory {...props} />);
-      const goldInput = screen.getByRole('spinbutton');
+      const goldInput = screen.getByRole('spinbutton', { name: /Gold Pieces/i });
 
       fireEvent.change(goldInput, { target: { value: '' } });
       expect(onInventoryChange).toHaveBeenCalledWith('gold', 0);
@@ -209,7 +209,7 @@ describe('WizardStepInventory', () => {
         formData: { inventory: {} },
       });
       render(<WizardStepInventory {...props} />);
-      expect(screen.getByRole('spinbutton')).toHaveValue(null);
+      expect(screen.getByRole('spinbutton', { name: /Gold Pieces/i })).toHaveValue(null);
     });
   });
 
@@ -366,8 +366,8 @@ describe('WizardStepInventory', () => {
       });
       render(<WizardStepInventory {...props} />);
 
-      expect(screen.getByText('Rope')).toBeInTheDocument();
-      expect(screen.getByText('Torch')).toBeInTheDocument();
+      expect(screen.getAllByText('Rope').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Torch').length).toBeGreaterThan(0);
       expect(screen.getByText('7 items')).toBeInTheDocument();
       expect(screen.getByText('+2 more')).toBeInTheDocument();
     });
@@ -498,5 +498,53 @@ describe('WizardStepInventory', () => {
       expect(setSearchField).toHaveBeenCalledWith(null);
       expect(setSearchQuery).toHaveBeenCalledWith('');
     });
+  });
+});
+
+describe('WizardStepInventory item details', () => {
+  beforeEach(() => {
+    useEquipmentSearch.mockReturnValue(createMockHookReturn());
+  });
+
+  it('renders editable quantity and description rows for backpack items', () => {
+    const props = createMockProps();
+    render(<WizardStepInventory {...props} />);
+    const qty = screen.getByLabelText('Quantity for Rope');
+    const desc = screen.getByLabelText('Description for Rope');
+    expect(qty).toHaveValue(1);
+    expect(desc).toHaveValue('');
+  });
+
+  it('writes quantity and description into inventory.itemMeta via onInventoryChange', () => {
+    const onInventoryChange = vi.fn();
+    const props = createMockProps({ onInventoryChange });
+    render(<WizardStepInventory {...props} />);
+
+    fireEvent.change(screen.getByLabelText('Quantity for Torch'), { target: { value: '4' } });
+    expect(onInventoryChange).toHaveBeenCalledWith('itemMeta', {
+      Torch: { quantity: 4, description: '' },
+    });
+
+    fireEvent.change(screen.getByLabelText('Description for Rope'), { target: { value: '50 feet' } });
+    expect(onInventoryChange).toHaveBeenCalledWith('itemMeta', expect.objectContaining({
+      Rope: { quantity: 1, description: '50 feet' },
+    }));
+  });
+
+  it('does not render item details when the backpack is empty', () => {
+    const props = createMockProps({ tempInventory: { backpack: [], equipped: [] } });
+    render(<WizardStepInventory {...props} />);
+    expect(screen.queryByText('Item Details (optional)')).toBeNull();
+  });
+
+  it('shows existing itemMeta values back in the inputs', () => {
+    const props = createMockProps({
+      formData: {
+        inventory: { gold: 50, itemMeta: { Rope: { quantity: 2, description: 'hempen' } } },
+      },
+    });
+    render(<WizardStepInventory {...props} />);
+    expect(screen.getByLabelText('Quantity for Rope')).toHaveValue(2);
+    expect(screen.getByLabelText('Description for Rope')).toHaveValue('hempen');
   });
 });

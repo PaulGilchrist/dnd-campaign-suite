@@ -227,6 +227,44 @@ describe('materialComponents', () => {
       );
     });
 
+    it('decrements itemMeta quantity and keeps the backpack string when more remain', async () => {
+      mockFetchOk();
+      const stats = {
+        name: 'Test Character',
+        inventory: {
+          backpack: ['Incense', 'Rations'],
+          itemMeta: { Incense: { quantity: 3, description: 'burning' } },
+        },
+      };
+
+      const result = await consumeMaterial(stats, 'Incense', 'test-campaign');
+
+      expect(result).toBe(true);
+      const updated = mockSetRuntimeValue.mock.calls.at(-1)[2];
+      expect(updated.backpack).toContain('Incense');
+      expect(updated.itemMeta.Incense.quantity).toBe(2);
+      expect(updated.itemMeta.Incense.description).toBe('burning');
+      expect(hasMaterial(stats, 'Incense')).toBe(true);
+    });
+
+    it('zeroes itemMeta quantity and removes the string when the last one is consumed', async () => {
+      mockFetchOk();
+      const stats = {
+        name: 'Test Character',
+        inventory: {
+          backpack: ['Incense', 'Rations'],
+          itemMeta: { Incense: { quantity: 1 } },
+        },
+      };
+
+      const result = await consumeMaterial(stats, 'Incense', 'test-campaign');
+
+      expect(result).toBe(true);
+      const updated = mockSetRuntimeValue.mock.calls.at(-1)[2];
+      expect(updated.backpack).toEqual(['Rations']);
+      expect(updated.itemMeta.Incense.quantity).toBe(0);
+    });
+
     it('removes material from backpack when items are objects', async () => {
       mockFetchOk();
       const stats = mockPlayerStats([

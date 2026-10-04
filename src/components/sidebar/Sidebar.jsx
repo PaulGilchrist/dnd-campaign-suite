@@ -7,6 +7,7 @@ const VIEW_LABELS = {
     encounter: { label: 'Encounters', icon: 'fa-dragon' },
     factions: { label: 'Factions', icon: 'fa-handshake' },
     initiative: { label: 'Initiative', icon: 'fa-shield-alt' },
+    partyInventory: { label: 'Inventory', icon: 'fa-boxes-stacked' },
     mapsManager: { label: 'Maps', icon: 'fa-map' },
     notes: { label: 'Notes', icon: 'fa-book' },
     quests: { label: 'Quests', icon: 'fa-scroll' },
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
     { view: 'encounter', onClick: 'onEncounterClick', localhostOnly: true },
     { view: 'factions', onClick: 'onFactionsClick', localhostOnly: true },
     { view: 'initiative', onClick: 'onInitiativeClick' },
+    { view: 'partyInventory', onClick: 'onInventoryClick' },
     { view: 'campaignLog', onClick: 'onLogClick' },
     { view: 'mapsManager', onClick: 'onMapsClick', playerLabel: 'Map' },
     { view: 'npcs', onClick: 'onNPCsClick', localhostOnly: true },
@@ -92,11 +94,11 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onInventoryClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView }) {
     const [diceResult, setDiceResult] = useState(null);
 
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
-    const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onNPCsClick, onNotesClick, onQuestsClick, onSettlementsClick };
+    const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onNPCsClick, onNotesClick, onQuestsClick, onInventoryClick, onSettlementsClick };
 
     return (
         <>

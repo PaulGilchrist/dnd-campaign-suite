@@ -52,6 +52,54 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ formData, 
     handleManualInputChange(fieldName, raw);
   };
 
+  // Optional per-item quantity/description metadata — backpack itself stays
+  // a comma-separated string list so all existing equipment checks work.
+  const itemMeta = formData.inventory.itemMeta || {};
+
+  const updateItemMeta = (itemName, patch) => {
+    const meta = { ...itemMeta };
+    const existingKey = Object.keys(meta).find(k => k.toLowerCase() === itemName.toLowerCase()) || itemName;
+    meta[existingKey] = { quantity: 1, description: '', ...meta[existingKey], ...patch };
+    onInventoryChange('itemMeta', meta);
+  };
+
+  const renderItemDetails = () => {
+    const items = [...new Set(tempInventory.backpack || [])];
+    if (items.length === 0) return null;
+    return (
+      <div className="form-group">
+        <label>Item Details (optional)</label>
+        {items.map(itemName => {
+          const meta = itemMeta[itemName]
+            || Object.entries(itemMeta).find(([key]) => key.toLowerCase() === itemName.toLowerCase())?.[1]
+            || {};
+          return (
+            <div key={itemName} className="wizard-item-meta-row">
+              <span className="wizard-item-meta-name">{itemName}</span>
+              <input
+                type="number"
+                min="1"
+                className="wizard-item-meta-qty"
+                aria-label={`Quantity for ${itemName}`}
+                value={meta.quantity ?? 1}
+                onChange={(e) => updateItemMeta(itemName, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+              />
+              <input
+                type="text"
+                className="wizard-item-meta-desc"
+                placeholder={`Description for ${itemName} (optional)`}
+                aria-label={`Description for ${itemName}`}
+                value={meta.description || ''}
+                onChange={(e) => updateItemMeta(itemName, { description: e.target.value })}
+              />
+            </div>
+          );
+        })}
+        <p className="field-description">Quantities and descriptions are stored alongside the item names — quantities show as ×N on the sheet, descriptions as a popup.</p>
+      </div>
+    );
+  };
+
   const renderInputWithSearch = (label, fieldValue, fieldName, placeholder) => {
     const items = fieldValue;
 
@@ -132,6 +180,7 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ formData, 
         <input
           type="number"
           min="0"
+          aria-label="Gold Pieces"
           value={formData.inventory.gold}
           onChange={(e) => onInventoryChange('gold', parseInt(e.target.value) || 0)}
         />
@@ -143,6 +192,8 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ formData, 
         'backpack',
         'Enter items separated by commas (e.g., Rope, Hempen, Torch, rations) or use Search Equipment'
       )}
+
+      {renderItemDetails()}
 
       {renderInputWithSearch(
         'Equipped Items',
