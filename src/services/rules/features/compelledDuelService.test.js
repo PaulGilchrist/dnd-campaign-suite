@@ -11,6 +11,15 @@ vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
+vi.mock('../combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(() => Promise.resolve(null)),
+    getTargetFromAttacker: vi.fn(() => null),
+}));
+
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 describe('compelledDuelService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -47,11 +56,28 @@ describe('compelledDuelService', () => {
             );
         });
 
-        it.each([null, {}])('falls back to "Unknown" when metaCtx is %s', async (metaCtx) => {
+        it.each([null, {}])('SP-026: refuses the cast (no handler, refusal popup + log) when metaCtx is %s', async (metaCtx) => {
             executeHandler.mockResolvedValue(null);
-            await triggerCompelledDuel({ name: 'Compelled Duel', level: 1 }, metaCtx, playerStats, campaignName, mapName);
+            const result = await triggerCompelledDuel({ name: 'Compelled Duel', level: 1 }, metaCtx, playerStats, campaignName, mapName);
+            expect(executeHandler).not.toHaveBeenCalled();
+            expect(result).toEqual({
+                type: 'popup',
+                payload: { type: 'automation_info', name: 'Compelled Duel', description: 'No target selected for Compelled Duel.' },
+            });
+            const { addEntry } = await import('../../ui/logService.js');
+            const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'compelled_duel_refused');
+            expect(refusal).toBeDefined();
+            expect(refusal.automationDetail).toBe('no_target');
+        });
+
+        it('resolves an armed target from combat context when metaCtx omits targetName', async () => {
+            const { getCombatContext, getTargetFromAttacker } = await import('../combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Orc' }] });
+            getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
+            executeHandler.mockResolvedValue(null);
+            await triggerCompelledDuel({ name: 'Compelled Duel', level: 1 }, {}, playerStats, campaignName, mapName);
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ automation: expect.objectContaining({ targetName: 'Unknown' }) }),
+                expect.objectContaining({ automation: expect.objectContaining({ targetName: 'Orc' }) }),
                 playerStats, campaignName, mapName,
             );
         });

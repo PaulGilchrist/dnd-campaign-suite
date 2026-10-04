@@ -25,6 +25,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,
+        // SP-026: attackerName rides the prompt so save_result logs carry the caster
+        // (savePrompt.js resolveSaveOutcome) instead of falling back to "Unknown".
+        attackerName: playerStats.name,
         saveType: 'WIS',
         saveDc: dc,
         dcSuccess: 'none',

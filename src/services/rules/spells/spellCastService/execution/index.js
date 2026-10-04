@@ -1,6 +1,9 @@
 import { setRuntimeValue, getRuntimeValue } from '../../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../../ui/logService.js';
 import { executeHandler } from '../../../../automation/index.js';
+// SP-026: direct handler import (mirrors targetResolution.js:4) — keeps the heavily-mocked
+// automation/index.js barrel out of the new consumer edge.
+import { checkCompelledDuelAttackExpiry } from '../../../../automation/handlers/spells/compelledDuelHandler.js';
 import { triggerHealingWord } from '../../../features/healingWordService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from '../../postCastHealService.js';
 import { triggerSmiteOfProtection } from '../../../features/smiteOfProtectionService.js';
@@ -589,6 +592,17 @@ async function runMarkedTargetSpell(spell, metaCtx, playerStats, campaignName, g
     return false;
 }
 
+// SP-026: RAW — casting a spell on an enemy other than the duel target ends Compelled
+// Duel. Generic harmful spells (a damage formula resolves against the armed target) ride
+// this single hook on the damage lane; duel-te lookup + duel-target no-op live inside
+// checkCompelledDuelAttackExpiry (compelledDuelHandler.js:172), mirroring the
+// dominate-monster/person/ray call sites (triggerSpells.js:292/305/318).
+async function expireCompelledDuelOnHarmfulCast(formula, getTargetInfo, playerStats, campaignName) {
+    if (!formula) return;
+    const harmfulTargetName = getTargetInfo ? (await getTargetInfo())?.name || null : null;
+    checkCompelledDuelAttackExpiry(playerStats.name, harmfulTargetName, campaignName);
+}
+
 // Pre-cast blocking checks, in original evaluation order. Returns the first
 // blocking result, or null when the cast proceeds.
 async function runCastBlockChecks(spell, playerStats, campaignName, getTargetInfo) {
@@ -659,6 +673,8 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     if (await runMarkedTargetSpell(spell, metaCtx, playerStats, campaignName, getTargetInfo)) return;
 
     // --- Damage path ---
+    await expireCompelledDuelOnHarmfulCast(formula, getTargetInfo, playerStats, campaignName);
+
     const rangeResult = computeRange(spell, metaCtx, attackerPos, targetPos, featEffects);
     const { empEvocFormula } = computeEmpoweredEvocation(playerStats, spell, formula);
     let finalFormula = computeBlessedStrikes(spell, empEvocFormula, playerStats, campaignName, getRuntimeValue);

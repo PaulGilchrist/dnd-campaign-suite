@@ -104,6 +104,7 @@ describe('compelledDuelHandler', () => {
             expect(result.payload.targetName).toBe('Unknown');
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
                 targetName: 'Unknown',
+                attackerName: 'Paladin',
                 saveType: 'WIS',
                 saveDc: 10,
                 dcSuccess: 'none',
@@ -132,6 +133,7 @@ describe('compelledDuelHandler', () => {
 
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
                 targetName: 'Goblin',
+                attackerName: 'Paladin',
                 saveType: 'WIS',
                 saveDc: 10,
                 dcSuccess: 'none',
