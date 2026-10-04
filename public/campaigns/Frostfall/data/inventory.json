@@ -1,11 +1,35 @@
 {
   "currency": {
     "pp": 0,
-    "gp": 0,
-    "sp": 22,
+    "gp": 767,
+    "sp": 545,
     "cp": 0
   },
   "items": [
+    {
+      "id": "a9727f07-e4ee-4e5d-805a-e5517df3d979",
+      "name": "*Broach",
+      "quantity": 1,
+      "description": "Owned by Druid Dirgin - May be magical"
+    },
+    {
+      "id": "bd9dc0e0-cd4e-4ad0-8c11-4f051156ee5b",
+      "name": "*Leather Belt",
+      "quantity": 1,
+      "description": "Dwarf - May be magical (very high quality)"
+    },
+    {
+      "id": "703fb632-7298-43bd-8ecb-e7377d854596",
+      "name": "*War Hammer",
+      "quantity": 1,
+      "description": "May be magical"
+    },
+    {
+      "id": "a917bd5c-3633-47ae-9f16-f92473ba5759",
+      "name": "Black Opals",
+      "quantity": 2,
+      "description": ""
+    },
     {
       "id": "bbb8b4f4-dc0b-49a5-80aa-cb0e0902b11f",
       "name": "Bloodstone",
@@ -22,6 +46,18 @@
       "id": "d54f71c0-d03d-4ba3-8f3d-dddbb8e84b39",
       "name": "Gems",
       "quantity": 8,
+      "description": ""
+    },
+    {
+      "id": "8769095b-f295-4fed-a21f-1860a1c467b0",
+      "name": "Gold Bars",
+      "quantity": 2,
+      "description": ""
+    },
+    {
+      "id": "3c1260d6-399e-4994-be5d-c79afc18dc60",
+      "name": "Gold Beard Ring",
+      "quantity": 1,
       "description": ""
     },
     {
@@ -43,10 +79,16 @@
       "description": ""
     },
     {
-      "id": "bd9dc0e0-cd4e-4ad0-8c11-4f051156ee5b",
-      "name": "Leather Belt",
+      "id": "83d6dcc6-78b6-4295-98b4-24665f0875db",
+      "name": "Healing Potion",
       "quantity": 1,
-      "description": "Dwarf - May be magical (very high quality)"
+      "description": ""
+    },
+    {
+      "id": "8f912c03-9707-4b01-8fe1-6c7777f23d9f",
+      "name": "Holy Emblem of Dumathoim",
+      "quantity": 1,
+      "description": ""
     },
     {
       "id": "7dcae3ef-15bc-4bf5-82d3-dfcae64ceed9",
@@ -61,6 +103,12 @@
       "description": ""
     },
     {
+      "id": "c313220b-8921-4617-8621-03c42c25bfc1",
+      "name": "Silver Beard Rings",
+      "quantity": 6,
+      "description": ""
+    },
+    {
       "id": "b6147295-637f-45f8-a167-0cb57f9c755f",
       "name": "Silver Belt Buckle",
       "quantity": 1,
@@ -71,6 +119,18 @@
       "name": "Silver Inlayed Hammer",
       "quantity": 1,
       "description": ""
+    },
+    {
+      "id": "10d5ca60-041c-4712-83cf-4aa0e1f497b7",
+      "name": "Stone Prayer Tablets",
+      "quantity": 3,
+      "description": ""
+    },
+    {
+      "id": "45250e9e-528e-4f07-b974-62885f4ef78e",
+      "name": "Wet Stone",
+      "quantity": 1,
+      "description": "Fancy"
     }
   ]
 }
