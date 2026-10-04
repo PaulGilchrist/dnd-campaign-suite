@@ -1170,7 +1170,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-049-circle-forms-ac-sheet-override-name-mismatch.md",
+      "verified": "verified",
       "class": "Druid",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Circle Forms effects (CR limit, AC override, temp HP) are applied via the hardcoded Wild Shape activation flow in wildShapeCreatureBuilder.js:activateWildShape() when a Moon Druid transforms. NOT via the circle_forms_active automation type (dead code — passive_buff handler does not process requiresActive or bonusExpression). CR limit: Druid level / 3 (round down). AC: 13 + WIS mod if higher than Beast AC. Temp HP: 3 × Druid level."

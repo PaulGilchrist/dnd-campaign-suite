@@ -34,7 +34,7 @@ function isShapeShiftBuff(buff) {
 
 // Circle Forms AC override: 13 + WIS modifier when shape_shift is active for Circle of the Moon
 function computeCircleFormsACOverride(playerStats, activeBuffs) {
-    const isMoonDruid = playerStats.class?.major?.name === 'Moon' || playerStats.class?.subclass?.name === 'Moon'
+    const isMoonDruid = playerStats.class?.major?.name === 'Circle of the Moon' || playerStats.class?.subclass?.name === 'Circle of the Moon'
     if (!isMoonDruid || !(Array.isArray(activeBuffs) && activeBuffs.some(isShapeShiftBuff))) return null
     const wis = playerStats.abilities.find(a => a.name === 'Wisdom')
     return 13 + (wis?.bonus ?? 0)

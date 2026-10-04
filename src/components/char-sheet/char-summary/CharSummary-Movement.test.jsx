@@ -168,15 +168,22 @@ describe('CharSummary - Circle Forms AC Override', () => {
 
     it.each([
         {
-            name: 'Moon Druid with shape_shift and WIS +3',
-            class: { name: 'Druid', subclass: { name: 'Moon' }, major: { name: 'Moon' } },
+            name: 'Circle of the Moon Druid with shape_shift and WIS +3',
+            class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } },
             abilities: [{ name: 'Wisdom', bonus: 3 }],
             buffs: [{ effect: 'shape_shift' }],
             expectedAC: '16',
         },
         {
-            name: 'Moon Druid with shape_shift and no WIS ability',
-            class: { name: 'Druid', subclass: { name: 'Moon' }, major: { name: 'Moon' } },
+            name: 'Circle of the Moon Druid (app shape: major null) with shape_shift and WIS +3',
+            class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: null },
+            abilities: [{ name: 'Wisdom', bonus: 3 }],
+            buffs: [{ effect: 'shape_shift' }],
+            expectedAC: '16',
+        },
+        {
+            name: 'Circle of the Moon Druid with shape_shift and no WIS ability',
+            class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } },
             abilities: [],
             buffs: [{ effect: 'shape_shift' }],
             expectedAC: '13',
@@ -189,8 +196,15 @@ describe('CharSummary - Circle Forms AC Override', () => {
             expectedAC: '18',
         },
         {
-            name: 'Moon Druid without shape_shift (no override)',
-            class: { name: 'Druid', subclass: { name: 'Moon' }, major: { name: 'Moon' } },
+            name: 'short-name Moon subclass (not app-canonical) gets no override',
+            class: { name: 'Druid', subclass: { name: 'Moon' }, major: null },
+            abilities: [{ name: 'Wisdom', bonus: 3 }],
+            buffs: [{ effect: 'shape_shift' }],
+            expectedAC: '18',
+        },
+        {
+            name: 'Circle of the Moon Druid without shape_shift (no override)',
+            class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } },
             abilities: [{ name: 'Wisdom', bonus: 3 }],
             buffs: [],
             expectedAC: '18',
