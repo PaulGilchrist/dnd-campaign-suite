@@ -1,7 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { setTempHpOnKey } from '../buffs/tempHpService.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
+import { getCombatSummary, getCurrentCombatRound } from '../../../encounters/combatData.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
 import storage from '../../../ui/storage.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
@@ -148,6 +149,19 @@ function buildSpiritCreature({ monster, displayName, casterName, initiativeValue
     const actions = resolveMonsterActions(monster, { slotLevel, spellAttackMod, spellSaveDc, wisModifier, spellcastingModifier });
 
     if (options.createThrall) {
+        // CLA-066: Hex rider transport (CLA-036 Bestial Fury byte-shape) —
+        // the thrall's weapon attack rows arm the hit-confirmed extra-Psychic
+        // leg (resolveCreateThrallRiderHit) when the target is under the
+        // warlock's Hex; once per thrall per round (`_CreateThrall_usedRound`
+        // latch, sneak-step convention). Save rows stay inert (never pass
+        // through the attack-chip press).
+        const thrallHexBonus = options.thrallHexBonus || { expression: '1d6', damageType: 'Psychic' };
+        actions.forEach(row => {
+            if (row.attack_bonus != null && row.save_dc == null) {
+                row.thrall_hex_rider = true;
+                row.thrall_hex_bonus = thrallHexBonus;
+            }
+        });
         actions.push({
             name: "Psychic Strike",
             casting_time: "Bonus Action",
@@ -178,7 +192,7 @@ function buildSpiritCreature({ monster, displayName, casterName, initiativeValue
         reactions: resolveMonsterReactions(monster, { slotLevel, spellAttackMod, spellSaveDc, wisModifier, spellcastingModifier }),
         summonedBy: casterName,
         summonSource: 'spell',
-        createThrall: true,
+        createThrall: options.createThrall === true,
         ...spiritWarlockOptions(options, playerStats),
     };
 }
@@ -210,15 +224,46 @@ function getCasterInitiativeValue(combatSummary, casterName) {
 // modifies Summon Aberration (no Concentration, 1 minute, temp HP, Hex rider).
 // Gate every thrall-specific behavior on the caster actually holding the feature —
 // never on the spell name alone (a Wizard's Summon Aberration is canonical).
-function hasCreateThrallFor(playerStats, spellName) {
-    const allFeatures = [
-        ...(playerStats?.class?.class_levels || []).flatMap(cl => cl.features || []),
-        ...(playerStats?.class?.subclass?.class_levels || []).flatMap(cl => cl.features || []),
+function featureHasThrallAutomation(f, spellName) {
+    const autos = Array.isArray(f.automation) ? f.automation : [f.automation].filter(Boolean);
+    return autos.some(a => a && a.type === 'create_thrall' && a.spell === spellName);
+}
+
+function rawThrallFeatures(playerStats) {
+    const klasses = playerStats?.class || {};
+    const subclass = klasses.subclass || {};
+    return [
+        ...(klasses.class_levels || []).flatMap(cl => cl.features || []),
+        ...(subclass.class_levels || []).flatMap(cl => cl.features || []),
+        // CLA-066 hydration: 2024 majors store features FLAT (classes.json
+        // majors[].features; subclasses=[]) — scan them here too.
+        ...(subclass.features || []),
+        ...(klasses.major?.features || []),
     ];
-    return allFeatures.some(f => {
-        const autos = Array.isArray(f.automation) ? f.automation : [f.automation].filter(Boolean);
-        return autos.some(a => a && a.type === 'create_thrall' && a.spell === spellName);
-    });
+}
+
+function hasCreateThrallFor(playerStats, spellName) {
+    // CLA-066: runtime automation.specialActions is the canonical shape for
+    // 2024 — the automationCollector flattens majors correctly, while
+    // runtime class.subclass is `{ name }` only. Gate on the collected
+    // automation first, then fall back to raw feature scans (legacy 5e
+    // class_levels + hydrated flat major/subclass features).
+    const specialActions = (playerStats?.automation || {}).specialActions || [];
+    if (specialActions.some(a => a && a.type === 'create_thrall' && a.spell === spellName)) {
+        return true;
+    }
+    return rawThrallFeatures(playerStats).some(f => featureHasThrallAutomation(f, spellName));
+}
+
+// CLA-066: rider die/damage type authored on the feature's attack_rider
+// automation (collected into playerStats.automation.passives); canonical
+// fallback is the lv1-4 Hex bonus die.
+function resolveThrallHexBonus(playerStats) {
+    const rider = (playerStats?.automation?.passives || []).find(p => p.type === 'attack_rider' && p.trigger === 'companion_aberration_hit');
+    return {
+        expression: rider?.damageExpression || '1d6',
+        damageType: rider?.damageType || 'Psychic',
+    };
 }
 
 // Minutes are encoded as rounds app-wide (CLA-334 recipe: 10min=100 rounds).
@@ -240,8 +285,9 @@ function resolveSummonFlags(playerStats, action) {
 
 function applyThrallTempHp(creature, playerStats, campaignName) {
     const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
-    const tempHp = playerStats.level + chaMod;
+    const tempHp = (playerStats.level || 0) + chaMod;
     setTempHpOnKey(creature.name, 'tempHp', tempHp, campaignName);
+    return tempHp;
 }
 
 // SP-005: unique combatant name + one 'summoned' te marker PER spawn.
@@ -296,6 +342,38 @@ async function refuseUnpaidSummon(action, playerStats, campaignName, reason) {
     };
 }
 
+// SP-114: spell-end removal clock ("up to N minute/hour" → rounds). Fires
+// remove_summoned_creatures at duration expiry; cleanupConcentrationEffects
+// consumes (and drains) this same entry on an earlier concentration break.
+// CLA-066: a Create Thrall caster drops Concentration but keeps a hard
+// 1-minute expiry (CLA-334 clock recipe: minutes×10 = rounds:10) — same
+// consumer, ONE addExpiration (§38 — no competing clocks).
+function applySummonDuration({ noConcentration, createThrall, casterName, action, auto, playerStats, combatSummary, campaignName }) {
+    const effects = [{ type: 'remove_summoned_creatures', spell: action.name }];
+    if (!noConcentration) {
+        addConcentration(combatSummary, casterName, action.name, getSpellSaveDc(playerStats));
+        addExpiration({ attackerName: casterName, targetName: casterName, effects, campaignName, rounds: summonDurationRounds(action.spell?.duration || auto.duration) });
+        return;
+    }
+    if (createThrall) {
+        addExpiration({ attackerName: casterName, targetName: casterName, effects, campaignName, rounds: 10 });
+    }
+}
+
+// CLA-066: modification spend log — the no-Concentration/1-minute + temp HP
+// modification is a resolved automation event, not silence.
+async function logCreateThrallApplied({ createThrall, campaignName, casterName, creatureName, thrallTempHp }) {
+    if (!createThrall) return;
+    await addEntry(campaignName, {
+        type: 'automation',
+        characterName: casterName,
+        automationType: 'create_thrall_applied',
+        name: 'Create Thrall',
+        description: `Create Thrall: ${creatureName} is summoned without Concentration (duration 1 minute) with ${thrallTempHp} Temporary Hit Points (Warlock level + Charisma modifier).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[summonSpiritHandler:thrall-log-error]", e); });
+}
+
 async function performSummon(action, playerStats, campaignName, variant) {
     const auto = action.automation;
     const casterName = playerStats.name;
@@ -330,16 +408,14 @@ async function performSummon(action, playerStats, campaignName, variant) {
     // summons never collide on the bare name ("Animated Object (Medium) 1/2/3").
     const displayName = getNextUniqueMonsterName(variant.name, combatSummary.creatures);
 
-    const creature = buildSpiritCreature({ monster, displayName, casterName, initiativeValue, slotLevel, auto, playerStats, options: { noConcentration, createThrall, warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp } });
+    const creature = buildSpiritCreature({ monster, displayName, casterName, initiativeValue, slotLevel, auto, playerStats, options: { noConcentration, createThrall, thrallHexBonus: resolveThrallHexBonus(playerStats), warlockLevel: playerStats.level, chaModifier: (playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0), halveHp } });
     if (isPhantasmalFreeCast) {
         creature.phantasmal = true;
         creature.spectral = true;
     }
     combatSummary.creatures.push(creature);
 
-    if (createThrall) {
-        applyThrallTempHp(creature, playerStats, campaignName);
-    }
+    const thrallTempHp = createThrall ? applyThrallTempHp(creature, playerStats, campaignName) : 0;
 
     const targetEffects = [...getTargetEffects(), buildSummonedMarker(creature.name, casterName, noConcentration)];
 
@@ -349,16 +425,7 @@ async function performSummon(action, playerStats, campaignName, variant) {
         return bInit - aInit;
     });
 
-    if (!noConcentration) {
-        addConcentration(combatSummary, casterName, action.name, getSpellSaveDc(playerStats));
-        // SP-114: spell-end removal clock ("up to N minute/hour" → rounds).
-        // Fires remove_summoned_creatures at duration expiry; cleanupConcentrationEffects
-        // consumes (and drains) this same entry on an earlier concentration break.
-        const rounds = summonDurationRounds(action.spell?.duration || auto.duration);
-        addExpiration({ attackerName: casterName, targetName: casterName, effects: [
-            { type: 'remove_summoned_creatures', spell: action.name },
-        ], campaignName, rounds });
-    }
+    applySummonDuration({ noConcentration, createThrall, casterName, action, auto, playerStats, combatSummary, campaignName });
     await storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
     await setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
@@ -376,6 +443,8 @@ async function performSummon(action, playerStats, campaignName, variant) {
         summonedCreatures: [creature.name],
         timestamp: Date.now(),
     }).catch((e) => { console.error("[summonSpiritHandler:log-error]", e); });
+
+    await logCreateThrallApplied({ createThrall, campaignName, casterName, creatureName: creature.name, thrallTempHp });
 
     return {
         type: 'popup',
@@ -395,6 +464,70 @@ async function performSummon(action, playerStats, campaignName, variant) {
             timestamp: Date.now(),
         }],
     };
+}
+
+// CLA-066: Create Thrall Hex rider — hit-confirmed extra-Psychic leg on the
+// thrall's attack rows (CLA-036 Bestial Fury / MA-0007 separate-leg template).
+// The attack_rider automation's trigger `companion_aberration_hit` has no
+// generic trigger bus; the card-row transport is the sanctioned consumer.
+// Bonus folds ONCE per thrall per round (`_CreateThrall_usedRound` latch,
+// sneak-step convention, round from FRESH getCurrentCombatRound) when the
+// target carries the hex te (top-level targetEffects channel). Separate roll
+// + own `roll damage` log leg; dice NEVER doubled on crit.
+export const THRALL_HEX_RIDER_LATCH_KEY = '_CreateThrall_usedRound';
+
+export async function resolveCreateThrallRiderHit({ campaignName, monsterName, autoDamage, rollDamage }) {
+    if (autoDamage?.thrallHexRider !== true) return null;
+    const round = getCurrentCombatRound(campaignName);
+    const attackName = autoDamage.name || 'Slam';
+    const targetName = autoDamage.targetName || null;
+
+    const usedRound = getRuntimeValue(monsterName, THRALL_HEX_RIDER_LATCH_KEY, campaignName);
+    if (Number(usedRound) === round) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'create_thrall_refused',
+            characterName: monsterName,
+            abilityName: attackName,
+            description: `${monsterName}: Create Thrall Hex bonus already applied this turn (once per turn) — no extra damage.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[summonSpiritHandler:rider-refusal-log-error]', e); });
+        return null;
+    }
+
+    if (!targetName) return null;
+    const hexed = getTargetEffects().some(te => te.target === targetName && te.effect === 'hex_ability_check_disadvantage');
+    if (!hexed) return null;
+
+    const expression = autoDamage.thrallHexBonus?.expression || '1d6';
+    const damageType = autoDamage.thrallHexBonus?.damageType || 'Psychic';
+    const result = rollExpression(expression);
+    if (!result) {
+        console.error('[summonSpiritHandler] Create Thrall Hex bonus roll failed for formula', expression);
+        return null;
+    }
+
+    await rollDamage({
+        name: `${attackName} — Create Thrall`,
+        formula: expression,
+        total: result.total,
+        rolls: result.rolls,
+        modifier: 0,
+        context: { damageType, targetName, attackerName: monsterName },
+    });
+    // Latch stamp awaited BEFORE the next rider read consumes it (§40).
+    await setRuntimeValue(monsterName, THRALL_HEX_RIDER_LATCH_KEY, round, campaignName);
+
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'create_thrall_hex_bonus',
+        characterName: monsterName,
+        abilityName: attackName,
+        description: `${monsterName} deals extra ${expression} ${damageType} (Hex on ${targetName}) — Create Thrall ${result.total} ${damageType}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[summonSpiritHandler:rider-grant-log-error]', e); });
+
+    return result;
 }
 
 export async function handle(action, playerStats, campaignName) {

@@ -25,6 +25,7 @@ import { loadSpells } from '../../services/ui/dataLoader.js';
 import { MONSTER_SPELL_USES_KEY, monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
 import { resolveMonsterSummonRow } from '../../services/encounters/monsterSummon.js';
 import { resolveBestialFuryStrikeGate, resolveBestialFuryMarkStrike } from '../../services/automation/handlers/class-ranger/primalCompanionHandler.js';
+import { resolveCreateThrallRiderHit } from '../../services/automation/handlers/spells/summonSpiritHandler.js';
 import { resolveMonsterActionAdvisoryRow } from '../../services/encounters/monsterActionAdvisory.js';
 import { resolveSelfAuraRow } from '../../services/encounters/monsterSelfAura.js';
 import { resolveMonsterSelfBuffRow, doublePrimaryDiceCount, endSelfBuffOnTrigger, isMonsterSelfBuffRow, buildAlreadyEnlargedRefusalPopup, buildAlreadyEnlargedRefusalLog } from '../../services/encounters/monsterSelfBuff.js';
@@ -970,6 +971,15 @@ export function bestialFuryRiderTransport(action) {
   return { bestialFuryRider: true, bestialFuryBonus: action.bestial_fury_bonus || null };
 }
 
+// CLA-066: Create Thrall Hex rider transport — thrall-stamped attack rows
+// arm the hit-confirmed extra-Psychic leg (resolveCreateThrallRiderHit);
+// unstamped rows emit {} (byte-inert).
+// eslint-disable-next-line react-refresh/only-export-components
+export function thrallHexRiderTransport(action) {
+  if (action?.thrall_hex_rider !== true) return {};
+  return { thrallHexRider: true, thrallHexBonus: action.thrall_hex_bonus || null };
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function buildAutoDamageOptions(action, name, enlarged = false) {
   // MA-0322: dice rows resolve first (byte-inert); flat prose-only hit
@@ -999,6 +1009,8 @@ export function buildAutoDamageOptions(action, name, enlarged = false) {
     // Strike row arms the hit-confirmed Hunter's Mark extra-Force leg
     // (resolveBestialFuryMarkStrike); every other row byte-inert ({}).
     ...bestialFuryRiderTransport(action),
+    // CLA-066: Create Thrall Hex rider transport — CLA-036 byte-shape twin.
+    ...thrallHexRiderTransport(action),
     // MA-0427: MA-0426 secondary keys now produced by the shared transport
     // helper (name falls back to the chip name for synthesized actions).
     // MA-0551: save-leg-rider composites are stripped downstream in
@@ -2007,13 +2019,25 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               context.hitClause = autoDamage.hitClause;
             }
             logUnpickedVariantDefaults({ campaignName, monsterName, autoDamage });
-            rollDamage({ name: autoDamage.name, formula: autoDamage.formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
+            // CLA-066: AWAITED base leg — an un-awaited fire-and-forget
+            // rollDamage races the rider's awaited write (un-awaited writes in
+            // one tick lose all but last, §39/§40): the rider applied its −N to
+            // a stale cs snapshot and the base damage vanished from cs. The
+            // rider leg never awaits its rollDamage, so awaiting here keeps
+            // strict base→rider POST ordering byte-identical elsewhere.
+            await rollDamage({ name: autoDamage.name, formula: autoDamage.formula, total: result.total, rolls: result.rolls, modifier: result.modifier, context: context });
             // CLA-036 lane (b): hit-confirmed Bestial Fury Hunter's Mark rider —
             // separate 1d6 Force leg + own roll-damage/hp_change log, once per
             // companion per round (MA-0007 charge-bonus separate-leg template).
             // Byte-inert when the auto-damage carries no Fury marker.
             await resolveBestialFuryMarkStrike({ campaignName, monsterName, autoDamage, rollDamage })
               .catch((e) => { console.error('[MonsterCardModal] Error resolving Bestial Fury mark rider:', e); });
+            // CLA-066 lane (b): hit-confirmed Create Thrall Hex rider — separate
+            // extra-Psychic leg + own roll-damage/hp_change log, once per thrall
+            // per round (CLA-036 separate-leg template). Byte-inert when the
+            // auto-damage carries no thrall-hex marker.
+            await resolveCreateThrallRiderHit({ campaignName, monsterName, autoDamage, rollDamage })
+              .catch((e) => { console.error('[MonsterCardModal] Error resolving Create Thrall Hex rider:', e); });
           } else {
             logBlockedDamageRoll(campaignName, monsterName, autoDamage.name || monsterName, autoDamage.formula);
           }

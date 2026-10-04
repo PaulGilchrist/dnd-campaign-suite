@@ -1,28 +1,36 @@
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { setTempHpOnKey } from '../buffs/tempHpService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
-function hasCreateThrallFeature(playerStats) {
-    const allFeatures = [
-        ...(playerStats?.class?.class_levels || []).flatMap(cl => (cl.features || [])),
-        ...(playerStats?.class?.subclass?.class_levels || []).flatMap(cl => (cl.features || [])),
+// CLA-066: 2024 runtime shape — classes.json stores patron features FLAT
+// under majors[].features (Warlock.subclasses=[]), so runtime
+// class.subclass is `{ name }` only. Scan the automation-collected shape
+// first (the collector flattens majors correctly), then raw feature lists
+// including the flat major/subclass features.
+function thrallFeatureMarkers(playerStats) {
+    const automation = playerStats?.automation || {};
+    const klasses = playerStats?.class || {};
+    const subclass = klasses.subclass || {};
+    return [
+        ...(automation.specialActions || []),
+        ...(automation.passives || []),
+        ...(klasses.class_levels || []).flatMap(cl => cl.features || []),
+        ...(subclass.class_levels || []).flatMap(cl => cl.features || []),
+        ...(subclass.features || []),
+        ...(klasses.major?.features || []),
     ];
-    return allFeatures.some(f => f.name === 'Create Thrall');
 }
 
-function computeThrallAbilityModifiers(abilities, level) {
-    const mod = (name) => (abilities.find(a => a.name === name)?.bonus || 0) - Math.floor((level - 1) / 2);
-    return {
-        strength: mod('Strength'),
-        dexterity: mod('Dexterity'),
-        constitution: mod('Constitution'),
-        intelligence: mod('Intelligence'),
-        wisdom: mod('Wisdom'),
-        charisma: mod('Charisma'),
-    };
+function hasCreateThrallFeature(playerStats) {
+    return thrallFeatureMarkers(playerStats).some(m =>
+        m && (m.type === 'create_thrall' || m.effect === 'create_thrall_temp_hp' || m.name === 'Create Thrall')
+    );
 }
 
+// CLA-066: canonical math is Warlock level + Charisma modifier — the old
+// - floor((level-1)/2) fold produced 11 instead of 17 at lv14/+3.
 function evaluateThrallTempHp(expr) {
     try {
         const result = new Function(`"use strict"; return (${expr})`)();
@@ -61,14 +69,14 @@ export async function handle(action, playerStats, campaignName) {
     const tempHpExpression = auto.tempHpExpression || 'warlock level + CHA modifier';
     const level = playerStats.level || 1;
     const abilities = Array.isArray(playerStats.abilities) ? playerStats.abilities : [];
-    const abilityModifiers = computeThrallAbilityModifiers(abilities, level);
+    const chaMod = abilities.find(a => a.name === 'Charisma')?.bonus || 0;
 
     const expr = tempHpExpression
         .replace(/warlock level/gi, level)
         .replace(/warlock_level/gi, level)
         .replace(/level/gi, level)
-        .replace(/CHA modifier/gi, abilityModifiers.charisma)
-        .replace(/charisma modifier/gi, abilityModifiers.charisma);
+        .replace(/CHA modifier/gi, chaMod)
+        .replace(/charisma modifier/gi, chaMod);
 
     const tempHp = evaluateThrallTempHp(expr);
 
@@ -89,15 +97,23 @@ export async function handle(action, playerStats, campaignName) {
         return null;
     }
 
-    // Apply temp HP to the companion
-    const tempHpKey = `_${companion.name.replace(/\s+/g, '_')}_tempHp`;
-    setTempHpOnKey(companion.name, tempHpKey, tempHp, campaignName);
+    // CLA-066: canonical `tempHp` runtime key (initiative/MonsterCard read
+    // tempHp — the old `_<Name>_tempHp` key had zero consumers) +
+    // replace-if-larger via tempHpService.
+    const existing = Number(getRuntimeValue(companion.name, 'tempHp') || 0);
+    const finalAmount = setTempHpOnKey(companion.name, 'tempHp', tempHp, campaignName);
+
+    if (finalAmount <= existing) {
+        // No increase — the summon-time stamp already stands; stay quiet
+        // (turn-start re-arms are idempotent, no repeat popup/log spam).
+        return null;
+    }
 
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${featureName}: ${companion.name} gains ${tempHp} Temporary Hit Points.`,
+        description: `${featureName}: ${companion.name} gains ${finalAmount} Temporary Hit Points.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[createThrallTempHp] Error:", e); });
 
@@ -106,7 +122,7 @@ export async function handle(action, playerStats, campaignName) {
         payload: {
             type: 'automation_info',
             name: featureName,
-            description: `${featureName}: ${companion.name} gains ${tempHp} Temporary Hit Points.`,
+            description: `${featureName}: ${companion.name} gains ${finalAmount} Temporary Hit Points.`,
             automation: auto,
         },
     };

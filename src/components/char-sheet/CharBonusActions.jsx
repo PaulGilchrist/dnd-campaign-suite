@@ -84,7 +84,13 @@ function BonusAidSelectionModal({ pendingAid, handleAidConfirm, handleAidSkip, c
     );
 }
 
-function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, hordeBreakerReady, hordeBreakerAttackItem, handleHordeBreakerTargetSelected, pendingHexSpell, handleHexAbilitySelected, handleHexCancel, pendingAid, handleAidConfirm, handleAidSkip, pendingBarkskin, handleBarkskinConfirm, handleBarkskinSkip, pendingHealingWord, handleHealingWordConfirm, handleHealingWordSkip, pendingSanctuary, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingLesserRestorationTarget, setPendingLesserRestorationTarget, campaignName, modalState, setModalState, warBondBondModal, setWarBondBondModal, warBondMax, playerStats }) {
+// CLA-066: armed guard for the shared TargetSpellPopups mount — hoisted out
+// of the component to hold the complexity cap.
+function targetSpellPopupsArmed(pendingLesserRestoration, pendingHex) {
+    return !!pendingLesserRestoration || !!pendingHex;
+}
+
+function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, hordeBreakerReady, hordeBreakerAttackItem, handleHordeBreakerTargetSelected, pendingHexSpell, handleHexAbilitySelected, handleHexCancel, pendingAid, handleAidConfirm, handleAidSkip, pendingBarkskin, handleBarkskinConfirm, handleBarkskinSkip, pendingHealingWord, handleHealingWordConfirm, handleHealingWordSkip, pendingSanctuary, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingLesserRestorationTarget, setPendingLesserRestorationTarget, pendingHex, handleHexConfirm, handleHexSkip, campaignName, modalState, setModalState, warBondBondModal, setWarBondBondModal, warBondMax, playerStats }) {
     return (
         <>
             <BonusAidSelectionModal pendingAid={pendingAid} handleAidConfirm={handleAidConfirm} handleAidSkip={handleAidSkip} campaignName={campaignName} attackerName={playerStats?.name} />
@@ -139,7 +145,13 @@ function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, 
                     confirmIcon="fa-shield-halved"
                 />
             )}
-            {pendingLesserRestoration && (
+            {/* CLA-066: hoist pendingHex out of the pendingLesserRestoration
+                guard — the bonus-row Hex cast lane (SpellDetailPopup →
+                HexAbilityModal → gateMetamagic → cfSetPending('hex')) armed
+                pendingHex on this flow instance, but the target modal never
+                rendered because TargetSpellPopups was only mounted for
+                pendingLesserRestoration props. Mirror mount pattern. */}
+            {targetSpellPopupsArmed(pendingLesserRestoration, pendingHex) && (
                 <TargetSpellPopups
                     campaignName={campaignName}
                     pendingLesserRestoration={pendingLesserRestoration}
@@ -147,6 +159,9 @@ function BonusActionTargetModals({ hordeBreakerTargets, setHordeBreakerTargets, 
                     handleLesserRestorationSkip={handleLesserRestorationSkip}
                     pendingLesserRestorationTarget={pendingLesserRestorationTarget}
                     setPendingLesserRestorationTarget={setPendingLesserRestorationTarget}
+                    pendingHex={pendingHex}
+                    handleHexConfirm={handleHexConfirm}
+                    handleHexSkip={handleHexSkip}
                 />
             )}
             {modalState?.arcaneVigorModal && (
@@ -735,7 +750,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     // SP-127: 2024 Aid is a Bonus Action — its gated chooser needs a host on this
     // lane too (row routing moved when casting_time became canonical Bonus Action).
-    const { pendingMetamagic, pendingAid, handleAidConfirm, handleAidSkip, pendingBarkskin, pendingHealingWord, pendingSanctuary, gateMetamagic, handleConfirm, handleSkip, handleBarkskinConfirm, handleBarkskinSkip, handleHealingWordConfirm, handleHealingWordSkip, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip } = useSpellMetamagicFlow({ playerStats: playerStats, campaignName: campaignName, onExecute: bonusCastAction, setSecondaryTargetModal: null, characters: characters, setPopupHtml: setPopupHtml });
+    const { pendingMetamagic, pendingAid, handleAidConfirm, handleAidSkip, pendingBarkskin, pendingHealingWord, pendingSanctuary, gateMetamagic, handleConfirm, handleSkip, handleBarkskinConfirm, handleBarkskinSkip, handleHealingWordConfirm, handleHealingWordSkip, handleSanctuaryConfirm, handleSanctuarySkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingHex, handleHexConfirm, handleHexSkip } = useSpellMetamagicFlow({ playerStats: playerStats, campaignName: campaignName, onExecute: bonusCastAction, setSecondaryTargetModal: null, characters: characters, setPopupHtml: setPopupHtml });
     const [pendingLesserRestorationTarget, setPendingLesserRestorationTarget] = useState(null);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
@@ -928,6 +943,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                     handleLesserRestorationSkip={handleLesserRestorationSkip}
                     pendingLesserRestorationTarget={pendingLesserRestorationTarget}
                     setPendingLesserRestorationTarget={setPendingLesserRestorationTarget}
+                    pendingHex={pendingHex}
+                    handleHexConfirm={handleHexConfirm}
+                    handleHexSkip={handleHexSkip}
                     campaignName={campaignName}
                     modalState={modalState}
                     setModalState={setModalState}

@@ -1513,7 +1513,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-066-thrall-gate-2024-majors.md",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "When you cast Summon Aberration, you can modify it so that it doesn't require Concentration. Duration becomes 1 minute. When summoned, the Aberration has Temporary Hit Points equal to Warlock level + Charisma modifier. First time each turn the Aberration hits a creature under Hex, deals extra Psychic damage equal to the bonus damage of that spell."

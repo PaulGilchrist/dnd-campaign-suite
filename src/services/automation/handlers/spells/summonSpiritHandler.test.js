@@ -3,7 +3,7 @@
 // @cleaned-by-ai
 // @improved-by-ai
 // @cleaned-by-ai
-import { handle, confirmSummonSpirit, resolveMonsterActions, resolveMonsterReactions } from './summonSpiritHandler.js';
+import { handle, confirmSummonSpirit, resolveMonsterActions, resolveMonsterReactions, resolveCreateThrallRiderHit } from './summonSpiritHandler.js';
 import summonFeySpells from '../../../../../public/data/2024/spells.json' with { type: 'json' };
 import summonFeyMonsters from '../../../../../public/data/monsters.json' with { type: 'json' };
 
@@ -18,6 +18,11 @@ vi.mock('../../../ui/logService.js', () => ({
 
 vi.mock('../../../encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
+    getCurrentCombatRound: vi.fn(() => 1),
+}));
+
+vi.mock('../../../dice/diceRoller.js', () => ({
+    rollExpression: vi.fn(),
 }));
 
 vi.mock('../../../ui/storage.js', () => ({
@@ -454,7 +459,123 @@ describe('summonSpiritHandler', () => {
                 const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Aberrant Spirit (Mind Flayer)'));
                 expect(effect).toMatchObject({ effect: 'summoned', duration: '1_minute' });
                 expect(addConcentration).not.toHaveBeenCalled();
-                expect(addExpiration).not.toHaveBeenCalled();
+                // CLA-066: the no-Concentration thrall carries a hard 1-minute
+                // expiry clock (rounds:10, CLA-334 recipe) — the old pin of
+                // "no clock at all" was a defect (summon never expired).
+                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'TestCaster', effects: [
+                    { type: 'remove_summoned_creatures', spell: 'Summon Aberration' },
+                ], campaignName: mockCampaignName, rounds: 10 });
+            });
+
+            it('CLA-066 automation-collected shape (subclass name-only): gate true via automation.specialActions', async () => {
+                loadMonsters.mockResolvedValue(mockMonsters);
+                const combatSummary = getCombatSummary(mockCampaignName);
+
+                // 2024 runtime shape: playerStats.class.subclass is { name } only
+                // (majors flattened by the collector into automation.specialActions).
+                const automationShapeWarlock = {
+                    ...mockPlayerStats,
+                    level: 14,
+                    abilities: [...mockPlayerStats.abilities, { name: 'Charisma', bonus: 3 }],
+                    class: { subclass: { name: 'Great Old One Patron' } },
+                    automation: {
+                        specialActions: [{ type: 'create_thrall', name: 'Create Thrall', spell: 'Summon Aberration' }],
+                        passives: [
+                            { type: 'create_thrall_temp_hp', name: 'Create Thrall' },
+                            { type: 'attack_rider', trigger: 'companion_aberration_hit', damageExpression: '1d6', damageType: 'Psychic', oncePerTurn: true },
+                        ],
+                    },
+                };
+
+                await confirmSummonSpirit(makeAberrantAction({ spell: { level: 4, duration: 'Concentration, up to 1 hour', concentration: true } }), automationShapeWarlock, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
+
+                const added = combatSummary.creatures.find(c => c.name?.startsWith('Aberrant Spirit (Mind Flayer)'));
+                expect(added).toBeDefined();
+                // modifications apply: rider row + rider transport on attack rows
+                expect(added.actions.map(a => a.name)).toEqual(['Psychic Slam', 'Psychic Strike']);
+                expect(added.actions[0].thrall_hex_rider).toBe(true);
+                expect(added.actions[0].thrall_hex_bonus).toEqual({ expression: '1d6', damageType: 'Psychic' });
+                // createThrall flag conditional on the gate (not unconditional stamp)
+                expect(added.createThrall).toBe(true);
+                // no caster concentration, 1-minute clock
+                expect(addConcentration).not.toHaveBeenCalled();
+                expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({ rounds: 10 }));
+                // THP = warlock level + CHA modifier = 14 + 3 = 17
+                expect(setTempHpOnKey).toHaveBeenCalledWith('Aberrant Spirit (Mind Flayer) 1', 'tempHp', 17, mockCampaignName);
+            });
+
+            it('CLA-066 non-thrall caster: createThrall flag stays false, no rider transport', async () => {
+                loadMonsters.mockResolvedValue(mockMonsters);
+                const combatSummary = getCombatSummary(mockCampaignName);
+
+                await confirmSummonSpirit(makeAberrantAction(), mockPlayerStats, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
+
+                const added = combatSummary.creatures.find(c => c.name?.startsWith('Aberrant Spirit (Mind Flayer)'));
+                expect(added.createThrall).toBe(false);
+                expect(added.actions.map(a => a.name)).toEqual(['Psychic Slam']);
+                expect(added.actions[0].thrall_hex_rider).toBeUndefined();
+            });
+
+            it('CLA-066 resolveCreateThrallRiderHit: rider fires once per turn on hexed target, second hit same round refused', async () => {
+                const store = {};
+                getRuntimeValue.mockImplementation((entity, key) => {
+                    if (entity === 'campaign' && key === 'targetEffects') return store.targetEffects;
+                    return store[`${entity}.${key}`];
+                });
+                setRuntimeValue.mockImplementation((entity, key, value) => { store[`${entity}.${key}`] = value; });
+                store.targetEffects = [{ target: 'Goblin 1', effect: 'hex_ability_check_disadvantage', source: 'HexWarlock' }];
+                getCombatSummary.mockReturnValue({ creatures: [] });
+
+                const rollDamage = vi.fn().mockResolvedValue({});
+                const { rollExpression } = await import('../../../dice/diceRoller.js');
+                rollExpression.mockReset().mockReturnValue({ total: 4, rolls: [4] });
+
+                const autoDamage = {
+                    name: 'Psychic Slam',
+                    targetName: 'Goblin 1',
+                    thrallHexRider: true,
+                    thrallHexBonus: { expression: '1d6', damageType: 'Psychic' },
+                };
+
+                const first = await resolveCreateThrallRiderHit({ campaignName: mockCampaignName, monsterName: 'Aberrant Spirit (Mind Flayer) 1', autoDamage, rollDamage });
+                expect(first).toEqual({ total: 4, rolls: [4] });
+                expect(rollDamage).toHaveBeenCalledTimes(1);
+                expect(rollDamage.mock.calls[0][0]).toMatchObject({ formula: '1d6', total: 4, context: { damageType: 'Psychic', targetName: 'Goblin 1' } });
+
+                // second hit same round — once-per-turn latch refuses, no second roll
+                const second = await resolveCreateThrallRiderHit({ campaignName: mockCampaignName, monsterName: 'Aberrant Spirit (Mind Flayer) 1', autoDamage, rollDamage });
+                expect(second).toBeNull();
+                expect(rollDamage).toHaveBeenCalledTimes(1);
+                expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({ automationType: 'create_thrall_refused' }));
+                expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({ automationType: 'create_thrall_hex_bonus' }));
+            });
+
+            it('CLA-066 resolveCreateThrallRiderHit: un-hexed target pays zero rider', async () => {
+                const store = { targetEffects: [] };
+                getRuntimeValue.mockImplementation((entity, key) => {
+                    if (entity === 'campaign' && key === 'targetEffects') return store.targetEffects;
+                    return store[`${entity}.${key}`];
+                });
+                setRuntimeValue.mockImplementation((entity, key, value) => { store[`${entity}.${key}`] = value; });
+                getCombatSummary.mockReturnValue({ creatures: [] });
+
+                const rollDamage = vi.fn();
+                const autoDamage = {
+                    name: 'Psychic Slam',
+                    targetName: 'Skeleton 1',
+                    thrallHexRider: true,
+                    thrallHexBonus: { expression: '1d6', damageType: 'Psychic' },
+                };
+                const result = await resolveCreateThrallRiderHit({ campaignName: mockCampaignName, monsterName: 'Aberrant Spirit (Mind Flayer) 1', autoDamage, rollDamage });
+                expect(result).toBeNull();
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
+            it('CLA-066 resolveCreateThrallRiderHit: byte-inert without rider marker', async () => {
+                const rollDamage = vi.fn();
+                const result = await resolveCreateThrallRiderHit({ campaignName: mockCampaignName, monsterName: 'Goblin 1', autoDamage: { name: 'Bite', targetName: 'Goblin 2' }, rollDamage });
+                expect(result).toBeNull();
+                expect(rollDamage).not.toHaveBeenCalled();
             });
         });
 

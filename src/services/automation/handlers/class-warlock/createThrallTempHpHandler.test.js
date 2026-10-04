@@ -138,7 +138,7 @@ describe('createThrallTempHpHandler', () => {
             );
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('13 Temporary Hit Points');
+            expect(result.payload.description).toContain('19 Temporary Hit Points');
         });
 
         it('should return null when temp HP expression evaluates to zero or negative', async () => {
@@ -250,7 +250,7 @@ describe('createThrallTempHpHandler', () => {
             expect(result.payload.automation).toEqual({ type: 'create_thrall', tempHpExpression: '10' });
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'Aberrant Spirit Companion',
-                '_Aberrant_Spirit_Companion_tempHp',
+                'tempHp',
                 10,
                 campaignName
             );
@@ -270,7 +270,7 @@ describe('createThrallTempHpHandler', () => {
 
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'Aberrant Spirit',
-                '_Aberrant_Spirit_tempHp',
+                'tempHp',
                 5,
                 campaignName
             );
@@ -290,7 +290,7 @@ describe('createThrallTempHpHandler', () => {
 
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'Aberrant Spirit',
-                '_Aberrant_Spirit_tempHp',
+                'tempHp',
                 7,
                 campaignName
             );
@@ -347,7 +347,7 @@ describe('createThrallTempHpHandler', () => {
 
             expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 abilityName: 'Custom Thrall',
-                description: 'Custom Thrall: Aberrant Spirit gains 13 Temporary Hit Points.',
+                description: 'Custom Thrall: Aberrant Spirit gains 19 Temporary Hit Points.',
             }));
         });
     });

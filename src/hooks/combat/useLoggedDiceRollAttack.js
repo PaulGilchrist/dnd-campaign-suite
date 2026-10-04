@@ -211,6 +211,10 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         // transport to the hit-confirmed seam (undefined = byte-inert).
         bestialFuryRider: context.bestialFuryRider,
         bestialFuryBonus: context.bestialFuryBonus,
+        // CLA-066: Create Thrall Hex rider marker + bonus dict — CLA-036
+        // byte-shape twin, resolved by resolveCreateThrallRiderHit.
+        thrallHexRider: context.thrallHexRider,
+        thrallHexBonus: context.thrallHexBonus,
         ...secondaryConditionTransportField(context),
         ripostePopup: context.ripostePopup,
         source: autoDamageSourceRef?.current || characterName,
