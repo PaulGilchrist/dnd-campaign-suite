@@ -2542,7 +2542,7 @@
       "handler": "src/services/automation/handlers/class-sorcerer/wildMagicSurgeHandler.js",
       "router": "src/services/automation/index.js",
       "infoBuilder": "src/services/automation/handlers/class-sorcerer/wildMagicSurgeHandler.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-134-feats-of-chaos-advantage-never-folded.md",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Manipulate chaos to give yourself Advantage on one D20 Test before rolling. Must cast Sorcerer spell with spell slot or finish Long Rest before using again. If you cast Sorcerer spell with spell slot before Long Rest, automatically roll on Wild Magic Surge table.",

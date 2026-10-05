@@ -32,7 +32,6 @@ import { computeTargetAc } from './targetAcComputation.js';
 import { processAttackAfterResult, processPotentCantrip } from './attackPostProcessing.js';
 import { processSaveRoll } from './saveProcessing.js';
 import { processInitiativeRoll } from './initiativeProcessing.js';
-import { consumeFeatsOfChaos } from './globalFeats.js';
 import { consumeArmedRestoreBalance } from '../../services/combat/restoreBalanceState.js';
 
 // MN-002: Bait and Switch AC fold for ANY attacker — max with the attacker-side
@@ -404,6 +403,9 @@ async function maybeCancelForcedMode({ ctx, rollType, characterName, campaignNam
     const cancelledBy = await consumeArmedRestoreBalance(campaignName, combatSummary, rollerName, name, rollType);
     if (cancelledBy) {
         ctx.forcedMode = 'normal';
+        // CLA-134: a cancelled roll must not be re-advantaged by the roll-time
+        // Feats of Chaos fold (computeD20Roll honors this marker, latch stays armed).
+        ctx._restoreBalanceCancelled = true;
     }
 }
 
@@ -562,7 +564,7 @@ export function createLogAndShow(deps) {
 
         await processRollTypeTail({ rollType, target, targetName, combatSummary, characterName, campaignName, ctx, bonus, logEntry, setPopupHtml, availableSuperiorityManeuvers });
 
-        // Consume Feats of Chaos after one d20 roll
-        consumeFeatsOfChaos(characterName, campaignName);
+        // CLA-134: Feats of Chaos consume moved to the computeD20Roll roll seam
+        // (single owner: globalFeats.consumeFeatsOfChaos, folded as advantage).
     };
 }

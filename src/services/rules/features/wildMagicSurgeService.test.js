@@ -452,6 +452,56 @@ describe('wildMagicSurgeService', () => {
             );
         });
 
+        it('CLA-134: re-arms via cast-time metaCtx stamp after the roll seam already consumed the flag', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_surge', name: 'Wild Surge' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                    ],
+                },
+            };
+            const spell = { ...SPELL };
+
+            getRuntimeValue.mockImplementation(() => null); // consumed at computeD20Roll
+
+            executeHandler.mockResolvedValue({ type: 'modal', payload: { mode: 'roll', roll: 42 } });
+
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 1, featsOfChaosArmedAtCast: true }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(result).toEqual({ type: 'modal', payload: { mode: 'roll', roll: 42 } });
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ autoSurge: true }),
+                }),
+                playerStats,
+                CAMPAIGN_NAME,
+                MAP_NAME,
+            );
+        });
+
+        it('CLA-134: unarmed slot cast keeps the normal (non-consuming) surge lane', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_surge', name: 'Wild Surge' },
+                        { type: 'feats_of_chaos', condition: 'feats_of_chaos_active', name: 'Feats of Chaos' },
+                    ],
+                },
+            };
+            const spell = { ...SPELL };
+
+            getRuntimeValue.mockImplementation(() => null);
+            executeHandler.mockResolvedValue({ type: 'modal', payload: { mode: 'roll', roll: 7 } });
+
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(result).toEqual({ type: 'modal', payload: { mode: 'roll', roll: 7 } });
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(playerStats.name, 'featsOfChaosUses', 1, CAMPAIGN_NAME, true);
+        });
+
         it('skips feats of chaos block when not active', async () => {
             const playerStats = {
                 ...BASE_PLAYER_STATS,

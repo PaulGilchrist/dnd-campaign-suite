@@ -237,6 +237,7 @@ import { handleSanctuarySave } from './sanctuarySave.js';
 import { resolveHit } from './hitResolution.js';
 import { processAttackAfterResult } from './attackPostProcessing.js';
 import { consumeFeatsOfChaos } from './globalFeats.js';
+import { computeD20Roll } from './d20RollComputation.js';
 import { resolveTarget } from './targetResolution.js';
 
 // ---------------------------------------------------------------------------
@@ -570,8 +571,8 @@ describe('createLogAndShow - Feats of Chaos & Lucky Cleanup', () => {
         return createLogAndShow(deps);
     }
 
-    describe('feats of chaos consumption', () => {
-        it('consumes featsOfChaosActive after one d20 roll', async () => {
+    describe('feats of chaos consumption (CLA-134: seam moved to computeD20Roll)', () => {
+        it('delegates the roll to computeD20Roll and no longer consumes at the logAndShow tail', async () => {
             const deps = createDefaultDeps();
             getRuntimeValue.mockImplementation((name, prop) => {
                 if (name === 'TestFighter' && prop === 'featsOfChaosActive') return true;
@@ -581,16 +582,17 @@ describe('createLogAndShow - Feats of Chaos & Lucky Cleanup', () => {
             const fn = createFn(deps);
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
-            expect(consumeFeatsOfChaos).toHaveBeenCalledWith('TestFighter', 'test-campaign');
+            expect(computeD20Roll).toHaveBeenCalledWith(expect.objectContaining({ characterName: 'TestFighter' }));
+            expect(consumeFeatsOfChaos).not.toHaveBeenCalled();
         });
 
-        it('does not consume when featsOfChaosActive is not true', async () => {
+        it('unarmed roll also consumes nothing at the tail (single owner is the roll seam)', async () => {
             const deps = createDefaultDeps();
 
             const fn = createFn(deps);
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
-            expect(consumeFeatsOfChaos).toHaveBeenCalledWith('TestFighter', 'test-campaign');
+            expect(consumeFeatsOfChaos).not.toHaveBeenCalled();
         });
     });
 

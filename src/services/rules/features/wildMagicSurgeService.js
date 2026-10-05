@@ -90,7 +90,11 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
     }
 
     const featsOfChaos = getFeatsOfChaosFeature(playerStats);
-    const featsOfChaosActive = getRuntimeValue(playerStats.name, 'featsOfChaosActive', campaignName) === true;
+    // CLA-134: an armed spell-attack cast consumes featsOfChaosActive at the
+    // computeD20Roll roll seam BEFORE this post-cast clause runs — the
+    // cast-time metaCtx stamp keeps the slot-cast re-arm + auto-surge clause
+    // RAW-correct for attack-roll spells.
+    const featsOfChaosActive = getRuntimeValue(playerStats.name, 'featsOfChaosActive', campaignName) === true || metaCtx?.featsOfChaosArmedAtCast === true;
     const surgeFeature = surgeFeatures[0];
 
     if (featsOfChaos && featsOfChaosActive) {

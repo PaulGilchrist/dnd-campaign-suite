@@ -2,6 +2,7 @@ import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasStarryDragonActive, starryDragonAppliesToRoll } from './starryDragon.js';
 import { consumeBurstOfIngenuityBuff } from '../../services/encounters/monsterBurstOfIngenuity.js';
+import { consumeFeatsOfChaos } from './globalFeats.js';
 
 // MA-1510: Burst of Ingenuity — the Sphinx of Wonder gated reaction press
 // arms a ONE-SHOT activeBuffs {effect:'burst_of_ingenuity', saveBonus:2}
@@ -241,6 +242,23 @@ export function computeD20Roll({ characterName, campaignName, name, rollType, co
 
     if (rayStrDisadvantage) {
         forcedMode = 'disadvantage';
+    }
+
+    // CLA-134: Feats of Chaos armed latch folds Advantage into the FIRST d20
+    // test at this seam and is consumed here (single owner — see
+    // globalFeats.consumeFeatsOfChaos). Covers every test that rolls through
+    // computeD20Roll: PC weapon attacks, PC spell attacks (the spell-cast /
+    // metamagic lane reaches rollAttack→logAndShow→computeD20Roll), saves,
+    // ability/skill checks and initiative. An existing forcedMode or a
+    // Restore Balance-cancelled roll beats the fold; the latch stays armed.
+    const featsOfChaosMode = consumeFeatsOfChaos(characterName, campaignName, {
+        name,
+        rollType,
+        forcedMode,
+        restoreBalanceCancelled: context?._restoreBalanceCancelled,
+    });
+    if (featsOfChaosMode) {
+        forcedMode = featsOfChaosMode;
     }
 
     const sacredWeaponBonus = context?.sacredWeaponBonus || 0;

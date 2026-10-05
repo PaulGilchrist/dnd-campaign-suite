@@ -684,7 +684,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     const { empEvocFormula } = computeEmpoweredEvocation(playerStats, spell, formula);
     let finalFormula = computeBlessedStrikes(spell, empEvocFormula, playerStats, campaignName, getRuntimeValue);
     finalFormula = computeRadiantSoul(spell, playerStats, campaignName, getRuntimeValue, finalFormula);
-    metaCtx = { ...metaCtx, finalFormula };
+    // CLA-134: stamp the Feats of Chaos armed state at CAST time (before the
+    // attack roll consumes it at the computeD20Roll seam) so the post-cast
+    // surge/re-arm clause still sees an armed cast. metaCtx threading only —
+    // no new persistence.
+    metaCtx = { ...metaCtx, finalFormula, featsOfChaosArmedAtCast: getRuntimeValue(playerStats.name, 'featsOfChaosActive', campaignName) === true };
     const { overchannelFormula, overchannelActive, overchannelUseCount } = computeOverchannel({ spell, metaCtx, playerStats, campaignName, getRuntimeValue, empEvocFormula, baseFormula: finalFormula });
 
     const savePathOpts = { spell, fullSpell, metaCtx, playerStats, campaignName, mapName, characters,
