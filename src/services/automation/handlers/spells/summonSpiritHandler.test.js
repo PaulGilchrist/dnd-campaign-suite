@@ -977,4 +977,47 @@ describe('summonSpiritHandler', () => {
             expect(added.actions[0].damage_dice_primary).toBe('1d8+4+4');
         });
     });
+
+    describe('SP-038 Draconic Spirit AC ladder (armor_class_scales_with_slot)', () => {
+        const draconicSpell = summonFeySpells.find(s => s.index === 'draconic-spirit');
+        const draconic = summonFeyMonsters.find(m => m.index === 'draconic-spirit');
+
+        it('spells.json RAW says "AC 14 + the spell\'s level" and routes to the draconic-spirit block', () => {
+            expect(draconicSpell.description.join(' ')).toContain('AC 14 + the spell\'s level');
+            expect(draconicSpell.automation).toMatchObject({ type: 'summon_spirit', baseLevel: 5, hpPerLevelAbove: 10 });
+            expect(draconicSpell.automation.variants).toEqual([{ name: 'Draconic Spirit', monsterIndex: 'draconic-spirit' }]);
+        });
+
+        it('monsters.json draconic-spirit block carries the AC ladder opt-in (SP-015 byte-twin of bestial-spirit-*)', () => {
+            expect(draconic.armor_class).toBe(14);
+            expect(draconic.armor_class_scales_with_slot).toBe(true);
+        });
+
+        it('lv5 cast spawns AC 19 / HP 50 and lv6 upcast spawns AC 20 / HP 60', async () => {
+            loadMonsters.mockResolvedValue(summonFeyMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+            const lv20Wizard = {
+                ...mockPlayerStats,
+                level: 20,
+                proficiency: 6,
+                spellAbilities: { toHit: 11, saveDc: 19, modifier: 5 },
+            };
+            const action = {
+                name: 'Draconic Spirit',
+                automation: draconicSpell.automation,
+                spell: { ...draconicSpell },
+                metaCtx: { slotLevel: 5 },
+            };
+            await handle(action, lv20Wizard, mockCampaignName);
+            const lv5 = combatSummary.creatures.find(c => c.name?.startsWith('Draconic Spirit'));
+            expect(lv5.ac).toBe(19);  // armor_class 14 + slot 5
+            expect(lv5.maxHp).toBe(50);
+
+            const lv6CombatSummary = getCombatSummary(mockCampaignName);
+            await handle({ ...action, metaCtx: { slotLevel: 6 } }, lv20Wizard, mockCampaignName);
+            const lv6 = lv6CombatSummary.creatures.filter(c => c.name?.startsWith('Draconic Spirit')).at(-1);
+            expect(lv6.ac).toBe(20);  // armor_class 14 + slot 6
+            expect(lv6.maxHp).toBe(60); // 50 + 10×(6−5)
+        });
+    });
 });

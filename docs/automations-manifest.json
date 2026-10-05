@@ -2003,7 +2003,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-SP-038-draconic-spirit-ac-flat.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "A Large Dragon spirit appears in an unoccupied space within range. The spirit has AC 14 + the spell's level. The spirit has 50 Hit Points plus 10 for each spell level above 5. Its Speed is 30 feet, Fly 60 feet, and Swim 30 feet."
