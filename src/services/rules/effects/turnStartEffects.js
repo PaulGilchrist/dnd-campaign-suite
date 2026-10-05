@@ -338,6 +338,14 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
         speedBonus: bonus,
     }];
     await setRuntimeValue(activeName, 'activeBuffs', newBuffs, campaignName);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: activeName,
+        abilityName: 'Dread Ambush',
+        description: `${activeName}'s Ambusher's Leap — Speed increases by ${bonus} ft until the end of this turn.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[turnStartEffects:dread-ambush-speed-log-error]", e); });
 }
 
 async function applyHeroismTempHp(activeName, playerStats, effect, campaignName) {

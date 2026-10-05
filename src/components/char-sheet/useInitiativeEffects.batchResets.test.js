@@ -107,6 +107,8 @@ describe('useInitiativeEffects - batch resets and once-per-turn trackers', () =>
                 'actionSurgeUsedThisRound',
                 'psionicStrikeUsedThisTurn',
                 'dreadAmbushUsedThisTurn',
+                // CLA-100: Ambusher's Leap once-per-combat latch re-arms on initiative.
+                'dreadAmbushSpeedActive',
                 'hurlThroughHellTurnUsed',
                 'portentUsedThisTurn',
                 BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY,

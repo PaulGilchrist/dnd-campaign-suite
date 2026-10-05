@@ -2027,7 +2027,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-100-dread-ambush.md",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Ambusher's Leap: at start of first turn of each combat, Speed +10 until end of that turn. Dreadful Strike: when you hit with a weapon, deal extra 2d6 Psychic damage (uses = Wisdom modifier, minimum once, regain on Long Rest). Initiative Bonus: add Wisdom modifier to Initiative roll."

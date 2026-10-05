@@ -59,6 +59,15 @@ export function createCreatureHandlers({
             const firstCreatureName = newSummary.creatures[0].name
             storage.set('activeCreatureName', firstCreatureName, campaignName)
             setActiveCreatureName(firstCreatureName)
+            // CLA-100: Clear restarts combat (round back to 1) but preserves per-creature
+            // runtime stores and dispatches no initiative-rolled event — reset the Dread
+            // Ambush Ambusher's Leap once-per-combat latch so round-1 of the new
+            // combat re-grants the speed_boost.
+            for (const creature of newSummary.creatures) {
+                if (creature.type === 'player') {
+                    setRuntimeValue(creature.name, 'dreadAmbushSpeedActive', null, campaignName)
+                }
+            }
         }
     }
 

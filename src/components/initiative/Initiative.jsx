@@ -106,6 +106,10 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_fortifiedHealth_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_Shield_Bash_usedRound', null, campaignName)
     setRuntimeValue(creatureName, 'piercerPunctureUsedThisTurn', null, campaignName)
+    // CLA-100: Dread Ambush Ambusher's Leap once-per-combat latch re-arms on
+    // initiative (new combat) — covers joins/rolls by any creature (no-detail
+    // initiative-rolled dispatches never reach the per-character batch).
+    setRuntimeValue(creatureName, 'dreadAmbushSpeedActive', null, campaignName)
 }
 
 function clearDominatedExpirations(creature, campaignName) {

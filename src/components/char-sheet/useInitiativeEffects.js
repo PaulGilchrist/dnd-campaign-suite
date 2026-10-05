@@ -79,6 +79,11 @@ function buildInitiativeUpdates(playerStats) {
     // Reset Dread Ambush once-per-turn flag on initiative (new combat)
     updates.dreadAmbushUsedThisTurn = null;
 
+    // CLA-100: reset Dread Ambush Ambusher's Leap once-per-combat latch on
+    // initiative (new combat) — the round-1 speed_boost grant re-arms each
+    // combat; without this reset the latch stayed true and blocked combat #2+.
+    updates.dreadAmbushSpeedActive = null;
+
     // Reset Hurl Through Hell once-per-turn flag on initiative (new combat)
     updates.hurlThroughHellTurnUsed = null;
 

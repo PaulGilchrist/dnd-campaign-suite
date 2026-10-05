@@ -233,6 +233,22 @@ describe('Initiative - Creature & NPC Handlers', () => {
         });
     });
 
+    describe('handleClear (CLA-100)', () => {
+        it('resets the Dread Ambush once-per-combat latch for player creatures', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 2, creatures: [{ name: 'Alice', type: 'player', currentHp: 10 }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                fireEvent.click(screen.getByText('Clear'));
+            });
+
+            for (const name of ['Alice', 'Bob']) {
+                expect(setRuntimeValue).toHaveBeenCalledWith(name, 'dreadAmbushSpeedActive', null, 'test-campaign');
+            }
+        });
+    });
+
     describe('handleInitiativeChange', () => {
         it('should call setInitiative with combatSummary, creatureName, and value', async () => {
             vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player', initiative: 10 }] });

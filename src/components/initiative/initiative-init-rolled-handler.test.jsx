@@ -34,6 +34,8 @@ const PER_ROUND_RESETS = [
     '_fortifiedHealth_usedRound',
     '_Shield_Bash_usedRound',
     'piercerPunctureUsedThisTurn',
+    // CLA-100: Dread Ambush Ambusher's Leap once-per-combat latch re-arms on initiative.
+    'dreadAmbushSpeedActive',
 ];
 
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
