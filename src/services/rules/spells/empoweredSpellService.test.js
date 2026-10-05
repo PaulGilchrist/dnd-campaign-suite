@@ -509,6 +509,16 @@ describe('getEmpoweredSpellDescription', () => {
     expect(getEmpoweredSpellDescription(action)).toBe(DEFAULT_DESC);
   });
 
+  it('falls back to 2014 text without rules argument', () => {
+    expect(getEmpoweredSpellDescription({})).toBe(DEFAULT_DESC);
+  });
+
+  it('falls back to 2024 RAW text for rules 2024', () => {
+    expect(getEmpoweredSpellDescription({}, '2024')).toBe(
+      'When you roll damage for a spell, you can spend 1 sorcery point to reroll any number of those dice that rolled a 1 or a 2. You must use the new rolls.'
+    );
+  });
+
   it.each([
     [
       '<li><b>Empowered Spell</b>. Reroll damage dice up to CHA mod.</li>',
@@ -531,4 +541,138 @@ describe('getEmpoweredSpellDescription', () => {
     expect(result).toBe(expected);
   });
 
+});
+
+// ── 2024 Empowered Spell semantics (CLA-122) ───────────────────
+
+describe('2024 Empowered Spell semantics', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('executeEmpoweredReroll rerolls every die showing 1 or 2, exceeding the CHA modifier cap', async () => {
+    const parsed = { count: 4, sides: 6, modifier: 0 };
+    parseExpression.mockReturnValue(parsed);
+    getCurrentSorceryPoints.mockReturnValue(2);
+    getMaxSorceryPoints.mockReturnValue(5);
+    getCombatContext.mockResolvedValue(makeCombatSummary([
+      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
+    ]));
+    applyDamageToTarget.mockReturnValue({ newHp: 2, finalDamage: 8 });
+
+    const lastEvent = {
+      damageFormula: '4d6',
+      rolls: [1, 2, 1, 5],
+      rawDamage: 9,
+      damageType: 'Fire',
+      spellName: 'Fire Bolt',
+      targetName: 'Goblin',
+      damageTypes: ['Fire'],
+    };
+
+    let randomIndex = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => [0.5, 0.5, 0.5][randomIndex++]);
+
+    const result = await executeEmpoweredReroll({
+      campaignName: CAMPAIGN,
+      playerStats: makePlayerStats({ rules: '2024' }),
+      lastEvent,
+      chaMod: 1,
+    });
+
+    expect(result.popupState.completed).toBe(true);
+    expect(result.popupState.result.rerollCount).toBe(3);
+    expect(result.popupState.result.originalDice).toEqual([1, 2, 1, 5]);
+    expect(result.popupState.result.newDice).toEqual([4, 4, 4, 5]);
+    expect(result.popupState.result.oldTotal).toBe(9);
+    expect(result.popupState.result.newTotal).toBe(17);
+    expect(result.popupState.currentSP).toBe(1);
+    expect(spendSorceryPoints).toHaveBeenCalledWith('Xander', 1, CAMPAIGN, 5);
+    expect(result.logEntries[0].rerolledDiceCount).toBe(3);
+    expect(result.logEntries[0].rollType).toBe('empowered-spell');
+
+    vi.restoreAllMocks();
+  });
+
+  it('executeEmpoweredReroll spends no SP and errors when no die shows 1 or 2', async () => {
+    const parsed = { count: 3, sides: 6, modifier: 0 };
+    parseExpression.mockReturnValue(parsed);
+    getCurrentSorceryPoints.mockReturnValue(3);
+    getMaxSorceryPoints.mockReturnValue(5);
+
+    const result = await executeEmpoweredReroll({
+      campaignName: CAMPAIGN,
+      playerStats: makePlayerStats({ rules: '2024' }),
+      lastEvent: {
+        damageFormula: '3d6',
+        rolls: [3, 4, 6],
+        rawDamage: 13,
+        damageType: 'Fire',
+        spellName: 'Fire Bolt',
+        targetName: 'Goblin',
+        damageTypes: ['Fire'],
+      },
+      chaMod: 5,
+    });
+
+    expect(result.popupState.error).toBe('No damage dice showing 1 or 2 to reroll.');
+    expect(result.popupState.completed).toBeUndefined();
+    expect(spendSorceryPoints).not.toHaveBeenCalled();
+  });
+
+  it('buildEmpoweredSpellState exposes eligible 1-or-2 die count uncapped by CHA modifier', async () => {
+    getMaxSorceryPoints.mockReturnValue(20);
+    getCurrentSorceryPoints.mockReturnValue(10);
+    findLastAttack.mockResolvedValue({
+      attackEvent: {
+        damageFormula: '4d6',
+        rolls: [1, 2, 4, 1],
+        rawDamage: 8,
+        spellName: 'Fire Bolt',
+        targetName: 'Goblin',
+        damageTypes: ['Fire'],
+      },
+    });
+    getChaModifier.mockReturnValue(1);
+    parseExpression.mockReturnValue({ count: 4, sides: 6, modifier: 0 });
+
+    const result = await buildEmpoweredSpellState(makePlayerStats({ rules: '2024' }));
+
+    expect(result.maxReroll).toBe(3);
+    expect(result.chaMod).toBe(1);
+  });
+
+  it('5e characters keep the CHA-modifier cap (2014 Empower)', async () => {
+    const parsed = { count: 4, sides: 6, modifier: 0 };
+    parseExpression.mockReturnValue(parsed);
+    getCurrentSorceryPoints.mockReturnValue(2);
+    getMaxSorceryPoints.mockReturnValue(5);
+    getCombatContext.mockResolvedValue(makeCombatSummary([
+      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
+    ]));
+    applyDamageToTarget.mockReturnValue({ newHp: 8, finalDamage: 2 });
+
+    const lastEvent = {
+      damageFormula: '4d6',
+      rolls: [1, 2, 1, 5],
+      rawDamage: 9,
+      damageType: 'Fire',
+      spellName: 'Fire Bolt',
+      targetName: 'Goblin',
+      damageTypes: ['Fire'],
+    };
+
+    let randomIndex = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => [0.5][randomIndex++]);
+
+    const result = await executeEmpoweredReroll({
+      campaignName: CAMPAIGN,
+      playerStats: makePlayerStats({ rules: '5e' }),
+      lastEvent,
+      chaMod: 1,
+    });
+
+    expect(result.popupState.result.rerollCount).toBe(1);
+    expect(result.popupState.result.newDice).toEqual([4, 2, 1, 5]);
+
+    vi.restoreAllMocks();
+  });
 });

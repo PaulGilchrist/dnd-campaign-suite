@@ -319,7 +319,7 @@ describe('CharActions - handleAutomationAction', () => {
     await waitFor(() => {
       expect(getByText('Empowered Spell:')).toBeInTheDocument();
     });
-    expect(getEmpoweredSpellDescription).toHaveBeenCalledWith(stats.actions[0]);
+    expect(getEmpoweredSpellDescription).toHaveBeenCalledWith(stats.actions[0], stats.rules);
   });
 
   it('renders feature detail popup when action has details but no automation', async () => {

@@ -31,6 +31,14 @@ export async function buildEmpoweredSpellState(playerStats) {
                 error: 'Could not parse damage formula',
             };
         }
+        if (playerStats.rules === '2024') {
+            return {
+                ...base,
+                lastEvent,
+                maxReroll: (lastEvent.rolls || []).filter(r => r <= 2).length,
+                formulaParsed: parsed,
+            };
+        }
         return {
             ...base,
             lastEvent,
@@ -73,11 +81,34 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
     const { sides, modifier } = parsed;
     const originalRolls = lastEvent.rolls || [];
 
-    const rerollCount = Math.min(chaMod, originalRolls.length);
-    const sortedWithIndex = originalRolls
-        .map((r, i) => ({ value: r, index: i }))
-        .sort((a, b) => a.value - b.value);
-    const rerollIndices = new Set(sortedWithIndex.slice(0, rerollCount).map(x => x.index));
+    let rerollIndices;
+    if (playerStats.rules === '2024') {
+        rerollIndices = new Set(
+            originalRolls
+                .map((r, i) => ({ value: r, index: i }))
+                .filter(x => x.value <= 2)
+                .map(x => x.index)
+        );
+        if (rerollIndices.size === 0) {
+            return {
+                popupState: {
+                    type: 'empowered_spell',
+                    name: 'Metamagic - Empowered Spell',
+                    currentSP,
+                    maxSP,
+                    lastEvent,
+                    chaMod,
+                    error: 'No damage dice showing 1 or 2 to reroll.',
+                },
+            };
+        }
+    } else {
+        const sortedWithIndex = originalRolls
+            .map((r, i) => ({ value: r, index: i }))
+            .sort((a, b) => a.value - b.value);
+        rerollIndices = new Set(sortedWithIndex.slice(0, Math.min(chaMod, originalRolls.length)).map(x => x.index));
+    }
+    const rerollCount = rerollIndices.size;
 
     const newRolls = originalRolls.map((r, i) =>
         rerollIndices.has(i) ? Math.floor(Math.random() * sides) + 1 : r
@@ -184,12 +215,15 @@ export function hasEmpoweredSpell(playerStats) {
     return options.some(o => o.effect === 'reroll_damage_dice');
 }
 
-export function getEmpoweredSpellDescription(action) {
+export function getEmpoweredSpellDescription(action, rules) {
     if (action.details) {
         const match = action.details.match(
             /<li><b>Empowered Spell<\/b>\.?\s*([\s\S]*?)<\/li>/i
         );
         if (match) return match[1].trim();
+    }
+    if (rules === '2024') {
+        return 'When you roll damage for a spell, you can spend 1 sorcery point to reroll any number of those dice that rolled a 1 or a 2. You must use the new rolls.';
     }
     return 'When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls.';
 }

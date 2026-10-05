@@ -95,7 +95,7 @@ function renderFeatureActionRow(action, playerStats, handleAutomationAction, set
         }
     };
     const displayName = isMetamagic ? 'Empowered Spell' : action.name;
-    const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
+    const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action, playerStats?.rules) : action.description;
     // Resolve 'ability' save DC placeholder to the caster's numeric spell save DC
     const badgeSaveDc = auto?.saveDc === 'ability' ? playerStats.spellAbilities?.saveDc : auto?.saveDc;
     return <div key={action.name}>
