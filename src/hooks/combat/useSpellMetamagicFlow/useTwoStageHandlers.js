@@ -192,14 +192,16 @@ export function useTwoStageHandlers({ playerStats, campaignName, cfClearPending,
       timestamp: Date.now(),
     }).catch((e) => { console.error("[useTwoStageHandlers:log-error]", e); })
 
-    const popup = await applyEnhanceAbilityEffect(
-      { name: pending.spellName, spell: pending.spell, automation: { type: 'enhance_ability', range: pending.range } },
+    // SP-039: applyEnhanceAbility destructures a SINGLE object argument —
+    // the positional call sent targetNames/ability as undefined and the
+    // handler silently returned null (te never stamped). Match the signature.
+    const popup = await applyEnhanceAbilityEffect({
+      action: { name: pending.spellName, spell: pending.spell, automation: { type: 'enhance_ability', range: pending.range } },
       playerStats,
       campaignName,
-      null,
-      targets,
-      ability
-    )
+      targetNames: targets,
+      ability,
+    })
 
     if (popup && setPopupHtml) {
       setPopupHtml(popup.payload)

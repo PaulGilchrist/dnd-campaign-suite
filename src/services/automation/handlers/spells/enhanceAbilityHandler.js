@@ -1,6 +1,9 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
+import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { addEntry } from '../../../ui/logService.js';
+import storage from '../../../ui/storage.js';
 
 export const ENHANCE_ABILITY_ABILITIES = [
     { value: 'STR', label: 'Strength' },
@@ -30,16 +33,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    // SP-039: 'enhance_ability_target_selection' had ZERO renderer consumers.
+    // The sheet gate flow (spellGates gateEnhanceAbility → HexAbilityModal +
+    // SecondaryTargetModal two-stage) owns target+ability selection, so this
+    // trigger lane reports via the rendered automation_info type instead of
+    // a dead popup (no new UI).
     const creatureTargets = combatSummary.creatures.map(c => c.name);
 
     return {
         type: 'popup',
         payload: {
-            type: 'enhance_ability_target_selection',
+            type: 'automation_info',
             name: action.name,
-            creatureTargets,
-            abilities: ENHANCE_ABILITY_ABILITIES,
-            range: auto.range || 'Touch',
+            description: `${action.name} needs a willing target and a chosen ability. Cast it from the spellbook to choose ${creatureTargets.join(', ')} and an ability (STR/DEX/INT/WIS/CHA).`,
             automation: auto,
         },
     };
@@ -54,7 +60,7 @@ export async function applyEnhanceAbility({ action, playerStats, campaignName, t
     const casterName = playerStats.name;
     const abilityLabel = getAbilityLabel(ability);
 
-    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
     const effects = Array.isArray(storedEffects) ? storedEffects : [];
 
     const existingIndex = effects.findIndex(
@@ -73,6 +79,19 @@ export async function applyEnhanceAbility({ action, playerStats, campaignName, t
         effects.push(enhanceEffect);
     }
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+
+    // SP-039: register caster concentration and persist the summary
+    // (protectionFromEnergyHandler SP-093/CLA-170 pattern) so the badge
+    // survives reload and concentration breaks are tracked.
+    const combatSummary = getCombatSummary(campaignName);
+    if (combatSummary?.creatures) {
+        const spellSaveDc = playerStats.spellAbilities?.saveDc || 8 + playerStats.proficiency;
+        addConcentration(combatSummary, casterName, action.name, spellSaveDc, targetName);
+        storage.set('combatSummary', combatSummary, campaignName);
+        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+    } else {
+        console.error('[enhanceAbility] No combat summary — concentration not registered for', casterName);
+    }
 
     addEntry(campaignName, {
         type: 'ability_use',

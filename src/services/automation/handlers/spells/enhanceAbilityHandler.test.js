@@ -18,10 +18,25 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../../encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(() => ({ creatures: [{ name: 'TestCaster' }, { name: 'Wolf' }] })),
+}));
+
+vi.mock('../../../combat/concentration/concentrationService.js', () => ({
+  addConcentration: vi.fn(),
+}));
+
+vi.mock('../../../ui/storage.js', () => ({
+  default: { set: vi.fn(), get: vi.fn() },
+}));
+
 import { handle, applyEnhanceAbility, ENHANCE_ABILITY_ABILITIES } from './enhanceAbilityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
+import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { addEntry } from '../../../ui/logService.js';
+import storage from '../../../ui/storage.js';
 
 const campaignName = 'TestCampaign';
 
@@ -57,7 +72,9 @@ describe('enhanceAbilityHandler', () => {
   });
 
   describe('handle', () => {
-    it('returns target selection payload with all creatures', async () => {
+    // SP-039: 'enhance_ability_target_selection' had zero renderer consumers —
+    // the dead popup type is dropped; the lane reports via rendered automation_info.
+    it('returns rendered automation_info popup listing creatures (no dead popup type)', async () => {
       getCombatContext.mockResolvedValue({
         creatures: [
           { name: 'TestCaster' },
@@ -69,10 +86,9 @@ describe('enhanceAbilityHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('enhance_ability_target_selection');
-      expect(result.payload.creatureTargets).toEqual(['TestCaster', 'Goblin', 'Wolf']);
-      expect(result.payload.abilities).toEqual(ENHANCE_ABILITY_ABILITIES);
-      expect(result.payload.range).toBe('Touch');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('TestCaster');
+      expect(result.payload.description).toContain('Goblin');
     });
 
     it('returns popup when no combat context', async () => {
@@ -85,12 +101,12 @@ describe('enhanceAbilityHandler', () => {
       expect(result.payload.description).toContain('No combat context');
     });
 
-    it('uses automation range when provided', async () => {
+    it('passes automation metadata through on the info popup', async () => {
       getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestCaster' }] });
 
       const result = await handle(makeAction({ range: '30 feet' }), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.range).toBe('30 feet');
+      expect(result.payload.automation.range).toBe('30 feet');
     });
   });
 
@@ -213,17 +229,92 @@ describe('enhanceAbilityHandler', () => {
       getRuntimeValue.mockReturnValue([]);
 
       const result = await applyEnhanceAbility({
-    action: makeAction(),
-    playerStats: makePlayerStats(),
-    campaignName,
-    mapName: null,
-    targetNames: ['Wolf'],
-    ability: 'STR',
-});
+        action: makeAction(),
+        playerStats: makePlayerStats(),
+        campaignName,
+        mapName: null,
+        targetNames: ['Wolf'],
+        ability: 'STR',
+      });
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('Wolf');
+    });
+
+    // SP-039: concentration must be registered on the caster and the summary persisted
+    // (protectionFromEnergyHandler SP-093/CLA-170 pattern) — te alone never breaks cleanly.
+    it('registers caster concentration and persists the combat summary', async () => {
+      getRuntimeValue.mockReturnValue([]);
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+      await applyEnhanceAbility({
+        action: makeAction(),
+        playerStats: makePlayerStats({ spellAbilities: { saveDc: 17 } }),
+        campaignName,
+        mapName: null,
+        targetNames: ['Wolf'],
+        ability: 'CHA',
+      });
+
+      expect(getCombatSummary).toHaveBeenCalledWith(campaignName);
+      expect(addConcentration).toHaveBeenCalledWith(
+        expect.objectContaining({ creatures: expect.any(Array) }),
+        'TestCaster',
+        'Enhance Ability',
+        17,
+        'Wolf',
+      );
+      expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.objectContaining({ creatures: expect.any(Array) }), campaignName);
+      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
+      dispatchSpy.mockRestore();
+    });
+
+    it('logs exactly one ability_use entry on apply', async () => {
+      getRuntimeValue.mockReturnValue([]);
+
+      await applyEnhanceAbility({
+        action: makeAction(),
+        playerStats: makePlayerStats(),
+        campaignName,
+        mapName: null,
+        targetNames: ['Wolf'],
+        ability: 'DEX',
+      });
+
+      const abilityUseCalls = addEntry.mock.calls.filter(([, e]) => e.type === 'ability_use');
+      expect(abilityUseCalls).toHaveLength(1);
+      expect(abilityUseCalls[0][1].description).toContain('Dexterity');
+    });
+  });
+
+  // CLA-113 lesson: positional-vs-object call-shape pin for the object-destructure
+  // signature — a positional call silently yields undefined keys and returns null.
+  describe('call-shape contract (CLA-113 family)', () => {
+    it('a positional call shape returns null without stamping anything', async () => {
+      getRuntimeValue.mockReturnValue([]);
+
+      const result = await applyEnhanceAbility(makeAction(), makePlayerStats(), campaignName, null, ['Wolf'], 'CHA');
+
+      expect(result).toBeNull();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addConcentration).not.toHaveBeenCalled();
+    });
+
+    it('the object call shape with targetNames+ability stamps and logs', async () => {
+      getRuntimeValue.mockReturnValue([]);
+
+      const result = await applyEnhanceAbility({
+        action: makeAction(),
+        playerStats: makePlayerStats(),
+        campaignName,
+        targetNames: ['Wolf'],
+        ability: 'CHA',
+      });
+
+      expect(result).not.toBeNull();
+      expect(setRuntimeValue).toHaveBeenCalled();
+      expect(addConcentration).toHaveBeenCalled();
     });
   });
 });

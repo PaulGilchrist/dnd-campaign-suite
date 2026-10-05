@@ -2300,7 +2300,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-SP-039-enhance-ability-positional-signature.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Range: Touch",
       "expectedBehavior": "You touch a creature and choose Strength, Dexterity, Intelligence, Wisdom, or Charisma. For the duration, the target has Advantage on ability checks using the chosen ability."
