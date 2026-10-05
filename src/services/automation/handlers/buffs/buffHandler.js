@@ -12,6 +12,35 @@ import { cleanupWildShape } from '../class-druid/wildShapeCreatureBuilder.js';
 import { hasUnlimitedWildShape } from '../../../rules/features/archdruidWildShapeService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
+import { endDraconicFlightBuff } from '../../../rules/features/draconicFlightService.js';
+
+const FLY_SPEED_EFFECT = 'fly_speed_equals_walk_speed';
+
+// CLA-096: the generic temp_buff lane never registered an expiration clock,
+// so the 10-minute wings stood until a Long Rest. These helpers consume the
+// automation JSON truth generically: duration→rounds (playbook §37:
+// minutes×10, hours×600) and a long-rest-recharged used flag that survives
+// early expiry/retract so the once-per-LR gate holds even after the buff
+// is gone (the flag is re-armed via LONG_REST_RESOURCES).
+function isLongRestFlightBuff(auto) {
+    return auto?.effect === FLY_SPEED_EFFECT && auto?.recharge === 'long_rest';
+}
+
+function longRestBuffUsedKey(actionName) {
+    const words = String(actionName).trim().split(/\s+/);
+    const camel = words.map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)).join('');
+    return `${camel}Used`;
+}
+
+function buffDurationToRounds(duration) {
+    const match = String(duration || '').match(/^(\d+)_(rounds?|minutes?|hours?)$/i);
+    if (!match) return undefined;
+    const n = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    if (unit.startsWith('hour')) return n * 600;
+    if (unit.startsWith('minute')) return n * 10;
+    return n;
+}
 
 const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';
 const PSYCHIC_WHISPERS_FREE_KEY = 'psychicWhispersFreeUsed';
@@ -113,6 +142,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const usesKey = gate.usesKey ?? null;
     const usesRemaining = gate.usesRemaining ?? null;
 
+    const retractPopup = tryRetractLongRestFlightBuff({ action, auto, playerStats, targetName, campaignName });
+    if (retractPopup) return retractPopup;
+
     const { wasActive } = toggleBuff(
         playerStats.name,
         action.name,
@@ -127,6 +159,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await applyGenericBuffSideEffects({ action, auto, playerStats, targetName, campaignName, wasActive });
 
     return buildBuffTogglePopup({ action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation });
+}
+
+// CLA-096: a long-rest-recharge flight buff already standing = retract
+// ("until you retract the wings (no action required)") — same-shape OFF-leg
+// exemption as the Wild Shape CLA-391 precedent. The use is NOT refunded;
+// re-activation after retract/expire refuses until the Long Rest re-arm.
+function tryRetractLongRestFlightBuff({ action, auto, playerStats, targetName, campaignName }) {
+    if (!isLongRestFlightBuff(auto) || !isBuffActive(targetName, action.name, campaignName)) return null;
+    endDraconicFlightBuff(targetName, campaignName, 'retracted');
+    return buildBuffTogglePopup({ action, auto, playerStats, targetName, wasActive: true, usesKey: null, usesAfterActivation: null });
 }
 
 async function gateTrackedBuffUses(action, auto, playerStats, campaignName) {
@@ -163,8 +205,14 @@ function buildLongRestRechargePopup(action, auto, playerStats, campaignName) {
     if (!(auto?.recharge === 'long_rest' && !auto?.uses)) return null;
     const stored = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];
-    if (!activeBuffs.some(b => b.name === action.name)) return null;
-    return {
+    const buffActive = activeBuffs.some(b => b.name === action.name);
+    const used = getRuntimeValue(playerStats.name, longRestBuffUsedKey(action.name), campaignName) === true;
+    // CLA-096: a used flag outliving the buff keeps the once-per-LR gate
+    // honest after the rounds clock or a retract drops the buff. While the
+    // buff still stands the click is a retract (handled on the OFF leg).
+    if (isLongRestFlightBuff(auto) && buffActive && used) return null;
+    if (!buffActive && !used) return null;
+    const refusalPopup = {
         type: 'popup',
         payload: {
             type: 'automation_info',
@@ -173,6 +221,16 @@ function buildLongRestRechargePopup(action, auto, playerStats, campaignName) {
             automation: auto,
         },
     };
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: `${String(action.name).toLowerCase().replace(/\s+/g, '_')}_refused`,
+        automationDetail: 'long_rest',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} attempted ${action.name} but it has been used and cannot be used again until a Long Rest.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[buffHandler] Long rest refusal log error:', e); });
+    return refusalPopup;
 }
 
 async function applyGenericBuffSideEffects({ action, auto, playerStats, targetName, campaignName, wasActive }) {
@@ -194,6 +252,31 @@ async function applyGenericBuffSideEffects({ action, auto, playerStats, targetNa
             setTempHp(playerStats.name, amount, campaignName);
         }
     }
+
+    if (!wasActive && isLongRestFlightBuff(auto)) {
+        await applyLongRestFlightActivation(action, auto, playerStats, campaignName);
+    }
+}
+
+// CLA-096: activation stamps the long-rest use flag first (awaited, then
+// the clock — full-store snapshots supersede so no §39 un-awaited race),
+// registers the ONE rounds clock (duration ×10 rounds/minute; rounds advance
+// per combat round — the verified minute-buff model, cf. CLA-048 rounds:10
+// and confirmTelepathicSpeech rounds:minutes×10), and logs the activation
+// (project rule: every automation logs).
+async function applyLongRestFlightActivation(action, auto, playerStats, campaignName) {
+    const name = playerStats.name;
+    await setRuntimeValue(name, longRestBuffUsedKey(action.name), true, campaignName);
+    addExpiration({ attackerName: name, targetName: name, effects: [
+        { type: FLY_SPEED_EFFECT }
+    ], campaignName, rounds: buffDurationToRounds(auto.duration) });
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: name,
+        abilityName: action.name,
+        description: `${name} activated ${action.name}: spectral wings sprout (Fly Speed equals Speed, ${auto.duration}; once until a Long Rest).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[buffHandler] Draconic Flight activation log error:', e); });
 }
 
 function buildBuffTogglePopup({ action, auto, playerStats, targetName, wasActive, usesKey, usesAfterActivation }) {

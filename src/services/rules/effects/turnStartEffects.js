@@ -96,6 +96,23 @@ function endCloakOfShadowsIfIncapacitated(activeName, campaignName) {
     }).catch((e) => { console.error("[turnStartEffects:log-error]", e); });
 }
 
+// CLA-096: Draconic Flight wings end early if the holder has the
+// Incapacitated condition (Wrath of the Sea / Cloak of Shadows precedent).
+function endDraconicFlightIfIncapacitated(activeName, campaignName) {
+    const flightBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName);
+    if (!Array.isArray(flightBuffs) || !flightBuffs.some(b => b.effect === 'fly_speed_equals_walk_speed' && b.name === 'Draconic Flight')) return;
+    const conds = getRuntimeValue(activeName, 'activeConditions', campaignName);
+    if (!(Array.isArray(conds) && conds.some(c => String(c).toLowerCase() === 'incapacitated'))) return;
+    const filteredBuffs = flightBuffs.filter(b => !(b.effect === 'fly_speed_equals_walk_speed' && b.name === 'Draconic Flight'));
+    setRuntimeValue(activeName, 'activeBuffs', filteredBuffs, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: activeName,
+        abilityName: 'Draconic Flight',
+        description: `${activeName}'s spectral wings dissolve due to the Incapacitated condition.`,
+    }).catch((e) => { console.error("[turnStartEffects:draconic-flight-incapacitated-log-error]", e); });
+}
+
 // Turn start effect type → handler. Async handlers return a Promise and are
 // awaited by the dispatch loop; sync handlers return undefined and run
 // synchronously — matching the original per-branch await semantics exactly.
@@ -237,6 +254,7 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
 
     endWrathOfTheSeaIfIncapacitated(activeName, campaignName);
     endCloakOfShadowsIfIncapacitated(activeName, campaignName);
+    endDraconicFlightIfIncapacitated(activeName, campaignName);
 
     // Clean up Topple weapon mastery Prone condition at start of target's next turn
     cleanUpToppleConditions(activeName, campaignName);

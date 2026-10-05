@@ -32,6 +32,7 @@ import CreatureBadge from '../../common/CreatureBadge.jsx'
 import ConditionEffectBadges from '../../initiative/ConditionEffectBadges.jsx'
 import { isBuffActive } from '../../../services/automation/common/buffToggle.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc } from '../../../services/combat/auras/unbreakableMajesty.js';
+import { endDraconicFlightBuff } from '../../../services/rules/features/draconicFlightService.js';
 import { computeCharSummaryContext } from './charSummaryCalc.js';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -302,15 +303,18 @@ function CharacterSummaryText({ playerStats, levelSuffix, handleXpModalOpen }) {
     );
 }
 
-function ContextFeatureBadges({ ctx }) {
+function ContextFeatureBadges({ ctx, playerName, campaignName }) {
     const { flyBuffActive, flyBuffName, largeFormActive, huntersMarkActive, tremorsenseActive } = ctx;
+    // CLA-096: the spectral wings are retractable "no action required" — the
+    // badge carries the retract affordance (removable + onRemove, mirroring
+    // the verified .creature-badge-remove consumers).
     const badgeSpecs = [
-        { show: flyBuffActive, icon: 'fa-feather', label: `${flyBuffName} Active`, cls: 'effect-buff' },
+        { show: flyBuffActive, icon: 'fa-feather', label: `${flyBuffName} Active`, cls: 'effect-buff', removable: flyBuffName === 'Draconic Flight', onRemove: () => endDraconicFlightBuff(playerName, campaignName, 'retracted') },
         { show: largeFormActive, icon: 'fa-expand', label: 'Large Form', cls: 'effect-buff' },
         { show: huntersMarkActive, icon: 'fa-crosshairs', label: "Hunter's Mark Active", cls: 'effect-neutral' },
         { show: tremorsenseActive, icon: 'fa-ear', label: 'Tremorsense 60 ft.', cls: 'effect-buff' },
     ];
-    return badgeSpecs.map((badge) => badge.show && <CreatureBadge key={badge.icon} icon={badge.icon} label={badge.label} cls={badge.cls} />);
+    return badgeSpecs.map((badge) => badge.show && <CreatureBadge key={badge.icon} icon={badge.icon} label={badge.label} cls={badge.cls} removable={badge.removable} onRemove={badge.onRemove} />);
 }
 
 function ResistanceImmunityLines({ allResistances, allImmunities, auraResistances, auraResistanceSource }) {
@@ -435,7 +439,7 @@ function showFeatDetailPopup(feat, setPopupHtml) {
     setPopupHtml(html);
 }
 
-function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effectiveInitiative, hasInspiration, handleInitiative, handleToggleInspiration, handleAllyModalOpen, currentAllies, setPopupHtml }) {
+function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effectiveInitiative, hasInspiration, handleInitiative, handleToggleInspiration, handleAllyModalOpen, currentAllies, setPopupHtml, campaignName }) {
     return (
         <div>
             <b>Proficiency: </b>+{playerStats.proficiency}<br />
@@ -446,7 +450,7 @@ function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effective
             <span className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
                 <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
             </span>
-            <ContextFeatureBadges ctx={ctx} />
+            <ContextFeatureBadges ctx={ctx} playerName={playerStats.name} campaignName={campaignName} />
         </div>
     );
 }
@@ -642,6 +646,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <SummaryProficiencyColumn
                     playerStats={playerStats}
                     ctx={ctx}
+                    campaignName={campaignName}
                     exhaustionLevel={exhaustionLevel}
                     effectiveInitiative={effectiveInitiative}
                     hasInspiration={hasInspiration}

@@ -139,10 +139,22 @@ function handleFlySpeedEqualsWalkSpeed(_effect, targetName, _attackerName, campa
             timestamp: Date.now(),
         }).catch((e) => { console.error("[expirations] Error:", e); });
     }
+    const filtered = buffs.filter(b => b.effect !== 'fly_speed_equals_walk_speed');
+    if (filtered.length !== buffs.length && !conditionSet.has('incapacitated')) {
+        // CLA-096: the rounds-clock expiry previously cleared the buff in
+        // silence — log the duration end too (every automation logs).
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: targetName,
+            abilityName: 'Draconic Flight',
+            description: `${targetName}'s spectral wings dissolve — Draconic Flight's duration has expired.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[expirations] Error:", e); });
+    }
     setRuntimeValue(
         targetName,
         'activeBuffs',
-        buffs.filter(b => b.effect !== 'fly_speed_equals_walk_speed'),
+        filtered,
         campaignName
     );
 }

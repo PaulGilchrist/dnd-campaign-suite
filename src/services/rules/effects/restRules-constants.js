@@ -239,13 +239,18 @@ export const LONG_REST_RESOURCES = [
      // CLA-064: Countercharm recharge:"long_rest" (classes.json lv7) — numeric uses
      // pool on the bard; null re-arm (handler reads `stored ?? auto.uses`).
      'countercharmUses',
-     // CLA-065: Cosmic Omen armed-but-unspent ±1d6 pending bonus expires with the
-     // Star Map it came from ("until you finish your next Long Rest") — null clear.
-     // The live store lives under the global 'cosmicOmen' characterKey and is also
-     // cleared explicitly in resetStarMapOnLongRest; this registration sweeps any
-     // legacy per-character copies from before the key unification.
-     'cosmicOmenPendingBonus'
-  ]
+      // CLA-065: Cosmic Omen armed-but-unspent ±1d6 pending bonus expires with the
+      // Star Map it came from ("until you finish your next Long Rest") — null clear.
+      // The live store lives under the global 'cosmicOmen' characterKey and is also
+      // cleared explicitly in resetStarMapOnLongRest; this registration sweeps any
+      // legacy per-character copies from before the key unification.
+      'cosmicOmenPendingBonus',
+      // CLA-096: Draconic Flight once-per-Long-Rest use flag — null re-arm so
+      // the trait is available again after a Long Rest even when the 10-minute
+      // rounds clock or a retract already dropped the buff (CLA-130 rule: any
+      // latch must be in LONG_REST_RESOURCES or the use dies permanently).
+      'draconicFlightUsed'
+   ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]
