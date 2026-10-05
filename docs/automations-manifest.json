@@ -2241,7 +2241,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-118-elfish-lineage-speed-render-bypass.md",
+      "verified": "verified",
       "triggerConditions": "Passive; Choose one lineage option",
       "expectedBehavior": "You are part of a lineage that grants you supernatural abilities. Choose one option; Intelligence, Wisdom, or Charisma is your spellcasting ability for the chosen lineage spells. (Elf trait)"
     },

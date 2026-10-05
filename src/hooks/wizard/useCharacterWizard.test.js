@@ -260,6 +260,60 @@ describe('useCharacterWizard', () => {
       );
     });
 
+    it('CLA-118: stamps runtime elfish lineage keys in one merged write when Elf subrace changes', async () => {
+      const campaignName = 'test-campaign';
+      const existingCharacter = { name: 'ElfTest', race: { name: 'Elf', subrace: { name: 'Wood Elf' } } };
+      const characterData = { name: 'ElfTest', race: { name: 'Elf', subrace: { name: 'Drow' } } };
+
+      global.fetch.mockImplementation(async () => ({ ok: true, json: async () => ({}) }));
+
+      const { result } = renderHook(createWrapper(campaignName));
+      act(() => {
+        result.current.setCharacterCallbacks({ setCharacters: vi.fn(), setActiveCharacter: vi.fn() });
+      });
+      act(() => {
+        result.current.handleEditCharacter(existingCharacter);
+      });
+      await act(async () => {
+        await result.current.handleEditWizardComplete(characterData);
+      });
+
+      const lineagePost = global.fetch.mock.calls.find(
+        ([url, opts]) => opts?.method === 'POST' && url.includes('ElfTest') && String(opts.body).includes('_elfishLineageSelection')
+      );
+      expect(lineagePost).toBeDefined();
+      const posted = JSON.parse(lineagePost[1].body).value;
+      expect(posted._elfishLineageSelection).toBe('Drow');
+      expect(posted._elfishLineageAbility).toBe('Charisma');
+      expect(posted._elfishLineageCantrip).toBe('Dancing Lights');
+      expect(posted._elfishLineageLevel3).toBe('Faerie Fire');
+      expect(posted._elfishLineageLevel5).toBe('Darkness');
+    });
+
+    it('CLA-118: does not stamp runtime lineage when the subrace is unchanged', async () => {
+      const campaignName = 'test-campaign';
+      const existingCharacter = { name: 'ElfTest', race: { name: 'Elf', subrace: { name: 'Drow' } } };
+      const characterData = { name: 'ElfTest', race: { name: 'Elf', subrace: { name: 'Drow' } } };
+
+      global.fetch.mockImplementation(async () => ({ ok: true, json: async () => ({}) }));
+
+      const { result } = renderHook(createWrapper(campaignName));
+      act(() => {
+        result.current.setCharacterCallbacks({ setCharacters: vi.fn(), setActiveCharacter: vi.fn() });
+      });
+      act(() => {
+        result.current.handleEditCharacter(existingCharacter);
+      });
+      await act(async () => {
+        await result.current.handleEditWizardComplete(characterData);
+      });
+
+      const lineagePosts = global.fetch.mock.calls.filter(
+        ([, opts]) => opts?.method === 'POST' && String(opts?.body || '').includes('_elfishLineageSelection')
+      );
+      expect(lineagePosts).toHaveLength(0);
+    });
+
     it('handles rename: PUTs to new file with originalFileName, replaces by original name in list', async () => {
       const existingCharacters = [{ name: 'Old Name', class: 'Wizard' }];
       const setCharacters = vi.fn((fn) => {

@@ -81,6 +81,7 @@ vi.mock('../../combat/automation/automationService.js', () => ({
 
 vi.mock('../../automation/handlers/class-other/elfishLineageHandler.js', () => ({
   getElfisLineageSelection: vi.fn(() => null),
+  elfishLineageSpeedBonus: vi.fn(() => 0),
 }));
 
 vi.mock('../../character/featBuffService.js', () => ({
@@ -173,6 +174,7 @@ const setupDefaults = (overrides = {}) => {
   abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
   attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
   elfishLineageHandler.getElfisLineageSelection.mockReturnValue(overrides.lineage ?? null);
+  elfishLineageHandler.elfishLineageSpeedBonus.mockReturnValue(overrides.lineage === 'Wood Elf' ? 5 : 0);
 };
 
 const setup2024Defaults = (overrides = {}) => {
@@ -194,6 +196,7 @@ const setup2024Defaults = (overrides = {}) => {
   automationService.getEvasionEffects.mockReturnValue([]);
   automationService.getAllSaveProficiencies.mockReturnValue([]);
   elfishLineageHandler.getElfisLineageSelection.mockReturnValue(null);
+  elfishLineageHandler.elfishLineageSpeedBonus.mockReturnValue(0);
 };
 
 describe('rules.getPlayerStats - speed bonuses', () => {

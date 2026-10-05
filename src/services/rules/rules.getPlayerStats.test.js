@@ -194,6 +194,7 @@ vi.mock('../../combat/automation/automationService.js', () => ({
 
 vi.mock('../automation/handlers/class-other/elfishLineageHandler.js', () => ({
   getElfisLineageSelection: vi.fn(() => null),
+  elfishLineageSpeedBonus: vi.fn(() => 0),
   handle: vi.fn(),
 }))
 

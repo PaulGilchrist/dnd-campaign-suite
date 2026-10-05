@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeObject, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const LINEAGE_KEY = '_elfishLineageSelection';
 const LINEAGE_CANTRIP_KEY = '_elfishLineageCantrip';
@@ -13,16 +13,64 @@ const ELVEN_LINEAGES = [
     { name: 'Wood Elf', description: 'Speed 35 ft. + Druidcraft cantrip. Level 3: Longstrider. Level 5: Pass Without Trace.', spellcastingAbility: 'Wisdom', icon: 'fa-tree', cantrip: 'Druidcraft', level3Spell: 'Longstrider', level5Spell: 'Pass Without Trace' },
 ];
 
+// CLA-118: race.subrace is the wizard-persisted authoritative channel; the
+// runtime _elfishLineageSelection keys go stale when the wizard edits the
+// subrace, so they are only a fallback for legacy sheet-chooser selections.
+export function resolveElfishLineage(playerStats, campaignName) {
+    return playerStats.race?.lineage
+        || playerStats.race?.subrace?.name
+        || getRuntimeValue(playerStats.name, LINEAGE_KEY, campaignName);
+}
+
+// Wood Elf ladder grant (races.json speedBonus). 0 when the character lacks
+// the elfish_lineage trait, the lineage isn't Wood Elf, or the 5e subrace
+// JSON already carries the absolute speed.
+export function elfishLineageSpeedBonus(playerStats, campaignName) {
+    const autoRows = [
+        ...(playerStats.automation?.specialActions || []),
+        ...(playerStats.automation?.passives || []),
+    ];
+    if (!autoRows.some(f => f.type === 'elfish_lineage')) return 0;
+    if (resolveElfishLineage(playerStats, campaignName) !== 'Wood Elf') return 0;
+    if (playerStats.race?.subrace?.speed != null) return 0;
+    const option = autoRows.flatMap(f => f.options || []).find(o => o.name === 'Wood Elf');
+    if (!option || option.speedBonus == null) {
+        console.error('[elfishLineageHandler] Wood Elf lineage selected but races.json option has no speedBonus:', playerStats.name);
+        return 0;
+    }
+    return option.speedBonus;
+}
+
+// CLA-118: stamp the runtime lineage keys in ONE merged write when the wizard
+// changes an Elf's subrace, so runtime consumers never serve stale grants.
+export function stampElfishLineageRuntime(characterName, subraceName, campaignName) {
+    const lineageData = ELVEN_LINEAGES.find(l => l.name === subraceName);
+    if (!lineageData) {
+        console.error('[elfishLineageHandler] cannot stamp runtime lineage — unknown elven subrace:', subraceName);
+        return;
+    }
+    setRuntimeObject(characterName, {
+        [LINEAGE_KEY]: lineageData.name,
+        [LINEAGE_ABILITY_KEY]: lineageData.spellcastingAbility,
+        [LINEAGE_CANTRIP_KEY]: lineageData.cantrip,
+        [LINEAGE_LEVEL3_KEY]: lineageData.level3Spell,
+        [LINEAGE_LEVEL5_KEY]: lineageData.level5Spell,
+        ...(lineageData.wizardCantripSwap ? { [LINEAGE_WIZARD_CANTRIP_KEY]: 'Prestidigitation' } : {}),
+    }, campaignName);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     // Check if lineage is already selected
     const storedLineage = getRuntimeValue(playerStats.name, LINEAGE_KEY, campaignName);
     if (storedLineage) {
+        // CLA-118: report the subrace-authoritative lineage, never a stale runtime value.
+        const resolvedLineage = resolveElfishLineage(playerStats, campaignName);
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `Elfish Lineage: ${storedLineage} (already selected).`,
+                description: `Elfish Lineage: ${resolvedLineage} (already selected).`,
                 automation: action.automation,
             },
         };

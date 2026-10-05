@@ -1,15 +1,20 @@
-import { getElfisLineageSelection } from '../../automation/handlers/class-other/elfishLineageHandler.js';
+import { elfishLineageSpeedBonus } from '../../automation/handlers/class-other/elfishLineageHandler.js';
 
 /**
- * Apply Elfish Lineage Wood Elf speed bonus.
- * Adds 5 ft. to base speed when Wood Elf lineage is selected.
+ * Apply Elfish Lineage Wood Elf speed bonus (CLA-118).
+ * The bonus is read from the races.json ladder (speedBonus); the grant seeds
+ * from playerStats.speed and falls back to the race JSON base so a Wood Elf
+ * whose loaded summary carries no speed still receives the ladder bump.
  */
 export function applyElfisLineageSpeed(playerStats, playerSummary) {
-    const lineage = getElfisLineageSelection(playerStats, playerSummary?.campaignName);
-    if (lineage === 'Wood Elf' && playerStats.speed != null) {
-        return playerStats.speed + 5;
+    const bonus = elfishLineageSpeedBonus(playerStats, playerSummary?.campaignName);
+    if (!bonus) return playerStats.speed;
+    const base = playerStats.speed ?? playerStats.race?.speed;
+    if (base == null) {
+        console.error('[speedUtils] Wood Elf lineage speed grant but no race speed to apply it to:', playerStats.name);
+        return playerStats.speed;
     }
-    return playerStats.speed;
+    return base + bonus;
 }
 
 /**

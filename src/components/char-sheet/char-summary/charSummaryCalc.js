@@ -5,6 +5,7 @@ import { getResistanceDamageType } from '../../../services/automation/handlers/b
 import { getStoneSkinDamageTypes } from '../../../services/automation/handlers/buffs/stoneSkinHandler.js'
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js'
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import { elfishLineageSpeedBonus } from '../../../services/automation/handlers/class-other/elfishLineageHandler.js'
 
 const NON_GENERIC_FLY_EFFECTS = ['fly_speed_20_hover', 'telekinetic_leap', 'avenging_angel_flight', 'dragon_wings']
 
@@ -42,8 +43,16 @@ function computeCircleFormsACOverride(playerStats, activeBuffs) {
     return 13 + (wis?.bonus ?? 0)
 }
 
-function getBaseSpeed(playerStats) {
-    return playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed
+// CLA-118: race JSON alone misses the 2024 Elfish Lineage ladder grant (the
+// Wood Elf option carries speedBonus 5, not an absolute subrace speed), so
+// the sheet lane adds the same grant rules.js applies to playerStats.speed.
+function getBaseSpeed(playerStats, campaignName) {
+    const raceSpeed = playerStats.race?.subrace?.speed ?? playerStats.race?.speed
+    if (raceSpeed == null) {
+        console.error('[charSummaryCalc] no race speed on playerStats.race for', playerStats.name)
+        return 0
+    }
+    return raceSpeed + elfishLineageSpeedBonus(playerStats, campaignName)
 }
 
 // Check if character is wearing armor or wielding a shield (for Unarmored Movement)
@@ -367,7 +376,7 @@ export function computeCharSummaryContext({ playerStats, campaignName, character
     const circleFormsACOverride = computeCircleFormsACOverride(playerStats, activeBuffs)
 
     const hasArmorOrShield = computeHasArmorOrShield(playerStats)
-    let speed = applyClassSpeedBonuses(playerStats, getBaseSpeed(playerStats), hasArmorOrShield)
+    let speed = applyClassSpeedBonuses(playerStats, getBaseSpeed(playerStats, campaignName), hasArmorOrShield)
     let buffSpeedBonus = computePassiveSpeedBonus(playerStats, hasArmorOrShield)
 
     speed = applySpeedConditions(speed, conditionEffects, exhaustionLevel)

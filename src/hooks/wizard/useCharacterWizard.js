@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import * as campaignService from '../../services/campaign/campaignService.js';
+import { stampElfishLineageRuntime } from '../../services/automation/handlers/class-other/elfishLineageHandler.js';
 
 export function useCharacterWizard(campaignName) {
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);
@@ -54,6 +55,13 @@ export function useCharacterWizard(campaignName) {
       const originalFileName = `${originalCharacter.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       const fileName = `${characterData.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       await campaignService.updateCharacter(campaignName, fileName, characterData, originalFileName);
+      // CLA-118: the wizard persists race.subrace only — stamp the runtime
+      // lineage keys in one merged write so nothing keeps granting the old lineage.
+      const originalSubraceName = originalCharacter?.race?.subrace?.name;
+      const newSubraceName = characterData.race?.subrace?.name;
+      if (characterData.race?.name === 'Elf' && newSubraceName && newSubraceName !== originalSubraceName) {
+        stampElfishLineageRuntime(characterData.name, newSubraceName, campaignName);
+      }
       callbacksRef.current.setActiveCharacter(cloneDeep(characterData));
       setShowEditCharacterWizard(false);
       const { setCharacters } = callbacksRef.current;

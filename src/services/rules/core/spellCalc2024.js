@@ -163,7 +163,9 @@ function resolveLineageName(playerSummary) {
 
 // elfish_lineage / gnomish_lineage / fiendish_legacy: add the lineage's cantrip and
 // level-spell grants and track them on the known counters.
-function applyLineageFeatureSpells(spellAbilities, feature, playerSummary) {
+// CLA-118: the ladder spells (levelNSpell keys, races.json:386+) unlock at the
+// character level encoded in the key — never grant them below that gate.
+function applyLineageFeatureSpells(spellAbilities, feature, playerStats, playerSummary) {
     const lineageName = resolveLineageName(playerSummary);
     if (!lineageName) return;
     const lineageData = feature.options?.find(o => o.name === lineageName);
@@ -183,18 +185,18 @@ function applyLineageFeatureSpells(spellAbilities, feature, playerSummary) {
         cantripCount++;
         addAlwaysPrepared(spellAbilities, cantripName);
     }
-    // Add level 3 spell
-    const level3Spell = lineageData.level3Spell;
-    if (level3Spell) {
+    // Add level-gated ladder spells (level3Spell at lv3, level5Spell at lv5)
+    Object.entries(lineageData).forEach(([key, spellName]) => {
+        const gate = key.match(/^level(\d+)Spell$/);
+        if (!gate || !spellName) return;
+        if (playerStats.level == null) {
+            console.error('[spellCalc2024] applyLineageFeatureSpells: character level missing, skipping ladder spell', spellName);
+            return;
+        }
+        if (playerStats.level < Number(gate[1])) return;
         levelSpellCount++;
-        addAlwaysPrepared(spellAbilities, level3Spell);
-    }
-    // Add level 5 spell
-    const level5Spell = lineageData.level5Spell;
-    if (level5Spell) {
-        levelSpellCount++;
-        addAlwaysPrepared(spellAbilities, level5Spell);
-    }
+        addAlwaysPrepared(spellAbilities, spellName);
+    });
 
     spellAbilities.cantrips_known += cantripCount;
     spellAbilities.spells_known += levelSpellCount;
@@ -294,7 +296,7 @@ function applyAutomationFeature(spellAbilities, feature, playerStats, playerSumm
         }
     }
     if (LINEAGE_FEATURE_TYPES.has(feature.type)) {
-        applyLineageFeatureSpells(spellAbilities, feature, playerSummary);
+        applyLineageFeatureSpells(spellAbilities, feature, playerStats, playerSummary);
     }
     if (feature.type === 'passive_rule' && feature.effect === 'always_prepared_spells' && feature.spells) {
         applyAlwaysPreparedGrantSpells(spellAbilities, feature, playerStats);

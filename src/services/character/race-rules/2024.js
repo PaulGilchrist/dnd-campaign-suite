@@ -5,6 +5,7 @@ import utils from '../../ui/utils.js';
 import { computePassiveSkills } from '../../shared/computePassiveSkills.js';
 import { deduplicateAndSort } from '../../shared/deduplicateAndSort.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { resolveElfishLineage } from '../../automation/handlers/class-other/elfishLineageHandler.js';
 
 const featureCategories = getCategories('2024');
 
@@ -164,7 +165,7 @@ const raceRules = {
           }
 
            // Elfish Lineage: Drow lineage overrides Darkvision to 120 ft.
-           if (resolveElfishLineage(playerStats) === 'Drow') {
+           if (resolveElfishLineage(playerStats, playerStats.campaignName) === 'Drow') {
                applyDarkvisionMinimum(passiveSenses, 120);
            }
 
@@ -183,7 +184,7 @@ const raceRules = {
             // Handle lineage-specific traits
         const resolvedLineage = playerStats.race?.lineage
             || getRuntimeValue(playerStats.name, '_gnomishLineageSelection', playerStats.campaignName)
-            || getRuntimeValue(playerStats.name, '_elfishLineageSelection', playerStats.campaignName);
+            || resolveElfishLineage(playerStats, playerStats.campaignName);
         if (resolvedLineage && playerStats.race.traits) {
             const lineageTraits = [];
             playerStats.race.traits.forEach(trait => {
@@ -221,11 +222,7 @@ function extractDarkvisionFeet(value) {
     return match ? parseInt(match[1], 10) : 0;
 }
 
-function resolveElfishLineage(playerStats) {
-    return playerStats.race?.lineage
-        || getRuntimeValue(playerStats.name, '_elfishLineageSelection', playerStats.campaignName)
-        || playerStats.race?.subrace?.name;
-}
+
 
 function resolveGnomishLineage(playerStats) {
     return playerStats.race?.lineage

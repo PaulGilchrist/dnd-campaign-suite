@@ -10,6 +10,9 @@ import {
     confirmElfisLineage,
     changeElfisLineageCantrip,
     restoreUses,
+    resolveElfishLineage,
+    elfishLineageSpeedBonus,
+    stampElfishLineageRuntime,
     getElfisLineageSelection,
     getElfisLineageAbility,
     getElfisLineageCantrip,
@@ -20,10 +23,11 @@ import {
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
+    setRuntimeObject: vi.fn(),
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import(
+const { getRuntimeValue, setRuntimeObject, setRuntimeValue } = await import(
     '../../../../hooks/runtime/useRuntimeState.js'
 );
 
@@ -232,6 +236,112 @@ describe('elfishLineageHandler', () => {
             const result = getElfisLineageWizardCantrip(makePlayerStats(), 'test-campaign');
             expect(result).toBe('Prestidigitation');
             expect(getRuntimeValue).toHaveBeenCalledWith('TestHero', '_elfishLineageWizardCantrip', 'test-campaign');
+        });
+    });
+
+    // CLA-118: race.subrace is authoritative when the runtime key is stale/absent
+    describe('resolveElfishLineage (CLA-118 precedence)', () => {
+        it('prefers race.subrace over a stale runtime selection', () => {
+            getRuntimeValue.mockReturnValue('Wood Elf');
+            const stats = makePlayerStats({ race: { name: 'Elf', subrace: { name: 'Drow' } } });
+            expect(resolveElfishLineage(stats, 'test-campaign')).toBe('Drow');
+        });
+
+        it('falls back to the runtime selection when no subrace is persisted', () => {
+            getRuntimeValue.mockReturnValue('Wood Elf');
+            expect(resolveElfishLineage(makePlayerStats({ race: { name: 'Elf' } }), 'test-campaign')).toBe('Wood Elf');
+        });
+
+        it('prefers race.lineage over subrace and runtime', () => {
+            getRuntimeValue.mockReturnValue('Wood Elf');
+            const stats = makePlayerStats({ race: { name: 'Elf', lineage: 'High Elf', subrace: { name: 'Drow' } } });
+            expect(resolveElfishLineage(stats, 'test-campaign')).toBe('High Elf');
+        });
+    });
+
+    describe('elfishLineageSpeedBonus (CLA-118)', () => {
+        const woodElfAuto = {
+            specialActions: [{
+                type: 'elfish_lineage',
+                options: [{ name: 'Wood Elf', spellcastingAbility: 'Wisdom', cantrip: 'Druidcraft', level3Spell: 'Longstrider', level5Spell: 'Pass Without Trace', speedBonus: 5 }],
+            }],
+        };
+
+        it('returns 5 for a 2024 Wood Elf resolved via subrace with no runtime key', () => {
+            getRuntimeValue.mockReturnValue(null);
+            const stats = makePlayerStats({ race: { name: 'Elf', speed: 30, subrace: { name: 'Wood Elf' } }, automation: woodElfAuto });
+            expect(elfishLineageSpeedBonus(stats, 'test-campaign')).toBe(5);
+        });
+
+        it('returns 0 when the resolved lineage is not Wood Elf', () => {
+            getRuntimeValue.mockReturnValue(null);
+            const stats = makePlayerStats({ race: { name: 'Elf', speed: 30, subrace: { name: 'Drow' } }, automation: woodElfAuto });
+            expect(elfishLineageSpeedBonus(stats, 'test-campaign')).toBe(0);
+        });
+
+        it('returns 0 when the character lacks the elfish_lineage trait', () => {
+            getRuntimeValue.mockReturnValue(null);
+            const stats = makePlayerStats({ race: { name: 'Elf', speed: 30, subrace: { name: 'Wood Elf' } }, automation: {} });
+            expect(elfishLineageSpeedBonus(stats, 'test-campaign')).toBe(0);
+        });
+
+        it('returns 0 when the 5e subrace JSON already carries the absolute speed', () => {
+            getRuntimeValue.mockReturnValue(null);
+            const stats = makePlayerStats({ race: { name: 'Elf', speed: 30, subrace: { name: 'Wood Elf', speed: 35 } }, automation: woodElfAuto });
+            expect(elfishLineageSpeedBonus(stats, 'test-campaign')).toBe(0);
+        });
+
+        it('logs an error and returns 0 when the Wood Elf option lacks speedBonus', () => {
+            const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            getRuntimeValue.mockReturnValue(null);
+            const stats = makePlayerStats({
+                race: { name: 'Elf', speed: 30, subrace: { name: 'Wood Elf' } },
+                automation: { specialActions: [{ type: 'elfish_lineage', options: [{ name: 'Wood Elf', cantrip: 'Druidcraft' }] }] },
+            });
+            expect(elfishLineageSpeedBonus(stats, 'test-campaign')).toBe(0);
+            expect(spy).toHaveBeenCalled();
+            spy.mockRestore();
+        });
+    });
+
+    describe('stampElfishLineageRuntime (CLA-118 wizard seam)', () => {
+        it('writes all runtime lineage keys in one merged write', () => {
+            stampElfishLineageRuntime('ElfTest', 'Drow', 'test-campaign');
+            expect(setRuntimeObject).toHaveBeenCalledTimes(1);
+            const [name, patch, campaign] = setRuntimeObject.mock.calls[0];
+            expect(name).toBe('ElfTest');
+            expect(campaign).toBe('test-campaign');
+            expect(patch).toEqual({
+                _elfishLineageSelection: 'Drow',
+                _elfishLineageAbility: 'Charisma',
+                _elfishLineageCantrip: 'Dancing Lights',
+                _elfishLineageLevel3: 'Faerie Fire',
+                _elfishLineageLevel5: 'Darkness',
+            });
+        });
+
+        it('includes the wizard cantrip swap for High Elf', () => {
+            stampElfishLineageRuntime('ElfTest', 'High Elf', 'test-campaign');
+            expect(setRuntimeObject.mock.calls[0][1]._elfishLineageWizardCantrip).toBe('Prestidigitation');
+        });
+
+        it('logs an error and writes nothing for an unknown subrace', () => {
+            const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            stampElfishLineageRuntime('ElfTest', 'Moon Elf', 'test-campaign');
+            expect(setRuntimeObject).not.toHaveBeenCalled();
+            expect(spy).toHaveBeenCalled();
+            spy.mockRestore();
+        });
+    });
+
+    describe('handle popup precedence (CLA-118)', () => {
+        it('reports the subrace-authoritative lineage, not the stale runtime value', async () => {
+            getRuntimeValue.mockReturnValue('Wood Elf');
+            const stats = makePlayerStats({ race: { name: 'Elf', subrace: { name: 'Drow' } } });
+            const result = await handle({ name: 'Elfish Lineage', automation: { type: 'elfish_lineage' } }, stats, 'test-campaign', null);
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Drow');
+            expect(result.payload.description).not.toContain('Wood Elf');
         });
     });
 });
