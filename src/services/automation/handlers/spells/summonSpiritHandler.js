@@ -355,9 +355,16 @@ function applySummonDuration({ noConcentration, createThrall, casterName, action
         addExpiration({ attackerName: casterName, targetName: casterName, effects, campaignName, rounds: summonDurationRounds(action.spell?.duration || auto.duration) });
         return;
     }
-    if (createThrall) {
-        addExpiration({ attackerName: casterName, targetName: casterName, effects, campaignName, rounds: 10 });
-    }
+    // CLA-138: any no-Concentration summon carries a hard expiry clock — the
+    // no-Concentration option shortens duration to 1 minute, and an unclocked
+    // summon never despawns (§38: ONE addExpiration).
+    addExpiration({
+        attackerName: casterName,
+        targetName: casterName,
+        effects,
+        campaignName,
+        rounds: createThrall ? 10 : (summonDurationRounds(action.spell?.duration) || 10),
+    });
 }
 
 // CLA-066: modification spend log — the no-Concentration/1-minute + temp HP
@@ -372,6 +379,17 @@ async function logCreateThrallApplied({ createThrall, campaignName, casterName, 
         description: `Create Thrall: ${creatureName} is summoned without Concentration (duration 1 minute) with ${thrallTempHp} Temporary Hit Points (Warlock level + Charisma modifier).`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[summonSpiritHandler:thrall-log-error]", e); });
+}
+
+// CLA-138: a no-Concentration feature free cast logs its payment truth and
+// 1-minute duration (runtime + log parity). Unstamped lanes stay byte-identical.
+function buildSummonCastLabel({ casterName, action, variant, creature, isPhantasmalFreeCast, featureNoConcentration, slotLevel }) {
+    if (isPhantasmalFreeCast) {
+        return `${casterName} casts ${action.name} — Phantasmal Creatures free cast (spectral, half HP), summoning ${variant.name} (${creature.maxHp}/${creature.maxHp} HP).`;
+    }
+    const payLabel = featureNoConcentration ? 'free cast — no spell slot consumed' : `slot level ${slotLevel}`;
+    const noConcLabel = featureNoConcentration ? ' — does not require Concentration (duration 1 minute)' : '';
+    return `${casterName} casts ${action.name} (${payLabel}), summoning ${variant.name} (${creature.maxHp}/${creature.maxHp} HP)${noConcLabel}.`;
 }
 
 async function performSummon(action, playerStats, campaignName, variant) {
@@ -398,8 +416,11 @@ async function performSummon(action, playerStats, campaignName, variant) {
     // only stamped by feature flows that explicitly drop it — phantasmal/free-cast
     // options). A caster holding the Create Thrall feature gets its verified
     // no-Concentration/1-minute thrall modification; everyone else concentrates.
+    // CLA-138: Fey Reinforcements' arm-time "Skip Concentration" choice rides the
+    // modified spell stamp (_noConcentrationChoice) from prepareSpellCast.
     const createThrall = hasCreateThrallFor(playerStats, action.name);
-    const noConcentration = !!auto.noConcentration || createThrall;
+    const featureNoConcentration = action.spell?._noConcentrationChoice === true;
+    const noConcentration = !!auto.noConcentration || createThrall || featureNoConcentration;
     const initiativeValue = getCasterInitiativeValue(combatSummary, casterName);
 
     const { isPhantasmalFreeCast, halveHp } = resolveSummonFlags(playerStats, action);
@@ -431,9 +452,7 @@ async function performSummon(action, playerStats, campaignName, variant) {
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
     const summonLabel = auto.typeLabel || variant.name;
-    const castLabel = isPhantasmalFreeCast
-        ? `${casterName} casts ${action.name} — Phantasmal Creatures free cast (spectral, half HP), summoning ${variant.name} (${creature.maxHp}/${creature.maxHp} HP).`
-        : `${casterName} casts ${action.name} (slot level ${slotLevel}), summoning ${variant.name} (${creature.maxHp}/${creature.maxHp} HP).`;
+    const castLabel = buildSummonCastLabel({ casterName, action, variant, creature, isPhantasmalFreeCast, featureNoConcentration, slotLevel });
 
     await addEntry(campaignName, {
         type: 'summons',

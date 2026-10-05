@@ -186,8 +186,11 @@ export const LONG_REST_RESOURCES = [
   'mysticArcanumLevel7',
   'mysticArcanumLevel8',
   'mysticArcanumLevel9',
-  '_Phantasmal_Creatures_freeCastCount',
-   '_Fey_Reinforcements_freeCastCount',
+   '_Phantasmal_Creatures_freeCastCount',
+    '_Fey_Reinforcements_freeCastCount',
+    // CLA-138: the arm-time "Skip Concentration" choice is consumed with the free
+    // cast; a spent latch and an untouched choice both null re-arm at LR.
+    '_Fey_Reinforcements_noConcentration',
      '_Misty_Wanderer_freeCastCount',
      "_Paladin's_Smite_freeCastCount",
     // CLA-130: Faithful Steed (2024 Paladin lv5, classes.json free_spell

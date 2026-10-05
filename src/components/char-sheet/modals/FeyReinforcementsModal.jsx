@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { confirmFeyReinforcement } from '../../../services/automation/handlers/class-warlock/feyReinforcementsHandler.js';
 import '../CharSheet.css';
+import './FeyReinforcementsModal.css';
 
 function FeyReinforcementsModal({ action, playerStats, campaignName, onClose }) {
     const [noConcentration, setNoConcentration] = useState(false);
@@ -38,8 +39,8 @@ function FeyReinforcementsModal({ action, playerStats, campaignName, onClose }) 
                 </div>
                 <div className="sp-body">
                     <p>Cast <strong>Summon Fey</strong> without material components or spell slot. This use does not consume a spell slot.</p>
-                    <div style={{ marginTop: '12px' }}>
-                        <label style={{ display: 'block', marginBottom: '8px', cursor: 'pointer' }}>
+                    <div className="fey-reinforcements-modal-options">
+                        <label>
                             <input
                                 type="checkbox"
                                 checked={noConcentration}
@@ -47,7 +48,7 @@ function FeyReinforcementsModal({ action, playerStats, campaignName, onClose }) 
                             />
                             {' '}Skip Concentration (duration becomes 1 minute)
                         </label>
-                        <p style={{ marginTop: '8px', opacity: 0.8, fontSize: '0.9em' }}>
+                        <p className="fey-reinforcements-modal-note">
                             {noConcentration
                                 ? 'The fey reinforcements will not require Concentration and will last 1 minute.'
                                 : 'The fey reinforcements will require Concentration and last up to 1 hour (normal Summon Fey duration).'}

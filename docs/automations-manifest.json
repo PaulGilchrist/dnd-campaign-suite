@@ -2638,7 +2638,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-138-fey-reinforcements-dead-free-cast.md",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "Action: passive; Action: action; Duration: Concentration, up to 1 hour",
       "expectedBehavior": "Cast Summon Fey without Material component. Cast it once without spell slot, regain on Long Rest. Can modify it to not require Concentration (duration becomes 1 minute)."

@@ -1,0 +1,15 @@
+.fey-reinforcements-modal-options {
+    margin-top: 12px;
+}
+
+.fey-reinforcements-modal-options label {
+    display: block;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.fey-reinforcements-modal-note {
+    margin-top: 8px;
+    opacity: 0.8;
+    font-size: 0.9em;
+}

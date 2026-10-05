@@ -20,6 +20,46 @@ function featureFreeCastKey(entry) {
   return `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
 }
 
+// CLA-138: Fey Reinforcements (2024 Ranger/Fey Wanderer lv11) arm modal writes the
+// "Skip Concentration" checkbox to runtime (`_<Feature>_noConcentration`) — until the
+// fix it was popup-only payload and the caster was always stamped concentrating.
+// A free cast of the entry's spell with the choice armed drops Concentration and
+// shortens duration to 1 minute; the choice is consumed with the free cast and
+// null re-armed by Long Rest (restRules-constants).
+const NO_CONCENTRATION_CHOICE_TYPES = ['fey_reinforcements'];
+
+function featureNoConcentrationKey(entry) {
+  return `_${entry.name.replace(/\s+/g, '_')}_noConcentration`;
+}
+
+function noConcentrationChoicePending(playerStats, spellName, playerName, campaignName) {
+  return collectAutomationActions(playerStats).some(entry =>
+    NO_CONCENTRATION_CHOICE_TYPES.includes(entry.type) &&
+    entrySpells(entry).includes(spellName) &&
+    getRuntimeValue(playerName, featureNoConcentrationKey(entry), campaignName) === true);
+}
+
+function consumeNoConcentrationChoices(allActions, playerName, spellName, campaignName) {
+  for (const entry of allActions) {
+    if (!NO_CONCENTRATION_CHOICE_TYPES.includes(entry.type)) continue;
+    if (!entrySpells(entry).includes(spellName)) continue;
+    const choice = getRuntimeValue(playerName, featureNoConcentrationKey(entry), campaignName);
+    // Free-cast consumption log (convention): the latch was just decremented by
+    // consumeActionFreeCastCounters — report what remains until the next Long Rest.
+    const remaining = Number(getRuntimeValue(playerName, featureFreeCastKey(entry), campaignName) ?? 0);
+    const note = `${entry.name} free cast of ${spellName} — no spell slot consumed. ${remaining} free cast${remaining === 1 ? '' : 's'} remaining until your next Long Rest.`;
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: playerName,
+      abilityName: entry.name,
+      spellName: spellName,
+      note: choice === true ? `${note} Concentration skipped — duration 1 minute.` : note,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+    if (choice != null) setRuntimeValue(playerName, featureNoConcentrationKey(entry), null, campaignName);
+  }
+}
+
 function parseFeatureSpellLevel(entry) {
   const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
   const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
@@ -421,6 +461,10 @@ function consumeSpecialFreeCastFlags(allActions, playerName, spellName, spellLev
   }
 
   consumeWildCompanionGrant(allActions, playerName, spellName, campaignName);
+
+  // CLA-138: consume the arm-time no-Concentration choice with its free cast
+  // (this lane runs only when the free cast actually consumed).
+  consumeNoConcentrationChoices(allActions, playerName, spellName, campaignName);
 
   const sigSpells = getRuntimeValue(playerName, 'SignatureSpells_selection', campaignName);
   if (Array.isArray(sigSpells) && sigSpells.includes(spellName) && spellLevel === 3) {
@@ -832,8 +876,12 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   // Concentration management
   const isWgbSpell = isWarGodsBlessingSpell(playerName, spell.name);
 
+  // CLA-138: arm-time "Skip Concentration" choice on a free-cast feature
+  // (Fey Reinforcements → Summon Fey) — honored only on the free cast itself.
+  const featureDropsConcentration = freeCastAuthorized === true && noConcentrationChoicePending(playerStats, spell.name, playerName, campaignName);
+
   const concentration = resolveConcentrationChange(spell, playerName, playerStats, campaignName, isWgbSpell);
-  const shouldSetConcentration = concentration.shouldSetConcentration;
+  const shouldSetConcentration = concentration.shouldSetConcentration && !featureDropsConcentration;
   const oldConcentrationSpell = concentration.oldConcentrationSpell;
   const isEyebiteRecast = concentration.isEyebiteRecast;
 
@@ -856,6 +904,15 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   const modifiedSpell = effectiveSpellLevel !== spell.level
     ? { ...spell, level: effectiveSpellLevel, baseLevel: spell.level }
     : { ...spell };
+
+  // CLA-138: the free cast carries the arm-time no-Concentration option onward —
+  // the summon lane (summonSpiritHandler) reads the stamp and skips the caster
+  // concentration + 1-hour clock in favor of a 1-minute expiry.
+  if (featureDropsConcentration) {
+    modifiedSpell.concentration = false;
+    modifiedSpell.duration = '1 minute';
+    modifiedSpell._noConcentrationChoice = true;
+  }
 
   stampModifiedSpell({ modifiedSpell, spell, playerStats, usePsychicDamage, freeCastAuthorized, playerName, campaignName });
 
