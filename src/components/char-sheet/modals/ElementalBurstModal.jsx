@@ -15,7 +15,7 @@ function resolveMartialArtsDie(playerStats) {
     return classLevel?.martial_arts_die || 4;
 }
 
-function ElementalBurstModal({ action, playerStats, campaignName, onClose }) {
+function ElementalBurstModal({ action, playerStats, campaignName, characters = null, onClose }) {
     const [phase, setPhase] = useState('element');
     const [aoePayload, setAoePayload] = useState(null);
 
@@ -101,6 +101,7 @@ function ElementalBurstModal({ action, playerStats, campaignName, onClose }) {
         return (
             <SaveAttackAoeModal
                 {...aoePayload}
+                characters={characters}
                 onClose={handleAoeClose}
             />
         );

@@ -2653,6 +2653,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         <SaveAttackAoeModal
           action={conePicker.action}
           playerStats={{ name: monsterName }}
+          characters={characters}
           campaignName={campaignName}
           range={conePicker.coneFt}
           damage={conePicker.saveDamageFormula}

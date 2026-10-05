@@ -83,12 +83,14 @@ function SpellEffectModals({ mergedModalState, setModalState, setPopupHtml, char
             {mergedModalState.saveAttackAoeModal && (
                 <SaveAttackAoeModal
                     {...mergedModalState.saveAttackAoeModal}
+                    characters={characters}
                     onClose={() => setModalState({ saveAttackAoeModal: null })}
                 />
             )}
             {mergedModalState.warpingImplosionModal && (
                 <WarpingImplosionModal
                     {...mergedModalState.warpingImplosionModal}
+                    characters={characters}
                     onClose={() => setModalState({ warpingImplosionModal: null })}
                 />
             )}
@@ -341,7 +343,7 @@ function ArcaneFeatureModals({ mergedModalState, setModalState }) {
     );
 }
 
-function DivineSparkFeatureModals({ mergedModalState, setModalState, playerStats, campaignName, handleDivineInterventionCast }) {
+function DivineSparkFeatureModals({ mergedModalState, setModalState, playerStats, campaignName, characters, handleDivineInterventionCast }) {
     return (
         <>
             {mergedModalState.elementalAttunementModal && (
@@ -355,6 +357,7 @@ function DivineSparkFeatureModals({ mergedModalState, setModalState, playerStats
                     {...mergedModalState.elementalBurstModal}
                     playerStats={playerStats}
                     campaignName={campaignName}
+                    characters={characters}
                     onClose={() => setModalState({ elementalBurstModal: null })}
                 />
             )}
@@ -728,7 +731,7 @@ function SecondaryModals({
                 />
             )}
             <SpellEffectModals mergedModalState={mergedModalState} setModalState={setModalState} setPopupHtml={setPopupHtml} characters={characters} />
-            <DivineSparkFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} playerStats={playerStats} campaignName={campaignName} handleDivineInterventionCast={handleDivineInterventionCast} />
+            <DivineSparkFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} playerStats={playerStats} campaignName={campaignName} characters={characters} handleDivineInterventionCast={handleDivineInterventionCast} />
             <WarMagicFeatureModals mergedModalState={mergedModalState} setModalState={setModalState} campaignName={campaignName} />
             {mergedModalState.sacredWeaponModal && (
                 <SacredWeaponModal

@@ -17,6 +17,7 @@ function WarpingImplosionModal({
     canRestore,
     restoreCost,
     hasRemaining,
+    characters = null,
     onClose,
 }) {
     const [phase, setPhase] = useState('choice');
@@ -51,6 +52,7 @@ function WarpingImplosionModal({
                 dcSuccess="none"
                 pullMarkerEffect="pulled_toward"
                 logSaveSuccess={true}
+                characters={characters}
                 onClose={onClose}
             />
         );

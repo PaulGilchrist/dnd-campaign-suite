@@ -11,6 +11,7 @@ import { storeSpellLastAttack, addTargetResult } from '../../../../services/auto
 import { triggerBewitchingMagic } from '../../../../services/rules/spells/postCastRiderService.js';
 import { registerTargetEffect, abilitySaveDisadvantageActive } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { isCircleOfPowerActive } from '../../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
+import { resolveAoESaveEvasion, evasionLedgerName } from '../../../../services/rules/combat/evasionUtils.js';
 import { addExpiration } from '../../../../services/rules/effects/expirationQueue.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
@@ -336,10 +337,11 @@ function resolvePromptSecondaryOutcome(args) {
     return applySecondaryPromptDamage(args);
 }
 
-function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, actionName, targetName, saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, secondary }) {
+function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, actionName, targetName, saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, secondary, evasion }) {
     if (!secondary) return null;
-    // SP-023: Circle of Power zeroes every half-damage leg of the same save.
-    const finalDamage = resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage: secondary.rawDamage, success, saveType, dcSuccess, campaignName });
+    // SP-023: Circle of Power zeroes every half-damage leg of the same save;
+    // CLA-124/125: so does evasion on a success (floor-half on a fail).
+    const finalDamage = resolveEvasionFinalDamage({ evasion, targetName, rawDamage: secondary.rawDamage, success, dcSuccess, campaignName });
     if (finalDamage <= 0) return { rawDamage: secondary.rawDamage, finalDamage: 0, damageType: secondary.damageType };
     const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
     applyDamageToTarget(combatSummary, targetName, finalDamage, [secondary.damageType], { campaignName, characters, ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
@@ -387,21 +389,58 @@ function circleOfPowerZeroOnSave(targetName, success, dcSuccess, campaignName) {
     return success === true && dcSuccess === 'half' && isCircleOfPowerActive(targetName, campaignName);
 }
 
-function resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage, success, saveType, dcSuccess, campaignName }) {
-    const targetChar = (combatSummary?.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
-    const evasionEffects = targetChar?.computedStats?.evasionEffects;
-    const evasionActive = hasEvasionForSave(evasionEffects, normalizeSaveType(saveType));
-    const damage = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasionActive);
+// CLA-124/CLA-125: evasion eligibility comes from resolveAoESaveEvasion —
+// full PlayerStats (computedStats.evasionEffects), Incapacitated exemption,
+// shared/Leading Evasion and the prompt roller's detail.evasionActive. The old
+// combatSummary-stub computedStats read was ALWAYS undefined on persisted
+// player entries (CLA-119 minimal-stub family) → fold inert both branches.
+// Feature evasion folds via computeDamageAfterEvasion (0 / floor-half);
+// Circle of Power keeps its own success-only zero channel (SP-023).
+function resolveEvasionFinalDamage({ evasion, targetName, rawDamage, success, dcSuccess, campaignName }) {
+    const damage = computeDamageAfterEvasion(rawDamage, success, dcSuccess, evasion.featureEvasionActive);
     return circleOfPowerZeroOnSave(targetName, success, dcSuccess, campaignName) ? 0 : damage;
 }
 
 // Human-readable zero-on-save attribution for the prompt lane log (mirrors the
 // logQuickRollEvasion name channel, useLoggedDiceRollSaves.js:161).
-function resolvePromptZeroOnSaveReason({ combatSummary, targetName, success, rawDamage, finalDamage, saveType, campaignName }) {
+function resolvePromptZeroOnSaveReason({ evasion, success, rawDamage, finalDamage }) {
     if (!success || rawDamage <= 0 || finalDamage > 0) return null;
-    if (circleOfPowerZeroOnSave(targetName, success, 'half', campaignName)) return 'Circle of Power';
-    const targetChar = (combatSummary?.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
-    return hasEvasionForSave(targetChar?.computedStats?.evasionEffects, normalizeSaveType(saveType)) ? 'Evasion' : null;
+    return evasion.hasCircleOfPower && !evasion.featureEvasionActive ? 'Circle of Power' : 'Evasion';
+}
+
+// rollType:'evasion' ledger entry (logEvasionRoll handleNpcSaveDamage.js:588 /
+// logQuickRollEvasion useLoggedDiceRollSaves.js:167 convention) — fire on
+// EVERY adjudicated evasion save, success AND failure (fail still pays the
+// floor-half).
+// Prompt-leg adjudication: evasion fold + zero attribution + ledger entry,
+// hoisted out of handleSaveResult (CLA-120 complexity-cap shape).
+function adjudicatePromptEvasion({ campaignName, characters, detail, targetName, rawDamage, success, saveDc, dcSuccess }) {
+    const evasion = resolveAoESaveEvasion({ characters, detail, targetName, saveType: detail.saveType, dcSuccess, campaignName });
+    const finalDamage = resolveEvasionFinalDamage({ evasion, targetName, rawDamage, success, dcSuccess, campaignName });
+    const zeroReason = resolvePromptZeroOnSaveReason({ evasion, success, rawDamage, finalDamage });
+    if (evasion.featureEvasionActive || zeroReason) {
+        logAoeEvasionLedger({ campaignName, targetName, saveType: detail.saveType, saveDc, dcSuccess, success, finalDamage, evasion, detail });
+    }
+    return { evasion, finalDamage, zeroReason };
+}
+
+function logAoeEvasionLedger({ campaignName, targetName, saveType, saveDc, dcSuccess, success, finalDamage, evasion, detail }) {
+    const { rawRolls, mode } = promptRollFidelity(detail);
+    addEntry(campaignName, {
+        type: 'roll',
+        rollType: 'evasion',
+        characterName: targetName,
+        name: evasionLedgerName(evasion),
+        targetName,
+        saveType,
+        saveDc,
+        saveResult: success ? 'success' : 'failure',
+        dcSuccess,
+        saveRawRolls: rawRolls,
+        mode,
+        finalDamage,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging evasion:', e); });
 }
 
 function logRadiantSoulOncePerTurn({ campaignName, playerStats, damageType, targetName, radiantSoulChaMod, radiantSoulFlagKey }) {
@@ -1331,6 +1370,10 @@ function DamageNote({ damage, damageType, secondaryDamage, secondaryDamageType, 
 function SaveAttackAoeModal({
     action,
     playerStats,
+    // CLA-124/125: full computed characters (computedStats.evasionEffects from
+    // rolled features) — the ONLY source evasion eligibility can be resolved
+    // from for PC targets (combatSummary player entries are minimal stubs).
+    characters,
     campaignName,
     _shape,
     range,
@@ -1595,25 +1638,9 @@ function SaveAttackAoeModal({
             timestamp: Date.now(),
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging player save:', e); });
 
-        // SP-023: evasion-style zero-on-success (Circle of Power) gets named in
-        // the log (mirror of logQuickRollEvasion, useLoggedDiceRollSaves.js:161).
-        if (zeroReason) {
-            addEntry(campaignName, {
-                type: 'roll',
-                rollType: 'evasion',
-                characterName: targetName,
-                name: zeroReason,
-                targetName,
-                saveType,
-                saveDc,
-                saveResult: 'success',
-                dcSuccess,
-                saveRawRolls: rawRolls,
-                mode,
-                finalDamage: 0,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging zero-on-save:', e); });
-        }
+        // CLA-124/125: the rollType:'evasion' ledger entry is emitted once per
+        // adjudicated save in handleSaveResult (logAoeEvasionLedger) — both
+        // outcomes, evasion AND Circle-of-Power zero legs.
 
         if (finalDamage > 0) {
             const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
@@ -1660,8 +1687,10 @@ function SaveAttackAoeModal({
         const saveTotal = detail.total ?? 0;
 
         const combatSummary = getCombatSummary(campaignName);
-        const finalDamage = resolveEvasionFinalDamage({ combatSummary, targetName, rawDamage, success, saveType: detail.saveType, dcSuccess, campaignName });
-        const zeroReason = resolvePromptZeroOnSaveReason({ combatSummary, targetName, success, rawDamage, finalDamage, saveType: detail.saveType, campaignName });
+        // CLA-124/CLA-125: evasion eligibility from full PlayerStats/rolled
+        // features (mirrors saveProcessing.js:1438 lane), Incapacitated exempt,
+        // prompt-roller detail.evasionActive honored first.
+        const { evasion, finalDamage, zeroReason } = adjudicatePromptEvasion({ campaignName, characters, detail, targetName, rawDamage, success, saveDc, dcSuccess });
 
         if (isSoulstitchProtected) {
             logSoulstitchAutoSave({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
@@ -1678,7 +1707,7 @@ function SaveAttackAoeModal({
 
         // MA-0563: secondary pool pays its own adjudicated leg (soulstitch
         // protection zeroes it); null when no secondary rides the prompt.
-        const secondary = resolvePromptSecondaryOutcome({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, saveType: detail.saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, isSoulstitchProtected, secondary: pendingPrompts[pendingIndex].secondary });
+        const secondary = resolvePromptSecondaryOutcome({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, saveType: detail.saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, isSoulstitchProtected, secondary: pendingPrompts[pendingIndex].secondary, evasion });
 
         if (!success && pullMarkerEffect) {
             // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
@@ -1715,7 +1744,7 @@ function SaveAttackAoeModal({
         }, secondary);
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, empoweredEvocationIntMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
+    }, [campaignName, characters, damage, damageType, radiantSoulChaMod, empoweredEvocationIntMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

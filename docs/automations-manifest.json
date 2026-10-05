@@ -2349,7 +2349,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-124-evasion-caster-aoe-lane-inert.md",
+      "verified": "verified",
       "class": "Monk",
       "triggerConditions": "Automation type: evasion",
       "expectedBehavior": "When subjected to an effect that allows a Dexterity saving throw for half damage, you take no damage on success and half damage on failure. Doesn't work if Incapacitated."
@@ -2361,7 +2361,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-124-evasion-caster-aoe-lane-inert.md (CLA-125 twin: same SaveAttackAoeModal stub lane, live-proven Rogue lv20 2026-10-04)",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Automation type: evasion",
       "expectedBehavior": "When you're subjected to an effect that allows a Dexterity saving throw to take only half damage, you take no damage if you succeed and only half damage if you fail. Can't use if Incapacitated."
