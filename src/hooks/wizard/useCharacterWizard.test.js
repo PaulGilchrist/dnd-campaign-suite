@@ -314,6 +314,60 @@ describe('useCharacterWizard', () => {
       expect(lineagePosts).toHaveLength(0);
     });
 
+    it('CLA-139: stamps runtime fiendish legacy keys in one merged write when Tiefling subrace changes', async () => {
+      const campaignName = 'test-campaign';
+      const existingCharacter = { name: 'TieflingTest', race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } };
+      const characterData = { name: 'TieflingTest', race: { name: 'Tiefling', subrace: { name: 'Infernal Tiefling' } } };
+
+      global.fetch.mockImplementation(async () => ({ ok: true, json: async () => ({}) }));
+
+      const { result } = renderHook(createWrapper(campaignName));
+      act(() => {
+        result.current.setCharacterCallbacks({ setCharacters: vi.fn(), setActiveCharacter: vi.fn() });
+      });
+      act(() => {
+        result.current.handleEditCharacter(existingCharacter);
+      });
+      await act(async () => {
+        await result.current.handleEditWizardComplete(characterData);
+      });
+
+      const legacyPost = global.fetch.mock.calls.find(
+        ([url, opts]) => opts?.method === 'POST' && url.includes('TieflingTest') && String(opts.body).includes('_fiendishLegacySelection')
+      );
+      expect(legacyPost).toBeDefined();
+      const posted = JSON.parse(legacyPost[1].body).value;
+      expect(posted._fiendishLegacySelection).toBe('Infernal');
+      expect(posted._fiendishLegacyAbility).toBe('Charisma');
+      expect(posted._fiendishLegacyCantrip).toBe('Fire Bolt');
+      expect(posted._fiendishLegacyLevel3).toBe('Hellish Rebuke');
+      expect(posted._fiendishLegacyLevel5).toBe('Darkness');
+    });
+
+    it('CLA-139: does not stamp runtime fiendish legacy when the subrace is unchanged', async () => {
+      const campaignName = 'test-campaign';
+      const existingCharacter = { name: 'TieflingTest', race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } };
+      const characterData = { name: 'TieflingTest', race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } };
+
+      global.fetch.mockImplementation(async () => ({ ok: true, json: async () => ({}) }));
+
+      const { result } = renderHook(createWrapper(campaignName));
+      act(() => {
+        result.current.setCharacterCallbacks({ setCharacters: vi.fn(), setActiveCharacter: vi.fn() });
+      });
+      act(() => {
+        result.current.handleEditCharacter(existingCharacter);
+      });
+      await act(async () => {
+        await result.current.handleEditWizardComplete(characterData);
+      });
+
+      const legacyPosts = global.fetch.mock.calls.filter(
+        ([, opts]) => opts?.method === 'POST' && String(opts?.body || '').includes('_fiendishLegacySelection')
+      );
+      expect(legacyPosts).toHaveLength(0);
+    });
+
     it('handles rename: PUTs to new file with originalFileName, replaces by original name in list', async () => {
       const existingCharacters = [{ name: 'Old Name', class: 'Wizard' }];
       const setCharacters = vi.fn((fn) => {

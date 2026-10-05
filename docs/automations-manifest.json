@@ -2650,7 +2650,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-139-fiendish-legacy-ungated-ladder-inert-keys.md",
+      "verified": "verified",
       "race": "Tiefling",
       "triggerConditions": "Automation type: fiendish_legacy",
       "expectedBehavior": "You are the recipient of a legacy that grants you supernatural abilities. Choose a legacy from the Fiendish Legacies table. You gain the level 1 benefit of the chosen legacy."

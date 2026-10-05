@@ -2,6 +2,21 @@ import { useState, useRef, useCallback } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import * as campaignService from '../../services/campaign/campaignService.js';
 import { stampElfishLineageRuntime } from '../../services/automation/handlers/class-other/elfishLineageHandler.js';
+import { stampFiendishLegacyRuntime } from '../../services/automation/handlers/class-other/fiendishLegacyHandler.js';
+
+// CLA-118/CLA-139: the wizard persists race.subrace only — stamp the runtime
+// lineage/legacy keys in one merged write so nothing keeps granting the old choice.
+function stampLineageRuntime(originalCharacter, characterData, campaignName) {
+  const originalSubraceName = originalCharacter?.race?.subrace?.name;
+  const newSubraceName = characterData.race?.subrace?.name;
+  if (!newSubraceName || newSubraceName === originalSubraceName) return;
+  if (characterData.race?.name === 'Elf') {
+    stampElfishLineageRuntime(characterData.name, newSubraceName, campaignName);
+  }
+  if (characterData.race?.name === 'Tiefling') {
+    stampFiendishLegacyRuntime(characterData.name, newSubraceName, campaignName);
+  }
+}
 
 export function useCharacterWizard(campaignName) {
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);
@@ -55,13 +70,7 @@ export function useCharacterWizard(campaignName) {
       const originalFileName = `${originalCharacter.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       const fileName = `${characterData.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       await campaignService.updateCharacter(campaignName, fileName, characterData, originalFileName);
-      // CLA-118: the wizard persists race.subrace only — stamp the runtime
-      // lineage keys in one merged write so nothing keeps granting the old lineage.
-      const originalSubraceName = originalCharacter?.race?.subrace?.name;
-      const newSubraceName = characterData.race?.subrace?.name;
-      if (characterData.race?.name === 'Elf' && newSubraceName && newSubraceName !== originalSubraceName) {
-        stampElfishLineageRuntime(characterData.name, newSubraceName, campaignName);
-      }
+      stampLineageRuntime(originalCharacter, characterData, campaignName);
       callbacksRef.current.setActiveCharacter(cloneDeep(characterData));
       setShowEditCharacterWizard(false);
       const { setCharacters } = callbacksRef.current;

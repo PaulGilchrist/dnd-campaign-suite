@@ -9,6 +9,8 @@ import {
     handle,
     confirmFiendishLegacy,
     restoreUses,
+    resolveFiendishLegacy,
+    stampFiendishLegacyRuntime,
     getFiendishLegacySelection,
     getFiendishLegacyAbility,
     getFiendishLegacyCantrip,
@@ -28,9 +30,10 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
         return keyValues[key] || null;
     }),
     setRuntimeValue: vi.fn(async () => {}),
+    setRuntimeObject: vi.fn(async () => {}),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
+const { getRuntimeValue, setRuntimeValue, setRuntimeObject } = await import('../../../../hooks/runtime/useRuntimeState.js');
 
 const campaignName = 'test-campaign';
 const playerName = 'Warlock1';
@@ -39,6 +42,7 @@ function makePlayerStats(overrides = {}) {
     return {
         name: playerName,
         level: 3,
+        race: { name: 'Tiefling', subrace: null },
         ...overrides,
     };
 }
@@ -64,6 +68,31 @@ const LEGACY_DATA = {
     },
 };
 
+describe('resolveFiendishLegacy (CLA-139 unified channel)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('subrace is authoritative and beats a stale runtime selection', () => {
+        getRuntimeValue.mockReturnValue('Infernal');
+        const stats = makePlayerStats({ race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } });
+        expect(resolveFiendishLegacy(stats, campaignName)).toBe('Abyssal');
+        expect(getRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('runtime selection refines when the Tiefling has no subrace', () => {
+        getRuntimeValue.mockReturnValue('Infernal');
+        expect(resolveFiendishLegacy(makePlayerStats(), campaignName)).toBe('Infernal');
+        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacySelection', campaignName);
+    });
+
+    it('returns null for non-Tieflings', () => {
+        getRuntimeValue.mockReturnValue('Infernal');
+        const stats = makePlayerStats({ race: { name: 'Elf', subrace: { name: 'Drow' } } });
+        expect(resolveFiendishLegacy(stats, campaignName)).toBeNull();
+    });
+});
+
 describe('fiendishLegacyHandler.handle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -83,6 +112,20 @@ describe('fiendishLegacyHandler.handle', () => {
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('Fiendish Legacy: Infernal (already selected)');
         expect(result.payload.automation).toEqual({ type: 'fiendish_legacy' });
+    });
+
+    it('CLA-139: reports the subrace-authoritative legacy, never a stale runtime value', async () => {
+        getRuntimeValue.mockReturnValue('Infernal');
+
+        const result = await handle(
+            { name: 'Fiendish Legacy', automation: { type: 'fiendish_legacy' } },
+            makePlayerStats({ race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } }),
+            'test-campaign',
+            null
+        );
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('Fiendish Legacy: Abyssal (already selected)');
     });
 
     it('returns modal when no legacy is selected', async () => {
@@ -120,9 +163,10 @@ describe('confirmFiendishLegacy', () => {
         const emptyResult = await confirmFiendishLegacy(makePlayerStats(), '', campaignName);
         expect(emptyResult.type).toBe('popup');
         expect(emptyResult.payload.description).toBe('No legacy selected.');
+        expect(setRuntimeObject).not.toHaveBeenCalled();
     });
 
-    it.each(Object.entries(LEGACY_DATA))('stores all runtime values for %s', async (legacy, data) => {
+    it.each(Object.entries(LEGACY_DATA))('CLA-139: stores all runtime values for %s in ONE merged write', async (legacy, data) => {
         getRuntimeValue.mockReturnValue(null);
         const result = await confirmFiendishLegacy(makePlayerStats(), legacy, campaignName);
 
@@ -130,11 +174,42 @@ describe('confirmFiendishLegacy', () => {
         expect(result.payload.description).toContain(`Selected ${legacy} legacy`);
         expect(result.payload.description).toContain(`Spellcasting ability: ${data.ability}`);
 
-        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, playerName, '_fiendishLegacySelection', legacy, campaignName);
-        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, playerName, '_fiendishLegacyAbility', data.ability, campaignName);
-        expect(setRuntimeValue).toHaveBeenNthCalledWith(3, playerName, '_fiendishLegacyCantrip', data.cantrip, campaignName);
-        expect(setRuntimeValue).toHaveBeenNthCalledWith(4, playerName, '_fiendishLegacyLevel3', data.level3, campaignName);
-        expect(setRuntimeValue).toHaveBeenNthCalledWith(5, playerName, '_fiendishLegacyLevel5', data.level5, campaignName);
+        expect(setRuntimeObject).toHaveBeenCalledTimes(1);
+        expect(setRuntimeObject).toHaveBeenCalledWith(playerName, {
+            '_fiendishLegacySelection': legacy,
+            '_fiendishLegacyAbility': data.ability,
+            '_fiendishLegacyCantrip': data.cantrip,
+            '_fiendishLegacyLevel3': data.level3,
+            '_fiendishLegacyLevel5': data.level5,
+        }, campaignName);
+    });
+});
+
+describe('stampFiendishLegacyRuntime (CLA-139 wizard seam)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('strips the Tiefling suffix and stamps all keys in one merged write', () => {
+        stampFiendishLegacyRuntime('TieflingTest', 'Infernal Tiefling', campaignName);
+
+        expect(setRuntimeObject).toHaveBeenCalledTimes(1);
+        expect(setRuntimeObject).toHaveBeenCalledWith('TieflingTest', {
+            '_fiendishLegacySelection': 'Infernal',
+            '_fiendishLegacyAbility': 'Charisma',
+            '_fiendishLegacyCantrip': 'Fire Bolt',
+            '_fiendishLegacyLevel3': 'Hellish Rebuke',
+            '_fiendishLegacyLevel5': 'Darkness',
+        }, campaignName);
+    });
+
+    it('logs and skips unknown subraces', () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        stampFiendishLegacyRuntime('TieflingTest', 'Moon Elf', campaignName);
+
+        expect(setRuntimeObject).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalled();
+        errorSpy.mockRestore();
     });
 });
 

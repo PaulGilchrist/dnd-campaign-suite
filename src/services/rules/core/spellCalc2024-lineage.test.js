@@ -17,6 +17,8 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((_key, _prop) => null),
 }));
 
+const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
+
 // ── Helpers ──
 
 function makePlayerStats(overrides = {}) {
@@ -263,6 +265,74 @@ describe('spellCalc2024-lineage', () => {
       expect(result.modifier).toBe(3);
       expect(result.toHit).toBe(5);
       expect(result.saveDc).toBe(13);
+    });
+
+    // CLA-139 mirror: Abyssal ladder per races.json:880 (Ray of Sickness lv1 in the
+    // 2024 spells DB, Hold Person lv2) — the level keys, not the slot filter, gate.
+    it('CLA-139: lv1/lv3 Abyssal Tiefling ladder is gated by the levelNSpell keys', () => {
+      const allSpells = [
+        makeSpell('Poison Spray', 0),
+        makeSpell('Ray of Sickness', 1),
+        makeSpell('Hold Person', 1),
+      ];
+
+      const abyssal = [{ name: 'Abyssal', cantrip: 'Poison Spray', level3Spell: 'Ray of Sickness', level5Spell: 'Hold Person' }];
+      const automation = { specialActions: [{ type: 'fiendish_legacy', options: abyssal }] };
+      const tiefling = { campaignName: 'test-campaign', race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } };
+
+      const lv1Names = getSpellAbilities(allSpells, makePlayerStats({ automation }), tiefling).spells.map(s => s.name);
+      expect(lv1Names).toContain('Poison Spray');
+      expect(lv1Names).not.toContain('Ray of Sickness');
+      expect(lv1Names).not.toContain('Hold Person');
+
+      const lv3Casting = { cantrips_known: 4, spell_slots_level_1: 4, spell_slots_level_2: 2, spell_slots_level_3: 2, spell_slots_level_4: 0, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spell_type: 'prepared' };
+      const lv3Stats = makePlayerStats({
+        level: 3,
+        class: {
+          name: 'Wizard',
+          class_levels: [{ level: 1, spellcasting: lv1Casting }, undefined, { level: 3, spellcasting: lv3Casting }],
+          spell_casting_ability: 'Intelligence',
+        },
+        automation,
+      });
+      const lv3Names = getSpellAbilities(allSpells, lv3Stats, tiefling).spells.map(s => s.name);
+      expect(lv3Names).toContain('Poison Spray');
+      expect(lv3Names).toContain('Ray of Sickness');
+      expect(lv3Names).not.toContain('Hold Person');
+
+      const lv5Stats = makePlayerStats({ level: 5, class: lv5WizardClass, automation });
+      const lv5Names = getSpellAbilities(allSpells, lv5Stats, tiefling).spells.map(s => s.name);
+      expect(lv5Names).toContain('Ray of Sickness');
+      expect(lv5Names).toContain('Hold Person');
+    });
+
+    // CLA-139: no subrace → the sheet-chooser runtime selection refines the lane.
+    it('CLA-139: Tiefling without subrace resolves legacy from the runtime selection', () => {
+      const allSpells = [
+        makeSpell('Fire Bolt', 0),
+        makeSpell('Hellish Rebuke', 1),
+        makeSpell('Darkness', 2),
+      ];
+
+      getRuntimeValue.mockImplementation((_name, key) => (key === '_fiendishLegacySelection' ? 'Infernal' : null));
+
+      const stats = makePlayerStats({
+        level: 5,
+        class: lv5WizardClass,
+        automation: {
+          specialActions: [{
+            type: 'fiendish_legacy',
+            options: [{ name: 'Infernal', cantrip: 'Fire Bolt', level3Spell: 'Hellish Rebuke', level5Spell: 'Darkness' }],
+          }],
+        },
+      });
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'test-campaign', race: { name: 'Tiefling', subrace: null } });
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Fire Bolt');
+      expect(names).toContain('Hellish Rebuke');
+      expect(names).toContain('Darkness');
+      expect(getRuntimeValue).toHaveBeenCalledWith('TestCharacter', '_fiendishLegacySelection', 'test-campaign');
     });
   });
 });

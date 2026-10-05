@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeObject, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const LEGACY_KEY = '_fiendishLegacySelection';
 const LEGACY_CANTRIP_KEY = '_fiendishLegacyCantrip';
@@ -6,14 +6,45 @@ const LEGACY_LEVEL3_KEY = '_fiendishLegacyLevel3';
 const LEGACY_LEVEL5_KEY = '_fiendishLegacyLevel5';
 const LEGACY_ABILITY_KEY = '_fiendishLegacyAbility';
 
+// Data mirrors races.json:880 Fiendish Legacy trait options (races are 2024).
 const FIENDISH_LEGACIES = [
-    { name: 'Abyssal', description: 'Resistance to Poison damage + Poison Spray cantrip. Level 3: Ray of Sickness. Level 5: Hold Person.', spellcastingAbility: 'Charisma' },
-    { name: 'Chthonic', description: 'Resistance to Necrotic damage + Chill Touch cantrip. Level 3: False Life. Level 5: Ray of Enfeeblement.', spellcastingAbility: 'Charisma' },
-    { name: 'Infernal', description: 'Resistance to Fire damage + Fire Bolt cantrip. Level 3: Hellish Rebuke. Level 5: Darkness.', spellcastingAbility: 'Charisma' },
+    { name: 'Abyssal', description: 'Resistance to Poison damage + Poison Spray cantrip. Level 3: Ray of Sickness. Level 5: Hold Person.', spellcastingAbility: 'Charisma', cantrip: 'Poison Spray', level3Spell: 'Ray of Sickness', level5Spell: 'Hold Person' },
+    { name: 'Chthonic', description: 'Resistance to Necrotic damage + Chill Touch cantrip. Level 3: False Life. Level 5: Ray of Enfeeblement.', spellcastingAbility: 'Charisma', cantrip: 'Chill Touch', level3Spell: 'False Life', level5Spell: 'Ray of Enfeeblement' },
+    { name: 'Infernal', description: 'Resistance to Fire damage + Fire Bolt cantrip. Level 3: Hellish Rebuke. Level 5: Darkness.', spellcastingAbility: 'Charisma', cantrip: 'Fire Bolt', level3Spell: 'Hellish Rebuke', level5Spell: 'Darkness' },
 ];
 
+// CLA-139: race.subrace IS the legacy in 2024 Tiefling data ("Abyssal Tiefling"
+// etc., races.json:9) — the wizard-persisted subrace is the authoritative channel.
+// The runtime _fiendishLegacySelection keys refine/fallback for sheet-chooser
+// selections made without a subrace (CLA-118 resolve shape).
+export function resolveFiendishLegacy(playerStats, campaignName) {
+    if (playerStats.race?.name !== 'Tiefling') return null;
+    const subraceName = playerStats.race?.subrace?.name;
+    if (subraceName) return subraceName.replace(' Tiefling', '');
+    return getRuntimeValue(playerStats.name, LEGACY_KEY, campaignName);
+}
+
+// CLA-139: stamp the runtime legacy keys in ONE merged write when the wizard
+// changes a Tiefling's subrace (legacy), so runtime consumers never serve stale grants.
+export function stampFiendishLegacyRuntime(characterName, subraceName, campaignName) {
+    const legacyName = (subraceName || '').replace(' Tiefling', '');
+    const legacyData = FIENDISH_LEGACIES.find(l => l.name === legacyName);
+    if (!legacyData) {
+        console.error('[fiendishLegacyHandler] cannot stamp runtime legacy — unknown tiefling subrace:', subraceName);
+        return;
+    }
+    setRuntimeObject(characterName, {
+        [LEGACY_KEY]: legacyData.name,
+        [LEGACY_ABILITY_KEY]: legacyData.spellcastingAbility,
+        [LEGACY_CANTRIP_KEY]: legacyData.cantrip,
+        [LEGACY_LEVEL3_KEY]: legacyData.level3Spell,
+        [LEGACY_LEVEL5_KEY]: legacyData.level5Spell,
+    }, campaignName);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
-    const storedLegacy = getRuntimeValue(playerStats.name, LEGACY_KEY, campaignName);
+    // CLA-139: report the subrace-authoritative legacy, never a stale runtime value.
+    const storedLegacy = resolveFiendishLegacy(playerStats, campaignName);
     if (storedLegacy) {
         return {
             type: 'popup',
@@ -56,28 +87,15 @@ export async function confirmFiendishLegacy(playerStats, chosenLegacy, campaignN
         };
     }
 
-    await setRuntimeValue(playerStats.name, LEGACY_KEY, chosenLegacy, campaignName);
-    await setRuntimeValue(playerStats.name, LEGACY_ABILITY_KEY, legacyData.spellcastingAbility, campaignName);
-
-    const cantripMap = {
-        'Abyssal': 'Poison Spray',
-        'Chthonic': 'Chill Touch',
-        'Infernal': 'Fire Bolt',
-    };
-    const level3Map = {
-        'Abyssal': 'Ray of Sickness',
-        'Chthonic': 'False Life',
-        'Infernal': 'Hellish Rebuke',
-    };
-    const level5Map = {
-        'Abyssal': 'Hold Person',
-        'Chthonic': 'Ray of Enfeeblement',
-        'Infernal': 'Darkness',
-    };
-
-    await setRuntimeValue(playerStats.name, LEGACY_CANTRIP_KEY, cantripMap[chosenLegacy], campaignName);
-    await setRuntimeValue(playerStats.name, LEGACY_LEVEL3_KEY, level3Map[chosenLegacy], campaignName);
-    await setRuntimeValue(playerStats.name, LEGACY_LEVEL5_KEY, level5Map[chosenLegacy], campaignName);
+    // CLA-139: single merged runtime write (CLA-118 shape) — the selection and
+    // its derived grants land together so consumers never read half-applied state.
+    await setRuntimeObject(playerStats.name, {
+        [LEGACY_KEY]: legacyData.name,
+        [LEGACY_ABILITY_KEY]: legacyData.spellcastingAbility,
+        [LEGACY_CANTRIP_KEY]: legacyData.cantrip,
+        [LEGACY_LEVEL3_KEY]: legacyData.level3Spell,
+        [LEGACY_LEVEL5_KEY]: legacyData.level5Spell,
+    }, campaignName);
 
     return {
         type: 'popup',

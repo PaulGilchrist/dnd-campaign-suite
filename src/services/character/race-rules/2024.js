@@ -16,13 +16,15 @@ const FIENDISH_LEGACY_RESISTANCE_MAP = {
     'Infernal': 'Fire',
 };
 
+// CLA-139: subrace is the authoritative legacy channel (races.json:9); the
+// sheet-chooser runtime _fiendishLegacySelection refines when no subrace is
+// set, so the modal choice actually drives the resistance (CLA-118 resolve shape).
 function resolveFiendishLegacyName(playerSummary) {
     const raceName = playerSummary.race?.name;
+    if (raceName !== 'Tiefling') return null;
     const subraceName = playerSummary.race?.subrace?.name;
-    if (subraceName && raceName === 'Tiefling') {
-        return subraceName.replace(' Tiefling', '');
-    }
-    return null;
+    if (subraceName) return subraceName.replace(' Tiefling', '');
+    return getRuntimeValue(playerSummary.name, '_fiendishLegacySelection', playerSummary.campaignName);
 }
 
 function pushFiendishLegacyResistance(resistances, legacyName) {

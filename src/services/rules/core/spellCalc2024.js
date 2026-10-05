@@ -153,11 +153,17 @@ function applyCantripAbilityOverride(spellAbilities, feature) {
     }
 }
 
-function resolveLineageName(playerSummary) {
+function resolveLineageName(playerStats, playerSummary) {
     const raceName = playerSummary?.race?.name;
     const subraceName = playerSummary?.race?.subrace?.name;
+    // CLA-139: Tiefling subrace is the authoritative legacy channel (races.json:9);
+    // the sheet-chooser runtime selection refines when no subrace is set (CLA-118 shape).
+    if (raceName === 'Tiefling') {
+        return subraceName
+            ? subraceName.replace(' Tiefling', '')
+            : getRuntimeValue(playerStats?.name, '_fiendishLegacySelection', playerSummary?.campaignName);
+    }
     if (!subraceName) return null;
-    if (raceName === 'Tiefling') return subraceName.replace(' Tiefling', '');
     return subraceName;
 }
 
@@ -166,7 +172,7 @@ function resolveLineageName(playerSummary) {
 // CLA-118: the ladder spells (levelNSpell keys, races.json:386+) unlock at the
 // character level encoded in the key — never grant them below that gate.
 function applyLineageFeatureSpells(spellAbilities, feature, playerStats, playerSummary) {
-    const lineageName = resolveLineageName(playerSummary);
+    const lineageName = resolveLineageName(playerStats, playerSummary);
     if (!lineageName) return;
     const lineageData = feature.options?.find(o => o.name === lineageName);
     if (!lineageData) return;
