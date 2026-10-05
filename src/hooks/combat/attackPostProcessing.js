@@ -418,12 +418,14 @@ export async function processPotentCantrip({ hit, isAutoMiss, targetName, charac
     }
 }
 
+// CLA-120: potentFormula rides the pre-baked autoDamageFormula, which cast-resolution
+// may already have folded with the INT term; append only when absent (CLA-279 shape).
 function buildPotentMissFormula(potentFormula, potentPlayerStats, context) {
     const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(potentPlayerStats).length > 0;
     const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
     const spellSchool = (context?.autoDamageSchool || '').toLowerCase();
     const isEvocation = spellSchool === 'evocation';
-    const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+    const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0 && !potentFormula.includes('[Empowered Evocation]');
     return shouldApplyEmpoweredEvoc ? `${potentFormula} + ${empEvocIntMod} [Empowered Evocation]` : potentFormula;
 }
 

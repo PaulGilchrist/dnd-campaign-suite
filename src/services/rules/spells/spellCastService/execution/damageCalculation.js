@@ -29,15 +29,23 @@ function computeRange(spell, metaCtx, attackerPos, targetPos, featEffects) {
     return {};
 }
 
-function computeEmpoweredEvocation(playerStats, spell, formula) {
+// CLA-120: single owner of the Empowered Evocation gate — INT mod on evocation
+// damage spells only (school gate + cantrip/leveled both eligible), 0 otherwise.
+function resolveEmpoweredEvocationIntMod(playerStats, spell) {
     const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
     const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
     const spellSchool = (spell.school || '').toLowerCase();
     const isEvocation = spellSchool === 'evocation';
-    const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && spell.damage && empEvocIntMod > 0;
+    return hasEmpoweredEvoc && isEvocation && spell.damage && empEvocIntMod > 0 ? empEvocIntMod : 0;
+}
 
+// CLA-120: execution/index.js is the single owner of the single-target bake —
+// formula may already carry " + N [Empowered Evocation]" from a pre-baked
+// autoDamageFormula; never re-append (CLA-279 Radiant Soul idempotency shape).
+function computeEmpoweredEvocation(playerStats, spell, formula) {
+    const empEvocIntMod = resolveEmpoweredEvocationIntMod(playerStats, spell);
     let empEvocFormula = formula || null;
-    if (shouldApplyEmpoweredEvoc && formula) {
+    if (empEvocIntMod > 0 && formula && !formula.includes('[Empowered Evocation]')) {
         empEvocFormula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
     }
 

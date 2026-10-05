@@ -117,7 +117,7 @@ function buildConditionOnlyAoePopup({ fullSpell, spell, metaCtx, playerStats, ca
 }
 
 function buildSaveAttackAoePopup({ fullSpell, spell, metaCtx, playerStats, campaignName, aoeShape, rangeFeet,
-    payloadDamage, effectiveDamageType, radiantSoulChaMod, spellSaveDc, innateSorceryActive, activeOverlay,
+    payloadDamage, effectiveDamageType, radiantSoulChaMod, empoweredEvocationIntMod, spellSaveDc, innateSorceryActive, activeOverlay,
     hasInvisible, overchannelActive, overchannelUseCount, slotLevel }) {
     return {
         automationPopup: {
@@ -132,6 +132,9 @@ function buildSaveAttackAoePopup({ fullSpell, spell, metaCtx, playerStats, campa
                 damage: payloadDamage,
                 damageType: effectiveDamageType,
                 radiantSoulChaMod,
+                // CLA-120: RAW grants Empowered Evocation on ONE damage roll per spell —
+                // the modal folds the INT adder onto the first selected target's roll only.
+                empoweredEvocationIntMod,
                 saveType: resolveAoeSaveType(fullSpell, spell, 'DEX'),
                 saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
                 dcSuccess: normalizeDcSuccess(fullSpell, spell),
@@ -146,15 +149,26 @@ function buildSaveAttackAoePopup({ fullSpell, spell, metaCtx, playerStats, campa
     };
 }
 
-// Mirror the single-target save formula builder: Empowered Evocation bonus + Overchannel maximize suffix
+// CLA-120: INT mod when the fold would apply to this AoE spell (formula was
+// raw — empEvocFormula differs from it); 0 when gated off or pre-baked.
+function resolveAoeEmpoweredEvocationMod(playerStats, fullSpell, damageExpression) {
+    const { empEvocFormula, empEvocIntMod } = computeEmpoweredEvocation(playerStats, fullSpell, damageExpression || null);
+    return (empEvocIntMod > 0 && empEvocFormula && empEvocFormula !== (damageExpression || null)) ? empEvocIntMod : 0;
+}
+
+// CLA-120: the AoE picker rolls damage SEPARATELY per target, so the INT adder
+// must NOT be baked into the shared payload formula (that folds it once per
+// target). RAW: ONE damage roll per spell — ship the raw dice plus the gated
+// int mod; the modal folds the adder onto the FIRST selected target's roll
+// only (pendingRadiantSoulTarget per-cast stamp shape, CLA-279).
 function resolveAoeDamageInfo(playerStats, fullSpell, spell, slotLevel, overchannelActive) {
     const damageAtSlotLevel = fullSpell.damage?.damage_at_slot_level || fullSpell.damage?.damage_at_character_level || spell.damage?.damage_at_slot_level || {};
     const damageExpression = resolveAoeDamageExpression(damageAtSlotLevel, slotLevel);
     const hasDamage = !!damageExpression && damageExpression !== '0' && damageExpression !== '';
-    const { empEvocFormula } = computeEmpoweredEvocation(playerStats, fullSpell, damageExpression || null);
-    const damageFormula = empEvocFormula || damageExpression || '0';
+    const empoweredEvocationIntMod = resolveAoeEmpoweredEvocationMod(playerStats, fullSpell, damageExpression);
+    const damageFormula = damageExpression || '0';
     const payloadDamage = overchannelActive ? `${damageFormula} [Overchannel Maximize]` : damageFormula;
-    return { damageExpression, hasDamage, payloadDamage };
+    return { damageExpression, hasDamage, payloadDamage, empoweredEvocationIntMod };
 }
 
 async function handleAoE({ spell, fullSpell, metaCtx, playerStats, campaignName, getRuntimeValue,
@@ -167,7 +181,7 @@ async function handleAoE({ spell, fullSpell, metaCtx, playerStats, campaignName,
 
     const rangeFeet = rangeToFeet(fullSpell.range || spell.range);
     const slotLevel = metaCtx?.slotLevel || spell.level;
-    const { hasDamage, payloadDamage } = resolveAoeDamageInfo(playerStats, fullSpell, spell, slotLevel, overchannelActive);
+    const { hasDamage, payloadDamage, empoweredEvocationIntMod } = resolveAoeDamageInfo(playerStats, fullSpell, spell, slotLevel, overchannelActive);
 
     const automationEffects = fullSpell.automation?.effects;
     const isConditionOnlyAoe = !hasDamage && automationEffects?.fail?.length > 0;
@@ -180,7 +194,7 @@ async function handleAoE({ spell, fullSpell, metaCtx, playerStats, campaignName,
     }
 
     return buildSaveAttackAoePopup({ fullSpell, spell, metaCtx, playerStats, campaignName, aoeShape, rangeFeet,
-        payloadDamage, effectiveDamageType, radiantSoulChaMod, spellSaveDc, innateSorceryActive, activeOverlay,
+        payloadDamage, effectiveDamageType, radiantSoulChaMod, empoweredEvocationIntMod, spellSaveDc, innateSorceryActive, activeOverlay,
         hasInvisible, overchannelActive, overchannelUseCount, slotLevel });
 }
 

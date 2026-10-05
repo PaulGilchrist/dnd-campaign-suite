@@ -61,8 +61,11 @@ export function buildRollBaseDamageStep() {
         formula = `${formula} [${baseDamageType}]`;
       }
 
+      // CLA-120: cast-resolution (execution/index.js computeEmpoweredEvocation) is
+      // the single owner of the INT fold — autoFormulaOverride/attack.damage may
+      // already carry " + N [Empowered Evocation]"; never re-append (CLA-279 shape).
       const empEvocMod = ctx.empoweredEvocationModifier || 0;
-      if (empEvocMod > 0) {
+      if (empEvocMod > 0 && !formula.includes('[Empowered Evocation]')) {
         formula = `${formula} + ${empEvocMod} [Empowered Evocation]`;
       }
 

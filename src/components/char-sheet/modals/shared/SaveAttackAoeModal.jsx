@@ -137,7 +137,7 @@ function npcSaveBonus(target, saveType) {
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
 function resolveNpcTarget(ctx) {
-    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, bothOutcomesClause } = ctx;
+    const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, bothOutcomesClause } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -172,7 +172,11 @@ function resolveNpcTarget(ctx) {
     const { saveBonus, hasRiderDisadvantage, hasSaveDisadvantage, saveRollRaw1, saveRollRaw2, saveRoll, saveTotal, success, targetEffects } = computeNpcSave(targetName, ctx);
 
     const isRadiantSoulTarget = targetName === radiantSoulTarget;
-    const targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
+    // CLA-120: INT folds on the cast-stamped first target's roll only.
+    const isEmpoweredEvocationTarget = targetName === empoweredEvocationTarget;
+    const targetDamageFormula = foldEmpoweredEvocationOnce(
+        isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage,
+        empoweredEvocationIntMod, isEmpoweredEvocationTarget);
     const damageRoll = rollDamageFormula(targetDamageFormula, overchannelActive);
     const rawDamage = damageRoll?.total ?? 0;
     const { resistances, immunities, evasionEffects } = getTargetDefenses(combatSummary, targetName);
@@ -186,9 +190,11 @@ function resolveNpcTarget(ctx) {
         finalDamage = 0;
     }
 
-    if (finalDamage > 0) {
-        applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
-        if (isRadiantSoulTarget) {
+        if (finalDamage > 0) {
+            applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
+            // CLA-120: the cast-stamped INT roll has landed — consume the stamp.
+            consumeEmpoweredEvocationStamp(playerStats, campaignName, isEmpoweredEvocationTarget);
+            if (isRadiantSoulTarget) {
             setRuntimeValue(playerStats.name, radiantSoulFlagKey, true, campaignName);
             setRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', null, campaignName);
             addEntry(campaignName, {
@@ -237,7 +243,7 @@ function resolveNpcTarget(ctx) {
 
 // Resolve a PC target: soulstitch/careful auto-protect (returns { result }) or a save prompt ({ prompt }).
 function resolvePcTarget(ctx) {
-    const { action, targetName, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, overchannelActive, isCarefulSpell, isCarefulAlly, heightenTarget, playerStats, campaignName, saveConditions } = ctx;
+    const { action, targetName, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, isCarefulSpell, isCarefulAlly, heightenTarget, playerStats, campaignName, saveConditions } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -271,7 +277,11 @@ function resolvePcTarget(ctx) {
     const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
     const pcResolvedDamage = scalingEntry?.damage || resolvedDamage;
     const isRadiantSoulTarget = targetName === radiantSoulTarget;
-    const targetDamageFormula = isRadiantSoulTarget ? `${pcResolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : pcResolvedDamage;
+    // CLA-120: INT folds on the cast-stamped first target's roll only.
+    const isEmpoweredEvocationTarget = targetName === empoweredEvocationTarget;
+    const targetDamageFormula = foldEmpoweredEvocationOnce(
+        isRadiantSoulTarget ? `${pcResolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : pcResolvedDamage,
+        empoweredEvocationIntMod, isEmpoweredEvocationTarget);
     const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
     const rawDamage = damageRoll?.total ?? 0;
 
@@ -487,15 +497,39 @@ function isTargetExcludedByTraps(c, attackerName) {
 }
 
 // CLA-279: if this PC is the stamped Radiant Soul recipient, its damage roll carries the CHA adder.
-function resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignName, radiantSoulChaMod, overchannelActive, targetName }) {
+// CLA-120: if this PC is the stamped Empowered Evocation recipient, its damage roll carries the INT adder.
+function resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignName, radiantSoulChaMod, empoweredEvocationIntMod, overchannelActive, targetName }) {
     const scalingEntry = resolveScaling(playerStats, action.automation?.scaling);
     const resolvedDamage = scalingEntry?.damage || damage;
     const radiantSoulFlagKey = `_radiantSoul_${playerStats.name.replace(/\s+/g, '_')}_oncePerTurn`;
     const radiantSoulPending = getRuntimeValue(playerStats.name, 'pendingRadiantSoulTarget', campaignName);
     const isRadiantSoulTarget = radiantSoulChaMod > 0 && radiantSoulPending === targetName;
-    const targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
+    let targetDamageFormula = isRadiantSoulTarget ? `${resolvedDamage} + ${radiantSoulChaMod} [Radiant Soul]` : resolvedDamage;
+    const isEmpoweredEvocationTarget = empoweredEvocationIntMod > 0 && getRuntimeValue(playerStats.name, 'pendingEmpoweredEvocationTarget', campaignName) === targetName;
+    targetDamageFormula = foldEmpoweredEvocationOnce(targetDamageFormula, empoweredEvocationIntMod, isEmpoweredEvocationTarget);
     const damageRoll = overchannelActive ? rollExpressionMaximized(targetDamageFormula) : rollExpression(targetDamageFormula);
-    return { resolvedDamage, radiantSoulFlagKey, isRadiantSoulTarget, targetDamageFormula, damageRoll };
+    return { resolvedDamage, radiantSoulFlagKey, isRadiantSoulTarget, isEmpoweredEvocationTarget, targetDamageFormula, damageRoll };
+}
+
+// CLA-120: RAW — Empowered Evocation adds INT to ONE damage roll of the spell.
+// The AoE picker rolls separately per target, so only the cast-stamped first
+// target folds the adder; every other target's roll stays dice-only (per-cast
+// stamp pendingEmpoweredEvocationTarget, pendingRadiantSoulTarget CLA-279 shape).
+function foldEmpoweredEvocationOnce(formula, intMod, isStampedTarget) {
+    if (!(intMod > 0) || !isStampedTarget) return formula;
+    return `${formula} + ${intMod} [Empowered Evocation]`;
+}
+
+// CLA-120: stamp the first selected target at cast — only it folds the INT adder.
+function stampEmpoweredEvocationTarget({ playerStats, campaignName, selectedNames, combatSummary, empoweredEvocationIntMod }) {
+    if (!(empoweredEvocationIntMod > 0)) return null;
+    const stamped = selectedNames.find(n => combatSummary.creatures.some(c => c.name === n)) || null;
+    setRuntimeValue(playerStats.name, 'pendingEmpoweredEvocationTarget', stamped, campaignName);
+    return stamped;
+}
+
+function consumeEmpoweredEvocationStamp(playerStats, campaignName, isStampedTarget) {
+    if (isStampedTarget) setRuntimeValue(playerStats.name, 'pendingEmpoweredEvocationTarget', null, campaignName);
 }
 
 function maybeStoreLastAttack(enabled, campaignName, cfg) {
@@ -1309,6 +1343,9 @@ function SaveAttackAoeModal({
     secondaryDamage,
     secondaryDamageType,
     radiantSoulChaMod = 0,
+    // CLA-120: Empowered Evocation — +INT folded onto ONE damage roll per cast
+    // (first selected target); byte-inert 0 default for every other picker row.
+    empoweredEvocationIntMod,
     saveType,
     saveDc,
     dcSuccess,
@@ -1470,12 +1507,18 @@ function SaveAttackAoeModal({
             }
         }
 
+        // CLA-120: Empowered Evocation — RAW grants INT to ONE damage roll per
+        // spell. The picker rolls separately per target, so the adder is stamped
+        // onto the first selected target's roll for this cast only (CLA-279 shape);
+        // every other target's roll folds zero.
+        const empoweredEvocationTarget = stampEmpoweredEvocationTarget({ playerStats, campaignName, selectedNames, combatSummary, empoweredEvocationIntMod });
+
         for (const targetName of selectedNames) {
             const target = combatSummary.creatures.find(c => c.name === targetName);
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
@@ -1508,7 +1551,7 @@ function SaveAttackAoeModal({
         armZoneTargets({ zoneTe, selectedNames, casterName: playerStats.name, actionName: action.name, saveDc, saveType, campaignName });
 
         return { results, prompts };
-    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
+    }, [campaignName, action, playerStats, damage, damageType, secondaryDamage, secondaryDamageType, radiantSoulChaMod, empoweredEvocationIntMod, dcSuccess, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, overchannelActive, overchannelUseCount, overchannelSpellLevel, pullMarkerEffect, logSaveSuccess, storeLastAttack, zoneTe, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
 
     function logSoulstitchAutoSave({ campaignName, playerStats, actionName, targetName, detail, saveBonus }) {
         addEntry(campaignName, {
@@ -1624,7 +1667,10 @@ function SaveAttackAoeModal({
             logSoulstitchAutoSave({ campaignName, playerStats, actionName: action.name, targetName, detail, saveBonus });
         }
 
-        const { radiantSoulFlagKey, isRadiantSoulTarget, targetDamageFormula, damageRoll } = resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignName, radiantSoulChaMod, overchannelActive, targetName });
+        const { radiantSoulFlagKey, isRadiantSoulTarget, isEmpoweredEvocationTarget, targetDamageFormula, damageRoll } = resolveRadiantSoulDamageRoll({ playerStats, action, damage, campaignName, radiantSoulChaMod, empoweredEvocationIntMod, overchannelActive, targetName });
+
+        // CLA-120: stamped prompt resolved — the cast's one INT roll is spent.
+        consumeEmpoweredEvocationStamp(playerStats, campaignName, isEmpoweredEvocationTarget);
 
         if (finalDamage > 0 || zeroReason) {
             applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason });
@@ -1669,7 +1715,7 @@ function SaveAttackAoeModal({
         }, secondary);
         const setters = ctx || { setResults, setPendingPrompts };
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
-    }, [campaignName, damage, damageType, radiantSoulChaMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
+    }, [campaignName, damage, damageType, radiantSoulChaMod, empoweredEvocationIntMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;

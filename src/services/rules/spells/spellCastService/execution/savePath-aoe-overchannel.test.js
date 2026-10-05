@@ -129,13 +129,16 @@ describe('savePath AoE — CLA-244 overchannel context threading', () => {
     expect(result.automationPopup.payload.damage).toMatch(/^3d6/);
   });
 
-  it('damage formula includes Empowered Evocation bonus for Evocation spells when overchannel active', async () => {
+  // CLA-120: the picker rolls per target — the shared payload damage must stay
+  // dice-only; the gated INT mod rides the payload for the modal to fold once.
+  it('Empowered Evocation bonus is NOT baked into per-target payload damage; int mod rides payload', async () => {
     postCastRider.getEmpoweredEvocationFeatures.mockReturnValue([{ name: 'Empowered Evocation' }]);
     postCastRider.getEmpoweredEvocationIntModifier.mockReturnValue(3);
 
     const result = await callSavePath({}, { active: true, useCount: 1 });
 
-    expect(result.automationPopup.payload.damage).toBe('3d6 + 3 [Empowered Evocation] [Overchannel Maximize]');
+    expect(result.automationPopup.payload.damage).toBe('3d6 [Overchannel Maximize]');
+    expect(result.automationPopup.payload.empoweredEvocationIntMod).toBe(3);
   });
 
   it('uses slot-level dice from damage_at_slot_level when upcast overchannel', async () => {

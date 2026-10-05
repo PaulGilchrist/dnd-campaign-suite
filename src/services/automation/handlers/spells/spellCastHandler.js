@@ -325,7 +325,8 @@ function buildSpellDamageRoll(spellName, spellData, playerStats) {
     const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
     const spellSchool = (spellData.school || '').toLowerCase();
     const isEvocation = spellSchool === 'evocation';
-    const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+    // CLA-120: idempotent fold — never stack a second [Empowered Evocation] term.
+    const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0 && !formula.includes('[Empowered Evocation]');
 
     const resolvedFormula = shouldApplyEmpoweredEvoc
         ? `${formula} + ${empEvocIntMod} [Empowered Evocation]`

@@ -5,11 +5,14 @@ import { featureModules } from './features/index.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getChosenRuntimeValue } from '../../../services/automation/common/choiceStorage.js';
 
+// CLA-120: cast-resolution (execution/index.js computeEmpoweredEvocation) is the
+// single owner of the INT fold — ctx.attack.damage may already carry the labeled
+// term via a pre-baked autoDamageFormula; never re-append (CLA-279 shape).
 function applyEmpoweredEvocation(formula, ctx, ps) {
   const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(ps).length > 0;
   const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(ps) : 0;
   const spellSchool = (ctx.autoDamageSchool || '').toLowerCase();
-  if (hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod > 0) {
+  if (hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod > 0 && !formula.includes('[Empowered Evocation]')) {
     return `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
   }
   return formula;
