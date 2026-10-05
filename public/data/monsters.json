@@ -22287,6 +22287,7 @@
     "initiative": null,
     "initiative_details": null,
     "armor_class": 12,
+    "armor_class_scales_with_slot": true,
     "armor_class_details": null,
     "hit_points": 30,
     "hit_dice": "4d8+12",

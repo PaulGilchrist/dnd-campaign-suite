@@ -1020,4 +1020,46 @@ describe('summonSpiritHandler', () => {
             expect(lv6.maxHp).toBe(60); // 50 + 10×(6−5)
         });
     });
+
+    describe('SP-047 Fey Spirit AC ladder (armor_class_scales_with_slot)', () => {
+        const feySpell = summonFeySpells.find(s => s.index === 'fey-spirit');
+        const fey = summonFeyMonsters.find(m => m.index === 'fey-spirit');
+
+        it('spells.json RAW says "AC 12 + the spell\'s level" and routes to the fey-spirit block', () => {
+            expect(feySpell.description.join(' ')).toContain('AC 12 + the spell\'s level');
+            expect(feySpell.automation).toMatchObject({ type: 'summon_spirit', baseLevel: 3, hpPerLevelAbove: 10 });
+            expect(feySpell.automation.variants).toEqual([{ name: 'Fey Spirit', monsterIndex: 'fey-spirit' }]);
+        });
+
+        it('monsters.json fey-spirit block carries the AC ladder opt-in (SP-015/SP-038 byte-twin of bestial-spirit-*)', () => {
+            expect(fey.armor_class).toBe(12);
+            expect(fey.armor_class_scales_with_slot).toBe(true);
+        });
+
+        it('lv3 cast spawns AC 15 / HP 30 and lv5 upcast spawns AC 17 / HP 50', async () => {
+            loadMonsters.mockResolvedValue(summonFeyMonsters);
+            const combatSummary = getCombatSummary(mockCampaignName);
+            const lv20Wizard = {
+                ...mockPlayerStats,
+                level: 20,
+                proficiency: 6,
+                spellAbilities: { toHit: 11, saveDc: 19, modifier: 5 },
+            };
+            const action = {
+                name: 'Fey Spirit',
+                automation: feySpell.automation,
+                spell: { ...feySpell },
+                metaCtx: { slotLevel: 3 },
+            };
+            await handle(action, lv20Wizard, mockCampaignName);
+            const lv3 = combatSummary.creatures.find(c => c.name?.startsWith('Fey Spirit'));
+            expect(lv3.ac).toBe(15);  // armor_class 12 + slot 3
+            expect(lv3.maxHp).toBe(30);
+
+            await handle({ ...action, metaCtx: { slotLevel: 5 } }, lv20Wizard, mockCampaignName);
+            const lv5 = combatSummary.creatures.filter(c => c.name?.startsWith('Fey Spirit')).at(-1);
+            expect(lv5.ac).toBe(17);  // armor_class 12 + slot 5
+            expect(lv5.maxHp).toBe(50); // 30 + 10×(5−3)
+        });
+    });
 });

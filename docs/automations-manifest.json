@@ -2591,7 +2591,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-SP-047-fey-spirit-ac-no-slot-scaling.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "A Small Fey spirit appears in an unoccupied space within range. The spirit has AC 12 + the spell's level. The spirit has 30 Hit Points plus 10 for each spell level above 3. Its Speed is 30 feet and Fly 30 feet."
