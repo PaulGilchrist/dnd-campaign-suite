@@ -171,6 +171,58 @@ describe('CharSpecialActions - Destructive Stride', () => {
       expect(popupCall).toContain('Destructive Stride');
       expect(popupCall).toContain('Struck target.');
     });
+
+    // CLA-113: applyTargetChoice has an OBJECT-destructure signature — the
+    // positional call left campaignName undefined (getCombatSummary(undefined)=null
+    // → silent zero damage). Pin the object shape (host-1 twin).
+    it('CLA-113: calls applyTargetChoice with the OBJECT signature, never positional', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'destructiveStride',
+        payload: {
+          action: { name: 'Destructive Stride' },
+          playerStats: createPlayerStats(),
+          campaignName: 'test',
+          chosenType: 'bludgeoning',
+          martialArtsDie: '1d6',
+        },
+      });
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          createSpecialAction('Destructive Stride', { type: 'destructive_stride' }),
+        ],
+      });
+
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+
+      fireEvent.click(screen.getAllByText(/Destructive Stride/)[0]);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('destructive-stride-modal')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Confirm Target'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Strike'));
+
+      await waitFor(() => {
+        expect(applyTargetChoice).toHaveBeenCalledOnce();
+      });
+
+      const arg = applyTargetChoice.mock.calls[0][0];
+      expect(arg).toEqual(expect.objectContaining({
+        action: expect.objectContaining({ name: 'Destructive Stride' }),
+        campaignName: 'test',
+        targetName: expect.any(String),
+      }));
+      expect(arg.playerStats).toBeDefined();
+      expect(applyTargetChoice.mock.calls[0].length).toBe(1);
+    });
   });
 });
 

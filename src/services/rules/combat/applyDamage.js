@@ -247,6 +247,21 @@ function addBuffResistances(resistances, activeBuffs) {
   return resistances;
 }
 
+// CLA-113: Elemental Epitome (2024 Warrior of the Elements lv17) — the chosen
+// resistance type is stamped on activeBuffs as {effect:'epitome_resistance',
+// damageType:<type>} by elementalEpitomeHandler. addBuffResistances above reads
+// resistanceTypes arrays only, so this MA-0681-shaped effect-scoped reader folds
+// the single damageType LIVE at hit-resolution — the producer REPLACES the same
+// entry in place on every re-pick (per-turn re-choosability), so no
+// computedStats refresh is needed (CLA-336 staleness). Byte-inert for every
+// character without the epitome buff armed.
+function getEpitomeResistances(activeBuffs) {
+  const types = activeBuffs
+    .filter(b => b && b.effect === 'epitome_resistance' && b.damageType)
+    .map(b => b.damageType);
+  return types.length > 0 ? [...new Set(types)] : [];
+}
+
 // MA-0681: Elemental Absorption (Elemental Cultist, 1/Day) — a MONSTER (NPC)
 // defensive reaction. The press-at-pending-hit resolver (MonsterCardHelpers)
 // stamps a one-shot activeBuffs entry {effect:'elemental_absorption',
@@ -676,6 +691,15 @@ async function resolveCreatureDefenses(creature, targetName, isPlayer, character
 
   if (isPlayer) {
     resistances = addBuffResistances(resistances, activeBuffs);
+    // CLA-113: fold the epitome chosen type LIVE into both resistances (halve the
+    // incoming damage, floor(raw/2) + resisted in the breakdown) and
+    // passiveResistances (log the halving) — the CLA-110/FT-009 lane twin, but
+    // sourced from the activeBuffs read above (already live, no new runtime read).
+    const epitomeResistances = getEpitomeResistances(activeBuffs);
+    if (epitomeResistances.length > 0) {
+      resistances = [...new Set([...resistances, ...epitomeResistances])];
+      passiveResistances = [...new Set([...passiveResistances, ...epitomeResistances])];
+    }
   } else {
     // MA-0681: NPC monsters fold only their armed elemental_absorption
     // instance-resistance into live resistances (never generic buff resistances).

@@ -25,6 +25,12 @@ function buildStepOfWindTexts(playerName, actionName, expend, isHeightened, focu
     };
 }
 
+// CLA-113 advisory: the CLA-333 Option A FP spend above happens BEFORE this
+// chooser opens — abandoning the Destructive Stride chain does not refund it
+// (CLA-112 pre-modal-spend family; no FP-refund seam exists app-wide). The
+// spend already paid out the granted Disengage + Dash, so no value is lost —
+// only the optional rider. Target-confirmed chains resolve damage (see
+// destructiveStrideHandler.applyTargetChoice) and never leak.
 async function maybeDestructiveStride(playerStats, campaignName) {
     const epitomeActive = getRuntimeValue(playerStats.name, 'elementalEpitomeActive', campaignName);
     if (!epitomeActive) return null;

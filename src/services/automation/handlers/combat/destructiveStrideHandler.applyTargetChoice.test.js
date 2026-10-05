@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyTargetChoice } from './destructiveStrideHandler.js';
 import * as combatData from '../../../encounters/combatData.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as applyDamage from '../../../rules/combat/applyDamage.js';
 import * as logService from '../../../ui/logService.js';
@@ -17,6 +18,25 @@ vi.mock('../../../encounters/combatData.js', () => ({
 
 vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
+}));
+
+// CLA-113: live 5-ft gate (isWithinRange, gridless-lenient), proximity advisory
+// map reads, and the once-per-turn-per-creature latch store.
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../../rules/combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+vi.mock('../../../maps/mapsService.js', () => ({
+    loadMapData: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
+    getDistanceFeet: vi.fn(() => null),
+}));
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/applyDamage.js', () => ({
@@ -303,7 +323,7 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
                 characterName: 'TestMonk',
                 abilityName: 'Destructive Stride',
                 targetName: 'Goblin',
-                description: expect.stringContaining('Goblin takes 4 Fire damage (d6 roll: 4).'),
+                description: expect.stringContaining('Goblin takes 4 Fire damage (1d6 roll: 4;'),
             }));
         });
 
@@ -360,6 +380,117 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             expect(result.type).toBe('popup');
             expect(consoleErrorSpy).toHaveBeenCalled();
             consoleErrorSpy.mockRestore();
+        });
+    });
+
+    describe('CLA-113: once-per-turn-per-creature latch + 5 ft gate', () => {
+        function latchRound(round, targets) {
+            runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+                if (key === '_Destructive_Stride_usedRound') return { round, targets };
+                return undefined;
+            });
+        }
+
+        it('refuses a second Destructive Stride hit on the SAME creature in the SAME round — zero damage', async () => {
+            combatData.getCombatSummary.mockReturnValue({ ...combatSummaryWithTargets, round: 3 });
+            latchRound(3, ['Goblin']);
+
+            const result = await applyTargetChoice({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
+                campaignName,
+                targetName: 'Goblin',
+                chosenType: 'Fire',
+                martialArtsDie: 6,
+            });
+
+            expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+            expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already taken Destructive Stride damage this turn');
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'automation',
+                automationType: 'destructive_stride_refused',
+                automationDetail: 'already_damaged_this_turn',
+            }));
+        });
+
+        it('re-arms next round and allows a fresh hit; stamps {round, targets} latch', async () => {
+            combatData.getCombatSummary.mockReturnValue({ ...combatSummaryWithTargets, round: 4 });
+            diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7] });
+            latchRound(3, ['Goblin']);
+
+            const result = await applyTargetChoice({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
+                campaignName,
+                targetName: 'Goblin',
+                chosenType: 'Fire',
+                martialArtsDie: 6,
+            });
+
+            expect(applyDamage.applyDamageToTarget).toHaveBeenCalled();
+            expect(result.payload.description).toBe('Goblin takes 7 Fire damage.');
+            const latchWrite = runtimeState.setRuntimeValue.mock.calls.find(a => a[1] === '_Destructive_Stride_usedRound');
+            expect(latchWrite[2]).toEqual({ round: 4, targets: ['Goblin'] });
+        });
+
+        it('tracks multiple creatures independently within the round', async () => {
+            combatData.getCombatSummary.mockReturnValue({ ...combatSummaryWithTargets, round: 2 });
+            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
+            latchRound(2, ['Goblin']);
+
+            await applyTargetChoice({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
+                campaignName,
+                targetName: 'Orc',
+                chosenType: 'Fire',
+                martialArtsDie: 6,
+            });
+
+            expect(applyDamage.applyDamageToTarget).toHaveBeenCalled();
+            const latchWrite = runtimeState.setRuntimeValue.mock.calls.find(a => a[1] === '_Destructive_Stride_usedRound');
+            expect(latchWrite[2]).toEqual({ round: 2, targets: ['Goblin', 'Orc'] });
+        });
+
+        it('refuses out-of-range targets (measured grid) — zero damage + refused log', async () => {
+            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
+            const { isWithinRange } = await import('../../../rules/combat/rangeCheck.js');
+            isWithinRange.mockResolvedValueOnce(false);
+
+            const result = await applyTargetChoice({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
+                campaignName,
+                targetName: 'Goblin',
+                chosenType: 'Fire',
+                martialArtsDie: 6,
+            });
+
+            expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
+            expect(result.payload.description).toContain('beyond 5 feet');
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                automationType: 'destructive_stride_refused',
+                automationDetail: 'out_of_range_5ft',
+            }));
+        });
+
+        it('consults isWithinRange with the monk and 5 ft on the success lane', async () => {
+            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
+            diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
+            const { isWithinRange } = await import('../../../rules/combat/rangeCheck.js');
+
+            await applyTargetChoice({
+                action: makeAction(),
+                playerStats: makePlayerStats(),
+                campaignName,
+                targetName: 'Goblin',
+                chosenType: 'Thunder',
+                martialArtsDie: 8,
+            });
+
+            expect(isWithinRange).toHaveBeenCalledWith('TestMonk', 'Goblin', 5);
         });
     });
 

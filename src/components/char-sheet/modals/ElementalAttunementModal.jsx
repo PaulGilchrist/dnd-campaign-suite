@@ -546,6 +546,14 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'elementalEpitomeActive' },
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'epitomeResistanceType' },
                 { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'epitomeEmpoweredUsedRound' },
+                // CLA-113: deactivation must also drop the epitome resistance activeBuffs
+                // entry, the numeric +20 speed_boost buff, and the Destructive Stride
+                // keys — otherwise epitome state leaks past Attunement expiry.
+                { type: 'remove_active_buff', buffName: 'Elemental Epitome' },
+                { type: 'remove_active_buff', buffName: 'Destructive Stride' },
+                { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'destructiveStrideActive' },
+                { type: 'clear_runtime_value', creatureName: playerStats.name, key: 'destructiveStrideDamageType' },
+                { type: 'clear_runtime_value', creatureName: playerStats.name, key: '_Destructive_Stride_usedRound' },
             ], campaignName, rounds: Infinity, expireOnCreatureName: playerStats.name });
 
         addEntry(campaignName, {

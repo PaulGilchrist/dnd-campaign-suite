@@ -39,6 +39,8 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_ShadowyDodge_usedRound',
     '_ShadowyDodge_appliedAttack',
     '_Slow_Fall_usedRound',
+    // CLA-113: Destructive Stride once-per-turn-per-creature latch re-arms at round wrap.
+    '_Destructive_Stride_usedRound',
     // FT-007: Boon of Combat Prowess round latch re-arms at round wrap (start of holder's next turn).
     '_Boon_of_Combat_Prowess_usedRound',
     '_Stones_Endurance_usedRound',

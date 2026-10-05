@@ -555,7 +555,18 @@ function useDestructiveStrideHandlers({ setDestructiveStrideModal, destructiveSt
         if (!destructiveStrideTargetModal) return;
         const { action, playerStats: modalPlayerStats, campaignName: modalCampaign, chosenType, martialArtsDie } = destructiveStrideTargetModal;
         setDestructiveStrideTargetModal(null);
-        const result = await applyDestructiveStrideTargetChoice(action, modalPlayerStats, modalCampaign, targetName, chosenType, martialArtsDie);
+        // CLA-113: applyTargetChoice has an OBJECT-destructure signature — the
+        // positional call made every arg land in `action` (campaignName undefined →
+        // getCombatSummary(undefined)=null → silent zero damage). Object shape twin
+        // of the CharActionModals (host 1) call site.
+        const result = await applyDestructiveStrideTargetChoice({
+            action,
+            playerStats: modalPlayerStats,
+            campaignName: modalCampaign,
+            targetName,
+            chosenType,
+            martialArtsDie,
+        });
         if (result?.type === 'popup') {
             const html = `<b>${result.payload?.name || 'Destructive Stride'}</b><br/>${result.payload?.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);

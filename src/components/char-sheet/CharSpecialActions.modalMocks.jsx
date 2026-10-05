@@ -170,12 +170,14 @@ vi.mock('./modals/ElementalEpitomeModal.jsx', () => ({
   ),
 }));
 
-// Mock DestructiveStrideModal
+// Mock DestructiveStrideModal — CLA-113: the real modal self-applies
+// applyDamageTypeChoice and echoes {action, playerStats, campaignName,
+// chosenType, martialArtsDie, targets} in its result payload.
 vi.mock('./modals/DestructiveStrideModal.jsx', () => ({
-  default: ({ action, playerStats: _ps, campaignName: _cn, onConfirm, onClose }) => (
+  default: ({ action, playerStats, campaignName, onConfirm, onClose }) => (
     <div data-testid="destructive-stride-modal">
       <span>{action?.name || 'Destructive Stride'}</span>
-      <button onClick={() => onConfirm({ type: 'modal', modalName: 'destructiveStrideTarget', payload: { targets: [{ name: 'Enemy1' }] } })}>Confirm Target</button>
+      <button onClick={() => onConfirm({ type: 'modal', modalName: 'destructiveStrideTarget', payload: { action, playerStats, campaignName, chosenType: 'Fire', martialArtsDie: 6, targets: [{ name: 'Enemy1' }] } })}>Confirm Target</button>
       <button onClick={() => onConfirm({ type: 'popup', payload: { name: 'Destructive Stride', description: 'Struck target.' } })}>Confirm Popup</button>
       <button onClick={onClose}>Close</button>
     </div>

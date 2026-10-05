@@ -22,7 +22,7 @@ import RevelationInFleshModal from './modals/RevelationInFleshModal.jsx'
 import MoonlightStepResourceModal from './modals/MoonlightStepResourceModal.jsx'
 import { handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 import { applyResistanceChoice } from '../../services/automation/handlers/combat/elementalEpitomeHandler.js'
-import { applyDamageTypeChoice, applyTargetChoice, skipTargetChoice } from '../../services/automation/handlers/combat/destructiveStrideHandler.js'
+import { applyTargetChoice, skipTargetChoice } from '../../services/automation/handlers/combat/destructiveStrideHandler.js'
 import { applyStarryChaliceHeal } from '../../services/rules/spells/postCastHealService.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
@@ -328,10 +328,14 @@ function CharActionModals({
         }
     };
 
-    const handleDestructiveStrideConfirm = async (chosenType) => {
+    // CLA-113: DestructiveStrideModal SELF-APPLIES the chosen type
+    // (applyDamageTypeChoice) and passes the RESULT OBJECT to onConfirm — re-calling
+    // applyDamageTypeChoice here double-applied and then returned null (chosenType was
+    // the result object, not a DAMAGE_TYPE), so the target picker never mounted.
+    // Mount result.payload directly — the CharSpecialActions (host 2) twin, byte-shape.
+    const handleDestructiveStrideConfirm = async (result) => {
         setModalState({ destructiveStrideModal: null });
-        const result = await applyDamageTypeChoice(mergedModalState.destructiveStrideModal?.action, playerStats, campaignName, chosenType);
-        if (result?.type === 'modal') {
+        if (result?.type === 'modal' && result.modalName === 'destructiveStrideTarget') {
             setModalState({ destructiveStrideTargetModal: result.payload });
         } else if (result?.payload) {
             setPopupHtml(result.payload);

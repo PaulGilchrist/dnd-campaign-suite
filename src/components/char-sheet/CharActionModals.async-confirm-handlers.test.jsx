@@ -432,12 +432,17 @@ vi.mock('./modals/ElementalEpitomeModal.jsx', () => ({
     );
   },
 }));
+// CLA-113: DestructiveStrideModal SELF-APPLIES applyDamageTypeChoice and passes
+// the RESULT OBJECT to onConfirm — the mock mirrors that verified contract
+// (previously it passed a raw type string, pinning the phantom shape that made
+// the host-1 confirm handler double-apply and swallow the picker).
 vi.mock('./modals/DestructiveStrideModal.jsx', () => ({
   default: function TestModal({ onClose, onConfirm }) {
     return (
       <div data-testid="destructive-stride-modal">
         <button data-testid="stride-close" onClick={onClose}>Close</button>
-        <button data-testid="stride-confirm" onClick={() => onConfirm('fire')}>Confirm</button>
+        <button data-testid="stride-confirm" onClick={() => onConfirm({ type: 'modal', modalName: 'destructiveStrideTarget', payload: { action: {}, chosenType: 'Fire', martialArtsDie: 12, targets: [] } })}>Confirm</button>
+        <button data-testid="stride-confirm-popup" onClick={() => onConfirm({ type: 'popup', payload: { description: 'done' } })}>ConfirmPopup</button>
       </div>
     );
   },
@@ -634,31 +639,14 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
 
   // ── handleDestructiveStrideConfirm ──
 
-  describe('handleDestructiveStrideConfirm', () => {
-    it('sets popupHtml when applyDamageTypeChoice returns payload without modal type', async () => {
-      const setPopupHtml = vi.fn();
-      const { applyDamageTypeChoice } = await import('../../services/automation/handlers/combat/destructiveStrideHandler.js');
-      applyDamageTypeChoice.mockResolvedValue({ payload: 'Damage applied' });
-
-      render(<CharActionModals
-        {...createBaseProps({ setPopupHtml })}
-        modalState={{ destructiveStrideModal: { action: {}, playerStats: {}, campaignName: 'test-campaign' } }}
-        setModalState={vi.fn()}
-      />);
-
-      fireEvent.click(screen.getByTestId('stride-confirm'));
-
-      await waitFor(() => {
-        expect(applyDamageTypeChoice).toHaveBeenCalled();
-        expect(setPopupHtml).toHaveBeenCalledWith('Damage applied');
-      });
-    });
-
-    it('sets destructiveStrideTargetModal when result has modal type', async () => {
+  // CLA-113: the modal SELF-APPLIES applyDamageTypeChoice and passes the RESULT
+  // OBJECT to onConfirm. The host must NOT re-call applyDamageTypeChoice
+  // (double-apply with the result object as chosenType → null → picker never
+  // mounted). It mounts result.payload straight onto the host slot.
+  describe('handleDestructiveStrideConfirm (CLA-113 result-object contract)', () => {
+    it('mounts the target picker from the self-applied result — no double applyDamageTypeChoice call', async () => {
       const setModalState = vi.fn();
       const { applyDamageTypeChoice } = await import('../../services/automation/handlers/combat/destructiveStrideHandler.js');
-      const modalPayload = { action: {}, chosenType: 'fire' };
-      applyDamageTypeChoice.mockResolvedValue({ type: 'modal', payload: modalPayload });
 
       render(<CharActionModals
         {...createBaseProps()}
@@ -669,7 +657,26 @@ describe('CharActionModals — async confirm handlers with setPopupHtml', () => 
       fireEvent.click(screen.getByTestId('stride-confirm'));
 
       await waitFor(() => {
-        expect(setModalState).toHaveBeenCalledWith({ destructiveStrideTargetModal: modalPayload });
+        expect(setModalState).toHaveBeenCalledWith(expect.objectContaining({
+          destructiveStrideTargetModal: expect.objectContaining({ chosenType: 'Fire', martialArtsDie: 12 }),
+        }));
+      });
+      expect(applyDamageTypeChoice).not.toHaveBeenCalled();
+    });
+
+    it('sets popupHtml when the self-applied result is a popup', async () => {
+      const setPopupHtml = vi.fn();
+
+      render(<CharActionModals
+        {...createBaseProps({ setPopupHtml })}
+        modalState={{ destructiveStrideModal: { action: {}, playerStats: {}, campaignName: 'test-campaign' } }}
+        setModalState={vi.fn()}
+      />);
+
+      fireEvent.click(screen.getByTestId('stride-confirm-popup'));
+
+      await waitFor(() => {
+        expect(setPopupHtml).toHaveBeenCalledWith({ description: 'done' });
       });
     });
   });
