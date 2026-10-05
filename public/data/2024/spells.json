@@ -5251,7 +5251,20 @@
         ],
         "subclasses": [],
         "area_of_effect": null,
-        "status_effects": []
+        "status_effects": [],
+        "automation": {
+            "type": "summon_spirit",
+            "typeLabel": "Otherworldly Steed",
+            "baseLevel": 2,
+            "hpPerLevelAbove": 10,
+            "variants": [
+                {
+                    "name": "Otherworldly Steed",
+                    "monsterIndex": "otherworldly-steed"
+                }
+            ],
+            "noConcentration": true
+          }
     },
     {
         "index": "find-traps",

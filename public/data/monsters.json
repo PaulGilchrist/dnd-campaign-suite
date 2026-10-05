@@ -22782,6 +22782,83 @@
     ]
   },
   {
+    "index": "otherworldly-steed",
+    "name": "Otherworldly Steed",
+    "size": "Large",
+    "type": "celestial",
+    "subtype": "",
+    "alignment": "unaligned",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 12,
+    "armor_class_scales_with_slot": true,
+    "armor_class_details": null,
+    "hit_points": 20,
+    "hit_dice": "4d8+4",
+    "speed": {
+      "walk": "60 ft."
+    },
+    "ability_scores": {
+      "str": 18,
+      "dex": 14,
+      "con": 15,
+      "int": 6,
+      "wis": 12,
+      "cha": 8
+    },
+    "ability_score_modifiers": {
+      "str": 4,
+      "dex": 2,
+      "con": 2,
+      "int": -2,
+      "wis": 1,
+      "cha": -1
+    },
+    "saving_throws": {},
+    "skills": {},
+    "senses": {
+      "darkvision": 60,
+      "passive_perception": 11
+    },
+    "languages": "understands one language you speak",
+    "challenge_rating": "0",
+    "xp": 0,
+    "proficiency_bonus": null,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "environments": [],
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [],
+    "actions": [
+      {
+        "name": "Hooves",
+        "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+4 Bludgeoning damage.",
+        "attack_bonus": null,
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8+4",
+        "damage_type_primary": "Bludgeoning"
+      }
+    ],
+    "traits": [
+      {
+        "name": "Spellcasting",
+        "description": "The steed can cast two cantrips of your choice from the Paladin spell list. It casts a cantrip on itself or its rider as its target. Spellcasting Ability: Charisma."
+      }
+    ],
+    "reactions": [],
+    "legendary_actions": [],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "2024 Player's Handbook",
+    "page": null,
+    "description": "An otherworldly steed summoned by Find Steed. Resembles a Large, rideable animal of the caster's choice; the caster chooses its type (Celestial, Fey, or Fiend). AC and Hit Points scale with the spell's level (AC 12 + spell level; 20 HP + 10 per spell level above 2nd)."
+  },
+  {
     "index": "fiendish-spirit-demon",
     "name": "Fiendish Spirit (Demon)",
     "size": "Large",

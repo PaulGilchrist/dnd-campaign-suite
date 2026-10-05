@@ -188,8 +188,20 @@ export const LONG_REST_RESOURCES = [
   'mysticArcanumLevel9',
   '_Phantasmal_Creatures_freeCastCount',
    '_Fey_Reinforcements_freeCastCount',
-    '_Misty_Wanderer_freeCastCount',
-    "_Paladin's_Smite_freeCastCount",
+     '_Misty_Wanderer_freeCastCount',
+     "_Paladin's_Smite_freeCastCount",
+    // CLA-130: Faithful Steed (2024 Paladin lv5, classes.json free_spell
+    // uses:1 recharge:"long_rest") — the spell row spends
+    // `_Faithful_Steed_freeCastCount` to 0 via spellPreparationService.
+    // Null re-arm restores the free use (featureFreeCastCount falls back to
+    // entry.uses=1, re-arming the "Free Cast" badge). Missing registration
+    // killed the free use permanently after one cast (CLA-096/099 family rule:
+    // every latch belongs in LONG_REST_RESOURCES or the use dies).
+    '_Faithful_Steed_freeCastCount',
+    // CLA-130 family safety-net: Favored Enemy's latch also gets the batch
+    // null re-arm here (the dedicated resetFlags site in restRules-longRest.js
+    // stays authoritative; null+null is idempotent).
+    '_Favored_Enemy_freeCastCount',
        'breathweaponUses',
   'stonecunningUses',
   'naturesVeilUses',

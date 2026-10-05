@@ -2457,7 +2457,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-130-faithful-steed-no-recharge-log-only-summon.md",
+      "verified": "verified",
       "class": "Paladin",
       "triggerConditions": "Action: passive; Spell: Find Steed",
       "expectedBehavior": "You always have the Find Steed spell prepared. You can also cast the spell once without expending a spell slot, and you regain the ability to do so when you finish a Long Rest."

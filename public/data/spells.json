@@ -3759,7 +3759,39 @@
         ],
         "subclasses": [
             "Lore"
-        ]
+        ],
+        "automation": {
+            "type": "summon_spirit",
+            "typeLabel": "Otherworldly Steed",
+            "scale": false,
+            "variants": [
+                {
+                    "name": "Warhorse",
+                    "monsterIndex": "warhorse"
+                },
+                {
+                    "name": "Riding Horse",
+                    "monsterIndex": "riding-horse"
+                },
+                {
+                    "name": "Mastiff",
+                    "monsterIndex": "mastiff"
+                },
+                {
+                    "name": "Pony",
+                    "monsterIndex": "pony"
+                },
+                {
+                    "name": "Camel",
+                    "monsterIndex": "camel"
+                },
+                {
+                    "name": "Elk",
+                    "monsterIndex": "elk"
+                }
+            ],
+            "noConcentration": true
+          }
     },
     {
         "index": "find-traps",

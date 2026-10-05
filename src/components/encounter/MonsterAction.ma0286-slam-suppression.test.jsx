@@ -113,7 +113,7 @@ describe('MA-0286 suppression-gate collateral scan — whole monsters.json', () 
     return hm ? hm[1].replace(/\s+/g, ' ').trim() : null;
   };
 
-  it('suppresses EXACTLY the one auto-hit attack row app-wide (AO Medium Slam; Drow Mage Staff armed by MA-0647)', () => {
+  it('suppresses exactly the auto-hit attack rows app-wide (AO Medium Slam; Drow Mage Staff armed by MA-0647)', () => {
     const suppressed = [];
     const kept = [];
     for (const mo of monsters) {
@@ -129,7 +129,10 @@ describe('MA-0286 suppression-gate collateral scan — whole monsters.json', () 
         }
       }
     }
-    expect(suppressed).toEqual(['animated-object-medium/Slam']);
+    // CLA-130: otherworldly-steed/Hooves is a summon-lane caster-fold row
+    // (attack_bonus null folded by summonSpiritHandler); MA-0286 suppression
+    // is correct for it on EB-direct join, same as animated-object-medium.
+    expect(suppressed).toEqual(['animated-object-medium/Slam', 'otherworldly-steed/Hooves']);
     expect(kept).toEqual(expect.arrayContaining(['giant-frog/Swallow', 'young-remorhaz/Heat Aura']));
     expect(kept.every(k => !/attack/i.test(k))).toBe(true);
   });
