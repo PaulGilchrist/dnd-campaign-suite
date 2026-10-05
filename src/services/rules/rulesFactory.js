@@ -179,6 +179,10 @@ const rulesFactory = {
         const elementalAffinityType = getChosenRuntimeValue(playerStats, 'Elemental Affinity', 'chosenType');
         if (elementalAffinityType) {
             mergeDefenseList(playerStats, 'resistances', [elementalAffinityType]);
+            // CLA-110: stamp merge provenance so the damage lane can REPLACE this slot
+            // LIVE on a mid-session re-pick (CLA-336 computedStats staleness — the
+            // re-pick never re-runs this compute). See applyDamage resolveCreatureDefenses.
+            playerStats._elementalAffinityResistedType = elementalAffinityType;
         }
 
         // Resolve Fiendish Resilience damage type resistance (2024 Warlock Fiend Patron)

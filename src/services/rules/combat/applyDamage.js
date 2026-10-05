@@ -227,6 +227,17 @@ function getBoonEnergyResistances(playerStats, campaignName) {
   return Array.isArray(chosen) ? chosen : [];
 }
 
+// CLA-110: Elemental Affinity (2024 Draconic Sorcery lv6) — the chosen damage
+// type lives ONLY under the runtime key `_Elemental_Affinity_chosenType` (stamped
+// by elementalAffinityHandler via choiceStorage name "Elemental Affinity").
+// rulesFactory merges it into computedStats.resistances for RENDER only (CLA-336
+// staleness), so read the producer key LIVE at hit-resolution — the FT-009 Boon
+// Energy lane above, same shape. Byte-inert for every character without the key.
+function getElementalAffinityResistances(playerStats, campaignName) {
+  const chosen = getChosenRuntimeValue(playerStats, 'Elemental Affinity', 'chosenType', campaignName);
+  return chosen ? [chosen] : [];
+}
+
 function addBuffResistances(resistances, activeBuffs) {
   for (const buff of activeBuffs) {
     if (buff.resistanceTypes?.length) {
@@ -636,6 +647,27 @@ async function resolveCreatureDefenses(creature, targetName, isPlayer, character
     if (boonEnergyResistances.length > 0) {
       resistances = [...new Set([...resistances, ...boonEnergyResistances])];
       passiveResistances = [...new Set([...passiveResistances, ...boonEnergyResistances])];
+    }
+    // CLA-110: fold the Elemental Affinity chosen type LIVE into both resistances
+    // (halve the incoming damage, floor(raw/2) + resisted:true in the breakdown)
+    // and passiveResistances (log the halving) so a mid-session re-pick takes
+    // effect WITHOUT a computedStats recompute — the FT-009 lane above, twin.
+    // Unlike the FT-009 lane, rulesFactory :179 ALSO merges this key into
+    // computedStats.resistances for the sheet, so a mid-session re-pick leaves the
+    // OLD type there (CLA-336 staleness). The merge stamps its provenance
+    // (_elementalAffinityResistedType): when live-chosen differs from the stamped
+    // type, REPLACE the stale slot — Fire→Cold means Fire is full again. The
+    // stamped slot is chooser-owned; a rare race/feat overlap of the OLD type is
+    // an adjudicated edge the single-slot chooser cannot model.
+    const elementalAffinityResistances = getElementalAffinityResistances(playerStats, campaignName);
+    if (elementalAffinityResistances.length > 0) {
+      const staleType = playerComputed?._elementalAffinityResistedType;
+      if (staleType) {
+        const lower = String(staleType).toLowerCase();
+        resistances = resistances.filter(r => String(r).toLowerCase() !== lower);
+      }
+      resistances = [...new Set([...resistances, ...elementalAffinityResistances])];
+      passiveResistances = [...new Set([...passiveResistances, ...elementalAffinityResistances])];
     }
   }
 

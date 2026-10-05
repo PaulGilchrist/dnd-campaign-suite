@@ -121,6 +121,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
       .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
+      .mockReturnValueOnce(null) // CLA-110 Elemental Affinity chosenType (unset → inert)
       .mockReturnValueOnce([{ resistanceTypes: ['fire'], resistanceTypes2: ['cold'] }])
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(30)
@@ -136,6 +137,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
       .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
+      .mockReturnValueOnce(null) // CLA-110 Elemental Affinity chosenType (unset → inert)
       .mockReturnValueOnce([
         { resistanceTypes: ['fire'] },
         { resistanceTypes: ['fire', 'cold'] },
@@ -154,6 +156,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
       .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
+      .mockReturnValueOnce(null) // CLA-110 Elemental Affinity chosenType (unset → inert)
       .mockReturnValueOnce('not-an-array')
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(30)
@@ -167,6 +170,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
       .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
+      .mockReturnValueOnce(null) // CLA-110 Elemental Affinity chosenType (unset → inert)
       .mockReturnValueOnce(null)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(30)
@@ -180,6 +184,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     getRuntimeValue
       .mockReturnValueOnce(null) // lastAttack read
       .mockReturnValueOnce(null) // FT-009 Energy Resistances chosenTypes (unset → inert)
+      .mockReturnValueOnce(null) // CLA-110 Elemental Affinity chosenType (unset → inert)
       .mockReturnValueOnce([{ resistanceTypes: ['cold'] }])
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(30)
