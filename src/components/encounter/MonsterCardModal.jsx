@@ -6,6 +6,7 @@ import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResist
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { findCreatureByName } from '../../services/rules/combat/damageUtils.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
+import { hasElusiveFeature } from '../../services/combat/conditions/elusiveFeature.js';
 import { isProtectionFromEvilAndGoodActive, isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import { resolveCreatureType } from '../../services/combat/creatureTypeResolver.js';
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
@@ -837,16 +838,24 @@ function resolveTargetDefense(target, creatures, primaryDamageType) {
   return { targetComputed, resistanceNotice };
 }
 
-function applyElusive(targetEffectData, target, targetComputed, targetConditions) {
-  if (target?.type !== 'player' || !targetComputed) return;
-  const hasElusive = [
-    ...(targetComputed.actions || []),
-    ...(targetComputed.bonusActions || []),
-    ...(targetComputed.reactions || []),
-    ...(targetComputed.specialActions || [])
-  ].some(a => a.name === 'Elusive');
-  const isIncapacitated = targetConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
-  if (hasElusive && !isIncapacitated) {
+// CLA-119: Elusive (lv18+ Rogue, both rulesets) — combatSummary player entries are
+// feature-less stubs (encounterToInitiative.js:57), so reading targetComputed here
+// made hasElusive ALWAYS false and advantage (e.g. Faerie Fire te) was never
+// cancelled vs an Elusive defender on this lane. Source the FULL rolled PlayerStats
+// (characters[i].computedStats — same rulesFactory.getPlayerStats output the sheet
+// lane consumes) via the shared hasElusiveFeature seam, mirroring the sibling
+// defender-backed folds applyProtectionFromEvilPenalty / applyDodgePenalty (BA-001)
+// in this same buildTargetEffectData chain. Incapacitated exemption reads the
+// runtime activeConditions channel (what EffectAdders/conditionSaveService write).
+// noAdvantageAgainst is a boolean fold consumed once in combineAttackModes (adv=0)
+// — idempotent when the sheet lane already stamped the flag.
+// eslint-disable-next-line react-refresh/only-export-components
+export function applyElusive(targetEffectData, target, characters, campaignName) {
+  if (target?.type !== 'player') return;
+  const playerStats = characters?.find(c => c.name === target.name)?.computedStats || null;
+  const activeConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+  const isIncapacitated = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
+  if (hasElusiveFeature(playerStats) && !isIncapacitated) {
     targetEffectData.noAdvantageAgainst = true;
   }
 }
@@ -1294,10 +1303,10 @@ function resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, ca
   return true;
 }
 
-function buildTargetEffectData({ target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses = null }) {
+function buildTargetEffectData({ target, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses = null, characters = null }) {
   const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name);
   const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget, attackerSenses });
-  applyElusive(targetEffectData, target, targetComputed, targetConditions);
+  applyElusive(targetEffectData, target, characters, campaignName);
   applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, getAttackerCreature);
   applyDodgePenalty(targetEffectData, target, campaignName);
   return targetEffectData;
@@ -2143,7 +2152,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const attackerEffects = computeConditionEffects({ conditions: attackerConditions, saveModifiers: targetSaveModifiers, targetEffects: monsterTargetEffects, attackerSenses: monsterSensesArray })
     if (resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, campaignName, monsterName, name)) return;
 
-    const targetEffectData = buildTargetEffectData({ target, targetComputed, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses: monsterSensesArray });
+    const targetEffectData = buildTargetEffectData({ target, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses: monsterSensesArray, characters });
 
     const effectiveBonus = bonus + (targetEffectData.riderAttackBonus || 0);
 

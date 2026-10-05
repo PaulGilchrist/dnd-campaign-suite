@@ -1,5 +1,6 @@
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js'
+import { hasElusiveFeature } from '../../services/combat/conditions/elusiveFeature.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js'
 import { isDistanceInRange } from '../../services/rules/combat/rangeCheck.js'
@@ -105,14 +106,8 @@ function applyPfeagTargetDisadvantage(conditionEffects, playerStats, combatConte
 
 // Elusive: no attack roll can have Advantage against you unless Incapacitated.
 function applyElusive(conditionEffects, playerStats, activeConditions) {
-    const hasElusive = [
-        ...(playerStats.actions || []),
-        ...(playerStats.bonusActions || []),
-        ...(playerStats.reactions || []),
-        ...(playerStats.specialActions || [])
-    ].some(a => a.name === 'Elusive');
     const isIncapacitated = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
-    if (hasElusive && !isIncapacitated) {
+    if (hasElusiveFeature(playerStats) && !isIncapacitated) {
         conditionEffects.noAdvantageAgainst = true;
     }
 }
