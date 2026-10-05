@@ -678,13 +678,17 @@ function gateHeroism({ spell, campaignName, cfSetPending }) {
   return false;
 }
 
-function gateHex({ spell, campaignName, cfSetPending, playerStats }) {
+// CLA-107: thread the HexAbilityModal chooser selection through the target
+// picker onto pending (gateConfusion:504 metaCtx-forwarding precedent) so the
+// chosen ability survives confirm → runHex → executeSpellCast.
+function gateHex({ spell, campaignName, cfSetPending, playerStats, metaCtx }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { excludeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('hex', makePending('hex', spell, {
       range: spell.range || '90 feet',
       creatureTargets,
       maxTargets: 1,
+      hexAbility: metaCtx?.hexAbility || null,
     }));
     return true;
   }

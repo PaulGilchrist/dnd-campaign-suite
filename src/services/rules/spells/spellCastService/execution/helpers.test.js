@@ -221,6 +221,40 @@ describe('helpers.js — applyHexEffects', () => {
     });
   });
 
+  // CLA-107: hex tes previously had producer-only duration:'hex_duration' with
+  // zero expiry consumer — arm ONE merged remove_target_effect clock on cast.
+  describe('CLA-107 expiry clock registration', () => {
+    it('arms ONE merged clock clearing both hex tes for the target (hours×600)', () => {
+      const playerStats = makePlayerStats({
+        automation: { passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }] },
+      });
+
+      applyHexEffects({ name: 'Hex' }, playerStats, 'test-campaign', 'Bandit 1', 'DEX');
+
+      expect(addExpiration).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(addExpiration).mock.calls[0][0];
+      expect(call.attackerName).toBe('TestWizard');
+      expect(call.targetName).toBe('Bandit 1');
+      expect(call.rounds).toBe(600);
+      expect(call.effects).toEqual([
+        { type: 'remove_target_effect', effectKey: 'hex_ability_check_disadvantage', source: 'TestWizard', target: 'Bandit 1' },
+        { type: 'remove_target_effect', effectKey: 'hex_save_disadvantage', source: 'TestWizard', target: 'Bandit 1' },
+      ]);
+    });
+
+    it('base Hex (no Eldritch Hex passive) registers only the check-disadvantage leg', () => {
+      const playerStats = makePlayerStats({ automation: { passives: [] } });
+
+      applyHexEffects({ name: 'Hex' }, playerStats, 'test-campaign', 'Bandit 1', 'DEX');
+
+      expect(addExpiration).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(addExpiration).mock.calls[0][0];
+      expect(call.effects).toEqual([
+        { type: 'remove_target_effect', effectKey: 'hex_ability_check_disadvantage', source: 'TestWizard', target: 'Bandit 1' },
+      ]);
+    });
+  });
+
   describe('updating existing effects', () => {
     it('replaces existing hex_ability_check_disadvantage instead of adding duplicate', () => {
       const spell = { name: 'Hex' };

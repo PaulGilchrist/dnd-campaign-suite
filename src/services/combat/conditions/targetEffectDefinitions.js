@@ -1480,17 +1480,22 @@ function getActiveTargetEffect(campaignName, targetName, effectKey) {
   return storedEffects.find(te => te.target === targetName && te.effect === effectKey) || null
 }
 
+// Ability-scoped save-disadvantage te keys folded by the shared matcher at
+// every save-roll seam (MA-1352 + CLA-107 Eldritch Hex).
+const ABILITY_SAVE_DISADVANTAGE_TE_KEYS = ['ability_save_disadvantage', 'hex_save_disadvantage']
+
 /**
  * MA-1352: ability-scoped save-disadvantage consumer match. saveType arrives
  * at the save-roll seams as a full word ('Intelligence') or abbreviation;
- * te.ability stores the lowercase abbreviation ('int'). Non-consuming — the
+ * te.ability stores the lowercase abbreviation ('int') — hex_save_disadvantage
+ * carries the chooser's uppercase key ('DEX') (CLA-107). Non-consuming — the
  * te persists until its anchored expiration clock clears it.
  */
 function abilitySaveDisadvantageActive(targetEffects, targetName, saveType) {
   const abbr = String(saveType || '').toLowerCase().slice(0, 3)
   if (!abbr) return false
   return (targetEffects || []).some(te => te.target === targetName
-    && te.effect === 'ability_save_disadvantage'
+    && ABILITY_SAVE_DISADVANTAGE_TE_KEYS.includes(te.effect)
     && String(te.ability || '').toLowerCase() === abbr)
 }
 

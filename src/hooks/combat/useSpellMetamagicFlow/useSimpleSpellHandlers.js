@@ -238,13 +238,15 @@ async function runCureWounds(d, pending, result) {
   d.onExecute(pending.spell, { targetName, slotLevel: healSlotLevel(pending) })
 }
 
+// CLA-107: forward the HexAbilityModal chooser selection (persisted on pending
+// by gateHex) onto the execute metaCtx — previously dropped, pinning STR.
 async function runHex(d, pending, result) {
   const targetName = Array.isArray(result) ? result[0] : result
   if (!targetName) return
   // CLA-033: onExecute reaches runPostCastTriggers — opt out of the
   // confirm-lane rider seam so Beguiling Magic fires exactly once.
   pending.postCastTriggersRan = true
-  d.onExecute(pending.spell, { targetName })
+  d.onExecute(pending.spell, { targetName, hexAbility: pending.hexAbility })
 }
 
 function refundGreaterRestorationNoEffects(d) {

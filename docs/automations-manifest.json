@@ -2134,7 +2134,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-107-eldritch-hex.md",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Always have Hex spell prepared. When you cast Hex and choose an ability, the target also has Disadvantage on saving throws of the chosen ability for the duration."

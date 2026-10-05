@@ -119,3 +119,27 @@ describe('MA-1352 getSaveDisadvantage — ability-scoped ability_save_disadvanta
     expect(getSaveDisadvantage({ targetName: 'Thug 1', saveType: 'INT' }, 'test-campaign')).toBe(false);
   });
 });
+
+// CLA-107: Eldritch Hex — hex_save_disadvantage folds disadvantage on the
+// GM save-prompt seam for the CHOSEN ability only.
+describe('CLA-107 getSaveDisadvantage — hex_save_disadvantage chosen-ability fold', () => {
+  const hexDex = [{ target: 'Bandit 1', effect: 'hex_save_disadvantage', ability: 'DEX', source: 'HexWarlock', duration: 'hex_duration' }];
+
+  beforeEach(() => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'targetEffects') return hexDex;
+      return null;
+    });
+  });
+
+  it('true on DEX saves (uppercase chooser key, full word)', () => {
+    expect(getSaveDisadvantage({ targetName: 'Bandit 1', saveType: 'DEX' }, 'test-campaign')).toBe(true);
+    expect(getSaveDisadvantage({ targetName: 'Bandit 1', saveType: 'Dexterity' }, 'test-campaign')).toBe(true);
+  });
+
+  it('false on every other save type, every other target', () => {
+    expect(getSaveDisadvantage({ targetName: 'Bandit 1', saveType: 'STR' }, 'test-campaign')).toBe(false);
+    expect(getSaveDisadvantage({ targetName: 'Bandit 1', saveType: 'WIS' }, 'test-campaign')).toBe(false);
+    expect(getSaveDisadvantage({ targetName: 'Thug 1', saveType: 'DEX' }, 'test-campaign')).toBe(false);
+  });
+});

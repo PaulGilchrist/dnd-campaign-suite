@@ -87,6 +87,27 @@ function clearRayOfEnfeeblementEffects(campaignName, casterName) {
     removeTargetEffectsByEffect('ray_of_enfeeble_debuff', casterName, campaignName);
 }
 
+// CLA-107: hex tes stamp duration:'hex_duration' so the generic
+// duration==='concentration' sweep misses them — purge both hex keys by
+// caster explicitly on every concentration-break lane (CLA-005/SP-035 purge
+// precedent, clearRayOfEnfeeblementEffects byte-shape). Removal is logged;
+// zero matching tes = zero write, zero log.
+function clearHexEffects(campaignName, casterName) {
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || []
+    const cleared = storedEffects.filter(te =>
+        ['hex_ability_check_disadvantage', 'hex_save_disadvantage'].includes(te.effect) && te.source === casterName)
+    if (cleared.length === 0) return
+    setRuntimeValue('campaign', 'targetEffects', storedEffects.filter(te => !cleared.includes(te)), campaignName, true)
+    const targets = [...new Set(cleared.map(te => te.target))]
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'hex_effects_cleared',
+        characterName: casterName,
+        description: `Hex ends (concentration lost) — check/save disadvantage cleared on ${targets.join(', ')}.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[concentrationService:hex-cleared]', e); })
+}
+
 function addConcentration(combatSummary, creatureName, spellName, dc, target = null) {
     const creature = combatSummary.creatures.find(c => c.name === creatureName)
     if (!creature) return
@@ -326,6 +347,11 @@ async function cleanupConcentrationEffects(casterName, spellName, campaignName) 
     revertObjectTransforms(casterName, campaignName);
 
     clearCasterConcentrationTargetEffects(casterName, campaignName);
+
+    // CLA-107: purge hex_ability_check/hex_save disadvantage tes BEFORE the
+    // expiration sweep so the hex end is logged (the armed clock leg would
+    // otherwise consume the same entries silently).
+    clearHexEffects(campaignName, casterName)
 
     clearPendingExpirations(casterName, campaignName);
 

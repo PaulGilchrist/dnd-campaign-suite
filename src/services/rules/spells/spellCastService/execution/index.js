@@ -479,10 +479,15 @@ async function runGenericHealPath({ spell, metaCtx, playerStats, campaignName, m
     return genericHealResult;
 }
 
-// Hex: apply effects and log the cast.
+// Hex: apply effects and log the cast. CLA-107: the chosen ability is threaded
+// by the chooser lane (gateHex → runHex); no silent STR default — a missing
+// choice console.errors and applies nothing (applyHexEffects guards).
 async function castHex(spell, metaCtx, playerStats, campaignName, getTargetInfo) {
-    const ability = metaCtx?.hexAbility || 'STR';
+    const ability = metaCtx?.hexAbility || null;
     const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
+    if (!ability) {
+        console.error('[spellCast] castHex: hexAbility is missing from metaCtx — chooser selection was dropped; applying zero hex effects');
+    }
     applyHexEffects(spell, playerStats, campaignName, hexTarget, ability);
     const hasEldritchHex = playerStats.automation?.passives?.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');
     const effects = hasEldritchHex ? 'ability check disadvantage + saving throw disadvantage' : 'ability check disadvantage';

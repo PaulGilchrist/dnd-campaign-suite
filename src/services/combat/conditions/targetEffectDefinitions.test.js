@@ -650,6 +650,17 @@ describe('targetEffectDefinitions', () => {
       expect(abilitySaveDisadvantageActive([te({ ability: 'dex' })], 'Bandit 1', 'Intelligence')).toBe(false);
     });
 
+    // CLA-107: Eldritch Hex producer te folds at every shared save-roll seam.
+    it('CLA-107 matcher: hex_save_disadvantage folds the chosen ability only', () => {
+      const hex = te({ effect: 'hex_save_disadvantage', ability: 'DEX', source: 'HexWarlock' });
+      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'DEX')).toBe(true);
+      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'Dexterity')).toBe(true);
+      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'dex')).toBe(true);
+      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'STR')).toBe(false);
+      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'Wisdom')).toBe(false);
+      expect(abilitySaveDisadvantageActive([hex], 'Other 1', 'Dexterity')).toBe(false);
+    });
+
     it('matcher: a separate next_save te does not leak into the ability-scoped match', () => {
       expect(abilitySaveDisadvantageActive(
         [{ target: 'Bandit 1', effect: 'disadvantage_on_next_save', source: 'X' }],

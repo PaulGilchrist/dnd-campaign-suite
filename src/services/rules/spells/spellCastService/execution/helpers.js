@@ -61,6 +61,15 @@ function applyHexEffects(spell, playerStats, campaignName, targetName, ability) 
     }
 
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+
+    // CLA-107: arm ONE merged remove_target_effect clock (§37 hours×600 — Hex
+    // is concentration, up to 1 hour) so both hex tes clear on duration
+    // expiry; concentration-break purges them via cleanupConcentrationEffects.
+    const expiryEffects = [{ type: 'remove_target_effect', effectKey: 'hex_ability_check_disadvantage', source: playerStats.name, target: targetName }];
+    if (hasEldritchHex) {
+        expiryEffects.push({ type: 'remove_target_effect', effectKey: 'hex_save_disadvantage', source: playerStats.name, target: targetName });
+    }
+    addExpiration({ attackerName: playerStats.name, targetName, effects: expiryEffects, campaignName, rounds: 600 });
 }
 
 async function triggerArcaneWard(spell, metaCtx, playerStats, campaignName) {

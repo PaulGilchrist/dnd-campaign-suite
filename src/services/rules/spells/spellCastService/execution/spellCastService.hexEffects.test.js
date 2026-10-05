@@ -508,5 +508,57 @@ describe('executeSpellCast - Hex spell edge cases', () => {
         expect.anything(), 'targetEffects', expect.anything(), 'testCampaign'
       )
     })
+
+    // CLA-107: the STR silent default pinned every cast — the chooser lane now
+    // threads hexAbility; a missing choice must console.error and stamp ZERO
+    // hex effects (never coerce to STR).
+    it('CLA-107: missing hexAbility console.errors and applies zero hex effects (no STR coercion)', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const services = makeServices({
+        playerStats: makePlayerStats({
+          automation: {
+            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
+          },
+        }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
+      })
+
+      const spell = { ...makeSpell(), name: 'Hex' }
+      delete spell.damage
+      delete spell.dc
+
+      await executeSpellCast(spell, makeMetaCtx(), services)
+
+      expect(errSpy).toHaveBeenCalled()
+      const hexWrite = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
+        c => c[1] === 'targetEffects'
+      )
+      expect(hexWrite).toBeUndefined()
+      errSpy.mockRestore()
+    })
+
+    it('CLA-107: chosen DEX threads into the cast log entry hexAbility', async () => {
+      const { addEntry } = await import('../../../../ui/logService.js')
+      const services = makeServices({
+        playerStats: makePlayerStats({
+          automation: {
+            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
+          },
+        }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
+      })
+
+      const spell = { ...makeSpell(), name: 'Hex' }
+      delete spell.damage
+      delete spell.dc
+
+      await executeSpellCast(spell, makeMetaCtx({ hexAbility: 'DEX' }), services)
+
+      const hexLog = vi.mocked(addEntry).mock.calls
+        .map(c => c[1])
+        .find(e => e && e.spellName === 'Hex' && e.hexAbility !== undefined)
+      expect(hexLog).toBeDefined()
+      expect(hexLog.hexAbility).toBe('DEX')
+    })
   })
 })
