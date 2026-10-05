@@ -249,7 +249,13 @@ function applyAlwaysPreparedGrantSpells(spellAbilities, feature, playerStats) {
 function applyFreeSpellGrant(spellAbilities, feature) {
     const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
     spellNames.forEach(spellName => {
-        if (spellAbilities.spells.find(s => s.name === spellName)) return;
+        const existing = spellAbilities.spells.find(s => s.name === spellName);
+        if (existing) {
+            // FT-035: stamp the exemption on an already-present row too — the free-cast
+            // guarantee belongs to the automation grant, not to how the row first arrived.
+            existing._freeSpellGrantFreeCast = true;
+            return;
+        }
         const spellEntry = { name: spellName, prepared: 'Always' };
         if (feature.automation?.casting_time) {
             spellEntry.casting_time = feature.automation.casting_time;
@@ -258,6 +264,16 @@ function applyFreeSpellGrant(spellAbilities, feature) {
             spellEntry._telekineticMasterFreeCast = true;
             spellEntry.spellCastingAbility = 'Intelligence';
         }
+        // FT-035: a free_spell automation makes the FEAT the caster (2024 RAW: Fey
+        // Touched's fixed spell — feats.json automation spell:["Misty Step"] — is a free
+        // cast 1× per Long Rest on ANY holder, including characters whose slot table has
+        // no slot at that spell level). Stamp the grant so keepSpellRow cannot silently
+        // drop the row (CLA-356/CLA-234 exemption family, generalized to every free_spell
+        // grant — data-driven, not feat-name-hardcoded). Authorization and consumption
+        // ride spellPreparationService's per-spell/recharge latches; once the latch is
+        // spent, slot payment falls back to consumeBaseSlot and fails cleanly there —
+        // this stamp never smuggles a free slot cast.
+        spellEntry._freeSpellGrantFreeCast = true;
         spellAbilities.spells.push(spellEntry);
     });
 }
@@ -664,6 +680,13 @@ function remapSpellRow(spell, allSpells, mageHandLegerdemainActive) {
     if (spell._telekineticMasterFreeCast) {
         copy._telekineticMasterFreeCast = true;
     }
+    // FT-035: carry the free_spell-grant exemption across the detail remap (the
+    // slot-level filter runs AFTER this remap) so a feat's fixed spell above the
+    // holder's slot table keeps its castable free-cast row (Fey Touched lv2 Misty
+    // Step on a lv1-slot-only Fighter was silently dropped — defect FT-035(a)).
+    if (spell._freeSpellGrantFreeCast) {
+        copy._freeSpellGrantFreeCast = true;
+    }
     // CLA-050: carry the Circle of the Land fixed level across the detail remap
     // (classes.json land levels are canonical): display, slot cost and damage
     // formula all resolve at the stamped level, not the spells-DB base level.
@@ -684,8 +707,8 @@ function remapSpellRow(spell, allSpells, mageHandLegerdemainActive) {
 }
 
 // Slot-level row filter — cantrips, Mystic Arcanum (CLA-231), ritual-only grants
-// (CLA-234), and Telekinetic Master free casts (CLA-356) are exempt; everything else
-// needs a slot at or above its level.
+// (CLA-234), Telekinetic Master free casts (CLA-356), and free_spell-grant rows
+// (FT-035) are exempt; everything else needs a slot at or above its level.
 function keepSpellRow(spell, spellAbilities, arcanumNames) {
     const spellLevel = spell.level !== undefined ? spell.level : 0;
     if (spellLevel === 0) return true;
@@ -697,6 +720,12 @@ function keepSpellRow(spell, spellAbilities, arcanumNames) {
     // CLA-356: Telekinetic Master's Telekinesis is a slotless free cast — never
     // drop it for lacking a lv5 slot (Fighter has no spellcasting table).
     if (spell._telekineticMasterFreeCast) return true;
+    // FT-035: free_spell automation grants are data-declared free casts (the feat/feature
+    // is the caster) — never drop the row for lacking a slot at its level (Fey Touched's
+    // lv2 Misty Step was silently killed on the lv1-slot-only Fighter fallback table).
+    // After the latch is spent, payment still routes through consumeBaseSlot, which
+    // refuses without a slot — no slotless smuggling via this exemption.
+    if (spell._freeSpellGrantFreeCast) return true;
     let hasAnySlot = false;
     for (let i = 1; i <= 9; i++) {
         if ((spellAbilities[`spell_slots_level_${i}`] || 0) > 0) {

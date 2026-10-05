@@ -205,6 +205,15 @@ export const LONG_REST_RESOURCES = [
     // null re-arm here (the dedicated resetFlags site in restRules-longRest.js
     // stays authoritative; null+null is idempotent).
     '_Favored_Enemy_freeCastCount',
+    // FT-035: Fey Touched feat free-cast latch family, keyed by the FEATURE name
+    // ('Fey Magic') by the spellPreparationService writers — the shared latch spent by
+    // the chosen-spell cast (adjustRechargeCounter) and the per-spell latch spent by
+    // the fixed Misty Step cast (adjustPerSpellCounter). Null re-arm returns BOTH free
+    // badges after a Long Rest (the :567 loop re-arms the per-spell key from the
+    // automation entry; this registration is the batch safety net). CLA-130 family
+    // rule: a latch missing here dies permanently.
+    '_Fey_Magic_freeCastCount',
+    '_Fey_Magic_Misty_Step_freeCastCount',
        'breathweaponUses',
   'stonecunningUses',
   'naturesVeilUses',

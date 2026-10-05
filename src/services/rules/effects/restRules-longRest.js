@@ -671,10 +671,16 @@ export async function applyLongRest(playerStats, campaignName) {
 
   resetMagicInitiateFreeCasts(name, playerStats, campaignName)
 
-  // Reset Fey Touched free cast counter on long rest
-  if (playerStats.feyTouchedSpell) {
-    setRuntimeValue(name, '_feyTouchedSpell_freeCastCount', null, campaignName, true)
-  }
+  // FT-035: reset the LIVE Fey Touched free-cast latches. Writers spell latch keys by
+  // FEATURE name (spellPreparationService): the chosen-spell spell row spends the shared
+  // `_Fey_Magic_freeCastCount` (rules.js addFeyTouchedFreeCast uses:1 recharge:long_rest
+  // entry, adjustRechargeCounter); the fixed Misty Step row spends the per-spell
+  // `_Fey_Magic_Misty_Step_freeCastCount` (automation-collected perSpellTracking entry,
+  // adjustPerSpellCounter) — re-armed generically by resetPerSpellFreeCastCounters below.
+  // The old `_feyTouchedSpell_freeCastCount` reset matched ZERO writers — dead-key defect,
+  // FT-070/CLA-130 family; null = re-armed (featureFreeCastCount `stored ?? uses`
+  // fallback restores the free badges). Both keys also registered in LONG_REST_RESOURCES.
+  setRuntimeValue(name, '_Fey_Magic_freeCastCount', null, campaignName, true)
 
   // FT-070: Shadow Touched per-spell free-cast counter resets moved into
   // resetPerSpellFreeCastCounters (aligned consumer keys, shared machinery).

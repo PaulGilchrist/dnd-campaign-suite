@@ -613,8 +613,11 @@ describe('applyLongRest', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', '_Level_1_Spell_[Instance_1]_freeCastCount', null, CAMPAIGN, true,
       )
+      // FT-035: LIVE writer key is feature-named `_Fey_Magic_freeCastCount`
+      // (spellPreparationService) — the old `_feyTouchedSpell_freeCastCount`
+      // reset was a dead key with zero writers.
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_feyTouchedSpell_freeCastCount', null, CAMPAIGN, true,
+        'Test Hero', '_Fey_Magic_freeCastCount', null, CAMPAIGN, true,
       )
       // FT-070: per-spell Shadow Magic counters reset to null (fresh) on long rest
       expect(setRuntimeValue).toHaveBeenCalledWith(
