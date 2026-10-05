@@ -111,6 +111,23 @@ describe('divineSparkHandler.handle', () => {
       );
     });
 
+    it('CLA-092: lv8 caster with no stored charges and no class_levels entry falls back to 3 (classes.json), not 2', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
+
+      const ps = makePlayerStats({ level: 8, class: undefined });
+      const action = makeAction();
+
+      await handle(action, ps, campaignName, null);
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        ps.name,
+        'channelDivinityCharges',
+        2,
+        campaignName,
+        true,
+      );
+    });
+
     it('uses class_specific.channel_divinity_charges when channel_divinity is 0', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
 

@@ -20,7 +20,6 @@ vi.mock('../../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
-  applyHealingDirectly: vi.fn(() => ({ newHp: 30, maxHp: 40, actualHeal: 10 })),
   logHealingToSSE: vi.fn(),
 }));
 
@@ -32,6 +31,37 @@ vi.mock('../../../../services/combat/auras/coronaAuraUtils.js', () => ({
   getCoronaSaveDisadvantageSync: vi.fn(() => ({ disadvantage: false })),
 }));
 
+// CLA-092: canonical choke points — clamping heal + typed damage application mocks.
+vi.mock('../../../../services/rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(async () => ({
+    creatures: [
+      { name: 'Orc Warrior', type: 'npc', currentHp: 20, maxHp: 40 },
+    ],
+  })),
+}));
+
+vi.mock('../../../../services/rules/combat/applyHealing.js', () => ({
+  applyHealingToTarget: vi.fn((cs, targetName, amount) => {
+    const creature = cs?.creatures?.find(c => c.name === targetName);
+    const maxHp = creature?.maxHp ?? 40;
+    const currentHp = creature?.currentHp ?? 7;
+    const newHp = Math.min(maxHp, currentHp + amount);
+    return { newHp, oldHp: currentHp, maxHp, actualHeal: newHp - currentHp };
+  }),
+}));
+
+vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
+  applyDamageToTarget: vi.fn(async (cs, targetName, rawDamage) => ({
+    finalDamage: rawDamage,
+    oldHp: 20,
+    newHp: Math.max(0, 20 - rawDamage),
+  })),
+}));
+
+vi.mock('../../../../services/rules/combat/rangeCheck.js', () => ({
+  isWithinRange: vi.fn(async () => true),
+}));
+
 // ── Re-import mocked modules ──
 
 import * as diceRoller from '../../../../services/dice/diceRoller.js';
@@ -39,6 +69,9 @@ import * as automationService from '../../../../services/combat/automation/autom
 import * as logService from '../../../../services/ui/logService.js';
 import * as healingRoll from '../../../../services/automation/common/healingRoll.js';
 import * as savePrompt from '../../../../services/automation/common/savePrompt.js';
+import * as applyHealing from '../../../../services/rules/combat/applyHealing.js';
+import * as applyDamage from '../../../../services/rules/combat/applyDamage.js';
+import * as rangeCheck from '../../../../services/rules/combat/rangeCheck.js';
 
 // ── Test fixtures ──
 
@@ -52,7 +85,7 @@ const baseProps = {
   damageTypes: ['Radiant'],
   saveType: 'CON',
   wisModifier: 3,
-  playerStats: { name: 'Paladin1', level: 3, hitPoints: 40 },
+  playerStats: { name: 'Paladin1', level: 3, proficiency: 2, hitPoints: 40 },
   onClose: vi.fn(),
 };
 
@@ -117,7 +150,7 @@ describe('DivineSparkModal', () => {
     render(<DivineSparkModal {...makeProps()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(logService.addEntry).not.toHaveBeenCalled();
-    expect(healingRoll.applyHealingDirectly).not.toHaveBeenCalled();
+    expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
   });
 
   // ── Heal flow ──
@@ -128,8 +161,10 @@ describe('DivineSparkModal', () => {
       fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
     });
     expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8');
-    expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(
-      { name: 'Orc Warrior' },
+    // CLA-092: heal routes through the canonical applyHealingToTarget choke point
+    // (cs threaded, target maxHp resolved there) — never the fake-playerStats lane.
+    expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
+      expect.objectContaining({ creatures: expect.any(Array) }),
       'Orc Warrior',
       10,
       'test-campaign'
@@ -141,6 +176,55 @@ describe('DivineSparkModal', () => {
       newHp: 30,
       maxHp: 40,
     });
+  });
+
+  it('CLA-092: heals a wounded target and reports finite clamped HP (no NaN)', async () => {
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Current HP: 30 \/ 40 \(healed 10\)/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+  });
+
+  it('CLA-092: clamps healing at target max HP without corrupting state', async () => {
+    applyHealing.applyHealingToTarget.mockImplementationOnce((cs, targetName, amount) => {
+      const creature = cs?.creatures?.find(c => c.name === targetName);
+      const maxHp = creature.maxHp;
+      const currentHp = 38;
+      const newHp = Math.min(maxHp, currentHp + amount);
+      return { newHp, oldHp: currentHp, maxHp, actualHeal: newHp - currentHp };
+    });
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Current HP: 40 \/ 40 \(healed 2\)/)).toBeInTheDocument();
+    });
+    expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      actualHeal: 2,
+      newHp: 40,
+      maxHp: 40,
+    }));
+  });
+
+  it('CLA-092: refuses heal and logs refusal when target is out of 30 ft range', async () => {
+    rangeCheck.isWithinRange.mockResolvedValueOnce(false);
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/out of range/i)).toBeInTheDocument();
+    });
+    expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+    expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Paladin1', 'Orc Warrior', 30);
+    const refusal = logService.addEntry.mock.calls.find(c => c[1]?.automationDetail === 'divine_spark_refused');
+    expect(refusal).toBeDefined();
+    expect(refusal[1]).toMatchObject({ type: 'automation', characterName: 'Paladin1', abilityName: 'Divine Spark' });
   });
 
   it('displays heal result with target name, total, and HP info', async () => {
@@ -196,12 +280,26 @@ describe('DivineSparkModal', () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
     expect(diceRoller.rollExpression).toHaveBeenCalledWith('3d6');
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', {
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       targetName: 'Orc Warrior',
+      attackerName: 'Paladin1',
       saveType: 'CON',
       saveDc: 13,
       disadvantage: false,
+    }));
+  });
+
+  it('CLA-092: threads damage transport onto the save prompt payload', async () => {
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      sourceName: 'Divine Spark',
+      damageFormula: '3d6 Radiant',
+      damageType: 'Radiant',
+      rawDamage: 10,
+    }));
   });
 
   // CLA-063: Corona of Light — Radiant save vs a listed enemy must arm the
@@ -227,17 +325,37 @@ describe('DivineSparkModal', () => {
     corona.getCoronaSaveDisadvantageSync.mockReturnValue({ disadvantage: false });
   });
 
-  it('calculates save DC as 8 + wisModifier + 2', async () => {
+  it('CLA-092: calculates save DC from caster proficiency (8 + WIS + PB), never hardcoded +2', async () => {
     render(<DivineSparkModal {...makeProps({ wisModifier: 5 })} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', {
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       targetName: 'Orc Warrior',
       saveType: 'CON',
-      saveDc: 15,
+      saveDc: 15, // 8 + 5 + PB 2
       disadvantage: false,
+    }));
+  });
+
+  it('CLA-092: lv8 WIS+4 PB+3 caster gets DC 15 (not 14)', async () => {
+    render(<DivineSparkModal {...makeProps({ wisModifier: 4, playerStats: { name: 'War_Cleric', level: 8, proficiency: 3 } })} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      saveDc: 15, // 8 + 4 + PB 3
+    }));
+  });
+
+  it('CLA-092: prefers the sheet spell save DC when present', async () => {
+    render(<DivineSparkModal {...makeProps({ wisModifier: 4, playerStats: { name: 'War_Cleric', level: 8, proficiency: 3, spellAbilities: { saveDc: 19 } } })} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
+    });
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      saveDc: 19,
+    }));
   });
 
   it('logs ability_use entry when harm is initiated', async () => {
@@ -389,6 +507,69 @@ describe('DivineSparkModal', () => {
     expect(typeof entry[1].timestamp).toBe('number');
   });
 
+  it('CLA-092: applies typed damage via the canonical resolver on failed save', async () => {
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
+    });
+    await act(async () => {
+      window.dispatchEvent(dispatchSaveResult(false));
+    });
+    await waitFor(() => {
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+        expect.objectContaining({ creatures: expect.any(Array) }),
+        'Orc Warrior',
+        10,
+        ['Radiant'],
+        expect.objectContaining({ campaignName: 'test-campaign', attackerName: 'Paladin1' })
+      );
+    });
+  });
+
+  it('CLA-092: applies NO damage through the resolver on save success', async () => {
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
+    });
+    await act(async () => {
+      window.dispatchEvent(dispatchSaveResult(true));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Target saved and takes no damage/)).toBeInTheDocument();
+    });
+    expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
+  });
+
+  it('CLA-092: logs damageType/rawDamage/finalDamage on the save-damage roll entry', async () => {
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
+    });
+    await act(async () => {
+      window.dispatchEvent(dispatchSaveResult(false));
+    });
+    const entry = findLogEntry('roll');
+    expect(entry[1]).toMatchObject({
+      damageFormula: '3d6 Radiant',
+      damageType: 'Radiant',
+      rawDamage: 10,
+      finalDamage: 10,
+    });
+  });
+
+  it('CLA-092: refuses harm and skips the save prompt when target is out of 30 ft range', async () => {
+    rangeCheck.isWithinRange.mockResolvedValueOnce(false);
+    render(<DivineSparkModal {...makeProps()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/out of range/i)).toBeInTheDocument();
+    });
+    expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+    expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
+  });
+
   it('adds roll log entry when target succeeds save', async () => {
     render(<DivineSparkModal {...makeProps()} />);
     await act(async () => {
@@ -482,12 +663,12 @@ describe('DivineSparkModal', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', {
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       targetName: 'Orc Warrior',
       saveType: 'CON',
       saveDc: 10,
       disadvantage: false,
-    });
+    }));
   });
 
   it('calculates correct save DC with negative wisModifier', async () => {
@@ -495,12 +676,12 @@ describe('DivineSparkModal', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Harm/ }));
     });
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', {
+    expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       targetName: 'Orc Warrior',
       saveType: 'CON',
       saveDc: 8,
       disadvantage: false,
-    });
+    }));
   });
 
   // ── Done button closes modal (consolidated from 3 separate tests) ──

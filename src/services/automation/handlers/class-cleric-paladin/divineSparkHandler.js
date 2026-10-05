@@ -2,10 +2,20 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { resolveTarget } from '../../common/targetResolver.js';
 import { addEntry } from '../../../ui/logService.js';
 
+// CLA-092: fallback table mirrors public/data/2024/classes.json Cleric
+// channel_divinity (lv2-5: 2, lv6-17: 3, lv18-20: 4) — used only when the
+// character carries no class_levels entry for the current level.
+function fallbackSparkChargesByLevel(level) {
+    if (level >= 18) return 4;
+    if (level >= 6) return 3;
+    if (level >= 2) return 2;
+    return 0;
+}
+
 function resolveSparkCharges(playerStats) {
     const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+    const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || fallbackSparkChargesByLevel(playerStats.level || 1);
     return storedCharges != null ? Number(storedCharges) : maxCharges;
 }
 
