@@ -132,6 +132,7 @@ import { handle as handleNaturesVeil } from './handlers/class-ranger/naturesVeil
 import { handle as handleTireless } from './handlers/class-ranger/tirelessHandler.js';
 import { handle as handleBonusActionChoice } from './handlers/combat/bonusActionChoiceHandler.js';
 import { handle as handleBonusAttacks } from './handlers/combat/bonusAttacksHandler.js';
+import { handle as handleDualWielderAttack } from './handlers/combat/dualWielderAttackHandler.js';
 import { handle as handlePatientDefense } from './handlers/combat/patientDefenseHandler.js';
 import { handle as handleStepOfTheWind } from './handlers/combat/stepOfTheWindHandler.js';
 import { handle as handleElementalAttunement } from './handlers/combat/elementalAttunementHandler.js';
@@ -441,6 +442,9 @@ const HANDLER_MAP = {
         tireless: handleTireless,
         bonus_action_choice: handleBonusActionChoice,
         bonus_attacks: handleBonusAttacks,
+        // FT-104: Dual Wielder off-hand bonus attack — dedicated lane, the
+        // Flurry handler multi-fires 3 Unarmed attacks for this feat row.
+        dual_wielder_attack: handleDualWielderAttack,
         patient_defense: handlePatientDefense,
         step_of_the_wind: handleStepOfTheWind,
         steady_aim: handleSteadyAim,

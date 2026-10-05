@@ -195,6 +195,8 @@ assign(ROUTES, routeSaveStyle, [
 
 assign(ROUTES, routeCtPassiveBonusOrAction, [
     'extra_action', 'heroes_feast', 'buff_ally', 'bardic_inspiration', 'bonus_attacks',
+    // FT-104: Dual Wielder off-hand bonus attack row (casting_time '1 bonus action').
+    'dual_wielder_attack',
     'bonus_action_attack', 'free_spell', 'fey_reinforcements', 'divine_intervention',
 ])
 

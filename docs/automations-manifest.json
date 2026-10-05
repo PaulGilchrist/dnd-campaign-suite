@@ -2063,7 +2063,7 @@
       "handler": "src/services/rules/core/attackCalc2024.js (hasDualWielder :227 – off-hand Bonus Action attack, no ability modifier) + src/services/automation/handlers/combat/bonusAttacksHandler.js",
       "router": "src/services/automation/index.js (bonus_attacks :443)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (bonus_attacks)",
-      "verified": "broken — see .opencode/plans/bug-FT-104-dual-wielder.md",
+      "verified": "verified",
       "class": "Feat",
       "triggerConditions": "Attack action with a Light weapon (extra attack as a Bonus Action with a different one-handed weapon); Quick Draw: draw/stow two weapons",
       "expectedBehavior": "When you take the Attack action on your turn and attack with a weapon that has the Light property, you can make one extra attack as a Bonus Action later on the same turn with a different weapon, which must be a Melee weapon that lacks the Two-Handed property. You don't add your ability modifier to the damage of this attack. You can draw or stow two weapons that lack the Two-Handed property when you would normally be able to draw or stow only one."

@@ -224,6 +224,26 @@ export const attackHandlers = {
         }
     },
 
+    // FT-104: Dual Wielder was routed through the monk Flurry handler
+    // (bonus_attacks) — dedicated effect key so its Bonus Actions row
+    // dispatches the single off-hand attack lane instead.
+    'dual_wielder_attack': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'dual_wielder_attack',
+            name: feature.name,
+            attacks: auto.attacks || auto.extraAttacks || 1,
+            attackType: auto.attackType || 'melee',
+            cost: auto.cost || null,
+            trigger: auto.trigger || 'attack_action_with_light_weapon',
+            action: 'bonus_action',
+            casting_time: auto.casting_time || '1 bonus action',
+            weaponRequirements: auto.weaponRequirements || null,
+            weaponRestriction: auto.weaponRestriction || null,
+            hasAutomation: true
+        }
+    },
+
     'concentration_bonus_attack': (feature, _playerStats) => {
         const auto = feature.automation
         return {

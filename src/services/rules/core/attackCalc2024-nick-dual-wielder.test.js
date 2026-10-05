@@ -352,25 +352,32 @@ describe('attackCalc2024 - Nick mastery and Dual Wielder', () => {
       automation: {
         passives: [],
         bonusActions: [
-          { type: 'bonus_attacks', trigger: 'attack_action_with_light_weapon' },
+          { type: 'dual_wielder_attack', trigger: 'attack_action_with_light_weapon' },
         ],
       },
     });
 
     const result = getAttacks(allEquipment, [], playerStats);
 
-    // Acidic Spear (+3 magic) = Action, Dagger = Bonus Action + Dual Wielder, Sickle = Bonus Action + Dual Wielder = 5
-    expect(result).toHaveLength(5);
+    // Acidic Spear (+3 magic) = Action, Dagger = Bonus Action, Sickle = Bonus
+    // Action, one Dual Wielder extra attack (off-hand = +2 Dagger) = 4.
+    // FT-104: rows must carry the canonical consumer shape (.type/.hitBonus).
+    expect(result).toHaveLength(4);
     expect(result[0].name).toBe('+3 Acidic Spear');
     expect(result[0].type).toBe('Action');
     expect(result[1].name).toBe('+2 Dagger');
     expect(result[1].type).toBe('Bonus Action');
-    expect(result[2].name).toBe('Dual Wielder Extra Attack');
-    expect(result[2].damageFormula).toContain('Weapon Magic Bonus');
-    expect(result[2].damage).toContain('+2');
-    expect(result[3].name).toBe('+1 Sickle');
+    expect(result[2].name).toBe('+1 Sickle');
+    expect(result[2].type).toBe('Bonus Action');
+    expect(result[3].name).toBe('Dual Wielder Extra Attack');
     expect(result[3].type).toBe('Bonus Action');
-    expect(result[4].name).toBe('Dual Wielder Extra Attack');
+    expect(result[3].weaponType).toBe('melee');
+    expect(result[3].range).toBe(5);
+    expect(result[3].hitBonus).toBe(8); // STR 3 + Prof 3 + magic 2
+    expect(result[3].weaponName).toBe('+2 Dagger');
+    expect(result[3].damageFormula).toContain('Weapon Magic Bonus');
+    expect(result[3].damage).toContain('+2');
+    expect(result[3].properties).toContain('Light');
   });
 
   it('adds Dual Wielder extra attack without magic bonus when weapon is not magical', async () => {
@@ -422,22 +429,171 @@ describe('attackCalc2024 - Nick mastery and Dual Wielder', () => {
       automation: {
         passives: [],
         bonusActions: [
-          { type: 'bonus_attacks', trigger: 'attack_action_with_light_weapon' },
+          { type: 'dual_wielder_attack', trigger: 'attack_action_with_light_weapon' },
         ],
       },
     });
 
     const result = getAttacks(allEquipment, [], playerStats);
 
-    expect(result).toHaveLength(5);
+    expect(result).toHaveLength(4);
     expect(result[1].name).toBe('Dagger');
     expect(result[1].type).toBe('Bonus Action');
-    expect(result[2].name).toBe('Dual Wielder Extra Attack');
-    expect(result[2].damageFormula).not.toContain('Weapon Magic Bonus');
-    expect(result[2].damage).toBe('1d4');
-    expect(result[3].name).toBe('Sickle');
+    expect(result[2].name).toBe('Sickle');
+    expect(result[2].type).toBe('Bonus Action');
+    expect(result[3].name).toBe('Dual Wielder Extra Attack');
     expect(result[3].type).toBe('Bonus Action');
-    expect(result[4].name).toBe('Dual Wielder Extra Attack');
+    expect(result[3].weaponType).toBe('melee');
+    expect(result[3].range).toBe(5);
+    expect(result[3].hitBonus).toBe(6); // STR 3 + Prof 3, no magic
+    expect(result[3].weaponName).toBe('Dagger');
+    expect(result[3].damageFormula).not.toContain('Weapon Magic Bonus');
+    expect(result[3].damage).toBe('1d4'); // dice only — no ability modifier
+  });
+
+  it('FT-104 canonical delta: DW holder with Longsword + Shortsword gets the off-hand bonus row (non-holder gets none)', async () => {
+    const { collectWeaponMastery } = await import('../../combat/automation/automationPassives.js');
+    vi.mocked(collectWeaponMastery).mockReturnValue({ baseMastery: null, extraMasteries: [] });
+
+    const allEquipment = [
+      {
+        name: 'Longsword',
+        equipment_category: 'Weapon',
+        weapon_range: 'Melee',
+        damage: { damage_dice: '1d8', damage_type: 'Slashing' },
+        range: { normal: 5 },
+        properties: ['Versatile'],
+        mastery: 'Nick',
+      },
+      {
+        name: 'Shortsword',
+        equipment_category: 'Weapon',
+        weapon_range: 'Melee',
+        damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+        range: { normal: 5 },
+        properties: ['Light', 'Finesse'],
+        mastery: 'Finesse',
+      },
+    ];
+    const base = {
+      level: 5,
+      name: 'Test Character',
+      campaignName: 'test-campaign',
+      abilities: [
+        { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+        { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+      ],
+      class: { name: 'Fighter' },
+    };
+
+    // Non-holder: Light-only gate — Shortsword promoted to Action, NO bonus row.
+    findEquippedWeaponsStub.mockReturnValueOnce([]).mockReturnValueOnce(['Longsword', 'Shortsword']);
+    const withoutFeat = getAttacks(allEquipment, [], defaultPlayerStats({
+      ...base,
+      automation: { passives: [], bonusActions: [] },
+    }));
+    expect(withoutFeat.some(a => a.name === 'Dual Wielder Extra Attack')).toBe(false);
+    expect(withoutFeat.map(a => [a.name, a.type])).toEqual([
+      ['Longsword', 'Action'],
+      ['Shortsword', 'Action'],
+    ]);
+
+    // DW holder: exactly one off-hand Bonus Action row, dice-only damage.
+    findEquippedWeaponsStub.mockReturnValueOnce([]).mockReturnValueOnce(['Longsword', 'Shortsword']);
+    const withFeat = getAttacks(allEquipment, [], defaultPlayerStats({
+      ...base,
+      automation: { passives: [], bonusActions: [{ type: 'dual_wielder_attack', trigger: 'attack_action_with_light_weapon' }] },
+    }));
+    const dwRow = withFeat.find(a => a.name === 'Dual Wielder Extra Attack');
+    expect(dwRow).toBeTruthy();
+    expect(dwRow.type).toBe('Bonus Action');
+    expect(dwRow.weaponType).toBe('melee');
+    expect(dwRow.range).toBe(5);
+    expect(dwRow.hitBonus).toBe(6); // STR 3 + Prof 3
+    expect(dwRow.weaponName).toBe('Shortsword'); // different from main-hand Longsword
+    expect(dwRow.damage).toBe('1d6'); // no +3 ability modifier
+    expect(withFeat.filter(a => a.name === 'Dual Wielder Extra Attack')).toHaveLength(1);
+  });
+
+  it('FT-104: negative ability modifier IS added to the Dual Wielder extra attack damage', async () => {
+    const { collectWeaponMastery } = await import('../../combat/automation/automationPassives.js');
+    vi.mocked(collectWeaponMastery).mockReturnValue({ baseMastery: null, extraMasteries: [] });
+
+    const allEquipment = [
+      {
+        name: 'Club',
+        equipment_category: 'Weapon',
+        weapon_range: 'Melee',
+        damage: { damage_dice: '1d4', damage_type: 'Bludgeoning' },
+        range: { normal: 5 },
+        properties: ['Light'],
+      },
+      {
+        name: 'Dagger',
+        equipment_category: 'Weapon',
+        weapon_range: 'Melee',
+        damage: { damage_dice: '1d4', damage_type: 'Piercing' },
+        range: { normal: 5 },
+        properties: ['Light', 'Finesse'],
+      },
+    ];
+
+    findEquippedWeaponsStub.mockReturnValueOnce([]).mockReturnValueOnce(['Club', 'Dagger']);
+    const result = getAttacks(allEquipment, [], defaultPlayerStats({
+      level: 5,
+      name: 'Test Character',
+      campaignName: 'test-campaign',
+      abilities: [
+        { name: 'Strength', baseScore: 8, abilityImprovements: 0, miscBonus: 0, bonus: -1 },
+        { name: 'Dexterity', baseScore: 8, abilityImprovements: 0, miscBonus: 0, bonus: -1 },
+      ],
+      class: { name: 'Fighter' },
+      automation: { passives: [], bonusActions: [{ type: 'dual_wielder_attack', trigger: 'attack_action_with_light_weapon' }] },
+    }));
+
+    const dwRow = result.find(a => a.name === 'Dual Wielder Extra Attack');
+    expect(dwRow).toBeTruthy();
+    expect(dwRow.damage).toBe('1d4-1'); // negative ability modifier applies
+    expect(dwRow.hitBonus).toBe(2); // STR -1 + Prof 3
+  });
+
+  it('FT-104: no Dual Wielder row when the second melee weapon is Two-Handed', async () => {
+    const { collectWeaponMastery } = await import('../../combat/automation/automationPassives.js');
+    vi.mocked(collectWeaponMastery).mockReturnValue({ baseMastery: null, extraMasteries: [] });
+
+    const allEquipment = [
+      {
+        name: 'Shortsword',
+        equipment_category: 'Weapon',
+        weapon_range: 'Melee',
+        damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+        range: { normal: 5 },
+        properties: ['Light', 'Finesse'],
+      },
+      {
+        name: 'Greatsword',
+        equipment_category: 'Weapon',
+        weapon_range: 'Melee',
+        damage: { damage_dice: '2d6', damage_type: 'Slashing' },
+        range: { normal: 5 },
+        properties: ['Heavy', 'Two-Handed'],
+      },
+    ];
+
+    findEquippedWeaponsStub.mockReturnValueOnce([]).mockReturnValueOnce(['Shortsword', 'Greatsword']);
+    const result = getAttacks(allEquipment, [], defaultPlayerStats({
+      level: 5,
+      name: 'Test Character',
+      campaignName: 'test-campaign',
+      abilities: [
+        { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+        { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+      ],
+      class: { name: 'Fighter' },
+      automation: { passives: [], bonusActions: [{ type: 'dual_wielder_attack', trigger: 'attack_action_with_light_weapon' }] },
+    }));
+
+    expect(result.some(a => a.name === 'Dual Wielder Extra Attack')).toBe(false);
   });
 
   it('skips Nick check when playerStats has no campaignName (localhost)', async () => {

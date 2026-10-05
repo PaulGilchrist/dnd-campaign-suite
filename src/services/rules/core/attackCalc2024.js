@@ -147,31 +147,79 @@ function resolveOffHandActionType(offBaseName, playerStats) {
 }
 
 /**
+ * FT-104: pick the Dual Wielder off-hand weapon: an equipped melee weapon
+ * lacking Two-Handed, different from the main hand (highest-damage eligible),
+ * with at least one Light weapon among the pair (feats.json trigger
+ * attack_action_with_light_weapon).
+ * @param {Array} allEquipment
+ * @param {string[]} meleeWeaponNames
+ * @returns {{ name: string, weapon: Object, magicBonus: number }|null}
+ */
+function resolveDualWielderOffHand(allEquipment, meleeWeaponNames) {
+    const eligible = meleeWeaponNames.filter(name => {
+        const { weapon } = resolveWeapon(allEquipment, name);
+        return weapon && !(weapon.properties || []).some(p => String(p).toLowerCase() === 'two-handed');
+    });
+    if (eligible.length < 2) return null;
+    if (!eligible.some(name => weaponHasLight(resolveWeapon(allEquipment, name).weapon))) return null;
+    const mainHand = pickHighestDamageWeapon(allEquipment, eligible);
+    if (!mainHand) return null;
+    const mainIdx = eligible.indexOf(mainHand.name);
+    const offHandName = eligible.find((name, i) => i !== mainIdx);
+    if (!offHandName) return null;
+    const { weapon: offHandWeapon, magicBonus } = resolveWeapon(allEquipment, offHandName);
+    return { name: offHandName, weapon: offHandWeapon, magicBonus };
+}
+
+/**
  * Build a Dual Wielder feat extra bonus action attack.
- * @param {Object} offHandWeapon
- * @param {number} offMagicBonus
- * @param {number} bonus
- * @param {string} abilityName
- * @param {number} proficiency
+ * FT-104: canonical buildWeaponAttack shape (type/hitBonus/weaponType/
+ * range/properties/mastery) so sheet consumers render the row; damage is
+ * dice-only (+magic) per feats.json — no ability modifier unless negative.
+ * @param {Object} opts { offHandWeapon, offHandName, magicBonus, abilityBonus, abilityName, proficiency }
  * @returns {Object} attack
  */
-function buildDualWielderAttack(offHandWeapon, offMagicBonus, bonus, abilityName, proficiency) {
-    const dmgFormula = `Damage Formula = ${offHandWeapon.damage.damage_dice}${offMagicBonus ? ` + Weapon Magic Bonus (${offMagicBonus})` : ''}`;
-    const dmg = offMagicBonus ? `${offHandWeapon.damage.damage_dice}+${offMagicBonus}` : offHandWeapon.damage.damage_dice;
+function buildDualWielderAttack({ offHandWeapon, offHandName, magicBonus, abilityBonus, abilityName, proficiency }) {
+    const dice = offHandWeapon.damage.damage_dice;
+    // feats.json: no ability modifier on the extra attack's damage unless negative.
+    const negativeMod = abilityBonus < 0 ? abilityBonus : 0;
+    const totalMod = magicBonus + negativeMod;
+    const dmg = totalMod === 0 ? dice : (totalMod > 0 ? `${dice}+${totalMod}` : `${dice}-${Math.abs(totalMod)}`);
+    const formulaParts = [dice];
+    if (magicBonus) formulaParts.push(`Weapon Magic Bonus (${magicBonus})`);
+    if (negativeMod) formulaParts.push(`${abilityName} Modifier (${negativeMod})`);
+    const magicSuffix = magicBonus ? ` + Weapon Magic Bonus (${magicBonus})` : '';
     return {
         name: 'Dual Wielder Extra Attack',
+        weaponName: offHandName || offHandWeapon.name,
         attackType: 'melee',
         isRanged: false,
-        range: '5_ft',
-        toHit: bonus + proficiency,
-        hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${bonus}) + Proficiency (${proficiency})`,
-        damageFormula: dmgFormula,
+        weaponType: 'melee',
+        range: 5,
+        toHit: abilityBonus + proficiency + magicBonus,
+        hitBonus: abilityBonus + proficiency + magicBonus,
+        hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${proficiency})${magicSuffix}`,
+        damageFormula: `Damage Formula = ${formulaParts.join(' + ')}`,
         damage: dmg,
         damageType: offHandWeapon.damage.damage_type,
         abilityName,
+        type: 'Bonus Action',
         actionType: 'Bonus Action',
-        properties: ['Melee'],
+        mastery: offHandWeapon.mastery || null,
+        properties: offHandWeapon.properties || ['Melee'],
     };
+}
+
+function pushDualWielderRow(attacks, dwOffHand, abilityBonus, abilityName, proficiency) {
+    if (!dwOffHand) return;
+    attacks.push(buildDualWielderAttack({
+        offHandWeapon: dwOffHand.weapon,
+        offHandName: dwOffHand.name,
+        magicBonus: dwOffHand.magicBonus,
+        abilityBonus,
+        abilityName,
+        proficiency,
+    }));
 }
 
 /**
@@ -210,10 +258,19 @@ function buildMeleeAttacks(ctx) {
     const passives = playerStats.automation?.passives ?? [];
     const addAbilityToDamage = passives.some(p => p.effect === 'two_weapon_fighting');
 
+    // FT-104: Dual Wielder feat row is granted BEFORE the Light-only gate so
+    // holders wielding Light + one-handed non-Light (Longsword+Shortsword) get
+    // the canonical off-hand bonus row. Non-holders never enter this lane.
+    const hasDualWielder = (playerStats.automation?.bonusActions ?? []).some(
+        a => a && (a.type === 'dual_wielder_attack' || a.trigger === 'attack_action_with_light_weapon')
+    );
+    const dwOffHand = hasDualWielder ? resolveDualWielderOffHand(allEquipment, meleeWeaponNames) : null;
+
     // < 2 light melee → all Action
     if (lightMelee.length < 2) {
         pushWeaponAttacks(attacks, allEquipment, lightMelee,
             (weapon, name) => buildMeleeMainHandAttack(weapon, name, duelCtx, isDueling));
+        pushDualWielderRow(attacks, dwOffHand, bonus, abilityName, ctx.proficiency);
         return attacks;
     }
 
@@ -223,18 +280,13 @@ function buildMeleeAttacks(ctx) {
         attacks.push(buildMeleeMainHandAttack(bestWeapon.weapon, bestWeapon.name, duelCtx, isDueling));
     }
 
-    const bonusActions = playerStats.automation?.bonusActions ?? [];
-    const hasDualWielder = bonusActions.some(
-        a => a.type === 'bonus_attacks' && a.trigger === 'attack_action_with_light_weapon'
-    );
-
     let bestSkipped = false;
     for (const meleeWeaponName of lightMelee) {
         if (meleeWeaponName === bestWeapon.name && !bestSkipped) {
             bestSkipped = true;
             continue;
         }
-        const { baseName: offBaseName, magicBonus: offMagicBonus, weapon: offHandWeapon } = resolveWeapon(allEquipment, meleeWeaponName);
+        const { baseName: offBaseName, weapon: offHandWeapon } = resolveWeapon(allEquipment, meleeWeaponName);
         if (offHandWeapon) {
             const actionType = resolveOffHandActionType(offBaseName, playerStats);
             attacks.push(buildWeaponAttack({
@@ -247,13 +299,10 @@ function buildMeleeAttacks(ctx) {
                 weaponType: 'melee',
                 includeAbilityBonusInDamage: addAbilityToDamage,
             }));
-
-            // Dual Wielder feat: extra bonus action attack beyond standard off-hand
-            if (hasDualWielder) {
-                attacks.push(buildDualWielderAttack(offHandWeapon, offMagicBonus, bonus, abilityName, ctx.proficiency));
-            }
         }
     }
+
+    pushDualWielderRow(attacks, dwOffHand, bonus, abilityName, ctx.proficiency);
     return attacks;
 }
 
