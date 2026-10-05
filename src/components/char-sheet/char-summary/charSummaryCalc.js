@@ -22,8 +22,10 @@ function isGenericFlyBuff(buff) {
 }
 
 function computeFlyBuffInfo(activeBuffs) {
+    // CLA-099: dragon_wings is non-generic (own flySpeed) but must surface its
+    // own named badge, same as the Draconic Flight precedent (CLA-096).
     const flyBuff = Array.isArray(activeBuffs)
-        ? activeBuffs.find(b => b.effect === 'fly_speed_equals_walk_speed' || isGenericFlyBuff(b))
+        ? activeBuffs.find(b => b.effect === 'fly_speed_equals_walk_speed' || b.effect === 'dragon_wings' || isGenericFlyBuff(b))
         : null
     return { flyBuffActive: !!flyBuff, flyBuffName: flyBuff?.name || '' }
 }

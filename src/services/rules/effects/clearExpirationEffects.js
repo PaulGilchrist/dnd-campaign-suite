@@ -412,7 +412,23 @@ const EXPIRATION_HANDLERS = {
     'advantage_on_target': handleAdvantageOnTarget,
     'fly_speed_equals_walk_speed': handleFlySpeedEqualsWalkSpeed,
     'fly_speed_20_hover': (_effect, targetName, _attackerName, campaignName) => removeBuffByEffect(targetName, 'fly_speed_20_hover', campaignName),
-    'dragon_wings': (_effect, targetName, _attackerName, campaignName) => removeBuffByEffect(targetName, 'dragon_wings', campaignName),
+    // CLA-099: the 1-hour rounds clock must clear the active flag too and log
+    // the expiry (every automation logs) — previously this handler was a silent
+    // buff strip with zero runtime producers calling it.
+    'dragon_wings': (_effect, targetName, _attackerName, campaignName) => {
+        setRuntimeValue(targetName, 'dragonWingsActive', false, campaignName);
+        const wingsBuffs = readBuffs(targetName);
+        removeBuffByEffect(targetName, 'dragon_wings', campaignName);
+        if (wingsBuffs.some(b => b.effect === 'dragon_wings')) {
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: targetName,
+                abilityName: 'Dragon Wings',
+                description: `${targetName}'s draconic wings dissolve — Dragon Wings' duration has expired.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[expirations] Error:", e); });
+        }
+    },
     'ice_walk': (_effect, targetName, _attackerName, campaignName) => removeBuffByEffect(targetName, 'ice_walk', campaignName),
     'speed_boost': (_effect, targetName, _attackerName, campaignName) => removeBuffByEffect(targetName, 'speed_boost', campaignName),
     'remove_active_buff': handleRemoveActiveBuff,

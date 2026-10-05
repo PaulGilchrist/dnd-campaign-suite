@@ -1,140 +1,154 @@
+// BUG CLA-099: Dragon Wings once-per-Long-Rest economy. Activation consumes the
+// use (dragonWingsUses=0), registers the ONE rounds clock (duration ×rounds —
+// playbook §37: minutes×10, hours×600) consumed by EXPIRATION_HANDLERS['dragon_wings'],
+// and stamps the active flag. At 0 uses the feature refuses until a Long Rest
+// re-arm (LONG_REST_RESOURCES) or 3 SP restores the use (clockworkCavalcade
+// consumeUse seam). Re-clicking while the wings stand retracts them via the
+// shared dragonWingsService choke point (no use refund).
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { spendSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
+import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { addEntry } from '../../../ui/logService.js';
+import { addExpiration } from '../../../rules/effects/expirationQueue.js';
+import {
+    DRAGON_WINGS_BUFF_NAME,
+    DRAGON_WINGS_EFFECT,
+    DRAGON_WINGS_USES_KEY,
+    DRAGON_WINGS_ACTIVE_KEY,
+    isDragonWingsBuff,
+    endDragonWingsBuff,
+    formatWingsDuration,
+} from '../../../rules/features/dragonWingsService.js';
 
-const DRAGON_WINGS_KEY = 'dragonWingsActive';
-const DRAGON_WINGS_USES_KEY = 'dragonWingsUses';
-
-function getRuntimeKey(playerName, key) {
-    return playerName.toLowerCase().replace(/\s+/g, '') + '_' + key;
+function wingsDurationToRounds(duration) {
+    const match = String(duration || '').match(/^(\d+)_(rounds?|minutes?|hours?)$/i);
+    if (!match) {
+        console.error(`[dragonWings] Unparseable duration "${duration}" — defaulting to 1 hour (600 rounds)`);
+        return 600;
+    }
+    const n = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    if (unit.startsWith('hour')) return n * 600;
+    if (unit.startsWith('minute')) return n * 10;
+    return n;
 }
 
-async function restoreDragonWings({ auto, playerName, featureName, usesKey, usesMax, currentSP, maxSP, campaignName }) {
-    const restoreCost = auto.restoreCost || 3;
-    if (currentSP < restoreCost) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `${featureName} has no uses remaining. Recharges on a Long Rest, or you can spend ${restoreCost} Sorcery Points to restore.`,
-                automation: auto,
-            },
-        };
-    }
-
-    spendSorceryPoints(playerName, restoreCost, campaignName, maxSP);
-    await setRuntimeValue(playerName, usesKey, usesMax, campaignName);
-
-    await addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: featureName,
-        description: `${playerName} restored Dragon Wings by spending ${restoreCost} Sorcery Points.`,
-    }).catch((e) => { console.error("[dragonWings] Error:", e); });
-
+function infoPopup(featureName, description, auto) {
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: featureName,
-            description: `${featureName} restored (${restoreCost} SP spent). Active until Long Rest.`,
+            description,
             automation: auto,
         },
     };
 }
 
-async function deactivateDragonWingsBuff({ playerName, featureName, campaignName, auto, activeBuffs }) {
-    const newBuffs = activeBuffs.filter(b => b.name !== featureName);
-    await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+function refusalPopup(featureName, restoreCost, auto) {
+    return infoPopup(
+        featureName,
+        `${featureName} has no uses remaining. Recharges on a Long Rest, or you can spend ${restoreCost} Sorcery Points to restore.`,
+        auto,
+    );
+}
 
+async function refuseExhaustedWings({ playerName, featureName, campaignName, auto, restoreCost }) {
     await addEntry(campaignName, {
-        type: 'ability_use',
+        type: 'automation',
+        automationType: `${String(featureName).toLowerCase().replace(/\s+/g, '_')}_refused`,
+        automationDetail: 'long_rest',
         characterName: playerName,
         abilityName: featureName,
-        description: `${featureName} deactivated.`,
+        description: `${playerName} attempted ${featureName} but it has no uses remaining — refills after a Long Rest or ${restoreCost} Sorcery Points.`,
+        timestamp: Date.now(),
     }).catch((e) => { console.error("[dragonWings] Error:", e); });
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: featureName,
-            description: `${featureName} deactivated.`,
-            automation: auto,
-        },
-    };
+    return refusalPopup(featureName, restoreCost, auto);
 }
 
-function resolveSorceryPoints(playerStats) {
-    const maxSP = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
-    const currentSP = playerStats.resources?.sorcery_points?.current ?? maxSP;
-    return { maxSP, currentSP };
-}
+async function activateWings({ playerName, featureName, campaignName, auto, usesMax, spentSP }) {
+    const durationText = formatWingsDuration(auto.duration || '1_hour');
+    const usesAfter = Math.max(0, usesMax - 1);
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const featureName = action.name || 'Dragon Wings';
-
-    const { maxSP, currentSP } = resolveSorceryPoints(playerStats);
-
-    const usesKey = getRuntimeKey(playerName, DRAGON_WINGS_USES_KEY);
-    const usesMax = auto.uses ?? 1;
-
-    const storedUses = getRuntimeValue(playerName, usesKey, campaignName);
-    const active = (storedUses != null ? Number(storedUses) : usesMax) > 0;
-
-    if (!active) {
-        return restoreDragonWings({ auto, playerName, featureName, usesKey, usesMax, currentSP, maxSP, campaignName });
+    if (spentSP > 0) {
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: `${playerName} restored ${featureName} by spending ${spentSP} Sorcery Points.`,
+        }).catch((e) => { console.error("[dragonWings] Error:", e); });
     }
 
-    // Toggle off if already active
+    // CLA-096 §39 ordering: awaited full-store writes land before the
+    // expiration write so no snapshot reordering can drop them.
+    await setRuntimeValue(playerName, DRAGON_WINGS_USES_KEY, usesAfter, campaignName);
+    await setRuntimeValue(playerName, DRAGON_WINGS_ACTIVE_KEY, true, campaignName);
+
     const activeBuffsRaw = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(activeBuffsRaw) ? activeBuffsRaw : [];
-    const wasActive = activeBuffs.some(b => b.name === featureName);
-
-    if (wasActive) {
-        return deactivateDragonWingsBuff({ playerName, featureName, campaignName, auto, activeBuffs });
-    }
-
-    // Activate
-    await setRuntimeValue(playerName, getRuntimeKey(playerName, DRAGON_WINGS_KEY), true, campaignName);
-
     const newBuffs = [...activeBuffs, {
         name: featureName,
-        effect: 'dragon_wings',
+        effect: DRAGON_WINGS_EFFECT,
         duration: auto.duration || '1_hour',
         flySpeed: auto.flySpeed || 60,
         hover: auto.hover || false,
     }];
     await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
+    addExpiration({
+        attackerName: playerName,
+        targetName: playerName,
+        effects: [{ type: DRAGON_WINGS_EFFECT }],
+        campaignName,
+        rounds: wingsDurationToRounds(auto.duration || '1_hour'),
+    });
+
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: featureName,
-        description: `${featureName} activated (Bonus Action, ${auto.duration || '1 hour'}). Fly Speed 60 feet (hover).`,
+        description: `${playerName} activated ${featureName} (Bonus Action, ${durationText}). Fly Speed ${auto.flySpeed || 60} feet${auto.hover ? ' (hover)' : ''}.${spentSP > 0 ? ` (${spentSP} SP spent to restore the use)` : ''}`,
     }).catch((e) => { console.error("[dragonWings] Error:", e); });
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: featureName,
-            description: `${featureName} activated. Fly Speed 60 feet (hover) for ${auto.duration || '1 hour'}.`,
-            automation: auto,
-        },
-    };
+    return infoPopup(
+        featureName,
+        `${featureName} activated. Fly Speed ${auto.flySpeed || 60} feet${auto.hover ? ' (hover)' : ''} for ${durationText}.${spentSP > 0 ? ` (${spentSP} SP spent to restore the use)` : ''}`,
+        auto,
+    );
 }
 
-export function isActive(playerName) {
-    const key = getRuntimeKey(playerName, DRAGON_WINGS_KEY);
-    return getRuntimeValue(playerName, key, null) === true;
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation || {};
+    const playerName = playerStats.name;
+    const featureName = action.name || DRAGON_WINGS_BUFF_NAME;
+
+    // Retract lane first (verified affordance): re-click while wings stand.
+    const activeBuffsRaw = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(activeBuffsRaw) ? activeBuffsRaw : [];
+    if (activeBuffs.some(isDragonWingsBuff)) {
+        endDragonWingsBuff(playerName, campaignName, 'retracted');
+        return infoPopup(featureName, `${featureName} deactivated.`, auto);
+    }
+
+    const usesMax = auto.uses ?? 1;
+    const storedUses = getRuntimeValue(playerName, DRAGON_WINGS_USES_KEY, campaignName);
+    const usesRemaining = storedUses != null ? Number(storedUses) : usesMax;
+
+    let spentSP = 0;
+    if (usesRemaining <= 0) {
+        const maxSP = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
+        const currentSP = getCurrentSorceryPoints(playerName, maxSP);
+        const restoreCost = auto.restoreCost || 3;
+        if (currentSP < restoreCost) {
+            return refuseExhaustedWings({ playerName, featureName, campaignName, auto, restoreCost });
+        }
+        spendSorceryPoints(playerName, restoreCost, campaignName, maxSP);
+        spentSP = restoreCost;
+    }
+
+    return activateWings({ playerName, featureName, campaignName, auto, usesMax, spentSP });
 }
 
-export function deactivate(playerName, campaignName) {
-    const key = getRuntimeKey(playerName, DRAGON_WINGS_KEY);
-    setRuntimeValue(playerName, key, false, campaignName);
+export function isActive(playerName, campaignName) {
+    return getRuntimeValue(playerName, DRAGON_WINGS_ACTIVE_KEY, campaignName) === true;
 }

@@ -249,7 +249,13 @@ export const LONG_REST_RESOURCES = [
       // the trait is available again after a Long Rest even when the 10-minute
       // rounds clock or a retract already dropped the buff (CLA-130 rule: any
       // latch must be in LONG_REST_RESOURCES or the use dies permanently).
-      'draconicFlightUsed'
+      'draconicFlightUsed',
+      // CLA-099: Dragon Wings once-per-Long-Rest uses counter + active stamp —
+      // null re-arm so the trait is available again after a Long Rest even when
+      // the 1-hour rounds clock or a retract already dropped the buff. The
+      // handler reads `storedUses ?? auto.uses` (null = full uses).
+      'dragonWingsUses',
+      'dragonWingsActive'
    ]
 
 export function getLongRestResources() {

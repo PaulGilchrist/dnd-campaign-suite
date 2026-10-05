@@ -2015,7 +2015,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-099-dragon-wings.md",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Action: bonus action; Duration: 1_hour",
       "expectedBehavior": "Bonus Action, cause draconic wings to appear for 1 hour. Fly Speed 60 feet. Once per Long Rest (or spend 3 SP to restore)."

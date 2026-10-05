@@ -33,6 +33,7 @@ import ConditionEffectBadges from '../../initiative/ConditionEffectBadges.jsx'
 import { isBuffActive } from '../../../services/automation/common/buffToggle.js';
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc } from '../../../services/combat/auras/unbreakableMajesty.js';
 import { endDraconicFlightBuff } from '../../../services/rules/features/draconicFlightService.js';
+import { endDragonWingsBuff } from '../../../services/rules/features/dragonWingsService.js';
 import { computeCharSummaryContext } from './charSummaryCalc.js';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -308,8 +309,12 @@ function ContextFeatureBadges({ ctx, playerName, campaignName }) {
     // CLA-096: the spectral wings are retractable "no action required" — the
     // badge carries the retract affordance (removable + onRemove, mirroring
     // the verified .creature-badge-remove consumers).
+    // CLA-099: Dragon Wings re-click retract is mirrored by the same removable
+    // badge affordance (CLA-096 precedent).
+    const isDraconicFlight = flyBuffName === 'Draconic Flight';
+    const isDragonWings = flyBuffName === 'Dragon Wings';
     const badgeSpecs = [
-        { show: flyBuffActive, icon: 'fa-feather', label: `${flyBuffName} Active`, cls: 'effect-buff', removable: flyBuffName === 'Draconic Flight', onRemove: () => endDraconicFlightBuff(playerName, campaignName, 'retracted') },
+        { show: flyBuffActive, icon: 'fa-feather', label: `${flyBuffName} Active`, cls: 'effect-buff', removable: isDraconicFlight || isDragonWings, onRemove: () => (isDragonWings ? endDragonWingsBuff(playerName, campaignName, 'retracted') : endDraconicFlightBuff(playerName, campaignName, 'retracted')) },
         { show: largeFormActive, icon: 'fa-expand', label: 'Large Form', cls: 'effect-buff' },
         { show: huntersMarkActive, icon: 'fa-crosshairs', label: "Hunter's Mark Active", cls: 'effect-neutral' },
         { show: tremorsenseActive, icon: 'fa-ear', label: 'Tremorsense 60 ft.', cls: 'effect-buff' },
