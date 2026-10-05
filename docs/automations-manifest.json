@@ -1907,7 +1907,7 @@
       "handler": "src/services/combat/automation/handlers/baseActionHandler.js",
       "router": "src/services/combat/automation/routers/baseActionRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/baseActionInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-BA-001-dodge.md",
+      "verified": "verified",
       "class": "Base Action",
       "triggerConditions": "Take the Dodge action on your turn",
       "expectedBehavior": "When you take the Dodge action, until your next turn, any creature making an attack roll against you has Disadvantage. Your movement is not difficult terrain for yourself."

@@ -485,9 +485,11 @@ const BUFF_EFFECT_HANDLERS = {
         effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1
         effects.attackAdvantageReasons.push(buff.name)
     },
-    dodge: (effects) => {
+    dodge: (effects, buff, ruleset) => {
         effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1
-        effects.dexSaveAdvantageCount = (effects.dexSaveAdvantageCount || 0) + 1
+        // BA-001: the Dex-save clause is 2014-only; 2024 Dodge is attack-roll
+        // disadvantage against the dodger, no saving-throw benefit.
+        if (ruleset !== '2024') effects.dexSaveAdvantageCount = (effects.dexSaveAdvantageCount || 0) + 1
     },
     clairvoyant_combatant: (effects) => {
         effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1
@@ -497,11 +499,11 @@ const BUFF_EFFECT_HANDLERS = {
     barkskin: (effects) => { effects.barkskinActive = true },
 }
 
-function applyActiveBuffs(effects, activeBuffs) {
+function applyActiveBuffs(effects, activeBuffs, ruleset) {
     if (!Array.isArray(activeBuffs)) return
     for (const buff of activeBuffs) {
         const handler = BUFF_EFFECT_HANDLERS[buff.effect]
-        if (handler) handler(effects, buff)
+        if (handler) handler(effects, buff, ruleset)
     }
 }
 
@@ -571,11 +573,17 @@ function removeBadgeEffect(badge, ctx) {
     if (handler) handler(badge, ctx)
 }
 
-function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, allCreatures, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage, playerStats: _playerStats, characters: _characters, activeMapName: _activeMapName, onRollConditionSave }) {
+// BA-001: ruleset resolves from the sheet's playerStats or, on initiative
+// cards, the characters list — 2024 Dodge badges must not claim Dex-save adv.
+function resolveBadgeRuleset(playerStats, characters, creatureName) {
+    return playerStats?.rules || (characters || []).find(c => c.name === creatureName)?.rules || '5e'
+}
+
+function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, allCreatures, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore, isLocalhost, coronaDisadvantage, playerStats, characters, activeMapName: _activeMapName, onRollConditionSave }) {
     const condKeys = (conditions || []).map(c => c.key)
     const effects = computeConditionEffects({ conditions: condKeys, saveModifiers: [], targetEffects })
     const activeBuffs = creatureName && campaignName ? (getRuntimeValue(creatureName, 'activeBuffs', campaignName) || []) : []
-    applyActiveBuffs(effects, activeBuffs)
+    applyActiveBuffs(effects, activeBuffs, resolveBadgeRuleset(playerStats, characters, creatureName))
     // Check if any creature has Vow of Enmity against this creature
     applyVowOfEnmity(effects, allCreatures, creatureName, campaignName)
 

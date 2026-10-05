@@ -253,7 +253,7 @@ function SummaryBadges({ playerStats, campaignName, activeMapName, characters, e
     return (
         <>
             <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
-            <ConditionEffectBadges conditions={conditionObjects} targetEffects={myTargetEffects} creatureName={playerStats.name} campaignName={campaignName} allCreatures={allCreaturesForBadges} isLocalhost={isLocalhost} />
+            <ConditionEffectBadges conditions={conditionObjects} targetEffects={myTargetEffects} creatureName={playerStats.name} campaignName={campaignName} allCreatures={allCreaturesForBadges} isLocalhost={isLocalhost} playerStats={playerStats} characters={characters} />
             {SUMMARY_BADGE_SPECS.map((spec) => {
                 const node = spec.render(badgeCtx);
                 return node ? <React.Fragment key={spec.key}>{node}</React.Fragment> : null;

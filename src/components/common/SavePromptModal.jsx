@@ -114,11 +114,13 @@ function modifierListGrantsAdvantage(current, saveModifiers, campaignName) {
   return false;
 }
 
-function isDodgeDexAdvantage(current, campaignName) {
+function isDodgeDexAdvantage(current, characters, campaignName) {
   const targetActiveBuffs = getRuntimeValue(current?.targetName, 'activeBuffs', campaignName) || [];
   const isDodgeActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
   const isDexSave = (current.saveType || '').toUpperCase() === 'DEX';
-  return isDodgeActive && isDexSave;
+  // BA-001: 2014-only clause — 2024 Dodge grants no saving-throw benefit.
+  const is2024 = ((characters || []).find(c => c.name === current?.targetName)?.rules || '5e') === '2024';
+  return isDodgeActive && isDexSave && !is2024;
 }
 
 // SP-014: beacon te lives at campaign ROOT targetEffects (producers write
@@ -135,7 +137,7 @@ function computeSaveAdvantage({ current, campaignName, hasDisadvantage, saveModi
   if (hasDisadvantage) return false;
   if (saveModifiers && saveModifiers.length > 0 && modifierListGrantsAdvantage(current, saveModifiers, campaignName)) return true;
   // Dodge: advantage on Dexterity saving throws only
-  if (isDodgeDexAdvantage(current, campaignName)) return true;
+  if (isDodgeDexAdvantage(current, characters, campaignName)) return true;
   // CLA-394 Zealous Presence: blanket advantage on saving throws (buff effect
   // advantage_attacks_and_saves) — mirrors the Dodge block shape.
   if (hasBuffEffect(current?.targetName, 'advantage_attacks_and_saves', campaignName)) return true;

@@ -67,12 +67,18 @@ function hasSpellOriginSaveAdvantage(targetSaveModifiers, pending, campaignName)
     return spellOrigin;
 }
 
+// BA-001: 2014-only clause — 2024 Dodge grants attack-roll disadvantage
+// against the dodger, NOT advantage on Dexterity saving throws.
+function hasDodgeDexSaveAdvantage(targetActiveBuffs, saveType, targetChar) {
+    const isDodging = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
+    return isDodging && saveType.toUpperCase() === 'DEX' && (targetChar?.rules || '5e') !== '2024';
+}
+
 function computeSaveAdvantage(pending, saveType, targetEffects, targetChar, campaignName) {
     const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
     const advantage = hasSpellOriginSaveAdvantage(targetSaveModifiers, pending, campaignName);
     const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];
-    const isDodging = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'dodge');
-    const dodgeAdvantage = isDodging && saveType.toUpperCase() === 'DEX';
+    const dodgeAdvantage = hasDodgeDexSaveAdvantage(targetActiveBuffs, saveType, targetChar);
     const beaconWisAdvantage = targetEffects.some(te => te.effect === 'beacon_of_hope') && saveType.toUpperCase() === 'WIS';
     const circleOfPowerAdvantage = isCircleOfPowerActive(pending.targetName, campaignName);
     return {

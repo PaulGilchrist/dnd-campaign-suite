@@ -859,6 +859,21 @@ function applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, 
   }
 }
 
+// BA-001: Dodge is an activeBuff on the PC (useCharActionsBaseActions), not a
+// condition or te, so the target-condition fold never saw it and EB monster
+// attacks against a dodging PC rolled single-d20 normal mode. Mirror
+// applyProtectionFromEvilPenalty (same active-buff-backed seam) and the PC-side
+// fold countDodgeDisadvantage (contextBuilder-sync.js:651): attack-roll
+// Disadvantage against a dodger is granted identically under 5e and 2024.
+// eslint-disable-next-line react-refresh/only-export-components
+export function applyDodgePenalty(targetEffectData, target, campaignName) {
+  if (target?.type !== 'player') return;
+  const targetActiveBuffs = getRuntimeValue(target.name, 'activeBuffs', campaignName) || [];
+  if (targetActiveBuffs.some(b => b.effect === 'dodge')) {
+    targetEffectData.targetDisadvantageCount = (targetEffectData.targetDisadvantageCount || 0) + 1;
+  }
+}
+
 function resolveTargetGridPos(mapData, target, attackerPlaced) {
   const targetPlayer = mapData.players?.find(p => p.name === target.name);
   if (targetPlayer) return { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
@@ -1284,6 +1299,7 @@ function buildTargetEffectData({ target, targetComputed, targetConditions, targe
   const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget, attackerSenses });
   applyElusive(targetEffectData, target, targetComputed, targetConditions);
   applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, getAttackerCreature);
+  applyDodgePenalty(targetEffectData, target, campaignName);
   return targetEffectData;
 }
 

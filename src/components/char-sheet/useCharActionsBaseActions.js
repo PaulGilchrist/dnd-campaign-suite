@@ -243,6 +243,11 @@ export default function useCharActionsBaseActions({
             campaignName,
             playerStats.name
         );
+        // BA-001: 2014 Dodge also grants advantage on Dexterity saving throws;
+        // 2024 Dodge is attack-roll disadvantage only (public/data manifest BA-001).
+        const dexSaveClause = playerStats.rules === '2024'
+            ? ''
+            : ' You have advantage on Dexterity saving throws.';
         if (!result.wasActive) {
             addExpiration({ attackerName: playerStats.name, targetName: playerStats.name, effects: [
                 { type: 'remove_active_buff', buffName: 'Dodge' }
@@ -251,7 +256,7 @@ export default function useCharActionsBaseActions({
                 type: 'ability_use',
                 characterName: playerStats.name,
                 abilityName: 'Dodge',
-                description: `${playerStats.name} takes the Dodge action. Attackers have disadvantage on attacks against you until the start of your next turn. You have advantage on Dexterity saving throws.`,
+                description: `${playerStats.name} takes the Dodge action. Attackers have disadvantage on attacks against you until the start of your next turn.${dexSaveClause}`,
             }).catch((e) => { console.error("[useCharActionsBaseActions:log-error]", e); });
         }
         setPopupHtml({
@@ -259,7 +264,7 @@ export default function useCharActionsBaseActions({
             name: 'Dodge',
             description: result.wasActive
                 ? 'Dodge deactivated.'
-                : 'Dodge activated. Attackers have disadvantage on attacks against you until the start of your next turn. You have advantage on Dexterity saving throws.',
+                : `Dodge activated. Attackers have disadvantage on attacks against you until the start of your next turn.${dexSaveClause}`,
         });
     }
 

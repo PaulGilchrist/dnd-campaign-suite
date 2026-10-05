@@ -8,11 +8,13 @@ import { KEY } from './turnStartEffects.js';
  * Add an expiration entry to the runtime store.
  */
 export function addExpiration({ attackerName, targetName, effects, campaignName, rounds, expireOnCreatureName }) {
-    let list = getRuntimeValue(attackerName, KEY);
-    if (!Array.isArray(list)) {
-        list = [];
-        setRuntimeValue(attackerName, KEY, list, campaignName);
-    }
+    // BA-001 / §39: the former two un-awaited writes on the same
+    // /changes/<Name> replace-route could reorder network-side — the seed
+    // [] POST landing last wiped the entry, so pendingExpirations stayed []
+    // and expireStaleEffects had nothing to consume (Dodge never cleared).
+    // One merged write carrying the appended entry fixes it app-wide.
+    const stored = getRuntimeValue(attackerName, KEY);
+    const list = Array.isArray(stored) ? stored : [];
     const currentRound = getCurrentCombatRound(campaignName);
     setRuntimeValue(attackerName, KEY, [
         ...list,
