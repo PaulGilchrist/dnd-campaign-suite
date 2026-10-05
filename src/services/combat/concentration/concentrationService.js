@@ -157,6 +157,29 @@ const SPELL_RUNTIME_CLEANERS = {
             setRuntimeValue(creature.name, 'stoneSkinDamageTypes', null, campaignName);
         }
     },
+    // SP-128: Expeditious Retreat — on ANY break (save fail, remove effect,
+    // replaced concentration, rest) the Dash bonus-action grant dies: clear
+    // the sheet-row flag, the per-turn Dash latch, the turn-start re-offer
+    // entry, and any lingering turn-scoped Dash speed_boost buff. The
+    // dash_bonus_action te itself rides the generic caster-concentration te
+    // sweep (clearCasterConcentrationTargetEffects, duration 'concentration').
+    'Expeditious Retreat': (creature, campaignName) => {
+        const name = creature.name
+        if (getRuntimeValue(name, 'expeditiousRetreatActive', campaignName)) {
+            setRuntimeValue(name, 'expeditiousRetreatActive', null, campaignName)
+        }
+        if (getRuntimeValue(name, '_Expeditious_Retreat_dash_usedRound', campaignName) != null) {
+            setRuntimeValue(name, '_Expeditious_Retreat_dash_usedRound', null, campaignName)
+        }
+        const offers = getRuntimeValue(name, 'turnStartEffects', campaignName)
+        if (Array.isArray(offers) && offers.some(e => e && e.type === 'expeditious_retreat_dash_offer')) {
+            setRuntimeValue(name, 'turnStartEffects', offers.filter(e => !e || e.type !== 'expeditious_retreat_dash_offer'), campaignName)
+        }
+        const buffs = getRuntimeValue(name, 'activeBuffs', campaignName) || []
+        if (Array.isArray(buffs) && buffs.some(b => b && b.name === 'Dash (Expeditious Retreat)')) {
+            setRuntimeValue(name, 'activeBuffs', buffs.filter(b => !(b && b.name === 'Dash (Expeditious Retreat)')), campaignName)
+        }
+    },
 };
 
 function revertObjectTransforms(casterName, campaignName) {

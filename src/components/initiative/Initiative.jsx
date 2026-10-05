@@ -69,6 +69,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_Slow_Fall_usedRound', null, campaignName)
     // FT-104: Dual Wielder once-per-turn extra attack latch re-arms on initiative roll.
     setRuntimeValue(creatureName, '_DualWielder_UsedRound', null, campaignName)
+    // SP-128: Expeditious Retreat Dash once-per-turn latch re-arms on initiative roll.
+    setRuntimeValue(creatureName, '_Expeditious_Retreat_dash_usedRound', null, campaignName)
     // CLA-113: Destructive Stride once-per-turn-per-creature latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Destructive_Stride_usedRound', null, campaignName)
     // FT-007: Boon of Combat Prowess round latch re-arms at round wrap (start of holder's next turn).

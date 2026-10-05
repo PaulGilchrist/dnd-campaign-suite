@@ -622,8 +622,36 @@ function InvokeDuplicityMoveRow({ activeBuffs, cannotAct, onAutomationAction }) 
     );
 }
 
-function computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem) {
-    return bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions || !!visibleHordeBreakerItem;
+function ExpeditiousRetreatDashRow({ playerStats, expeditiousRetreatActive, cannotAct, onAutomationAction }) {
+    // SP-128: Expeditious Retreat (2024) — while the concentration stamp is
+    // active ("until the spell ends, you can take that action again as a
+    // Bonus Action"), surface the Dash grant row (mirror Wrath of the Sea /
+    // Invoke Duplicity conditional rows). Routes via HANDLER_MAP
+    // expeditious_retreat_dash → expeditiousRetreatDashHandler (Dash =
+    // speed_boost double-speed, once per turn, refusals logged).
+    if (!expeditiousRetreatActive) return null;
+    const speed = playerStats.speed || 30;
+    return (
+        <div>
+            <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
+                if (cannotAct) return;
+                onAutomationAction({
+                    name: 'Dash (Expeditious Retreat)',
+                    description: `Take the Dash action — your Speed doubles ${speed} → ${speed * 2} ft until the end of the turn. Available on each of your turns until Concentration ends.`,
+                    automation: {
+                        type: 'expeditious_retreat_dash',
+                        action: 'bonus_action',
+                        casting_time: '1 bonus action',
+                        duration: 'until_end_of_turn',
+                    },
+                });
+            }}>Dash (Expeditious Retreat):</b> <span>{`Take the Dash action — your Speed doubles ${speed} → ${speed * 2} ft until the end of the turn (once per turn; available each turn until the spell ends).`}</span>
+        </div>
+    );
+}
+
+function computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem, hasExpeditiousRetreatDash) {
+    return bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions || !!visibleHordeBreakerItem || !!hasExpeditiousRetreatDash;
 }
 
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState, modalState }) {
@@ -637,6 +665,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    // SP-128: reactive Expeditious Retreat Dash grant flag (server-first).
+    const expeditiousRetreatActive = useRuntimeValue(playerStats.name, 'expeditiousRetreatActive', campaignName);
 
     const [hordeBreakerTargets, setHordeBreakerTargets] = useState(null);
     const huntersPreyChoice = useRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", campaignName);
@@ -845,7 +875,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         }).catch((e) => { console.error("[charBonusActions:log-error]", e); });
     }, [hordeBreakerAttackItem, hordeBreakerReady, campaignName, exhaustionPenalty, playerStats.name, rollAttack]);
 
-    const hasBonusContent = computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem);
+    const hasBonusContent = computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem, expeditiousRetreatActive);
 
     if (!hasBonusContent) return null;
 
@@ -908,6 +938,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                 <SpiritualWeaponMoveRow playerStats={playerStats} activeBuffs={activeBuffs} campaignName={campaignName} cannotAct={cannotAct} exhaustionPenalty={exhaustionPenalty} rollAttack={rollAttack} setPopupHtml={setPopupHtml} />
 
                 <InvokeDuplicityMoveRow activeBuffs={activeBuffs} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />
+
+                <ExpeditiousRetreatDashRow playerStats={playerStats} expeditiousRetreatActive={expeditiousRetreatActive} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />
 
                 {showEatTreat && <EatTreatRow handleEatBolsteringTreat={handleEatBolsteringTreat} />}
 

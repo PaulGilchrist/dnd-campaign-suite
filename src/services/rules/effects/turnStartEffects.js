@@ -178,6 +178,11 @@ const TURN_START_HANDLERS = {
     'vitalityOfTheTree_turn_start': applyVitalityOfTheTreeTurnStart,
     'aura_of_life_turn_start_heal': applyAuraOfLifeTurnStartHeal,
     'confusion_turn_start': (_activeName, _playerStats, _effect, campaignName) => applyConfusionTurnStart(_activeName, campaignName),
+    // SP-128: Expeditious Retreat — "until the spell ends, you can take that
+    // action again as a Bonus Action" (2024 spells.json). Re-offer the Dash
+    // grant at every turn start of the caster: re-arm the once-per-turn
+    // latch and log the offer while the grant is active.
+    'expeditious_retreat_dash_offer': (_activeName, _playerStats, _effect, campaignName) => applyExpeditiousRetreatDashOffer(_activeName, campaignName),
 };
 
 export async function applyTurnStartEffects(activeName, playerStats, campaignName, characters = []) {
@@ -584,6 +589,23 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
 
     storage.set('combatSummary', combatSummary, campaignName);
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
+// SP-128: Expeditious Retreat Dash re-offer at the caster's turn start —
+// clears the once-per-turn latch so the "Dash (Expeditious Retreat)" Bonus
+// Actions row is clickable again this turn, and logs the offer. Inert once
+// concentration ends (the er_active flag + turnStartEffects entry are
+// cleared together by the concentration-break cleanup).
+async function applyExpeditiousRetreatDashOffer(activeName, campaignName) {
+    if (!getRuntimeValue(activeName, 'expeditiousRetreatActive', campaignName)) return;
+    setRuntimeValue(activeName, '_Expeditious_Retreat_dash_usedRound', null, campaignName);
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: activeName,
+        abilityName: 'Expeditious Retreat',
+        description: `${activeName} can take the Dash action as a Bonus Action this turn (Expeditious Retreat).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[turnStartEffects:expeditious-retreat-offer-log-error]', e); });
 }
 
 async function applyConfusionTurnStart(activeName, campaignName) {

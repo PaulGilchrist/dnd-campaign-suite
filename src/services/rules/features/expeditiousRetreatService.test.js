@@ -24,10 +24,16 @@ vi.mock('../../combat/concentration/concentrationService.js', () => ({
     addConcentration: vi.fn(),
 }));
 
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+}));
+
 const { getCombatSummary } = await import('../../encounters/combatData.js');
 const { addConcentration } = await import('../../combat/concentration/concentrationService.js');
 const { addEntry } = await import('../../ui/logService.js');
 const storage = await import('../../ui/storage.js');
+const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 
 describe('expeditiousRetreatService', () => {
     let dispatchSpy;
@@ -254,6 +260,46 @@ describe('expeditiousRetreatService', () => {
                     '[expeditiousRetreat] Error logging:',
                     expect.any(Error),
                 );
+            });
+        });
+
+        describe('SP-128 Dash grant stamp', () => {
+            beforeEach(() => {
+                getCombatSummary.mockReturnValue({ creatures: [{ name: 'Wizard' }] });
+                getRuntimeValue.mockReturnValue(null);
+            });
+
+            it('stamps the persisted grant flag', async () => {
+                await callTrigger();
+
+                expect(setRuntimeValue).toHaveBeenCalledWith('Wizard', 'expeditiousRetreatActive', true, campaignName);
+            });
+
+            it('pushes a turn-start Dash re-offer entry', async () => {
+                await callTrigger();
+
+                const offerWrite = vi.mocked(setRuntimeValue).mock.calls.find(c => c[1] === 'turnStartEffects');
+                expect(offerWrite).toBeTruthy();
+                expect(offerWrite[2]).toEqual(expect.arrayContaining([
+                    expect.objectContaining({ type: 'expeditious_retreat_dash_offer' }),
+                ]));
+            });
+
+            it('does not duplicate the re-offer entry when one already exists', async () => {
+                getRuntimeValue.mockImplementation((_n, key) => {
+                    if (key === 'turnStartEffects') return [{ type: 'expeditious_retreat_dash_offer' }];
+                    return null;
+                });
+
+                await callTrigger();
+
+                expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[1] === 'turnStartEffects')).toHaveLength(0);
+            });
+
+            it('does not stamp grant state for non-matching spells', async () => {
+                await triggerExpeditiousRetreat({ name: 'Blur' }, {}, playerStats, campaignName, mapName);
+
+                expect(setRuntimeValue).not.toHaveBeenCalled();
             });
         });
 

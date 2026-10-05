@@ -133,6 +133,7 @@ import { handle as handleTireless } from './handlers/class-ranger/tirelessHandle
 import { handle as handleBonusActionChoice } from './handlers/combat/bonusActionChoiceHandler.js';
 import { handle as handleBonusAttacks } from './handlers/combat/bonusAttacksHandler.js';
 import { handle as handleDualWielderAttack } from './handlers/combat/dualWielderAttackHandler.js';
+import { handle as handleExpeditiousRetreatDash } from './handlers/spells/expeditiousRetreatDashHandler.js';
 import { handle as handlePatientDefense } from './handlers/combat/patientDefenseHandler.js';
 import { handle as handleStepOfTheWind } from './handlers/combat/stepOfTheWindHandler.js';
 import { handle as handleElementalAttunement } from './handlers/combat/elementalAttunementHandler.js';
@@ -445,6 +446,8 @@ const HANDLER_MAP = {
         // FT-104: Dual Wielder off-hand bonus attack — dedicated lane, the
         // Flurry handler multi-fires 3 Unarmed attacks for this feat row.
         dual_wielder_attack: handleDualWielderAttack,
+        // SP-128: Expeditious Retreat Dash Bonus Action grant row.
+        expeditious_retreat_dash: handleExpeditiousRetreatDash,
         patient_defense: handlePatientDefense,
         step_of_the_wind: handleStepOfTheWind,
         steady_aim: handleSteadyAim,

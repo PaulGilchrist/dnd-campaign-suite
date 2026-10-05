@@ -2409,7 +2409,7 @@
       "handler": "src/services/rules/features/expeditiousRetreatService.js + src/services/rules/spells/spellCastService/execution/triggerSpells.js (Dash bonus action while the spell is active)",
       "router": "n/a",
       "infoBuilder": "n/a",
-      "verified": "broken — see .opencode/plans/bug-SP-128-expeditious-retreat-no-dash-grant.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Bonus Action on each of your turns until the spell ends: Dash",
       "expectedBehavior": "This spell allows you to move at an incredible pace. When you cast this spell, and then as a bonus action on each of your turns until the spell ends, you can take the Dash action."
