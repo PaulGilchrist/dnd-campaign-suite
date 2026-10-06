@@ -725,6 +725,16 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
         const deferred = await resolveDeferredAttackMode({ forcedMode, playerName, playerStats, targetName, attack, activeBuffs, consumeAttackTe, avengingAngelActive, campaignName });
         forcedMode = deferred.forcedMode;
         dis += deferred.dis;
+        // SP-052: the deferred blur/foresight attacker-dis lane (hasBlurOrForesightWithoutCounter
+        // dis++) was accumulated here but NEVER converted — the PC popup lane rolled
+        // mode:'normal' against foresighted/blur targets. Combine the final counts once
+        // (same resolveAdvantageMode fold as resolveBuffScanMode; no forks): any
+        // attacker-side disadvantage forces mode:'disadvantage' unless a forced mode was
+        // already decided upstream. Foresight's own-holder advantage rides adv upstream,
+        // so the foresighted creature attacking keeps advantage ("other creatures" RAW).
+        if (forcedMode === undefined && dis > 0) {
+            forcedMode = 'disadvantage';
+        }
         const advantageReason = deferred.advantageReason;
 
         const autoDamageFormula = buildAutoDamageFormula(attack, stanceDamageBonus, brutalStrikeFormulaPart);

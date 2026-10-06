@@ -198,6 +198,41 @@ describe('foresightService', () => {
                 expect(newEffects[0].effect).toBe('foresight');
                 expect(newEffects[0].target).toBe('Wizard');
             });
+
+            it('SP-052: null targetEffects (cleared campaign store) does NOT throw — te lands on the selected target', async () => {
+                // Admin-clear / first cast of a session returns null for the
+                // campaign te key. The old throw aborted AFTER slot spend
+                // (slot leak) with zero te. Null must behave like empty.
+                mockGetRuntimeValue
+                    .mockReturnValueOnce([])
+                    .mockReturnValueOnce(null);
+
+                await expect(callTrigger({ name: 'Foresight' }, { targetName: 'ElfTest' })).resolves.toMatchObject({
+                    type: 'popup',
+                });
+
+                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
+                expect(newEffects).toHaveLength(4);
+                expect(newEffects[0]).toEqual({ target: 'ElfTest', source: 'Wizard', effect: 'foresight', duration: '8_hours' });
+            });
+
+            it('SP-052: re-cast replaces the previous target te ("ends early if cast again")', async () => {
+                const existing = [
+                    { target: 'Bandit 1', source: 'Wizard', effect: 'foresight', duration: '8_hours' },
+                    { target: 'Bandit 1', source: 'Wizard', effect: 'advantage_attacks', duration: '8_hours' },
+                    { target: 'Bandit 1', source: 'Wizard', effect: 'advantage_saves', duration: '8_hours' },
+                    { target: 'Bandit 1', source: 'Wizard', effect: 'advantage_abilities', duration: '8_hours' },
+                ];
+                mockGetRuntimeValue
+                    .mockReturnValueOnce([])
+                    .mockReturnValueOnce(existing);
+
+                await callTrigger({ name: 'Foresight' }, { targetName: 'ElfTest' });
+
+                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
+                expect(newEffects.filter(te => te.target === 'Bandit 1')).toHaveLength(0);
+                expect(newEffects.filter(te => te.target === 'ElfTest')).toHaveLength(4);
+            });
         });
 
         describe('return value', () => {

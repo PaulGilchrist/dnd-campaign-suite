@@ -29,11 +29,12 @@ export async function triggerForesight(spell, metaCtx, playerStats, campaignName
     //
     // The spell ends early if you cast it again, so remove any existing Foresight
     // from this caster before applying the new one.
+    // SP-052: a cleared campaign store returns null for targetEffects (admin clear /
+    // first cast of a session). Throwing here aborted the cast AFTER prepareSpellCast
+    // had already consumed the lv9 slot (slot leak) and left zero te. Every te
+    // consumer in the app treats null as empty (getRuntimeValue('campaign',
+    // 'targetEffects') || []); match that convention.
     const rawEffects = getRuntimeValue('campaign', 'targetEffects');
-    if (rawEffects == null) {
-        console.error('[foresightService] Missing array:', rawEffects);
-        throw new Error('Expected array, got ' + rawEffects);
-    }
     const effects = Array.isArray(rawEffects) ? rawEffects : [];
     const filtered = effects.filter(te => !(te.effect === 'foresight' && te.source === playerStats.name) && !(te.effect === 'advantage_attacks' && te.source === playerStats.name) && !(te.effect === 'advantage_saves' && te.source === playerStats.name) && !(te.effect === 'advantage_abilities' && te.source === playerStats.name));
 

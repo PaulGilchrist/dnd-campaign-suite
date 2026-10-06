@@ -312,7 +312,11 @@ const SIMPLE_SPELL_SPECS = [
   { name: 'lesserRestoration', key: 'LesserRestoration', run: applySpell(() => applyLesserRestorationEffect, p => ({ automation: { type: 'lesser_restoration', range: p.range } })) },
   { name: 'removeCurse', key: 'RemoveCurse', run: applySpell(() => confirmRemoveCurse, p => ({ automation: { type: 'remove_curse', range: p.range } }), showPopupIfPayload) },
   { name: 'mageArmor', key: 'MageArmor', run: applySpell(() => applyMageArmorEffect, p => ({ automation: { type: 'mage_armor', range: p.range } })) },
-  { name: 'foresight', key: 'Foresight', run: runForesight },
+  // SP-052: single-target confirm lane — log ONLY the radio selection (aid
+  // toArray(sel) precedent). The allTargets default stamped every combatant with
+  // creatureTargets[0] ("Bandit 1") as targetName no matter who was picked, so the
+  // cast log lied about the target even when the radio worked.
+  { name: 'foresight', key: 'Foresight', run: runForesight, confirmTargets: (d, pending, sel) => toArray(sel) },
   {
     name: 'protectionFromEvilAndGood',
     key: 'ProtectionFromEvilAndGood',

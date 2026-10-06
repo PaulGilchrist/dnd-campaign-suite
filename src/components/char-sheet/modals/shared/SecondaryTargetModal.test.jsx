@@ -93,4 +93,24 @@ describe('SecondaryTargetModal map distance badges', () => {
         fireEvent.click(screen.getByRole('button', { name: /Attack/ }));
         expect(onTargetSelected).toHaveBeenCalledWith('Goblin B');
     });
+
+    // SP-052: radio selection must persist across repeat clicks — the bug
+    // claim was "clicking ElfTest radio twice snaps back to Bandit 1".
+    it('repeated clicks on a non-first radio keep it checked and confirm forwards it', async () => {
+        const onTargetSelected = vi.fn();
+        render(<SecondaryTargetModal {...baseProps} onTargetSelected={onTargetSelected} />);
+
+        const radios = document.querySelectorAll('input[name="secondaryTarget"]');
+        fireEvent.click(radios[1]);
+        fireEvent.click(radios[1]);
+
+        const checked = Array.from(document.querySelectorAll('input[name="secondaryTarget"]')).filter(r => r.checked);
+        expect(checked).toHaveLength(1);
+        expect(checked[0].closest('.secondary-target-row').textContent).toContain('Goblin B');
+
+        const confirm = screen.getByRole('button', { name: /Attack/ });
+        expect(confirm).not.toBeDisabled();
+        fireEvent.click(confirm);
+        expect(onTargetSelected).toHaveBeenCalledWith('Goblin B');
+    });
 });
