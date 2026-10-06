@@ -14,6 +14,7 @@ import { computeAuraComboEffects } from '../../combat/auras/auraComboEffects.js'
 import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
 import { applyWardingBond } from '../../rules/features/wardingBondService.js';
 import { wakeSleepOnDamage } from '../../rules/features/sleepService.js';
+import { breakHypnoticPatternOnDamage } from '../features/hypnoticPatternService.js';
 import { checkPsychicVeil } from '../../rules/features/psychicVeilService.js';
 import { checkHolyAuraDamage } from '../../rules/features/holyAuraDamageService.js';
 import { checkDarkOnesBlessing } from '../../rules/features/darkOnesBlessingService.js';
@@ -534,6 +535,12 @@ function removeConditionFromList({ creature, conditions, conditionKey, displayNa
 // Both removals filter the SAME single-read condition list, preserving the original
 // last-write-wins semantics when a creature holds both conditions at once.
 function removeCombatConditionsOnDamage(creature, domination, isPlayer, campaignName) {
+  // SP-069: Hypnotic Pattern ends for an affected creature that takes damage —
+  // strip its charmed/incapacitated/speed_zero trio BEFORE the generic reads so
+  // the charmed strip below is a no-op on hypno targets (single owner per fact).
+  if (!domination) {
+    breakHypnoticPatternOnDamage(creature.name, campaignName);
+  }
   const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
   removeConditionFromList({ creature, conditions, conditionKey: 'frightened', displayName: 'Frightened', reason: 'took damage', campaignName });
   if (!domination) {

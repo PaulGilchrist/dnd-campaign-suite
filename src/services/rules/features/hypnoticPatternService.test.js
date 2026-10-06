@@ -4,11 +4,22 @@
 // @improved-by-ai
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { triggerHypnoticPattern } from './hypnoticPatternService.js';
+import { triggerHypnoticPattern, breakHypnoticPatternOnDamage } from './hypnoticPatternService.js';
 import { executeHandler } from '../../automation/index.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../ui/logService.js';
 
 vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
+}));
+
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // Silence console.error during tests (the service logs errors before throwing)
@@ -269,5 +280,59 @@ describe('hypnoticPatternService', () => {
 
             expect(result).toBeNull();
         });
+    });
+});
+
+describe('breakHypnoticPatternOnDamage (SP-069)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        addEntry.mockResolvedValue(undefined);
+    });
+
+    it('breaks hypno conditions on a charmed+incapacitated+speed_zero target and logs', () => {
+        getRuntimeValue.mockReturnValue(['charmed', 'incapacitated', 'speed_zero']);
+
+        const broke = breakHypnoticPatternOnDamage('Bandit 1', 'test-campaign');
+
+        expect(broke).toBe(true);
+        expect(setRuntimeValue).toHaveBeenCalledWith('Bandit 1', 'activeConditions', [], 'test-campaign');
+
+        const removedLogs = addEntry.mock.calls
+            .map(c => c[1])
+            .filter(e => e.type === 'condition' && e.action === 'removed');
+        expect(removedLogs.map(e => e.condition).sort()).toEqual(['Charmed', 'Incapacitated', 'Speed_zero']);
+        removedLogs.forEach(e => expect(e.reason).toMatch(/Took damage \(Hypnotic Pattern\)/));
+
+        const brokenLog = addEntry.mock.calls.map(c => c[1]).find(e => e.automation === 'hypnotic_pattern_broken');
+        expect(brokenLog).toBeTruthy();
+        expect(brokenLog.characterName).toBe('Bandit 1');
+    });
+
+    it('preserves unrelated conditions while removing the hypno trio', () => {
+        getRuntimeValue.mockReturnValue(['prone', 'charmed', 'incapacitated', 'speed_zero', 'poisoned']);
+
+        const broke = breakHypnoticPatternOnDamage('Bandit 1', 'test-campaign');
+
+        expect(broke).toBe(true);
+        expect(setRuntimeValue).toHaveBeenCalledWith('Bandit 1', 'activeConditions', ['prone', 'poisoned'], 'test-campaign');
+    });
+
+    it('does NOT break a Confusion-charmed target (charmed+speed_zero, no incapacitated)', () => {
+        getRuntimeValue.mockReturnValue(['charmed', 'speed_zero']);
+
+        const broke = breakHypnoticPatternOnDamage('Goblin', 'test-campaign');
+
+        expect(broke).toBe(false);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('does NOT break a plain charmed target and guards null stored conditions', () => {
+        getRuntimeValue.mockReturnValue(['charmed']);
+        expect(breakHypnoticPatternOnDamage('Victim', 'test-campaign')).toBe(false);
+
+        getRuntimeValue.mockReturnValue(null);
+        expect(breakHypnoticPatternOnDamage('Victim', 'test-campaign')).toBe(false);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 });

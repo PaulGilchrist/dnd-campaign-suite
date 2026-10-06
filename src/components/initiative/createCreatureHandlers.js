@@ -5,6 +5,7 @@ import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromp
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc } from '../../services/encounters/initiativeService.js'
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js'
 import { vanishSummonAtZeroHp } from '../../services/combat/summons/summonedCreatureService.js'
+import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypnoticPatternService.js'
 
 /**
  * Creates creature operation handlers for the initiative component.
@@ -30,6 +31,12 @@ export function createCreatureHandlers({
         const oldHp = isPlayer ? (getRuntimeValue(creature.name, 'currentHitPoints') ?? 0) : creature.currentHp
         const delta = newValue - oldHp
         if (delta === 0) return
+
+        // SP-069: a GM HP-input reduction is adjudicated damage — Hypnotic Pattern
+        // ends for the affected creature if it takes any damage (per-creature, logged).
+        if (delta < 0) {
+            breakHypnoticPatternOnDamage(creatureName, campaignName)
+        }
 
         if (isPlayer) {
             setRuntimeValue(creature.name, 'currentHitPoints', newValue, campaignName)

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { addTargetResult } from '../../../../services/automation/common/damageRollback.js';
@@ -36,6 +36,11 @@ function HypnoticPatternModal({
 }) {
     const [pendingPrompts, setPendingPrompts] = useState([]);
     usePendingPromptsCleanup(setPendingPrompts);
+
+    // SP-069: CLA-101 re-entry latch — the spell slot is paid once upstream by
+    // gateMetamagic → prepareSpellCast; a repeated confirm click here must never
+    // re-run the save lane (sp-roll-btn stayed clickable while PC prompts pended).
+    const confirmStartedRef = useRef(false);
 
     const [heightenTarget, setHeightenTarget] = useState(null);
 
@@ -184,6 +189,9 @@ function HypnoticPatternModal({
     };
 
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
+        if (confirmStartedRef.current) return;
+        confirmStartedRef.current = true;
+
         await logAbilityUseSelection(campaignName, { casterName: playerStats.name, abilityName: action.name, targetCount: selectedNames.length, saveDc, saveType, logPrefix: '[HypnoticPatternModal]' });
 
         const { prompts } = await resolveAllSaves(selectedNames);
@@ -207,7 +215,7 @@ function HypnoticPatternModal({
             title={action.name}
             icon="fa-eye"
             targets={getCreatureTargets()}
-            description={`Select creatures in the 20-foot-radius sphere. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`}
+            description={`Select creatures in the 30-foot Cube. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`}
             note={`On a failed save, target becomes <strong>Charmed</strong>, <strong>Incapacitated</strong>, and has <strong>Speed 0</strong>. The spell ends if the creature takes damage or someone uses an action to shake it free.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`}
             confirmLabel={action.name}
             confirmIcon="fa-eye"

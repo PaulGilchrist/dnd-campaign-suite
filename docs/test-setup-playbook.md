@@ -2101,3 +2101,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §SP-068 (2026-10-06, Hunters Mark re-mark FIXED) Recipe + pitfalls
 - RAW re-mark lane = spellPreparationService.resolveConcentrationChange; same-spell-recast branch was inert except Eyebite. Fix: isReMark branch (old mark target currentHp<=0) → shouldSetConcentration=true + oldConcentrationSpell=null → applyConcentration swaps id+target in ONE combatSummary write (no break/purge); log `hunters_mark_remarked`. Verify by concentration id change, NOT spell-log presence.
 - Rig: bare seeded combatant needs `ac` or computeTargetAc throws `[AC] no AC defined` aborting damage pre-rider; anchor weapon to-hit chips by row, not text-is("+8") (matches Dex saves).
+
+## §SP-069 (2026-10-06, Hypnotic Pattern FIXED) Recipe + pitfalls
+- Modal-lane AoE spells pay slot in gateMetamagic→prepareSpellCast (pre-modal), NOT in modal — confirm lane only needs CLA-101 useRef latch. GM card HP-input writes cs directly bypassing applyDamage: condition-on-damage enders hook BOTH handleCreatureHpChange (delta<0) and removeCombatConditionsOnDamage. Hypno fingerprint = charmed+incapacitated+speed_zero trio (confusion lacks incapacitated). Token `hypnotic_pattern_broken`.
