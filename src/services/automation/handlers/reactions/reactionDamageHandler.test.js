@@ -659,7 +659,12 @@ describe('reactionDamageHandler', () => {
             expect(result.payload.description).toContain('has no uses remaining');
         });
 
-        it('skips focus point cost for Hand of Harm with Flurry of Healing and Harm', async () => {
+        // CLA-158: stale pin INVERTED. The old pin asserted a blanket FP skip
+        // for any lv11+ Hand of Harm holding Flurry of Healing and Harm — that
+        // made the STANDALONE reaction press charge 0 FP (RAW: 1 FP). The
+        // flurry lane's free harm legs route through bonusAttacksHandler and
+        // never reach this handler, so standalone always charges.
+        it('charges the focus point cost for standalone Hand of Harm even with Flurry of Healing and Harm', async () => {
             getRuntimeValue.mockImplementation((_playerName, key) => {
                 if (key === 'focusPoints') return 0;
                 return undefined;
@@ -674,15 +679,17 @@ describe('reactionDamageHandler', () => {
             resolveTarget.mockResolvedValue({ target: { name: 'Enemy' } });
 
             let result = await handle(action, ps, 'test-campaign', null);
-            expect(result.payload.description).toContain('CON saving throw');
-
-            // Without Flurry
-            const action2 = makeAction({
-                name: 'Hand of Harm',
-                automation: { saveType: 'CON', resourceCost: 'focus_point' },
-            });
-            result = await handle(action2, makePlayerStats(), 'test-campaign', null);
             expect(result.payload.description).toBe('No Focus Points remaining.');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'focusPoints', expect.any(Number), 'test-campaign');
+
+            // With focus available the save prompt runs and 1 FP is spent.
+            getRuntimeValue.mockImplementation((_playerName, key) => {
+                if (key === 'focusPoints') return 3;
+                return undefined;
+            });
+            result = await handle(action, ps, 'test-campaign', null);
+            expect(result.payload.description).toContain('CON saving throw');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'focusPoints', 2, 'test-campaign');
         });
     });
 
@@ -849,7 +856,9 @@ describe('reactionDamageHandler', () => {
                 detail: { promptId: 'test-prompt-id', success: false },
             }));
 
-            await Promise.resolve();
+            // CLA-158: applyFailInfliction became async (awaited te write +
+            // condition log) — flush the full continuation chain, not one tick.
+            await new Promise(r => setTimeout(r, 0));
 
             expect(setRuntimeValue).toHaveBeenCalledWith('Enemy', 'activeConditions', ['poisoned'], 'test-campaign');
         });
@@ -872,7 +881,8 @@ describe('reactionDamageHandler', () => {
                 detail: { promptId: 'test-prompt-id', success: false },
             }));
 
-            await Promise.resolve();
+            // CLA-158: async fail-lane — flush the full continuation chain.
+            await new Promise(r => setTimeout(r, 0));
 
             const lastCall = setRuntimeValue.mock.calls[setRuntimeValue.mock.calls.length - 1];
             expect(lastCall[2]).toEqual(['poisoned']);

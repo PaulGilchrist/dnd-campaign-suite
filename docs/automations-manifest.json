@@ -3091,7 +3091,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-158-hand-of-harm-no-affordance.md",
+      "verified": "verified",
       "class": "Monk",
       "triggerConditions": "Trigger: creature_within_5ft_hits_on_attack_roll; Action: 1 reaction",
       "expectedBehavior": "When a creature you can see within 5 feet of you hits on an attack roll, you can take a Reaction to channel supernatural poison through that creature. The creature must succeed on a Constitution saving throw against your spell save DC or take 1d6 Necrotic damage and have Disadvantage on the next attack roll it makes. This Necrotic damage increases to 2d6 at level 11 and 3d6 at level 17."

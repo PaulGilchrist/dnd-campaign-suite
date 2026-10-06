@@ -68,6 +68,8 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_Telekinetic_Shove_usedRound',
     // CLA-361: Thought Shield reflect round latch re-arms at round wrap.
     '_Thought_Shield_usedRound',
+    // CLA-158: Hand of Harm holder-hit reaction round latch re-arms at round wrap.
+    '_Hand_of_Harm_usedRound',
     '_Superior_Hunters_Defense_usedRound',
     '_Riposte_usedRound',
     '_Riposte_appliedAttack',

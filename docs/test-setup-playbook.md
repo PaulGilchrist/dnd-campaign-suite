@@ -2063,3 +2063,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §CLA-155 (2026-10-06, Guarded Mind FIXED) Recipe + pitfalls
 - Pitfall: Short Rest wipes `activeConditions`+meta (restRules-shortRest.js:315) — "GM-add condition then rest then end-condition feature" probes click an already-empty lane; seed conditions AFTER the rest. Guarded Mind has two lanes (sheet clickable = spend+clear; SavePromptModal reroll `_guardedMind_usedRest`) — judge by popup copy. Subclass-edit stale `psionicEnergy:0` persists across reloads; CLA-027 null→max fallback + `class_levels.find(level===).energy.energy_die_num` resolves max live. EffectAdder Conditions tab single-select — Apply twice per condition.
+
+## §CLA-158 (2026-10-06, Hand of Harm FIXED) Recipe + pitfalls
+- The reaction row DOES render clickable (categorized '1 reaction'); the dead seam was execution: save branch pulled resolveTarget(holder)=defender's armed slot (empty post-hit) → permanent refusal. Holder-targeted reaction_damage triggers MUST pull attacker from findLastAttack (target===holder && hit; RAW arms on attack roll, unlike CLA-150 rollback rider needing totalDamage>0).
+- FP-free reactions skip in the lane providing the free use (flurry = bonusAttacksHandler), NEVER in shared reactionDamageHandler (standalone always charges 1 FP raw).
+- Ops: interim popup/save can re-stamp lastAttack with holder as attacker — judge trigger validity from fresh lastAttack immediately before affordance click. `.sp-modal` save applies damage only after Done — poll post-Done.

@@ -96,6 +96,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_Telekinetic_Shove_usedRound', null, campaignName)
     // CLA-361: Thought Shield reflect round latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Thought_Shield_usedRound', null, campaignName)
+    // CLA-158: Hand of Harm holder-hit reaction round latch re-arms at round wrap.
+    setRuntimeValue(creatureName, '_Hand_of_Harm_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_Superior_Hunters_Defense_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_Riposte_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_Riposte_appliedAttack', null, campaignName)

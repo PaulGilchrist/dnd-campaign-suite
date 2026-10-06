@@ -26,6 +26,86 @@ const THOUGHT_SHIELD_ROUND_KEY = '_Thought_Shield_usedRound';
 // initiative.jsx / navigationHandlers.js).
 const ADJACENT_DAMAGE_REACTION_ROUND_KEY = '_Retaliation_usedRound';
 
+// CLA-158: Hand of Harm ("When a creature you can see within 5 feet of you hits
+// on an attack roll...") — holder-targeted round latch, CLA-361/CLA-383 family.
+// Cleared at round wrap in Initiative.jsx clearPlayerRoundFlags +
+// navigationHandlers.js PLAYER_ROUND_LATCH_KEYS.
+function holderHitReactionLatchKey(featureName) {
+    return `_${String(featureName).replace(/\s+/g, '_')}_usedRound`;
+}
+
+// CLA-158: level-scaled damage expression ({'11':'2d6','17':'3d6'}), same
+// semantics as bonusAttacksHandler's resolveHandOfHarmExpression lane — the raw
+// classes.json row carries the lv3 base and the scaling map, so the handler must
+// resolve it at execution time (lv20 standalone HoH = 3d6, not 1d6).
+function resolveReactionDamageExpression(auto, playerStats) {
+    const scaling = auto.scaling || {};
+    let expression = auto.damageExpression || '';
+    const levels = Object.keys(scaling).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
+    for (const level of levels) {
+        if (playerStats.level >= level) expression = String(scaling[level]);
+    }
+    return expression;
+}
+
+function holderHitRefuse(action, playerName, campaignName, description) {
+    const slug = String(action.name).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: `${slug}_refused`,
+        name: action.name,
+        description,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[reactionDamage] Error logging refusal:', e); });
+    return refusalPopup(action, action.automation, description);
+}
+
+// CLA-158: gate for the holder-targeted trigger creature_within_5ft_hits_on_attack_roll.
+// The holder is the DEFENDER — the target is taken from lastAttack (mirrors the
+// CLA-150 Glorious Defense seam: findLastAttack + target-side trigger), never the
+// holder's own armed-target slot, which is empty post-hit and made the reaction
+// permanently refuse ("requires a target"). RAW wording is the attack ROLL hitting
+// ("hits on an attack roll"), so a 0-damage hit (immunity) still triggers — unlike
+// the CLA-150 damage-rollback rider which requires totalDamage>0. Adjacency is
+// lenient per playbook §42 (isWithinRange passes gridless/unpositioned).
+async function gateCreatureHitHolder(action, auto, playerStats, campaignName) {
+    const playerName = playerStats.name;
+    const refuse = (description) => holderHitRefuse(action, playerName, campaignName, description);
+
+    const lastAttack = await findLastAttack(campaignName);
+    const attackerName = lastAttack.attackerName;
+
+    if (!lastAttack.attackEvent || !attackerName) {
+        return { refusal: refuse(`No recent attack found. ${action.name} triggers when a creature within 5 feet of you hits you on an attack roll.`) };
+    }
+    if (attackerName === playerName) {
+        return { refusal: refuse(`${action.name}: you cannot trigger this reaction on yourself.`) };
+    }
+    if (lastAttack.targetName !== playerName) {
+        return { refusal: refuse(`You were not the target of the last attack (${lastAttack.targetName} was). ${action.name} only triggers when a creature within 5 feet of you hits you.`) };
+    }
+    if (lastAttack.attackEvent.hit !== true) {
+        return { refusal: refuse(`The last attack by ${attackerName} missed — ${action.name} requires a hit on an attack roll.`) };
+    }
+
+    const rangeFt = rangeToFeet(auto.range) ?? 5;
+    const withinRange = await isWithinRange(playerName, attackerName, rangeFt);
+    if (!withinRange) {
+        return { refusal: refuse(`${attackerName} is not within ${rangeFt} feet of you. ${action.name} requires the attacker to be within ${rangeFt} feet.`) };
+    }
+
+    const combatContext = await getCombatContext(campaignName);
+    const currentRound = combatContext?.round || 1;
+    const latchKey = holderHitReactionLatchKey(action.name);
+    const usedRound = Number(getRuntimeValue(playerName, latchKey, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return { refusal: refuse(`You have already used ${action.name} this round — your Reaction is spent until your next turn.`) };
+    }
+
+    return { attackerName, latchKey, currentRound };
+}
+
 function refusalPopup(action, auto, description) {
     return {
         type: 'popup',
@@ -85,22 +165,21 @@ function getRuntimeUsesKey(featureName) {
 
 async function consumeResourceCost(auto, playerStats, campaignName, actionName) {
     if (auto.resourceCost === 'focus_point') {
-        const isHandOfHarm = actionName === 'Hand of Harm';
-        const hasFlurryHealingHarm = playerStats.specialActions?.some(f => f.name === "Flurry of Healing and Harm");
-        const skipFP = isHandOfHarm && hasFlurryHealingHarm;
+        // CLA-158: the old blanket skip (isHandOfHarm && hasFlurryHealingHarm)
+        // charged 0 FP on EVERY standalone Hand of Harm press once the monk held
+        // the lv11 passive. The Flurry lane's free harm legs route through
+        // bonusAttacksHandler.handleBonusAttacks (they never reach this
+        // handler) — standalone RAW cost is 1 Focus Point, so charge it here.
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const maxFocus = classLevel?.focus_points || 0;
+        const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? maxFocus);
 
-        if (!skipFP) {
-            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxFocus = classLevel?.focus_points || 0;
-            const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? maxFocus);
-
-            if (currentFocus <= 0) {
-                return { ok: false, message: 'No Focus Points remaining.' };
-            }
-
-            await setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
-            return { ok: true };
+        if (currentFocus <= 0) {
+            return { ok: false, message: 'No Focus Points remaining.' };
         }
+
+        await setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
+        return { ok: true };
     }
 
     if (auto.uses_expression) {
@@ -115,6 +194,46 @@ async function consumeResourceCost(auto, playerStats, campaignName, actionName) 
     }
 
     return { ok: true };
+}
+
+// CLA-158: holder-targeted trigger — the holder was the one hit, so the
+// reaction's target is the attacker from lastAttack (CLA-150 seam), gated
+// on hit + adjacency + once-per-round latch BEFORE any resource spend.
+// Non-holder triggers keep the existing armed-target resolution byte-identical.
+async function resolveSaveBranchTarget({ action, auto, playerStats, campaignName }) {
+    let holderGate = null;
+    let targetName = null;
+
+    if (auto.trigger === 'creature_within_5ft_hits_on_attack_roll') {
+        holderGate = await gateCreatureHitHolder(action, auto, playerStats, campaignName);
+        if (holderGate.refusal) return { refusal: holderGate.refusal };
+        targetName = holderGate.attackerName;
+    } else {
+        const targetInfo = await resolveTarget(campaignName, playerStats.name);
+        if (!targetInfo?.target) {
+            return { refusal: refusalPopup(action, auto, `${action.name} requires a target. Select a creature in combat and try again.`) };
+        }
+        targetName = targetInfo.target.name;
+    }
+
+    const resourceResult = await consumeResourceCost(auto, playerStats, campaignName, action.name);
+    if (!resourceResult.ok) {
+        // CLA-158: refusals log (CLA-337 storms_thunder_refused shape) — popup-only
+        // refusals were the §7 gap. This lane's only resourceCost consumer is the
+        // focus_point Hand of Harm row.
+        if (holderGate) {
+            return { refusal: holderHitRefuse(action, playerStats.name, campaignName, `${action.name} refused — ${resourceResult.message} Nothing was spent.`) };
+        }
+        return { refusal: refusalPopup(action, auto, resourceResult.message) };
+    }
+
+    // Stamp the latch before the save prompt so a spent Reaction cannot refire
+    // within the round (CLA-361 order; FP pre-modal spend = paid value, CLA-113).
+    if (holderGate) {
+        await setRuntimeValue(playerStats.name, holderGate.latchKey, holderGate.currentRound, campaignName);
+    }
+
+    return { targetName };
 }
 
 export async function handle(action, playerStats, campaignName, _mapName, characters = []) {
@@ -137,37 +256,18 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
         return await handleMeleeReactionAttack(action, auto, playerStats, campaignName);
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    if (!targetInfo?.target) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} requires a target. Select a creature in combat and try again.`,
-                automation: auto,
-            },
-        };
-    }
-    const targetName = targetInfo.target.name;
+    const resolved = await resolveSaveBranchTarget({ action, auto, playerStats, campaignName });
+    if (resolved.refusal) return resolved.refusal;
+    const targetName = resolved.targetName;
 
-    const resourceResult = await consumeResourceCost(auto, playerStats, campaignName, action.name);
-    if (!resourceResult.ok) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: resourceResult.message,
-                automation: auto,
-            },
-        };
-    }
-
-    const saveDc = buildSaveDc(auto, playerStats);
+    // CLA-158: Monk spellcasting ability is Wisdom — buildSaveDc's 'ability'
+    // path defaults to CON without this stamp (CLA-144 convention).
+    const saveAbility = auto.saveAbility || (playerStats.class?.name === 'Monk' ? 'WIS' : 'CON');
+    const saveDc = buildSaveDc({ ...auto, saveAbility }, playerStats);
     const saveType = auto.saveType || 'CON';
     const { promptId } = createSaveListener(campaignName, {
         targetName,
+        attackerName: playerStats.name,
         saveType,
         saveDc,
     });
@@ -205,8 +305,9 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
 }
 
 async function applyFailDamage({ auto, action, playerStats, campaignName, targetName, characters }) {
-    if (!auto.damageExpression) return;
-    const damageResult = rollExpression(auto.damageExpression);
+    const damageExpression = resolveReactionDamageExpression(auto, playerStats);
+    if (!damageExpression) return;
+    const damageResult = rollExpression(damageExpression);
     if (!damageResult) return;
 
     const damageType = auto.damageType || 'Necrotic';
@@ -218,7 +319,7 @@ async function applyFailDamage({ auto, action, playerStats, campaignName, target
         targetName,
         damageType,
         total: damageResult.total,
-        formula: auto.damageExpression,
+        formula: damageExpression,
         rolls: damageResult.rolls,
         description: `${action.name} dealt ${damageResult.total} ${damageType} damage to ${targetName}.`,
     }).catch((e) => { console.error("[reactionDamage] Error:", e); });
@@ -231,9 +332,12 @@ async function applyFailDamage({ auto, action, playerStats, campaignName, target
     }
 }
 
-function applyFailInfliction({ auto, action, campaignName, targetName }) {
+async function applyFailInfliction({ auto, action, campaignName, targetName, playerName }) {
     if (!auto.alsoInflicts) return;
-    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    // CLA-158: campaignName threaded (CLA-150 buildProtectedRefusal shape) — an
+    // unthreaded read can miss the live campaign store. Registered te lane
+    // (disadvantage_next_attack) consumed/cleared by attackPostProcessing.
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
     const newEffects = [...storedEffects, {
         target: targetName,
         source: action.name,
@@ -241,7 +345,16 @@ function applyFailInfliction({ auto, action, campaignName, targetName }) {
         effect: auto.alsoInflicts,
         duration: 'until_used',
     }];
-    setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName);
+    await setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName);
+
+    addEntry(campaignName, {
+        type: 'condition',
+        characterName: targetName,
+        action: 'applied',
+        condition: 'Disadvantage on next attack roll',
+        reason: `${playerName || action.name}'s ${action.name} (failed saving throw)`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[reactionDamage] Error logging inflicted condition:', e); });
 }
 
 function applyFailPhysiciansTouch({ playerStats, campaignName, targetName }) {
@@ -256,7 +369,7 @@ function applyFailPhysiciansTouch({ playerStats, campaignName, targetName }) {
 
 async function applySaveFailureEffects({ auto, action, playerStats, campaignName, targetName, characters }) {
     await applyFailDamage({ auto, action, playerStats, campaignName, targetName, characters });
-    applyFailInfliction({ auto, action, campaignName, targetName });
+    await applyFailInfliction({ auto, action, campaignName, targetName, playerName: playerStats.name });
     applyFailPhysiciansTouch({ playerStats, campaignName, targetName });
 }
 
