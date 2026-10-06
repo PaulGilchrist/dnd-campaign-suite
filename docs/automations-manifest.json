@@ -3054,7 +3054,7 @@
       "handler": "src/services/automation/handlers/class-sorcerer/guardedMindHandler.js",
       "router": "src/services/combat/automation/automationRouter.js",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/spell.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-155-guarded-mind-no-clear.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "resistance, guarded_mind",
       "expectedBehavior": "Resistance to Psychic damage. Can expend Psionic Energy Die to end Charmed/Frightened conditions."
