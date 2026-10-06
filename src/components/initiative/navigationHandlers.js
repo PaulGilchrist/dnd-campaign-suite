@@ -43,6 +43,9 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_DualWielder_UsedRound',
     // SP-128: Expeditious Retreat Dash once-per-turn latch re-arms at round wrap.
     '_Expeditious_Retreat_dash_usedRound',
+    // CLA-405: Fleet Step Step-of-the-Wind grant (armed by a non-Step Bonus
+    // Action, "immediately after") expires at round wrap.
+    '_Fleet_Step_grantRound',
     // CLA-113: Destructive Stride once-per-turn-per-creature latch re-arms at round wrap.
     '_Destructive_Stride_usedRound',
     // FT-007: Boon of Combat Prowess round latch re-arms at round wrap (start of holder's next turn).

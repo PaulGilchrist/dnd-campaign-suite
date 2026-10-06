@@ -32,6 +32,7 @@ import { resolveSpiritualWeaponMoveAndAttack } from '../../services/rules/featur
 import ArcaneVigorModal from './ArcaneVigorModal.jsx';
 import WarBondChooserModal from './modals/WarBondChooserModal.jsx';
 import { handleBond as handleWarBondBind, inventoryWeaponNames } from '../../services/automation/handlers/class-fighter-rogue/warBondHandler.js';
+import { FLEET_STEP_GRANT_KEY, FLEET_STEP_ROW_NAME, isFleetStepEligible, consumeFleetStep } from '../../services/rules/features/fleetStepService.js';
 import { loadWeapons } from './modals/weapon-kind-mastery-cache.js';
 import './CharActions.css'
 
@@ -650,8 +651,44 @@ function ExpeditiousRetreatDashRow({ playerStats, expeditiousRetreatActive, cann
     );
 }
 
-function computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem, hasExpeditiousRetreatDash) {
-    return bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions || !!visibleHordeBreakerItem || !!hasExpeditiousRetreatDash;
+function fleetStepRowVisible(playerStats, fleetStepGrantRound, campaignName) {
+    return isFleetStepEligible(playerStats)
+        && fleetStepGrantRound != null
+        && Number(fleetStepGrantRound) === getCurrentCombatRound(campaignName);
+}
+
+function FleetStepRow({ playerStats, campaignName, cannotAct, onAutomationAction }) {
+    // CLA-405: Fleet Step (Warrior of the Open Hand lv11, 2024) — after a
+    // Bonus Action other than Step of the Wind, the fleetStepGrantRound latch
+    // (fleetStepService, SP-128 flag-lane shape) offers this row. Click
+    // consumes the grant (awaited BEFORE dispatch — §5 same-endpoint write
+    // merge) and executes the canonical step_of_the_wind lane; FP accounting
+    // is the existing CLA-333 Option A handler (1 FP upgrade at FP>=1, free
+    // Dash at 0 — no free casts fabricated). No 'trigger' field: Fleet Step
+    // IS the grant; the after_attack_action gate must not refuse it.
+    return (
+        <div>
+            <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={async () => {
+                if (cannotAct) return;
+                const consumed = await consumeFleetStep(playerStats, campaignName);
+                if (!consumed) return;
+                onAutomationAction({
+                    name: 'Step of the Wind',
+                    description: 'Take Dash as Bonus Action, or expend 1 Focus Point for Disengage + Dash with doubled jump distance.',
+                    automation: {
+                        type: 'step_of_the_wind',
+                        action: 'bonus_action',
+                        cost: { resource: 'focus_points', amount: 1 },
+                        casting_time: '1 bonus action',
+                    },
+                });
+            }}>{FLEET_STEP_ROW_NAME}:</b> <span>Granted by Fleet Step after your Bonus Action — take Dash as a Bonus Action immediately (canonical Step of the Wind costs apply).</span>
+        </div>
+    );
+}
+
+function computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem, grantRows) {
+    return bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions || !!visibleHordeBreakerItem || !!grantRows;
 }
 
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onResolveSpellDamage, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo, setModalState, modalState }) {
@@ -667,6 +704,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     // SP-128: reactive Expeditious Retreat Dash grant flag (server-first).
     const expeditiousRetreatActive = useRuntimeValue(playerStats.name, 'expeditiousRetreatActive', campaignName);
+    // CLA-405: reactive Fleet Step grant latch (holder-keyed round, server-first).
+    const fleetStepGrantRound = useRuntimeValue(playerStats.name, FLEET_STEP_GRANT_KEY, campaignName);
+    const showFleetStepRow = fleetStepRowVisible(playerStats, fleetStepGrantRound, campaignName);
 
     const [hordeBreakerTargets, setHordeBreakerTargets] = useState(null);
     const huntersPreyChoice = useRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", campaignName);
@@ -875,7 +915,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         }).catch((e) => { console.error("[charBonusActions:log-error]", e); });
     }, [hordeBreakerAttackItem, hordeBreakerReady, campaignName, exhaustionPenalty, playerStats.name, rollAttack]);
 
-    const hasBonusContent = computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem, expeditiousRetreatActive);
+    const hasBonusContent = computeHasBonusContent(bonusActionSpells, bonusActionAttacks, hasBonusActions, visibleHordeBreakerItem, expeditiousRetreatActive || showFleetStepRow);
 
     if (!hasBonusContent) return null;
 
@@ -940,6 +980,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                 <InvokeDuplicityMoveRow activeBuffs={activeBuffs} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />
 
                 <ExpeditiousRetreatDashRow playerStats={playerStats} expeditiousRetreatActive={expeditiousRetreatActive} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />
+
+                {showFleetStepRow && <FleetStepRow playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />}
 
                 {showEatTreat && <EatTreatRow handleEatBolsteringTreat={handleEatBolsteringTreat} />}
 

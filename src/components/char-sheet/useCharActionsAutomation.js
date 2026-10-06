@@ -4,6 +4,7 @@ import { executeSpellCast } from '../../services/rules/spells/spellCastService.j
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
+import { grantFleetStep } from '../../services/rules/features/fleetStepService.js'
 
 const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
 
@@ -433,6 +434,16 @@ export default function useCharActionsAutomation({
         dispatchAutomationResult(result, { modalMap, setPopupHtml, rollDamage, rollAttack, onBuffsChange });
 
         finalizeAutomationOutcome(result, auto, addEntry, campaignName, onBuffsChange);
+
+        // CLA-405: a resolved Bonus Action feature row (any casting_time
+        // "1 bonus action" / action 'bonus_action' row that is NOT Step of the
+        // Wind) arms the Fleet Step Step-of-the-Wind grant for the rest of the
+        // turn — SP-128 flag-lane shape, refusals above never reach this line
+        // so a refused BA burns no grant.
+        if (auto?.casting_time === '1 bonus action' || auto?.action === 'bonus_action') {
+            grantFleetStep(playerStats, campaignName, action.name, auto)
+                .catch((e) => { console.error('[useCharActionsAutomation:fleet-step]', e); });
+        }
     }
 
     async function handleDivineInterventionCast(selectedSpell) {

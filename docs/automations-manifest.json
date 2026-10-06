@@ -2710,7 +2710,7 @@
       "handler": "n/a — not implemented",
       "router": "n/a",
       "infoBuilder": "n/a",
-      "verified": "broken — see .opencode/plans/bug-CLA-405-fleet-step-unimplemented.md",
+      "verified": "verified",
       "class": "Monk",
       "triggerConditions": "Passive: after taking any Bonus Action other than Step of the Wind, you may use Step of the Wind",
       "expectedBehavior": "When you take a Bonus Action other than Step of the Wind, you can also use Step of the Wind immediately after that Bonus Action.",

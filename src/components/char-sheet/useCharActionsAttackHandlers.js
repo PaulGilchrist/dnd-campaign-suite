@@ -6,6 +6,7 @@ import { markOncePerTurn } from '../../services/automation/common/oncePerTurn.js
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js'
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js'
 import { selectBrutalStrikeRiders } from '../../services/combat/brutalStrikeSelection.js'
+import { grantFleetStep } from '../../services/rules/features/fleetStepService.js'
 
 function readBrutalStrikeOffer(passives) {
     const brutalStrikePassives = selectBrutalStrikeRiders(passives);
@@ -53,6 +54,13 @@ export default function useCharActionsAttackHandlers({
         // multiple FP options.
         if (attack?.type !== 'Bonus Action') {
             setRuntimeValue(playerName, '_attackActionTakenRound', getCurrentCombatRound(campaignName), campaignName);
+        }
+        // CLA-405: a Bonus Action attack row resolves a Bonus Action — arm the
+        // Fleet Step (lv11+ 2024 Open Hand Monk) Step-of-the-Wind grant for the
+        // rest of this turn (holder-keyed round latch, SP-128 flag-lane shape).
+        if (attack?.type === 'Bonus Action') {
+            grantFleetStep(playerStats, campaignName, attack?.name, attack?.automation)
+                .catch((e) => { console.error('[useCharActionsAttackHandlers:fleet-step]', e); });
         }
         endFriendsOnHostileAction(playerName, campaignName);
         endInvisibilityOnHostileAction(playerName, campaignName);

@@ -2079,3 +2079,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §CLA-194 (2026-10-06, Innate Sorcery FIXED) Recipe + pitfalls
 - Sorcerer sheet spell-row cast is 3-stage: detail popup → Metamagic chooser (sorcerer ALWAYS queueSorceryMetamagic; "Cast Without Metamagic" answers) → roll Done. Abandoning stage-2 = phantom "cast inert" — poll chooser count before declaring swallowed. Advantage fold live: noSavePath innateSorceryRollContext (buff active + no metaCtx.forcedMode → forcedMode:'advantage' at computeD20Roll). Activation now logs ability_use; refusals innate_sorcery_refused. Residual: no 1-min expiration clock (buff until LR).
+
+## §CLA-405 (2026-10-06, Fleet Step FIXED) Recipe + pitfalls
+- Fleet Step grant rides SP-128 lane: new `fleetStepService.js`; BA≠Step (monk lv11+ 2024) → `_Fleet_Step_grantedRound` grant + `fleet_step_triggered` log + "Step of the Wind (Fleet Step):" row in Bonus lane → click = canonical Step of the Wind (FP −1, no_opportunity_attacks te) + `fleet_step_used`, latch cleared; round-keyed PLAYER_ROUND_LATCH_KEYS round-wrap clear.
+- Ops: "click does nothing" → suspect wrong `.char-actions` section (match exact .sectionHeader text) or stuck popup overlay (Done button closes; backdrop ignored). Dispatch MouseEvent('click',{bubbles:true}) + read getRuntimeValue sync to split "click never landed" vs "handler returned false".
