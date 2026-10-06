@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getRuntimeUsesKey, GIANT_ANCESTRY_KEY, GIANT_OPTIONS, getOptionByName } from './giantAncestryOptions.js';
 
 export async function confirmGiantAncestry(playerStats, chosenOption, campaignName) {
@@ -101,7 +102,12 @@ export function ancestryDamagePopup({ optName, formula, damageResult, actualDama
     };
 }
 
-export async function applySpeedReductionEffect(targetName, sourceName, speedReduction, campaignName) {
+// CLA-148: RAW duration is "until the START of your next turn" — stamp
+// until_start_of_next_turn and arm ONE attacker-anchored clock (fires at the
+// attacker's next turn-start, currentRound > appliedRound), mirroring the
+// verified FT-082 Hamstring lane (attackRiderHandler.js:612) and the
+// hills_tumble anchor seam in this file's consumers.
+export async function applySpeedReductionEffect(targetName, sourceName, speedReduction, campaignName, attackerName) {
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const filteredEffects = storedEffects.filter(te => !(te.target === targetName && te.effect === 'speed_reduction'));
     const speedEffect = {
@@ -109,9 +115,19 @@ export async function applySpeedReductionEffect(targetName, sourceName, speedRed
         source: sourceName,
         effect: 'speed_reduction',
         value: speedReduction,
-        duration: 'until_end_of_next_turn',
+        duration: 'until_start_of_next_turn',
     };
     await setRuntimeValue('campaign', 'targetEffects', [...filteredEffects, speedEffect], campaignName);
+    addExpiration({
+        attackerName,
+        targetName,
+        effects: [
+            { type: 'remove_target_effect', effectKey: 'speed_reduction', source: sourceName, target: targetName },
+        ],
+        campaignName,
+        rounds: undefined,
+        expireOnCreatureName: attackerName,
+    });
 }
 
 export async function logSpeedReductionCondition(campaignName, playerStats, optName, targetName, speedReduction) {
@@ -121,7 +137,7 @@ export async function logSpeedReductionCondition(campaignName, playerStats, optN
         targetName,
         condition: 'speed_reduction',
         source: optName,
-        description: `${playerStats.name} used ${optName} to reduce ${targetName}'s speed by ${speedReduction} ft until the end of their next turn.`,
+        description: `${playerStats.name} used ${optName} to reduce ${targetName}'s speed by ${speedReduction} ft until the start of ${playerStats.name}'s next turn.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 }
 

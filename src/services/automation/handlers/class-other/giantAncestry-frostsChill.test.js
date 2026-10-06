@@ -47,6 +47,10 @@ vi.mock('../../common/damageRollback.js', () => ({
     })),
 }));
 
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 beforeEach(() => { vi.resetAllMocks(); });
 import { describe, it, expect } from 'vitest';
 import {
@@ -56,7 +60,30 @@ import {
 import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 import { makeAction, makePlayerStats } from './giantAncestry.test.setup.js';
+
+function expectFrostSpeedStampAndClock(setRuntimeValueMock) {
+    // CLA-148: RAW "until the start of your next turn" — te must stamp
+    // until_start_of_next_turn and arm ONE attacker-anchored clock.
+    expect(setRuntimeValueMock).toHaveBeenCalledWith('campaign', 'targetEffects', expect.arrayContaining([
+        expect.objectContaining({
+            target: 'Goblin',
+            source: "Frost's Chill",
+            effect: 'speed_reduction',
+            value: 10,
+            duration: 'until_start_of_next_turn',
+        }),
+    ]), 'campaign');
+    expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+        attackerName: 'TestHero',
+        targetName: 'Goblin',
+        campaignName: 'campaign',
+        rounds: undefined,
+        expireOnCreatureName: 'TestHero',
+        effects: [{ type: 'remove_target_effect', effectKey: 'speed_reduction', source: "Frost's Chill", target: 'Goblin' }],
+    }));
+}
 
 function makeUsesMock(usesKey, value) {
     getRuntimeValue.mockImplementation((_name, key) => {
@@ -92,7 +119,9 @@ describe('giantAncestry selection & dispatch', () => {
                 targetName: 'Goblin',
                 condition: 'speed_reduction',
                 source: "Frost's Chill",
+                description: expect.stringContaining("until the start of TestHero's next turn"),
             }));
+            expectFrostSpeedStampAndClock(setRuntimeValue);
         });
 
         it('returns popup when no lastAttack', async () => {
@@ -163,6 +192,8 @@ describe('giantAncestry selection & dispatch', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('missed');
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'frostsChillUses', 2, 'campaign');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
+            expect(addExpiration).not.toHaveBeenCalled();
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'automation',
                 automationType: 'frosts_chill_refused',
@@ -218,6 +249,30 @@ describe('giantAncestry selection & dispatch', () => {
                 targetName: 'Goblin',
                 condition: 'speed_reduction',
                 source: "Frost's Chill",
+                description: expect.stringContaining("until the start of TestHero's next turn"),
+            }));
+            expectFrostSpeedStampAndClock(setRuntimeValue);
+        });
+
+        it('CLA-148 direct lane: refuses a MISS lastAttack with zero spend, zero te, zero clock', async () => {
+            makeUsesMock('frostsChillUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack', hit: false },
+                attackerName: 'TestHero',
+                targetName: 'Goblin',
+                totalDamage: 0,
+            });
+
+            const result = await handleFrostsChillDirect(directAction, makePlayerStats(), 'campaign');
+
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('missed');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'frostsChillUses', 2, 'campaign');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
+            expect(addExpiration).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'automation',
+                automationType: 'frosts_chill_refused',
             }));
         });
 

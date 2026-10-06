@@ -2056,3 +2056,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §CLA-147 (2026-10-06, Frenzy FIXED) Recipe + pitfalls
 - FIXED seam: frenzy single-owner = attackRollBonuses.applyFrenzyBonuses (roll+apply+latch); contextBuilder-sync contributes NO frenzy to autoDamageFormula — diceRoller rolls ' plus '-joined segments, a "display" bake is a REAL roll (CLA-120 idempotency family).
 - Ops: attacker's own initiative card = select whose options include victim and OMIT attacker; second same-round sheet attack re-arms target on Initiative page only; lingering `.sp-overlay` "Brutal Strike Apply/Skip" chooser intercepts chip click — Skip keeps advantage without spending.
+
+## §CLA-148 (2026-10-06, Frost's Chill FIXED) Recipe + pitfalls
+- FIXED duration axis: te was until_end_of_next_turn with ZERO pendingExpirations (immortal); fix = until_start_of_next_turn + ONE addExpiration expireOnCreatureName=attacker (anchor leg suppressed same-round, fires at attacker's next-round turn-start; FT-082 Hamstring + hills_tumble byte-shape).
+- Rig traps: sheet "+11" .clickable matches skill cells — anchor to weapon-row y; popup stacks flush pop()+reverse-Done (stale stage-2 Done absorbs clicks zero-log); revive dead NPC via card HP fill+Enter before damage proofs; several "Attack (to hit)" cells roll Charisma saves — count log entries per click.

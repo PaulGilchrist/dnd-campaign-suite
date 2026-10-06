@@ -98,7 +98,7 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     const cs = await getCombatContext(campaignName);
     const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
 
-    await applySpeedReductionEffect(targetName, optName, speedReduction, campaignName);
+    await applySpeedReductionEffect(targetName, optName, speedReduction, campaignName, playerStats.name);
 
     await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula: opt.damage, damageResult });
     await logSpeedReductionCondition(campaignName, playerStats, optName, targetName, speedReduction);

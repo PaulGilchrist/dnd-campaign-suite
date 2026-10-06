@@ -2831,7 +2831,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-148-frosts-chill-fires-on-miss.md",
+      "verified": "verified",
       "class": "Frost Giant",
       "triggerConditions": "On hit with attack roll; Uses: proficiency_bonus, recharges on long rest",
       "expectedBehavior": "When you hit a target with an attack roll and deal damage to it, you can also deal 1d6 Cold damage and reduce the target's speed by 10 ft until the end of its next turn. (Frost Giant subrace of Goliath)"
