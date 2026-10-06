@@ -176,6 +176,8 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 vi.mock('../../services/encounters/combatData.js', () => ({
   getActiveCreatureName: vi.fn(() => 'TestFighter'),
   loadCombatSummary: vi.fn(() => Promise.resolve(null)),
+  // CLA-143: Attack-action lane stamps the round latch — extend partial mock (§45)
+  getCurrentCombatRound: vi.fn(() => 1),
 }));
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
   getMonsterData: vi.fn(() => Promise.resolve(null)),

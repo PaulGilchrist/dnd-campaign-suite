@@ -2,6 +2,7 @@ import { onSpellSelected as onDivineInterventionSpellSelected } from '../../serv
 import { confirmTelepathicSpeech } from '../../services/automation/handlers/buffs/buffHandler.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
+import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
 
 const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
@@ -115,25 +116,48 @@ function gateFeatureOptionChoice({ auto, action, playerStats, campaignName, getR
     return false;
 }
 
+// Refusal convention (playbook §5): popup + automation <feature>_refused log
+// with a reason token, zero spend (CLA-399).
+async function refuseTriggerGate({ action, playerStats, campaignName, setPopupHtml, addEntry, message, reasonToken }) {
+    setPopupHtml(`<b>${action.name}</b><br/>${message}`);
+    const refusalSlug = String(action.name || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'action';
+    await addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerStats.name,
+        automationType: `${refusalSlug}_refused`,
+        name: action.name,
+        description: `${action.name} refused — ${reasonToken}: ${message}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[useCharActionsAutomation:log-error]', e); });
+}
+
 // Check trigger conditions for gated actions
 async function gateTriggerRequirement({ auto, action, playerStats, campaignName, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry }) {
     if (auto?.trigger && auto.trigger !== '' && auto.trigger === 'after_casting_action_spell') {
         const lastCast = getRuntimeValue(playerStats.name, 'lastActionSpellCast', campaignName);
         if (!lastCast) {
-            setPopupHtml(`<b>${action.name}</b><br/>You must cast a spell with a casting time of an action first.`);
-            // CLA-399: refusals must log with a reason token (zero-spend).
-            const refusalSlug = String(action.name || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'action';
-            await addEntry(campaignName, {
-                type: 'automation',
-                characterName: playerStats.name,
-                automationType: `${refusalSlug}_refused`,
-                name: action.name,
-                description: `${action.name} refused — no_action_spell_cast: You must cast a spell with a casting time of an action first.`,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[useCharActionsAutomation:log-error]', e); });
+            await refuseTriggerGate({ action, playerStats, campaignName, setPopupHtml, addEntry,
+                message: 'You must cast a spell with a casting time of an action first.',
+                reasonToken: 'no_action_spell_cast' });
             return false;
         }
         await setRuntimeValue(playerStats.name, 'lastActionSpellCast', 0, campaignName);
+    }
+    // CLA-143: after_attack_action triggers (Monk Flurry of Blows / Heightened
+    // Flurry of Blows / Patient Defense / Step of the Wind) were unenforced —
+    // they fired with no prior Attack action and burned Focus. Round-keyed latch
+    // `_attackActionTakenRound` is armed by the Attack-action row lane
+    // (useCharActionsAttackHandlers.js, CLA-274 pattern); re-arms at round wrap,
+    // consumed zero times so one Attack action arms every FP option (RAW 2024).
+    if (auto?.trigger === 'after_attack_action') {
+        const currentRound = getCurrentCombatRound(campaignName);
+        const armedRound = Number(getRuntimeValue(playerStats.name, '_attackActionTakenRound', campaignName) ?? 0);
+        if (armedRound !== currentRound) {
+            await refuseTriggerGate({ action, playerStats, campaignName, setPopupHtml, addEntry,
+                message: 'You must take the Attack action first.',
+                reasonToken: 'no_attack_action_taken' });
+            return false;
+        }
     }
     return true;
 }
@@ -387,11 +411,14 @@ export default function useCharActionsAutomation({
 
         if (gateFeatureOptionChoice({ auto, action, playerStats, campaignName, getRuntimeValue, setModalState })) return;
 
-        const fpProceed = await spendMonkFocusPoint({ action, auto, playerStats, playerName, campaignName, cloakActive, hasFlurryHealingHarm: HAS_FLURRY_HEALING_HARM, stunningStrikeArmed, stunningStrikeRound, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry });
-        if (!fpProceed) return;
-
+        // CLA-143: gate runs BEFORE the Focus pre-spend — an unmet trigger must
+        // refuse with ZERO Focus burned (previously spend ran first and the
+        // after_attack_action trigger had no enforcement at all).
         const triggerProceed = await gateTriggerRequirement({ auto, action, playerStats, campaignName, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry });
         if (!triggerProceed) return;
+
+        const fpProceed = await spendMonkFocusPoint({ action, auto, playerStats, playerName, campaignName, cloakActive, hasFlurryHealingHarm: HAS_FLURRY_HEALING_HARM, stunningStrikeArmed, stunningStrikeRound, getRuntimeValue, setRuntimeValue, setPopupHtml, addEntry });
+        if (!fpProceed) return;
 
         const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
         if (!result) return;

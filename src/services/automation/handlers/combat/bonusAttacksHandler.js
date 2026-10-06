@@ -126,9 +126,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const currentTarget = getTargetFromAttacker(cs, playerName);
     const currentTargetName = currentTarget?.name || null;
 
-    const attackBonus = playerStats.attacks?.[0]?.hitBonus ?? 0;
-    const damageFormula = playerStats.attacks?.[0]?.damage ?? '1d4+0';
-    const damageType = playerStats.attacks?.[0]?.damageType || 'Bludgeoning';
+    const { attackBonus, damageFormula, damageType } = resolveFlurryWeaponStats(playerStats, auto);
 
     return {
         type: 'modal',
@@ -305,6 +303,9 @@ async function resolveFlurryHitStrike(ctx) {
         damageResult = outcome.damageResult;
         finalDamage = outcome.finalDamage;
         ctx.totalDamageRef.value += finalDamage;
+        // CLA-143: track rolled totals too — finalDamage death-clamps to 0 on
+        // corpses, so "Total damage dealt: 0" alone was dishonest in the ledger.
+        ctx.totalRolledRef.value += damageResult.rawDamage;
 
         registerHandOfHarmSave({
             isHandOfHarmStrike, handOfHarmAuto, finalDamage, cs, targetName,
@@ -395,11 +396,20 @@ function resolveFlurryHealingHarm(playerStats, campaignName) {
     return { hasFlurryHealingHarm, flurryHealingHarmUses, handOfHarmAuto };
 }
 
-function resolveFlurryWeaponStats(playerStats) {
+// CLA-143: attackType:'unarmed_strike' rows (Flurry of Blows / Heightened
+// Flurry of Blows, both rulesets) must roll the Unarmed Strike entry's die
+// (lv20 2024 = 1d12), NOT attacks[0] — with a Quarterstaff equipped first the
+// old code silently dealt staff 1d6 on "unarmed" Flurry. Rows without
+// attackType (e.g. disengage_dodge) keep the attacks[0] behavior byte-identical.
+function resolveFlurryWeaponStats(playerStats, auto) {
+    const attacks = Array.isArray(playerStats?.attacks) ? playerStats.attacks : [];
+    const entry = (auto?.attackType === 'unarmed_strike'
+        ? (attacks.find(a => a?.weaponType === 'unarmed') || attacks.find(a => a?.name === 'Unarmed Strike'))
+        : null) || attacks[0];
     return {
-        attackBonus: playerStats.attacks?.[0]?.hitBonus ?? 0,
-        damageFormula: playerStats.attacks?.[0]?.damage ?? '1d4+0',
-        damageType: playerStats.attacks?.[0]?.damageType || 'Bludgeoning',
+        attackBonus: entry?.hitBonus ?? 0,
+        damageFormula: entry?.damage ?? '1d4+0',
+        damageType: entry?.damageType || 'Bludgeoning',
     };
 }
 
@@ -422,11 +432,14 @@ function rollFlurryAttackRoll(d20Roll, attackBonus, ac) {
     return { totalAttack, isCrit, hit };
 }
 
-function buildFlurryAbilityDesc(playerName, featureName, numAttacks, totalDamage, hasFlurryHealingHarm) {
+function buildFlurryAbilityDesc(playerName, featureName, numAttacks, totals, hasFlurryHealingHarm) {
     if (hasFlurryHealingHarm) {
-        return `${playerName} used ${featureName} (Flurry of Healing and Harm), making ${numAttacks} strikes. Total damage: ${totalDamage}.`;
+        return `${playerName} used ${featureName} (Flurry of Healing and Harm), making ${numAttacks} strikes. Total damage: ${totals.applied}.`;
     }
-    return `${playerName} used ${featureName}, making ${numAttacks} unarmed strikes. Total damage dealt: ${totalDamage}.`;
+    // CLA-143: applied totals death-clamp to 0 on corpses — report rolled
+    // honestly when they diverge.
+    const clampNote = totals.rolled > totals.applied ? ` (rolled ${totals.rolled}, clamped by resistances or death)` : '';
+    return `${playerName} used ${featureName}, making ${numAttacks} unarmed strikes. Total damage dealt: ${totals.applied}${clampNote}.`;
 }
 
 export async function applyFlurryOfBlows({ action, playerStats, campaignName, _mapName, distribution, numAttacks, healingTarget = null }) {
@@ -440,12 +453,13 @@ export async function applyFlurryOfBlows({ action, playerStats, campaignName, _m
     const cs = getCombatSummary(campaignName);
     if (!cs) return null;
 
-    const { attackBonus, damageFormula, damageType } = resolveFlurryWeaponStats(playerStats);
+    const { attackBonus, damageFormula, damageType } = resolveFlurryWeaponStats(playerStats, action.automation);
 
     const targetSnapshots = buildFlurryTargetSnapshots(cs, playerName);
 
     const attackResults = [];
     const totalDamageRef = { value: 0 };
+    const totalRolledRef = { value: 0 };
     const pendingOpenHandTargets = new Map();
     const handOfHarmSavePromises = [];
 
@@ -472,7 +486,7 @@ export async function applyFlurryOfBlows({ action, playerStats, campaignName, _m
                     cs, targetName, damageFormula, damageType, isCrit, campaignName, playerName,
                     hasFlurryHealingHarm, healingTarget, handOfHarmAuto, openHandFeature,
                     pendingOpenHandTargets, playerStats, featureName, targetSnapshots,
-                    handOfHarmSavePromises, totalDamageRef, flurryHealingHarmUses, _mapName,
+                    handOfHarmSavePromises, totalDamageRef, totalRolledRef, flurryHealingHarmUses, _mapName,
                 });
                 damageResult = outcome.damageResult;
                 flurryHealingHarmUses = outcome.flurryHealingHarmUses;
@@ -497,7 +511,7 @@ export async function applyFlurryOfBlows({ action, playerStats, campaignName, _m
         }
     }
 
-    const abilityDesc = buildFlurryAbilityDesc(playerName, featureName, numAttacks, totalDamageRef.value, hasFlurryHealingHarm);
+    const abilityDesc = buildFlurryAbilityDesc(playerName, featureName, numAttacks, { applied: totalDamageRef.value, rolled: totalRolledRef.value }, hasFlurryHealingHarm);
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,

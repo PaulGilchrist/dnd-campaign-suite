@@ -46,6 +46,14 @@ export default function useCharActionsAttackHandlers({
             return;
         }
         if (gatePsychicBladeAttack(attack)) return;
+        // CLA-143: arm after_attack_action triggers (Flurry of Blows, Patient
+        // Defense, Step of the Wind) for this round — round-keyed latch on the
+        // holder (CLA-274 _PsychicBlade_attack_round pattern), re-arms at round
+        // wrap, never cleared by bonus-action lanes so one Attack action can arm
+        // multiple FP options.
+        if (attack?.type !== 'Bonus Action') {
+            setRuntimeValue(playerName, '_attackActionTakenRound', getCurrentCombatRound(campaignName), campaignName);
+        }
         endFriendsOnHostileAction(playerName, campaignName);
         endInvisibilityOnHostileAction(playerName, campaignName);
 
